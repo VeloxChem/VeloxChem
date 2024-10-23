@@ -125,9 +125,20 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
          double dzeta_drho = -M_SQRT2*sqrt(-pair_density)/pow(density, 2);
 
-         fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+         double dfzeta_dzeta = 0.0;
 
-         double dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         if (1.0 - zeta > 1.0e-16)
+         {
+             fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         }
+         else
+         {
+             fzeta = pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = (4.0/3.0)*cbrt(zeta + 1.0);
+         }
 
          dfzeta_dpi = dfzeta_dzeta*dzeta_dpi;
 
@@ -332,9 +343,20 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
          double dzeta_drho = -M_SQRT2*sqrt(-pair_density)/pow(density, 2);
 
-         fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+         double dfzeta_dzeta = 0.0;
 
-         double dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         if (1.0 - zeta > 1.0e-16)
+         {
+             fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         }
+         else
+         {
+             fzeta = pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = (4.0/3.0)*cbrt(zeta + 1.0);
+         }
 
          dfzeta_dpi = dfzeta_dzeta*dzeta_dpi;
 

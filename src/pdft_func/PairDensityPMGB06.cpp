@@ -149,9 +149,20 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
          double dzeta_dpi = (1.0/2.0)*M_SQRT2*sqrt(-pair_density)/(density*pair_density);
 
-         fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+         double dfzeta_dzeta = 0.0;
 
-         double dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         if (1.0 - zeta > 1.0e-16)
+         {
+             fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         }
+         else
+         {
+             fzeta = pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = (4.0/3.0)*cbrt(zeta + 1.0);
+         }
 
          dfzeta_drho = dfzeta_dzeta*dzeta_drho;
 
@@ -268,9 +279,20 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
          double dzeta_dpi = (1.0/2.0)*M_SQRT2*sqrt(-pair_density)/(density*pair_density);
 
-         fzeta_2 = pow(1.0 - zeta, 2.0/3.0) + pow(zeta + 1.0, 2.0/3.0);
+         double dfzeta_2_dzeta = 0.0;
 
-         double dfzeta_2_dzeta = (2.0/3.0)/cbrt(zeta + 1.0) - (2.0/3.0)/cbrt(1.0 - zeta);
+         if (1.0 - zeta > 1.0e-16)
+         {
+             fzeta_2 = pow(1.0 - zeta, 2.0/3.0) + pow(zeta + 1.0, 2.0/3.0);
+
+             dfzeta_2_dzeta = (2.0/3.0)/cbrt(zeta + 1.0) - (2.0/3.0)/cbrt(1.0 - zeta);
+         }
+         else
+         {
+             fzeta_2 = pow(zeta + 1.0, 2.0/3.0);
+
+             dfzeta_2_dzeta = (2.0/3.0)/cbrt(zeta + 1.0);
+         }
 
          dfzeta_2_drho = dfzeta_2_dzeta*dzeta_drho;
 
@@ -337,9 +359,20 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
          double dzeta_dpi = (1.0/2.0)*M_SQRT2*sqrt(-pair_density)/(density*pair_density);
 
-         fzeta_3 = pow(1.0 - zeta, 8.0/3.0) + pow(zeta + 1.0, 8.0/3.0);
+         double dfzeta_3_dzeta = 0.0;
 
-         double dfzeta_3_dzeta = -8.0/3.0*pow(1.0 - zeta, 5.0/3.0) + (8.0/3.0)*pow(zeta + 1.0, 5.0/3.0);
+         if (1.0 - zeta > 1.0e-16)
+         {
+             fzeta_3 = pow(1.0 - zeta, 8.0/3.0) + pow(zeta + 1.0, 8.0/3.0);
+
+             dfzeta_3_dzeta = -8.0/3.0*pow(1.0 - zeta, 5.0/3.0) + (8.0/3.0)*pow(zeta + 1.0, 5.0/3.0);
+         }
+         else
+         {
+             fzeta_3 = pow(zeta + 1.0, 8.0/3.0);
+
+             dfzeta_3_dzeta = (8.0/3.0)*pow(zeta + 1.0, 5.0/3.0);
+         }
 
          dfzeta_3_drho = dfzeta_3_dzeta*dzeta_drho;
 

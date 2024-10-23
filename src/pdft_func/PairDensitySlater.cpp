@@ -90,17 +90,22 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double fxa = std::pow(1.0 + zeta, fourthird);
 
-            double fxb = std::pow(1.0 - zeta, fourthird);
-
-            f_zeta = fxa + fxb;
-
-            // Derivatives
-
             double dxa = std::pow(1.0 + zeta, onethird);
 
-            double dxb = std::pow(1.0 - zeta, onethird);
+            f_zeta = fxa;
 
-            double fl_zeta = dxa - dxb;
+            double fl_zeta = dxa;
+
+            if (1.0 - zeta > 1.0e-16)
+            {
+                double fxb = std::pow(1.0 - zeta, fourthird);
+
+                f_zeta += fxb;
+
+                double dxb = std::pow(1.0 - zeta, onethird);
+
+                fl_zeta -= dxb;
+            }
 
             // dExc/d(rho)
 

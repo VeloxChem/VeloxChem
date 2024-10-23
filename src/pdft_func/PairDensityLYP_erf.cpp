@@ -139,9 +139,20 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          double dzeta_dpi = (1.0/2.0)*M_SQRT2*sqrt(-pair_density)/(density*pair_density);
 
-         fzeta = pow(1.0 - zeta, 8.0/3.0) + pow(zeta + 1.0, 8.0/3.0);
+         double dfzeta_dzeta = 0.0;
 
-         double dfzeta_dzeta = -8.0/3.0*pow(1.0 - zeta, 5.0/3.0) + (8.0/3.0)*pow(zeta + 1.0, 5.0/3.0);
+         if (1.0 - zeta > 1.0e-16)
+         {
+             fzeta = pow(1.0 - zeta, 8.0/3.0) + pow(zeta + 1.0, 8.0/3.0);
+
+             dfzeta_dzeta = -8.0/3.0*pow(1.0 - zeta, 5.0/3.0) + (8.0/3.0)*pow(zeta + 1.0, 5.0/3.0);
+         }
+         else
+         {
+             fzeta = pow(zeta + 1.0, 8.0/3.0);
+
+             dfzeta_dzeta = (8.0/3.0)*pow(zeta + 1.0, 5.0/3.0);
+         }
 
          dfzeta_drho = dfzeta_dzeta*dzeta_drho;
 

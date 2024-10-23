@@ -167,9 +167,9 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
       double dzeta2_dpi = -2/pow(density, 2);
 
-      double x = zeta2 + 1;
+      double x = -zeta2 + 1;
 
-      double dx_dzeta2 = 1;
+      double dx_dzeta2 = -1;
 
       double dx_drho = dx_dzeta2*dzeta2_drho;
 

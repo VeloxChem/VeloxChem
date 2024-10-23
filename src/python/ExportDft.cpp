@@ -626,6 +626,7 @@ export_dft(py::module& m)
     // exposing functions
 
     m.def("available_functionals", &vxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
+    m.def("available_pdft_functionals", &vxcfuncs::getAvailablePairDensityFunctionals, "Gets a list of available pdft exchange-correlation functionals components.");
 
     m.def("parse_xc_func",
           &vxcfuncs::getExchangeCorrelationFunctional,

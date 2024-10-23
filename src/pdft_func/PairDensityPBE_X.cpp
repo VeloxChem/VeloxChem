@@ -117,40 +117,46 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          double dfa_dpi = dfa_dxsa2*dxsa2_dpi + dfa_dzeta*dzeta_dpi;
 
-         double xsb2 = 0.25/pow(1 - zeta, 2.0/3.0);
+         fg_zeta = fa;
 
-         double dxsb2_dzeta = 0.16666666666666666/pow(1 - zeta, 5.0/3.0);
+         dfg_zeta_drho = dfa_drho;
 
-         double dxsb2_dpi = dxsb2_dzeta*dzeta_dpi;
+         dfg_zeta_dsig = dfa_dsig;
 
-         double dxsb2_drho = dxsb2_dzeta*dzeta_drho;
+         dfg_zeta_dpi = dfa_dpi;
 
-         double fb = pow(1 - zeta, 4.0/3.0)/(xfact*xsb2 + 1);
+         if (1 - zeta > 1.0e-16)
+         {
+             double xsb2 = 0.25/pow(1 - zeta, 2.0/3.0);
 
-         double dfb_dxsb2 = -xfact*pow(1 - zeta, 4.0/3.0)/pow(xfact*xsb2 + 1, 2);
+             double dxsb2_dzeta = 0.16666666666666666/pow(1 - zeta, 5.0/3.0);
 
-         double dfb_dxfact = -xsb2*pow(1 - zeta, 4.0/3.0)/pow(xfact*xsb2 + 1, 2);
+             double dxsb2_dpi = dxsb2_dzeta*dzeta_dpi;
 
-         double dfb_dzeta = -4.0/3.0*cbrt(1 - zeta)/(xfact*xsb2 + 1);
+             double dxsb2_drho = dxsb2_dzeta*dzeta_drho;
 
-         double dfb_dsig = dfb_dxfact*dxfact_dsig;
+             double fb = pow(1 - zeta, 4.0/3.0)/(xfact*xsb2 + 1);
 
-         double dfb_drho = dfb_dxfact*dxfact_drho + dfb_dxsb2*dxsb2_drho + dfb_dzeta*dzeta_drho;
+             double dfb_dxsb2 = -xfact*pow(1 - zeta, 4.0/3.0)/pow(xfact*xsb2 + 1, 2);
 
-         double dfb_dpi = dfb_dxsb2*dxsb2_dpi + dfb_dzeta*dzeta_dpi;
+             double dfb_dxfact = -xsb2*pow(1 - zeta, 4.0/3.0)/pow(xfact*xsb2 + 1, 2);
 
-         fg_zeta = fa + fb;
+             double dfb_dzeta = -4.0/3.0*cbrt(1 - zeta)/(xfact*xsb2 + 1);
 
-         double dfg_zeta_dfb = 1;
+             double dfb_dsig = dfb_dxfact*dxfact_dsig;
 
-         double dfg_zeta_dfa = 1;
+             double dfb_drho = dfb_dxfact*dxfact_drho + dfb_dxsb2*dxsb2_drho + dfb_dzeta*dzeta_drho;
 
-         dfg_zeta_drho = dfa_drho*dfg_zeta_dfa + dfb_drho*dfg_zeta_dfb;
+             double dfb_dpi = dfb_dxsb2*dxsb2_dpi + dfb_dzeta*dzeta_dpi;
 
-         dfg_zeta_dsig = dfa_dsig*dfg_zeta_dfa + dfb_dsig*dfg_zeta_dfb;
+             fg_zeta += fb;
 
-         dfg_zeta_dpi = dfa_dpi*dfg_zeta_dfa + dfb_dpi*dfg_zeta_dfb;
+             dfg_zeta_drho += dfb_drho;
 
+             dfg_zeta_dsig += dfb_dsig;
+
+             dfg_zeta_dpi += dfb_dpi;
+         }
       }
       else if (pair_density < 9.9999999999999998e-17)
       {
@@ -318,9 +324,20 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          double dzeta_drho = -M_SQRT2*sqrt(-pair_density)/pow(density, 2);
 
-         fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+         double dfzeta_dzeta = 0.0;
 
-         double dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         if (1.0 - zeta > 1.0e-16)
+         {
+             fzeta = pow(1.0 - zeta, 4.0/3.0) + pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = -4.0/3.0*cbrt(1.0 - zeta) + (4.0/3.0)*cbrt(zeta + 1.0);
+         }
+         else
+         {
+             fzeta = pow(zeta + 1.0, 4.0/3.0);
+
+             dfzeta_dzeta = (4.0/3.0)*cbrt(zeta + 1.0);
+         }
 
          dfzeta_dpi = dfzeta_dzeta*dzeta_dpi;
 

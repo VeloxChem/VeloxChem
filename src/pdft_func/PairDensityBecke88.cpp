@@ -127,52 +127,58 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
          double dfa_drho = ddenom_a_drho*dfa_ddenom_a + dfa_dzeta*dzeta_drho;
 
-         double xb = cbrt(2)*xt/cbrt(1 - zeta);
+         f = fa;
 
-         double dxb_dxt = cbrt(2)/cbrt(1 - zeta);
+         df_dsig = dfa_dsig;
 
-         double dxb_dzeta = (1.0/3.0)*cbrt(2)*xt/pow(1 - zeta, 4.0/3.0);
+         df_dpi = dfa_dpi;
 
-         double dxb_dpi = dxb_dzeta*dzeta_dpi;
+         df_drho = dfa_drho;
 
-         double dxb_drho = dxb_dxt*dxt_drho + dxb_dzeta*dzeta_drho;
+         if (1 - zeta > 1.0e-16)
+         {
+             double xb = cbrt(2)*xt/cbrt(1 - zeta);
 
-         double dxb_dsig = dxb_dxt*dxt_dsig;
+             double dxb_dxt = cbrt(2)/cbrt(1 - zeta);
 
-         double denom_b = b88_beta*b88_gamma*xb*asinh(xb) + 1;
+             double dxb_dzeta = (1.0/3.0)*cbrt(2)*xt/pow(1 - zeta, 4.0/3.0);
 
-         double ddenom_b_dxb = b88_beta*b88_gamma*xb/sqrt(pow(xb, 2) + 1) + b88_beta*b88_gamma*asinh(xb);
+             double dxb_dpi = dxb_dzeta*dzeta_dpi;
 
-         double ddenom_b_dpi = ddenom_b_dxb*dxb_dpi;
+             double dxb_drho = dxb_dxt*dxt_drho + dxb_dzeta*dzeta_drho;
 
-         double ddenom_b_drho = ddenom_b_dxb*dxb_drho;
+             double dxb_dsig = dxb_dxt*dxt_dsig;
 
-         double ddenom_b_dsig = ddenom_b_dxb*dxb_dsig;
+             double denom_b = b88_beta*b88_gamma*xb*asinh(xb) + 1;
 
-         double fb = pow(1 - zeta, 2.0/3.0)/denom_b;
+             double ddenom_b_dxb = b88_beta*b88_gamma*xb/sqrt(pow(xb, 2) + 1) + b88_beta*b88_gamma*asinh(xb);
 
-         double dfb_ddenom_b = -pow(1 - zeta, 2.0/3.0)/pow(denom_b, 2);
+             double ddenom_b_dpi = ddenom_b_dxb*dxb_dpi;
 
-         double dfb_dzeta = -(2.0/3.0)/(denom_b*cbrt(1 - zeta));
+             double ddenom_b_drho = ddenom_b_dxb*dxb_drho;
 
-         double dfb_dsig = ddenom_b_dsig*dfb_ddenom_b;
+             double ddenom_b_dsig = ddenom_b_dxb*dxb_dsig;
 
-         double dfb_dpi = ddenom_b_dpi*dfb_ddenom_b + dfb_dzeta*dzeta_dpi;
+             double fb = pow(1 - zeta, 2.0/3.0)/denom_b;
 
-         double dfb_drho = ddenom_b_drho*dfb_ddenom_b + dfb_dzeta*dzeta_drho;
+             double dfb_ddenom_b = -pow(1 - zeta, 2.0/3.0)/pow(denom_b, 2);
 
-         f = fa + fb;
+             double dfb_dzeta = -(2.0/3.0)/(denom_b*cbrt(1 - zeta));
 
-         double df_dfb = 1;
+             double dfb_dsig = ddenom_b_dsig*dfb_ddenom_b;
 
-         double df_dfa = 1;
+             double dfb_dpi = ddenom_b_dpi*dfb_ddenom_b + dfb_dzeta*dzeta_dpi;
 
-         df_dsig = df_dfa*dfa_dsig + df_dfb*dfb_dsig;
+             double dfb_drho = ddenom_b_drho*dfb_ddenom_b + dfb_dzeta*dzeta_drho;
 
-         df_dpi = df_dfa*dfa_dpi + df_dfb*dfb_dpi;
+             f += fb;
 
-         df_drho = df_dfa*dfa_drho + df_dfb*dfb_drho;
+             df_dsig += dfb_dsig;
 
+             df_dpi += dfb_dpi;
+
+             df_drho += dfb_drho;
+         }
       }
       else if (pair_density < 9.9999999999999998e-17)
       {

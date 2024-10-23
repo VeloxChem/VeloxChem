@@ -48,6 +48,7 @@ from .veloxchemlib import chemical_element_identifier
 from .veloxchemlib import chemical_element_mass
 from .veloxchemlib import chemical_element_max_angular_momentum
 from .veloxchemlib import available_functionals
+from .veloxchemlib import available_pdft_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
