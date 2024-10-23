@@ -83,23 +83,21 @@ class TestPDFT:
         "tSlater_erf": -0.0780214343193473,
         "tVWN_RPA": -0.05792602070111518,
         "tVWN5": -0.040929846047812316,
+        "tPMGB06": -0.023054878539261928,
         "tP86": -0.018538415905553742,
         "tPBE_X": -0.2543064204128253,
         "tPBEX_erf": -0.09113476160995143,
         "tPBE_C": -0.014861790644530826,
+        "tPBEC_erf": -0.01496306351838878,
         "tB88": -0.045962079987423625,
         "tB88_erf": -0.011016744566851068,
         "tLYP": -0.013596771624186594,
-        "tLYP_erf": -0.01415140810845559, #Should this really be bigger than LYP?
+        "tLYP_erf": -0.01415140810845559,
         "HPG20": -0.0139680482003766
         }
 
         for func in available_pdft_functionals():
             print(func)
-            if func == "tPMGB06": # Will have to fix it later
-                continue
-            if func == "tPBEC_erf": # Will have to fix it later
-                continue
             pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(total_density, D2act,
                                                            mo_act.T.copy(),
                                                            molecule, basis, molgrid,

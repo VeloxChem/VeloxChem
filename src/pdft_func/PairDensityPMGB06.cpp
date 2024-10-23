@@ -447,14 +447,6 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
          double drp_dpi = drp_dzeta*dzeta_dpi;
 
-         double rm = cbrt(2)*rs*cbrt(1.0/(1 - zeta));
-
-         double drm_dzeta = (1.0/3.0)*cbrt(2)*rs*cbrt(1.0/(1 - zeta))/(1 - zeta);
-
-         double drm_drho = drm_dzeta*dzeta_drho + cbrt(2)*drs_drho*cbrt(1.0/(1 - zeta));
-
-         double drm_dpi = drm_dzeta*dzeta_dpi;
-
          double r2 = pow(rp, 2);
 
          double dr2_drp = 2*rp;
@@ -473,35 +465,57 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
          double dg2_2_dpi = dg2_2_dr2*dr2_dpi + dg2_2_drp*drp_dpi;
 
-         double r2_2 = pow(rm, 2);
-
-         double dr2_2_drm = 2*rm;
-
-         double dr2_2_drho = dr2_2_drm*drm_drho;
-
-         double dr2_2_dpi = dr2_2_drm*drm_dpi;
-
-         double g2_3 = (1 - 0.022669999999999999*rm)/(r2_2*(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1));
-
-         double dg2_3_drm = -0.43190000000000001*(1 - 0.022669999999999999*rm)/(r2_2*pow(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1, 2)) - 0.022669999999999999/(r2_2*(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1));
-
-         double dg2_3_dr2_2 = -0.040000000000000001*(1 - 0.022669999999999999*rm)/(r2_2*pow(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1, 2)) - (1 - 0.022669999999999999*rm)/(pow(r2_2, 2)*(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1));
-
-         double dg2_3_drho = dg2_3_dr2_2*dr2_2_drho + dg2_3_drm*drm_drho;
-
-         double dg2_3_dpi = dg2_3_dr2_2*dr2_2_dpi + dg2_3_drm*drm_dpi;
-
-         crzeta = (1.0/4.0)*g2_2*pow(zeta + 1, 2) + (1.0/4.0)*g2_3*pow(1 - zeta, 2);
+         crzeta = (1.0/4.0)*g2_2*pow(zeta + 1, 2);
 
          double dcrzeta_dg2_2 = (1.0/4.0)*pow(zeta + 1, 2);
 
-         double dcrzeta_dg2_3 = (1.0/4.0)*pow(1 - zeta, 2);
+         double dcrzeta_dzeta = (1.0/4.0)*g2_2*(2*zeta + 2);
 
-         double dcrzeta_dzeta = (1.0/4.0)*g2_2*(2*zeta + 2) + (1.0/4.0)*g2_3*(2*zeta - 2);
+         dcrzeta_drho = dcrzeta_dg2_2*dg2_2_drho;
 
-         dcrzeta_drho = dcrzeta_dg2_2*dg2_2_drho + dcrzeta_dg2_3*dg2_3_drho + dcrzeta_dzeta*dzeta_drho;
+         dcrzeta_dpi = dcrzeta_dg2_2*dg2_2_dpi;
 
-         dcrzeta_dpi = dcrzeta_dg2_2*dg2_2_dpi + dcrzeta_dg2_3*dg2_3_dpi + dcrzeta_dzeta*dzeta_dpi;
+         if (1 - zeta > 1.0e-16)
+         {
+             double rm = cbrt(2)*rs*cbrt(1.0/(1 - zeta));
+
+             double drm_dzeta = (1.0/3.0)*cbrt(2)*rs*cbrt(1.0/(1 - zeta))/(1 - zeta);
+
+             double drm_drho = drm_dzeta*dzeta_drho + cbrt(2)*drs_drho*cbrt(1.0/(1 - zeta));
+
+             double drm_dpi = drm_dzeta*dzeta_dpi;
+
+             double r2_2 = pow(rm, 2);
+
+             double dr2_2_drm = 2*rm;
+
+             double dr2_2_drho = dr2_2_drm*drm_drho;
+
+             double dr2_2_dpi = dr2_2_drm*drm_dpi;
+
+             double g2_3 = (1 - 0.022669999999999999*rm)/(r2_2*(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1));
+
+             double dg2_3_drm = -0.43190000000000001*(1 - 0.022669999999999999*rm)/(r2_2*pow(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1, 2)) - 0.022669999999999999/(r2_2*(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1));
+
+             double dg2_3_dr2_2 = -0.040000000000000001*(1 - 0.022669999999999999*rm)/(r2_2*pow(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1, 2)) - (1 - 0.022669999999999999*rm)/(pow(r2_2, 2)*(0.040000000000000001*r2_2 + 0.43190000000000001*rm + 1));
+
+             double dg2_3_drho = dg2_3_dr2_2*dr2_2_drho + dg2_3_drm*drm_drho;
+
+             double dg2_3_dpi = dg2_3_dr2_2*dr2_2_dpi + dg2_3_drm*drm_dpi;
+
+             crzeta += (1.0/4.0)*g2_3*pow(1 - zeta, 2);
+
+             double dcrzeta_dg2_3 = (1.0/4.0)*pow(1 - zeta, 2);
+
+             dcrzeta_dzeta += (1.0/4.0)*g2_3*(2*zeta - 2);
+
+             dcrzeta_drho += dcrzeta_dg2_3*dg2_3_drho + dcrzeta_dzeta*dzeta_drho;
+
+             dcrzeta_dpi += dcrzeta_dg2_3*dg2_3_dpi + dcrzeta_dzeta*dzeta_dpi;
+         }
+         dcrzeta_drho += dcrzeta_dzeta*dzeta_drho;
+
+         dcrzeta_dpi += dcrzeta_dzeta*dzeta_dpi;
 
       }
       else if (pair_density < 9.9999999999999998e-17)
