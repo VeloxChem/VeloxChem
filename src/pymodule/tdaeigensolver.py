@@ -482,7 +482,7 @@ class TdaEigenSolver(LinearSolver):
 
             # Add response results to the final checkpoint file
             final_h5_fname = str(
-                Path(self.checkpoint_file).with_suffix('.solutions.h5'))
+                Path(self.checkpoint_file).with_suffix('.results.h5'))
             write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
             self._print_results(ret_dict)
@@ -798,7 +798,7 @@ class TdaEigenSolver(LinearSolver):
             return
 
         final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.solutions.h5'))
+            Path(self.checkpoint_file).with_suffix('.results.h5'))
 
         create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
                     potfile_text)
