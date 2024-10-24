@@ -54,7 +54,7 @@ class CosmoDriver:
         - grid_per_sphere: Number of Lebedev grid points per sphere.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, gps, comm=None, ostream=None):
         """
         Initializes COSMO driver.
         """
@@ -77,16 +77,16 @@ class CosmoDriver:
         self.ostream = ostream
 
         # grid information
-        self.grid_per_sphere = 110
+        self.grid_per_sphere = gps
 
         # input keywords
         self.input_keywords = {
             'cosmo': {
-                'grid_per_sphere': ('int', 'number of Lebedev grid points'),
+                'grid_per_sphere': (int, 'number of Lebedev grid points'),
             },
         }
 
-    def compute(self, Bzvec, Cvec, q, molecule=False):
+    def compute_solv_energy(self, Bzvec, Cvec, q, molecule=False):
         """
         Computes (electrostatic component of) C-PCM energy.
         TODO: add other components of the energy
@@ -141,9 +141,8 @@ class CosmoDriver:
                 (atom_grid_coords, unit_grid_weights, grid_zeta, atom_idx))
             cosmo_grid_raw = np.vstack((cosmo_grid_raw, atom_grid))
 
-        sw_func_raw = self.get_switching_function(atom_coords, atom_radii,
-                                                  cosmo_grid_raw)
-        sw_mask = (sw_func_raw > 1.0e-10)
+        sw_func_raw = self.get_switching_function(atom_coords, atom_radii, cosmo_grid_raw)
+        sw_mask = (sw_func_raw > 1.0e-8)
 
         cosmo_grid = cosmo_grid_raw[sw_mask, :]
         sw_func = sw_func_raw[sw_mask]
@@ -237,7 +236,7 @@ class CosmoDriver:
 
         return Bmat
 
-    def form_vector_C(self, grid, molecule, basis, D):
+    def form_vector_C(self, grid, molecule, basis, D, erf):
         esp = np.zeros(grid.shape[0])
         # electrostatic potential integrals
         node_grps = [p for p in range(self.nodes)]
@@ -253,12 +252,16 @@ class CosmoDriver:
 
         local_esp = np.zeros(end - start)
         npot_drv = NuclearPotentialDriver()
-
+        nerf_drv = NuclearPotentialErfDriver()
+        
         for i in range(start, end):
-            epi_matrix = npot_drv.compute(molecule, basis, [1.0],
-                                         [grid[i,:3]]).full_matrix().to_numpy()
+            if erf:
+                epi_matrix = 1.0 * nerf_drv.compute(molecule, basis, [1.0], [grid[i,:3]], grid[i,4]).full_matrix().to_numpy()
+            else:
+                epi_matrix = 1.0 * npot_drv.compute(molecule, basis, [1.0], [grid[i,:3]]).full_matrix().to_numpy()
+
             if local_comm.Get_rank() == mpi_master():
-                local_esp[i - start] -= np.sum(np.array(epi_matrix) * D)
+                local_esp[i - start] -= np.sum(epi_matrix * D)
 
         if local_comm.Get_rank() == mpi_master():
             local_esp = cross_comm.gather(local_esp, root=mpi_master())
@@ -272,7 +275,7 @@ class CosmoDriver:
         else:
             return None
 
-    def get_contribution_to_Fock(self, molecule, basis,  grid, q, erf=False):
+    def get_contribution_to_Fock(self, molecule, basis,  grid, q, erf):
         grid_coords = grid[:, :3].copy()
         zeta        = grid[:, 4].copy()
 

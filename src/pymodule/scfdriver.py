@@ -207,6 +207,7 @@ class ScfDriver:
         self.cpcm_epsilon = 78.39 # standard setting is for that
                                   # of water as the solvent
         self.cpcm_x = 0 # x in scaling function f
+        self.cpcm_grid_per_sphere = 110
         self.cpcm_erf = False
 
         # split communicators
@@ -519,7 +520,7 @@ class ScfDriver:
         self._pe_sanity_check()
 
         if self._cpcm:
-            self.cpcm_drv = CosmoDriver(self.comm, self.ostream)
+            self.cpcm_drv = CosmoDriver(self.cpcm_grid_per_sphere, self.comm, self.ostream)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -1141,7 +1142,7 @@ class ScfDriver:
             if self._cpcm:
                 Cvec = self.cpcm_drv.form_vector_C(
                     self._cpcm_grid, molecule, ao_basis,
-                    den_mat[0] + den_mat[0])
+                    den_mat[0] + den_mat[0], self.cpcm_erf)
                     #den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0))
 
                 scale_f = -(self.cpcm_epsilon - 1) / (self.cpcm_epsilon + self.cpcm_x)
@@ -1149,9 +1150,9 @@ class ScfDriver:
                 q = np.linalg.solve(self._cpcm_Amat, rhs)
                 self._cpcm_q = q
 
-                e_sol = self.cpcm_drv.compute(self._cpcm_Bzvec, Cvec, q)
+                e_sol = self.cpcm_drv.compute_solv_energy(self._cpcm_Bzvec, Cvec, q)
                 e_el += e_sol
-                self._cpcm_epol = e_sol
+                self.cpcm_epol = e_sol
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
                     self._cpcm_grid, q, self.cpcm_erf)
