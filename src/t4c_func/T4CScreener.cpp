@@ -23,9 +23,8 @@ CT4CScreener::CT4CScreener(const CT4CScreener& other)
 
 CT4CScreener::CT4CScreener(CT4CScreener&& other) noexcept
 
-    : _gto_pair_blocks{}
+    : _gto_pair_blocks(std::move(other._gto_pair_blocks))
 {
-    std::swap(_gto_pair_blocks, other._gto_pair_blocks);
 }
 
 auto
@@ -39,7 +38,10 @@ CT4CScreener::operator=(const CT4CScreener& other) -> CT4CScreener&
 auto
 CT4CScreener::operator=(CT4CScreener&& other) noexcept -> CT4CScreener&
 {
-    std::swap(_gto_pair_blocks, other._gto_pair_blocks);
+    if (this != &other)
+    {
+        _gto_pair_blocks = std::move(other._gto_pair_blocks);
+    }
 
     return *this;
 }

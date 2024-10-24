@@ -36,11 +36,11 @@ from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import DispersionModel
-from .veloxchemlib import Matrices
-from .veloxchemlib import make_matrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import xcfun
+from .veloxchemlib import denmat, mat_t
+from .veloxchemlib import make_matrix
+from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .fockdriver import FockDriver
 from .profiler import Profiler
@@ -232,7 +232,7 @@ class ScfDriver:
         self.filename = None
 
         self._debug = False
-        self._block_size_factor = 1
+        self._block_size_factor = 16
 
         # input keywords
         self._input_keywords = {
@@ -1071,12 +1071,15 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Using sub-communicators for {}.'.format(valstr))
         else:
+            self._print_debug_info('before screener')
             if self.rank == mpi_master():
                 screener = T4CScreener()
                 screener.partition(ao_basis, molecule, 'eri')
             else:
                 screener = None
+            self._print_debug_info('after  screener')
             screener = self.comm.bcast(screener, root=mpi_master())
+            self._print_debug_info('after  bcast screener')
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1356,14 +1359,14 @@ class ScfDriver:
 
             ovl_drv = OverlapDriver()
             ovl_mat = ovl_drv.compute(molecule, basis)
-            ovl_mat = ovl_mat.full_matrix().to_numpy()
+            ovl_mat = ovl_mat.to_numpy()
 
             ovl_dt = tm.time() - t0
             t0 = tm.time()
 
             kin_drv = KineticEnergyDriver()
             kin_mat = kin_drv.compute(molecule, basis)
-            kin_mat = kin_mat.full_matrix().to_numpy()
+            kin_mat = kin_mat.to_numpy()
 
             kin_dt = tm.time() - t0
         else:
@@ -1453,6 +1456,20 @@ class ScfDriver:
         npot_mat = self.comm.reduce(npot_mat, root=mpi_master())
 
         return npot_mat
+
+    def _print_debug_info(self, label):
+        """
+        Prints debug information.
+
+        :param label:
+            The label of debug information.
+        """
+
+        if self._debug:
+            profiler = Profiler()
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
+                                    profiler.get_available_memory())
+            self.ostream.flush()
 
     def _comp_2e_fock(self,
                       den_mat,
@@ -1544,18 +1561,10 @@ class ScfDriver:
                 den_mat_for_Kb = None
                 den_mat_for_Jab = None
 
-            den_mat_for_fock = Matrices()
-
-            dm_fock = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
-            den_mat_for_fock.add(dm_fock, '0')
-
-            dm_fock = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
-            den_mat_for_fock.add(dm_fock, '1')
-
-            dm_fock = self.comm.bcast(den_mat_for_Jab, root=mpi_master())
-            den_mat_for_fock.add(dm_fock, '2')
-
-            dm_fock = None
+            den_mat_for_Ka = self.comm.bcast(den_mat_for_Ka, root=mpi_master())
+            den_mat_for_Kb = self.comm.bcast(den_mat_for_Kb, root=mpi_master())
+            den_mat_for_Jab = self.comm.bcast(den_mat_for_Jab,
+                                              root=mpi_master())
 
         if e_grad is None:
             thresh_int = int(-math.log10(self.eri_thresh))
@@ -1566,7 +1575,8 @@ class ScfDriver:
 
         fock_drv = FockDriver(self.comm)
 
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv._set_block_size_factor(self._block_size_factor,
+                                        basis.get_dimensions_of_basis())
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
@@ -1592,21 +1602,18 @@ class ScfDriver:
 
         fock_mat = None
 
-        if self._debug:
-            if profiler is None:
-                profiler = Profiler()
-            self.ostream.print_info(
-                '==DEBUG==   available memory before Fock build: ' +
-                profiler.get_available_memory())
-            self.ostream.flush()
+        self._print_debug_info('before Fock build')
 
         if self.scf_type == 'restricted':
             # restricted SCF
+            self._print_debug_info('before rest Fock build')
             fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
                                         exchange_scaling_factor, 0.0,
                                         thresh_int)
+            self._print_debug_info('after  rest Fock build')
 
-            fock_mat_np = fock_mat.full_matrix().to_numpy()
+            fock_mat_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
 
             if fock_type == 'j':
                 # for pure functional
@@ -1614,12 +1621,17 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
+                self._print_debug_info('before rest erf Fock build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
+                self._print_debug_info('after  rest erf Fock build')
 
-                fock_mat_np -= fock_mat.full_matrix().to_numpy()
+                fock_mat_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             fock_mat_np = self.comm.reduce(fock_mat_np, root=mpi_master())
+
+            den_mat_for_fock = Matrix()
 
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
@@ -1631,44 +1643,73 @@ class ScfDriver:
             # unrestricted SCF or restricted open-shell SCF
             if fock_type == 'j':
                 # for pure functional
-                # den_mat_for_fock.matrix('2') is D_total
-                fock_mat = fock_drv.compute(screener,
-                                            den_mat_for_fock.matrix('2'), 'j',
-                                            0.0, 0.0, thresh_int)
+                # den_mat_for_Jab is D_total
+                self._print_debug_info('before unrest Fock J build')
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
+                                            0.0, thresh_int)
+                self._print_debug_info('after  unrest Fock J build')
 
-                J_ab_np = fock_mat.full_matrix().to_numpy()
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
 
             else:
-                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
-                                            ['kx', 'kx', 'j'],
+                self._print_debug_info('before unrest Fock Ka build')
+                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
+                self._print_debug_info('after  unrest Fock Kb build')
 
-                K_a_np = fock_mat.matrix('0').full_matrix().to_numpy()
-                K_b_np = fock_mat.matrix('1').full_matrix().to_numpy()
-                J_ab_np = fock_mat.matrix('2').full_matrix().to_numpy()
+                K_a_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+                self._print_debug_info('before unrest Fock Kb build')
+                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+                self._print_debug_info('after  unrest Fock Kb build')
+
+                K_b_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+                self._print_debug_info('before unrest Fock J build')
+                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+                self._print_debug_info('after  unrest Fock J build')
+
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 fock_mat_a_np = J_ab_np - K_a_np
                 fock_mat_b_np = J_ab_np - K_b_np
 
             if need_omega:
                 # for range-separated functional
-                den_mat_for_erf_k = Matrices()
-                den_mat_for_erf_k.add(den_mat_for_fock.matrix('0'), '0')
-                den_mat_for_erf_k.add(den_mat_for_fock.matrix('1'), '1')
+                self._print_debug_info('before unrest erf Fock Ka build')
+                fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
+                                            erf_k_coef, omega, thresh_int)
+                self._print_debug_info('after  unrest erf Fock Ka build')
 
-                fock_mat = fock_drv.compute(screener, den_mat_for_erf_k,
-                                            ['kx_rs', 'kx_rs'], erf_k_coef,
-                                            omega, thresh_int)
+                fock_mat_a_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
 
-                fock_mat_a_np -= fock_mat.matrix('0').full_matrix().to_numpy()
-                fock_mat_b_np -= fock_mat.matrix('1').full_matrix().to_numpy()
+                self._print_debug_info('before unrest erf Fock Kb build')
+                fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
+                                            erf_k_coef, omega, thresh_int)
+                self._print_debug_info('after  unrest erf Fock Kb build')
+
+                fock_mat_b_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             fock_mat_a_np = self.comm.reduce(fock_mat_a_np, root=mpi_master())
             fock_mat_b_np = self.comm.reduce(fock_mat_b_np, root=mpi_master())
+
+            den_mat_for_Ka = Matrix()
+            den_mat_for_Kb = Matrix()
+            den_mat_for_Jab = Matrix()
 
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
@@ -1676,12 +1717,7 @@ class ScfDriver:
             else:
                 fock_mat = None
 
-        if self._debug:
-            self.ostream.print_info(
-                '==DEBUG==   available memory after  Fock build: ' +
-                profiler.get_available_memory())
-            self.ostream.print_blank()
-            self.ostream.flush()
+        self._print_debug_info('after  Fock build')
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)

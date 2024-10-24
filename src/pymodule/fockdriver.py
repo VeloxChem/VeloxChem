@@ -99,7 +99,7 @@ class FockDriver:
 
         return self._fock_drv._compute_fock_omp(*args)
 
-    def _set_block_size_factor(self, factor):
+    def _set_block_size_factor(self, factor, naos):
 
         assert_msg_critical(
             factor in [1, 2, 4, 8, 16, 32, 64, 128],
@@ -107,14 +107,15 @@ class FockDriver:
 
         total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
 
-        # TODO: double check extra_factor for total_cores >= 4096
+        if total_cores >= 2048:
+            if naos >= 4500:
+                extra_factor = 4
+            else:
+                extra_factor = 2
 
-        if total_cores >= 4096:
-            extra_factor = 8
-        elif total_cores >= 2048:
-            extra_factor = 4
         elif total_cores >= 1024:
             extra_factor = 2
+
         else:
             extra_factor = 1
 

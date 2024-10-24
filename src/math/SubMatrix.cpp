@@ -72,13 +72,10 @@ CSubMatrix::CSubMatrix(const CSubMatrix &other)
 
 CSubMatrix::CSubMatrix(CSubMatrix &&other) noexcept
 
-    : _dimensions{0, 0, 0, 0}
+    : _dimensions(std::move(other._dimensions))
 
-    , _values{}
+    , _values(std::move(other._values))
 {
-    std::swap(_dimensions, other._dimensions);
-
-    std::swap(_values, other._values);
 }
 
 auto
@@ -94,9 +91,12 @@ CSubMatrix::operator=(const CSubMatrix &other) -> CSubMatrix &
 auto
 CSubMatrix::operator=(CSubMatrix &&other) noexcept -> CSubMatrix &
 {
-    std::swap(_dimensions, other._dimensions);
+    if (this != &other)
+    {
+        _dimensions = std::move(other._dimensions);
 
-    std::swap(_values, other._values);
+        _values = std::move(other._values);
+    }
 
     return *this;
 }

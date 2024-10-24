@@ -152,7 +152,7 @@ class ScfGradientDriver(GradientDriver):
             gmats = kin_grad_drv.compute(molecule, basis, iatom)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix(label).full_matrix().to_numpy()
+                gmat = gmats.matrix_to_numpy(label)
                 self.gradient[iatom, i] += 2.0 * np.sum((gmat + gmat.T) * D)
 
         # nuclear potential contribution to gradient
@@ -165,8 +165,8 @@ class ScfGradientDriver(GradientDriver):
             gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat_100 = gmats_100.matrix(label).full_matrix().to_numpy()
-                gmat_010 = gmats_010.matrix(label).full_matrix().to_numpy()
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                gmat_010 = gmats_010.matrix_to_numpy(label)
 
                 # TODO: move minus sign into function call (such as in oneints)
                 self.gradient[iatom, i] -= 2.0 * np.sum(
@@ -181,7 +181,7 @@ class ScfGradientDriver(GradientDriver):
             gmats = ovl_grad_drv.compute(molecule, basis, iatom)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix(label).full_matrix().to_numpy()
+                gmat = gmats.matrix_to_numpy(label)
                 # Note: minus sign for energy weighted density
                 self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
 
@@ -232,7 +232,7 @@ class ScfGradientDriver(GradientDriver):
             factor = 2.0 if fock_type == 'j' else 1.0
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix(label).full_matrix().to_numpy()
+                gmat = gmats.matrix_to_numpy(label)
                 self.gradient[iatom, i] += np.sum(gmat * D) * factor
 
         # XC contribution to gradient
@@ -331,7 +331,7 @@ class ScfGradientDriver(GradientDriver):
             gmats = kin_grad_drv.compute(molecule, basis, iatom)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix(label).full_matrix().to_numpy()
+                gmat = gmats.matrix_to_numpy(label)
                 self.gradient[iatom, i] += np.sum((gmat + gmat.T) * (Da + Db))
 
         # nuclear potential contribution to gradient
@@ -344,8 +344,8 @@ class ScfGradientDriver(GradientDriver):
             gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat_100 = gmats_100.matrix(label).full_matrix().to_numpy()
-                gmat_010 = gmats_010.matrix(label).full_matrix().to_numpy()
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                gmat_010 = gmats_010.matrix_to_numpy(label)
 
                 # TODO: move minus sign into function call (such as in oneints)
                 self.gradient[iatom, i] -= np.sum(
@@ -360,7 +360,7 @@ class ScfGradientDriver(GradientDriver):
             gmats = ovl_grad_drv.compute(molecule, basis, iatom)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix(label).full_matrix().to_numpy()
+                gmat = gmats.matrix_to_numpy(label)
                 # Note: minus sign for energy weighted density
                 self.gradient[iatom, i] -= np.sum((gmat + gmat.T) * (Wa + Wb))
 
@@ -422,12 +422,12 @@ class ScfGradientDriver(GradientDriver):
                                                  exchange_scaling_factor, 0.0)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat_jab = gmats_Jab.matrix(label).full_matrix().to_numpy()
+                gmat_jab = gmats_Jab.matrix_to_numpy(label)
                 self.gradient[iatom, i] += 0.5 * np.sum(gmat_jab * (Da + Db))
 
                 if fock_type != 'j':
-                    gmat_ka = gmats_Ka.matrix(label).full_matrix().to_numpy()
-                    gmat_kb = gmats_Kb.matrix(label).full_matrix().to_numpy()
+                    gmat_ka = gmats_Ka.matrix_to_numpy(label)
+                    gmat_kb = gmats_Kb.matrix_to_numpy(label)
                     self.gradient[iatom, i] -= 0.5 * np.sum(gmat_ka * Da)
                     self.gradient[iatom, i] -= 0.5 * np.sum(gmat_kb * Db)
 

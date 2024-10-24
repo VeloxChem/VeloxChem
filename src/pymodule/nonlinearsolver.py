@@ -29,8 +29,9 @@ import math
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import make_matrix, mat_t
 from .veloxchemlib import mpi_master
+from .veloxchemlib import make_matrix, mat_t
+from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
 from .fockdriver import FockDriver
@@ -133,7 +134,7 @@ class NonlinearSolver:
         self.filename = None
 
         self._debug = False
-        self._block_size_factor = 1
+        self._block_size_factor = 16
 
         # input keywords
         self._input_keywords = {
@@ -445,7 +446,8 @@ class NonlinearSolver:
 
         fock_drv = FockDriver(self.comm)
 
-        fock_drv._set_block_size_factor(self._block_size_factor)
+        fock_drv._set_block_size_factor(self._block_size_factor,
+                                        ao_basis.get_dimensions_of_basis())
 
         # TODO: take screening from eri_dict
         if self.rank == mpi_master():
@@ -808,7 +810,9 @@ class NonlinearSolver:
 
                 fock_mat = fock_drv.compute(screening, den_mat, fock_type,
                                             fock_k_factor, 0.0, thresh_int)
-                fock_np = fock_mat.full_matrix().to_numpy()
+
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 if fock_type == 'j':
                     # for pure functional
@@ -816,9 +820,11 @@ class NonlinearSolver:
 
                 if need_omega:
                     # for range-separated functional
-                    erf_k_mat = fock_drv.compute(screening, den_mat, 'kx_rs',
-                                                 erf_k_coef, omega, thresh_int)
-                    fock_np -= erf_k_mat.full_matrix().to_numpy()
+                    fock_mat = fock_drv.compute(screening, den_mat, 'kx_rs',
+                                                erf_k_coef, omega, thresh_int)
+
+                    fock_np -= fock_mat.to_numpy()
+                    fock_mat = Matrix()
 
                 fock_arrays.append(fock_np)
 
