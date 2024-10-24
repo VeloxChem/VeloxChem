@@ -1,9 +1,10 @@
 //
-//                              VELOXCHEM
+//                           VELOXCHEM 1.0-RC2
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -37,7 +38,7 @@ namespace pdftb88 {  // pdftb88 namespace
  @param exc the functional value.
  @param vrho the 1st-order functional derivative wrt density.
  */
-void compute_exc_vxc(const int np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
+void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
 
 }  // namespace pdftb88
 

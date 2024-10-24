@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - simd_master_test
+      - multipsi_newcore
 
 jobs:
   vlx_ci:

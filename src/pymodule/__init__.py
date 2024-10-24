@@ -38,6 +38,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import DispersionModel
 
 # C++ functions
 from .veloxchemlib import is_chemical_element
@@ -47,6 +48,7 @@ from .veloxchemlib import chemical_element_identifier
 from .veloxchemlib import chemical_element_mass
 from .veloxchemlib import chemical_element_max_angular_momentum
 from .veloxchemlib import available_functionals
+from .veloxchemlib import available_pdft_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
@@ -79,6 +81,7 @@ from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .fockdriver import FockDriver
+from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver

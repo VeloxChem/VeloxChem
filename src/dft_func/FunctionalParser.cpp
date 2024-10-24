@@ -149,33 +149,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 std::vector<std::string>
 getAvailablePairDensityFunctionals()
 {
-    return std::vector<std::string>({"TSLATER", "TLDA", "TPBE", "TBLYP"});
+    return std::vector<std::string>({"tSlater", "tSlater_erf", "tVWN_RPA", "tVWN5", "tPMGB06", "tP86", "tPBE_X", "tPBEX_erf", "tPBE_C", "tPBEC_erf", "tB88", "tB88_erf", "tLYP", "tLYP_erf", "HPG20"});
 }
 
-CXCPairDensityFunctional
-getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
-{
-    auto availFuncs = getAvailablePairDensityFunctionals();
-
-    if (std::find(availFuncs.begin(), availFuncs.end(), format::upper_case(xcLabel)) != availFuncs.end())
-    {
-        // Pair-density local density exchange-correlation functional
-
-        if (format::upper_case(xcLabel) == "TSLATER") return CXCPairDensityFunctional("TSLATER", {"TSLATER"}, {1.0});
-
-        if (format::upper_case(xcLabel) == "TLDA") return CXCPairDensityFunctional("TLDA", {"TSLATER", "TVWN"}, {1.0, 1.0});
-
-        if (format::upper_case(xcLabel) == "TPBE") return CXCPairDensityFunctional("TPBE", {"TPBE_X", "TPBE_C"}, {1.0, 1.0});
-
-        if (format::upper_case(xcLabel) == "TBLYP") return CXCPairDensityFunctional("TBLYP", {"TSLATER", "TB88", "TLYP"}, {1.0, 1.0, 1.0});
-        // FIX ME: add other functionals here...
-    }
-
-    std::string errmsg(std::string("getPairDensityExchangeCorrelationFunctional: ") + xcLabel + std::string(" is not available"));
-
-    errors::assertMsgCritical(false, errmsg);
-
-    return CXCPairDensityFunctional("Undefined", {}, {});
 }
-
-}  // namespace vxcfuncs

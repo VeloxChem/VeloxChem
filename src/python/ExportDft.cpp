@@ -212,13 +212,15 @@ CXCIntegrator_integrate_kxclxc_fock(const CXCIntegrator&              self,
 
 static auto
 CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
-                                 const py::array_t<double>& densityMatrix,
-                                 const py::array_t<double>& active2DM,
-                                 const py::array_t<double>& activeMOs,
-                                 const CMolecule&           molecule,
-                                 const CMolecularBasis&     basis,
-                                 const CMolecularGrid&      molecularGrid,
-                                 const std::string&         xcFuncLabel) -> py::list
+                   const py::array_t<double>& densityMatrix,
+                   const py::array_t<double>& active2DM,
+                   const py::array_t<double>& activeMOs,
+                   const CMolecule&           molecule,
+                   const CMolecularBasis&     basis,
+                   const CMolecularGrid&      molecularGrid,
+                   const std::string&         xcFuncLabel,
+                   const py::dict             components,
+                   const double               rs_omega) -> py::list
 {
     // active2DM
 
@@ -264,6 +266,17 @@ CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
     same_size = ((densityMatrix.ndim() == 2) && (densityMatrix.shape(0) == naos) && (densityMatrix.shape(1) == naos));
     errors::assertMsgCritical(same_size, errsizes);
 
+    // Functional
+
+    std::vector<std::string> labels;
+    std::vector<double> coeffs;
+    for (auto item : components)
+    {
+        labels.push_back(item.first.cast<std::string>());
+        coeffs.push_back(item.second.cast<double>());
+    };
+    CXCPairDensityFunctional xcfun = CXCPairDensityFunctional(xcFuncLabel, labels, coeffs);
+
     // Create output tensors
 
     CAOKohnShamMatrix matrixVxc(naos, naos, true);
@@ -272,11 +285,11 @@ CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
     CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
     tensorWxc.zero();
 
-    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, densityMatrix.data(), tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
+    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, densityMatrix.data(), tensor2DM, denseActiveMO, molecularGrid, xcfun, rs_omega);
 
     py::list returnList;
     returnList.append(matrixVxc);
-    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active * n_active * n_active}));
+    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), {naos, n_active, n_active, n_active}));
     return returnList;
 }
 
@@ -611,6 +624,7 @@ export_dft(py::module& m)
     // exposing functions
 
     m.def("available_functionals", &vxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
+    m.def("available_pdft_functionals", &vxcfuncs::getAvailablePairDensityFunctionals, "Gets a list of available pdft exchange-correlation functionals components.");
 
     m.def("parse_xc_func",
           &vxcfuncs::getExchangeCorrelationFunctional,

@@ -23,23 +23,24 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef PairDensityLYP_hpp
-#define PairDensityLYP_hpp
+#ifndef PairDensityPBEX_erf_hpp
+#define PairDensityPBEX_erf_hpp
 
 #include <cstdint>
 
-namespace pdftlyp {  // pdftlyp namespace
+namespace pdftpbex_erf {  // pdftpbex_erf namespace
 
 /**
- Computes Exc and Vxc Fock for pair-density LYP correlation.
+ Computes Exc and Vxc Fock for pair-density PBE exchange with erf attenuation.
 
  @param np the number of grid points.
  @param rho the density.
  @param exc the functional value.
  @param vrho the 1st-order functional derivative wrt density.
+ @param mu the range-separation parameter.
  */
-void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
+void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma, const double mu);
 
-}  // namespace pdftlyp
+}  // namespace pdftpbex_erf
 
-#endif /* PairDensityLYP_hpp */
+#endif /* PairDensityPBEX_erf_hpp */
