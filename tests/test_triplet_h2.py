@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -7,6 +8,7 @@ from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
+@pytest.mark.solvers
 class TestTripletH2:
 
     def run_scf(self, inpfile, potfile, xcfun_label, ref_e_scf, ref_dip):
