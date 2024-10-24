@@ -171,6 +171,35 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
             hf[key] = dset
         hf.close()
 
+def write_lr_rsp_results_to_hdf5(fname, rsp_results):
+    """
+    Writes the results of a linear response calculation to HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param rsp_results:
+        The dictionary containing the linear response results.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+
+        hf = h5py.File(fname, 'a')
+
+        # write SCF tensors
+        keys = rsp_results.keys()
+
+        for key in keys:
+            # Do not write the eigenvectors, file names and excitation details
+            if "vector" in key or "cube" in key or "file" in key or "details" in key:
+                continue
+            else:
+                hf.create_dataset(key, data=rsp_results[key])
+
+        hf.close()
+
 
 def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
                    ostream):

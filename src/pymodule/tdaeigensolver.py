@@ -49,7 +49,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .inputparser import get_random_string_parallel
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
-                         write_rsp_solution)
+                         write_rsp_solution, write_lr_rsp_results_to_hdf5)
 
 
 class TdaEigenSolver(LinearSolver):
@@ -479,6 +479,11 @@ class TdaEigenSolver(LinearSolver):
 
             self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
                                    pe_dict['potfile_text'], eigvecs)
+
+            # Add response results to the final checkpoint file
+            final_h5_fname = str(
+                Path(self.checkpoint_file).with_suffix('.solutions.h5'))
+            write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
             self._print_results(ret_dict)
 

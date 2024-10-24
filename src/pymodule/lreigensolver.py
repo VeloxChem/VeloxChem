@@ -47,7 +47,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import get_random_string_parallel
-from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
+from .checkpoint import (check_rsp_hdf5, create_hdf5, write_rsp_solution,
+                         write_rsp_hdf5, write_lr_rsp_results_to_hdf5)
 
 
 class LinearResponseEigenSolver(LinearSolver):
@@ -736,6 +737,9 @@ class LinearResponseEigenSolver(LinearSolver):
                         checkpoint_text += final_h5_fname
                         self.ostream.print_info(checkpoint_text)
                         self.ostream.print_blank()
+
+                    # Write the response results to the final checkpoint file 
+                    write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
                     self._print_results(ret_dict)
 
