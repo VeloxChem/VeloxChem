@@ -1,0 +1,16 @@
+@jobs
+task: scf
+@end
+
+@method settings
+basis: aug-cc-pvdz
+@end
+
+@molecule
+charge: 0
+multiplicity: 3
+units: au
+xyz:  
+H   0.0   0.0   0.7
+H   0.0   0.0  -0.7
+@end 
