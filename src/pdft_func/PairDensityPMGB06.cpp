@@ -509,9 +509,9 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho, 
 
              dcrzeta_dzeta += (1.0/4.0)*g2_3*(2*zeta - 2);
 
-             dcrzeta_drho += dcrzeta_dg2_3*dg2_3_drho + dcrzeta_dzeta*dzeta_drho;
+             dcrzeta_drho += dcrzeta_dg2_3*dg2_3_drho;
 
-             dcrzeta_dpi += dcrzeta_dg2_3*dg2_3_dpi + dcrzeta_dzeta*dzeta_dpi;
+             dcrzeta_dpi += dcrzeta_dg2_3*dg2_3_dpi;
          }
          dcrzeta_drho += dcrzeta_dzeta*dzeta_drho;
 
