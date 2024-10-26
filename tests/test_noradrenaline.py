@@ -42,7 +42,10 @@ class TestNoradrenaline:
 
     def test_hf(self):
 
-        mol = Molecule.read_xyz_file('noradrenaline.xyz')
+        here = Path(__file__).parent
+        xyz_file = str(here / 'data' / 'noradrenaline.xyz')
+        mol = Molecule.read_xyz_file(xyz_file)
+
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
         min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
@@ -62,7 +65,10 @@ class TestNoradrenaline:
 
     def test_lda(self):
 
-        mol = Molecule.read_xyz_file('noradrenaline.xyz')
+        here = Path(__file__).parent
+        xyz_file = str(here / 'data' / 'noradrenaline.xyz')
+        mol = Molecule.read_xyz_file(xyz_file)
+
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
         min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
@@ -82,7 +88,10 @@ class TestNoradrenaline:
 
     def test_gga(self):
 
-        mol = Molecule.read_xyz_file('noradrenaline.xyz')
+        here = Path(__file__).parent
+        xyz_file = str(here / 'data' / 'noradrenaline.xyz')
+        mol = Molecule.read_xyz_file(xyz_file)
+
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
         min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
