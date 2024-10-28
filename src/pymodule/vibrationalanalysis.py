@@ -226,7 +226,7 @@ class VibrationalAnalysis:
 
         if 'filename' in vib_dict:
             self.filename = vib_dict['filename']
-            self.checkpoint_file = f'{self.filename}.vib.results.h5'
+            self.checkpoint_file = f'{self.filename}-vib-results.h5'
 
         # settings for property modules
         if hessian_dict is None:
