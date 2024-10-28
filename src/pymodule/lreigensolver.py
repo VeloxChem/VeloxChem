@@ -521,7 +521,7 @@ class LinearResponseEigenSolver(LinearSolver):
             if self.rank == mpi_master():
                 # create h5 file for response solutions
                 if (self.save_solutions and self.checkpoint_file is not None):
-					# replace .h5 in the checkpoint_file name by _results.h5
+                    # replace .h5 in the checkpoint_file name by _results.h5
                     final_h5_fname = str(
                         Path(self.checkpoint_file))[:-3] + '_results.h5'
                     create_hdf5(final_h5_fname, molecule, basis,
@@ -739,8 +739,8 @@ class LinearResponseEigenSolver(LinearSolver):
                         self.ostream.print_info(checkpoint_text)
                         self.ostream.print_blank()
 
-                    # Write the response results to the final checkpoint file 
-                    write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
+                        # Write the response results to the final checkpoint file 
+                        write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
                     self._print_results(ret_dict)
 
