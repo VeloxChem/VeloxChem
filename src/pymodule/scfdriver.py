@@ -415,7 +415,7 @@ class ScfDriver:
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}_scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -943,7 +943,7 @@ class ScfDriver:
             else:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
-            self.checkpoint_file = f'{base_fname}.scf.h5'
+            self.checkpoint_file = f'{base_fname}_scf.h5'
         self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
         self.comm.barrier()
 
@@ -2525,8 +2525,9 @@ class ScfDriver:
         if self.checkpoint_file is None:
             return
 
+		# replace the suffix .h5 from the checkpoint_file name by _results.h5
         final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.results.h5'))
+            Path(self.checkpoint_file))[:-3] + '_results.h5'
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()

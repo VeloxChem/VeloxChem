@@ -299,7 +299,7 @@ class LinearSolver:
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}.rsp.h5'
+                self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -1093,7 +1093,7 @@ class LinearSolver:
             return
 
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.rsp.h5'
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         t0 = tm.time()
 
