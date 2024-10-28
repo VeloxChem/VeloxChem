@@ -768,8 +768,7 @@ class ComplexResponse(LinearSolver):
                     if (self.save_solutions and
                             self.checkpoint_file is not None):
                         final_h5_fname = str(
-                            Path(self.checkpoint_file).with_suffix(
-                                '.solutions.h5'))
+                            Path(self.checkpoint_file))[:-3] + '_solutions.h5'
                         create_hdf5(final_h5_fname, molecule, basis,
                                     dft_dict['dft_func_label'],
                                     pe_dict['potfile_text'])
