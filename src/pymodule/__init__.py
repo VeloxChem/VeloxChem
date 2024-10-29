@@ -123,6 +123,7 @@ from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
+from .densityviewer import DensityViewer
 from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver

@@ -69,7 +69,7 @@ class DensityViewer:
         self.dm_element_threshold = 1e-4
 
         # flag for using interpolation when computing densities
-        self.use_visualization_driver = False
+        self.use_visualization_driver = True
 
         # flag for the type of density
         self.den_type = denmat.rest
@@ -92,9 +92,9 @@ class DensityViewer:
         # AOs and density
         self._ao_to_atom = None
         self._ao_dict = None
-        self._i_den = 0
-        self._den_list = None
-        self._den_labels = None
+        self._i_den = None
+        self._density_list = None
+        self._density_labels = None
         self._is_uhf = False
 
         # plot
@@ -385,10 +385,13 @@ class DensityViewer:
         self._molecule = molecule
         self._basis = basis
 
-        self._den_labels = den_dict.keys()
-        self._den_list = []
-        for label in self._den_labels:
-            self._den_list.append(den_dict[label])
+        self._density_labels = []
+        self._density_list = []
+        for label in den_dict.keys():
+            self._density_labels.append(label)
+            self._density_list.append(den_dict[label])
+
+        self._i_den = len(self._density_list) - 1
 
         self._this_plot = k3d.plot(grid_visible=False)
         plt_atoms, plt_bonds = self.draw_molecule(molecule)
@@ -396,14 +399,14 @@ class DensityViewer:
         for bonds in plt_bonds:
             self._this_plot += bonds
 
-        density = self.compute_density(self._den_list[self._i_den])
+        density = self.compute_density(self._density_list[self._i_den])
         self._plt_iso_one, self._plt_iso_two = self.draw_density(density)
         self._this_plot += self._plt_iso_one
         self._this_plot += self._plt_iso_two
         self._this_plot.display()
 
         den_list = []
-        for i, label in enumerate(self._den_labels):
+        for i, label in enumerate(self._density_labels):
             den_list.append((label, i))
 
         # Add widget
@@ -413,7 +416,6 @@ class DensityViewer:
         display(self.density_selector)
         self.density_selector.observe(self.on_density_index_change,
                                       names='value')
-        print(self._i_den)
 
     def on_density_index_change(self, change):
         """
@@ -424,7 +426,6 @@ class DensityViewer:
         """
 
         i_den = change['new']
-        print(i_den)
 
         # Do not do anything if 'blank index' is chosen
         if i_den < 0:
@@ -437,8 +438,7 @@ class DensityViewer:
         self._this_plot -= self._plt_iso_one
         self._this_plot -= self._plt_iso_two
 
-        self.density_selector.value = -1
-        density = self.compute_density(self._density_list[i_den])
+        density = self.compute_density(self._density_list[self._i_den])
 
         self._plt_iso_one, self._plt_iso_two = self.draw_density(density)
         self._this_plot += self._plt_iso_one
