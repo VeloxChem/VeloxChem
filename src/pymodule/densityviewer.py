@@ -122,14 +122,17 @@ class DensityViewer:
         valid_checkpoint = (fname and isinstance(fname, str) and
                         Path(fname).is_file())
 
-        errmsg = "DensityViewer: %s is not a valid checkpoint file" %s
-        assert_msg_critical(valid_checkpoint, errmsh)
+        errmsg = f"DensityViewer: {fname} is not a valid checkpoint file."
+        assert_msg_critical(valid_checkpoint, errmsg)
 
         h5f = h5py.File(fname, "r")
     
         # TODO: add other density types as they become available
         for key in h5f.keys():
             if "detach" in key or "attach" in key:
+                data = np.array(h5f.get(key))
+                den_dict[key] = data
+            if "hole" in key or "particle" in key:
                 data = np.array(h5f.get(key))
                 den_dict[key] = data
 
@@ -427,7 +430,7 @@ class DensityViewer:
 
         # TODO: create the read_hdf5 routine
         if isinstance(den_inp, str):
-            den_dict = read_hdf5(den_inp)
+            den_dict = self.read_hdf5(den_inp)
         elif isinstance(den_inp, dict):
             den_dict = den_inp
         else:
