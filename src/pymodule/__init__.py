@@ -61,6 +61,7 @@ from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
+from .veloxchemlib import partition_atoms
 
 # C++ enums
 from .veloxchemlib import mat_t
