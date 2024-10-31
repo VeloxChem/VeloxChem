@@ -167,8 +167,31 @@ def polgrad_sanity_check(obj, method_flag, lr_results):
     response_results = lr_results.get('solutions', None)
     for frequency in obj.frequencies:
         if (obj.vector_components[0], frequency) not in response_results.keys():
-            error_text = 'Frequency {:2.3f} in '.format(frequency)
-            error_text += method_flag + ' not found in linear response results ' 
-            error_text += 'for vector compontent ' + obj.vector_components[0] 
-            raise ValueError(error_text)
+            error_msg = 'Frequency {:2.3f} in '.format(frequency)
+            error_msg += method_flag + ' not found in linear response results ' 
+            error_msg += 'for vector compontent ' + obj.vector_components[0] 
+            raise ValueError(error_msg)
+
+def raman_sanity_check(obj):
+    """
+    Checks whether both normal and resonance Raman has been requested.
+    Print warning message and set normal Raman flag to False.
+    The driver will continue with resonance Raman.
+
+    :param obj:
+        The object (vibrational analysis driver)
+    """
+
+    if (obj.do_raman and obj.do_resonance_raman):
+        warn_msg = 'Both normal and resonance Raman have been requested, '
+        warn_msg += 'but only one can run at a time.\n'
+        obj.ostream.print_warning(warn_msg)
+        info_msg = 'Will continue with resonance Raman.'
+        obj.ostream.print_warning(info_msg)
+        obj.ostream.flush()
+        obj.do_raman = False
+
+
+
+
 
