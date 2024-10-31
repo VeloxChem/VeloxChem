@@ -47,7 +47,7 @@ from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import raman_sanity_check
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -79,7 +79,7 @@ class VibrationalAnalysis:
         - polarizability_gradient: The gradient of the polarizability.
         - raman_intensities: The Raman intensities (in A**4/amu).
         - frequencies: the frequency/ies of external electric field (for resonance Raman)
-        - flag: The type of Hessian driver.
+        - flag: The name of the driver.
         - numerical_hessian: Perform numerical Hessian calculation.
         - numerical_raman: Perform numerical polarizability gradient calculation.
         - do_four_point_hessian: Perform four-point numerical approximation.
@@ -264,6 +264,8 @@ class VibrationalAnalysis:
 
         # compute the polarizability gradient for Raman intensities
         if (self.do_raman or self.do_resonance_raman) and self.is_scf:
+            # check if both normal and resonance Raman requested
+            raman_sanity_check(self)
             self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():
@@ -375,10 +377,7 @@ class VibrationalAnalysis:
                     gamma_bar_tmp_1 = np.abs(raman_transmom[i, i] - raman_transmom[j, j])
                     gamma_bar_tmp_2 = np.abs(raman_transmom[i, j])
                     gamma_bar_sq += 0.5 * (gamma_bar_tmp_1)**2 + 3.0 * (gamma_bar_tmp_2)**2
-                    #gamma_bar_sq += (0.5 * (raman_transmom[i, i] - raman_transmom[j, j])**2
-                    #                 + 3 * raman_transmom[i, j]**2)
 
-            #alpha_bar_sq = alpha_bar**2
             alpha_bar_sq = np.abs(alpha_bar)**2
             raman_intensities[freq] = (
                 45.0 * alpha_bar_sq + 7.0 * gamma_bar_sq) * raman_conversion_factor
@@ -501,9 +500,8 @@ class VibrationalAnalysis:
             The AO basis set.
         """
 
-        # TODO sanity check: not both normal and resonance Raman
-        # INCLUDE check: if both, check if damping is non-zero
-        # If zero: run normal Raman
+        # check if both normal and resonance Raman requested
+        raman_sanity_check(self)
 
         scf_tensors = self.scf_driver.scf_tensors
 
