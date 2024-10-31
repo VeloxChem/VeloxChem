@@ -80,6 +80,8 @@ class DensityViewer:
         self.atom_centers = None
 
         # molecule
+        self._molecule = None
+        self._basis = None
         self._atomnr = None
         self._coords = None
 
@@ -160,6 +162,9 @@ class DensityViewer:
         :param basis:
             The AO basis set.
         """
+
+        self._molecule = molecule
+        self._basis = basis
 
         # Define box size
         self._atomnr = np.array(molecule.get_identifiers()) - 1
@@ -405,8 +410,6 @@ class DensityViewer:
             assert_msg_critical(False, 'DensityViewer.plot: Invalid density input')
 
         self.initialize(molecule, basis)
-        self._molecule = molecule
-        self._basis = basis
 
         self._density_labels = []
         self._density_list = []
