@@ -27,8 +27,17 @@ from .import_from_pyscf import dipole_deriv
 
 class PolarizabilityGradient():
     """
-    Implements the gradient of the dipole polarizability
-    needed for the calculation of vibrational Raman intensities.
+    Implements the dipole polarizability gradient.
+
+    Instance variables
+        - polgradient: The polarizability gradient
+        - delta_h: the numerical perturbation
+        - is_complex: Complex polarizability
+        - damping: Damping factor for complex polarizability gradient
+        - numerical: Numerical differentiation
+        - do_four_point: Four-point numerical differentiation
+        - frequencies: The frequencies
+        - vector_components: Cartesian components of the tensor
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -54,11 +63,11 @@ class PolarizabilityGradient():
         self.ostream = ostream
 
         self.polgradient = None
-        self.delta_h = 0.001  # for numerical pol. gradient
+        self.delta_h = 0.001
 
         self.is_complex = False
         self.grad_dt = np.float_  # data type for pol. gradient (real/complex)
-        self.damping = 1000.0 / hartree_in_wavenumber()  # inverse life-time parameter
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         self.numerical = False
         self.do_four_point = False
