@@ -914,8 +914,7 @@ class PolarizabilityGradient():
 
     def get_k_fraction(self):
         """
-        Determines fraction prefactor for K
-        TODO: what actually is this
+        Determines fraction of exact exchange, prefactor for K.
 
         :return frac_k:
             The fraction
