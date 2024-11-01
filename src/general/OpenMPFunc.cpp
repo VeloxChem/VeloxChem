@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <ranges>
 #include <utility>
-#include <iostream>
 
 #include "BatchFunc.hpp"
 #include "CustomViews.hpp"
@@ -276,8 +275,6 @@ make_bra_ket_work_group(const std::vector<CBlockedGtoPairBlock>& bra_gto_pair_bl
         {
             for (size_t j = 0; j < ket_nblocks; j++)
             {
-                std::cout << "i/j pair " << i << " " << j << std::endl;
-
                 // apply threshold to blocked GTOs pair blocks on bra and ket side
 
                 for (int bra_idx = 0; bra_idx < 16; bra_idx++)
@@ -318,8 +315,6 @@ make_bra_ket_work_group(const std::vector<CBlockedGtoPairBlock>& bra_gto_pair_bl
 
                         if ((bra_idx + ket_idx) <= ithreshold)
                         {
-                            std::cout << "bra/ket/thresh " << bra_idx + ket_idx << " " << std::endl;
-
                             for (size_t itask = 0; itask < bra_blocks; itask++)
                             {
                                 const auto bindices = batch::batch_range(itask, bra_size, bra_bsize);

@@ -26,6 +26,7 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import time as tm
+import math
 
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
@@ -65,6 +66,8 @@ class ScfGradientDriver(GradientDriver):
 
         self.scf_driver = scf_drv
         self.flag = 'SCF Gradient Driver'
+
+        self.eri_thresh = scf_drv.eri_thresh
 
         self.numerical = False
         self.delta_h = 0.001
@@ -228,19 +231,16 @@ class ScfGradientDriver(GradientDriver):
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
 
+        thresh_int = int(-math.log10(self.eri_thresh))
+
         for iatom in local_atoms:
 
-            """
-            gmats = fock_grad_drv.compute(basis, molecule, den_mat_for_fock,
-                                          iatom, fock_type,
-                                          exchange_scaling_factor, 0.0)
-            """
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
             gmats = fock_grad_drv.compute_with_screening(
-                    basis, molecule, screener, screener_atom,
-                    den_mat_for_fock, iatom, fock_type,
-                    exchange_scaling_factor, 0.0, 12)
+                basis, molecule, screener, screener_atom, den_mat_for_fock,
+                iatom, fock_type, exchange_scaling_factor, 0.0, thresh_int)
 
             factor = 2.0 if fock_type == 'j' else 1.0
 
@@ -422,17 +422,27 @@ class ScfGradientDriver(GradientDriver):
 
         fock_grad_drv = FockGeom1000Driver()
 
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+
+        thresh_int = int(-math.log10(self.eri_thresh))
+
         for iatom in local_atoms:
-            gmats_Jab = fock_grad_drv.compute(basis, molecule, Dab_for_fock,
-                                              iatom, 'j', 0.0, 0.0)
+
+            screener_atom = T4CScreener()
+            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+            gmats_Jab = fock_grad_drv.compute_with_screening(
+                basis, molecule, screener, screener_atom, Dab_for_fock, iatom,
+                'j', 0.0, 0.0, thresh_int)
 
             if fock_type != 'j':
-                gmats_Ka = fock_grad_drv.compute(basis, molecule, Da_for_fock,
-                                                 iatom, 'kx',
-                                                 exchange_scaling_factor, 0.0)
-                gmats_Kb = fock_grad_drv.compute(basis, molecule, Db_for_fock,
-                                                 iatom, 'kx',
-                                                 exchange_scaling_factor, 0.0)
+                gmats_Ka = fock_grad_drv.compute_with_screening(
+                    basis, molecule, screener, screener_atom, Da_for_fock,
+                    iatom, 'kx', exchange_scaling_factor, 0.0, thresh_int)
+                gmats_Kb = fock_grad_drv.compute_with_screening(
+                    basis, molecule, screener, screener_atom, Db_for_fock,
+                    iatom, 'kx', exchange_scaling_factor, 0.0, thresh_int)
 
             for i, label in enumerate(['X', 'Y', 'Z']):
                 gmat_jab = gmats_Jab.matrix_to_numpy(label)

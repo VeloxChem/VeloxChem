@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <ranges>
 #include <utility>
-#include <iostream>
 
 #include "DiagonalElectronRepulsionFunc.hpp"
 #include "GtoFunc.hpp"
@@ -180,8 +179,7 @@ CT4CScreener::partition_atom(const CMolecularBasis& basis, const CMolecule& mole
         _gto_pair_blocks.reserve(nblocks);
 
         std::ranges::for_each(std::views::iota(size_t{0}, nblocks),
-                              [&](const auto index) { _gto_pair_blocks.push_back(CBlockedGtoPairBlock(gto_pair_blocks[index], max_values[index]));
-                              std::cout << "screen " << index << " " << std::endl; });
+                              [&](const auto index) { _gto_pair_blocks.push_back(CBlockedGtoPairBlock(gto_pair_blocks[index], max_values[index])); });
     }
 }
 

@@ -198,8 +198,6 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
 
         return;
     }
-
-    std::cout << "diag_compute: uncaught exception!" << " " << angmoms.first << " " << angmoms.second << std::endl;
 }
 
 }  // namespace erifunc

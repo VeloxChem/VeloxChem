@@ -2,7 +2,6 @@
 #define FockGeomX000Driver_hpp
 
 #include <string>
-#include <iostream>
 
 #include "ElectronRepulsionGeom1000Func.hpp"
 #include "GtoFunc.hpp"
@@ -159,9 +158,6 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
                     auto ket_range = std::pair<size_t, size_t>(0, ket_gpairs.number_of_contracted_pairs());
                     erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
                     distributor.accumulate(bra_gpairs, ket_gpairs);
-
-                    std::cout << i << " " << j << " " << bra_gpairs.number_of_contracted_pairs() << " " << ket_gpairs.number_of_contracted_pairs() << std::endl;
-
                 }
             });
         }
@@ -259,9 +255,6 @@ CFockGeomX000Driver<N>::compute_with_screening(const CMolecularBasis &basis,
                 const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
                 //const bool diagonal   = (task[0] == task[1]) && (task[2] == task[3]) && (bra_range == ket_range);
                 const bool diagonal   = false;
-
-                std::cout << task[0] << " " << task[1] << " (" << task[2] << " " << task[3] << ") " << task[4] << " " << task[5] << ", " << task[6] << " " << task[7] << std::endl;
-
 #pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal)
                 {
                     CT4CGeomX0MatricesDistributor distributor(ptr_focks, ptr_density, label, exchange_factor, omega);
