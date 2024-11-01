@@ -53,8 +53,8 @@ export_t4cintegrals(py::module& m)
                const CMatrix&         density,
                const std::string&     label,
                const double           exchange_factor,
-               const double           omega) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(fock_drv.compute(basis, molecule, density, label, exchange_factor, omega));
+               const double           omega) -> CMatrix {
+                return fock_drv.compute(basis, molecule, density, label, exchange_factor, omega);
             },
             "Computes single Fock matrix of requested type for given molecule and basis.")
         .def(
@@ -65,8 +65,8 @@ export_t4cintegrals(py::module& m)
                const std::string&  label,
                const double        exchange_factor,
                const double        omega,
-               const int           ithreshold) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(fock_drv.compute(screener, density, label, exchange_factor, omega, ithreshold));
+               const int           ithreshold) -> CMatrix {
+                return fock_drv.compute(screener, density, label, exchange_factor, omega, ithreshold);
             },
             "Computes single Fock matrix of requested type for two-electron integrals screener.")
         .def(
@@ -77,8 +77,8 @@ export_t4cintegrals(py::module& m)
                const std::vector<std::string>& labels,
                const double                    exchange_factor,
                const double                    omega,
-               const int                       ithreshold) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(fock_drv.compute(screener, densities, labels, exchange_factor, omega, ithreshold));
+               const int                       ithreshold) -> CMatrices {
+                return fock_drv.compute(screener, densities, labels, exchange_factor, omega, ithreshold);
             },
             "Computes Fock matrices of requested type for two-electron integrals screener.")
         .def(
@@ -91,8 +91,8 @@ export_t4cintegrals(py::module& m)
                const std::string&  label,
                const double        exchange_factor,
                const double        omega,
-               const int           ithreshold) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(fock_drv.compute(screener, rank, nodes, density, label, exchange_factor, omega, ithreshold));
+               const int           ithreshold) -> CMatrix {
+                return fock_drv.compute(screener, rank, nodes, density, label, exchange_factor, omega, ithreshold);
             },
             "Computes single Fock matrix of requested type for two-electron integrals screener.")
         .def(
@@ -105,8 +105,8 @@ export_t4cintegrals(py::module& m)
                const std::vector<std::string>& labels,
                const double                    exchange_factor,
                const double                    omega,
-               const int                       ithreshold) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(fock_drv.compute(screener, rank, nodes, densities, labels, exchange_factor, omega, ithreshold));
+               const int                       ithreshold) -> CMatrices {
+                return fock_drv.compute(screener, rank, nodes, densities, labels, exchange_factor, omega, ithreshold);
             },
             "Computes Fock matrices of requested type for two-electron integrals screener.");
 
@@ -137,8 +137,8 @@ export_t4cintegrals(py::module& m)
                const int                     iatom,
                const std::string&            label,
                const double                  exchange_factor,
-               const double                  omega) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
+               const double                  omega) -> CMatrices {
+                return fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega);
             },
             "Computes gradient of Fock matrix of requested type for given molecule and basis.")
         .def("compute_with_screening", &CFockGeomX000Driver<1>::compute_with_screening, "Computes gradient of Fock matrix of requested type for given molecule and basis.");

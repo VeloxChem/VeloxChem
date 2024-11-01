@@ -121,64 +121,64 @@ export_math(py::module &m) -> void
     // exposing functions from MatrixFunc.hpp
     m.def(
         "make_matrix",
-        [](const CMolecularBasis &basis, const mat_t mat_type) -> std::shared_ptr<CMatrix> {
-            return std::make_shared<CMatrix>(matfunc::make_matrix(basis, mat_type));
+        [](const CMolecularBasis &basis, const mat_t mat_type) -> CMatrix {
+            return matfunc::make_matrix(basis, mat_type);
         },
         "Creates matrix for given basis.");
     m.def(
         "make_matrix",
-        [](const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> std::shared_ptr<CMatrix> {
-            return std::make_shared<CMatrix>(matfunc::make_matrix(bra_basis, ket_basis));
+        [](const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrix {
+            return matfunc::make_matrix(bra_basis, ket_basis);
         },
         "Creates matrix for given pair of bases.");
 
     // exposing functions from MatrixFunc.hpp
     m.def(
         "make_matrices",
-        [](const int order, const CMolecularBasis &basis, const mat_t mtype) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(std::array<int, 1>{order}, basis, mtype));
+        [](const int order, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(std::array<int, 1>{order}, basis, mtype);
         },
         "Creates matrices for given basis.");
     m.def(
         "make_matrices",
-        [](const std::array<int, 2> orders, const CMolecularBasis &basis, const mat_t mtype) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(orders, basis, mtype));
+        [](const std::array<int, 2> orders, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(orders, basis, mtype);
         },
         "Creates matrices for given basis.");
     m.def(
         "make_matrices",
-        [](const std::array<int, 3> orders, const CMolecularBasis &basis, const mat_t mtype) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(orders, basis, mtype));
+        [](const std::array<int, 3> orders, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(orders, basis, mtype);
         },
         "Creates matrices for given basis.");
     m.def(
         "make_matrices",
-        [](const std::array<int, 4> orders, const CMolecularBasis &basis, const mat_t mtype) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(orders, basis, mtype));
+        [](const std::array<int, 4> orders, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(orders, basis, mtype);
         },
         "Creates matrices for given basis.");
     m.def(
         "make_matrices",
-        [](const int order, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(std::array<int, 1>{order}, bra_basis, ket_basis));
+        [](const int order, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(std::array<int, 1>{order}, bra_basis, ket_basis);
         },
         "Creates matrices for given basis.");
     m.def(
         "make_matrices",
-        [](const std::array<int, 2> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(orders, bra_basis, ket_basis));
+        [](const std::array<int, 2> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(orders, bra_basis, ket_basis);
         },
         "Creates matrices for given basis.");
     m.def(
         "make_matrices",
-        [](const std::array<int, 3> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(orders, bra_basis, ket_basis));
+        [](const std::array<int, 3> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(orders, bra_basis, ket_basis);
         },
         "Creates matrices for given basis.");
     m.def(
         "make_matrices",
-        [](const std::array<int, 4> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> std::shared_ptr<CMatrices> {
-            return std::make_shared<CMatrices>(matfunc::make_matrices(orders, bra_basis, ket_basis));
+        [](const std::array<int, 4> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(orders, bra_basis, ket_basis);
         },
         "Creates matrices for given basis.");
 
@@ -279,14 +279,14 @@ export_math(py::module &m) -> void
         .def("angular_pairs", &CMatrix::angular_pairs, "Gets vector of angular pairs for stored submatrices.")
         .def(
             "submatrix",
-            [](const CMatrix &self, const std::pair<int, int> &angpair) -> std::shared_ptr<CSubMatrix> {
+            [](const CMatrix &self, const std::pair<int, int> &angpair) -> CSubMatrix {
                 if (auto submat = self.sub_matrix(angpair); submat != nullptr)
                 {
-                    return std::make_shared<CSubMatrix>(*submat);
+                    return *submat;
                 }
                 else
                 {
-                    return std::make_shared<CSubMatrix>();
+                    return CSubMatrix();
                 }
             },
             "Gets specific submatrix from matrix.")
@@ -295,7 +295,7 @@ export_math(py::module &m) -> void
         .def("number_of_columns", &CMatrix::number_of_columns, "Number of columns in matrix.")
         .def(
             "full_matrix",
-            [](const CMatrix &self) -> std::shared_ptr<CSubMatrix> { return std::make_shared<CSubMatrix>(self.full_matrix()); },
+            [](const CMatrix &self) -> CSubMatrix { return self.full_matrix(); },
             "Creates full matrix representation of matrix.")
         .def(
             "to_numpy",
@@ -323,27 +323,27 @@ export_math(py::module &m) -> void
         .def("keys", &CMatrices::keys, "Gets vector of keys for stored matrices.")
         .def(
             "matrix",
-            [](const CMatrices &self, const std::string &label) -> std::shared_ptr<CMatrix> {
+            [](const CMatrices &self, const std::string &label) -> CMatrix {
                 if (auto mat = self.matrix(label); mat != nullptr)
                 {
-                    return std::make_shared<CMatrix>(*mat);
+                    return *mat;
                 }
                 else
                 {
-                    return std::make_shared<CMatrix>();
+                    return CMatrix();
                 }
             },
             "Gets specific matrix from matrices.")
         .def(
             "matrix",
-            [](const CMatrices &self, const int key) -> std::shared_ptr<CMatrix> {
+            [](const CMatrices &self, const int key) -> CMatrix {
                 if (auto mat = self.matrix(key); mat != nullptr)
                 {
-                    return std::make_shared<CMatrix>(*mat);
+                    return *mat;
                 }
                 else
                 {
-                    return std::make_shared<CMatrix>();
+                    return CMatrix();
                 }
             },
             "Gets specific matrix from matrices.")
