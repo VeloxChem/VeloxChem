@@ -2,6 +2,7 @@
 #define FockGeomX000Driver_hpp
 
 #include <string>
+#include <iostream>
 
 #include "ElectronRepulsionGeom1000Func.hpp"
 #include "GtoFunc.hpp"
@@ -11,6 +12,7 @@
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "OpenMPFunc.hpp"
 #include "T4CGeomX0MatricesDistributor.hpp"
 
 /// Class CFockGeomX000Driver provides methods for computing Fock matrices
@@ -69,6 +71,20 @@ class CFockGeomX000Driver
                  const std::string     &label,
                  const double           exchange_factor,
                  const double           omega) const -> CMatrices;
+
+    auto compute_with_screening(const CMolecularBasis &basis,
+                                const CMolecule       &molecule,
+                                const CT4CScreener&   screener,
+                                const CT4CScreener&   screener_atom,
+                                const CMatrix         &density,
+                                const int              iatom,
+                                const std::string     &label,
+                                const double           exchange_factor,
+                                const double           omega,
+                                const int              ithreshold) const -> CMatrices;
+
+   private:
+    int _block_size_factor = 16;
 };
 
 template <int N>
@@ -141,6 +157,115 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
                     distributor.set_indices(bra_gpairs, ket_gpairs);
                     auto bra_range = std::pair<size_t, size_t>(0, bra_gpairs.number_of_contracted_pairs());
                     auto ket_range = std::pair<size_t, size_t>(0, ket_gpairs.number_of_contracted_pairs());
+                    erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    distributor.accumulate(bra_gpairs, ket_gpairs);
+
+                    std::cout << i << " " << j << " " << bra_gpairs.number_of_contracted_pairs() << " " << ket_gpairs.number_of_contracted_pairs() << std::endl;
+
+                }
+            });
+        }
+    }
+
+    return fock_mats;
+}
+
+template <int N>
+auto
+CFockGeomX000Driver<N>::compute_with_screening(const CMolecularBasis &basis,
+                                               const CMolecule       &molecule,
+                                               const CT4CScreener&   screener,
+                                               const CT4CScreener&   screener_atom,
+                                               const CMatrix         &density,
+                                               const int              iatom,
+                                               const std::string     &label,
+                                               const double           exchange_factor,
+                                               const double           omega,
+                                               const int             ithreshold) const -> CMatrices
+{
+    const auto nao = density.number_of_rows();
+
+    int bsfac = _block_size_factor;
+
+    if (nao < 450) { bsfac = 16 * _block_size_factor; }
+    else if (nao < 900) { bsfac = 8 * _block_size_factor; }
+    else if (nao < 1800) { bsfac = 4 * _block_size_factor; }
+    else if (nao < 3600) { bsfac = 2 * _block_size_factor; }
+    else { bsfac = _block_size_factor; }
+
+    // set up Fock matrices
+
+    auto fock_mats = matfunc::make_matrices(
+        std::array<int, 1>{
+            1,
+        },
+        basis,
+        mat_t::general);
+
+    fock_mats.zero();
+
+    // prepare pointers for OMP parallel region
+
+    auto ptr_screener = &screener;
+
+    auto ptr_screener_atom = &screener_atom;
+
+    auto ptr_density = &density;
+
+    auto ptr_focks = &fock_mats;
+
+    /*
+    // set basis function pair blocks
+
+    const auto bra_pairs = gtofunc::make_gto_blocks(basis,
+                                                    molecule,
+                                                    {
+                                                        iatom,
+                                                    });
+
+    const auto ket_pairs = gtofunc::make_gto_blocks(basis, molecule);
+
+    const auto bra_gto_pair_blocks = gtofunc::make_gto_pair_blocks(bra_pairs, ket_pairs);
+
+    const auto ket_gto_pair_blocks = gtofunc::make_gto_pair_blocks(ket_pairs);
+
+    // prepare pointers for OMP parallel region
+
+    auto ptr_bra_gto_pair_blocks = &bra_gto_pair_blocks;
+
+    auto ptr_ket_gto_pair_blocks = &ket_gto_pair_blocks;
+
+    auto ptr_density = &density;
+
+    auto ptr_focks = &fock_mats;
+    */
+
+    // execute OMP tasks with static scheduling
+
+#pragma omp parallel shared(ptr_screener, ptr_screener_atom, ptr_density, ptr_focks, label, exchange_factor, omega, ithreshold)
+    {
+#pragma omp single nowait
+        {
+            auto bra_gto_pair_blocks = ptr_screener_atom->gto_pair_blocks();
+
+            auto ket_gto_pair_blocks = ptr_screener->gto_pair_blocks();
+
+            const auto work_tasks = omp::make_bra_ket_work_group(bra_gto_pair_blocks, ket_gto_pair_blocks, ithreshold, bsfac);
+
+            std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
+                const auto bra_gpairs = bra_gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
+                const auto ket_gpairs = ket_gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
+                const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
+                const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
+                //const bool diagonal   = (task[0] == task[1]) && (task[2] == task[3]) && (bra_range == ket_range);
+                const bool diagonal   = false;
+
+                std::cout << task[0] << " " << task[1] << " (" << task[2] << " " << task[3] << ") " << task[4] << " " << task[5] << ", " << task[6] << " " << task[7] << std::endl;
+
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal)
+                {
+                    CT4CGeomX0MatricesDistributor distributor(ptr_focks, ptr_density, label, exchange_factor, omega);
+                    distributor.set_indices(bra_gpairs, ket_gpairs);
                     erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
                     distributor.accumulate(bra_gpairs, ket_gpairs);
                 }

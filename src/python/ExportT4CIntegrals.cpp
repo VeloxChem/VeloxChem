@@ -118,6 +118,7 @@ export_t4cintegrals(py::module& m)
         .def(py::pickle([](const CT4CScreener& screener) { return py::make_tuple(screener.gto_pair_blocks()); },
                         [](py::tuple t) { return CT4CScreener(t[0].cast<std::vector<CBlockedGtoPairBlock>>()); }))
         .def("partition", &CT4CScreener::partition, "Partition basis funtion pairs blocks for given molecule and basis.")
+        .def("partition_atom", &CT4CScreener::partition_atom, "Partition basis funtion pairs blocks for given molecule and basis.")
         .def("gto_pair_blocks", &CT4CScreener::gto_pair_blocks, "Gets vector of blocked basis function pairs blocks.")
         .def("__eq__", [](const CT4CScreener& self, const CT4CScreener& other) { return self == other; })
         .def("__ne__", [](const CT4CScreener& self, const CT4CScreener& other) { return self != other; })
@@ -139,7 +140,8 @@ export_t4cintegrals(py::module& m)
                const double                  omega) -> std::shared_ptr<CMatrices> {
                 return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
             },
-            "Computes gradient of Fock matrix of requested type for given molecule and basis.");
+            "Computes gradient of Fock matrix of requested type for given molecule and basis.")
+        .def("compute_with_screening", &CFockGeomX000Driver<1>::compute_with_screening, "Computes gradient of Fock matrix of requested type for given molecule and basis.");
 }
 
 }  // namespace vlx_t4cintegrals

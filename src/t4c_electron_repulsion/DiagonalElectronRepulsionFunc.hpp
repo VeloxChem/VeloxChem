@@ -52,6 +52,13 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
         return;
     }
 
+    if (angmoms == std::pair<int, int>({1, 0}))
+    {
+        erirec::comp_diag_electron_repulsion_psps(distributor, gto_pair_block, range);
+
+        return;
+    }
+
     // angular order - 2
 
     if (angmoms == std::pair<int, int>({0, 2}))
@@ -156,6 +163,8 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
 
         return;
     }
+
+    std::cout << "diag_compute: uncaught exception!" << " " << angmoms.first << " " << angmoms.second << std::endl;
 }
 
 }  // namespace erifunc

@@ -32,6 +32,7 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
 from .veloxchemlib import DispersionModel
+from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import partition_atoms, make_matrix
 from .veloxchemlib import parse_xc_func
@@ -224,10 +225,22 @@ class ScfGradientDriver(GradientDriver):
 
         fock_grad_drv = FockGeom1000Driver()
 
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+
         for iatom in local_atoms:
+
+            """
             gmats = fock_grad_drv.compute(basis, molecule, den_mat_for_fock,
                                           iatom, fock_type,
                                           exchange_scaling_factor, 0.0)
+            """
+            screener_atom = T4CScreener()
+            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+            gmats = fock_grad_drv.compute_with_screening(
+                    basis, molecule, screener, screener_atom,
+                    den_mat_for_fock, iatom, fock_type,
+                    exchange_scaling_factor, 0.0, 12)
 
             factor = 2.0 if fock_type == 'j' else 1.0
 
