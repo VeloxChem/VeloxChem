@@ -71,13 +71,12 @@ class CFockGeomX000Driver
                  const double           exchange_factor,
                  const double           omega) const -> CMatrices;
 
-    auto compute_with_screening(const CMolecularBasis &basis,
-                                const CMolecule       &molecule,
-                                const CT4CScreener&   screener,
-                                const CT4CScreener&   screener_atom,
-                                const CMatrix         &density,
+    auto compute_with_screening(const CMolecularBasis& basis,
+                                const CT4CScreener&    screener_atom,
+                                const CT4CScreener&    screener,
+                                const CMatrix&         density,
                                 const int              iatom,
-                                const std::string     &label,
+                                const std::string&     label,
                                 const double           exchange_factor,
                                 const double           omega,
                                 const int              ithreshold) const -> CMatrices;
@@ -168,16 +167,15 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
 
 template <int N>
 auto
-CFockGeomX000Driver<N>::compute_with_screening(const CMolecularBasis &basis,
-                                               const CMolecule       &molecule,
-                                               const CT4CScreener&   screener,
-                                               const CT4CScreener&   screener_atom,
-                                               const CMatrix         &density,
+CFockGeomX000Driver<N>::compute_with_screening(const CMolecularBasis& basis,
+                                               const CT4CScreener&    screener_atom,
+                                               const CT4CScreener&    screener,
+                                               const CMatrix&         density,
                                                const int              iatom,
-                                               const std::string     &label,
+                                               const std::string&     label,
                                                const double           exchange_factor,
                                                const double           omega,
-                                               const int             ithreshold) const -> CMatrices
+                                               const int              ithreshold) const -> CMatrices
 {
     const auto nao = density.number_of_rows();
 
