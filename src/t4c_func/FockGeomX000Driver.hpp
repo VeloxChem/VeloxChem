@@ -81,8 +81,14 @@ class CFockGeomX000Driver
                  const double           omega,
                  const int              ithreshold) const -> CMatrices;
 
+    auto set_block_size_factor(const int factor) -> void;
+
    private:
     int _block_size_factor = 16;
+
+    auto _get_nao(const CMatrix& mat) const -> int;
+
+    auto _determine_block_size_factor(const int nao) const -> int;
 };
 
 template <int N>
@@ -177,15 +183,7 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
                                 const double           omega,
                                 const int              ithreshold) const -> CMatrices
 {
-    const auto nao = density.number_of_rows();
-
-    int bsfac = _block_size_factor;
-
-    if (nao < 450) { bsfac = 16 * _block_size_factor; }
-    else if (nao < 900) { bsfac = 8 * _block_size_factor; }
-    else if (nao < 1800) { bsfac = 4 * _block_size_factor; }
-    else if (nao < 3600) { bsfac = 2 * _block_size_factor; }
-    else { bsfac = _block_size_factor; }
+    auto bsfac = _determine_block_size_factor(_get_nao(density));
 
     // set up Fock matrices
 
@@ -237,6 +235,46 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
     }
 
     return fock_mats;
+}
+
+template <int N>
+auto
+CFockGeomX000Driver<N>::set_block_size_factor(const int factor) -> void
+{
+    _block_size_factor = factor;
+}
+
+template <int N>
+auto
+CFockGeomX000Driver<N>::_get_nao(const CMatrix& mat) const -> int
+{
+    return mat.number_of_rows();
+}
+
+template <int N>
+auto
+CFockGeomX000Driver<N>::_determine_block_size_factor(const int nao) const -> int
+{
+    if (nao < 450)
+    {
+        return 16 * _block_size_factor;
+    }
+    else if (nao < 900)
+    {
+        return 8 * _block_size_factor;
+    }
+    else if (nao < 1800)
+    {
+        return 4 * _block_size_factor;
+    }
+    else if (nao < 3600)
+    {
+        return 2 * _block_size_factor;
+    }
+    else
+    {
+        return _block_size_factor;
+    }
 }
 
 #endif /* FockGeomX000Driver_hpp */

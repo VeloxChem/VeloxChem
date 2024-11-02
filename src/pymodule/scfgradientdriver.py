@@ -24,6 +24,7 @@
 
 from mpi4py import MPI
 from copy import deepcopy
+from os import environ
 import numpy as np
 import time
 import math
@@ -70,8 +71,10 @@ class ScfGradientDriver(GradientDriver):
         self.flag = 'SCF Gradient Driver'
 
         self.eri_thresh = scf_drv.eri_thresh
-        self._debug = scf_drv._debug
         self.timing = scf_drv.timing
+
+        self._debug = scf_drv._debug
+        self._block_size_factor = scf_drv._block_size_factor
 
         self.numerical = False
         self.delta_h = 0.001
@@ -92,6 +95,24 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
                                     profiler.get_available_memory())
             self.ostream.flush()
+
+    def _get_extra_block_size_factor(self, naos):
+
+        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
+
+        if total_cores >= 2048:
+            if naos >= 4500:
+                extra_factor = 4
+            else:
+                extra_factor = 2
+
+        elif total_cores >= 1024:
+            extra_factor = 2
+
+        else:
+            extra_factor = 1
+
+        return extra_factor
 
     def compute(self, molecule, basis, scf_results):
         """
@@ -272,6 +293,11 @@ class ScfGradientDriver(GradientDriver):
         self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
+
+        extra_factor = self._get_extra_block_size_factor(
+            basis.get_dimensions_of_basis())
+        fock_grad_drv._set_block_size_factor(self._block_size_factor *
+                                             extra_factor)
 
         t0 = time.time()
 
@@ -500,6 +526,11 @@ class ScfGradientDriver(GradientDriver):
         Dab_for_fock.set_values(Da + Db)
 
         fock_grad_drv = FockGeom1000Driver()
+
+        extra_factor = self._get_extra_block_size_factor(
+            basis.get_dimensions_of_basis())
+        fock_grad_drv._set_block_size_factor(self._block_size_factor *
+                                             extra_factor)
 
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
