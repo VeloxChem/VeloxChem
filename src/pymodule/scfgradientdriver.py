@@ -25,7 +25,7 @@
 from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
-import time as tm
+import time
 import math
 
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
@@ -87,7 +87,7 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
-        start_time = tm.time()
+        start_time = time.time()
         self.print_header()
 
         if self.rank == mpi_master():
@@ -112,7 +112,7 @@ class ScfGradientDriver(GradientDriver):
         self.print_gradient(molecule)
 
         valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
@@ -226,10 +226,20 @@ class ScfGradientDriver(GradientDriver):
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(D)
 
+        fock_timing = {
+            'Screening': 0.0,
+            'FockGrad': 0.0,
+            'LinAlg': 0.0,
+        }
+
         fock_grad_drv = FockGeom1000Driver()
+
+        t0 = time.time()
 
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
+
+        fock_timing['Screening'] += time.time() - t0
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -238,15 +248,23 @@ class ScfGradientDriver(GradientDriver):
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
+            t0 = time.time()
+
             gmats = fock_grad_drv.compute_with_screening(
                 basis, screener_atom, screener, den_mat_for_fock, iatom,
                 fock_type, exchange_scaling_factor, 0.0, thresh_int)
 
+            fock_timing['FockGrad'] += time.time() - t0
+
             factor = 2.0 if fock_type == 'j' else 1.0
+
+            t0 = time.time()
 
             for i, label in enumerate(['X', 'Y', 'Z']):
                 gmat = gmats.matrix_to_numpy(label)
                 self.gradient[iatom, i] += np.sum(gmat * D) * factor
+
+            fock_timing['LinAlg'] += time.time() - t0
 
         # XC contribution to gradient
 
@@ -291,6 +309,12 @@ class ScfGradientDriver(GradientDriver):
         # collect gradient
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
+
+        if self.rank == mpi_master():
+            self.ostream.print_info('Fock timing decomposition')
+            for key, val in fock_timing.items():
+                self.ostream.print_info(f'    {key:<10s}:  {val:.2f} sec')
+            self.ostream.print_blank()
 
     def compute_unrestricted(self, molecule, basis, scf_results):
         """
@@ -511,7 +535,7 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
-        start_time = tm.time()
+        start_time = time.time()
         self.print_header()
 
         self.ostream.mute()
@@ -524,7 +548,7 @@ class ScfGradientDriver(GradientDriver):
         self.print_gradient(molecule)
 
         valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
