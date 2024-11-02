@@ -63,23 +63,23 @@ class CFockGeomX000Driver
     /// @param exchange_factor The exchange-correlation factors.
     /// @param omega The range separation factor.
     /// @return The Fock matrices.
-    auto compute(const CMolecularBasis &basis,
-                 const CMolecule       &molecule,
-                 const CMatrix         &density,
+    auto compute(const CMolecularBasis& basis,
+                 const CMolecule&       molecule,
+                 const CMatrix&         density,
                  const int              iatom,
-                 const std::string     &label,
+                 const std::string&     label,
                  const double           exchange_factor,
                  const double           omega) const -> CMatrices;
 
-    auto compute_with_screening(const CMolecularBasis& basis,
-                                const CT4CScreener&    screener_atom,
-                                const CT4CScreener&    screener,
-                                const CMatrix&         density,
-                                const int              iatom,
-                                const std::string&     label,
-                                const double           exchange_factor,
-                                const double           omega,
-                                const int              ithreshold) const -> CMatrices;
+    auto compute(const CMolecularBasis& basis,
+                 const CT4CScreener&    screener_atom,
+                 const CT4CScreener&    screener,
+                 const CMatrix&         density,
+                 const int              iatom,
+                 const std::string&     label,
+                 const double           exchange_factor,
+                 const double           omega,
+                 const int              ithreshold) const -> CMatrices;
 
    private:
     int _block_size_factor = 16;
@@ -167,15 +167,15 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
 
 template <int N>
 auto
-CFockGeomX000Driver<N>::compute_with_screening(const CMolecularBasis& basis,
-                                               const CT4CScreener&    screener_atom,
-                                               const CT4CScreener&    screener,
-                                               const CMatrix&         density,
-                                               const int              iatom,
-                                               const std::string&     label,
-                                               const double           exchange_factor,
-                                               const double           omega,
-                                               const int              ithreshold) const -> CMatrices
+CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
+                                const CT4CScreener&    screener_atom,
+                                const CT4CScreener&    screener,
+                                const CMatrix&         density,
+                                const int              iatom,
+                                const std::string&     label,
+                                const double           exchange_factor,
+                                const double           omega,
+                                const int              ithreshold) const -> CMatrices
 {
     const auto nao = density.number_of_rows();
 
@@ -208,32 +208,6 @@ CFockGeomX000Driver<N>::compute_with_screening(const CMolecularBasis& basis,
 
     auto ptr_focks = &fock_mats;
 
-    /*
-    // set basis function pair blocks
-
-    const auto bra_pairs = gtofunc::make_gto_blocks(basis,
-                                                    molecule,
-                                                    {
-                                                        iatom,
-                                                    });
-
-    const auto ket_pairs = gtofunc::make_gto_blocks(basis, molecule);
-
-    const auto bra_gto_pair_blocks = gtofunc::make_gto_pair_blocks(bra_pairs, ket_pairs);
-
-    const auto ket_gto_pair_blocks = gtofunc::make_gto_pair_blocks(ket_pairs);
-
-    // prepare pointers for OMP parallel region
-
-    auto ptr_bra_gto_pair_blocks = &bra_gto_pair_blocks;
-
-    auto ptr_ket_gto_pair_blocks = &ket_gto_pair_blocks;
-
-    auto ptr_density = &density;
-
-    auto ptr_focks = &fock_mats;
-    */
-
     // execute OMP tasks with static scheduling
 
 #pragma omp parallel shared(ptr_screener, ptr_screener_atom, ptr_density, ptr_focks, label, exchange_factor, omega, ithreshold)
@@ -251,9 +225,7 @@ CFockGeomX000Driver<N>::compute_with_screening(const CMolecularBasis& basis,
                 const auto ket_gpairs = ket_gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
                 const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
                 const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
-                //const bool diagonal   = (task[0] == task[1]) && (task[2] == task[3]) && (bra_range == ket_range);
-                const bool diagonal   = false;
-#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal)
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range)
                 {
                     CT4CGeomX0MatricesDistributor distributor(ptr_focks, ptr_density, label, exchange_factor, omega);
                     distributor.set_indices(bra_gpairs, ket_gpairs);

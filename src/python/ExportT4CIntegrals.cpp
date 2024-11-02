@@ -130,7 +130,7 @@ export_t4cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CFockGeomX000Driver<1>& fock_drv,
+            [](const CFockGeomX000Driver<1>& self,
                const CMolecularBasis&        basis,
                const CMolecule&              molecule,
                const CMatrix&                density,
@@ -138,10 +138,24 @@ export_t4cintegrals(py::module& m)
                const std::string&            label,
                const double                  exchange_factor,
                const double                  omega) -> CMatrices {
-                return fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega);
+                return self.compute(basis, molecule, density, iatom, label, exchange_factor, omega);
             },
             "Computes gradient of Fock matrix of requested type for given molecule and basis.")
-        .def("compute_with_screening", &CFockGeomX000Driver<1>::compute_with_screening, "Computes gradient of Fock matrix of requested type for given molecule and basis.");
+        .def(
+            "compute",
+            [](const CFockGeomX000Driver<1>& self,
+               const CMolecularBasis&        basis,
+               const CT4CScreener&           screener_atom,
+               const CT4CScreener&           screener,
+               const CMatrix&                density,
+               const int                     iatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega,
+               const int                     ithreshold) -> CMatrices {
+                return self.compute(basis, screener_atom, screener, density, iatom, label, exchange_factor, omega, ithreshold);
+            },
+            "Computes gradient of Fock matrix of requested type for given molecule and basis.");
 }
 
 }  // namespace vlx_t4cintegrals
