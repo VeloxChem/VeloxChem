@@ -33,6 +33,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .molecule import Molecule
+from .profiler import Profiler
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -76,6 +77,8 @@ class OptimizationEngine(geometric.engine.Engine):
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
 
+        self._debug = False
+
     def calc_new(self, coords, dirname):
         """
         Implements calc_new method for the engine.
@@ -104,6 +107,15 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
+        if self._debug:
+            profiler = Profiler()
+            self.grad_drv.ostream.print_blank()
+            self.grad_drv.ostream.print_info(
+                '==DEBUG==   available memory before gradient: ' +
+                profiler.get_available_memory())
+            self.grad_drv.ostream.print_blank()
+            self.grad_drv.ostream.flush()
+
         self.grad_drv.ostream.mute()
 
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
@@ -127,6 +139,14 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.print_info(valstr)
             valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
             self.grad_drv.ostream.print_info(valstr)
+            self.grad_drv.ostream.print_blank()
+            self.grad_drv.ostream.flush()
+
+        if self._debug:
+            profiler = Profiler()
+            self.grad_drv.ostream.print_info(
+                '==DEBUG==   available memory after  gradient: ' +
+                profiler.get_available_memory())
             self.grad_drv.ostream.print_blank()
             self.grad_drv.ostream.flush()
 
