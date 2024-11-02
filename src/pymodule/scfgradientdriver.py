@@ -37,6 +37,8 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import partition_atoms, make_matrix
 from .veloxchemlib import parse_xc_func
+from .matrices import Matrices
+from .profiler import Profiler
 from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
@@ -68,12 +70,28 @@ class ScfGradientDriver(GradientDriver):
         self.flag = 'SCF Gradient Driver'
 
         self.eri_thresh = scf_drv.eri_thresh
+        self._debug = scf_drv._debug
+        self.timing = scf_drv.timing
 
         self.numerical = False
         self.delta_h = 0.001
 
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
+
+    def _print_debug_info(self, label):
+        """
+        Prints debug information.
+
+        :param label:
+            The label of debug information.
+        """
+
+        if self._debug:
+            profiler = Profiler()
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
+                                    profiler.get_available_memory())
+            self.ostream.flush()
 
     def compute(self, molecule, basis, scf_results):
         """
@@ -152,6 +170,8 @@ class ScfGradientDriver(GradientDriver):
 
         kin_grad_drv = KineticEnergyGeom100Driver()
 
+        self._print_debug_info('before kin_grad')
+
         for iatom in local_atoms:
             gmats = kin_grad_drv.compute(molecule, basis, iatom)
 
@@ -159,7 +179,13 @@ class ScfGradientDriver(GradientDriver):
                 gmat = gmats.matrix_to_numpy(label)
                 self.gradient[iatom, i] += 2.0 * np.sum((gmat + gmat.T) * D)
 
+            gmats = Matrices()
+
+        self._print_debug_info('after  kin_grad')
+
         # nuclear potential contribution to gradient
+
+        self._print_debug_info('before npot_grad')
 
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
@@ -177,7 +203,14 @@ class ScfGradientDriver(GradientDriver):
                     (gmat_100 + gmat_100.T) * D)
                 self.gradient[iatom, i] -= 2.0 * np.sum(gmat_010 * D)
 
+            gmats_100 = Matrices()
+            gmats_010 = Matrices()
+
+        self._print_debug_info('after  npot_grad')
+
         # orbital contribution to gradient
+
+        self._print_debug_info('before ovl_grad')
 
         ovl_grad_drv = OverlapGeom100Driver()
 
@@ -188,6 +221,10 @@ class ScfGradientDriver(GradientDriver):
                 gmat = gmats.matrix_to_numpy(label)
                 # Note: minus sign for energy weighted density
                 self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
+
+            gmats = Matrices()
+
+        self._print_debug_info('after  ovl_grad')
 
         # ERI contribution to gradient
 
@@ -232,6 +269,8 @@ class ScfGradientDriver(GradientDriver):
             'LinAlg': 0.0,
         }
 
+        self._print_debug_info('before fock_grad')
+
         fock_grad_drv = FockGeom1000Driver()
 
         t0 = time.time()
@@ -265,9 +304,15 @@ class ScfGradientDriver(GradientDriver):
                 gmat = gmats.matrix_to_numpy(label)
                 self.gradient[iatom, i] += np.sum(gmat * D) * factor
 
+            gmats = Matrices()
+
             fock_timing['LinAlg'] += time.time() - t0
 
+        self._print_debug_info('after  fock_grad')
+
         # XC contribution to gradient
+
+        self._print_debug_info('before xc_grad')
 
         if use_dft:
             if self.rank == mpi_master():
@@ -295,6 +340,8 @@ class ScfGradientDriver(GradientDriver):
         else:
             xcfun_label = 'hf'
 
+        self._print_debug_info('after  xc_grad')
+
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
         # (only added on master rank)
@@ -311,7 +358,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
-        if self.rank == mpi_master():
+        if self.timing and self.rank == mpi_master():
             self.ostream.print_info('Fock timing decomposition')
             for key, val in fock_timing.items():
                 self.ostream.print_info(f'    {key:<10s}:  {val:.2f} sec')
@@ -372,6 +419,8 @@ class ScfGradientDriver(GradientDriver):
                 gmat = gmats.matrix_to_numpy(label)
                 self.gradient[iatom, i] += np.sum((gmat + gmat.T) * (Da + Db))
 
+            gmats = Matrices()
+
         # nuclear potential contribution to gradient
 
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
@@ -390,6 +439,9 @@ class ScfGradientDriver(GradientDriver):
                     (gmat_100 + gmat_100.T) * (Da + Db))
                 self.gradient[iatom, i] -= np.sum(gmat_010 * (Da + Db))
 
+            gmats_100 = Matrices()
+            gmats_010 = Matrices()
+
         # orbital contribution to gradient
 
         ovl_grad_drv = OverlapGeom100Driver()
@@ -401,6 +453,8 @@ class ScfGradientDriver(GradientDriver):
                 gmat = gmats.matrix_to_numpy(label)
                 # Note: minus sign for energy weighted density
                 self.gradient[iatom, i] -= np.sum((gmat + gmat.T) * (Wa + Wb))
+
+            gmats = Matrices()
 
         # ERI contribution to gradient
 
@@ -480,6 +534,12 @@ class ScfGradientDriver(GradientDriver):
                     gmat_kb = gmats_Kb.matrix_to_numpy(label)
                     self.gradient[iatom, i] -= 0.5 * np.sum(gmat_ka * Da)
                     self.gradient[iatom, i] -= 0.5 * np.sum(gmat_kb * Db)
+
+            gmats_Jab = Matrices()
+
+            if fock_type != 'j':
+                gmats_Ka = Matrices()
+                gmats_Kb = Matrices()
 
         # TODO: unrestricted DFT gradient
         # XC contribution to gradient
@@ -571,12 +631,16 @@ class ScfGradientDriver(GradientDriver):
             The energy.
         """
 
-        self.ostream.mute()
+        if not self._debug:
+            self.ostream.mute()
+
         self.scf_driver.restart = False
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
-        self.ostream.unmute()
+
+        if not self._debug:
+            self.ostream.unmute()
 
         if self.rank == mpi_master():
             scf_results.update(new_scf_results)
