@@ -29,7 +29,7 @@ import numpy as np
 import time as tm
 import tempfile
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -65,10 +65,6 @@ class OptimizationDriver:
         - max_iter: The maximum number of optimization steps.
         - filename: The filename that will be used by geomeTRIC.
         - grad_drv: The gradient driver.
-        - cna: The flag for computation of Jaccard similarity index.
-        - cna_bond: The cut-off radius for chemical bond in CNA analysis.
-        - cna_rcut: The cut-off radius for chemical bonds environment in
-          CNA analysis.
         - transition: The flag for transition state searching.
         - hessian: The flag for computing Hessian.
     """
@@ -127,9 +123,7 @@ class OptimizationDriver:
         self.filename = 'vlx_' + get_random_string_parallel(self.comm)
         self.grad_drv = grad_drv
 
-        self.cna = False
-        self.cna_bond = None
-        self.cna_rcut = None
+        self._debug = False
 
         # input keywords
         self.input_keywords = {
@@ -148,9 +142,7 @@ class OptimizationDriver:
                 'conv_gmax': ('float', ''),
                 'conv_drms': ('float', ''),
                 'conv_dmax': ('float', ''),
-                'cna': ('bool', ''),
-                'cna_bond': ('float', ''),
-                'cna_rcut': ('float', ''),
+                '_debug': ('bool', 'print debug info'),
             },
         }
 
@@ -174,18 +166,6 @@ class OptimizationDriver:
         }
 
         parse_input(self, opt_keywords, opt_dict)
-
-        # update CNA bond cut-off radius
-        if self.cna_bond is None:
-            self.cna_bond = 3.0
-        else:
-            self.cna_bond /= bohr_in_angstrom()
-
-        # update CNA bond environment cut-off radius
-        if self.cna_rcut is None:
-            self.cna_rcut = 4.5
-        else:
-            self.cna_rcut /= bohr_in_angstrom()
 
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']
@@ -228,6 +208,10 @@ class OptimizationDriver:
         start_time = tm.time()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
+
+        if self._debug:
+            opt_engine._debug = True
+
         hessian_exit = False
         final_mol = None
 
@@ -371,9 +355,6 @@ class OptimizationDriver:
                         self.print_ic_rmsd(final_mol, self.ref_xyz)
                     else:
                         self.print_ic_rmsd(final_mol, molecule)
-
-                if self.cna:
-                    self.cna_analysis(final_mol, molecule, self.ref_xyz)
 
                 if self.hessian in ['last', 'first+last', 'each']:
                     self.print_vib_analysis(filename, 'vdata_last')

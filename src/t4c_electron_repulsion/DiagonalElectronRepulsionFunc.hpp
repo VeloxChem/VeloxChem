@@ -52,11 +52,25 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
         return;
     }
 
+    if (angmoms == std::pair<int, int>({1, 0}))
+    {
+        erirec::comp_diag_electron_repulsion_psps(distributor, gto_pair_block, range);
+
+        return;
+    }
+
     // angular order - 2
 
     if (angmoms == std::pair<int, int>({0, 2}))
     {
         erirec::comp_diag_electron_repulsion_sdsd(distributor, gto_pair_block, range);
+
+        return;
+    }
+
+    if (angmoms == std::pair<int, int>({2, 0}))
+    {
+        erirec::comp_diag_electron_repulsion_dsds(distributor, gto_pair_block, range);
 
         return;
     }
@@ -77,9 +91,23 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
         return;
     }
 
+    if (angmoms == std::pair<int, int>({3, 0}))
+    {
+        erirec::comp_diag_electron_repulsion_fsfs(distributor, gto_pair_block, range);
+
+        return;
+    }
+
     if (angmoms == std::pair<int, int>({1, 2}))
     {
         erirec::comp_diag_electron_repulsion_pdpd(distributor, gto_pair_block, range);
+
+        return;
+    }
+
+    if (angmoms == std::pair<int, int>({2, 1}))
+    {
+        erirec::comp_diag_electron_repulsion_dpdp(distributor, gto_pair_block, range);
 
         return;
     }
@@ -93,9 +121,23 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
         return;
     }
 
+    if (angmoms == std::pair<int, int>({4, 0}))
+    {
+        erirec::comp_diag_electron_repulsion_gsgs(distributor, gto_pair_block, range);
+
+        return;
+    }
+
     if (angmoms == std::pair<int, int>({1, 3}))
     {
         erirec::comp_diag_electron_repulsion_pfpf(distributor, gto_pair_block, range);
+
+        return;
+    }
+
+    if (angmoms == std::pair<int, int>({3, 1}))
+    {
+        erirec::comp_diag_electron_repulsion_fpfp(distributor, gto_pair_block, range);
 
         return;
     }
@@ -116,9 +158,23 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
         return;
     }
 
+    if (angmoms == std::pair<int, int>({4, 1}))
+    {
+        erirec::comp_diag_electron_repulsion_gpgp(distributor, gto_pair_block, range);
+
+        return;
+    }
+
     if (angmoms == std::pair<int, int>({2, 3}))
     {
         erirec::comp_diag_electron_repulsion_dfdf(distributor, gto_pair_block, range);
+
+        return;
+    }
+
+    if (angmoms == std::pair<int, int>({3, 2}))
+    {
+        erirec::comp_diag_electron_repulsion_fdfd(distributor, gto_pair_block, range);
 
         return;
     }
@@ -128,6 +184,13 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
     if (angmoms == std::pair<int, int>({2, 4}))
     {
         erirec::comp_diag_electron_repulsion_dgdg(distributor, gto_pair_block, range);
+
+        return;
+    }
+
+    if (angmoms == std::pair<int, int>({4, 2}))
+    {
+        erirec::comp_diag_electron_repulsion_gdgd(distributor, gto_pair_block, range);
 
         return;
     }
@@ -144,6 +207,13 @@ diag_compute(T& distributor, const CGtoPairBlock& gto_pair_block, const std::pai
     if (angmoms == std::pair<int, int>({3, 4}))
     {
         erirec::comp_diag_electron_repulsion_fgfg(distributor, gto_pair_block, range);
+
+        return;
+    }
+
+    if (angmoms == std::pair<int, int>({3, 4}))
+    {
+        erirec::comp_diag_electron_repulsion_gfgf(distributor, gto_pair_block, range);
 
         return;
     }
