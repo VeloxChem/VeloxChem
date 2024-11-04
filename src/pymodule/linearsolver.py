@@ -171,6 +171,9 @@ class LinearSolver:
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        # serial ratio as in Amdahl's law for estimating parallel efficiency
+        self.serial_ratio = 0.1
+
         # input keywords
         self._input_keywords = {
             'response': {
@@ -180,6 +183,7 @@ class LinearSolver:
                 'max_iter': ('int', 'maximum number of iterations'),
                 'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'serial_ratio': ('float', 'serial ratio as in Amdahl\'s law'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -646,8 +650,7 @@ class LinearSolver:
                 ave, res = divmod(n_total, n_subcomms)
                 counts = [ave + 1 if p < res else ave for p in range(n_subcomms)]
 
-                serial_ratio = 0.08
-                time_per_fock = serial_ratio + (1 - serial_ratio) / subcomm_size
+                time_per_fock = self.serial_ratio + (1 - self.serial_ratio) / subcomm_size
                 dt = max(counts) * time_per_fock
 
                 dt_and_subcomm_size.append((dt, subcomm_size))
@@ -697,7 +700,8 @@ class LinearSolver:
         # go through batches
 
         if self.rank == mpi_master():
-            batch_str = f'Processing {n_total} Fock builds...'
+            batch_str = f'Processing {n_total} Fock builds'
+            batch_str += f' on {batch_size} subcommunicators...'
             self.ostream.print_info(batch_str)
             self.ostream.flush()
 
