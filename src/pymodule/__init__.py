@@ -39,6 +39,7 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
+from .veloxchemlib import XCMolecularGradient
 
 # C++ functions
 from .veloxchemlib import is_chemical_element

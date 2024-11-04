@@ -38,6 +38,7 @@
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
 #include "XCFunctional.hpp"
+#include "XCMolecularGradientForPDFT.hpp"
 
 /**
  Class CXCMolecularGradient implements XC molecular gradient.
@@ -154,6 +155,30 @@ class CXCMolecularGradient
                                       const std::vector<const double*>& gsDensityPointers,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
+
+    /**
+     Integrates first-order exchange-correlation functional contribution to
+     PDFT molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix object.
+     @param twoBodyDensityMatrix the MO two-body active density matrix.
+     @param activeMOs the active molecular orbitals.
+     @param molecularGrid the molecular grid.
+     @param fvxc exchange-correlation functional.
+     @param rs_omega range-separation parameter.
+     @return the molecular gradient.
+     */
+    CDenseMatrix integrateVxcPDFTGradient(const CMolecule&                    molecule,
+                                          const CMolecularBasis&              basis,
+                                          const double*                       densityMatrixPointer,
+                                          const CDenseMatrix&                 twoBodyDensityMatrix,
+                                          const CDenseMatrix&                 activeMOs,
+                                          const CMolecularGrid&               molecularGrid,
+                                          const CXCPairDensityFunctional&     fvxc,
+                                          const double                        rs_omega) const;
+
 };
 
 #endif /* XCMolecularGradient_hpp */
