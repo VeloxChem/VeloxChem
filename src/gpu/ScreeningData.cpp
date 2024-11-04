@@ -41,8 +41,12 @@
 
 #define MATH_CONST_PI 3.14159265358979323846
 
-CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold)
+CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold, const int rank, const int nnodes)
 {
+    _rank = rank;
+
+    _nnodes = nnodes;
+
     _num_gpus_per_node = num_gpus_per_node;
 
     _pair_threshold = pair_threshold;
@@ -1416,9 +1420,8 @@ CScreeningData::_sortQ(const int64_t s_prim_count,
     _pd_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
     _dd_pair_data_local = std::vector<std::vector<double>>(_num_gpus_per_node);
 
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+    auto rank = _rank;
+    auto nnodes = _nnodes;
 
     for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {
@@ -3462,9 +3465,8 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
     _local_pair_inds_i_for_K_dd = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
     _local_pair_inds_k_for_K_dd = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
 
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+    auto rank = _rank;
+    auto nnodes = _nnodes;
 
     for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {

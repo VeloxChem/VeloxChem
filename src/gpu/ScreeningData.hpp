@@ -41,6 +41,10 @@
  */
 class CScreeningData
 {
+    int _rank{0};
+
+    int _nnodes{1};
+
     int64_t _num_gpus_per_node{8};
 
     double _pair_threshold{0.0};
@@ -206,7 +210,7 @@ class CScreeningData
                 const std::vector<double>& d_prim_info) -> void;
 
    public:
-    CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold);
+    CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold, const int rank, const int nnodes);
 
     auto getNumGpusPerNode() const -> const int64_t;
 

@@ -41,6 +41,7 @@ from .veloxchemlib import compute_angular_momentum_integrals_gpu
 from .veloxchemlib import integrate_fxc_fock_gpu
 from .veloxchemlib import mpi_master, hartree_in_ev, rotatory_strength_in_cgs
 from .distributedarray import DistributedArray
+from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
@@ -346,7 +347,8 @@ class LinearSolver:
         num_gpus_per_node = self._get_num_gpus_per_node()
 
         screening = ScreeningData(molecule, basis, num_gpus_per_node,
-                                  self.pair_thresh, self.density_thresh)
+                                  self.pair_thresh, self.density_thresh,
+                                  self.comm.Get_rank(), self.comm.Get_size())
 
         return {
             'screening': screening,
@@ -625,9 +627,94 @@ class LinearSolver:
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
+        else:
+            mo = None
+            fa = None
+            nocc = None
+            norb = None
+            fa_mo = None
 
-        batch_size = 1
-        num_batches = n_total
+        if self.rank == mpi_master():
+            print()
+            print()
+            print('n_total:', n_total)
+            dt_and_subcomm_size = []
+            for subcomm_size in range(1, 16 + 1):
+                if self.nodes % subcomm_size != 0:
+                    continue
+                print('  subcomm_size:', subcomm_size)
+
+                n_subcomms = self.nodes // subcomm_size
+
+                ave, res = divmod(n_total, n_subcomms)
+                counts = [ave + 1 if p < res else ave for p in range(n_subcomms)]
+                print('    counts:', counts)
+
+                serial_ratio = 0.08
+                time_per_fock = serial_ratio + (1 - serial_ratio) / subcomm_size
+                dt = max(counts) * time_per_fock
+                print('    dt:', dt)
+
+                dt_and_subcomm_size.append((dt, subcomm_size))
+            dt_and_subcomm_size.sort()
+            subcomm_size = dt_and_subcomm_size[0][1]
+            print('final_subcomm_size:', subcomm_size)
+
+            print()
+            print()
+        else:
+            subcomm_size = None
+        subcomm_size = self.comm.bcast(subcomm_size, root=mpi_master())
+
+        grps = [p // subcomm_size for p in range(self.nodes)]
+        subcomm = SubCommunicators(self.comm, grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+
+        is_local_master = (local_comm.Get_rank() == mpi_master())
+        is_global_master = (self.rank == mpi_master())
+
+        subcomm_index = None
+        local_master_ranks = None
+
+        if is_local_master:
+            mo = cross_comm.bcast(mo, root=mpi_master())
+            fa = cross_comm.bcast(fa, root=mpi_master())
+            nocc = cross_comm.bcast(nocc, root=mpi_master())
+            norb = cross_comm.bcast(norb, root=mpi_master())
+            fa_mo = cross_comm.bcast(fa_mo, root=mpi_master())
+
+            subcomm_index = cross_comm.Get_rank()
+            local_master_ranks = cross_comm.allgather(self.rank)
+
+            """
+            cross_rank = cross_comm.Get_rank()
+            cross_nodes = cross_comm.Get_size()
+
+            ave, res = divmod(n_total, cross_nodes)
+            count = [ave + 1 if i < res else ave for i in range(cross_nodes)]
+            displ = [sum(count[:i]) for i in range(cross_nodes)]
+            """
+
+        if is_global_master:
+            print('local_master_ranks:', local_master_ranks)
+            print()
+            print()
+
+        subcomm_index = local_comm.bcast(subcomm_index, root=mpi_master())
+        local_master_ranks = local_comm.bcast(local_master_ranks, root=mpi_master())
+
+        batch_size = self.nodes // subcomm_size
+
+        num_batches = n_total // batch_size
+        if n_total % batch_size != 0:
+            num_batches += 1
+
+        num_gpus_per_node = self._get_num_gpus_per_node()
+
+        local_screening = ScreeningData(molecule, basis, num_gpus_per_node,
+                                        self.pair_thresh, self.density_thresh,
+                                        local_comm.Get_rank(), local_comm.Get_size())
 
         # go through batches
 
@@ -640,34 +727,74 @@ class LinearSolver:
 
             # form density matrices
 
+            """
+            if is_local_master:
+                batch_start = displ[cross_rank]
+                batch_end = displ[cross_rank] + count[cross_rank]
+            else:
+                batch_start = None
+                batch_end = None
+            batch_start, batch_end = cross_comm.bcast(
+                (batch_start, batch_end), root=mpi_master())
+            """
+
             batch_start = batch_size * batch_ind
             batch_end = min(batch_start + batch_size, n_total)
 
-            if self.rank == mpi_master():
+            if is_global_master:
+                print('batch_start, batch_end:   ', batch_start, batch_end)
+                sys.stdout.flush()
+
+            if is_local_master:
                 dks = []
                 kns = []
 
-            symm_flags = []
+            symm_flags = [None for idx in range(len(local_master_ranks))]
+            vec_list = [None for idx in range(len(local_master_ranks))]
 
-            for col in range(batch_start, batch_end):
+            for idx, local_master_rank in enumerate(local_master_ranks):
+
+                #if idx >= batch_end - batch_start:
+                #    break
+
+                #self.comm.barrier()
+                #print('  idx, local_master_rank, batch_end, batch_start', idx, local_master_rank, batch_end, batch_start)
+                #sys.stdout.flush()
+                #self.comm.barrier()
+
+                col = idx + batch_start
+
                 if col < n_ger:
-                    v_ger = vecs_ger.get_full_vector(col)
-                    if self.rank == mpi_master():
+                    v_ger = vecs_ger.get_full_vector(col, root=local_master_rank)
+                    if self.rank == local_master_rank:
                         # full-size gerade trial vector
-                        vec = np.hstack((v_ger, v_ger))
+                        vec_list[idx] = np.hstack((v_ger, v_ger))
                     # Note: antisymmetric density matrix from gerade vector
                     # due to commut_mo_density
-                    symm_flags.append('antisymm')
-                else:
-                    v_ung = vecs_ung.get_full_vector(col - n_ger)
-                    if self.rank == mpi_master():
+                    symm_flags[idx] = 'antisymm'
+                #else:
+                elif col < batch_end:
+                    v_ung = vecs_ung.get_full_vector(col - n_ger, root=local_master_rank)
+                    if self.rank == local_master_rank:
                         # full-size ungerade trial vector
-                        vec = np.hstack((v_ung, -v_ung))
+                        vec_list[idx] = np.hstack((v_ung, -v_ung))
                     # Note: symmetric density matrix from ungerade vector
                     # due to commut_mo_density
-                    symm_flags.append('symm')
+                    symm_flags[idx] = 'symm'
 
-                if self.rank == mpi_master():
+            print('subcomm_index, batch_end, batch_start', subcomm_index, batch_end, batch_start)
+            sys.stdout.flush()
+            self.comm.barrier()
+
+            if subcomm_index + batch_start < batch_end:
+
+                local_master_rank = local_master_ranks[subcomm_index]
+
+                symm_flag = symm_flags[subcomm_index]
+
+                if is_local_master:
+                    vec = vec_list[subcomm_index]
+
                     half_size = vec.shape[0] // 2
 
                     if getattr(self, 'core_excitation', False):
@@ -688,111 +815,154 @@ class LinearSolver:
                     dks.append(dak)
                     kns.append(kn)
 
-            symm_flag = symm_flags[0]
-            if self.rank == mpi_master():
-                den_mat_np = dks[0]
-                naos = den_mat_np.shape[0]
-            else:
-                naos = None
-            naos = self.comm.bcast(naos, root=mpi_master())
+                if is_local_master:
+                    den_mat_np = dks[0]
+                    naos = den_mat_np.shape[0]
+                else:
+                    naos = None
+                naos = local_comm.bcast(naos, root=mpi_master())
 
-            if self.rank != mpi_master():
-                den_mat_np = np.zeros((naos, naos))
+                print('  subcomm_index after naos:', subcomm_index)
+                sys.stdout.flush()
 
-            self.comm.Bcast(den_mat_np, root=mpi_master())
+                if not is_local_master:
+                    den_mat_np = np.zeros((naos, naos))
 
-            dens = AODensityMatrix([den_mat_np], denmat.rest)
+                local_comm.Bcast(den_mat_np, root=mpi_master())
 
-            # form Fock matrices
+                print('  subcomm_index after den_mat_np:', subcomm_index)
+                sys.stdout.flush()
 
-            # Note: skipping Coulomb for antisymmetric density matrix
-            coulomb_coef = 0.0 if symm_flag == 'antisymm' else 2.0
-            fock_mat_local = self._comp_lr_fock(dens, molecule, basis, eri_dict,
-                                                dft_dict, pe_dict, coulomb_coef,
-                                                symm_flag, profiler)
+                dens = AODensityMatrix([den_mat_np], denmat.rest)
 
-            if self.rank == mpi_master():
-                fock_mat = np.zeros(fock_mat_local.shape)
-            else:
-                fock_mat = None
+                # form Fock matrices
 
-            self.comm.Reduce(fock_mat_local,
-                             fock_mat,
-                             op=MPI.SUM,
-                             root=mpi_master())
+                # Note: skipping Coulomb for antisymmetric density matrix
+                coulomb_coef = 0.0 if symm_flag == 'antisymm' else 2.0
+                fock_mat_local = self._comp_lr_fock(dens, molecule, basis, eri_dict,
+                                                    dft_dict, pe_dict, coulomb_coef,
+                                                    symm_flag, local_screening, local_comm,
+                                                    profiler)
 
-            e2_ger = None
-            e2_ung = None
+                print('  subcomm_index after fock:', subcomm_index)
+                sys.stdout.flush()
 
-            fock_ger = None
-            fock_ung = None
+                if is_local_master:
+                    fock_mat = np.zeros(fock_mat_local.shape)
+                else:
+                    fock_mat = None
 
-            if self.rank == mpi_master():
+                local_comm.Reduce(fock_mat_local,
+                                  fock_mat,
+                                  op=MPI.SUM,
+                                  root=mpi_master())
 
-                batch_ger, batch_ung = 0, 0
-                for col in range(batch_start, batch_end):
+                print('  subcomm_index after fock_reduce:', subcomm_index)
+                sys.stdout.flush()
+
+            self.comm.barrier()
+            if is_global_master:
+                print()
+                print('=== barrier! ===')
+                print()
+                sys.stdout.flush()
+
+            if subcomm_index + batch_start < batch_end:
+            #if True:
+
+                e2_ger = None
+                e2_ung = None
+
+                fock_ger = None
+                fock_ung = None
+
+                if is_local_master:
+
+                    """
+                    batch_ger, batch_ung = 0, 0
+                    for col in range(batch_start, batch_end):
+                        if col < n_ger:
+                            batch_ger += 1
+                        else:
+                            batch_ung += 1
+                    """
+                    col = batch_start + subcomm_index
                     if col < n_ger:
-                        batch_ger += 1
+                        batch_ger, batch_ung = 1, 0
                     else:
-                        batch_ung += 1
+                        batch_ger, batch_ung = 0, 1
 
-                e2_ger = np.zeros((half_size, batch_ger))
-                e2_ung = np.zeros((half_size, batch_ung))
-
-                if self.nonlinear:
-                    fock_ger = np.zeros((norb**2, batch_ger))
-                    fock_ung = np.zeros((norb**2, batch_ung))
-
-                for ifock in range(batch_ger + batch_ung):
-                    fak = fock_mat
-
-                    if getattr(self, 'core_excitation', False):
-                        core_exc_orb_inds = list(range(
-                            self.num_core_orbitals)) + list(range(nocc, norb))
-                        mo_core_exc = mo[:, core_exc_orb_inds]
-                        fak_mo = np.linalg.multi_dot(
-                            [mo_core_exc.T, fak, mo_core_exc])
-                    else:
-                        fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
-
-                    kfa_mo = self.commut(fa_mo.T, kns[ifock])
-
-                    fat_mo = fak_mo + kfa_mo
-
-                    if getattr(self, 'core_excitation', False):
-                        gmo = -self.commut_mo_density(fat_mo, nocc,
-                                                      self.num_core_orbitals)
-                        gmo_vec_halfsize = self.lrmat2vec(
-                            gmo, nocc, norb, self.num_core_orbitals)[:half_size]
-                    else:
-                        gmo = -self.commut_mo_density(fat_mo, nocc)
-                        gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
-                                                          norb)[:half_size]
+                    e2_ger = np.zeros((half_size, batch_ger))
+                    e2_ung = np.zeros((half_size, batch_ung))
 
                     if self.nonlinear:
-                        # Note: fak_mo_vec uses full MO coefficients matrix
-                        # since it is only for fock_ger/fock_ung in nonlinear
-                        # response
-                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                          mo]).reshape(norb**2)
+                        fock_ger = np.zeros((norb**2, batch_ger))
+                        fock_ung = np.zeros((norb**2, batch_ung))
 
-                    if ifock < batch_ger:
-                        e2_ger[:, ifock] = -gmo_vec_halfsize
+                    print('batch_ger, batch_ung', batch_ger, batch_ung)
+                    for ifock in range(batch_ger + batch_ung):
+                        print('ifock', ifock)
+
+                        fak = fock_mat
+
+                        if getattr(self, 'core_excitation', False):
+                            core_exc_orb_inds = list(range(
+                                self.num_core_orbitals)) + list(range(nocc, norb))
+                            mo_core_exc = mo[:, core_exc_orb_inds]
+                            fak_mo = np.linalg.multi_dot(
+                                [mo_core_exc.T, fak, mo_core_exc])
+                        else:
+                            fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+
+                        kfa_mo = self.commut(fa_mo.T, kns[ifock])
+
+                        fat_mo = fak_mo + kfa_mo
+
+                        if getattr(self, 'core_excitation', False):
+                            gmo = -self.commut_mo_density(fat_mo, nocc,
+                                                          self.num_core_orbitals)
+                            gmo_vec_halfsize = self.lrmat2vec(
+                                gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                        else:
+                            gmo = -self.commut_mo_density(fat_mo, nocc)
+                            gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
+                                                              norb)[:half_size]
+
                         if self.nonlinear:
-                            fock_ger[:, ifock] = fak_mo_vec
-                    else:
-                        e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
-                        if self.nonlinear:
-                            fock_ung[:, ifock - batch_ger] = fak_mo_vec
+                            # Note: fak_mo_vec uses full MO coefficients matrix
+                            # since it is only for fock_ger/fock_ung in nonlinear
+                            # response
+                            fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
+                                                              mo]).reshape(norb**2)
 
-            vecs_e2_ger = DistributedArray(e2_ger, self.comm)
-            vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+                        if ifock < batch_ger:
+                            e2_ger[:, ifock] = -gmo_vec_halfsize
+                            if self.nonlinear:
+                                fock_ger[:, ifock] = fak_mo_vec
+                        else:
+                            e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
+                            if self.nonlinear:
+                                fock_ung[:, ifock - batch_ger] = fak_mo_vec
 
-            if self.nonlinear:
-                dist_fock_ger = DistributedArray(fock_ger, self.comm)
-                dist_fock_ung = DistributedArray(fock_ung, self.comm)
-                self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+            for idx, local_master_rank in enumerate(local_master_ranks):
+
+                if idx >= batch_end - batch_start:
+                    break
+
+                #col = idx + batch_start
+
+                #if col < n_ger:
+
+                #for col in range(batch_start, batch_end):
+
+                vecs_e2_ger = DistributedArray(e2_ger, self.comm, root=local_master_rank)
+                vecs_e2_ung = DistributedArray(e2_ung, self.comm, root=local_master_rank)
+                self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
+                if self.nonlinear:
+                    dist_fock_ger = DistributedArray(fock_ger, self.comm, root=local_master_rank)
+                    dist_fock_ung = DistributedArray(fock_ung, self.comm, root=local_master_rank)
+                    self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
@@ -807,6 +977,8 @@ class LinearSolver:
                       pe_dict,
                       prefac_coulomb,
                       flag_exchange,
+                      local_screening,
+                      local_comm,
                       profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
@@ -829,7 +1001,7 @@ class LinearSolver:
             The profiler.
         """
 
-        screening = eri_dict['screening']
+        #screening = eri_dict['screening']
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
@@ -855,16 +1027,16 @@ class LinearSolver:
                                                 prefac_coulomb, full_k_coef,
                                                 0.0, flag_exchange,
                                                 self.eri_thresh,
-                                                self.prelink_thresh, screening)
+                                                self.prelink_thresh, local_screening)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
-                        for dt in screening.get_coulomb_time()
+                        for dt in local_screening.get_coulomb_time()
                     ])
 
                     exchange_timing += np.array([
                         float(dt.split()[0])
-                        for dt in screening.get_exchange_time()
+                        for dt in local_screening.get_exchange_time()
                     ])
 
                     fock_mat_erf_k = compute_fock_gpu(molecule, basis, dens,
@@ -872,16 +1044,16 @@ class LinearSolver:
                                                       flag_exchange,
                                                       self.eri_thresh,
                                                       self.prelink_thresh,
-                                                      screening)
+                                                      local_screening)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
-                        for dt in screening.get_coulomb_time()
+                        for dt in local_screening.get_coulomb_time()
                     ])
 
                     exchange_timing += np.array([
                         float(dt.split()[0])
-                        for dt in screening.get_exchange_time()
+                        for dt in local_screening.get_exchange_time()
                     ])
 
                 else:
@@ -890,16 +1062,16 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         self.xcfun.get_frac_exact_exchange(), 0.0,
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
-                        screening)
+                        local_screening)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
-                        for dt in screening.get_coulomb_time()
+                        for dt in local_screening.get_coulomb_time()
                     ])
 
                     exchange_timing += np.array([
                         float(dt.split()[0])
-                        for dt in screening.get_exchange_time()
+                        for dt in local_screening.get_exchange_time()
                     ])
 
             else:
@@ -907,15 +1079,15 @@ class LinearSolver:
                 fock_mat = compute_fock_gpu(molecule, basis, dens,
                                             prefac_coulomb, 0.0, 0.0,
                                             flag_exchange, self.eri_thresh,
-                                            self.prelink_thresh, screening)
+                                            self.prelink_thresh, local_screening)
 
                 coulomb_timing += np.array([
-                    float(dt.split()[0]) for dt in screening.get_coulomb_time()
+                    float(dt.split()[0]) for dt in local_screening.get_coulomb_time()
                 ])
 
                 exchange_timing += np.array([
                     float(dt.split()[0])
-                    for dt in screening.get_exchange_time()
+                    for dt in local_screening.get_exchange_time()
                 ])
 
         else:
@@ -923,16 +1095,16 @@ class LinearSolver:
             fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
                                         1.0, 0.0, flag_exchange,
                                         self.eri_thresh, self.prelink_thresh,
-                                        screening)
+                                        local_screening)
 
             coulomb_timing += np.array(
-                [float(dt.split()[0]) for dt in screening.get_coulomb_time()])
+                [float(dt.split()[0]) for dt in local_screening.get_coulomb_time()])
 
             exchange_timing += np.array(
-                [float(dt.split()[0]) for dt in screening.get_exchange_time()])
+                [float(dt.split()[0]) for dt in local_screening.get_exchange_time()])
 
-        all_coulomb_timing = self.comm.allgather(coulomb_timing)
-        all_exchange_timing = self.comm.allgather(exchange_timing)
+        all_coulomb_timing = local_comm.allgather(coulomb_timing)
+        all_exchange_timing = local_comm.allgather(exchange_timing)
 
         all_coulomb_timing = np.array(all_coulomb_timing).reshape(-1)
         all_exchange_timing = np.array(all_exchange_timing).reshape(-1)
@@ -963,7 +1135,7 @@ class LinearSolver:
                 integrate_fxc_fock_gpu(fock_mat, molecule, basis, dens,
                                        gs_density, molgrid,
                                        self.xcfun.get_func_label(),
-                                       screening.get_num_gpus_per_node())
+                                       local_screening.get_num_gpus_per_node())
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)

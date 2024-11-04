@@ -1064,7 +1064,8 @@ class ScfDriver:
         num_gpus_per_node = self._get_num_gpus_per_node()
 
         screener = ScreeningData(molecule, ao_basis, num_gpus_per_node,
-                                 self.pair_thresh, self.density_thresh)
+                                 self.pair_thresh, self.density_thresh,
+                                 self.comm.Get_rank(), self.comm.Get_size())
 
         self.ostream.print_info(
             f'Using {num_gpus_per_node} GPU devices per MPI rank.')

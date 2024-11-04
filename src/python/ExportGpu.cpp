@@ -58,7 +58,7 @@ export_gpu(py::module& m)
     // CScreeningData class
 
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
-        .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t, const double, const double>())
+        .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t, const double, const double, const int, const int>())
         .def("get_num_gpus_per_node", &CScreeningData::getNumGpusPerNode)
         .def("get_prelink_time", &CScreeningData::getPreLinkTime)
         .def("get_coulomb_time", &CScreeningData::getCoulombTime)
