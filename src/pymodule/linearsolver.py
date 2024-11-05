@@ -694,9 +694,14 @@ class LinearSolver:
 
         num_gpus_per_node = self._get_num_gpus_per_node()
 
+        screening_t0 = tm.time()
+
         local_screening = ScreeningData(molecule, basis, num_gpus_per_node,
                                         self.pair_thresh, self.density_thresh,
                                         local_comm.Get_rank(), local_comm.Get_size())
+
+        if profiler is not None:
+            profiler.add_timing_info('Screening', tm.time() - screening_t0)
 
         # go through batches
 
@@ -1047,9 +1052,9 @@ class LinearSolver:
             profiler.add_timing_info(
                 'FockPrep', eri_dt - max_coulomb_timing - max_exchange_timing)
             profiler.add_timing_info('FockJ', max_coulomb_timing)
-            profiler.add_timing_info('LoadImbJ', coulomb_load_imb)
+            #profiler.add_timing_info('LoadImbJ', coulomb_load_imb)
             profiler.add_timing_info('FockK', max_exchange_timing)
-            profiler.add_timing_info('LoadImbK', exchange_load_imb)
+            #profiler.add_timing_info('LoadImbK', exchange_load_imb)
 
         if self._dft:
             t0 = tm.time()
