@@ -365,6 +365,7 @@ class ComplexResponse(LinearSolver):
         self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
 
         if not self.nonlinear:
+            # TODO: make this screening temporary
             b_grad = self.get_complex_prop_grad(self.b_operator,
                                                 self.b_components, molecule,
                                                 basis, scf_tensors,
@@ -756,6 +757,7 @@ class ComplexResponse(LinearSolver):
 
         # calculate response functions
         if not self.nonlinear:
+            # TODO: make this screening temporary
             a_grad = self.get_complex_prop_grad(self.a_operator,
                                                 self.a_components, molecule,
                                                 basis, scf_tensors,

@@ -350,6 +350,7 @@ class LinearSolver:
 
         num_gpus_per_node = self._get_num_gpus_per_node()
 
+        # TODO: remove this screening
         screening = ScreeningData(molecule, basis, num_gpus_per_node,
                                   self.pair_thresh, self.density_thresh,
                                   self.comm.Get_rank(), self.comm.Get_size())
@@ -701,7 +702,9 @@ class LinearSolver:
 
         if self.rank == mpi_master():
             batch_str = f'Processing {n_total} Fock builds'
-            batch_str += f' on {batch_size} subcommunicators...'
+            if batch_size > 1:
+                batch_str += f' on {batch_size} subcommunicators'
+            batch_str += '...'
             self.ostream.print_info(batch_str)
             self.ostream.flush()
 
@@ -1050,6 +1053,8 @@ class LinearSolver:
 
         if self._dft:
             t0 = tm.time()
+
+            molgrid.re_distribute_counts_and_displacements(local_comm)
 
             # TODO: enable meta-GGA
             # Note: skipping Fxc for antisymmetric density matrix
