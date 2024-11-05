@@ -1040,7 +1040,6 @@ class SystemBuilder:
         else:
             self.solvent_ffs = solvent_ffs
 
-    # TODO: Make this a bit neater :)
     def _write_system_gro(self, filename='system.gro'):
         """
         Write the system's molecule into a GRO file.
@@ -1180,8 +1179,8 @@ class SystemBuilder:
                 atom_counter += 1
             residue_counter += 1
 
-            # After writing the solute atoms
-            solvent_offset = len(self.solute_ff.atoms)
+            # Initialize coordinate counter after solute atoms
+            coordinate_counter = len(self.solute_ff.atoms)
 
             # Special case for 'itself' solvent
             if self.solvent_name == 'itself':
@@ -1191,34 +1190,24 @@ class SystemBuilder:
                     if residue_counter > 9999:
                         residue_counter -= 9999
                     for i, atom in self.solute_ff.atoms.items():
-                        idx = solvent_offset + mols * num_atoms_per_molecule + i
                         atom_name = atom['name']
                         element = self.solute.get_labels()[i]
-                        x, y, z = coordinates[idx]
+                        x, y, z = coordinates[coordinate_counter]
                         f.write("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   "
                                 "{:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}\n".format(
                             'HETATM', atom_counter, atom_name, '', residue_name, chain_ids[1],
                             residue_counter, '', x, y, z, 1.00, 0.00, element))
                         pdb_atom_numbers[('solvent', mols, i)] = atom_counter
                         atom_counter += 1
+                        coordinate_counter += 1
                     residue_counter += 1
-            
+
             # Solvents
             elif self.solvent_name in ['spce', 'tip3p']:
                 # The force field for SPCE and TIP3P water models are standardized
                 # and do not require a separate force field object.
                 elements = self.solvents[0].get_labels()
-                solvent_offset = len(elements)
                 residue_name = 'HOH'
-                ##############################################
-                # IMPORTANT NOTE:
-                # Check if the number of solvent atoms exceeds 99999
-                # This is a known issue in PDB format. See known problems:
-                # http://www.bmsc.washington.edu/CrystaLinks/man/pdb/guide2.2_frame.html
-                # OpenMM will confuse the CONECT records when the atom number is reset after 9999.
-                # Therefore it should trigger an error if the number of atoms exceeds 99999.
-                # This is not a problem in GROMACS.
-                ##############################################
                 if self.added_solvent_counts[0] * len(elements) > 99999:
                     raise ValueError("The number of solvent atoms exceeds 99999. The PDB format does not support more than 99999 atoms. Write GROMACS files instead.")
                 # Atom names are O, H1, and H2
@@ -1228,30 +1217,20 @@ class SystemBuilder:
                     for j in range(3):
                         atom_name = ['O', 'H1', 'H2'][j]
                         element = elements[j]
-                        x, y, z = self.system_molecule.get_coordinates_in_angstrom()[solvent_offset]
+                        x, y, z = coordinates[coordinate_counter]
                         f.write("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}\n".format(
                             'ATOM', atom_counter, atom_name, '', residue_name, chain_ids[1], residue_counter, '',
                             x, y, z, 1.00, 0.00, element))
                         pdb_atom_numbers[('solvent', 0, i, j)] = atom_counter
                         atom_counter += 1
-                        solvent_offset += 1
+                        coordinate_counter += 1
                     residue_counter += 1
-            
+
             else:
                 # The force field for other solvents are not standardized 
                 # and require a separate force field object.
-                solvent_offset = len(self.solute_ff.atoms)  
                 for i, solvent_ff in enumerate(self.solvent_ffs):
                     elements = self.solvents[i].get_labels()
-                    ##############################################
-                    # IMPORTANT NOTE:
-                    # Check if the number of solvent atoms exceeds 99999
-                    # This is a known issue in PDB format. See known problems:
-                    # http://www.bmsc.washington.edu/CrystaLinks/man/pdb/guide2.2_frame.html
-                    # OpenMM will confuse the CONECT records when the atom number is reset after 9999.
-                    # Therefore it should trigger an error if the number of atoms exceeds 99999.
-                    # This is not a problem in GROMACS.
-                    ##############################################
                     if self.added_solvent_counts[i] * len(elements) > 99999:
                         raise ValueError("The number of solvent atoms exceeds 99999. The PDB format does not support more than 99999 atoms. Write GROMACS files instead.")
                     for j in range(self.added_solvent_counts[i]):
@@ -1261,34 +1240,35 @@ class SystemBuilder:
                             residue_name = f'S{i+1:02d}'
                             atom_name = solvent_ff.atoms[k]['name']
                             element = elements[k]
-                            x, y, z = self.system_molecule.get_coordinates_in_angstrom()[solvent_offset]
+                            x, y, z = coordinates[coordinate_counter]
                             f.write("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}\n".format(
                                 'HETATM', atom_counter, atom_name, '', residue_name, chain_ids[1], residue_counter, '',
                                 x, y, z, 1.00, 0.00, element))
                             pdb_atom_numbers[('solvent', i, j, k)] = atom_counter
                             atom_counter += 1
-                            solvent_offset += 1
+                            coordinate_counter += 1
                         residue_counter += 1
 
-            # Counterions will be added as a single residue according to 
-            # OpenMM convention for standard force fields.
+            # Counterions
             if self.counterion:
-                if self.ion_name in ['Na', 'K', 'Li']:
-                    # Residue name and atom name are defined as Na+, K+, and Li+
-                    atom_name = self.ion_name + '+'
-                    residue_name = self.ion_name + '+'
-                elif self.ion_name == 'Cl':
-                    # Residue name and atom name are defined as Cl-
-                    atom_name = 'Cl-'
-                    residue_name = 'Cl-'
-                element = self.counterion.get_labels()[0]
-                x, y, z = self.system_molecule.get_coordinates_in_angstrom()[solvent_offset]
-                f.write("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}\n".format(
-                    'ATOM', atom_counter, atom_name, '', residue_name, chain_ids[2], residue_counter, '',
-                    x, y, z, 1.00, 0.00, element))
-                pdb_atom_numbers[('counterion', 0)] = atom_counter
+                for i in range(self.added_counterions):
+                    if residue_counter > 9999:
+                        residue_counter -= 9999
+                    if self.ion_name in ['Na', 'K', 'Li']:
+                        atom_name = self.ion_name + '+'
+                        residue_name = self.ion_name + '+'
+                    elif self.ion_name == 'Cl':
+                        atom_name = 'Cl-'
+                        residue_name = 'Cl-'
+                    element = self.counterion.get_labels()[0]
+                    x, y, z = coordinates[coordinate_counter]
+                    f.write("{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}\n".format(
+                        'ATOM', atom_counter, atom_name, '', residue_name, chain_ids[2], residue_counter, '',
+                        x, y, z, 1.00, 0.00, element))
+                    pdb_atom_numbers[('counterion', i)] = atom_counter
+                    atom_counter += 1
+                    coordinate_counter += 1
                 residue_counter += 1
-                atom_counter += 1
 
             # Write CONECT records for bonds
             # Solute bonds
@@ -1314,14 +1294,15 @@ class SystemBuilder:
                 else:
                     # Use the bonds defined in the solvent force field
                     for i, solvent_ff in enumerate(self.solvent_ffs):
-                        for k in range(self.added_solvent_counts[i]):
+                        for j in range(self.added_solvent_counts[i]):
                             for (i_atom, j_atom) in solvent_ff.bonds:
-                                pdb_i = pdb_atom_numbers[('solvent', i, k, i_atom)]
-                                pdb_j = pdb_atom_numbers[('solvent', i, k, j_atom)]
+                                pdb_i = pdb_atom_numbers[('solvent', i, j, i_atom)]
+                                pdb_j = pdb_atom_numbers[('solvent', i, j, j_atom)]
                                 f.write(f"CONECT{pdb_i:>5d}{pdb_j:>5d}\n")
 
             # Write END line
             f.write("END\n")
+
 
     def _get_volume(self, molecule):
         """

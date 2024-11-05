@@ -240,6 +240,7 @@ class OMMExplicitSolvation:
         header = "VeloxChem/OpenMM Solvation Free Energy Calculation"
         self.ostream.print_header(header)
         self.ostream.print_header("="*len(header))
+        self.ostream.print_blank()
         self.ostream.flush()
 
         # Run the simulations
@@ -522,9 +523,6 @@ class OMMExplicitSolvation:
         # Minimize energy
         simulation.minimizeEnergy()
 
-        # Set velocities
-        simulation.context.setVelocitiesToTemperature(self.temperature)
-
         # Equilibration
         simulation.step(10000)
 
@@ -539,7 +537,7 @@ class OMMExplicitSolvation:
         # State data reporter
         simulation.reporters.append(app.StateDataReporter(f'energy_{lambda_value}_step{self.step}.txt', interval,
                                                         step=True, potentialEnergy=True, temperature=True))
-        
+
         # Write the system to a file
         if self.step in [1, 2]:
             system_filename = f'solvated_system_{lambda_value}_step{self.step}.xml'
@@ -566,17 +564,19 @@ class OMMExplicitSolvation:
         time_start = time.time()
         # Create the hdf5 file
         hf = h5py.File(hdf5_filename, 'w')
+        
         # Snapshot counter for the hdf5 file labels
         snapshot = 0
         for s in range(self.num_steps):
-            if s % interval == 0:
-                # Save the positions in the hdf5 file
+            simulation.step(1)
+            if (s + 1) % interval == 0:
+                # Save the positions in the hdf5 file after stepping
                 snapshot += 1
                 state = simulation.context.getState(getPositions=True)
                 positions = state.getPositions().value_in_unit(unit.nanometers)
                 label = f'positions_{snapshot}'
-                hf.create_dataset(label, data=positions)
-            simulation.step(1)
+                hf.create_dataset(label, data=positions) 
+        hf.close()
 
         time_end = time.time()
 
@@ -611,8 +611,8 @@ class OMMExplicitSolvation:
 
     def _recalculate_energies(self, trajectories, forcefields, topology):
 
-        u_kln = np.zeros((len(trajectories), len(trajectories), self.number_of_snapshots))
-        
+        u_kln = np.zeros((len(trajectories), len(forcefields), self.number_of_snapshots))
+
         # k loop for U_kln
         for k, trajectory in enumerate(trajectories):
             time_start_trajectory = time.time()
@@ -620,9 +620,8 @@ class OMMExplicitSolvation:
             self.ostream.flush()
             # Load the positions from the hdf5 file for recalculation
             positions = []
-            for n in range(self.number_of_snapshots):
-                with h5py.File(trajectory, 'r') as hf:
-                    positions.append(hf[f'positions_{n+1}'][:])
+            with h5py.File(trajectory, 'r') as hf:
+                positions = [hf[f'positions_{n+1}'][:] for n in range(self.number_of_snapshots)]
 
             # l loop for U_kln
             for l in range(len(forcefields)):
@@ -635,9 +634,11 @@ class OMMExplicitSolvation:
 
                 # n loop for U_kln
                 for n in range(self.number_of_snapshots):
-                    simulation.context.setPositions(positions[n])
+                    positions_with_units = positions[n] * unit.nanometers
+                    simulation.context.setPositions(positions_with_units)
                     state = simulation.context.getState(getEnergy=True)
                     u_kln[k, l, n] = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
+
                 time_end_forcefield = time.time()
                 elapsed_time_forcefield = time_end_forcefield - time_start_forcefield
                 self.ostream.print_info(f"Forcefield {forcefields[l]} energy recalculation took {elapsed_time_forcefield:.2f} seconds.")
