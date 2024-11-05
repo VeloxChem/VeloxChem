@@ -121,6 +121,8 @@ auto bcastScalar(const int64_t val, MPI_Comm comm) -> int64_t;
  */
 auto bcastScalar(const double val, MPI_Comm comm) -> double;
 
+auto bcastStdVectorInt(const std::vector<int64_t>& vector, MPI_Comm comm) -> std::vector<int64_t>;
+
 /**
  Broadcasts dense matrix.
 

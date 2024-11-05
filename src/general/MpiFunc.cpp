@@ -173,6 +173,56 @@ bcastScalar(const double val, MPI_Comm comm) -> double
 }
 
 auto
+bcastStdVectorInt(const std::vector<int64_t>& vector, MPI_Comm comm) -> std::vector<int64_t>
+{
+    if constexpr (ENABLE_MPI)
+    {
+        // MPI info
+
+        auto mpi_master = mpi::master();
+
+        auto mpi_master_int32 = static_cast<int32_t>(mpi_master);
+
+        auto rank = mpi::rank(comm);
+
+        auto nodes = mpi::nodes(comm);
+
+        if (nodes == 1) return vector;
+
+        // broadcast size
+
+        int64_t num_elems = 0;
+
+        if (rank == mpi_master) num_elems = static_cast<int64_t>(vector.size());
+
+        auto merror = MPI_Bcast(&num_elems, 1, MPI_INT64_T, mpi_master_int32, comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcastStdVectorInt");
+
+        // broadcast data
+
+        std::vector<int64_t> bcast_vector;
+
+        if (rank == mpi_master)
+        {
+            bcast_vector = vector;
+        }
+        else
+        {
+            bcast_vector = std::vector<int64_t>(num_elems);
+        }
+
+        merror = MPI_Bcast(bcast_vector.data(), static_cast<int32_t>(num_elems), MPI_INT64_T, mpi_master_int32, comm);
+
+        if (merror != MPI_SUCCESS) mpi::abort(merror, "mpi::bcastStdVectorInt");
+
+        return bcast_vector;
+    }
+
+    return vector;
+}
+
+auto
 bcastDenseMatrix(const CDenseMatrix& matrix, MPI_Comm comm) -> CDenseMatrix
 {
     if constexpr (ENABLE_MPI)

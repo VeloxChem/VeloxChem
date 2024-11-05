@@ -642,7 +642,7 @@ class LinearSolver:
         if self.rank == mpi_master():
             dt_and_subcomm_size = []
 
-            for subcomm_size in range(1, 16 + 1):
+            for subcomm_size in range(1, self.nodes + 1):
                 if self.nodes % subcomm_size != 0:
                     continue
 
