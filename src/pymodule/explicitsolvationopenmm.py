@@ -245,19 +245,19 @@ class OMMExplicitSolvation:
 
         # Run the simulations
         self.ostream.print_info("Starting solvated simulation (Stage 1)...\n")
-        delta_f_1 = self._run_lambda_simulations(step=1)
+        delta_f_1, free_en_s1 = self._run_lambda_simulations(step=1)
         self.ostream.flush()
         
         self.ostream.print_info("Starting removing GSC potential (Stage 2)...\n")
-        delta_f_2 = self._run_lambda_simulations(step=2)
+        delta_f_2, free_en_s2 = self._run_lambda_simulations(step=2)
         self.ostream.flush()
 
         self.ostream.print_info("Starting vacuum simulation (Stage 3)...\n")
-        delta_f_3 = self._run_lambda_simulations(step=3, vacuum=True)
+        delta_f_3, free_en_s3 = self._run_lambda_simulations(step=3, vacuum=True)
         self.ostream.flush()
 
         # Calculate the final free energy
-        final_free_energy = delta_f_1['Delta_f'][-1, 0] + delta_f_2['Delta_f'][-1, 0] - delta_f_3['Delta_f'][-1, 0]
+        final_free_energy = free_en_s1 + free_en_s2 - free_en_s3
         self.ostream.print_line(f"Final free energy: {final_free_energy} kcal/mol")
         self.ostream.flush()
 
@@ -334,10 +334,11 @@ class OMMExplicitSolvation:
         self.ostream.print_info(f"Calculating the free energy with MBAR for stage {step}...")
         self.ostream.flush()
         delta_f = self._calculate_free_energy(u_kln)
+        free_energy = delta_f['Delta_f'][-1, 0]
         self.ostream.print_line(f"Free energy for stage {step}: {delta_f['Delta_f'][-1, 0]:.4f} +/- {delta_f['dDelta_f'][-1, 0]:.4f} kcal/mol")
         self.ostream.flush()
 
-        return delta_f
+        return delta_f, free_energy
     
     def _run_single_lambda_simulation(self, args):
         """
