@@ -60,7 +60,8 @@ integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
                        const CDenseMatrix&             activeMOs,
                        const CMolecularGrid&           molecularGrid,
                        const double                    screeningThresholdForGTOValues,
-                       const CXCPairDensityFunctional& xcFunctional)
+                       const CXCPairDensityFunctional& xcFunctional,
+                       const double                    rs_omega)
 {
     CMultiTimer timer;
 
@@ -234,7 +235,7 @@ integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_plda(npoints, rho, exc, vrho);
+        xcFunctional.compute_exc_vxc_for_plda(npoints, rho, exc, vrho, rs_omega);
 
         std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
 
@@ -302,7 +303,8 @@ integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
                        const CDenseMatrix&             activeMOs,
                        const CMolecularGrid&           molecularGrid,
                        const double                    screeningThresholdForGTOValues,
-                       const CXCPairDensityFunctional& xcFunctional)
+                       const CXCPairDensityFunctional& xcFunctional,
+                       const double                    rs_omega)
 {
     CMultiTimer timer;
 
@@ -495,7 +497,7 @@ integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_pgga(npoints, rho, sigma, exc, vrho, vsigma);
+        xcFunctional.compute_exc_vxc_for_pgga(npoints, rho, sigma, exc, vrho, vsigma, rs_omega);
 
         std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
 

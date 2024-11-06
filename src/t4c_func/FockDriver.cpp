@@ -334,22 +334,22 @@ CFockDriver::_determine_block_size_factor(const int nao) const -> int
 {
     if (nao < 450)
     {
-        return 32 * _block_size_factor;
+        return 16 * _block_size_factor;
     }
     else if (nao < 900)
     {
-        return 16 * _block_size_factor;
+        return 8 * _block_size_factor;
     }
     else if (nao < 1800)
     {
-        return 8 * _block_size_factor;
+        return 4 * _block_size_factor;
     }
     else if (nao < 3600)
     {
-        return 4 * _block_size_factor;
+        return 2 * _block_size_factor;
     }
     else
     {
-        return 2 * _block_size_factor;
+        return _block_size_factor;
     }
 }

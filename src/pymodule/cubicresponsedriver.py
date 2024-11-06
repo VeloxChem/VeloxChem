@@ -155,15 +155,15 @@ class CubicResponseDriver(NonlinearSolver):
 
         assert_msg_critical(
             self.b_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid b_component')
 
         assert_msg_critical(
             self.c_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid c_component')
 
         assert_msg_critical(
             self.d_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid d_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -324,7 +324,7 @@ class CubicResponseDriver(NonlinearSolver):
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
         }
 
         for key in cpp_keywords:
@@ -1320,7 +1320,7 @@ class CubicResponseDriver(NonlinearSolver):
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
         }
 
         for key in cpp_keywords:

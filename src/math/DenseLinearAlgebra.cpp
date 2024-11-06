@@ -53,6 +53,8 @@ multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 
     CDenseMatrix mat(narow, nbcol);
 
+    if ((narow == 0) || (nbcol == 0)) return mat;
+
     // compute matrix-matrix multiplication
 
     auto narow_int32 = static_cast<int32_t>(narow);
@@ -95,6 +97,8 @@ multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatri
     // allocate dense matrix
 
     CDenseMatrix mat(narow, nbrow);
+
+    if ((narow == 0) || (nbrow == 0)) return mat;
 
     // compute matrix-matrix multiplcation
 
@@ -139,6 +143,8 @@ multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatri
     // allocate dense matrix
 
     CDenseMatrix mat(nacol, nbcol);
+
+    if ((nacol == 0) || (nbcol == 0)) return mat;
 
     // compute matrix-matrix multiplication
 

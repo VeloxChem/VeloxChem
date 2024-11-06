@@ -334,53 +334,31 @@ CGtoPairBlock::CGtoPairBlock(const CGtoPairBlock &other)
 
 CGtoPairBlock::CGtoPairBlock(CGtoPairBlock &&other) noexcept
 
-    : _bra_coordinates{}
+    : _bra_coordinates(std::move(other._bra_coordinates))
 
-    , _ket_coordinates{}
+    , _ket_coordinates(std::move(other._ket_coordinates))
 
-    , _bra_exponents{}
+    , _bra_exponents(std::move(other._bra_exponents))
 
-    , _ket_exponents{}
+    , _ket_exponents(std::move(other._ket_exponents))
 
-    , _norms{}
+    , _norms(std::move(other._norms))
 
-    , _overlaps{}
+    , _overlaps(std::move(other._overlaps))
 
-    , _bra_orb_indices{}
+    , _bra_orb_indices(std::move(other._bra_orb_indices))
 
-    , _ket_orb_indices{}
+    , _ket_orb_indices(std::move(other._ket_orb_indices))
 
-    , _bra_atm_indices{}
+    , _bra_atm_indices(std::move(other._bra_atm_indices))
 
-    , _ket_atm_indices{}
+    , _ket_atm_indices(std::move(other._ket_atm_indices))
 
-    , _angular_momentums({-1, -1})
+    , _angular_momentums(std::move(other._angular_momentums))
 
-    , _nppairs(-1)
+    , _nppairs(std::move(other._nppairs))
+
 {
-    std::swap(_bra_coordinates, other._bra_coordinates);
-
-    std::swap(_ket_coordinates, other._ket_coordinates);
-
-    std::swap(_bra_exponents, other._bra_exponents);
-
-    std::swap(_ket_exponents, other._ket_exponents);
-
-    std::swap(_norms, other._norms);
-
-    std::swap(_overlaps, other._overlaps);
-
-    std::swap(_bra_orb_indices, other._bra_orb_indices);
-
-    std::swap(_ket_orb_indices, other._ket_orb_indices);
-
-    std::swap(_bra_atm_indices, other._bra_atm_indices);
-
-    std::swap(_ket_atm_indices, other._ket_atm_indices);
-
-    std::swap(_angular_momentums, other._angular_momentums);
-
-    std::swap(_nppairs, other._nppairs);
 }
 
 auto
@@ -416,29 +394,32 @@ CGtoPairBlock::operator=(const CGtoPairBlock &other) -> CGtoPairBlock &
 auto
 CGtoPairBlock::operator=(CGtoPairBlock &&other) noexcept -> CGtoPairBlock &
 {
-    std::swap(_bra_coordinates, other._bra_coordinates);
+    if (this != &other)
+    {
+        _bra_coordinates = std::move(other._bra_coordinates);
 
-    std::swap(_ket_coordinates, other._ket_coordinates);
+        _ket_coordinates = std::move(other._ket_coordinates);
 
-    std::swap(_bra_exponents, other._bra_exponents);
+        _bra_exponents = std::move(other._bra_exponents);
 
-    std::swap(_ket_exponents, other._ket_exponents);
+        _ket_exponents = std::move(other._ket_exponents);
 
-    std::swap(_norms, other._norms);
+        _norms = std::move(other._norms);
 
-    std::swap(_overlaps, other._overlaps);
+        _overlaps = std::move(other._overlaps);
 
-    std::swap(_bra_orb_indices, other._bra_orb_indices);
+        _bra_orb_indices = std::move(other._bra_orb_indices);
 
-    std::swap(_ket_orb_indices, other._ket_orb_indices);
+        _ket_orb_indices = std::move(other._ket_orb_indices);
 
-    std::swap(_bra_atm_indices, other._bra_atm_indices);
+        _bra_atm_indices = std::move(other._bra_atm_indices);
 
-    std::swap(_ket_atm_indices, other._ket_atm_indices);
+        _ket_atm_indices = std::move(other._ket_atm_indices);
 
-    std::swap(_angular_momentums, other._angular_momentums);
+        _angular_momentums = std::move(other._angular_momentums);
 
-    std::swap(_nppairs, other._nppairs);
+        _nppairs = std::move(other._nppairs);
+    }
 
     return *this;
 }

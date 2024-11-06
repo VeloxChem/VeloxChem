@@ -39,6 +39,7 @@
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
 #include "XCFunctional.hpp"
+#include "XCPairDensityFunctional.hpp"
 
 /**
  Class CXCIntegrator implements XC integrator.
@@ -243,17 +244,19 @@ class CXCIntegrator
      @param twoBodyDensityMatrix the MO two-body active density matrix.
      @param activeMOs the active molecular orbitals.
      @param molecularGrid the molecular grid.
-     @param xcFuncLabel the label of exchange-correlation functional.
+     @param fvxc exchange-correlation functional.
+     @param rs_omega range-separation parameter.
      */
-    auto integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
-                          CDense4DTensor&        tensorWxc,
-                          const CMolecule&       molecule,
-                          const CMolecularBasis& basis,
-                          const double*          densityMatrixPointer,
-                          const CDenseMatrix&    twoBodyDensityMatrix,
-                          const CDenseMatrix&    activeMOs,
-                          const CMolecularGrid&  molecularGrid,
-                          const std::string&     xcFuncLabel) const -> void;
+    auto integrateVxcPDFT(CAOKohnShamMatrix&                  aoFockMatrix,
+                          CDense4DTensor&                     tensorWxc,
+                          const CMolecule&                    molecule,
+                          const CMolecularBasis&              basis,
+                          const double*                       densityMatrixPointer,
+                          const CDenseMatrix&                 twoBodyDensityMatrix,
+                          const CDenseMatrix&                 activeMOs,
+                          const CMolecularGrid&               molecularGrid,
+                          const CXCPairDensityFunctional&     fvxc,
+                          const double                        rs_omega) const -> void;
 
     /**
      Computes GTOs values on grid points.

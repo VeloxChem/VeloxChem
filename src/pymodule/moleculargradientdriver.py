@@ -128,7 +128,7 @@ class MolecularGradientDriver:
         grad_drv = KineticEnergyGeom100Driver()
         gmats = grad_drv.compute(molecule, basis, iatom)
         for i, label in enumerate(['X', 'Y', 'Z']):
-            gmat = gmats.matrix(label).full_matrix().to_numpy()
+            gmat = gmats.matrix_to_numpy(label)
             grad_mat[iatom, i] += 2.0 * np.trace(np.matmul(gmat + gmat.T, density))
         
     def comp_npot_grad(self, grad_mat, molecule, basis, density, iatom):
@@ -148,13 +148,13 @@ class MolecularGradientDriver:
         grad_drv = NuclearPotentialGeom100Driver()
         gmats = grad_drv.compute(molecule, basis, iatom)
         for i, label in enumerate(['X', 'Y', 'Z']):
-            gmat = gmats.matrix(label).full_matrix().to_numpy()
+            gmat = gmats.matrix_to_numpy(label)
             grad_mat[iatom, i] -= 2.0 * np.trace(np.matmul(gmat + gmat.T, density))
         
         grad_drv = NuclearPotentialGeom010Driver()
         gmats = grad_drv.compute(molecule, basis, iatom)
         for i, label in enumerate(['X', 'Y', 'Z']):
-            gmat = gmats.matrix(label).full_matrix().to_numpy()
+            gmat = gmats.matrix_to_numpy(label)
             grad_mat[iatom, i] -= 2.0 * np.trace(np.matmul(gmat, density))
             
     def comp_orb_grad(self, grad_mat, molecule, basis, density, iatom):
@@ -174,7 +174,7 @@ class MolecularGradientDriver:
         grad_drv = OverlapGeom100Driver()
         gmats = grad_drv.compute(molecule, basis, iatom)
         for i, label in enumerate(['X', 'Y', 'Z']):
-            gmat = gmats.matrix(label).full_matrix().to_numpy()
+            gmat = gmats.matrix_to_numpy(label)
             grad_mat[iatom, i] += 2.0 * np.trace(np.matmul(gmat + gmat.T, density))
             
     def comp_fock_grad(self, grad_mat, molecule, basis, density, xcfactor, omega, iatom):
@@ -205,5 +205,5 @@ class MolecularGradientDriver:
             fmats = fock_drv.compute(basis, molecule, den_mat, iatom, "2jk", 0.0, 0.0)
             
         for i, label in enumerate(['X', 'Y', 'Z']):
-            fmat = fmats.matrix(label).full_matrix().to_numpy()
+            fmat = fmats.matrix_to_numpy(label)
             grad_mat[iatom, i] += np.trace(np.matmul(fmat, density))

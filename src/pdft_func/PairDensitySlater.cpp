@@ -1,9 +1,10 @@
-//
-//                              VELOXCHEM
+    //
+//                           VELOXCHEM 1.0-RC2
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -23,17 +24,15 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "PairDensitySlater.hpp"
-
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-
 #include "MathConst.hpp"
 
 namespace pdftslater {  // pdftslater namespace
 
 void
-compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho)
+compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 {
     double onethird = 1.0 / 3.0;
 
@@ -47,11 +46,11 @@ compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho)
 
     double eightthird = 8.0 / 3.0;
 
-    double frg = -std::pow(6.0 / mathconst::pi_value(), onethird);
+    double frg = -std::pow(6.0 / M_PI, onethird);
 
     double fre = frg * 0.75 / std::pow(2.0, fourthird);
 
-    for (int g = 0; g < np; g++)
+    for (int32_t g = 0; g < np; g++)
     {
         double density = rho[2 * g + 0];
 
@@ -91,17 +90,22 @@ compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho)
 
             double fxa = std::pow(1.0 + zeta, fourthird);
 
-            double fxb = std::pow(1.0 - zeta, fourthird);
-
-            f_zeta = fxa + fxb;
-
-            // Derivatives
-
             double dxa = std::pow(1.0 + zeta, onethird);
 
-            double dxb = std::pow(1.0 - zeta, onethird);
+            f_zeta = fxa;
 
-            double fl_zeta = dxa - dxb;
+            double fl_zeta = dxa;
+
+            if (1.0 - zeta > 1.0e-16)
+            {
+                double fxb = std::pow(1.0 - zeta, fourthird);
+
+                f_zeta += fxb;
+
+                double dxb = std::pow(1.0 - zeta, onethird);
+
+                fl_zeta -= dxb;
+            }
 
             // dExc/d(rho)
 

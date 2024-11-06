@@ -48,9 +48,8 @@ CMatrices::CMatrices(const CMatrices& other)
 
 CMatrices::CMatrices(CMatrices&& other) noexcept
 
-    : _matrices(std::map<std::string, CMatrix*>())
+    : _matrices(std::move(other._matrices))
 {
-    std::swap(_matrices, other._matrices);
 }
 
 CMatrices::~CMatrices()
@@ -71,7 +70,13 @@ CMatrices::operator=(const CMatrices& other) -> CMatrices&
 auto
 CMatrices::operator=(CMatrices&& other) noexcept -> CMatrices&
 {
-    std::swap(_matrices, other._matrices);
+    if (this != &other)
+    {
+        // release existing resources
+        _deallocate();
+
+        _matrices = std::move(other._matrices);
+    }
 
     return *this;
 }

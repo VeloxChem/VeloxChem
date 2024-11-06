@@ -36,13 +36,10 @@ CMolecularBasis::CMolecularBasis(const CMolecularBasis &other)
 
 CMolecularBasis::CMolecularBasis(CMolecularBasis &&other) noexcept
 
-    : _basis_sets{}
+    : _basis_sets(std::move(other._basis_sets))
 
-    , _indices{}
+    , _indices(std::move(other._indices))
 {
-    std::swap(_basis_sets, other._basis_sets);
-
-    std::swap(_indices, other._indices);
 }
 
 auto
@@ -58,9 +55,12 @@ CMolecularBasis::operator=(const CMolecularBasis &other) -> CMolecularBasis &
 auto
 CMolecularBasis::operator=(CMolecularBasis &&other) noexcept -> CMolecularBasis &
 {
-    std::swap(_basis_sets, other._basis_sets);
+    if (this != &other)
+    {
+        _basis_sets = std::move(other._basis_sets);
 
-    std::swap(_indices, other._indices);
+        _indices = std::move(other._indices);
+    }
 
     return *this;
 }

@@ -81,9 +81,10 @@ class CXCPairDensityFunctional
      * @param[in] rho values of the density at grid points. Order: [(0), (1)].
      * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
      * @param[in,out] vrho values of the first derivative of the
+     * @param[in] rs_omega the range-separation parameter.
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      */
-    void _plda_exc_vxc(const std::string& compName, const int np, const double* rho, double* exc, double* vrho) const;
+    void _plda_exc_vxc(const std::string& compName, const int np, const double* rho, double* exc, double* vrho, double rs_omega) const;
 
     /** Computes values and first derivative of pair-GGA exchange-correlation
      * functional component on grid.
@@ -96,6 +97,7 @@ class CXCPairDensityFunctional
      * @param[in,out] vrho values of the first derivative of the
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      * @param[in,out] vsigma values of the first derivative of the
+     * @param[in] rs_omega the range-separation parameter.
      * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
      */
     void _pgga_exc_vxc(const std::string& compName,
@@ -104,7 +106,8 @@ class CXCPairDensityFunctional
                        const double*      sigma,
                        double*            exc,
                        double*            vrho,
-                       double*            vsigma) const;
+                       double*            vsigma,
+                       double             rs_omega) const;
 
    public:
     /** Creates an exchange-correlation functional object.
@@ -180,9 +183,10 @@ class CXCPairDensityFunctional
      * @param[in] rho values of the density at grid points. Order: [(0), (1)].
      * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
      * @param[in,out] vrho values of the first derivative of the
+     * @param[in] rs_omega the range-separation parameter.
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      */
-    auto compute_exc_vxc_for_plda(int np, const double* rho, double* exc, double* vrho) const -> void;
+    auto compute_exc_vxc_for_plda(int np, const double* rho, double* exc, double* vrho, double rs_omega) const -> void;
 
     /** Computes values and first derivative of pair-GGA exchange-correlation functional on grid.
      *
@@ -193,9 +197,10 @@ class CXCPairDensityFunctional
      * @param[in,out] vrho values of the first derivative of the
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      * @param[in,out] vsigma values of the first derivative of the
+     * @param[in] rs_omega the range-separation parameter.
      * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
      */
-    auto compute_exc_vxc_for_pgga(int np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void;
+    auto compute_exc_vxc_for_pgga(int np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma, double rs_omega) const -> void;
 };
 
 #endif /* XCPairDensityFunctional_hpp */

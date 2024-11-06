@@ -54,19 +54,19 @@ export_t2cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const COverlapDriver& ovl_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(ovl_drv.compute(basis, molecule));
+            [](const COverlapDriver& ovl_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> CMatrix {
+                return ovl_drv.compute(basis, molecule);
             },
             "Computes overlap matrix for given molecule and basis.")
         .def(
             "compute",
             [](const COverlapDriver& ovl_drv, const CMolecule& molecule, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis)
-                -> std::shared_ptr<CMatrix> { return std::make_shared<CMatrix>(ovl_drv.compute(bra_basis, ket_basis, molecule)); },
+                -> CMatrix { return ovl_drv.compute(bra_basis, ket_basis, molecule); },
             "Computes overlap matrix for given molecule and pair of bases.")
         .def(
             "compute",
             [](const COverlapDriver& ovl_drv, const CMolecule& bra_molecule,  const CMolecule& ket_molecule, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis)
-                -> std::shared_ptr<CMatrix> { return std::make_shared<CMatrix>(ovl_drv.compute(bra_basis, ket_basis, bra_molecule, ket_molecule)); },
+                -> CMatrix { return ovl_drv.compute(bra_basis, ket_basis, bra_molecule, ket_molecule); },
             "Computes overlap matrix for given pair of molecules and pair of bases.");
 
     // CKineticEnergyDriver class
@@ -74,8 +74,8 @@ export_t2cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CKineticEnergyDriver& kin_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(kin_drv.compute(basis, molecule));
+            [](const CKineticEnergyDriver& kin_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> CMatrix {
+                return kin_drv.compute(basis, molecule);
             },
             "Computes kinetic energy matrix for given molecule and basis.");
 
@@ -88,17 +88,17 @@ export_t2cintegrals(py::module& m)
                const CMolecule&                          molecule,
                const CMolecularBasis&                    basis,
                const std::vector<double>&                charges,
-               const std::vector<std::array<double, 3>>& coords) -> std::shared_ptr<CMatrix> {
+               const std::vector<std::array<double, 3>>& coords) -> CMatrix {
                 auto points = std::vector<TPoint<double>>();
                 points.reserve(coords.size());
                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                return std::make_shared<CMatrix>(npot_drv.compute(charges, points, basis, molecule));
+                return npot_drv.compute(charges, points, basis, molecule);
             },
             "Computes nuclear potential matrix for given molecule, basis and vector of external charges.")
         .def(
             "compute",
-            [](const CNuclearPotentialDriver& npot_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(npot_drv.compute(basis, molecule));
+            [](const CNuclearPotentialDriver& npot_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> CMatrix {
+                return npot_drv.compute(basis, molecule);
             },
             "Computes nuclear potential matrix for given molecule and basis.");
 
@@ -112,11 +112,11 @@ export_t2cintegrals(py::module& m)
                const CMolecularBasis&                    basis,
                const std::vector<double>&                charges,
                const std::vector<std::array<double, 3>>& coords,
-               const std::vector<double>&                omegas) -> std::shared_ptr<CMatrix> {
+               const std::vector<double>&                omegas) -> CMatrix {
                 auto points = std::vector<TPoint<double>>();
                 points.reserve(coords.size());
                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                return std::make_shared<CMatrix>(npot_drv.compute(charges, points, omegas, basis, molecule));
+                return npot_drv.compute(charges, points, omegas, basis, molecule);
             },
             "Computes range separated nuclear potential matrix for given molecule, basis and vector of external "
             "charges.")
@@ -127,11 +127,11 @@ export_t2cintegrals(py::module& m)
                const CMolecularBasis&                    basis,
                const std::vector<double>&                charges,
                const std::vector<std::array<double, 3>>& coords,
-               const double                              omega) -> std::shared_ptr<CMatrix> {
+               const double                              omega) -> CMatrix {
                 auto points = std::vector<TPoint<double>>();
                 points.reserve(coords.size());
                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                return std::make_shared<CMatrix>(npot_drv.compute(charges, points, omega, basis, molecule));
+                return npot_drv.compute(charges, points, omega, basis, molecule);
             },
             "Computes range separated nuclear potential matrix for given molecule, basis and vector of external "
             "charges.");
@@ -145,8 +145,8 @@ export_t2cintegrals(py::module& m)
             [](const CElectricDipoleMomentumDriver& dip_drv,
                const CMolecule&                     molecule,
                const CMolecularBasis&               basis,
-               const std::array<double, 3>&         origin) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(dip_drv.compute(basis, molecule, TPoint<double>(origin)));
+               const std::array<double, 3>&         origin) -> CMatrices {
+                return dip_drv.compute(basis, molecule, TPoint<double>(origin));
             },
             "Computes the electric dipole momentum matrices for a given molecule and basis.");
 
@@ -161,18 +161,18 @@ export_t2cintegrals(py::module& m)
                const CMolecule&                          molecule,
                const CMolecularBasis&                    basis,
                const std::vector<double>&                dipoles,
-               const std::vector<std::array<double, 3>>& coords) -> std::shared_ptr<CMatrices> {
+               const std::vector<std::array<double, 3>>& coords) -> CMatrices {
                 auto points = std::vector<TPoint<double>>();
                 points.reserve(coords.size());
                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                return std::make_shared<CMatrices>(geom_drv.compute(dipoles, points, basis, molecule));
+                return geom_drv.compute(dipoles, points, basis, molecule);
             },
             "Computes nuclear potential derivatives matrices for given molecule, basis and vector of external "
             "dipoles.")
         .def(
             "compute",
             [](const CNuclearPotentialGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom020Driver class
@@ -184,18 +184,18 @@ export_t2cintegrals(py::module& m)
                const CMolecule&                          molecule,
                const CMolecularBasis&                    basis,
                const std::vector<double>&                quadrupoles,
-               const std::vector<std::array<double, 3>>& coords) -> std::shared_ptr<CMatrices> {
+               const std::vector<std::array<double, 3>>& coords) -> CMatrices {
                 auto points = std::vector<TPoint<double>>();
                 points.reserve(coords.size());
                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                return std::make_shared<CMatrices>(geom_drv.compute(quadrupoles, points, basis, molecule));
+                return geom_drv.compute(quadrupoles, points, basis, molecule);
             },
             "Computes nuclear potential derivatives matrices for given molecule, basis and vector of external "
             "quadrupoles.")
         .def(
             "compute",
             [](const CNuclearPotentialGeom0X0Driver<2>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom100Driver class
@@ -218,7 +218,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const CNuclearPotentialGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes nuclear potential first derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom200Driver class
@@ -227,7 +227,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const CNuclearPotentialGeomX00Driver<2>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes nuclear potential second derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom101Driver class
@@ -239,8 +239,8 @@ export_t2cintegrals(py::module& m)
                const CMolecule&                            molecule,
                const CMolecularBasis&                      basis,
                const int                                   iatom,
-               const int                                   jatom) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom, jatom));
+               const int                                   jatom) -> CMatrices {
+                return geom_drv.compute(basis, molecule, iatom, jatom);
             },
             "Computes nuclear potential second derivatives matrices for given molecule, basis and selected atom.");
 
@@ -253,8 +253,8 @@ export_t2cintegrals(py::module& m)
                const CMolecule&                            molecule,
                const CMolecularBasis&                      basis,
                const int                                   iatom,
-               const int                                   jatom) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom, jatom));
+               const int                                   jatom) -> CMatrices {
+                return geom_drv.compute(basis, molecule, iatom, jatom);
             },
             "Computes nuclear potential second derivatives matrices for given molecule, basis and selected atom.");
 
@@ -264,7 +264,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const COverlapGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
 
     // COverlapGeom200Driver class
@@ -273,7 +273,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const COverlapGeomX00Driver<2>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes overlap second derivatives matrices for given molecule, basis and selected atom.");
 
     // COverlapGeom101Driver class
@@ -282,7 +282,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const COverlapGeomX0YDriver<1, 1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom, const int jatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom, jatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom, jatom); },
             "Computes overlap second derivatives matrices for given molecule, basis and selected atom.");
 
     // CKineticEnergyGeom100Driver class
@@ -291,7 +291,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const CKineticEnergyGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes kinetic energy first derivatives matrices for given molecule, basis and selected atom.");
 
     // CKineticEnergyGeom200Driver class
@@ -300,7 +300,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const CKineticEnergyGeomX00Driver<2>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes kinetic energy first derivatives matrices for given molecule, basis and selected atom.");
 
     // CKineticEnergyGeom101Driver class
@@ -312,8 +312,8 @@ export_t2cintegrals(py::module& m)
                const CMolecule&                         molecule,
                const CMolecularBasis&                   basis,
                const int                                iatom,
-               const int                                jatom) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom, jatom));
+               const int                                jatom) -> CMatrices {
+                return geom_drv.compute(basis, molecule, iatom, jatom);
             },
             "Computes kinetic energy second derivatives matrices for given molecule, basis and selected atom.");
 
@@ -327,8 +327,8 @@ export_t2cintegrals(py::module& m)
                const CMolecule&                               molecule,
                const CMolecularBasis&                         basis,
                const std::array<double, 3>&                   origin,
-               const int                                      iatom) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(dip_drv.compute(basis, molecule, TPoint<double>(origin), iatom));
+               const int                                      iatom) -> CMatrices {
+                return dip_drv.compute(basis, molecule, TPoint<double>(origin), iatom);
             },
             "Computes the electric dipole momentum derivatives matrices for a given molecule, basis and selected atom.");
 }
