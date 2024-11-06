@@ -63,13 +63,13 @@ class OMMExplicitSolvation:
         - alpha: The alpha parameter for the Gaussian softcore potential.
         - beta: The beta parameter for the Gaussian softcore potential.
         - x: The x parameter for the Gaussian softcore potential.
-        - lambdas_step1: The lambdas for step 1.
-        - lambdas_step2: The lambdas for step 2.
-        - lambdas_step3: The lambdas for step 3.
-        - u_kln: The potential energies across steps.
-        - step: The current step.
+        - lambdas_stage1: The lambdas for stage 1.
+        - lambdas_stage2: The lambdas for stage 2.
+        - lambdas_stage3: The lambdas for stage 3.
+        - u_kln: The potential energies across stages.
+        - stage: The current stage.
         - final_free_energy: The final free energy.
-        - delta_f: The free energy calculations for each step.
+        - delta_f: The free energy calculations for each stage.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -118,17 +118,17 @@ class OMMExplicitSolvation:
         self.alpha = 5 * unit.kilocalories_per_mole
         self.beta = 5
         self.x = 4
-        # Single parameter for lambdas for step 1
+        # Single parameter for lambdas for stage 1
         # Set to 6 to be on the safe side
-        self.lambdas_step1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Asymetric lambdas for step 2
-        self.lambdas_step2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
-        # Fixed lambda vector for step 3 with 5 lambdas
-        self.lambdas_step3 = [1.0, 0.5, 0.2, 0.1, 0.0]
+        self.lambdas_stage1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        # Asymetric lambdas for stage 2
+        self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
+        # Fixed lambda vector for stage 3 with 5 lambdas
+        self.lambdas_stage3 = [1.0, 0.5, 0.2, 0.1, 0.0]
 
-        # Storage for potential energies across steps
+        # Storage for potential energies across stages
         self.u_kln = []
-        self.step = 1
+        self.stage = 1
 
         # Final energies
         self.final_free_energy = 0.0
@@ -153,7 +153,7 @@ class OMMExplicitSolvation:
         :param target_density:
             The target density for the solvent. Mandatory for 'other' or 'itself' solvent options.
         :return:
-            A list containing the free energy calculations for each step.
+            A list containing the free energy calculations for each stage.
         """
         sys_builder = SystemBuilder()
 
@@ -167,7 +167,9 @@ class OMMExplicitSolvation:
         
         self.solvent_name = solvent
         
-        sys_builder.write_openmm_files(ff_gen_solute, ff_gen_solvent)
+        # Note: GROMACS files will be used instead of OpenMM files.
+        # For some reason, the results are more consistent. (?)
+        sys_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
 
         if not ff_gen_solute:
             self.solute_ff = sys_builder.solute_ff
@@ -190,7 +192,7 @@ class OMMExplicitSolvation:
         :param other_xml_files:
             A list with the XML files needed for the rest of the system.
         :return:
-            A list containing the free energy calculations for each step.
+            A list containing the free energy calculations for each stage.
         """
 
         # Special name for the solvent
@@ -218,7 +220,7 @@ class OMMExplicitSolvation:
         :param solute_top:
             The TOP file with the solute topology.
         :return:
-            A list containing the free energy calculations for each step.
+            A list containing the free energy calculations for each stage.
         """
 
         # Special name for the solvent
@@ -235,7 +237,7 @@ class OMMExplicitSolvation:
 
     def _run_stages(self):
         """
-        Manage the simulation steps.
+        Manage the simulation stages.
         """
         header = "VeloxChem/OpenMM Solvation Free Energy Calculation"
         self.ostream.print_header(header)
@@ -243,17 +245,39 @@ class OMMExplicitSolvation:
         self.ostream.print_blank()
         self.ostream.flush()
 
+        # Print the simulation parameters
+        self.ostream.print_line("Simulation parameters:")
+        self.ostream.print_line("-"*len("Simulation parameters:"))
+        self.ostream.print_blank()
+        self.ostream.print_line(f"Temperature: {self.temperature}")
+        self.ostream.print_line(f"Pressure: {self.pressure}")
+        self.ostream.print_line(f"Timestep: {self.timestep}")
+        self.ostream.print_line(f"Non-Bonded Cutoff: {self.cutoff}")
+        self.ostream.print_line("Thermodynamic Ensemble: NPT")
+        simulation_time = self.num_steps * self.timestep.value_in_unit(unit.nanoseconds) 
+        self.ostream.print_blank()
+        self.ostream.print_line("Alchemical Parameters:")
+        self.ostream.print_line("-"*len("Alchemical Parameters:"))
+        self.ostream.print_line(f"Number of steps per lambda simulation: {self.num_steps}")
+        self.ostream.print_line(f"Number of snapshots per lambda simulation: {self.number_of_snapshots}")
+        # Simulation time per lambda in ns with 2 decimal places
+        self.ostream.print_line(f"Simulation time per lambda: {simulation_time:.2f} ns")
+        self.ostream.print_line(f"Lambdas in Stage 1: {self.lambdas_stage1}")
+        self.ostream.print_line(f"Lambdas in Stage 2: {self.lambdas_stage2}")
+        self.ostream.print_line(f"Lambdas in Stage 3: {self.lambdas_stage3}")
+        self.ostream.print_blank()
+
         # Run the simulations
         self.ostream.print_info("Starting solvated simulation (Stage 1)...\n")
-        delta_f_1, free_en_s1 = self._run_lambda_simulations(step=1)
+        delta_f_1, free_en_s1 = self._run_lambda_simulations(stage=1)
         self.ostream.flush()
         
         self.ostream.print_info("Starting removing GSC potential (Stage 2)...\n")
-        delta_f_2, free_en_s2 = self._run_lambda_simulations(step=2)
+        delta_f_2, free_en_s2 = self._run_lambda_simulations(stage=2)
         self.ostream.flush()
 
         self.ostream.print_info("Starting vacuum simulation (Stage 3)...\n")
-        delta_f_3, free_en_s3 = self._run_lambda_simulations(step=3, vacuum=True)
+        delta_f_3, free_en_s3 = self._run_lambda_simulations(stage=3, vacuum=True)
         self.ostream.flush()
 
         # Calculate the final free energy
@@ -266,12 +290,12 @@ class OMMExplicitSolvation:
 
         return [delta_f_1, delta_f_2, delta_f_3], final_free_energy
 
-    def _run_lambda_simulations(self, step, vacuum=False):
+    def _run_lambda_simulations(self, stage, vacuum=False):
         """
-        Runs simulations for a given step.
+        Runs simulations for a given stage.
 
-        :param step:
-            The step number. 1 for solvated simulation, 2 for removing GSC potential, 3 for vacuum simulation.
+        :param stage:
+            The stage number. 1 for solvated simulation, 2 for removing GSC potential, 3 for vacuum simulation.
         :param vacuum:
             If True, run the simulation in vacuum.
         """
@@ -279,18 +303,18 @@ class OMMExplicitSolvation:
         total_sim_time = 0  # Track total simulation time
         total_ns_simulated = 0  # Track total simulated time in ns
 
-        self.step = step
+        self.stage = stage
 
-        if step == 1:
-            lambdas = self.lambdas_step1
-        elif step == 2:
-            lambdas = self.lambdas_step2
-        elif step == 3:
-            lambdas = self.lambdas_step3
+        if stage == 1:
+            lambdas = self.lambdas_stage1
+        elif stage == 2:
+            lambdas = self.lambdas_stage2
+        elif stage == 3:
+            lambdas = self.lambdas_stage3
 
         for lam in lambdas:
             lam = round(lam, 2)
-            self.ostream.print_info(f"Running lambda = {lam}, step = {step}...")
+            self.ostream.print_info(f"Running lambda = {lam}, stage = {stage}...")
             self.ostream.flush()
 
             # Run the simulation for the current lambda
@@ -309,33 +333,33 @@ class OMMExplicitSolvation:
             self.ostream.print_info(f'Lambda = {lam} completed. Performance: {ns_per_hour:.2f} ns/hour')
             self.ostream.flush()
 
-        # Print total performance metrics for the step
+        # Print total performance metrics for the stage
         overall_ns_per_hour = (total_ns_simulated / total_sim_time) * 3600
-        self.ostream.print_info(f"Total simulation time for stage {step}: {total_sim_time:.2f} s. "
+        self.ostream.print_info(f"Total simulation time for stage {stage}: {total_sim_time:.2f} s. "
                                 f"Total simulated time: {total_ns_simulated:.2f} ns.")
-        self.ostream.print_info(f"Overall performance for stage {step}: {overall_ns_per_hour:.2f} ns/hour")
+        self.ostream.print_info(f"Overall performance for stage {stage}: {overall_ns_per_hour:.2f} ns/hour")
         self.ostream.flush()
 
-        # Time the energy recalculation step
-        self.ostream.print_info(f"Recalculating energies for stage {step}...")
+        # Time the energy recalculation stage
+        self.ostream.print_info(f"Recalculating energies for stage {stage}...")
         self.ostream.flush()
         recalculation_start = time.time()
-        trajectories, forcefields = self._fetch_files(lambdas=lambdas, step=step)
+        trajectories, forcefields = self._fetch_files(lambdas=lambdas, stage=stage)
 
         u_kln = self._recalculate_energies(trajectories, forcefields, topology)
 
         recalculation_end = time.time()
         recalculation_time = recalculation_end - recalculation_start
 
-        self.ostream.print_info(f"Energy recalculation for stage {step} took {recalculation_time:.2f} seconds.")
+        self.ostream.print_info(f"Energy recalculation for stage {stage} took {recalculation_time:.2f} seconds.")
         self.ostream.flush()
         self.u_kln.append(u_kln)
 
-        self.ostream.print_info(f"Calculating the free energy with MBAR for stage {step}...")
+        self.ostream.print_info(f"Calculating the free energy with MBAR for stage {stage}...")
         self.ostream.flush()
         delta_f = self._calculate_free_energy(u_kln)
         free_energy = delta_f['Delta_f'][-1, 0]
-        self.ostream.print_line(f"Free energy for stage {step}: {delta_f['Delta_f'][-1, 0]:.4f} +/- {delta_f['dDelta_f'][-1, 0]:.4f} kcal/mol")
+        self.ostream.print_line(f"Free energy for stage {stage}: {delta_f['Delta_f'][-1, 0]:.4f} +/- {delta_f['dDelta_f'][-1, 0]:.4f} kcal/mol")
         self.ostream.flush()
 
         return delta_f, free_energy
@@ -345,9 +369,9 @@ class OMMExplicitSolvation:
         Runs a single lambda simulation. Can be run in parallel.
 
         """
-        lam, step, vacuum = args
+        lam, stage, vacuum = args
         lam = round(lam, 2)
-        self.ostream.print_info(f"Running lambda = {lam}, stage = {step}")
+        self.ostream.print_info(f"Running lambda = {lam}, stage = {stage}...")
         self.ostream.flush()
 
         if vacuum:
@@ -363,41 +387,39 @@ class OMMExplicitSolvation:
         """
         # Reading the system from files
         if self.solvent_name == 'omm_files':
+            # Under investigation!
             pdb = app.PDBFile(self.system_pdb)
             initial_system_ff = app.ForceField(self.solute_xml, *self.other_xml_files)
             topology = pdb.topology
             positions = pdb.positions
 
         elif self.solvent_name == 'gro_files':
-            pdb = app.GromacsGroFile(self.system_gro)
-            initial_system_ff = app.GromacsTopFile(self.system_top, periodicBoxVectors=pdb.getPeriodicBoxVectors())
+            gro = app.GromacsGroFile(self.system_gro)
+            initial_system_ff = app.GromacsTopFile(self.system_top, 
+                                                   periodicBoxVectors=gro.getPeriodicBoxVectors())
             topology = initial_system_ff.topology
-            positions = pdb.positions
+            positions = gro.positions
 
         # From molecule and ffgenerator
         else:
             if self.solvent_name != 'itself':
-                pdb = app.PDBFile('system.pdb')
-                # For standard forcefields forcefield objects are not generated in the SystemBuilder
-                if self.solvent_name == 'spce':
-                    initial_system_ff = app.ForceField('solute.xml', 'amber03.xml','spce.xml')
-                elif self.solvent_name == 'tip3p':
-                    initial_system_ff = app.ForceField('solute.xml', 'amber03.xml','tip3p.xml')
-                else:
-                    initial_system_ff = app.ForceField('solute.xml', 'solvent_1.xml')
-                topology = pdb.topology
-                positions = pdb.positions
+                gro = app.GromacsGroFile('system.gro')
+                initial_system_ff = app.GromacsTopFile('system.top', 
+                                                        periodicBoxVectors=gro.getPeriodicBoxVectors())
+                topology = initial_system_ff.topology
+                positions = gro.positions
             else:
-                pdb = app.PDBFile('liquid.pdb')
-                initial_system_ff = app.ForceField('liquid.xml')
-                topology = pdb.topology
-                positions = pdb.positions
+                gro = app.GromacsGroFile('liquid.gro')
+                initial_system_ff = app.GromacsTopFile('liquid.top',
+                                                    periodicBoxVectors=gro.getPeriodicBoxVectors())
+                topology = initial_system_ff.topology
+                positions = gro.positions
         
         # createSystem from a top file does not require the topology as an argument
-        if self.solvent_name == 'gro_files':
-            sys_arguments = [self.nonbondedMethod, self.cutoff, self.constraints]
-        else:
+        if self.solvent_name == 'omm_files':
             sys_arguments = [topology, self.nonbondedMethod, self.cutoff, self.constraints]
+        else:
+            sys_arguments = [self.nonbondedMethod, self.cutoff, self.constraints]
 
         solvated_system = initial_system_ff.createSystem(*sys_arguments)
 
@@ -421,9 +443,9 @@ class OMMExplicitSolvation:
                     gsc_force.addParticle([sigma])
 
                     if i in alchemical_region:
-                        if self.step == 1:
+                        if self.stage == 1:
                             force.setParticleParameters(i, charge * (1 - lambda_val), sigma, epsilon * (1 - lambda_val))
-                        elif self.step == 2:
+                        elif self.stage == 2:
                             force.setParticleParameters(i, 0, 0, 0)
                 
                 # Handle exceptions (interaction exclusions)
@@ -456,16 +478,17 @@ class OMMExplicitSolvation:
 
         # From molecule and ffgenerator
         else:
-            self.solute_ff.write_openmm_files('solute_vacuum', 'MOL')
-            pdb = app.PDBFile('solute_vacuum.pdb')
-            forcefield_solute = app.ForceField('solute_vacuum.xml')
-            topology = pdb.topology
-            positions = pdb.positions
+            self.solute_ff.write_gromacs_files('solute_vacuum', 'MOL')
+            gro = app.GromacsGroFile('solute_vacuum.gro')
+            forcefield_solute = app.GromacsTopFile('solute_vacuum.top')
+            topology = forcefield_solute.topology
+            positions = gro.positions
 
-        if self.solvent_name == 'gro_files':
-            vacuum_system = forcefield_solute.createSystem(nonbondedMethod=app.NoCutoff, constraints=self.constraints)
-        else:
+        if self.solvent_name == 'omm_files':
             vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
+
+        else:
+            vacuum_system = forcefield_solute.createSystem(nonbondedMethod=app.NoCutoff, constraints=self.constraints)
         
         csc_force = self._get_conventional_softcore_force(lambda_val, vacuum_system)
 
@@ -534,32 +557,32 @@ class OMMExplicitSolvation:
         # Setup reporters  
         # XTC reporter is optional because it affects performance!
         if self.save_trajectory_xtc:
-            simulation.reporters.append(app.XTCReporter(f'trajectory_{lambda_value}_step{self.step}.xtc', interval))
+            simulation.reporters.append(app.XTCReporter(f'trajectory_{lambda_value}_stage{self.stage}.xtc', interval))
+            self.ostream.print_info(f"Trajectory will be saved in trajectory_{lambda_value}_stage{self.stage}.xtc")
+            self.ostream.flush()
         # State data reporter
-        simulation.reporters.append(app.StateDataReporter(f'energy_{lambda_value}_step{self.step}.txt', interval,
+        simulation.reporters.append(app.StateDataReporter(f'energy_{lambda_value}_stage{self.stage}.txt', interval,
                                                         step=True, potentialEnergy=True, temperature=True))
 
         # Write the system to a file
-        if self.step in [1, 2]:
-            system_filename = f'solvated_system_{lambda_value}_step{self.step}.xml'
+        if self.stage in [1, 2]:
+            system_filename = f'solvated_system_{lambda_value}_stage{self.stage}.xml'
             with open(system_filename, 'w') as f:
                 f.write(mm.XmlSerializer.serialize(system))
             self.ostream.print_info(f"System XML written to {system_filename}")
             self.ostream.flush()
             # Name for the hdf5 file
-            hdf5_filename = f'positions_{lambda_value}_step{self.step}.h5'
+            hdf5_filename = f'positions_{lambda_value}_stage{self.stage}.h5'
 
 
         else:
-            system_filename = f'vacuum_system_{lambda_value}_step{self.step}.xml'
+            system_filename = f'vacuum_system_{lambda_value}_stage{self.stage}.xml'
             with open(system_filename, 'w') as f:
                 f.write(mm.XmlSerializer.serialize(system))
             self.ostream.print_info(f"System XML written to {system_filename}")
             
             # Name for the hdf5 file
-            hdf5_filename = f'positions_{lambda_value}_step{self.step}.h5'
-            self.ostream.print_info(f"Trajectory will be saved in trajectory_{lambda_value}_step{self.step}.xtc")
-            self.ostream.flush()
+            hdf5_filename = f'positions_{lambda_value}_stage{self.stage}.h5'
             
         # Start the production run
         time_start = time.time()
@@ -593,7 +616,7 @@ class OMMExplicitSolvation:
         return simulated_ns, elapsed_time
 
 
-    def _fetch_files(self, lambdas, step):
+    def _fetch_files(self, lambdas, stage):
         """
         Fetch trajectories and forcefields generated during the simulation.
         """
@@ -601,12 +624,11 @@ class OMMExplicitSolvation:
         forcefields = []
         for lam in lambdas:
             lam = round(lam, 2)
-            trajectories.append(f'positions_{lam}_step{step}.h5')
-            #trajectories.append(f'trajectory_{lam}_step{step}.pdb')
-            if step in [1, 2]:
-                forcefields.append(f'solvated_system_{lam}_step{step}.xml')
+            trajectories.append(f'positions_{lam}_stage{stage}.h5')
+            if stage in [1, 2]:
+                forcefields.append(f'solvated_system_{lam}_stage{stage}.xml')
             else:
-                forcefields.append(f'vacuum_system_{lam}_step{step}.xml')
+                forcefields.append(f'vacuum_system_{lam}_stage{stage}.xml')
 
         return trajectories, forcefields
 

@@ -991,7 +991,7 @@ class SystemBuilder:
             The number of moles per nm^3.
         """
         # Get the mass in kg/mol
-        mass = sum(molecule.masses_to_numpy()) * 1e-3 / 6.022e23
+        mass = sum(molecule.get_masses()) * 1e-3 / 6.022e23
 
         # Get the mols per m^3
         mols_per_m3 = density / mass

@@ -128,7 +128,7 @@ from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
 from .systembuilder import SystemBuilder
-from .explicitsolvationopenmm import OMMExplicitSolvation
+from .openmmexplicitsolvation import OMMExplicitSolvation
 from .openmmdynamics import OpenMMDynamics
 
 
