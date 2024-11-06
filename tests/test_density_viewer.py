@@ -64,3 +64,43 @@ class TestDensityViewer:
             assert np.max(np.abs(density - ref_den_values)) < 1.0e-6
 
         task.finish()
+
+    def test_density_viewer_relative_difference(self):
+
+        molstr = """
+            O   0.0   0.0   0.0
+            H   0.0   1.4   1.1
+            H   0.0  -1.4   1.1
+        """
+        mol = Molecule.read_molecule_string(molstr, units='au')
+        bas = MolecularBasis.read(mol, 'aug-cc-pvdz', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            density_matrix = 2 * scf_results['D_alpha']
+
+            density_viewer = DensityViewer()
+            density_viewer.grid_density = 6
+            density_viewer.atombox_radius = 9
+            density_viewer.initialize(mol, bas)
+            density_viewer.use_visualization_driver = False
+            density = density_viewer.compute_density(density_matrix)
+
+            density_viewer.use_visualization_driver = True
+            density_ref = density_viewer.compute_density(density_matrix)
+
+            max_rel_diff = 0.0
+            for i in range(density_ref.shape[0]):
+                for j in range(density_ref.shape[1]):
+                    for k in range(density_ref.shape[2]):
+                        if abs(density_ref[i, j, k]) < 1e-6:
+                            assert abs(density[i, j, k] -
+                                       density_ref[i, j, k]) < 1e-6
+                        else:
+                            rel_diff = abs(density[i, j, k] /
+                                           density_ref[i, j, k] - 1.0)
+                            max_rel_diff = max(rel_diff, max_rel_diff)
+            assert max_rel_diff < 0.5
