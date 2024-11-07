@@ -78,6 +78,15 @@ auto integrateFxcGradientForGGA(const CMolecule&        molecule,
                                 const double            screeningThresholdForGTOValues,
                                 const CXCFunctional&    xcFunctional) -> CDenseMatrix;
 
+auto integrateKxcGradientForGGA(const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const std::vector<const double*>& rwDensityPointersOne,
+                                const std::vector<const double*>& rwDensityPointersTwo,
+                                const std::vector<const double*>& gsDensityPointers,
+                                const CMolecularGrid&   molecularGrid,
+                                const double            screeningThresholdForGTOValues,
+                                const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+
 auto computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
 }  // namespace xcgradgga

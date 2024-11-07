@@ -172,10 +172,9 @@ CXCMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
         {
             return xcgradlda::integrateKxcGradientForLDA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
-        /*
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateKxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
+            return xcgradgga::integrateKxcGradientForGGA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
         {
@@ -183,7 +182,6 @@ CXCMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
-        */
     }
     else
     {

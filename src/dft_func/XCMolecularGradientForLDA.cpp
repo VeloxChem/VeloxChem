@@ -35,8 +35,8 @@
 
 #include "AODensityMatrix.hpp"
 #include "DenseLinearAlgebra.hpp"
-#include "DensityGridQuad.hpp"
 #include "DensityGridGenerator.hpp"
+#include "DensityGridQuad.hpp"
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
