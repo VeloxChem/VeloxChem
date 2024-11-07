@@ -14,8 +14,8 @@ class TestScfVibrationalAnalysisDriver:
     def test_scf_vibrational_analysis_driver(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
-        h5file = str(here / 'inputs' / 'water_vib_scf.h5')
+        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
+        h5file = str(here / 'data' / 'water_vib_scf.h5')
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
@@ -59,8 +59,8 @@ class TestScfVibrationalAnalysisDriver:
     def test_scf_resonance_raman(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_hessian_scf.inp')
-        h5file = str(here / 'inputs' / 'water_vib_scf.h5')
+        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
+        h5file = str(here / 'data' / 'water_vib_scf.h5')
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)

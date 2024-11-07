@@ -56,7 +56,7 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'inputs'/'polarizabilitygradients.h5')
+            hf_file_name = str(here /'data'/'polarizabilitygradients.h5')
             hf = h5py.File(hf_file_name, 'r')
             an_label = 'an_' + label
             polgrad_reference = np.array(hf.get(an_label))
@@ -83,7 +83,7 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'inputs'/'polarizabilitygradients.h5')
+            hf_file_name = str(here /'data'/'polarizabilitygradients.h5')
             hf = h5py.File(hf_file_name, 'r')
             num_label = 'num_' + label
             polgrad_reference = np.array(hf.get(num_label))
@@ -132,7 +132,7 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'inputs'/'polarizabilitygradients.h5')
+            hf_file_name = str(here /'data'/'polarizabilitygradients.h5')
             hf = h5py.File(hf_file_name, 'r')
             an_label = 'an_' + label
             polgrad_reference = np.array(hf.get(an_label))
@@ -159,7 +159,7 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'inputs'/'polarizabilitygradients.h5')
+            hf_file_name = str(here /'data'/'polarizabilitygradients.h5')
             hf = h5py.File(hf_file_name, 'r')
             num_label = 'num_' + label
             polgrad_reference = np.array(hf.get(num_label))

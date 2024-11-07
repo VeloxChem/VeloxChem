@@ -56,7 +56,7 @@ class TestCphfPolgrad(unittest.TestCase):
             cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'inputs'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label))
             hf.close()
@@ -103,7 +103,7 @@ class TestCphfPolgrad(unittest.TestCase):
             cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'inputs'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label))
             hf.close()

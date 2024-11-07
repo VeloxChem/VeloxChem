@@ -17,8 +17,8 @@ class TestXtbVibrationalAnalysisDriver:
     def test_xtb_vibrational_analysis_driver(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_hessian_xtb.inp')
-        h5file = str(here / 'inputs' / 'water_hessian_xtb.h5')
+        inpfile = str(here / 'data' / 'water_hessian_xtb.inp')
+        h5file = str(here / 'data' / 'water_hessian_xtb.h5')
 
         task = MpiTask([inpfile, None])
 

@@ -40,7 +40,7 @@ class TestCphfSolver(unittest.TestCase):
             cphf_coefficients = cphf_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'inputs'/'cphf_coefficients.h5')
+            hf_file_name = str(here /'data'/'cphf_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphf_reference = np.array(hf.get(label))
             hf.close()

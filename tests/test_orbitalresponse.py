@@ -99,8 +99,8 @@ class TestOrbitalResponse(unittest.TestCase):
     def test_tda_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_orbrsp.inp')
-        orbrsp_ref_file = str(here / 'inputs' / 'orbital_response_hf_ref.h5')
+        inpfile = str(here / 'data' / 'water_orbrsp.inp')
+        orbrsp_ref_file = str(here / 'data' / 'orbital_response_hf_ref.h5')
 
         potfile = None
 
@@ -112,8 +112,8 @@ class TestOrbitalResponse(unittest.TestCase):
     def test_rpa_hf(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'water_orbrsp.inp')
-        orbrsp_ref_file = str(here / 'inputs' / 'orbital_response_hf_ref.h5')
+        inpfile = str(here / 'data' / 'water_orbrsp.inp')
+        orbrsp_ref_file = str(here / 'data' / 'orbital_response_hf_ref.h5')
 
         potfile = None
 
