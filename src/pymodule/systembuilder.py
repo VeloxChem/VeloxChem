@@ -678,25 +678,6 @@ class SystemBuilder:
         else:
             gro = app.GromacsGroFile('system.gro')
 
-        # # Append a list of force fields for different cases:
-        # force_fields = ['solute.xml']
-        # if self.solvent_name == "spce":
-        #     force_fields.append('amber03.xml')
-        #     force_fields.append('spce.xml')
-        # elif self.solvent_name == "tip3p":
-        #     force_fields.append('amber03.xml')
-        #     force_fields.append('tip3p.xml')
-        # else:
-        #     if self.solvent_name != 'itself':
-        #         for i in range(len(self.solvent_ffs)):
-        #             force_fields.append(f'solvent_{i+1}.xml')
-
-        # if self.counterion:
-        #     if self.solvent_name in ['spce', 'tip3p']:
-        #         pass
-        #     else:
-        #         force_fields.append('amber03.xml')
-        
         # # Create the force field
         if self.solvent_name == 'itself':
             forcefield = app.GromacsTopFile('liquid.top', periodicBoxVectors=gro.getPeriodicBoxVectors())
@@ -705,9 +686,6 @@ class SystemBuilder:
 
         topology = forcefield.topology
         positions = gro.positions
-
-        # Create the force field
-        #forcefield = app.ForceField(*force_fields)
 
         # Create the OpenMM system
         system = forcefield.createSystem(
@@ -752,14 +730,20 @@ class SystemBuilder:
             app.PDBFile.writeFile(simulation.topology, positions, f)
 
         # Delete the produced gro and top files
-            #if self.solvent_name == 'itself':
-            #os.remove('liquid.gro')
-            #os.remove('liquid.top')
-            #os.remove('liquid.itp')
-            #else:
-            #os.remove('system.gro')
-            #os.remove('system.top')
-        #os.remove('solute.itp')
+        if self.solvent_name == 'itself':
+            os.remove('liquid.gro')
+            os.remove('liquid.top')
+            os.remove('liquid.itp')
+        elif self.solvent_name in ['spce', 'tip3p']:
+            os.remove('system.gro')
+            os.remove('system.top')
+            os.remove('solute.itp')
+        else:
+            os.remove('system.gro')
+            os.remove('system.top')
+            os.remove('solute.itp')
+            for i in range(len(self.solvent_ffs)):
+                os.remove(f'solvent_{i+1}.itp')
 
         # Update the system molecule
         self.system_molecule = Molecule.read_pdb_file('equilibrated_system.pdb')
