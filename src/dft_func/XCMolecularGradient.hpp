@@ -51,33 +51,6 @@ class CXCMolecularGradient
     double _screeningThresholdForGTOValues;
 
     /**
-     Integrates first-order LDA exchnage-correlation functional contribution to
-     molecular gradient.
-
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param rwDensityMatrix the perturbed AO density matrix (to be contracted
-            with GTO gradient).
-     @param gsDensityMatrix the ground state AO density matrix.
-     @param molecularGrid the molecular grid.
-     @param xcFunctional the exchange-correlation functional.
-     @return the molecular gradient.
-     */
-    auto _integrateVxcGradientForLDA(const CMolecule&        molecule,
-                                     const CMolecularBasis&  basis,
-                                     const std::vector<const double*>& rwDensityPointers,
-                                     const std::vector<const double*>& gsDensityPointers,
-                                     const CMolecularGrid&   molecularGrid,
-                                     const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
-
-    auto _integrateVxcGradientForLDAOpenShell(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const std::vector<const double*>& rwDensityPointers,
-                                              const std::vector<const double*>& gsDensityPointers,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
-
-    /**
      Integrates first-order GGA exchnage-correlation functional contribution to
      molecular gradient.
 

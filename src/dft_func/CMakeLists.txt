@@ -30,6 +30,8 @@ target_sources(vlxobjs
     XCIntegratorForLDA.cpp
     XCIntegratorForMGGA.cpp
     XCMolecularGradient.cpp
+    XCMolecularGradientForLDA.cpp
+    XCMolecularGradientForGGA.cpp
   )
 
 target_include_directories(vlxobjs
