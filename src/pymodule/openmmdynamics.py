@@ -31,15 +31,11 @@ from time import time
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
-# TODO: added try import openmm to ensure that the
-# python tests are run even if openmm is not installed.
-# Are there better solutions?
-try:
-    import openmm as mm
-    import openmm.app as app
-    import openmm.unit as unit
-except ImportError:
-    pass
+# Required OpenMM imports
+import openmm as mm
+import openmm.app as app
+import openmm.unit as unit
+
 from .molecule import Molecule
 from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
@@ -49,8 +45,11 @@ from .forcefieldgenerator import ForceFieldGenerator
 from .systembuilder import SystemBuilder
 
 # Drivers
-#from .xtbdriver import XtbDriver
-#from .impesdriver import ImpesDriver
+from .xtbdriver import XtbDriver
+from .scfdriver import ScfDriver
+from .scfrestdriver import ScfRestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
 
 class OpenMMDynamics:
@@ -88,7 +87,8 @@ class OpenMMDynamics:
         - molecule: The VeloxChem molecule object.
         - unique_residues: The list of unique residues in the system.
         - unique_molecules: The list of unique molecules in the system.
-        - qm_driver: The VeloxChem driver object. Options are XtbDriver and ImpesDriver.
+        - qm_driver: The VeloxChem driver object. Options are XtbDriver or an ScfDriver.
+        - basis: The basis set for the QM region if an SCF driver is used.
         - grad_driver: The VeloxChem gradient driver object.
         - qm_atoms: The list of atom indices for the QM region.
         - mm_subregion: The list of atom indices for the MM subregion (part of a molecule).
@@ -133,7 +133,7 @@ class OpenMMDynamics:
         self.parent_ff = 'amber03.xml'
         self.water_ff = 'spce.xml'
         self.box_size = 2.0 
-        self.padding = 2.0
+        self.padding = 1.0
         self.cutoff = 1.0
         self.integrator = None
 
@@ -154,6 +154,7 @@ class OpenMMDynamics:
 
         # QM Region parameters
         self.qm_driver = None
+        self.basis = None
         self.grad_driver = None
         self.qm_atoms = None
         self.mm_subregion = None
@@ -422,7 +423,7 @@ class OpenMMDynamics:
             sys_builder.solvate(solute=molecule, 
                                 solvent=solvent,
                                 padding=self.padding,
-                                equilibrate=True
+                                equilibrate=True,
                                 )
             
             sys_builder.write_openmm_files(solute_ff=ff_gen)
@@ -1056,8 +1057,12 @@ class OpenMMDynamics:
             # Name flag based on if is instance of the XtbDriver or ScfDriver
             if isinstance(qm_driver, XtbDriver):
                 drv_name = 'XTB Driver'
-            else:
-                drv_name = 'SCF Driver'
+            elif isinstance(qm_driver, ScfRestrictedDriver):
+                drv_name = 'RSCF Driver'
+            elif isinstance(qm_driver, ScfUnrestrictedDriver):
+                drv_name = 'USCF Driver'
+            elif instance(qm_driver, ScfRestrictedOpenDriver):
+                drv_name = 'ROSCF Driver'
 
             msg = f'Requested QM minimization with {drv_name}'
             self.ostream.print_info(msg)
@@ -1252,8 +1257,9 @@ class OpenMMDynamics:
         self.ostream.flush()
 
     def run_qmmm(self, 
-                 qm_driver, 
+                 qm_driver,
                  grad_driver,
+                 basis = None,
                  restart_file = None, 
                  ensemble='NVE', 
                  temperature=298.15, 
@@ -1272,6 +1278,8 @@ class OpenMMDynamics:
             QM driver object from VeloxChem.
         :param grad_driver:
             Gradient driver object from VeloxChem.
+        :param basis:
+            Molecular basis object from Veloxchem.
         :param restart_file:
             Last state of the simulation to restart from. Default is None.
         :param ensemble:
@@ -1296,6 +1304,9 @@ class OpenMMDynamics:
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
+        if basis is not None:
+            self.basis = basis
+
         self.ensemble = ensemble
         self.temperature = temperature * unit.kelvin
         self.friction = friction / unit.picosecond
@@ -1309,8 +1320,14 @@ class OpenMMDynamics:
         # Driver flag 
         if isinstance(self.qm_driver, XtbDriver):
             self.driver_flag = 'XTb Driver'
-        elif isinstance(self.qm_driver, ImpesDriver):
-            self.driver_flag = 'Impes Driver'
+        elif isinstance(self.qm_driver, ScfRestrictedDriver):
+            self.driver_flag = 'RSCF Driver'
+        elif isinstance(self.qm_driver, ScfUnrestrictedDriver):
+            self.driver_flag = 'USCF Driver'
+        elif isinstance(self.qm_driver, ScfRestrictedOpenDriver):
+            self.driver_flag = 'ROSCF Driver'
+        else:
+            raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
 
         self.qm_potentials = []
         self.qm_mm_interaction_energies = []
@@ -2201,17 +2218,16 @@ class OpenMMDynamics:
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
 
-        if not isinstance(self.qm_driver, ImpesDriver):
-            # Compute explicitly the energy and gradient
+        if self.basis is not None:
+            scf_result = self.qm_driver.compute(new_molecule, self.basis)
+            gradient = self.grad_driver.compute(new_molecule, self.basis, scf_result)
+            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+            gradient = self.grad_driver.get_gradient()
+        else:
             self.qm_driver.compute(new_molecule)
             self.grad_driver.compute(new_molecule)
             potential_kjmol = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
             gradient = self.grad_driver.get_gradient()
-        else:
-            # IM driver has the energy and gradient in the same driver
-            self.qm_driver.compute(new_molecule)
-            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
-            gradient = self.qm_driver.get_gradient()
 
         return gradient, potential_kjmol
 
@@ -2275,8 +2291,10 @@ class OpenMMDynamics:
         Returns:
             The potential energy of the QM region.
         """
-
-        potential_energy = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+        if self.basis is not None:
+            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+        else:
+            potential_energy = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
 
         return potential_energy
     

@@ -656,11 +656,9 @@ class SystemBuilder:
         solute_ff.partial_charges = self.solute.get_partial_charges(self.solute.get_charge())
         solute_ff.create_topology(self.solute)
 
-        if self.solvent_name == 'itself':
-            solvent_ffs = []
-
-        elif self.solvent_name in ['spce', 'tip3p']:
+        if self.solvent_name in ['spce', 'tip3p','itself']:
             solvent_ffs = None
+            
         else:
             solvent_ffs = []
             for i in range(len(self.solvents)):
@@ -1113,6 +1111,8 @@ class SystemBuilder:
                         self.ostream.print_info(f'Generated the ForceField for the solvent')
                         self.ostream.flush()
                     self.solvent_ffs.append(solvent_ff)
+            else:
+                self.solvent_ffs = None
         else:
             self.solvent_ffs = solvent_ffs
 
