@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -114,15 +113,8 @@ def print_libxc_reference(xcfun, ostream):
     """
 
     if isinstance(xcfun, XCFunctional):
-        valstr = 'Using the Libxc library '
-        valstr += f'(version {xcfun.get_libxc_version()}).'
-        ostream.print_info(valstr)
-        ostream.print_blank()
-        valstr = xcfun.get_libxc_reference()
-        ostream.print_reference(valstr)
-        ostream.print_blank()
-
-        valstr = f'Using the {xcfun.get_func_label()} functional.'
+        valstr = f'Using the {xcfun.get_func_label()} functional and the '
+        valstr += f'Libxc library (v{xcfun.get_libxc_version()}).'
         ostream.print_info(valstr)
         ostream.print_blank()
         printed_refs = []
@@ -130,4 +122,6 @@ def print_libxc_reference(xcfun, ostream):
             if ref not in printed_refs:
                 ostream.print_reference(ref)
                 printed_refs.append(ref)
+        ostream.print_blank()
+        ostream.print_reference(xcfun.get_libxc_reference())
         ostream.print_blank()

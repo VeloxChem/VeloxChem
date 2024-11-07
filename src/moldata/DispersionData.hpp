@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -39,14 +38,14 @@ namespace dispdata {  // dispdata namespace
 
  @return a vector of refn data.
  */
-std::vector<int32_t> getRefN();
+std::vector<int> getRefN();
 
 /**
  Creates the Zeff data (reference: dftd4 v2.4.0).
 
  @return a vector of Zeff data.
  */
-std::vector<int32_t> getZeff();
+std::vector<int> getZeff();
 
 /**
  Creates the chemical hardness data (reference: dftd4 v2.4.0).
@@ -67,7 +66,7 @@ std::vector<double> getR4R2();
 
  @return a 2d vector of refsys data.
  */
-std::vector<std::vector<int32_t>> getRefSys();
+std::vector<std::vector<int>> getRefSys();
 
 /**
  Creates the clsh data (reference: dftd4 v2.4.0).
@@ -124,7 +123,7 @@ std::vector<std::vector<std::vector<double>>> getAlphaiw();
  @param index the index.
  @return the sscale value.
  */
-double getSscale(int32_t index);
+double getSscale(int index);
 
 /**
  Gets the secaiw data (reference: dftd4 v2.4.0).
@@ -132,7 +131,7 @@ double getSscale(int32_t index);
  @param index the index.
  @return a vector of secaiw data.
  */
-std::vector<double> getSecaiw(int32_t index);
+std::vector<double> getSecaiw(int index);
 
 }  // namespace dispdata
 

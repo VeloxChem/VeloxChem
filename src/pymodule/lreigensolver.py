@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -30,17 +29,16 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import denmat
 from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
                            extinction_coefficient_from_beta)
+from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
@@ -98,7 +96,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nto = False
         self.nto_pairs = None
-        self.nto_cubes = True
+        self.nto_cubes = False
         self.detach_attach = False
         self.cube_origin = None
         self.cube_stepsize = None
@@ -288,11 +286,6 @@ class LinearResponseEigenSolver(LinearSolver):
         exc_residuals = {}
         relative_residual_norm = {}
 
-        signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(self._graceful_exit, molecule,
-                                            basis, dft_dict, pe_dict,
-                                            rsp_vector_labels)
-
         iter_per_trial_in_hours = None
 
         # start iterations
@@ -300,7 +293,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            profiler.set_timing_key(f'Iteration {iteration+1}')
+            profiler.set_timing_key(f'Iteration {iteration + 1}')
 
             profiler.start_timer('ReducedSpace')
 
@@ -488,8 +481,6 @@ class LinearResponseEigenSolver(LinearSolver):
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        signal_handler.remove_sigterm_function()
-
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
 
@@ -590,12 +581,12 @@ class LinearResponseEigenSolver(LinearSolver):
                                                   mo_vir.shape[1])
                         nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                        nto_h5_fname = f'{base_fname}_S{s+1}_NTO.h5'
+                        nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
                         nto_mo.write_hdf5(nto_h5_fname)
                         nto_h5_files.append(nto_h5_fname)
                     else:
                         nto_mo = MolecularOrbitals()
-                    nto_mo.broadcast(self.rank, self.comm)
+                    nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
 
                     if self.nto_cubes:
                         lam_diag, nto_cube_fnames = self.write_nto_cubes(
@@ -617,7 +608,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                     else:
                         dens_DA = AODensityMatrix()
-                    dens_DA.broadcast(self.rank, self.comm)
+                    dens_DA = dens_DA.broadcast(self.comm, root=mpi_master())
 
                     dens_cube_fnames = self.write_detach_attach_cubes(
                         cubic_grid, molecule, basis, s, dens_DA)
@@ -626,16 +617,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         dens_cube_files.append(dens_cube_fnames)
 
                 if self.esa:
-                    dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-                    dipole_matrices = dipole_drv.compute(molecule, basis)
-
-                    if self.rank == mpi_master():
-                        dipole_integrals = (dipole_matrices.x_to_numpy(),
-                                            dipole_matrices.y_to_numpy(),
-                                            dipole_matrices.z_to_numpy())
-                    else:
-                        dipole_integrals = None
-
                     if self.esa_from_state is None:
                         source_states = list(range(self.nstates))
                     else:
@@ -647,8 +628,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.rank == mpi_master():
                         esa_results = []
-                    else:
-                        esa_results = None
+                        dipole_integrals = compute_electric_dipole_integrals(
+                            molecule, basis, [0.0, 0.0, 0.0])
 
                     for s_1, s_2 in esa_pairs:
                         eigvec_1 = self.get_full_solution_vector(
@@ -678,7 +659,6 @@ class LinearResponseEigenSolver(LinearSolver):
                                     [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]))
 
                             esa_trans_dipole = np.array([
-                                -1.0 *
                                 np.sum(esa_trans_dens * dipole_integrals[i])
                                 for i in range(3)
                             ])
@@ -698,9 +678,9 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
-                            edip_grad[ind], eigvec) * (-1.0)
+                            edip_grad[ind], eigvec)
                         velo_trans_dipoles[s, ind] = np.vdot(
-                            lmom_grad[ind], eigvec) / eigvals[s]
+                            lmom_grad[ind], eigvec) / (-eigvals[s])
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
 

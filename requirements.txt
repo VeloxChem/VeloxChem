@@ -1,6 +1,0 @@
-geometric >=1.0
-h5py >=2.8
-mpi4py >=3.0
-numpy >=1.15
-psutil >=5.6
-pybind11[global] >=2.6

@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -24,9 +23,8 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from sys import stderr
 import math
-
-from .veloxchemlib import assert_msg_critical as vlx_assert
 
 
 def assert_msg_critical(condition, msg=''):
@@ -42,7 +40,11 @@ def assert_msg_critical(condition, msg=''):
     if __debug__ and MPI.COMM_WORLD.Get_size() == 1:
         assert condition, msg
     else:
-        vlx_assert(condition, msg)
+        if not condition:
+            stderr.write(' **** Critical Error (process {}) **** {}\n'.format(
+                MPI.COMM_WORLD.Get_rank(), msg))
+            stderr.flush()
+            MPI.COMM_WORLD.Abort()
 
 
 def safe_arccos(val):

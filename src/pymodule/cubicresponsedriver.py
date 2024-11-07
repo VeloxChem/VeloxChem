@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -29,7 +28,7 @@ import numpy as np
 import time
 import sys
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -156,15 +155,15 @@ class CubicResponseDriver(NonlinearSolver):
 
         assert_msg_critical(
             self.b_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid b_component')
 
         assert_msg_critical(
             self.c_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid c_component')
 
         assert_msg_critical(
             self.d_component in ['x', 'y', 'z'],
-            'CubicResponseDriver: Undefined or invalid a_component')
+            'CubicResponseDriver: Undefined or invalid d_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -212,8 +211,15 @@ class CubicResponseDriver(NonlinearSolver):
         norb = self.comm.bcast(norb, root=mpi_master())
 
         # Computing first-order gradient vectors
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, ao_basis)
+        if self.rank == mpi_master():
+            mu_dipole_mats = compute_electric_dipole_integrals(
+                molecule, ao_basis)
+            # Note: nonliear response uses r instead of mu for dipole operator
+            dipole_mats = (mu_dipole_mats[0] * (-1.0),
+                           mu_dipole_mats[1] * (-1.0),
+                           mu_dipole_mats[2] * (-1.0))
+        else:
+            dipole_mats = tuple()
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
@@ -236,18 +242,30 @@ class CubicResponseDriver(NonlinearSolver):
             a_grad = list(a_grad)
             for ind in range(len(a_grad)):
                 a_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if operator == 'dipole':
+                    a_grad[ind] *= -1.0
 
             b_grad = list(b_grad)
             for ind in range(len(b_grad)):
                 b_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if operator == 'dipole':
+                    b_grad[ind] *= -1.0
 
             c_grad = list(c_grad)
             for ind in range(len(c_grad)):
                 c_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if operator == 'dipole':
+                    c_grad[ind] *= -1.0
 
             d_grad = list(d_grad)
             for ind in range(len(d_grad)):
                 d_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if operator == 'dipole':
+                    d_grad[ind] *= -1.0
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
@@ -291,9 +309,9 @@ class CubicResponseDriver(NonlinearSolver):
             ABCD.update(D)
 
             X = {
-                'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
-                'y': 2 * self.ao2mo(mo, dipole_mats.y_to_numpy()),
-                'z': 2 * self.ao2mo(mo, dipole_mats.z_to_numpy())
+                'x': 2 * self.ao2mo(mo, dipole_mats[0]),
+                'y': 2 * self.ao2mo(mo, dipole_mats[1]),
+                'z': 2 * self.ao2mo(mo, dipole_mats[2])
             }
         else:
             X = None
@@ -304,9 +322,9 @@ class CubicResponseDriver(NonlinearSolver):
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
-            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
         }
 
         for key in cpp_keywords:
@@ -1300,9 +1318,9 @@ class CubicResponseDriver(NonlinearSolver):
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
-            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
         }
 
         for key in cpp_keywords:

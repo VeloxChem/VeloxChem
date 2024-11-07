@@ -2,8 +2,6 @@
 # This is useful for static analysis tools and linters
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(MPI REQUIRED COMPONENTS CXX)
-
 find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
 
 message(STATUS "Configuring a ${CMAKE_BUILD_TYPE} build")
@@ -21,6 +19,24 @@ message(STATUS "   OpenMP parallelization : ${OpenMP_CXX_FLAGS}")
 string(REPLACE " " ";" VLX_CXX_FLAGS ${VLX_CXX_FLAGS})
 if(DEFINED EXTRA_CXXFLAGS)
   string(REPLACE " " ";" EXTRA_CXXFLAGS ${EXTRA_CXXFLAGS})
+endif()
+
+# option for using higher order geometric derivatives
+option(USE_4TH_GEOM_DERIV "Use 4th-order geometric derivatives" ON)
+option(USE_3RD_GEOM_DERIV "Use 3rd-order geometric derivatives" ON)
+option(USE_2ND_GEOM_DERIV "Use 2nd-order geometric derivatives" ON)
+if(USE_4TH_GEOM_DERIV)
+  print_option(USE_4TH_GEOM_DERIV "${USE_4TH_GEOM_DERIV}")
+  add_compile_definitions(USE_4TH_GEOM_DERIV)
+  add_compile_definitions(USE_3RD_GEOM_DERIV)
+  add_compile_definitions(USE_2ND_GEOM_DERIV)
+elseif(USE_3RD_GEOM_DERIV)
+  print_option(USE_3RD_GEOM_DERIV "${USE_3RD_GEOM_DERIV}")
+  add_compile_definitions(USE_3RD_GEOM_DERIV)
+  add_compile_definitions(USE_2ND_GEOM_DERIV)
+elseif(USE_2ND_GEOM_DERIV)
+  print_option(USE_2ND_GEOM_DERIV "${USE_2ND_GEOM_DERIV}")
+  add_compile_definitions(USE_2ND_GEOM_DERIV)
 endif()
 
 # figure out where to put the Python module
@@ -82,9 +98,5 @@ install(
 
 enable_testing()
 include(CTest)
-# these two add_subdirectory commands must come last!!
-# do not build unit tests if we are doing a `pip install .`
-if(NOT SKBUILD)
-  add_subdirectory(unit_tests)
-endif()
-add_subdirectory(python_tests)
+# this add_subdirectory command must come last!!
+add_subdirectory(tests)

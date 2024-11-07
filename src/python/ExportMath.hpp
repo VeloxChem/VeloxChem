@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -29,14 +28,10 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <memory>
-
 #include "DenseMatrix.hpp"
-#include "Dense4DTensor.hpp"
+#include "ExportHelpers.hpp"
 
-namespace py = pybind11;
-
-namespace vlx_math {  // vlx_math namespace
+namespace vlx_math {
 
 /**
  Converts numpy array to CDenseMatrix
@@ -44,20 +39,11 @@ namespace vlx_math {  // vlx_math namespace
  @param arr the numpy array.
  @return a CDenseMatrix object.
  */
-std::shared_ptr<CDenseMatrix> CDenseMatrix_from_numpy(const py::array_t<double>& arr);
+auto CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDenseMatrix>;
 
-/**
- Converts numpy array to CDense4DTensor
-
- @param arr the numpy array.
- @return a CDense4DTensor object.
- */
-std::shared_ptr<CDense4DTensor> CDense4DTensor_from_numpy(const py::array_t<double>& arr);
-
-/**
- Exports classes/functions in src/math to python.
- */
-void export_math(py::module& m);
+/// @brief Exports classes/functions in src/math to Python module.
+/// @param m The Python module.
+auto export_math(py::module &m) -> void;
 
 }  // namespace vlx_math
 

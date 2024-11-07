@@ -1,311 +1,169 @@
-//
-//                           VELOXCHEM 1.0-RC2
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
-//
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
-//
-//  SPDX-License-Identifier: LGPL-3.0-or-later
-//
-//  This file is part of VeloxChem.
-//
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
-//
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-
 #ifndef AtomBasis_hpp
 #define AtomBasis_hpp
 
-#include <cstdint>
-#include <ostream>
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
-
-#include <mpi.h>
 
 #include "BasisFunction.hpp"
 
-/**
- Class CAtomBasis stores data about atomic basis set and provides set of methods
- for handling of atomic basis set data.
-
- @author Z. Rinkevicius
- */
+/// @brief Class CAtomBasis stores data about atom basis and provides set of
+/// methods for handling of atom basis data.
 class CAtomBasis
 {
-    /**
-     The vector of basis function objects.
-     */
-    std::vector<CBasisFunction> _basisFunctions;
-
-    /**
-     The identifier of chemical element.
-     */
-    int32_t _idElemental;
-
-    /**
-     The maximum angular momentum.
-     */
-    int32_t _maxAngularMomentum;
-
    public:
-    /**
-     Creates an empty atom basis object.
-     */
+    /// @brief The default constructor.
     CAtomBasis();
 
-    /**
-     Creates a atom basis object by copying other atom basis object.
+    /// @brief The constructor with vector of basis functions, name of basis set,
+    /// ECP label, and chemical element identifier.
+    /// @param functions The vector of basis functions.
+    /// @param name The name of atom basis.
+    /// @param ecp_label The label of ECP in atom basis.
+    /// @param identifier The chemical element identifier.
+    CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const std::string &ecp_label, const int identifier);
 
-     @param source the atom basis object.
-     */
-    CAtomBasis(const CAtomBasis& source);
+    /// @brief The default copy constructor.
+    /// @param other The atom basis to be copied.
+    CAtomBasis(const CAtomBasis &other);
 
-    /**
-     Creates a atom basis object by moving other atom basis object.
+    /// @brief The default move constructor.
+    /// @param other The atom basis to be moved.
+    CAtomBasis(CAtomBasis &&other) noexcept;
 
-     @param source the atom basis object.
-     */
-    CAtomBasis(CAtomBasis&& source) noexcept;
+    /// @brief The default destructor.
+    ~CAtomBasis() = default;
 
-    /**
-     Destroys a atom basis object.
-     */
-    ~CAtomBasis();
+    /// @brief The default copy assignment operator.
+    /// @param other The atom basis to be copy assigned.
+    /// @return The assigned atom basis.
+    auto operator=(const CAtomBasis &other) -> CAtomBasis &;
 
-    /**
-     Assigns a atom basis object by copying other atom basis object.
+    /// @brief The default move assignment operator.
+    /// @param other The atom basis to be move assigned.
+    /// @return The assigned atom basis.
+    auto operator=(CAtomBasis &&other) noexcept -> CAtomBasis &;
 
-     @param source the atom basis object.
-     */
-    CAtomBasis& operator=(const CAtomBasis& source);
+    /// @brief The equality operator.
+    /// @param other The atom basis to be compared.
+    /// @return True if atom bases are equal, False otherwise.
+    auto operator==(const CAtomBasis &other) const -> bool;
 
-    /**
-     Assigns a atom basis object by moving other atom basis object.
+    /// @brief The equality operator.
+    /// @param other The atom basis to be compared.
+    /// @return True if atom bases are not equal, False otherwise.
+    auto operator!=(const CAtomBasis &other) const -> bool;
 
-     @param source the atom basis object.
-     */
-    CAtomBasis& operator=(CAtomBasis&& source) noexcept;
+    /// @brief Sets identifier of chemical element in atom basis.
+    /// @param identifier The identifier of chemical element.
+    auto set_identifier(const int identifier) -> void;
 
-    /**
-     Compares atom basis object with other atom basis object.
+    /// @brief Sets name of atom basis.
+    /// @param name The name of atom basis.
+    auto set_name(const std::string &name) -> void;
 
-     @param other the atom basis object.
-     @return true if atom basis objects are equal, false otherwise.
-     */
-    bool operator==(const CAtomBasis& other) const;
+    /// @brief Sets effective core potential label of atom basis.
+    /// @param label The label of effective core potential in atom basis.
+    auto set_ecp_label(const std::string &label) -> void;
 
-    /**
-     Compares atom basis object with other atom basis object.
+    /// @brief Adds basis function to atom basis.
+    /// @param function The basis function.
+    auto add(const CBasisFunction &function) -> void;
 
-     @param other the atom basis object.
-     @return true if atom basis objects are not equal, false otherwise.
-     */
-    bool operator!=(const CAtomBasis& other) const;
+    /// @brief Reduces atom basis set to valence atom basis.
+    /// @return The valence atom basis.
+    auto reduce_to_valence_basis() const -> CAtomBasis;
 
-    /**
-     Sets identifier of chemical element in atom basis.
+    /// @brief Gets vector of basis functions.
+    /// @return The vector of basis functions.
+    auto basis_functions() const -> std::vector<CBasisFunction>;
 
-     @param idElemental the identifier of chemical element.
-     */
-    void setIdElemental(const int32_t idElemental);
+    /// @brief Gets vector of basis functions with specific angular momentum.
+    /// @param angular_momentum The angular momentum of requested basis
+    /// functions.
+    /// @return The vector of basis functions.
+    auto basis_functions(const int angular_momentum) const -> std::vector<CBasisFunction>;
 
-    /**
-     Sets maximum angular momentum in atom basis.
+    /// @brief Gets vector of GTOs with specific angular momentum and number of
+    /// primitive basis functions.
+    /// @param angular_momentum The angular momentum of requested basis
+    /// functions.
+    /// @param npgtos The number primitive basis functions in requested basis
+    /// functions.
+    /// @return The vector of basis functions.
+    auto basis_functions(const int angular_momentum, const size_t npgtos) const -> std::vector<CBasisFunction>;
 
-     @param maxAngularMomentum the maximum angular momentum.
-     */
-    void setMaxAngularMomentum(const int32_t maxAngularMomentum);
+    /// @brief Gets identifier of chemical element.
+    /// @return The identifier of chemical element.
+    auto get_identifier() const -> int;
 
-    /**
-     Adds basis function object to atom basis.
+    /// @brief Gets name of atom basis.
+    /// @return The name of atom basis.
+    auto get_name() const -> std::string;
 
-     @param basisFunction the basis function object.
-     */
-    void addBasisFunction(const CBasisFunction& basisFunction);
+    /// @brief Gets effective core potential label of atom basis.
+    /// @return The label of effective core potential.
+    auto get_ecp_label() const -> std::string;
 
-    /**
-     Gets identifier of chemical element.
+    /// @brief Checks if atom basis requires effective core potential.
+    /// @return Trrue if atom basis contains effective core potential, False
+    /// otherwise.
+    auto need_ecp() const -> bool;
 
-     @return the identifier of chemical element.
-     */
-    int32_t getIdElemental() const;
+    /// @brief Gets maximum angular momentum of basis functions in atom basis.
+    /// @return The maximum angular momentum.
+    auto max_angular_momentum() const -> int;
 
-    /**
-     Gets maximum angular momentum.
+    /// @brief Gets number of basis functions with specific angular momentum in
+    /// atom basis.
+    /// @param angular_momentum The requested angular momentum of basis
+    /// functions.
+    /// @return The number of basis functions.
+    auto number_of_basis_functions(const int angular_momentum) const -> size_t;
 
-     @return the maximum angular momentum.
-     */
-    int32_t getMaxAngularMomentum() const;
+    /// @brief Gets number of basis functions with specific angular momentum and
+    /// number of prmitive basis functions in atom basis.
+    /// @param angular_momentum The requested angular momentum of basis
+    /// functiions.
+    /// @param npgtos The requested number of primitive basis functions in basis
+    /// functions.
+    /// @return The number of basis functions.
+    auto number_of_basis_functions(const int angular_momentum, const size_t npgtos) const -> size_t;
 
-    /**
-     Gets number of basis functions with specific angular momentum.
+    /// @brief Gets number of primitive basis functions with requested angular
+    /// momentum.
+    /// @param angular_momentum The requested angular momentum of primitive basis
+    /// functiions.
+    /// @return The number of primitive basis functions.
+    auto number_of_primitive_functions(const int angular_momentum) const -> size_t;
 
-     @param angularMomentum the angular momentum.
-     @return the number of basis functions.
-     */
-    int32_t getNumberOfBasisFunctions(const int32_t angularMomentum) const;
-    
-    /**
-     Gets number of basis functions with specific angular momentum and number of primitve GTOs.
+    /// @brief Get set of unique contraction numbers of basis functions with
+    /// given angular momentum in atom basis.
+    /// @param angular_momentum The requested angular momentum of basis
+    /// functions.
+    /// @return The set of unique contraction numbers
+    auto contraction_depths(const int angular_momentum) const -> std::set<size_t>;
 
-     @param angularMomentum the angular momentum.
-     @param nPrimitiveGtos the number of primitive GTOs.
-     @return the number of basis functions.
-     */
-    int32_t getNumberOfBasisFunctions(const int32_t angularMomentum,
-                                      const int32_t nPrimitiveGtos) const;
+    /// @brief Gets contraction string of atom basis.
+    /// @return The contraction string.
+    auto contraction_string() const -> std::string;
 
-    /**
-     Gets number of primitive Gaussain functions with requested angular momentum.
+    /// @brief Gets primitive basis functions strig for atom basis.
+    /// @return The primitive basis functions string.
+    auto primitives_string() const -> std::string;
 
-     @param angularMomentum the angular momentum.
-     @return the number of primitive Gaussian functions.
-     */
-    int32_t getNumberOfPrimitiveFunctions(const int32_t angularMomentum) const;
-    
-    /**
-     Get vector of unique contraction numbers of basis function with given angular momentum in atom basis.
+   private:
+    /// @brief The vector of basis functions.
+    std::vector<CBasisFunction> _functions;
 
-     @param angularMomentum the angular momentum.
-     @return the vector of unique contraction numbers.
-    */
-    std::set<int32_t> getContractionDepths(const int32_t angularMomentum) const;
+    /// @brief The name of atomic basis.
+    std::string _name;
 
-    /**
-     Gets contraction string for atom basis.
+    /// @brief The effective core potential label of atomic basis.
+    std::string _ecp_label;
 
-     @return the contraction string.
-     */
-    std::string getContractionString() const;
-
-    /**
-     Gets primitives strig for atom basis.
-
-     @return the primitives string.
-     */
-    std::string getPrimitivesString() const;
-
-    /**
-      Gets vector of basis function objects with specific angular momentum.
-
-     @param angularMomentum the angular momentum.
-     @return the vector of basis function objects.
-     */
-    std::vector<CBasisFunction> getBasisFunctions(const int32_t angularMomentum) const;
-
-    /**
-     Reduces atom basis set to valence atom basis
-
-     @return the valence atom basis.
-     */
-    CAtomBasis reduceToValenceBasis() const;
-
-    /**
-     Broadcasts atom basis object within domain of MPI communicator.
-
-     @param rank the rank of MPI process.
-     @param comm the MPI communicator.
-     */
-    void broadcast(int32_t rank, MPI_Comm comm);
-
-    /**
-     Converts atom basis object to text output
-     */
-    std::string repr() const;
-
-    /** @{ Iterators */
-    using store_type     = std::vector<CBasisFunction>;
-    using iterator       = typename store_type::iterator;
-    using const_iterator = typename store_type::const_iterator;
-
-    iterator
-    begin() noexcept
-    {
-        return _basisFunctions.begin();
-    }
-    const_iterator
-    begin() const noexcept
-    {
-        return _basisFunctions.begin();
-    }
-    const_iterator
-    cbegin() const noexcept
-    {
-        return _basisFunctions.cbegin();
-    }
-
-    iterator
-    end() noexcept
-    {
-        return _basisFunctions.end();
-    }
-    const_iterator
-    end() const noexcept
-    {
-        return _basisFunctions.end();
-    }
-    const_iterator
-    cend() const noexcept
-    {
-        return _basisFunctions.cend();
-    }
-
-    using reverse_iterator       = typename store_type::reverse_iterator;
-    using const_reverse_iterator = typename store_type::const_reverse_iterator;
-
-    reverse_iterator
-    rbegin() noexcept
-    {
-        return _basisFunctions.rbegin();
-    }
-    const_reverse_iterator
-    rbegin() const noexcept
-    {
-        return _basisFunctions.rbegin();
-    }
-    const_reverse_iterator
-    crbegin() const noexcept
-    {
-        return _basisFunctions.crbegin();
-    }
-
-    reverse_iterator
-    rend() noexcept
-    {
-        return _basisFunctions.rend();
-    }
-    const_reverse_iterator
-    rend() const noexcept
-    {
-        return _basisFunctions.rend();
-    }
-    const_reverse_iterator
-    crend() const noexcept
-    {
-        return _basisFunctions.crend();
-    }
-    /** @}*/
+    /// @brief  identifier of chemical element.
+    int _identifier;
 };
-
-/**
- Converts atom basis object to text output and insert it into output
- text stream.
-
- @param output the output text stream.
- @param source the atom basis object.
- */
-std::ostream& operator<<(std::ostream& output, const CAtomBasis& source);
 
 #endif /* AtomBasis_hpp */

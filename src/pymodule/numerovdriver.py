@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -805,7 +804,7 @@ class NumerovDriver:
             The molecule.
         """
 
-        m1, m2 = molecule.masses_to_numpy()
+        m1, m2 = molecule.get_masses()
         mu = (m1 * m2) / (m1 + m2)
 
         self.set_reduced_mass(mu)

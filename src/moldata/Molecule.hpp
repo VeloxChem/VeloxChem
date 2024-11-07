@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -26,417 +25,223 @@
 #ifndef Molecule_hpp
 #define Molecule_hpp
 
-#include <mpi.h>
-
-#include <cstdint>
-#include <ostream>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "AtomicRadii.hpp"
-#include "MemBlock.hpp"
-#include "MemBlock2D.hpp"
+#include "Point.hpp"
 
-/**
- Class CMolecule stores data about single molecule and provides set of methods
- for handling of molecular data.
-
- @author Z. Rinkevicius
- */
+/// @brief Class CMolecule stores geometrical data of molecule and provides set
+/// of methods for handling of this data.
 class CMolecule
 {
-    /**
-     The charge of molecule.
-     */
+   public:
+    /// @brief The default constructor.
+    CMolecule();
+
+    /// @brief The constructor with vector of chemical elements and vector of atoms coordinates.
+    /// @param identifiers The vector of chemical element identifiers.
+    /// @param coordinates The vector of Cartesian coordinates of atoms.
+    /// @param unit The unit used to define coordinates of atoms.
+    CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit);
+
+    /// @brief The constructor with vector of chemical elements, atoms coordinates and atom basis labels.
+    /// @param identifiers The vector of chemical element identifiers.
+    /// @param coordinates The vector of Cartesian coordinates of atoms.
+    /// @param unit The unit used to define coordinates of atoms.
+    /// @param atom_basis_labels The atom basis labels.
+    CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit, const std::vector<std::string>& atom_basis_labels);
+
+    /// @brief The constructor with two molecular fragments.
+    /// @param molecule_one The first molecule to merge.
+    /// @param molecule_two The second molecule to merge.
+    CMolecule(const CMolecule &molecule_one, const CMolecule &molecule_two);
+
+    /// @brief The default copy constructor.
+    /// @param other The molecule to be copied.
+    CMolecule(const CMolecule &other);
+
+    /// @brief The default move constructor.
+    /// @param other The molecule to be moved.
+    CMolecule(CMolecule &&other) noexcept;
+
+    /// @brief The default copy assignment operator.
+    /// @param other the molecule to be copy assigned.
+    /// @return The assigned molecule.
+    auto operator=(const CMolecule &other) -> CMolecule &;
+
+    /// @brief The default move assignment operator.
+    /// @param other The molecule to be move assigned.
+    /// @return The assigned molecule.
+    auto operator=(CMolecule &&other) noexcept -> CMolecule &;
+
+    /// @brief The equality operator.
+    /// @param other The molecule to be compared.
+    /// @return True if molecules are equal, False otherwise.
+    auto operator==(const CMolecule &other) const -> bool;
+
+    /// @brief The equality operator.
+    /// @param other The molecule to be compared.
+    /// @return True if molecules are not equal, False otherwise.
+    auto operator!=(const CMolecule &other) const -> bool;
+
+    /// @brief Adds atom to molecule.
+    /// @param identifier The chemical element identifier.
+    /// @param coordinates The coordinates of atom.
+    /// @param unit The unit used to define coordinates of atoms.
+    auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit) -> void;
+
+    /// @brief Adds atom to molecule.
+    /// @param identifier The chemical element identifier.
+    /// @param coordinates The coordinates of atom.
+    /// @param unit The unit used to define coordinates of atoms.
+    /// @param atom_basis_label The atom basis label.
+    auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit, const std::string& atom_basis_label) -> void;
+
+    /// @brief Slices given set of atoms into new molecule.
+    /// @param atoms The vector of atom indices to be slinced.
+    /// @return The molcule constructed from sliced atoms.
+    auto slice(const std::vector<int> &atoms) const -> CMolecule;
+
+    /// @brief Sets charge of molecule.
+    /// @param charge The charge of molecule.
+    auto set_charge(const double charge) -> void;
+
+    /// @brief Sets spin multiplicity of molecule.
+    /// @param multiplicity The multiplicity (2S+1) of molecule.
+    auto set_multiplicity(const int multiplicity) -> void;
+
+    /// @brief Gets charge of molecule.
+    /// @return The charge of molecule.
+    auto get_charge() const -> double;
+
+    /// @brief Gets spin multiplicity of molecule.
+    /// @return The multiplicity of molecule.
+    auto get_multiplicity() const -> int;
+
+    /// @brief Gets total number of atoms in molecule.
+    /// @return The number of atoms in molecule.
+    auto number_of_atoms() const -> int;
+
+    /// @brief Gets number of atoms belonging to specific chemical element in
+    /// molecule.
+    /// @param identifier The chemical element identifier.
+    /// @return The number of atoms in molecule.
+    auto number_of_atoms(const int identifier) const -> int;
+
+    /// @brief Gets number of atoms belonging to specific chemical element and in
+    /// predefined list of atoms in molecule.
+    /// @param iatom The index of first atom in list of atoms.
+    /// @param natoms The number of atoms in list of atoms.
+    /// @param identifier The chemical element identifier.
+    /// @return The number of atoms in molecule.
+    auto number_of_atoms(const int iatom, const int natoms, const int identifier) const -> int;
+
+    /// @brief Gets set of unique chemical element identifiers in molecule.
+    /// @return The set unique chemical element identifiers.
+    auto elemental_composition() const -> std::set<int>;
+
+    /// @brief Gets a number of electrons in molecule.
+    /// @return The number of electrons.
+    auto number_of_electrons() const -> int;
+
+    /// @brief Gets vector of chemical element identifiers.
+    /// @return The vector og chemical element identifiers.
+    auto identifiers() const -> std::vector<int>;
+
+    /// Gets vector of atom basis set labels.
+    auto atom_basis_labels() const -> std::vector<std::string>;
+
+    /// @brief Gets vector Cartesian coordinates of atoms in molecule.
+    /// @param unit The unit used to define coordinates of atoms.
+    /// @return The vector of atom coordinates.
+    auto coordinates(const std::string &unit = std::string("au")) const -> std::vector<TPoint<double>>;
+
+    /// @brief Gets charges of all atoms in molecule.
+    /// @return The vector of atomic charges of molecule.
+    auto charges() const -> std::vector<double>;
+
+    /// @brief Gets masses of all atoms in molecule.
+    /// @return The vector of atomic masses of molecule.
+    auto masses() const -> std::vector<double>;
+
+    /// @brief Gets labels of all atoms in molecule.
+    /// @return The vector of atomic labels of molecule.
+    auto labels() const -> std::vector<std::string>;
+
+    /// @brief Gets label of specific atom.
+    /// @param iatom The index of atom.
+    /// @return The label of atom.
+    auto label(const int iatom) const -> std::string;
+
+    /// @brief Gets coordinates of specific atom.
+    /// @param iatom The index of atom.
+    /// @param unit The unit used to define coordinates of atoms.
+    /// @return The coordinates of atom.
+    auto atom_coordinates(const int iatom, const std::string &unit = std::string("au")) const -> TPoint<double>;
+
+    /// @brief Sets coordinates of specific atom.
+    /// @param iatom The index of atom.
+    /// @param xyz The new coordinates.
+    auto set_atom_coordinates(const int iatom, const std::vector<double>& xyz) -> void;
+
+    /// @brief Gets indices of atoms with given atomic label.
+    /// @param label The label of requested atom type.
+    /// @return The vector of atom indices.
+    auto atom_indices(const std::string &label) const -> std::vector<int>;
+
+    /// @brief Gets nuclear repulsion energy for molecule assuming point charge
+    /// model for nucleus.
+    /// @return The nuclear repulsion energy.
+    auto nuclear_repulsion_energy() const -> double;
+
+    /// @brief Checks if any pair of atoms in molecule is closer than given
+    /// minimal distance.
+    /// @param distance The minimal distance between two atoms.
+    /// @return True if non of atom pairs fail proximity check, False otherwise.
+    auto check_proximity(const double distance) const -> bool;
+
+    /// @brief Computes vector of distances to closest neighbouring atom for each
+    /// atom.
+    /// @return The vector of distances between atoms.
+    auto min_distances() const -> std::vector<double>;
+
+    /// @brief Gets VDW radii of the atoms.
+    /// @return the vector of VDW radii.
+    auto get_vdw_radii() const -> std::vector<double>;
+
+    /// @brief Gets MK radii of the atoms.
+    /// @return the vector of MK radii.
+    auto get_mk_radii() const -> std::vector<double>;
+
+    /// @brief Gets CHELPG radii of the atoms.
+    /// @return the vector of CHELPG radii.
+    auto get_chelpg_radii() const -> std::vector<double>;
+
+    /// @brief Gets covalent radii of the atoms.
+    /// @return the vector of covalent radii.
+    auto get_covalent_radii() const -> std::vector<double>;
+
+   private:
+    /// @brief The charge of molecule.
     double _charge{0.0};
 
-    /**
-     The multiplicity of electronic ground state.
-     */
-    int32_t _multiplicity{1};
+    /// @brief The multiplicity of electronic ground state.
+    int _multiplicity{1};
 
-    /**
-     The vector of atomic coordinates (x, y, z).
-     */
-    CMemBlock2D<double> _atomCoordinates;
+    /// @brief The vector of Cartesian coordinates of atoms.
+    std::vector<TPoint<double>> _coordinates;
 
-    /**
-     The vector of atomic charges.
-     */
-    CMemBlock<double> _atomCharges;
+    /// @brief The vector of chemical element identifiers of atoms.
+    std::vector<int> _identifiers;
 
-    /**
-     The vector of atomic masses.
-     */
-    CMemBlock<double> _atomMasses;
+    /// @brief The vector of atom basis set labels.
+    std::vector<std::string> _atom_basis_labels;
 
-    /**
-     The vector of chemical element names.
-     */
-    std::vector<std::string> _atomLabels;
-
-    /**
-     The vector of global indexes.
-     */
-    CMemBlock<int32_t> _idsAtomic;
-
-    /**
-     The vector of chemical element identifiers.
-     */
-    CMemBlock<int32_t> _idsElemental;
-
-   public:
-    /**
-     Creates an empty molecule object.
-     */
-    CMolecule() = default;
-
-    /**
-     Creates a molecule object.
-
-     @param atomCoordinates the vector (all x,all y, all z) of atomic coordinates.
-     @param atomCharges the vector of atomic charges.
-     @param atomMasses the vector of atomic masses.
-     @param atomLabels the vector of atomic names.
-     @param idsElemental the vector of atomic identifiers.
-     */
-    CMolecule(const std::vector<double>&      atomCoordinates,
-              const std::vector<double>&      atomCharges,
-              const std::vector<double>&      atomMasses,
-              const std::vector<std::string>& atomLabels,
-              const std::vector<int32_t>&     idsElemental);
-
-    /**
-     Creates a molecule object by copying other molecule object.
-
-     @param source the molecule object.
-     */
-    CMolecule(const CMolecule& source);
-
-    /**
-     Creates a molecule object by moving other molecule object.
-
-     @param source the molecule object.
-     */
-    CMolecule(CMolecule&& source) noexcept;
-
-    /**
-     Creates a molecule object by combining two molecule object.
-
-     @param mol_1 the first molecule object.
-     @param mol_2 the second molecule object.
-     */
-    CMolecule(const CMolecule& mol_1, const CMolecule& mol_2);
-
-    /**
-     Creates a sub-molecule object by slicing the molecule object.
-
-     @param startIndex the starting index of the sub-molecule (0-based).
-     @param numAtoms the number of atoms in the sub-molecule.
-     */
-    CMolecule getSubMolecule(int32_t startIndex, int32_t numAtoms);
-
-    /**
-     Adds atom to molecule using given atom label and coordinates.
-
-     @param atomLabel the label of atom.
-     @param atomCoordinateX the coordinate X of atom.
-     @param atomCoordinateY the coordinate Y of atom.
-     @param atomCoordinateZ the coordinate Z of atom.
-    */
-    void addAtom(const std::string& atomLabel, const double atomCoordinateX, const double atomCoordinateY, const double atomCoordinateZ);
-
-    /**
-     Assigns a molecule object by copying other molecule object.
-
-     @param source the molecule object.
-     */
-    CMolecule& operator=(const CMolecule& source);
-
-    /**
-     Assigns a molecule object by moving other molecule object.
-
-     @param source the molecule object.
-     */
-    CMolecule& operator=(CMolecule&& source) noexcept;
-
-    /**
-     Compares molecule object with other molecule object.
-
-     @param other the molecule object.
-     @return true if molecule objects are equal, false otherwise.
-     */
-    bool operator==(const CMolecule& other) const;
-
-    /**
-     Compares molecule object with other molecule object.
-
-     @param other the molecule object.
-     @return true if molecule objects are not equal, false otherwise.
-     */
-    bool operator!=(const CMolecule& other) const;
-
-    /**
-     Sets atomic indexes of all atoms in molecule object.
-
-     @param startIndex the starting index of atomic indexes.
-     */
-    void setAtomicIndexes(const int32_t startIndex);
-
-    /**
-     Sets charge of molecule object.
-
-     @param charge the charge of molecule.
-     */
-    void setCharge(const double charge);
-
-    /**
-     Sets spin multiplicity of molecule object.
-
-     @param multiplicity the multiplicity (2S+1) of molecule.
-     */
-    void setMultiplicity(const int32_t multiplicity);
-
-    /**
-     Gets charge of molecule.
-
-     @return the charge of molecule.
-     */
-    double getCharge() const;
-
-    /**
-     Gets spin multiplicity of molecule.
-
-     @return the multiplicity of molecules.
-     */
-    int32_t getMultiplicity() const;
-
-    /**
-     Gets total number of atoms in molecule.
-
-     @return the total number of atoms.
-     */
-    int32_t getNumberOfAtoms() const;
-
-    /**
-     Gets number of atoms belonging to specific chemical element in molecule.
-
-     @param idElemental the chemical element number.
-     @return the number of atoms.
-     */
-    int32_t getNumberOfAtoms(const int32_t idElemental) const;
-
-    /**
-    Gets number of atoms belonging to specific chemical element in list of atoms
-    in molecule.
-
-    @param iAtom the index of first atom in list of atoms.
-    @param nAtoms the number of atoms in list of atoms.
-    @param idElemental the chemical element number.
-    @return the number of atoms.
-    */
-    int32_t getNumberOfAtoms(const int32_t iAtom, const int32_t nAtoms, const int32_t idElemental) const;
-
-    /**
-     Gets set of unique chemical elements in molecule.
-
-     @return the set of unique chemical elements.
-     */
-    std::set<int32_t> getElementalComposition() const;
-
-    /**
-     Gets a number of electrons in molecule.
-
-     @return the number of electrons.
-     */
-    int32_t getNumberOfElectrons() const;
-
-    /**
-     Gets constant pointer to vector of chemical element identifiers.
-
-     @return the constant pointer to chemical element indentifiers.
-     */
-    const int32_t* getIdsElemental() const;
-
-    /**
-     Gets vector Cartesian X coordinates of atoms in molecule.
-
-     @return the constant pointer to vector of coordinates.
-     */
-    const double* getCoordinatesX() const;
-
-    /**
-     Gets vector Cartesian Y coordinates of atoms in molecule.
-
-     @return the constant pointer to vector of coordinates.
-     */
-    const double* getCoordinatesY() const;
-
-    /**
-     Gets vector Cartesian Z coordinates of atoms in molecule.
-
-     @return the constant pointer to vector of coordinates.
-     */
-    const double* getCoordinatesZ() const;
-
-    /**
-     Gets coordinates of all atoms in molecule.
-
-     @return the 2D memory block object (all x, all y, all z).
-     */
-    CMemBlock2D<double> getCoordinates() const;
-
-    /**
-     Gets charges of all atoms in molecule.
-
-     @return the memory block object (all charges).
-     */
-    CMemBlock<double> getCharges() const;
-
-    /**
-     Gets masses of all atoms in molecule.
-
-     @return the memory block object (all masses).
-     */
-    CMemBlock<double> getMasses() const;
-
-    /**
-     Computes vector of distances to closest neighbouring atom for each atom.
-
-     @return the vector of distances.
-     */
-    CMemBlock<double> getMinDistances() const;
-
-    /**
-     Computes minimal distance from given external point (x,y,z) to closest atom
-     in molecule.
-
-     @param coordinateX the coordinate X of external point.
-     @param coordinateY the coordinate Y of external point.
-     @param coordinateZ the coordinate Z of external point.
-     @return the minimal distance.
-    */
-    double getMinDistance(const double coordinateX, const double coordinateY, const double coordinateZ) const;
-
-    /**
-     Gets nuclear repulsion energy for molecule assuming point charge model for
-     nucleus.
-
-     @return the nuclear repulsion energy.
-     */
-    double getNuclearRepulsionEnergy() const;
-
-    /**
-     Gets VDW radii of the atoms.
-
-     @return the vector of VDW radii.
-     */
-    std::vector<double> getVdwRadii() const;
-
-    /**
-     Gets MK radii of the atoms.
-
-     @return the vector of MK radii.
-     */
-    std::vector<double> getMkRadii() const;
-
-    /**
-     Gets CHELPG radii of the atoms.
-
-     @return the vector of CHELPG radii.
-     */
-    std::vector<double> getChelpgRadii() const;
-
-    /**
-     Gets covalent radii of the atoms.
-
-     @return the vector of covalent radii.
-     */
-    std::vector<double> getCovalentRadii() const;
-
-    /**
-     Gets label of specific atom.
-
-     @param iAtom the index of atom.
-     @return the label of atom.
-     */
-    std::string getLabel(const int32_t iAtom) const;
-
-    /**
-     Gets indexes of atoms with given atomic label.
-
-     @param atomLabel the label of requested atom type.
-     @return the vector of atom indexes.
-    */
-    std::vector<int32_t> getAtomIndexes(const std::string& atomLabel) const;
-
-    /**
-     Gets vector of atom coordinates of specific atom.
-
-     @param iAtom the index of atom.
-     @return the vector of atom indexes.
-    */
-    std::vector<double> getAtomCoordinates(const int32_t iAtom) const;
-
-    /**
-     Sets atom coordinates of specific atom.
-
-     @param iAtom the index of atom.
-     @param xyz the Cartesian coordinates.
-     */
-    void setAtomCoordinates(const int32_t iAtom, const std::vector<double>& xyz);
-
-    /**
-     Gets index of nearest atom with given atom label to specific atom.
-
-     @param iAtom the index of requested atom.
-     @return the index of nearest atom to requested atom.
-    */
-    int32_t getIndexOfNearestAtom(const int32_t iAtom) const;
-
-    /**
-     Gets coordination number of specific atom in molecule.
-
-     @param iAtom the index of requested atom.
-     @param radius the effective coordination radius.
-     @return the coordination number of atom.
-    */
-    int32_t getCoordinationNummber(const int32_t iAtom, const double radius) const;
-
-    /**
-     Prints geometry of molecule as table to output stream.
-
-     @return the output string.
-     */
-    std::string printGeometry() const;
-
-    /**
-     Checks if any pair of atoms in molecule is closer than given minimal
-     distance. Prints error message to output stream for first pair of atoms,
-     which are to close.
-
-     @param minDistance the minimal distance.
-     @return true if proximity condition is not violated, false otherwise.
-     */
-    bool checkProximity(const double minDistance) const;
-
-    /**
-     Broadcasts molecule object within domain of MPI communicator.
-
-     @param rank the rank of MPI process.
-     @param comm the MPI communicator.
-     */
-    void broadcast(int32_t rank, MPI_Comm comm);
-
-    /**
-     Converts molecule object to text output and insert it into output text
-     stream.
-
-     @param output the output text stream.
-     @param source the molecule object.
-     */
-    friend std::ostream& operator<<(std::ostream& output, const CMolecule& source);
+    /// @brief Checks if coordinates of atoms are given in Angstrom.
+    /// @param unit The unit used to define coordinates of atoms.
+    /// @return True if unit is Angstrom, False otherwise.
+    auto _is_angstrom(const std::string &unit) const -> bool;
 };
 
 #endif /* Molecule_hpp */

@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -643,9 +642,9 @@ class TpaFullDriver(TpaDriver):
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
-            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
         }
 
         for key in cpp_keywords:

@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -29,9 +28,8 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import molorb, fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .molecularorbitals import MolecularOrbitals
+from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
@@ -50,7 +48,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initializes spin restricted closed shell SCF driver to default setup
+        Initializes spin restricted open shell SCF driver to default setup
         (convergence threshold, initial guess, etc) by calling base class
         constructor.
         """
@@ -87,14 +85,14 @@ class ScfRestrictedOpenDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            smat = ovl_mat.to_numpy()
-            tmat = oao_mat.to_numpy()
+            smat = ovl_mat
+            tmat = oao_mat
 
-            dmat_a = den_mat.alpha_to_numpy(0)
-            dmat_b = den_mat.beta_to_numpy(0)
+            dmat_a = den_mat[0]
+            dmat_b = den_mat[1]
 
-            fmat_a = fock_mat.alpha_to_numpy(0)
-            fmat_b = fock_mat.beta_to_numpy(0)
+            fmat_a = fock_mat[0]
+            fmat_b = fock_mat[1]
 
             fds_a = np.matmul(fmat_a, np.matmul(dmat_a, smat))
             fds_b = np.matmul(fmat_b, np.matmul(dmat_b, smat))
@@ -131,9 +129,8 @@ class ScfRestrictedOpenDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            diff_mat = den_mat.sub(old_den_mat)
-            ddmat_a = diff_mat.alpha_to_numpy(0)
-            ddmat_b = diff_mat.beta_to_numpy(0)
+            ddmat_a = den_mat[0] - old_den_mat[0]
+            ddmat_b = den_mat[1] - old_den_mat[1]
 
             diff_den_a = np.linalg.norm(ddmat_a)
             diff_den_b = np.linalg.norm(ddmat_b)
@@ -171,19 +168,19 @@ class ScfRestrictedOpenDriver(ScfDriver):
                 self._density_matrices_alpha.popleft()
                 self._density_matrices_beta.popleft()
 
-            self._fock_matrices_alpha.append(fock_mat.alpha_to_numpy(0))
-            self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
+            self._fock_matrices_alpha.append(fock_mat[0].copy())
+            self._fock_matrices_beta.append(fock_mat[1].copy())
             self._fock_matrices_proj.append(
                 self.get_projected_fock(
-                    fock_mat.alpha_to_numpy(0),
-                    fock_mat.beta_to_numpy(0),
-                    den_mat.alpha_to_numpy(0),
-                    den_mat.beta_to_numpy(0),
-                    ovl_mat.to_numpy(),
+                    fock_mat[0],
+                    fock_mat[1],
+                    den_mat[0],
+                    den_mat[1],
+                    ovl_mat,
                 ))
 
-            self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
-            self._density_matrices_beta.append(den_mat.beta_to_numpy(0))
+            self._density_matrices_alpha.append(den_mat[0].copy())
+            self._density_matrices_beta.append(den_mat[1].copy())
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -205,7 +202,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
         if self.rank == mpi_master():
 
             if len(self._fock_matrices_alpha) == 1:
-                return self._fock_matrices_proj[0]
+                return (self._fock_matrices_proj[0],)
 
             if len(self._fock_matrices_alpha) > 1:
 
@@ -220,11 +217,13 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
                 return self._get_scaled_fock(weights)
 
-        return None, None
+            return tuple(fock_mat)
+
+        return (None,)
 
     def _get_scaled_fock(self, weights):
         """
-        Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
+        Computes effective spin restricted open shell Fock/Kohn-Sham matrix
         by summing Fock/Kohn-Sham matrices scalwd with weigths.
 
         :param weights:
@@ -239,9 +238,9 @@ class ScfRestrictedOpenDriver(ScfDriver):
         for w, fmat in zip(weights, self._fock_matrices_proj):
             effmat = effmat + w * fmat
 
-        return effmat
+        return (effmat,)
 
-    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, eff_fock_mat, oao_mat):
         """
         Generates spin restricted molecular orbital by diagonalizing
         spin restricted projected open shell Fock/Kohn-Sham matrix. Overloaded base
@@ -249,8 +248,8 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         :param molecule:
             The molecule.
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
+        :param eff_fock_mat:
+            The effective Fock/Kohn-Sham matrix.
         :param oao_mat:
             The orthogonalization matrix.
 
@@ -259,13 +258,11 @@ class ScfRestrictedOpenDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
+            tmat = oao_mat
+            eigs, evecs = np.linalg.eigh(
+                np.linalg.multi_dot([tmat.T, eff_fock_mat[0], tmat]))
 
-            tmat = oao_mat.to_numpy()
-            fock_mat = np.linalg.multi_dot([tmat.T, fock_mat, tmat])
-
-            eigs, evecs = np.linalg.eigh(fock_mat)
-
-            orb_coefs = np.linalg.multi_dot([tmat, evecs])
+            orb_coefs = np.matmul(tmat, evecs)
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size)
@@ -331,28 +328,6 @@ class ScfRestrictedOpenDriver(ScfDriver):
             return "Spin-Restricted Open-Shell Kohn-Sham" + pe_type
 
         return "Spin-Restricted Open-Shell Hartree-Fock" + pe_type
-
-    def _update_fock_type(self, fock_mat):
-        """
-        Updates Fock matrix to fit selected functional in Kohn-Sham
-        calculations.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        """
-
-        if self.xcfun.is_hybrid():
-            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'alpha')
-            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
-                                      'alpha')
-            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'beta')
-            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
-                                      'beta')
-        else:
-            fock_mat.set_fock_type(fockmat.unrestj, 0, 'alpha')
-            fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
-
-        return
 
     def __deepcopy__(self, memo):
         """

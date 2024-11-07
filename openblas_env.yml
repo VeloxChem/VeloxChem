@@ -15,19 +15,17 @@ dependencies:
   - setuptools
   - wheel
   - pybind11-global
-  - python>=3.8
+  - python>=3.9
   - psutil
   - pytest
   - mdanalysis
   - openmm
   - scipy
-  - gtest
-  - gmock
   - openbabel
   - cppe
   - xtb
   - geometric
-  - libxc
+  - libxc<7
   - clang-format
   - yapf
   - toml

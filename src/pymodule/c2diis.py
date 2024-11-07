@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -59,8 +58,8 @@ class CTwoDiis:
             The orthogonalization matrix.
         """
 
-        smat = overlap_matrix.to_numpy()
-        tmat = oao_matrix.to_numpy()
+        smat = overlap_matrix
+        tmat = oao_matrix
 
         self.error_vectors.clear()
 
@@ -94,8 +93,8 @@ class CTwoDiis:
             The orthogonalization matrix.
         """
 
-        smat = overlap_matrix.to_numpy()
-        tmat = oao_matrix.to_numpy()
+        smat = overlap_matrix
+        tmat = oao_matrix
 
         self.error_vectors.clear()
 
@@ -135,8 +134,8 @@ class CTwoDiis:
             The orthogonalization matrix.
         """
 
-        smat = overlap_matrix.to_numpy()
-        tmat = oao_matrix.to_numpy()
+        smat = overlap_matrix
+        tmat = oao_matrix
 
         self.error_vectors.clear()
 

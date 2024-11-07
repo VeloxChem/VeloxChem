@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -23,108 +22,59 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import numpy as np
-import h5py
-
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
-from .errorhandler import assert_msg_critical
+from .veloxchemlib import mpi_master
 
 
-def _AODensityMatrix_write_hdf5(self, fname):
+def _AODensityMatrix_broadcast(self, comm, root=mpi_master()):
     """
-    Writes AODensityMatrix to hdf5 file.
+    Broadcasts AODensityMatrix object.
 
-    :param fname:
-        The name of the hdf5 file.
-    """
-
-    hf = h5py.File(fname, 'w')
-
-    matrix_count = 0
-
-    density_type = self.get_density_type()
-
-    for density_id in range(self.number_of_density_matrices()):
-
-        if density_type == denmat.rest:
-
-            name = f'{matrix_count}_rest.alpha_{density_id}'
-            array = self.alpha_to_numpy(density_id)
-            hf.create_dataset(name, data=array)
-            matrix_count += 1
-
-        elif density_type == denmat.unrest:
-
-            name = f'{matrix_count}_unrest.alpha_{density_id}'
-            array = self.alpha_to_numpy(density_id)
-            hf.create_dataset(name, data=array)
-            matrix_count += 1
-
-            name = f'{matrix_count}_unrest.beta_{density_id}'
-            array = self.beta_to_numpy(density_id)
-            hf.create_dataset(name, data=array)
-            matrix_count += 1
-
-    hf.close()
-
-
-@staticmethod
-def _AODensityMatrix_read_hdf5(fname):
-    """
-    Reads AODensityMatrix from hdf5 file.
-
-    :param fname:
-        The name of the hdf5 file.
+    :param comm:
+        The MPI communicator.
+    :param root:
+        The root rank to broadcast from.
 
     :return:
-        The AODensityMatrix.
+        The AODensityMatrix object.
     """
 
-    dentype = {
-        'rest.alpha': denmat.rest,
-        'unrest.alpha': denmat.unrest,
-        'unrest.beta': denmat.unrest,
-    }
+    densities = []
 
-    hf = h5py.File(fname, 'r')
+    if comm.Get_rank() == root:
+        density_type = ('rest'
+                        if self.get_density_type() == denmat.rest else 'unrest')
+        num_dens = self.number_of_density_matrices()
+    else:
+        density_type = None
+        num_dens = None
 
-    matrix_id_and_keys = sorted([
-        (int(key.split('_')[0]), key) for key in list(hf.keys())
-    ])
+    density_type = comm.bcast(density_type, root=root)
+    num_dens = comm.bcast(num_dens, root=root)
 
-    dens = [np.array(hf.get(key)) for matrix_id, key in matrix_id_and_keys]
+    if comm.Get_rank() == root:
+        for i in range(num_dens):
+            densities.append(self.alpha_to_numpy(i))
+            if density_type == 'unrest':
+                densities.append(self.beta_to_numpy(i))
 
-    types = [
-        dentype[key.split('_')[1]] for matrix_id, key in matrix_id_and_keys
-    ]
+    else:
+        for i in range(num_dens):
+            densities.append(None)
+            if density_type == 'unrest':
+                densities.append(None)
 
-    hf.close()
+    if density_type == 'rest':
+        for i in range(num_dens):
+            densities[i] = comm.bcast(densities[i], root=root)
+    elif density_type == 'unrest':
+        for i in range(num_dens * 2):
+            densities[i] = comm.bcast(densities[i], root=root)
 
-    assert_msg_critical(
-        len(set(types)) == 1,
-        'AODensityMatrix.read_hdf5: inconsistent density type')
+    density_type = (denmat.rest if density_type == 'rest' else denmat.unrest)
 
-    assert_msg_critical(types[0] in [denmat.rest, denmat.unrest],
-                        'AODensityMatrix.read_hdf5: invalid density type')
-
-    return AODensityMatrix(dens, types[0])
-
-
-def _AODensityMatrix_deepcopy(self, memo):
-    """
-    Implements deepcopy.
-
-    :param memo:
-        The memo dictionary for deepcopy.
-
-    :return:
-        A deepcopy of self.
-    """
-
-    return AODensityMatrix(self)
+    return AODensityMatrix(densities, density_type)
 
 
-AODensityMatrix.write_hdf5 = _AODensityMatrix_write_hdf5
-AODensityMatrix.read_hdf5 = _AODensityMatrix_read_hdf5
-AODensityMatrix.__deepcopy__ = _AODensityMatrix_deepcopy
+AODensityMatrix.broadcast = _AODensityMatrix_broadcast

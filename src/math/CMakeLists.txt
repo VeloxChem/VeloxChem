@@ -4,9 +4,10 @@ target_sources(vlxobjs
     DenseDiagonalizer.cpp
     DenseLinearAlgebra.cpp
     DenseMatrix.cpp
-    MathFunc.cpp
-    SparseMatrix.cpp
-    SparseVector.cpp
+    Matrices.cpp
+    Matrix.cpp
+    MatrixFunc.cpp
+    SubMatrix.cpp
   )
 
 target_include_directories(vlxobjs

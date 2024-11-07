@@ -2,19 +2,14 @@ target_sources(vlxobjs
   PRIVATE
     AODensityMatrix.cpp
     AOIndices.cpp
-    AngularMomentum.cpp
     AtomBasis.cpp
     BasisFunction.cpp
-    GenFunc.cpp
+    BlockedGtoPairBlock.cpp
     GtoBlock.cpp
-    GtoContainer.cpp
-    GtoPairsBlock.cpp
-    GtoPairsContainer.cpp
-    GtoTransform.cpp
+    GtoFunc.cpp
+    GtoPairBlock.cpp
+    GtoPairBlockFunc.cpp
     MolecularBasis.cpp
-    MolecularOrbitals.cpp
-    SADGuessDriver.cpp
-    SphericalMomentum.cpp
   )
 
 target_include_directories(vlxobjs

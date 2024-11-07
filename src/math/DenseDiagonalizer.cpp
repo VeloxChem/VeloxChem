@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -24,9 +23,10 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "DenseDiagonalizer.hpp"
-#include "DenseLinearAlgebra.hpp"
 
 #include <cmath>
+
+#include "DenseLinearAlgebra.hpp"
 
 #ifdef ENABLE_MKL
 #include <mkl_lapacke.h>
@@ -42,26 +42,22 @@ CDenseDiagonalizer::CDenseDiagonalizer()
 {
 }
 
-CDenseDiagonalizer::~CDenseDiagonalizer()
-{
-}
-
-void
-CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix)
+auto
+CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix) -> void
 {
     // copy matrix into temporary storage
 
-    _matrix = matrix;
+    _matrix = CDenseMatrix(matrix);
 
     // determine dimensions of matrix
 
-    int32_t ndim = _matrix.getNumberOfRows();
+    auto ndim = _matrix.getNumberOfRows();
 
     // initialize eigenvalues and eigenvectors
 
-    _eigenVectors = CDenseMatrix(ndim);
+    _eigenVectors = CDenseMatrix(ndim, ndim);
 
-    _eigenValues = CMemBlock<double>(ndim);
+    _eigenValues = std::vector<double>(ndim);
 
     // set up pointers to matrices and vectors
 
@@ -73,15 +69,33 @@ CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix)
 
     // temporary array for pivot data
 
-    CMemBlock<int32_t> idx(2 * ndim);
+    auto ndim_int32 = static_cast<int32_t>(ndim);
+
+    std::vector<int32_t> idx_int32(2 * ndim_int32);
 
     // initialize number of eigenvalues
 
-    int32_t nval = 0;
+    int32_t nval_int32 = 0;
 
     // diagonalize matrix
 
-    auto st = LAPACKE_dsyevr(LAPACK_ROW_MAJOR, 'V', 'A', 'U', ndim, mat, ndim, 0.0, 0.0, 0, 0, 1.0e-13, &nval, evals, evecs, ndim, idx.data());
+    auto st = LAPACKE_dsyevr(LAPACK_ROW_MAJOR,
+                             'V',
+                             'A',
+                             'U',
+                             ndim_int32,
+                             mat,
+                             ndim_int32,
+                             0.0,
+                             0.0,
+                             0,
+                             0,
+                             1.0e-13,
+                             &nval_int32,
+                             evals,
+                             evecs,
+                             ndim_int32,
+                             idx_int32.data());
 
     // update state of diagonalizer
 
@@ -92,71 +106,26 @@ CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix)
     if (_state) _isSolved = true;
 }
 
-bool
-CDenseDiagonalizer::getState() const
+auto
+CDenseDiagonalizer::getState() const -> bool
 {
     return _state;
 }
 
-bool
-CDenseDiagonalizer::isLinearlyDependentBasis(const double threshold) const
-{
-    if (getNumberOfEigenValues(threshold) != _eigenValues.size())
-    {
-        return true;
-    }
-
-    return false;
-}
-
-CDenseMatrix
-CDenseDiagonalizer::getEigenVectors() const
+auto
+CDenseDiagonalizer::getEigenVectors() const -> CDenseMatrix
 {
     return _eigenVectors;
 }
 
-CDenseMatrix
-CDenseDiagonalizer::getEigenVectors(const double threshold) const
-{
-    auto rdim = getNumberOfEigenValues(threshold);
-
-    auto nrow = _eigenVectors.getNumberOfRows();
-
-    if (rdim != nrow)
-    {
-        auto spos = nrow - rdim;
-
-        return _eigenVectors.slice(0, spos, nrow, rdim);
-    }
-
-    return _eigenVectors;
-}
-
-CMemBlock<double>
-CDenseDiagonalizer::getEigenValues() const
+auto
+CDenseDiagonalizer::getEigenValues() const -> std::vector<double>
 {
     return _eigenValues;
 }
 
-CMemBlock<double>
-CDenseDiagonalizer::getEigenValues(const double threshold) const
-{
-    auto rdim = getNumberOfEigenValues(threshold);
-
-    auto ndim = _eigenValues.size();
-
-    if (rdim != ndim)
-    {
-        auto spos = ndim - rdim;
-
-        return _eigenValues.slice(spos, rdim);
-    }
-
-    return _eigenValues;
-}
-
-CDenseMatrix
-CDenseDiagonalizer::getInvertedSqrtMatrix() const
+auto
+CDenseDiagonalizer::getInvertedSqrtMatrix() const -> CDenseMatrix
 {
     if (_isSolved)
     {
@@ -172,8 +141,7 @@ CDenseDiagonalizer::getInvertedSqrtMatrix() const
 
         // compute e^-1/2 vector
 
-        #pragma omp simd aligned(fvals: VLX_ALIGN)
-        for (int32_t i = 0; i < ndim; i++)
+        for (size_t i = 0; i < ndim; i++)
         {
             fvals[i] = 1.0 / std::sqrt(fvals[i]);
         }
@@ -188,8 +156,8 @@ CDenseDiagonalizer::getInvertedSqrtMatrix() const
     return CDenseMatrix();
 }
 
-CDenseMatrix
-CDenseDiagonalizer::getInvertedMatrix() const
+auto
+CDenseDiagonalizer::getInvertedMatrix() const -> CDenseMatrix
 {
     if (_isSolved)
     {
@@ -205,8 +173,7 @@ CDenseDiagonalizer::getInvertedMatrix() const
 
         // compute e^-1 vector
 
-        #pragma omp simd aligned(fvals: VLX_ALIGN)
-        for (int32_t i = 0; i < ndim; i++)
+        for (size_t i = 0; i < ndim; i++)
         {
             fvals[i] = 1.0 / fvals[i];
         }
@@ -219,23 +186,4 @@ CDenseDiagonalizer::getInvertedMatrix() const
     }
 
     return CDenseMatrix();
-}
-
-int32_t
-CDenseDiagonalizer::getNumberOfEigenValues(const double threshold) const
-{
-    // NOTE: dserv stores eigenvalues in ascending order
-
-    if (_isSolved)
-    {
-        for (int32_t i = 0; i < _eigenValues.size(); i++)
-        {
-            if (_eigenValues.at(i) > threshold)
-            {
-                return _eigenValues.size() - i;
-            }
-        }
-    }
-
-    return 0;
 }

@@ -1,0 +1,26 @@
+target_sources(vlxobjs
+  PRIVATE
+    PairDensityBecke88.cpp
+    PairDensityB88_erf.cpp
+    PairDensityGridGenerator.cpp
+    PairDensityHPG20.cpp
+    PairDensityLYP.cpp
+    PairDensityLYP_erf.cpp
+    PairDensityPBE_C.cpp
+    PairDensityPBEC_erf.cpp
+    PairDensityLYP_erf.cpp
+    PairDensityP86.cpp
+    PairDensityPBE_X.cpp
+    PairDensityPBEX_erf.cpp
+    PairDensityPMGB06.cpp
+    PairDensitySlater.cpp
+    PairDensitySlater_erf.cpp
+    PairDensityVWN.cpp
+    XCIntegratorForPDFT.cpp
+    XCPairDensityFunctional.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

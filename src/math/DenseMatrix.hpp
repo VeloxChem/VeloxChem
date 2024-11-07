@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -27,39 +26,29 @@
 #define DenseMatrix_hpp
 
 #include <cstdint>
-#include <ostream>
-#include <string>
 #include <vector>
-
-#include <mpi.h>
-
-#include "MemBlock.hpp"
-#include "MpiFunc.hpp"
-#include "NumaPolicy.hpp"
 
 /**
  Class CDenseMatrix stores dense matrix in coordinate format (zero-based
  indexing scheme) and provides set of methods for manipulating dense matrix
  data.
-
- @author Z. Rinkevicius
  */
 class CDenseMatrix
 {
     /**
      The number of rows.
      */
-    int32_t _nRows;
+    int _nRows;
 
     /**
      The number of columns.
      */
-    int32_t _nColumns;
+    int _nColumns;
 
     /**
-     The vector of matrix element values.
+     The matrix element values.
      */
-    CMemBlock<double> _values;
+    std::vector<double> _values;
 
    public:
     /**
@@ -68,44 +57,12 @@ class CDenseMatrix
     CDenseMatrix();
 
     /**
-     Creates a dense matrix object from vector of values.
-
-     @param values the vector of matrix elements.
-     @param nRows the number of rows in matrix.
-     @param nColumns the number of columns in matrix.
-     */
-    CDenseMatrix(const std::vector<double>& values,
-                 const int32_t              nRows,
-                 const int32_t              nColumns);
-
-    /**
-     Creates an empty dense matrix object with specific number of rows and
-     columns.
+     Creates a dense matrix object.
 
      @param nRows the number of rows in matrix.
      @param nColumns the number of columns in matrix.
      */
-    CDenseMatrix(const int32_t nRows,
-                 const int32_t nColumns);
-    
-    /**
-     Creates an empty dense matrix object with specific number of rows and
-     columns with specific NUMA policy.
-     
-     @param nRows the number of rows in matrix.
-     @param nColumns the number of columns in matrix.
-     @param numaPolicy - the numa policy for data initialization.
-     */
-    CDenseMatrix(const int32_t nRows,
-                 const int32_t nColumns,
-                 const numa    numaPolicy);
-
-    /**
-     Creates an empty square dense matrix object with specific number of rows.
-
-     @param nRows the number of rows in matrix.
-     */
-    CDenseMatrix(const int32_t nRows);
+    CDenseMatrix(const int nRows, const int nColumns);
 
     /**
      Creates a dense matrix object by copying other dense matrix object.
@@ -131,14 +88,14 @@ class CDenseMatrix
 
      @param source the dense matrix object.
      */
-    CDenseMatrix& operator=(const CDenseMatrix& source);
+    auto operator=(const CDenseMatrix& source) -> CDenseMatrix&;
 
     /**
      Assigns a dense matrix object by moving other dense matrix object.
 
      @param source the dense matrix object.
      */
-    CDenseMatrix& operator=(CDenseMatrix&& source) noexcept;
+    auto operator=(CDenseMatrix&& source) noexcept -> CDenseMatrix&;
 
     /**
      Compares dense matrix object with other dense matrix object.
@@ -146,7 +103,7 @@ class CDenseMatrix
      @param other the dense matrix object.
      @return true if dense matrix objects are equal, false otherwise.
      */
-    bool operator==(const CDenseMatrix& other) const;
+    auto operator==(const CDenseMatrix& other) const -> bool;
 
     /**
      Compares dense matrix object with other dense matrix object.
@@ -154,142 +111,90 @@ class CDenseMatrix
      @param other the dense matrix object.
      @return true if dense matrix objects are not equal, false otherwise.
      */
-    bool operator!=(const CDenseMatrix& other) const;
+    auto operator!=(const CDenseMatrix& other) const -> bool;
 
     /**
      Sets all values in dense matrix to zero.
      */
-    void zero();
+    auto zero() -> void;
 
     /**
      Creates transpose dense matrix.
 
      @return the transpose dense matrix.
      */
-    CDenseMatrix transpose() const;
+    auto transpose() const -> CDenseMatrix;
 
     /**
      Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).
      */
-    void symmetrize();
+    auto symmetrize() -> void;
 
     /**
      Symmetrizes elements of square matrix: a_ij = a_ji = factor * (a_ij + a_ji).
 
      @param factor the factor.
      */
-    void symmetrizeAndScale(const double factor);
-
-    /**
-     Reduces dense matrix objects from all MPI process within domain of MPI
-     communicator into dense matrix object on master node by summing them.
-
-     @param rank the rank of MPI process.
-     @param nodes the number of MPI processes in MPI communicator.
-     @param comm the MPI communicator.
-     */
-    void reduce_sum(int32_t rank, int32_t nodes, MPI_Comm comm);
-
-    /**
-     Creates dense matrix object by slicing specified size submatrix at
-     selected position from this dense matrix object.
-
-     @param iRow the starting row of submatrix.
-     @param iColumn the starting column of submatrix.
-     @param nRows the number of rows in submatrix.
-     @param nColumns the number of columns in submatrix.
-     @return the dense matrix object.
-     */
-    CDenseMatrix slice(const int32_t iRow, const int32_t iColumn, const int32_t nRows, const int32_t nColumns) const;
-
-    /**
-     Creates dense matrix from selected colums in this dense matrix object.
-
-     @param iColumns the indexes of selected columns.
-     @return the dense matrix.
-     */
-    CDenseMatrix selectByColumn(const std::vector<int32_t>& iColumns) const;
-
-    /**
-     Creates dense matrix from selected rows im this dense matrix object.
-
-     @param iRows the indexes of selected rows.
-     @return the dense matrix.
-     */
-    CDenseMatrix selectByRow(const std::vector<int32_t>& iRows) const;
+    auto symmetrizeAndScale(const double factor) -> void;
 
     /**
      Gets number of rows in dense matrix.
 
      @return the number of rows.
      */
-    int32_t getNumberOfRows() const;
+    auto getNumberOfRows() const -> int;
 
     /**
      Gets number of columns in dense matrix.
 
      @return the number of columns.
      */
-    int32_t getNumberOfColumns() const;
+    auto getNumberOfColumns() const -> int;
 
     /**
      Gets number of elements in dense matrix.
 
      @return the number of elements.
      */
-    int32_t getNumberOfElements() const;
+    auto getNumberOfElements() const -> int;
 
     /**
      Gets constant pointer to first element of dense matrix.
 
      @return the constant pointer to first element of dense matrix.
      */
-    const double* values() const;
+    auto values() const -> const double*;
 
     /**
      Gets pointer to first element of dense matrix.
 
      @return the pointer to first element of dense matrix.
      */
-    double* values();
+    auto values() -> double*;
 
     /**
      Gets constant pointer to first element of specific row in dense matrix.
 
      @return the constant pointer to first element of specific row.
      */
-    const double* row(const int32_t iRow) const;
+    auto row(const int iRow) const -> const double*;
 
     /**
      Gets pointer to first element of specific row in dense matrix.
 
      @return the pointer to first element of specific row.
      */
-    double* row(const int32_t iRow);
+    auto row(const int iRow) -> double*;
 
     /**
-     Gets string representation of dense matrix object.
+     Creates dense matrix object by slicing part of this dense matrix
+     object.
 
-     @return the string representation.
+     @param iPosition the position of first column.
+     @param nElements the number of columns to be sliced.
+     @return the dense matrix object.
      */
-    std::string getString() const;
-
-    /**
-     Broadcasts density matrix object within domain of MPI communicator.
-
-     @param rank the rank of MPI process.
-     @param comm the MPI communicator.
-     */
-    void broadcast(int32_t rank, MPI_Comm comm);
-
-    /**
-     Converts dense matrix object to text output and insert it into output
-     text stream.
-
-     @param output the output text stream.
-     @param source the dense matrix object.
-     */
-    friend std::ostream& operator<<(std::ostream& output, const CDenseMatrix& source);
+    auto slice(const int iPosition, const int nElements) const -> CDenseMatrix;
 };
 
 #endif /* DenseMatrix_hpp */

@@ -2,18 +2,14 @@ target_sources(vlxobjs
   PRIVATE
     Codata.cpp
     ErrorHandler.cpp
-    FourIndexes.cpp
-    MpiFunc.cpp
     MultiTimer.cpp
-    OMPTasks.cpp
+    OpenMPFunc.cpp
     StringFormat.cpp
-    ThreeIndexes.cpp
+    TensorLabels.cpp
     Timer.cpp
-    TwoIndexes.cpp
   )
 
 target_include_directories(vlxobjs
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   )

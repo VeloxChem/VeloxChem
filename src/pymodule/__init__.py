@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -26,31 +25,32 @@
 # C++ classes
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
-from .veloxchemlib import OverlapIntegralsDriver
-from .veloxchemlib import KineticEnergyIntegralsDriver
-from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import LinearMomentumIntegralsDriver
-from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import SADGuessDriver
-from .veloxchemlib import DispersionModel
-from .veloxchemlib import DenseMatrix
-from .veloxchemlib import TwoIndexes
-from .veloxchemlib import MOIntsBatch
-from .veloxchemlib import ExcitationVector
+from .veloxchemlib import OverlapDriver
+from .veloxchemlib import KineticEnergyDriver
+from .veloxchemlib import NuclearPotentialDriver
+from .veloxchemlib import ElectricDipoleMomentDriver
+from .veloxchemlib import OverlapGeom100Driver
+from .veloxchemlib import KineticEnergyGeom100Driver
+from .veloxchemlib import NuclearPotentialGeom010Driver
+from .veloxchemlib import NuclearPotentialGeom100Driver
+from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+from .veloxchemlib import T4CScreener
+from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import DispersionModel
 
 # C++ functions
+from .veloxchemlib import is_chemical_element
+from .veloxchemlib import chemical_element_name
+from .veloxchemlib import chemical_element_label
+from .veloxchemlib import chemical_element_identifier
+from .veloxchemlib import chemical_element_mass
+from .veloxchemlib import chemical_element_max_angular_momentum
 from .veloxchemlib import available_functionals
+from .veloxchemlib import available_pdft_functionals
 from .veloxchemlib import mpi_master
-from .veloxchemlib import mpi_initialized
-from .veloxchemlib import ao_matrix_to_veloxchem
-from .veloxchemlib import ao_matrix_to_dalton
-from .veloxchemlib import get_basis_function_indices_for_atom
-from .veloxchemlib import bohr_in_angstrom, bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_kcalpermol
 from .veloxchemlib import hartree_in_wavenumber, hartree_in_wavenumbers
@@ -58,38 +58,39 @@ from .veloxchemlib import dipole_in_debye
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import extinction_coefficient_from_beta
 from .veloxchemlib import fine_structure_constant
-from .veloxchemlib import mathconst_pi
 from .veloxchemlib import parse_xc_func
+from .veloxchemlib import make_matrix
+from .veloxchemlib import make_matrices
 
 # C++ enums
+from .veloxchemlib import mat_t
 from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
-from .veloxchemlib import szblock
-from .veloxchemlib import ericut
-from .veloxchemlib import molorb
-from .veloxchemlib import moints
+
+# Python enums
+from .molecularorbitals import molorb
 
 # Python classes
 from .atomtypeidentifier import AtomTypeIdentifier
 from .seminario import Seminario
 from .inputparser import InputParser
 from .outputstream import OutputStream
+from .matrix import Matrix
+from .matrices import Matrices
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
-from .aofockmatrix import AOFockMatrix
+from .fockdriver import FockDriver
+from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
-from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
-from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
@@ -115,10 +116,9 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
-from .rspcustomproperty import CustomProperty
+#from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
-from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
@@ -139,22 +139,8 @@ from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
 
-# for backward compatibility
-from .veloxchemlib import XCIntegrator as XCNewIntegrator
-from .veloxchemlib import XCFunctional as XCNewFunctional
-from .veloxchemlib import parse_xc_func as new_parse_xc_func
-from .xtbdriver import XtbDriver as XTBDriver
-from .xtbgradientdriver import XtbGradientDriver as XTBGradientDriver
-from .xtbhessiandriver import XtbHessianDriver as XTBHessianDriver
-from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
-from .shgdriver import ShgDriver as SHGDriver
-from .tpafulldriver import TpaFullDriver as TPAFullDriver
-from .tpareddriver import TpaReducedDriver as TPAReducedDriver
-
 # Python functions
 from .errorhandler import assert_msg_critical
-from .qqscheme import get_qq_type
-from .qqscheme import get_qq_scheme
 from .features import print_features
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv

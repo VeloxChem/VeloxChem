@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -23,8 +22,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
+from .veloxchemlib import mpi_master
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
@@ -56,9 +55,6 @@ def scf_results_sanity_check(obj, scf_results):
     if obj.rank == mpi_master():
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
-
-        if scf_results.get('qq_type', None) is not None:
-            updated_scf_info['qq_type'] = scf_results['qq_type']
 
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint

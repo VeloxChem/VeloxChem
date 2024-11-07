@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -25,71 +24,34 @@
 
 #include "ErrorHandler.hpp"
 
-#include <mpi.h>
-
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
 
-#include "MpiFunc.hpp"
-
 namespace errors {  // errors namespace
-namespace detail {
+
 auto
-msg(const std::string& label, const std::string& header) -> void
+msg(const std::string& message, const std::string& header) -> void
 {
     std::stringstream sst;
 
-    sst << "**** " << header;
+    sst << "**** " << header << " ****" << std::endl;
 
-    if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
-    {
-        sst << " (process " << mpi::rank(MPI_COMM_WORLD) << ")";
-    }
-
-    sst << " ****" << std::endl;
-
-    sst << "     " << label << std::endl << std::endl;
+    sst << "     " << message << std::endl << std::endl;
 
     std::cerr << sst.str();
 }
-}  // namespace detail
 
 auto
 assertMsgCritical(const bool condition, const std::string& message) -> void
 {
     if (!condition)
     {
-        msgCritical(message);
+        msg(message, "Critical Error");
+
+        std::abort();
     }
 }
 
-auto
-msgCritical(const std::string& message) -> void
-{
-    detail::msg(message, "Critical Error");
-
-    if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
-    {
-        MPI_Abort(MPI_COMM_WORLD, MPI_ERR_OTHER);
-    }
-
-    std::abort();
-}
-
-auto
-assertMsgWarning(const bool condition, const std::string& message) -> void
-{
-    if (!condition)
-    {
-        msgWarning(message);
-    }
-}
-
-auto
-msgWarning(const std::string& message) -> void
-{
-    detail::msg(message, "Warning");
-}
 }  // namespace errors

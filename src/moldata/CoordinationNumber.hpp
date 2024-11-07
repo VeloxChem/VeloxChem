@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -29,10 +28,10 @@
 #ifndef CoordinationNumber_hpp
 #define CoordinationNumber_hpp
 
+#include <vector>
+
 #include "DenseMatrix.hpp"
 #include "Molecule.hpp"
-
-#include <vector>
 
 namespace coordnum {  // coordnum namespace
 
@@ -41,7 +40,7 @@ namespace coordnum {  // coordnum namespace
 
  @return a vector of covalent radii with nuclear charge as index.
  */
-std::vector<double> getCovalentRadius();
+auto getCovalentRadius() -> std::vector<double>;
 
 /**
  Creates atomic coordination numbers (reference: dftd4 v2.4.0).
@@ -49,7 +48,7 @@ std::vector<double> getCovalentRadius();
  @param molecule the molecule.
  @return a vector of atomic coordination numbers for a molecule.
  */
-std::vector<double> getCoordinationNumber(const CMolecule& molecule);
+auto getCoordinationNumber(const CMolecule& molecule) -> std::vector<double>;
 
 /**
  Creates atomic coordination numbers (reference: dftd4 v2.4.0).
@@ -58,14 +57,14 @@ std::vector<double> getCoordinationNumber(const CMolecule& molecule);
  @param dcndr the derivative matrix of dimension (3N,N).
  @return a vector of atomic coordination numbers for a molecule.
  */
-std::vector<double> getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr);
+auto getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr) -> std::vector<double>;
 
 /**
  Creates Pauling electronegativity (reference: dftd4 v2.4.0).
 
  @return a vector of Pauling electronegativity with nuclear charge as index.
  */
-std::vector<double> getPaulingElectronegativity();
+auto getPaulingElectronegativity() -> std::vector<double>;
 
 /**
  Creates atomic covalent coordination numbers (reference: dftd4 v2.4.0).
@@ -74,7 +73,7 @@ std::vector<double> getPaulingElectronegativity();
  @param dcovcndr the derivative matrix of dimension (3N,N).
  @return a vector of atomic covalent coordination numbers for a molecule.
  */
-std::vector<double> getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr);
+auto getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr) -> std::vector<double>;
 
 }  // namespace coordnum
 

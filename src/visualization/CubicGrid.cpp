@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -30,7 +29,6 @@
 #include <vector>
 
 #include "ErrorHandler.hpp"
-#include "MemBlock.hpp"
 
 CCubicGrid::CCubicGrid()
 
@@ -40,11 +38,11 @@ CCubicGrid::CCubicGrid()
 
     , _numPoints{0, 0, 0}
 
-    , _values{CMemBlock<double>()}
+    , _values{std::vector<double>()}
 {
 }
 
-CCubicGrid::CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int32_t, 3>& numPoints)
+CCubicGrid::CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int, 3>& numPoints)
 
     : _origin(origin)
 
@@ -60,7 +58,7 @@ CCubicGrid::CCubicGrid(const std::array<double, 3>& origin, const std::array<dou
 
     errors::assertMsgCritical(_numPoints.size() == 3, errmsg);
 
-    _values = CMemBlock<double>(numPoints[0] * numPoints[1] * numPoints[2]);
+    _values = std::vector<double>(numPoints[0] * numPoints[1] * numPoints[2]);
 }
 
 CCubicGrid::CCubicGrid(const CCubicGrid& source)
@@ -155,7 +153,7 @@ CCubicGrid::getStepSize() const
     return _stepSize;
 }
 
-std::array<int32_t, 3>
+std::array<int, 3>
 CCubicGrid::getNumPoints() const
 {
     return _numPoints;
@@ -180,7 +178,7 @@ CCubicGrid::setValues(const std::vector<double> vals)
 
     auto npoints = _numPoints[0] * _numPoints[1] * _numPoints[2];
 
-    errors::assertMsgCritical(npoints == static_cast<int32_t>(vals.size()), errmsg);
+    errors::assertMsgCritical(npoints == static_cast<int>(vals.size()), errmsg);
 
     std::memcpy(_values.data(), vals.data(), npoints * sizeof(double));
 }

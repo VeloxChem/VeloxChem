@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -27,13 +26,12 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-from .veloxchemlib import GridDriver, XCMolecularGradient
+from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
+from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .dftutils import get_default_grid_level
-from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check
 
@@ -82,6 +80,8 @@ class GradientDriver:
         self.flag = None
         self.delta_h = 0.001
 
+        # TODO: double check self.numerical
+
         self.numerical = False
         self.do_four_point = False
 
@@ -94,12 +94,14 @@ class GradientDriver:
         self._input_keywords = {
             'gradient': {
                 'numerical': ('bool', 'do numerical integration'),
-                'do_four_point': ('bool', 'do four-point numerical integration'),
+                'do_four_point':
+                    ('bool', 'do four-point numerical integration'),
                 'delta_h': ('float', 'the displacement for finite difference'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
+                'dispersion': ('bool', 'do dft-d4 dispersion correction'),
             }
         }
 
@@ -118,7 +120,7 @@ class GradientDriver:
         }
 
         parse_input(self, grad_keywords, grad_dict)
-        
+
         # sanity check
         if (self.do_four_point and not self.numerical):
             self.numerical = True
@@ -156,7 +158,7 @@ class GradientDriver:
             The same arguments as the "compute" function.
         """
 
-        # atom labels
+        # atom ids
         labels = molecule.get_labels()
 
         # atom coordinates (nx3)
@@ -172,26 +174,26 @@ class GradientDriver:
         for i in range(molecule.number_of_atoms()):
             for d in range(3):
                 coords[i, d] += self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
+                new_mol = Molecule(labels, coords, 'au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 e_plus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] -= 2.0 * self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
+                new_mol = Molecule(labels, coords, 'au')
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 e_minus = self.compute_energy(new_mol, *args)
 
                 if self.do_four_point:
                     coords[i, d] -= self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
+                    new_mol = Molecule(labels, coords, 'au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
                     e_minus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] += 4.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
+                    new_mol = Molecule(labels, coords, 'au')
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
                     e_plus2 = self.compute_energy(new_mol, *args)
@@ -221,12 +223,15 @@ class GradientDriver:
             The energy.
         """
 
+        # TODO: remove compute_energy and use grad_drv.get_energy()
+
         return
 
     def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density,
                          xcfun_label):
         """
-        Calculates the vxc = (d exc / d rho) exchange-correlation contribution to the gradient.
+        Calculates the vxc = (d exc / d rho) exchange-correlation contribution
+        to the gradient.
 
         :param molecule:
             The molecule.
@@ -396,7 +401,7 @@ class GradientDriver:
         coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
-        nuclear_charges = molecule.elem_ids_to_numpy()
+        nuclear_charges = molecule.get_element_ids()
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):
@@ -420,7 +425,7 @@ class GradientDriver:
             The gradient.
         """
 
-        return self.gradient
+        return self.gradient.copy()
 
     def print_geometry(self, molecule):
         """
@@ -480,12 +485,13 @@ class GradientDriver:
                 self.ostream.print_blank()
                 for i in range(molecule.number_of_atoms()):
                     valstr = '  {:<4s}'.format(labels[i])
-                    if len(gradient_shape)==2:
+                    if len(gradient_shape) == 2:
                         for d in range(3):
                             valstr += '{:22.12f}'.format(self.gradient[i, d])
                     else:
                         for d in range(3):
-                            valstr += '{:22.12f}'.format(self.gradient[index, i, d])
+                            valstr += '{:22.12f}'.format(self.gradient[index, i,
+                                                                       d])
                     self.ostream.print_header(valstr)
                 index += 1
         self.ostream.print_blank()
@@ -534,8 +540,8 @@ class GradientDriver:
 
         if state_deriv_index is not None:
             if type(state_deriv_index) is int:
-                cur_str = ( 'Excited State of Interest       : ' 
-                            + str(state_deriv_index + 1) )
+                cur_str = ('Excited State of Interest       : ' +
+                           str(state_deriv_index + 1))
                 self.ostream.print_header(cur_str.ljust(str_width))
             elif type(state_deriv_index) is tuple:
                 states_txt = ""

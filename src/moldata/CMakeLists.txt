@@ -2,7 +2,6 @@ target_sources(vlxobjs
   PRIVATE
     AtomicRadii.cpp
     ChemicalElement.cpp
-    CommonNeighbors.cpp
     CoordinationNumber.cpp
     DispersionData.cpp
     DispersionModel.cpp

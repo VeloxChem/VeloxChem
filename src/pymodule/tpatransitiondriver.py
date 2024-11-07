@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -29,8 +28,8 @@ import numpy as np
 import time
 import sys
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_ev,
+from .oneeints import compute_electric_dipole_integrals
+from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
@@ -171,8 +170,15 @@ class TpaTransitionDriver(NonlinearSolver):
         norb = self.comm.bcast(norb, root=mpi_master())
 
         # Computing first-order gradient vectors
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, ao_basis)
+        if self.rank == mpi_master():
+            mu_dipole_mats = compute_electric_dipole_integrals(
+                molecule, ao_basis)
+            # Note: nonliear response uses r instead of mu for dipole operator
+            dipole_mats = (mu_dipole_mats[0] * (-1.0),
+                           mu_dipole_mats[1] * (-1.0),
+                           mu_dipole_mats[2] * (-1.0))
+        else:
+            dipole_mats = tuple()
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
@@ -188,19 +194,25 @@ class TpaTransitionDriver(NonlinearSolver):
             a_grad = list(a_grad)
             for ind in range(len(a_grad)):
                 a_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if operator == 'dipole':
+                    a_grad[ind] *= -1.0
 
             b_grad = list(b_grad)
             for ind in range(len(b_grad)):
                 b_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if operator == 'dipole':
+                    b_grad[ind] *= -1.0
 
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
 
         rpa_keywords = [
             'nstates', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
-            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
         ]
 
         for key in rpa_keywords:
@@ -239,9 +251,9 @@ class TpaTransitionDriver(NonlinearSolver):
             })
 
             X = {
-                'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
-                'y': 2 * self.ao2mo(mo, dipole_mats.y_to_numpy()),
-                'z': 2 * self.ao2mo(mo, dipole_mats.z_to_numpy())
+                'x': 2 * self.ao2mo(mo, dipole_mats[0]),
+                'y': 2 * self.ao2mo(mo, dipole_mats[1]),
+                'z': 2 * self.ao2mo(mo, dipole_mats[2])
             }
         else:
             X = None
@@ -251,9 +263,9 @@ class TpaTransitionDriver(NonlinearSolver):
 
         cpp_keywords = {
             'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
-            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'electric_field', 'program_end_time', '_debug', '_block_size_factor'
         }
 
         for key in cpp_keywords:
@@ -577,7 +589,7 @@ class TpaTransitionDriver(NonlinearSolver):
         # conversion factor for TPA cross-sections in GM
         # a0 in cm, c in cm/s, gamma (0.1 eV) in au
         alpha = fine_structure_constant()
-        a0 = bohr_in_angstroms() * 1.0e-8
+        a0 = bohr_in_angstrom() * 1.0e-8
         c = speed_of_light_in_vacuum_in_SI() * 100.0
         gamma = 0.1 / hartree_in_ev()
         au2gm = (8.0 * np.pi**2 * alpha * a0**5) / (c * gamma) * 1.0e+50
@@ -1080,7 +1092,7 @@ class TpaTransitionDriver(NonlinearSolver):
         # * c in cm/s
         # * broadening parameter not included in au2gm
         alpha = fine_structure_constant()
-        a0_in_cm = bohr_in_angstroms() * 1.0e-8
+        a0_in_cm = bohr_in_angstrom() * 1.0e-8
         c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
         au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
 

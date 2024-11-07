@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -87,15 +86,15 @@ CDispersionModel::_cngw(const double wf, const double cn, const double cnref)
     return std::exp(-wf * std::pow(cn - cnref, 2));
 }
 
-CMemBlock<double>
+std::vector<double>
 CDispersionModel::_getWeights()
 {
-    CMemBlock<double> freq({0.000001, 0.050000, 0.100000, 0.200000, 0.300000, 0.400000, 0.500000, 0.600000, 0.700000, 0.800000, 0.900000, 1.000000,
+    std::vector<double> freq({0.000001, 0.050000, 0.100000, 0.200000, 0.300000, 0.400000, 0.500000, 0.600000, 0.700000, 0.800000, 0.900000, 1.000000,
                             1.200000, 1.400000, 1.600000, 1.800000, 2.000000, 2.500000, 3.000000, 4.000000, 5.000000, 7.500000, 10.00000});
 
-    CMemBlock<double> weights(freq.size());
+    std::vector<double> weights(freq.size());
 
-    for (int32_t i = 0; i < freq.size(); i++)
+    for (int i = 0; i < freq.size(); i++)
     {
         if (i > 0)
         {
@@ -116,23 +115,21 @@ CDispersionModel::_getMaximum(const std::vector<std::vector<double>>& data)
 {
     std::vector<double> values;
 
-    for (int32_t i = 0; i < static_cast<int32_t>(data.size()); i++)
+    for (size_t i = 0; i < data.size(); i++)
     {
-        auto num = static_cast<int32_t>(data[i].size());
-
-        if (num > 0)
+        if (data[i].size() > 0)
         {
-            values.push_back(mathfunc::max(data[i].data(), num));
+            values.push_back(*std::max_element(data[i].begin(), data[i].end()));
         }
     }
 
-    return mathfunc::max(values.data(), static_cast<int32_t>(values.size()));
+    return *std::max_element(values.begin(), values.end());
 }
 
-int32_t
+int
 CDispersionModel::_getRound(const double value)
 {
-    return static_cast<int32_t>(std::round(value));
+    return static_cast<int>(std::round(value));
 }
 
 void
@@ -140,7 +137,7 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 {
     // get dispersion model parameters
 
-    const double thopi = 3.0 / mathconst::getPiValue();
+    const double thopi = 3.0 / mathconst::pi_value();
 
     auto refn = dispdata::getRefN();
 
@@ -164,11 +161,11 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
     auto alphaiw = dispdata::getAlphaiw();
 
-    auto n_alpha = static_cast<int32_t>(alphaiw[1][0].size());
+    auto n_alpha = static_cast<int>(alphaiw[1][0].size());
 
-    auto max_elem = static_cast<int32_t>(refn.size());
+    auto max_elem = static_cast<int>(refn.size());
 
-    auto max_refn = mathfunc::max(refn.data(), max_elem);
+    auto max_refn = *std::max_element(refn.begin(), refn.end());
 
     auto max_refn_2 = max_refn * max_refn;
 
@@ -176,9 +173,9 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
     // get molecular information
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
-    auto idselem = molecule.getIdsElemental();
+    auto idselem = molecule.identifiers();
 
     // initialize dispersion model data
 
@@ -194,7 +191,7 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
     _alpha.clear();
 
-    for (int32_t i = 0; i < max_elem; i++)
+    for (int i = 0; i < max_elem; i++)
     {
         auto n_i = alphaiw[i].size();
 
@@ -202,7 +199,7 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
         _nref.push_back(0);
 
-        _ncount.push_back(std::vector<int32_t>(n_i, 0));
+        _ncount.push_back(std::vector<int>(n_i, 0));
 
         _cn.push_back(std::vector<double>(n_i, 0.0));
 
@@ -217,11 +214,11 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
     // compute dispersion model data
 
-    CMemBlock<double> alpha(n_alpha);
+    std::vector<double> alpha(n_alpha);
 
-    std::vector<int32_t> cncount(max_ref_cn, 0);
+    std::vector<int> cncount(max_ref_cn, 0);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         cncount.assign(cncount.size(), 0);
 
@@ -233,7 +230,7 @@ CDispersionModel::_initialize(const CMolecule& molecule)
         {
             _nref[ia] = refn[ia];
 
-            for (int32_t j = 0; j < refn[ia]; j++)
+            for (int j = 0; j < refn[ia]; j++)
             {
                 auto is = refsys[ia][j];
 
@@ -243,7 +240,7 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
                 auto secaiw = dispdata::getSecaiw(is);
 
-                for (int32_t k = 0; k < alpha.size(); k++)
+                for (int k = 0; k < alpha.size(); k++)
                 {
                     alpha.data()[k] = sscale * secaiw[k] * _zeta(_g_a, gam[is] * _g_c, iz, clsh[ia][j] + iz);
                 }
@@ -254,15 +251,15 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
                 cncount[icn] += 1;
 
-                for (int32_t k = 0; k < alpha.size(); k++)
+                for (int k = 0; k < alpha.size(); k++)
                 {
                     _alpha[ia][j][k] = std::max(ascale[ia][j] * (alphaiw[ia][j][k] - hcount[ia][j] * alpha.data()[k]), 0.0);
                 }
             }
 
-            for (int32_t j = 0; j < refn[ia]; j++)
+            for (int j = 0; j < refn[ia]; j++)
             {
-                int32_t icn = cncount[_getRound(refcn[ia][j])];
+                int icn = cncount[_getRound(refcn[ia][j])];
 
                 _ncount[ia][j] = icn * (icn + 1) / 2;
             }
@@ -275,9 +272,9 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
     auto weights = _getWeights();
 
-    for (int32_t i = 1; i < max_elem; i++)
+    for (int i = 1; i < max_elem; i++)
     {
-        for (int32_t j = 1; j <= i; j++)
+        for (int j = 1; j <= i; j++)
         {
             double* c6_ij = _c6.data() + (i * max_elem + j) * max_refn_2;
 
@@ -285,11 +282,11 @@ CDispersionModel::_initialize(const CMolecule& molecule)
 
             if ((_atoms[i] > 0) && (_atoms[j] > 0))
             {
-                for (int32_t ii = 0; ii < _nref[i]; ii++)
+                for (int ii = 0; ii < _nref[i]; ii++)
                 {
-                    for (int32_t jj = 0; jj < _nref[j]; jj++)
+                    for (int jj = 0; jj < _nref[j]; jj++)
                     {
-                        for (int32_t k = 0; k < alpha.size(); k++)
+                        for (int k = 0; k < alpha.size(); k++)
                         {
                             alpha.data()[k] = _alpha[i][ii][k] * _alpha[j][jj][k];
                         }
@@ -313,7 +310,7 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const s
 
     _ndim = 0;
 
-    for (int32_t i = 0; i < static_cast<int32_t>(_atoms.size()); i++)
+    for (int i = 0; i < static_cast<int>(_atoms.size()); i++)
     {
         _ndim += _atoms[i] * _nref[i];
     }
@@ -332,31 +329,31 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const s
 
     auto refn = dispdata::getRefN();
 
-    auto max_elem = static_cast<int32_t>(refn.size());
+    auto max_elem = static_cast<int>(refn.size());
 
-    auto max_refn = mathfunc::max(refn.data(), max_elem);
+    auto max_refn = *std::max_element(refn.begin(), refn.end());
 
     auto max_refn_2 = max_refn * max_refn;
 
     // get molecular inforamtion
 
-    auto idselem = molecule.getIdsElemental();
+    auto idselem = molecule.identifiers();
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
     // compute weights
 
-    std::vector<std::vector<int32_t>> itbl(max_refn, std::vector<int32_t>(natoms, 0));
+    std::vector<std::vector<int>> itbl(max_refn, std::vector<int>(natoms, 0));
 
-    for (int32_t i = 0, k = 0; i < natoms; i++)
+    for (int i = 0, k = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < _nref[idselem[i]]; j++, k++)
+        for (int j = 0; j < _nref[idselem[i]]; j++, k++)
         {
             itbl[j][i] = k;
         }
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         auto ia = idselem[i];
 
@@ -364,9 +361,9 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const s
 
         double dnorm = 0.0;
 
-        for (int32_t j = 0; j < _nref[ia]; j++)
+        for (int j = 0; j < _nref[ia]; j++)
         {
-            for (int32_t t = 0; t < _ncount[ia][j]; t++)
+            for (int t = 0; t < _ncount[ia][j]; t++)
             {
                 double twf = (t + 1) * _wf;
 
@@ -380,7 +377,7 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const s
 
         norm = 1.0 / norm;
 
-        for (int32_t j = 0; j < _nref[ia]; j++)
+        for (int j = 0; j < _nref[ia]; j++)
         {
             auto k = itbl[j][i];
 
@@ -388,7 +385,7 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const s
 
             double expw = 0.0;
 
-            for (int32_t t = 0; t < _ncount[ia][j]; t++)
+            for (int t = 0; t < _ncount[ia][j]; t++)
             {
                 double twf = (t + 1) * _wf;
 
@@ -403,7 +400,7 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const s
 
             if (_gw[k] != _gw[k])
             {
-                auto max_cn_ia = mathfunc::max(_cn[ia].data(), _nref[ia]);
+                auto max_cn_ia = *std::max_element(_cn[ia].data(), _cn[ia].data() + _nref[ia]);
 
                 if (max_cn_ia == _cn[ia][j])
                 {
@@ -426,21 +423,21 @@ CDispersionModel::_compWeightsAndCoefficients(const CMolecule& molecule, const s
 
     // compute coefficients
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         auto ia = idselem[i];
 
-        for (int32_t j = 0; j <= i; j++)
+        for (int j = 0; j <= i; j++)
         {
             auto ja = idselem[j];
 
             const double* c6_jaia = _c6.data() + (ja * max_elem + ia) * max_refn_2;
 
-            for (int32_t ji = 0; ji < _nref[ia]; ji++)
+            for (int ji = 0; ji < _nref[ia]; ji++)
             {
                 auto k = itbl[ji][i];
 
-                for (int32_t jj = 0; jj < _nref[ja]; jj++)
+                for (int jj = 0; jj < _nref[ja]; jj++)
                 {
                     if ((j == i) && (jj > ji)) continue;
 
@@ -489,31 +486,27 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule&           molecule,
 
     auto refn = dispdata::getRefN();
 
-    auto max_elem = static_cast<int32_t>(refn.size());
+    auto max_elem = static_cast<int>(refn.size());
 
-    auto max_refn = mathfunc::max(refn.data(), max_elem);
+    auto max_refn = *std::max_element(refn.begin(), refn.end());
 
     const double rthr_vdw = 4000.0;
 
     // get molecular inforamtion
 
-    auto idselem = molecule.getIdsElemental();
+    auto idselem = molecule.identifiers();
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
-    auto xcoord = molecule.getCoordinatesX();
-
-    auto ycoord = molecule.getCoordinatesY();
-
-    auto zcoord = molecule.getCoordinatesZ();
+    auto coords = molecule.coordinates();
 
     // compute two-body contribution to dispersion energy
 
-    std::vector<std::vector<int32_t>> itbl(max_refn, std::vector<int32_t>(natoms, 0));
+    std::vector<std::vector<int>> itbl(max_refn, std::vector<int>(natoms, 0));
 
-    for (int32_t i = 0, k = 0; i < natoms; i++)
+    for (int i = 0, k = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < _nref[idselem[i]]; j++, k++)
+        for (int j = 0; j < _nref[idselem[i]]; j++, k++)
         {
             itbl[j][i] = k;
         }
@@ -529,13 +522,13 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule&           molecule,
 
     CDenseMatrix dc6dq(natoms, 1);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         auto ia = idselem[i];
 
         auto iz = zeff[ia];
 
-        for (int32_t j = 0; j < _nref[ia]; j++)
+        for (int j = 0; j < _nref[ia]; j++)
         {
             auto k = itbl[j][i];
 
@@ -555,15 +548,19 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule&           molecule,
 
     errors::assertMsgCritical(gradient.getNumberOfColumns() == natoms, err_size);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         auto ia = idselem[i];
 
-        for (int32_t j = 0; j < i; j++)
+        auto coord_i = coords[i].coordinates();
+
+        for (int j = 0; j < i; j++)
         {
             auto ja = idselem[j];
 
-            std::vector<double> rij({xcoord[i] - xcoord[j], ycoord[i] - ycoord[j], zcoord[i] - zcoord[j]});
+            auto coord_j = coords[j].coordinates();
+
+            std::vector<double> rij({coord_i[0] - coord_j[0], coord_i[1] - coord_j[1], coord_i[2] - coord_j[2]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
@@ -581,11 +578,11 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule&           molecule,
 
             double djzij = 0.0;
 
-            for (int32_t ji = 0; ji < _nref[ia]; ji++)
+            for (int ji = 0; ji < _nref[ia]; ji++)
             {
                 auto k = itbl[ji][i];
 
-                for (int32_t jj = 0; jj < _nref[ja]; jj++)
+                for (int jj = 0; jj < _nref[ja]; jj++)
                 {
                     auto l = itbl[jj][j];
 
@@ -623,7 +620,7 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule&           molecule,
 
             double ddisp = param_s6 * door6 + param_s8 * r4r2ij * door8 + param_s10 * 49.0 / 40.0 * std::pow(r4r2ij, 2) * door10;
 
-            for (int32_t d = 0; d < 3; d++)
+            for (int d = 0; d < 3; d++)
             {
                 gradient.values()[d * natoms + i] -= c6ij * ddisp * rij[d] / r;
 
@@ -646,7 +643,7 @@ CDispersionModel::_compTwoBodyContribution(const CMolecule&           molecule,
 
     auto prod_sum = denblas::addAB(prod_q, prod_cn, 1.0);
 
-    for (int32_t dj = 0; dj < 3 * natoms; dj++)
+    for (int dj = 0; dj < 3 * natoms; dj++)
     {
         gradient.values()[dj] -= prod_sum.values()[dj];
     }
@@ -680,9 +677,9 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
     auto refn = dispdata::getRefN();
 
-    auto max_elem = static_cast<int32_t>(refn.size());
+    auto max_elem = static_cast<int>(refn.size());
 
-    auto max_refn = mathfunc::max(refn.data(), max_elem);
+    auto max_refn = *std::max_element(refn.begin(), refn.end());
 
     const double rthr_mbd = 1600.0;
 
@@ -692,23 +689,19 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
     // get molecular inforamtion
 
-    auto idselem = molecule.getIdsElemental();
+    auto idselem = molecule.identifiers();
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
-    auto xcoord = molecule.getCoordinatesX();
-
-    auto ycoord = molecule.getCoordinatesY();
-
-    auto zcoord = molecule.getCoordinatesZ();
+    auto coords = molecule.coordinates();
 
     // prepare c6ab
 
-    std::vector<std::vector<int32_t>> itbl(max_refn, std::vector<int32_t>(natoms, 0));
+    std::vector<std::vector<int>> itbl(max_refn, std::vector<int>(natoms, 0));
 
-    for (int32_t i = 0, k = 0; i < natoms; i++)
+    for (int i = 0, k = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < _nref[idselem[i]]; j++, k++)
+        for (int j = 0; j < _nref[idselem[i]]; j++, k++)
         {
             itbl[j][i] = k;
         }
@@ -720,13 +713,13 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
     CDenseMatrix dc6dcn(natoms, 1);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         auto ia = idselem[i];
 
         auto iz = zeff[ia];
 
-        for (int32_t j = 0; j < _nref[ia]; j++)
+        for (int j = 0; j < _nref[ia]; j++)
         {
             auto k = itbl[j][i];
 
@@ -740,11 +733,11 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
     std::vector<double> dc6ab(natoms * natoms, 0.0);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         auto ia = idselem[i];
 
-        for (int32_t j = 0; j <= i; j++)
+        for (int j = 0; j <= i; j++)
         {
             auto ja = idselem[j];
 
@@ -754,11 +747,11 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
             double djc6ij = 0.0;
 
-            for (int32_t ji = 0; ji < _nref[ia]; ji++)
+            for (int ji = 0; ji < _nref[ia]; ji++)
             {
                 auto k = itbl[ji][i];
 
-                for (int32_t jj = 0; jj < _nref[ja]; jj++)
+                for (int jj = 0; jj < _nref[ja]; jj++)
                 {
                     auto l = itbl[jj][j];
 
@@ -793,15 +786,19 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
     errors::assertMsgCritical(gradient.getNumberOfColumns() == natoms, err_size);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         auto ia = idselem[i];
 
-        for (int32_t j = 0; j < i; j++)
+        auto coord_i = coords[i].coordinates();
+
+        for (int j = 0; j < i; j++)
         {
             auto ja = idselem[j];
 
-            std::vector<double> ijvec({xcoord[j] - xcoord[i], ycoord[j] - ycoord[i], zcoord[j] - zcoord[i]});
+            auto coord_j = coords[j].coordinates();
+
+            std::vector<double> ijvec({coord_j[0] - coord_i[0], coord_j[1] - coord_i[1], coord_j[2] - coord_i[2]});
 
             double rij2 = std::pow(ijvec[0], 2) + std::pow(ijvec[1], 2) + std::pow(ijvec[2], 2);
 
@@ -811,17 +808,19 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
             double cij = param_a1 * std::sqrt(3.0 * r4r2[ia] * r4r2[ja]) + param_a2;
 
-            for (int32_t k = 0; k < j; k++)
+            for (int k = 0; k < j; k++)
             {
                 auto ka = idselem[k];
 
-                std::vector<double> ikvec({xcoord[k] - xcoord[i], ycoord[k] - ycoord[i], zcoord[k] - zcoord[i]});
+                auto coord_k = coords[k].coordinates();
+
+                std::vector<double> ikvec({coord_k[0] - coord_i[0], coord_k[1] - coord_i[1], coord_k[2] - coord_i[2]});
 
                 double rik2 = std::pow(ikvec[0], 2) + std::pow(ikvec[1], 2) + std::pow(ikvec[2], 2);
 
                 if (rik2 > rthr_mbd) continue;
 
-                std::vector<double> jkvec({xcoord[k] - xcoord[j], ycoord[k] - ycoord[j], zcoord[k] - zcoord[j]});
+                std::vector<double> jkvec({coord_k[0] - coord_j[0], coord_k[1] - coord_j[1], coord_k[2] - coord_j[2]});
 
                 double rjk2 = std::pow(jkvec[0], 2) + std::pow(jkvec[1], 2) + std::pow(jkvec[2], 2);
 
@@ -869,7 +868,7 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
                 val = (-dang * c9 * fdmp + dfdmp / r * c9 * ang) / r;
 
-                for (int32_t d = 0; d < 3; d++)
+                for (int d = 0; d < 3; d++)
                 {
                     gradient.values()[d * natoms + i] -= val * ijvec[d];
 
@@ -888,7 +887,7 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
                 val = (-dang * c9 * fdmp + dfdmp / r * c9 * ang) / r;
 
-                for (int32_t d = 0; d < 3; d++)
+                for (int d = 0; d < 3; d++)
                 {
                     gradient.values()[d * natoms + i] -= val * ikvec[d];
 
@@ -907,7 +906,7 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
                 val = (-dang * c9 * fdmp + dfdmp / r * c9 * ang) / r;
 
-                for (int32_t d = 0; d < 3; d++)
+                for (int d = 0; d < 3; d++)
                 {
                     gradient.values()[d * natoms + j] -= val * jkvec[d];
 
@@ -935,7 +934,7 @@ CDispersionModel::_compThreeBodyContribution(const CMolecule&    molecule,
 
     auto prod_cn = denblas::multAB(dcovcndr, dc6dcn);
 
-    for (int32_t dj = 0; dj < 3 * natoms; dj++)
+    for (int dj = 0; dj < 3 * natoms; dj++)
     {
         gradient.values()[dj] -= prod_cn.values()[dj];
     }
@@ -948,11 +947,11 @@ CDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
 {
     _initialize(molecule);
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
     CDenseMatrix dqdr(3 * natoms, natoms);
 
-    auto chg = parchg::getPartialCharges(molecule, molecule.getCharge(), dqdr);
+    auto chg = parchg::getPartialCharges(molecule, molecule.get_charge(), dqdr);
 
     CDenseMatrix dcovcndr(3 * natoms, natoms);
 

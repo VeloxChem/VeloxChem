@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -25,20 +24,26 @@
 
 from mpi4py import MPI
 from copy import deepcopy
-import time as tm
 import numpy as np
+import time
+import math
 
-from .veloxchemlib import (XCFunctional, MolecularGrid)
-from .veloxchemlib import mpi_master
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver,
+                           NuclearPotentialGeom010Driver, FockGeom1000Driver)
+from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
+from .veloxchemlib import DispersionModel
+from .veloxchemlib import T4CScreener
+from .veloxchemlib import mpi_master, mat_t
+from .veloxchemlib import partition_atoms, make_matrix
+from .veloxchemlib import parse_xc_func
+from .matrices import Matrices
+from .profiler import Profiler
+from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
-from .sanitychecks import dft_sanity_check
-
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import eri_deriv
-from .import_from_pyscf import hcore_deriv
 
 
 class ScfGradientDriver(GradientDriver):
@@ -51,6 +56,7 @@ class ScfGradientDriver(GradientDriver):
     Instance variables
         - flag: The driver flag.
         - delta_h: The displacement for finite difference.
+        - dispersion: The flag for calculating D4 dispersion correction.
     """
 
     def __init__(self, scf_drv):
@@ -63,133 +69,554 @@ class ScfGradientDriver(GradientDriver):
         self.scf_driver = scf_drv
         self.flag = 'SCF Gradient Driver'
 
-    def compute(self, molecule, ao_basis):
+        self.eri_thresh = scf_drv.eri_thresh
+        self._debug = scf_drv._debug
+        self.timing = scf_drv.timing
+
+        self.numerical = False
+        self.delta_h = 0.001
+
+        # D4 dispersion correction
+        self.dispersion = scf_drv.dispersion
+
+    def _print_debug_info(self, label):
         """
-        Computes the analytical or numerical nuclear gradient.
+        Prints debug information.
 
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
+        :param label:
+            The label of debug information.
         """
 
-        dft_sanity_check(self, 'compute')
-
-        if self.rank == mpi_master():
-            self.print_header()
-
-        start_time = tm.time()
-
-        # compute gradient
-        if self.numerical:
-            self.ostream.mute()
-            self.compute_numerical(molecule, ao_basis)
-            self.ostream.unmute()
-        else:
-            self.compute_analytical(molecule, ao_basis)
-
-        # print gradient
-
-        if self.rank == mpi_master():
-            self.print_geometry(molecule)
-            self.print_gradient(molecule)
-
-            valstr = '*** Time spent in gradient calculation: '
-            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
+        if self._debug:
+            profiler = Profiler()
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
+                                    profiler.get_available_memory())
             self.ostream.flush()
 
-    def compute_analytical(self, molecule, ao_basis):
+    def compute(self, molecule, basis, scf_results):
         """
-        Computes the analytical nuclear gradient.
-        So far only for restricted Hartree-Fock with PySCF integral derivatives...
+        Performs calculation of gradient.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
         """
 
-        natm = molecule.number_of_atoms()
-
-        self.gradient = np.zeros((natm, 3))
+        start_time = time.time()
+        self.print_header()
 
         if self.rank == mpi_master():
+            scf_type = scf_results['scf_type']
+        else:
+            scf_type = None
+        scf_type = self.comm.bcast(scf_type, root=mpi_master())
+
+        if scf_type == 'restricted':
+            self.compute_restricted(molecule, basis, scf_results)
+
+        elif scf_type == 'unrestricted':
+            self.compute_unrestricted(molecule, basis, scf_results)
+
+        else:
+            assert_msg_critical(
+                False,
+                'ScfGradientDriver: Not implemented for restricted open-shell')
+
+        # print gradient
+        self.print_geometry(molecule)
+        self.print_gradient(molecule)
+
+        valstr = '*** Time spent in gradient calculation: '
+        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def compute_restricted(self, molecule, basis, scf_results):
+        """
+        Performs calculation of gradient for restricted SCF.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
+        """
+
+        if self.rank == mpi_master():
+            D = scf_results['D_alpha']
             nocc = molecule.number_of_alpha_electrons()
+            ene_occ = scf_results['E_alpha'][:nocc]
+            mo_occ = scf_results['C_alpha'][:, :nocc].copy()
+            W = np.linalg.multi_dot([mo_occ, np.diag(ene_occ), mo_occ.T])
+        else:
+            D = None
+            W = None
 
-            mo = self.scf_driver.scf_tensors['C_alpha']
-            mo_occ = mo[:, :nocc].copy()
+        D = self.comm.bcast(D, root=mpi_master())
+        W = self.comm.bcast(W, root=mpi_master())
 
-            one_pdm_ao = self.scf_driver.scf_tensors['D_alpha']
+        natoms = molecule.number_of_atoms()
 
-            eo_diag = np.diag(self.scf_driver.scf_tensors['E_alpha'][:nocc])
-            epsilon_dm_ao = -np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
+        self.gradient = np.zeros((natoms, 3))
 
-            for i in range(natm):
-                t0 = tm.time()
-                d_ovlp = overlap_deriv(molecule, ao_basis, i)
-                d_hcore = hcore_deriv(molecule, ao_basis, i)
-                d_eri_partial = eri_deriv(molecule, ao_basis, i, full_deriv=False) 
-                t1 = tm.time()
-                self.ostream.print_info("Import of integral derivatives"
-                                    + ' took'
-                                    + ' {:.2f} sec.'.format(t1 - t0))
-                self.ostream.flush()
+        local_atoms = partition_atoms(natoms, self.rank, self.nodes)
 
-                self.gradient[i] = (
-                    2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_hcore) +
-                    2.0 * np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp))
-                t2 = tm.time()
-                self.ostream.print_info("Core Hamiltonian and overlap"
-                                    + ' derivative contribution computed in'
-                                    + ' {:.2f} sec.'.format(t2 - t1))
-                self.ostream.flush()
-                if self._dft:
-                    if self.xcfun.is_hybrid():
-                        frac_K = self.xcfun.get_frac_exact_exchange()
-                    else:
-                        frac_K = 0.0
-                else:
-                    frac_K = 1.0
+        # kinetic energy contribution to gradient
 
-                # place in C-layer, aux Fock build, (derivative on first AO index, m)
-                # (m* n | t p)
-                aux_Fock_deriv_j = np.einsum('xmntp,tp->xmn', d_eri_partial, one_pdm_ao)
-                aux_Fock_deriv_k = np.einsum('xmtnp,tp->xmn', d_eri_partial, one_pdm_ao)
-                aux_Fock_deriv = 2 * aux_Fock_deriv_j - frac_K * aux_Fock_deriv_k
+        kin_grad_drv = KineticEnergyGeom100Driver()
 
-                # The factor 4 comes from the permutations of the AO index where the derivative is taken 
-                self.gradient[i] += 4.0 * np.einsum('xmn,mn->x', aux_Fock_deriv, one_pdm_ao)
+        self._print_debug_info('before kin_grad')
 
-                # TODO: remove old commented out code
-                #self.gradient[i] += 2.0 * np.einsum(
-                #    'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                #self.gradient[i] -= frac_K * np.einsum(
-                #    'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+        for iatom in local_atoms:
+            gmats = kin_grad_drv.compute(molecule, basis, iatom)
 
-                t3 = tm.time()
-                self.ostream.print_info("Two electron integral derivatives"
-                                    + ' contribution computed in'
-                                    + ' {:.2f} sec.'.format(t3 - t2))
-                self.ostream.print_blank()
-                self.ostream.flush()
-        # Add the xc contribution
-        if self._dft:
-            density = self.scf_driver.density
-            xcfun_label = self.scf_driver.xcfun.get_func_label()
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                self.gradient[iatom, i] += 2.0 * np.sum((gmat + gmat.T) * D)
 
-            vxc_contrib = self.grad_vxc_contrib(molecule, ao_basis, density,
-                                                density, xcfun_label)
+            gmats = Matrices()
 
+        self._print_debug_info('after  kin_grad')
+
+        # nuclear potential contribution to gradient
+
+        self._print_debug_info('before npot_grad')
+
+        npot_grad_100_drv = NuclearPotentialGeom100Driver()
+        npot_grad_010_drv = NuclearPotentialGeom010Driver()
+
+        for iatom in local_atoms:
+            gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
+            gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                gmat_010 = gmats_010.matrix_to_numpy(label)
+
+                # TODO: move minus sign into function call (such as in oneints)
+                self.gradient[iatom, i] -= 2.0 * np.sum(
+                    (gmat_100 + gmat_100.T) * D)
+                self.gradient[iatom, i] -= 2.0 * np.sum(gmat_010 * D)
+
+            gmats_100 = Matrices()
+            gmats_010 = Matrices()
+
+        self._print_debug_info('after  npot_grad')
+
+        # orbital contribution to gradient
+
+        self._print_debug_info('before ovl_grad')
+
+        ovl_grad_drv = OverlapGeom100Driver()
+
+        for iatom in local_atoms:
+            gmats = ovl_grad_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                # Note: minus sign for energy weighted density
+                self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
+
+            gmats = Matrices()
+
+        self._print_debug_info('after  ovl_grad')
+
+        # ERI contribution to gradient
+
+        if self.rank == mpi_master():
+            use_dft = 'xcfun' in scf_results
+        else:
+            use_dft = False
+        use_dft = self.comm.bcast(use_dft, root=mpi_master())
+
+        # determine fock_type and exchange_scaling_factor
+        if use_dft:
             if self.rank == mpi_master():
-                self.gradient += vxc_contrib
+                xcfun = scf_results['xcfun']
+            else:
+                xcfun = None
+            xcfun = self.comm.bcast(xcfun, root=mpi_master())
+            xcfun = parse_xc_func(xcfun)
 
-        # Add the nuclear contribution
+            if xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+        else:
+            fock_type = '2jk'
+            exchange_scaling_factor = 1.0
+
+        # TODO: range-separated Fock
+        need_omega = (use_dft and xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
+
+        den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
+        den_mat_for_fock.set_values(D)
+
+        fock_timing = {
+            'Screening': 0.0,
+            'FockGrad': 0.0,
+            'LinAlg': 0.0,
+        }
+
+        self._print_debug_info('before fock_grad')
+
+        fock_grad_drv = FockGeom1000Driver()
+
+        t0 = time.time()
+
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+
+        fock_timing['Screening'] += time.time() - t0
+
+        thresh_int = int(-math.log10(self.eri_thresh))
+
+        for iatom in local_atoms:
+
+            screener_atom = T4CScreener()
+            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+            t0 = time.time()
+
+            gmats = fock_grad_drv.compute(basis, screener_atom, screener,
+                                          den_mat_for_fock, iatom, fock_type,
+                                          exchange_scaling_factor, 0.0,
+                                          thresh_int)
+
+            fock_timing['FockGrad'] += time.time() - t0
+
+            factor = 2.0 if fock_type == 'j' else 1.0
+
+            t0 = time.time()
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                self.gradient[iatom, i] += np.sum(gmat * D) * factor
+
+            gmats = Matrices()
+
+            fock_timing['LinAlg'] += time.time() - t0
+
+        self._print_debug_info('after  fock_grad')
+
+        # XC contribution to gradient
+
+        self._print_debug_info('before xc_grad')
+
+        if use_dft:
+            if self.rank == mpi_master():
+                xcfun_label = scf_results['xcfun']
+                grid_level = scf_results.get('grid_level', None)
+            else:
+                xcfun_label = None
+                grid_level = None
+
+            xcfun_label, grid_level = self.comm.bcast((xcfun_label, grid_level),
+                                                      root=mpi_master())
+
+            grid_level = (get_default_grid_level(xcfun_label)
+                          if grid_level is None else grid_level)
+
+            # TODO: take molecular grid from scf
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(grid_level)
+            mol_grid = grid_drv.generate(molecule)
+
+            grad_drv = XCMolecularGradient()
+            self.gradient += grad_drv.integrate_vxc_gradient(
+                molecule, basis, [D], mol_grid, xcfun_label)
+
+        else:
+            xcfun_label = 'hf'
+
+        self._print_debug_info('after  xc_grad')
+
+        # nuclear contribution to gradient
+        # and D4 dispersion correction if requested
+        # (only added on master rank)
+
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
-    def compute_energy(self, molecule, ao_basis):
+            if self.dispersion:
+                disp = DispersionModel()
+                disp.compute(molecule, xcfun_label)
+                self.gradient += disp.get_gradient().to_numpy()
+
+        # collect gradient
+
+        self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
+
+        if self.timing and self.rank == mpi_master():
+            self.ostream.print_info('Fock timing decomposition')
+            for key, val in fock_timing.items():
+                self.ostream.print_info(f'    {key:<10s}:  {val:.2f} sec')
+            self.ostream.print_blank()
+
+    def compute_unrestricted(self, molecule, basis, scf_results):
+        """
+        Performs calculation of gradient for unrestricted SCF.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
+        """
+
+        if self.rank == mpi_master():
+            Da = scf_results['D_alpha']
+            Db = scf_results['D_beta']
+
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
+
+            ene_occ_a = scf_results['E_alpha'][:nocc_a]
+            ene_occ_b = scf_results['E_beta'][:nocc_b]
+
+            mo_occ_a = scf_results['C_alpha'][:, :nocc_a].copy()
+            mo_occ_b = scf_results['C_beta'][:, :nocc_b].copy()
+
+            Wa = np.linalg.multi_dot([mo_occ_a, np.diag(ene_occ_a), mo_occ_a.T])
+            Wb = np.linalg.multi_dot([mo_occ_b, np.diag(ene_occ_b), mo_occ_b.T])
+        else:
+            Da = None
+            Db = None
+            Wa = None
+            Wb = None
+
+        Da = self.comm.bcast(Da, root=mpi_master())
+        Db = self.comm.bcast(Db, root=mpi_master())
+        Wa = self.comm.bcast(Wa, root=mpi_master())
+        Wb = self.comm.bcast(Wb, root=mpi_master())
+
+        natoms = molecule.number_of_atoms()
+
+        self.gradient = np.zeros((natoms, 3))
+
+        local_atoms = partition_atoms(natoms, self.rank, self.nodes)
+
+        # kinetic energy contribution to gradient
+
+        kin_grad_drv = KineticEnergyGeom100Driver()
+
+        for iatom in local_atoms:
+            gmats = kin_grad_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                self.gradient[iatom, i] += np.sum((gmat + gmat.T) * (Da + Db))
+
+            gmats = Matrices()
+
+        # nuclear potential contribution to gradient
+
+        npot_grad_100_drv = NuclearPotentialGeom100Driver()
+        npot_grad_010_drv = NuclearPotentialGeom010Driver()
+
+        for iatom in local_atoms:
+            gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
+            gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                gmat_010 = gmats_010.matrix_to_numpy(label)
+
+                # TODO: move minus sign into function call (such as in oneints)
+                self.gradient[iatom, i] -= np.sum(
+                    (gmat_100 + gmat_100.T) * (Da + Db))
+                self.gradient[iatom, i] -= np.sum(gmat_010 * (Da + Db))
+
+            gmats_100 = Matrices()
+            gmats_010 = Matrices()
+
+        # orbital contribution to gradient
+
+        ovl_grad_drv = OverlapGeom100Driver()
+
+        for iatom in local_atoms:
+            gmats = ovl_grad_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                # Note: minus sign for energy weighted density
+                self.gradient[iatom, i] -= np.sum((gmat + gmat.T) * (Wa + Wb))
+
+            gmats = Matrices()
+
+        # ERI contribution to gradient
+
+        if self.rank == mpi_master():
+            use_dft = 'xcfun' in scf_results
+        else:
+            use_dft = False
+        use_dft = self.comm.bcast(use_dft, root=mpi_master())
+
+        # determine fock_type and exchange_scaling_factor
+        if use_dft:
+            if self.rank == mpi_master():
+                xcfun = scf_results['xcfun']
+            else:
+                xcfun = None
+            xcfun = self.comm.bcast(xcfun, root=mpi_master())
+            xcfun = parse_xc_func(xcfun)
+
+            if xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+        else:
+            fock_type = '2jk'
+            exchange_scaling_factor = 1.0
+
+        # TODO: range-separated Fock
+        need_omega = (use_dft and xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
+
+        Da_for_fock = make_matrix(basis, mat_t.symmetric)
+        Da_for_fock.set_values(Da)
+
+        Db_for_fock = make_matrix(basis, mat_t.symmetric)
+        Db_for_fock.set_values(Db)
+
+        Dab_for_fock = make_matrix(basis, mat_t.symmetric)
+        Dab_for_fock.set_values(Da + Db)
+
+        fock_grad_drv = FockGeom1000Driver()
+
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+
+        thresh_int = int(-math.log10(self.eri_thresh))
+
+        for iatom in local_atoms:
+
+            screener_atom = T4CScreener()
+            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+            gmats_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
+                                              Dab_for_fock, iatom, 'j', 0.0,
+                                              0.0, thresh_int)
+
+            if fock_type != 'j':
+                gmats_Ka = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                 Da_for_fock, iatom, 'kx',
+                                                 exchange_scaling_factor, 0.0,
+                                                 thresh_int)
+                gmats_Kb = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                 Db_for_fock, iatom, 'kx',
+                                                 exchange_scaling_factor, 0.0,
+                                                 thresh_int)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat_jab = gmats_Jab.matrix_to_numpy(label)
+                self.gradient[iatom, i] += 0.5 * np.sum(gmat_jab * (Da + Db))
+
+                if fock_type != 'j':
+                    gmat_ka = gmats_Ka.matrix_to_numpy(label)
+                    gmat_kb = gmats_Kb.matrix_to_numpy(label)
+                    self.gradient[iatom, i] -= 0.5 * np.sum(gmat_ka * Da)
+                    self.gradient[iatom, i] -= 0.5 * np.sum(gmat_kb * Db)
+
+            gmats_Jab = Matrices()
+
+            if fock_type != 'j':
+                gmats_Ka = Matrices()
+                gmats_Kb = Matrices()
+
+        # TODO: unrestricted DFT gradient
+        # XC contribution to gradient
+
+        if use_dft:
+            if self.rank == mpi_master():
+                xcfun_label = scf_results['xcfun']
+                grid_level = scf_results.get('grid_level', None)
+            else:
+                xcfun_label = None
+                grid_level = None
+
+            xcfun_label, grid_level = self.comm.bcast((xcfun_label, grid_level),
+                                                      root=mpi_master())
+
+            grid_level = (get_default_grid_level(xcfun_label)
+                          if grid_level is None else grid_level)
+
+            # TODO: take molecular grid from scf
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(grid_level)
+            mol_grid = grid_drv.generate(molecule)
+
+            grad_drv = XCMolecularGradient()
+            self.gradient += grad_drv.integrate_vxc_gradient(
+                molecule, basis, [Da, Db], mol_grid, xcfun_label)
+
+        else:
+            xcfun_label = 'hf'
+
+        # nuclear contribution to gradient
+        # and D4 dispersion correction if requested
+        # (only added on master rank)
+
+        if self.rank == mpi_master():
+            self.gradient += self.grad_nuc_contrib(molecule)
+
+            if self.dispersion:
+                disp = DispersionModel()
+                disp.compute(molecule, xcfun_label)
+                self.gradient += disp.get_gradient().to_numpy()
+
+        # collect gradient
+
+        self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
+
+    def compute_numerical_gradient(self, molecule, ao_basis, scf_results):
+        """
+        Performs calculation of gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
+        """
+
+        start_time = time.time()
+        self.print_header()
+
+        self.ostream.mute()
+        # Currently, only numerical gradients activated
+        self.compute_numerical(molecule, ao_basis, scf_results)
+        self.ostream.unmute()
+
+        # print gradient
+        self.print_geometry(molecule)
+        self.print_gradient(molecule)
+
+        valstr = '*** Time spent in gradient calculation: '
+        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def compute_energy(self, molecule, ao_basis, scf_results):
         """
         Computes the energy at current geometry.
 
@@ -197,17 +624,26 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
 
         :return:
             The energy.
         """
 
-        self.ostream.mute()
+        if not self._debug:
+            self.ostream.mute()
+
         self.scf_driver.restart = False
-        self.scf_driver.compute(molecule, ao_basis)
+        new_scf_results = self.scf_driver.compute(molecule, ao_basis)
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
-        self.ostream.unmute()
+
+        if not self._debug:
+            self.ostream.unmute()
+
+        if self.rank == mpi_master():
+            scf_results.update(new_scf_results)
 
         return self.scf_driver.get_scf_energy()
 

@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -204,7 +203,7 @@ class InputParser:
         Gets the input dictonary.
 
         :return:
-            A dictionary containing all information from the input file.
+            A dictionary containing all information form the input file.
         """
 
         return self.input_dict
@@ -366,7 +365,7 @@ def parse_input(obj, keyword_types, input_dictionary):
     """
     Parses input keywords for object.
         - 'str' for string input, such as 'checkpoint_file: mycheckpoint.h5'
-        - 'str_upper' for uppercase string input, such as 'qq_type: QQ_DEN'
+        - 'str_upper' for uppercase string input, such as 'acc_type: DIIS'
         - 'str_lower' for lowercase string input, such as 'coordsys: tric'
         - 'int' for integer input, such as 'max_iter: 300'
         - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
@@ -445,6 +444,8 @@ def print_keywords(input_keywords, ostream):
         ostream.print_header(f'  @{group_print}'.ljust(width))
         ostream.print_header('-' * width)
         for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
             text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
             text += f'  {val[1]}'.ljust(width - 45)
@@ -462,6 +463,8 @@ def print_attributes(input_keywords, ostream):
     ostream.print_header('=' * width)
     for group in input_keywords:
         for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
             text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
             text += f'  {val[1]}'.ljust(width - 45)
@@ -500,20 +503,6 @@ def get_keyword_type(keyword_type):
     }[keyword_type]
 
 
-def get_datetime_string():
-    """
-    Gets datetime string.
-
-    :return:
-        The datetime string (ISO format with ':' replaced by '.').
-    """
-
-    # TODO: deprecate get_datetime_string
-
-    return datetime.now().isoformat(sep='T',
-                                    timespec='seconds').replace(':', '.')
-
-
 def get_random_string_serial():
     """
     Gets a random string.
@@ -523,7 +512,7 @@ def get_random_string_serial():
     """
 
     datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
-    datetime_string = datetime_string.split('T')[0].replace('-', '')
+    datetime_string = datetime_string.replace(':', '.')
 
     random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
 

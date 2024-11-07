@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -28,7 +27,6 @@ import numpy as np
 import math
 
 from .veloxchemlib import Molecule
-from .veloxchemlib import ChemicalElement
 from .veloxchemlib import bohr_in_angstrom
 from .outputstream import OutputStream
 from .inputparser import print_keywords
@@ -282,14 +280,21 @@ def _Molecule_read_molecule_string(mol_str, units='angstrom'):
 
     labels = []
     coords = []
+    basis_set_labels = []
 
     for line in mol_str.strip().splitlines():
         if line:
             content = line.split()
-            labels.append(content[0])
+            labels.append(content[0].upper())
             coords.append([float(x) for x in content[1:4]])
+            if len(content) > 4:
+                basis_set_labels.append(content[4].upper())
+            else:
+                basis_set_labels.append('')
 
-    return Molecule(labels, coords, units)
+    coords = np.array(coords)
+
+    return Molecule(labels, coords, units, basis_set_labels)
 
 
 @staticmethod
@@ -378,8 +383,13 @@ def _Molecule_from_dict(mol_dict):
 
     mol.set_charge(charge)
     mol.set_multiplicity(multiplicity)
-    mol.check_multiplicity()
-    mol.check_proximity(0.1)
+
+    assert_msg_critical(
+        mol.check_multiplicity(),
+        'Molecule: Incompatible multiplicity and number of electrons')
+    assert_msg_critical(
+        mol.check_proximity(0.1),
+        'Molecule: Corrupted geometry with closely located atoms')
 
     return mol
 
@@ -655,17 +665,6 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
         'overlapping atoms')
 
 
-def _Molecule_center_of_mass(self):
-    """
-    Computes center of mass of a molecule in Bohr (for backward compatibility).
-
-    :return:
-        The center of mass in Bohr.
-    """
-
-    return self.center_of_mass_in_bohr()
-
-
 def _Molecule_center_of_mass_in_bohr(self):
     """
     Computes center of mass of a molecule in Bohr.
@@ -674,16 +673,14 @@ def _Molecule_center_of_mass_in_bohr(self):
         The center of mass in Bohr.
     """
 
-    masses = self.masses_to_numpy()
-    x_coords = self.x_to_numpy()
-    y_coords = self.y_to_numpy()
-    z_coords = self.z_to_numpy()
+    masses = np.array(self.get_masses())
+    coords = self.get_coordinates_in_bohr()
 
-    x_center = np.sum(x_coords * masses) / np.sum(masses)
-    y_center = np.sum(y_coords * masses) / np.sum(masses)
-    z_center = np.sum(z_coords * masses) / np.sum(masses)
+    x_center = np.sum(coords[:, 0] * masses) / np.sum(masses)
+    y_center = np.sum(coords[:, 1] * masses) / np.sum(masses)
+    z_center = np.sum(coords[:, 2] * masses) / np.sum(masses)
 
-    return x_center, y_center, z_center
+    return np.array([x_center, y_center, z_center])
 
 
 def _Molecule_center_of_mass_in_angstrom(self):
@@ -695,6 +692,29 @@ def _Molecule_center_of_mass_in_angstrom(self):
     """
 
     return self.center_of_mass_in_bohr() * bohr_in_angstrom()
+
+
+def _Molecule_get_string(self):
+    """
+    Returns string representation of molecule.
+
+    :return:
+        A string with representation of molecule.
+    """
+
+    labels = self.get_labels()
+    coords_in_angstrom = self.get_coordinates_in_angstrom()
+
+    mol_str = 'Molecular Geometry (Angstroms)\n'
+    mol_str += '================================\n\n'
+    mol_str += '  Atom         Coordinate X'
+    mol_str += '          Coordinate Y          Coordinate Z  \n\n'
+    for label, coords in zip(labels, coords_in_angstrom):
+        mol_str += f'  {label:<4s}{coords[0]:>22.12f}'
+        mol_str += f'{coords[1]:>22.12f}{coords[2]:>22.12f}\n'
+    mol_str += '\n'
+
+    return mol_str
 
 
 def _Molecule_more_info(self):
@@ -726,35 +746,6 @@ def _Molecule_more_info(self):
     return '\n'.join(mol_info)
 
 
-def _Molecule_get_labels(self):
-    """
-    Returns atom labels.
-
-    :return:
-        A list of atom labels.
-    """
-
-    labels = []
-
-    for elem_id in self.elem_ids_to_numpy():
-        elem = ChemicalElement()
-        elem.set_atom_type(elem_id)
-        labels.append(elem.get_name())
-
-    return labels
-
-
-def _Molecule_get_coordinates(self):
-    """
-    Returns atom coordinates in Bohr (for backward compatibility).
-
-    :return:
-        A numpy array of atom coordinates (nx3) in Bohr.
-    """
-
-    return self.get_coordinates_in_bohr()
-
-
 def _Molecule_get_coordinates_in_bohr(self):
     """
     Returns atom coordinates in Bohr.
@@ -763,11 +754,11 @@ def _Molecule_get_coordinates_in_bohr(self):
         A numpy array of atom coordinates (nx3) in Bohr.
     """
 
-    return np.array([
-        self.x_to_numpy(),
-        self.y_to_numpy(),
-        self.z_to_numpy(),
-    ]).T.copy()
+    coords = []
+    for r in self.get_coordinates():
+        coords.append(r.coordinates())
+
+    return np.array(coords)
 
 
 def _Molecule_get_coordinates_in_angstrom(self):
@@ -778,7 +769,11 @@ def _Molecule_get_coordinates_in_angstrom(self):
         A numpy array of atom coordinates (nx3) in Angstrom.
     """
 
-    return self.get_coordinates_in_bohr() * bohr_in_angstrom()
+    coords = []
+    for r in self.get_coordinates('angstrom'):
+        coords.append(r.coordinates())
+
+    return np.array(coords)
 
 
 def _Molecule_get_distance_matrix_in_angstrom(self):
@@ -837,59 +832,6 @@ def _Molecule_write_xyz_file(self, xyz_filename):
 
     with open(str(xyz_filename), 'w') as fh:
         fh.write(self.get_xyz_string())
-
-def _Molecule_moments_of_inertia(self):
-    """
-    Calculates the moment of inertia tensor and principle axes
-
-    :return:
-        The principle moments of inertia.
-    """
-
-    masses = self.masses_to_numpy()
-    coordinates = self.get_coordinates()
-    center_of_mass = np.array(self.center_of_mass())
-    natm = self.number_of_atoms()
-
-    # Coordinates in the center-of-mass frame
-    coords_com = coordinates - center_of_mass[np.newaxis, :]
-
-    # Moment of inertia tensor
-    I = np.sum([masses[i] * (np.eye(3)*(np.dot(coords_com[i], coords_com[i]))
-                - np.outer(coords_com[i], coords_com[i])) for i in range(natm)], axis=0)
-
-    # Principal moments
-    Ivals, Ivecs = np.linalg.eigh(I)
-    # Eigenvectors are in the rows after transpose
-    #Ivecs = Ivecs.T
-
-    return Ivals
-
-def _Molecule_is_linear(self):
-    """
-    Checks if a molecule is linear or not.
-
-    :return:
-        True if linear, False otherwise.
-    """
-
-    # Get principle moments of inertia
-    Ivals = self.moments_of_inertia()
-
-    # Obtain the number of rotational degrees of freedom (DoF)
-    Rotational_DoF = 0
-    for i in range(3):
-        if abs(Ivals[i]) > 1.0e-10:
-            Rotational_DoF += 1
-
-    if Rotational_DoF == 2:
-        return True
-    elif Rotational_DoF == 3:
-        return False
-    # TODO: Raise an error if rotational DoFs are not 2 or 3
-    else:
-        pass
-
 
 
 def _Molecule_show(self,
@@ -983,7 +925,7 @@ def _Molecule_moments_of_inertia(self, principal_axes=False):
         The principal moments of inertia and principal axes.
     """
 
-    masses = self.masses_to_numpy()
+    masses = np.array(self.get_masses())
     coordinates = self.get_coordinates_in_bohr()
     center_of_mass = np.array(self.center_of_mass_in_bohr())
     natm = self.number_of_atoms()
@@ -1125,18 +1067,35 @@ def _Molecule_print_keywords():
     print_keywords(input_keywords, ostream)
 
 
-def _Molecule_deepcopy(self, memo):
+def _Molecule_check_multiplicity(self):
     """
-    Implements deepcopy.
-
-    :param memo:
-        The memo dictionary for deepcopy.
-
-    :return:
-        A deepcopy of self.
+    Returns True if multiplicity and charge of molecule consistent, False otherwise.
     """
 
-    return Molecule(self)
+    multip = self.get_multiplicity() % 2
+    nelec = self.number_of_electrons() % 2
+
+    if (multip == 0) and (nelec != 1):
+        return False
+    if (multip == 1) and (nelec != 0):
+        return False
+    return True
+
+
+def _Molecule_number_of_alpha_electrons(self):
+    """
+    Returns number of alpha electrons in molecule.
+    """
+
+    return (self.number_of_electrons() + self.get_multiplicity() - 1) // 2
+
+
+def _Molecule_number_of_beta_electrons(self):
+    """
+    Returns number of beta electrons in molecule.
+    """
+
+    return (self.number_of_electrons() - self.get_multiplicity() + 1) // 2
 
 
 Molecule._get_input_keywords = _Molecule_get_input_keywords
@@ -1158,12 +1117,9 @@ Molecule.get_dihedral = _Molecule_get_dihedral
 Molecule.set_dihedral = _Molecule_set_dihedral
 Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
 Molecule.set_dihedral_in_degrees = _Molecule_set_dihedral_in_degrees
-Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
 Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
 Molecule.more_info = _Molecule_more_info
-Molecule.get_labels = _Molecule_get_labels
-Molecule.get_coordinates = _Molecule_get_coordinates
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
 Molecule.get_distance_matrix_in_angstrom = _Molecule_get_distance_matrix_in_angstrom
@@ -1175,7 +1131,10 @@ Molecule.get_aufbau_alpha_occupation = _Molecule_get_aufbau_alpha_occupation
 Molecule.get_aufbau_beta_occupation = _Molecule_get_aufbau_beta_occupation
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
 Molecule.print_keywords = _Molecule_print_keywords
-Molecule.__deepcopy__ = _Molecule_deepcopy
+Molecule.check_multiplicity = _Molecule_check_multiplicity
+Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
+Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
+Molecule.get_string = _Molecule_get_string
 
 # aliases for backward compatibility
 Molecule.read_xyz = _Molecule_read_xyz_file

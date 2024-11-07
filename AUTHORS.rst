@@ -38,4 +38,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2024-09-09 by ``git shortlog -sn``
+The list of contributors was obtained 2024-10-11 by ``git shortlog -sn``

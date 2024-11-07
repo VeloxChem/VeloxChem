@@ -1,577 +1,542 @@
-//
-//                           VELOXCHEM 1.0-RC2
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
-//
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
-//
-//  SPDX-License-Identifier: LGPL-3.0-or-later
-//
-//  This file is part of VeloxChem.
-//
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
-//
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-
 #include "GtoBlock.hpp"
 
-#include <cmath>
-#include <utility>
+#include <algorithm>
+#include <ranges>
 
-#include "AngularMomentum.hpp"
-#include "MatOrder.hpp"
+#include "ErrorHandler.hpp"
+#include "MathFunc.hpp"
 
 CGtoBlock::CGtoBlock()
 
-    : _angularMomentum(-1)
+    : _coordinates{}
+
+    , _exponents{}
+
+    , _norms{}
+
+    , _orb_indices{}
+
+    , _atm_indices{}
+
+    , _angular_momentum{-1}
+
+    , _npgtos{0}
 {
 }
 
-CGtoBlock::CGtoBlock(const CMemBlock2D<double>& gtoPrimitives, const CMemBlock2D<int32_t>& contrPattern, const int32_t angularMomentum)
+CGtoBlock::CGtoBlock(const std::vector<TPoint<double>> &coordinates,
+                     const std::vector<double>         &exponents,
+                     const std::vector<double>         &norms,
+                     const std::vector<size_t>         &orb_indices,
+                     const std::vector<int>            &atm_indices,
+                     const int                          angular_momentum,
+                     const int                          npgtos)
 
-    : _angularMomentum(angularMomentum)
+    : _coordinates(coordinates)
 
-    , _contrPattern(contrPattern)
+    , _exponents(exponents)
 
-    , _gtoPrimitives(gtoPrimitives)
+    , _norms(norms)
+
+    , _orb_indices(orb_indices)
+
+    , _atm_indices(atm_indices)
+
+    , _angular_momentum(angular_momentum)
+
+    , _npgtos(npgtos)
 {
 }
 
-CGtoBlock::CGtoBlock(const CMolecule& molecule, const CMolecularBasis& basis, const int32_t angularMomentum)
+CGtoBlock::CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, const int angular_momentum, const int npgtos)
 
-    : CGtoBlock(molecule, basis, 0, molecule.getNumberOfAtoms(), angularMomentum)
+    : _coordinates{}
+
+    , _exponents{}
+
+    , _norms{}
+
+    , _orb_indices{}
+
+    , _atm_indices{}
+
+    , _angular_momentum{-1}
+
+    , _npgtos{0}
 {
-}
-
-CGtoBlock::CGtoBlock(const CMolecule&       molecule,
-                     const CMolecularBasis& basis,
-                     const int32_t          iAtom,
-                     const int32_t          nAtoms,
-                     const int32_t          angularMomentum)
-
-    : _angularMomentum(angularMomentum)
-{
-    // allocate primitives data
-
-    auto npfuncs = basis.getNumberOfPrimitiveBasisFunctions(molecule, iAtom, nAtoms, _angularMomentum);
-
-    if (npfuncs > 0)
+    if (const auto gtos = basis.basis_functions(angular_momentum, npgtos); !gtos.empty())
     {
-        _gtoPrimitives = CMemBlock2D<double>(npfuncs, 5);
+        _angular_momentum = angular_momentum;
 
-        // allocate contraction data
+        _npgtos = npgtos;
 
-        auto ncfuncs = basis.getNumberOfBasisFunctions(molecule, _angularMomentum);
+        _orb_indices = basis.index_map(angular_momentum, npgtos);
 
-        auto angcomp = angmom::to_SphericalComponents(_angularMomentum);
+        _atm_indices = basis.atomic_indices(angular_momentum, npgtos);
 
-        auto ncdim = basis.getNumberOfBasisFunctions(molecule, iAtom, nAtoms, _angularMomentum);
+        _coordinates.reserve(_atm_indices.size());
 
-        _contrPattern = CMemBlock2D<int32_t>(ncdim, 3 + angcomp);
+        std::ranges::for_each(_atm_indices, [&](const int i) { _coordinates.push_back(molecule.atom_coordinates(i)); });
 
-        // determine partial dimensions of AO basis
+        const auto ncgtos = static_cast<int>(gtos.size());
 
-        auto npartdim = basis.getPartialDimensionsOfBasis(molecule, _angularMomentum);
+        _exponents = std::vector<double>(ncgtos * npgtos, 0.0);
 
-        // determine offset in contracted GTOs block
+        _norms = std::vector<double>(ncgtos * npgtos, 0.0);
 
-        auto ncoff = basis.getNumberOfBasisFunctions(molecule, 0, iAtom, _angularMomentum);
-
-        // set up pointers to molecular data
-
-        auto molrx = molecule.getCoordinatesX();
-
-        auto molry = molecule.getCoordinatesY();
-
-        auto molrz = molecule.getCoordinatesZ();
-
-        auto idselem = molecule.getIdsElemental();
-
-        // contraction pattern data
-
-        auto spos = _contrPattern.data(0);
-
-        auto epos = _contrPattern.data(1);
-
-        auto idxatm = _contrPattern.data(2);
-
-        // primitives data
-
-        auto gtoexps = _gtoPrimitives.data(0);
-
-        auto gtonorms = _gtoPrimitives.data(1);
-
-        auto coordsx = _gtoPrimitives.data(2);
-
-        auto coordsy = _gtoPrimitives.data(3);
-
-        auto coordsz = _gtoPrimitives.data(4);
-
-        // loop over atoms in molecule
-
-        int32_t icgto = 0;
-
-        int32_t iprim = 0;
-
-        for (int32_t i = iAtom; i < (iAtom + nAtoms); i++)
-        {
-            // get atom coordinates
-
-            auto rx = molrx[i];
-
-            auto ry = molry[i];
-
-            auto rz = molrz[i];
-
-            // loop over basis functions of i-th atom
-
-            auto gtos = basis.getBasisFunctions(idselem[i], _angularMomentum);
-
-            for (size_t j = 0; j < gtos.size(); j++)
-            {
-                auto nprim = gtos[j].getNumberOfPrimitiveFunctions();
-
-                // set contraction pattern
-
-                spos[icgto] = iprim;
-
-                epos[icgto] = iprim + nprim;
-
-                idxatm[icgto] = i;
-
-                for (int32_t k = 0; k < angcomp; k++)
-                {
-                    auto pgtoidx = _contrPattern.data(3 + k);
-
-                    pgtoidx[icgto] = npartdim + k * ncfuncs + ncoff + icgto;
-                }
-
-                // retrieve primitve exponents, norm. factors
-
-                auto pexp = gtos[j].getExponents();
-
-                auto pnorm = gtos[j].getNormalizationFactors();
-
-                // set up primitives data
-
-                for (int32_t k = 0; k < nprim; k++)
-                {
-                    // assign exponent, norm. factor
-
-                    gtoexps[iprim + k] = pexp[k];
-
-                    gtonorms[iprim + k] = pnorm[k];
-
-                    // assign atom coordinates
-
-                    coordsx[iprim + k] = rx;
-
-                    coordsy[iprim + k] = ry;
-
-                    coordsz[iprim + k] = rz;
-                }
-
-                // update indexes
-
-                iprim += nprim;
-
-                icgto++;
-            }
-        }
+        std::ranges::for_each(std::views::iota(0, ncgtos), [&](const int i) {
+            const auto fexps  = gtos[i].get_exponents();
+            const auto fnorms = gtos[i].get_normalization_factors();
+            std::ranges::for_each(std::views::iota(0, npgtos), [&](const int j) {
+                _exponents[j * ncgtos + i] = fexps[j];
+                _norms[j * ncgtos + i]     = fnorms[j];
+            });
+        });
     }
 }
 
-CGtoBlock::CGtoBlock(const CGtoBlock& source)
+CGtoBlock::CGtoBlock(const CMolecularBasis  &basis,
+                     const CMolecule        &molecule,
+                     const std::vector<int> &atoms,
+                     const int               angular_momentum,
+                     const int               npgtos)
+    : _coordinates{}
 
-    : _angularMomentum(source._angularMomentum)
+    , _exponents{}
 
-    , _contrPattern(source._contrPattern)
+    , _norms{}
 
-    , _gtoPrimitives(source._gtoPrimitives)
+    , _orb_indices{}
+
+    , _atm_indices{}
+
+    , _angular_momentum{-1}
+
+    , _npgtos{0}
+{
+    if (const auto gtos = basis.basis_functions(atoms, angular_momentum, npgtos); !gtos.empty())
+    {
+        _angular_momentum = angular_momentum;
+
+        _npgtos = npgtos;
+
+        _orb_indices = basis.index_map(atoms, angular_momentum, npgtos);
+
+        _atm_indices = basis.atomic_indices(atoms, angular_momentum, npgtos);
+
+        _coordinates.reserve(_atm_indices.size());
+
+        std::ranges::for_each(_atm_indices, [&](const int i) { _coordinates.push_back(molecule.atom_coordinates(i)); });
+
+        const auto ncgtos = static_cast<int>(gtos.size());
+
+        _exponents = std::vector<double>(ncgtos * npgtos, 0.0);
+
+        _norms = std::vector<double>(ncgtos * npgtos, 0.0);
+
+        std::ranges::for_each(std::views::iota(0, ncgtos), [&](const int i) {
+            const auto fexps  = gtos[i].get_exponents();
+            const auto fnorms = gtos[i].get_normalization_factors();
+            std::ranges::for_each(std::views::iota(0, npgtos), [&](const int j) {
+                _exponents[j * ncgtos + i] = fexps[j];
+                _norms[j * ncgtos + i]     = fnorms[j];
+            });
+        });
+    }
+}
+
+CGtoBlock::CGtoBlock(const CGtoBlock &other)
+
+    : _coordinates(other._coordinates)
+
+    , _exponents(other._exponents)
+
+    , _norms(other._norms)
+
+    , _orb_indices(other._orb_indices)
+
+    , _atm_indices(other._atm_indices)
+
+    , _angular_momentum(other._angular_momentum)
+
+    , _npgtos(other._npgtos)
 {
 }
 
-CGtoBlock::CGtoBlock(CGtoBlock&& source) noexcept
+CGtoBlock::CGtoBlock(CGtoBlock &&other) noexcept
 
-    : _angularMomentum(std::move(source._angularMomentum))
+    : _coordinates(std::move(other._coordinates))
 
-    , _contrPattern(std::move(source._contrPattern))
+    , _exponents(std::move(other._exponents))
 
-    , _gtoPrimitives(std::move(source._gtoPrimitives))
+    , _norms(std::move(other._norms))
+
+    , _orb_indices(std::move(other._orb_indices))
+
+    , _atm_indices(std::move(other._atm_indices))
+
+    , _angular_momentum(std::move(other._angular_momentum))
+
+    , _npgtos(std::move(other._npgtos))
 {
 }
 
-CGtoBlock::~CGtoBlock()
+auto
+CGtoBlock::operator=(const CGtoBlock &other) -> CGtoBlock &
 {
-}
+    _coordinates = other._coordinates;
 
-CGtoBlock&
-CGtoBlock::operator=(const CGtoBlock& source)
-{
-    if (this == &source) return *this;
+    _exponents = other._exponents;
 
-    _angularMomentum = source._angularMomentum;
+    _norms = other._norms;
 
-    _contrPattern = source._contrPattern;
+    _orb_indices = other._orb_indices;
 
-    _gtoPrimitives = source._gtoPrimitives;
+    _atm_indices = other._atm_indices;
+
+    _angular_momentum = other._angular_momentum;
+
+    _npgtos = other._npgtos;
 
     return *this;
 }
 
-CGtoBlock&
-CGtoBlock::operator=(CGtoBlock&& source) noexcept
+auto
+CGtoBlock::operator=(CGtoBlock &&other) noexcept -> CGtoBlock &
 {
-    if (this == &source) return *this;
+    if (this != &other)
+    {
+        _coordinates = std::move(other._coordinates);
 
-    _angularMomentum = std::move(source._angularMomentum);
+        _exponents = std::move(other._exponents);
 
-    _contrPattern = std::move(source._contrPattern);
+        _norms = std::move(other._norms);
 
-    _gtoPrimitives = std::move(source._gtoPrimitives);
+        _orb_indices = std::move(other._orb_indices);
+
+        _atm_indices = std::move(other._atm_indices);
+
+        _angular_momentum = std::move(other._angular_momentum);
+
+        _npgtos = std::move(other._npgtos);
+    }
 
     return *this;
 }
 
-bool
-CGtoBlock::operator==(const CGtoBlock& other) const
+auto
+CGtoBlock::operator==(const CGtoBlock &other) const -> bool
 {
-    if (_angularMomentum != other._angularMomentum) return false;
-
-    if (_contrPattern != other._contrPattern) return false;
-
-    if (_gtoPrimitives != other._gtoPrimitives) return false;
-
-    return true;
+    if (_angular_momentum != other._angular_momentum)
+    {
+        return false;
+    }
+    else if (_npgtos != other._npgtos)
+    {
+        return false;
+    }
+    else if (_atm_indices != other._atm_indices)
+    {
+        return false;
+    }
+    else if (_orb_indices != other._orb_indices)
+    {
+        return false;
+    }
+    else if (!std::ranges::equal(_norms, other._norms, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); }))
+    {
+        return false;
+    }
+    else if (!std::ranges::equal(
+                 _exponents, other._exponents, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); }))
+    {
+        return false;
+    }
+    else
+    {
+        return _coordinates == other._coordinates;
+    }
 }
 
-bool
-CGtoBlock::operator!=(const CGtoBlock& other) const
+auto
+CGtoBlock::operator!=(const CGtoBlock &other) const -> bool
 {
     return !(*this == other);
 }
 
-void
-CGtoBlock::setAngularMomentum(const int32_t angularMomentum)
+auto
+CGtoBlock::coordinates() const -> std::vector<TPoint<double>>
 {
-    _angularMomentum = angularMomentum;
+    return _coordinates;
 }
 
-std::tuple<int32_t, int32_t>
-CGtoBlock::compress(const CGtoBlock& source, const CMemBlock<double>& screeningFactors, const double screeningThreshold)
+auto
+CGtoBlock::exponents() const -> std::vector<double>
 {
-    if (_angularMomentum != source._angularMomentum)
+    return _exponents;
+}
+
+auto
+CGtoBlock::normalization_factors() const -> std::vector<double>
+{
+    return _norms;
+}
+
+auto
+CGtoBlock::orbital_indices() const -> std::vector<size_t>
+{
+    return _orb_indices;
+}
+
+auto
+CGtoBlock::atomic_indices() const -> std::vector<int>
+{
+    return _atm_indices;
+}
+
+auto
+CGtoBlock::getAtomicOrbitalsIndexes() const -> std::vector<int>
+{
+    std::vector<int> ao_inds;
+
+    // go through spherical harmonics components
+
+    for (int comp = 0; comp < _angular_momentum * 2 + 1; comp++)
     {
-        return std::make_tuple(0, 0);
-    }
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
 
-    // zero current data
-
-    _gtoPrimitives.zero();
-
-    _contrPattern.zero();
-
-    // set up pointers to primitives data source
-
-    auto srcexps = source.getExponents();
-
-    auto srcfacts = source.getNormFactors();
-
-    // set up primitive GTOs coordinates data source
-
-    auto srcrx = source.getCoordinatesX();
-
-    auto srcry = source.getCoordinatesY();
-
-    auto srcrz = source.getCoordinatesZ();
-
-    // set up pointers to contraction pattern data source
-
-    auto srcspos = source.getStartPositions();
-
-    auto srcepos = source.getEndPositions();
-
-    auto sridxatm = source.getAtomicIdentifiers();
-
-    // set up pointer to screening factors
-
-    auto sfacts = screeningFactors.data();
-
-    // determine number of angular components
-
-    auto angcomp = angmom::to_SphericalComponents(_angularMomentum);
-
-    // set up pointers to primitives
-
-    auto pexps = getExponents();
-
-    auto pfacts = getNormFactors();
-
-    // set up primitive GTOs coordinates
-
-    auto prx = getCoordinatesX();
-
-    auto pry = getCoordinatesY();
-
-    auto prz = getCoordinatesZ();
-
-    // set up contraction pattern data
-
-    auto cspos = getStartPositions();
-
-    auto cepos = getEndPositions();
-
-    auto cidxatm = getAtomicIdentifiers();
-
-    // primitive and contracted GTOs counters
-
-    int32_t npgto = 0;
-
-    int32_t ncgto = 0;
-
-    // loop over contracted contraction pattern
-
-    for (int32_t i = 0; i < _contrPattern.size(0); i++)
-    {
-        int32_t cprim = 0;
-
-        // add primite GTOs data
-
-        for (int32_t j = srcspos[i]; j < srcepos[i]; j++)
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
         {
-            if (sfacts[j] > screeningThreshold)
-            {
-                auto poff = npgto + cprim;
-
-                pexps[poff] = srcexps[j];
-
-                pfacts[poff] = srcfacts[j];
-
-                prx[poff] = srcrx[j];
-
-                pry[poff] = srcry[j];
-
-                prz[poff] = srcrz[j];
-
-                cprim++;
-            }
-        }
-
-        // add GTOs contraction data
-
-        if (cprim > 0)
-        {
-            cspos[ncgto] = npgto;
-
-            cepos[ncgto] = npgto + cprim;
-
-            cidxatm[ncgto] = sridxatm[i];
-
-            // store GTOs indexes
-
-            for (int32_t j = 0; j < angcomp; j++)
-            {
-                auto srcidx = source.getIdentifiers(j);
-
-                auto curidx = getIdentifiers(j);
-
-                curidx[ncgto] = srcidx[i];
-            }
-
-            // update counters
-
-            npgto += cprim;
-
-            ncgto++;
+            ao_inds.push_back(comp * _orb_indices[0] + _orb_indices[ind]);
         }
     }
 
-    return std::make_tuple(npgto, ncgto);
+    return ao_inds;
 }
 
-int32_t
-CGtoBlock::getAngularMomentum() const
+auto
+CGtoBlock::getAtomicOrbitalsIndexesForCartesian(const int ncgtos_d) const -> std::vector<int>
 {
-    return _angularMomentum;
-}
+    errors::assertMsgCritical(_angular_momentum <= 3, std::string("GtoBlock: getAtomicOrbitalsIndexesForCartesian only supports up to f-orbitals"));
 
-bool
-CGtoBlock::empty() const
-{
-    return (_contrPattern.size(0) == 0);
-}
-
-int32_t
-CGtoBlock::getNumberOfPrimGtos() const
-{
-    return _gtoPrimitives.size(0);
-}
-
-int32_t
-CGtoBlock::getNumberOfContrGtos() const
-{
-    return _contrPattern.size(0);
-}
-
-const int32_t*
-CGtoBlock::getStartPositions() const
-{
-    return _contrPattern.data(0);
-}
-
-int32_t*
-CGtoBlock::getStartPositions()
-{
-    return _contrPattern.data(0);
-}
-
-const int32_t*
-CGtoBlock::getEndPositions() const
-{
-    return _contrPattern.data(1);
-}
-
-int32_t*
-CGtoBlock::getEndPositions()
-{
-    return _contrPattern.data(1);
-}
-
-const int32_t*
-CGtoBlock::getAtomicIdentifiers() const
-{
-    return _contrPattern.data(2);
-}
-
-int32_t*
-CGtoBlock::getAtomicIdentifiers()
-{
-    return _contrPattern.data(2);
-}
-
-const int32_t*
-CGtoBlock::getIdentifiers(const int32_t iComponent) const
-{
-    if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
+    if (_angular_momentum == 3)
     {
-        return _contrPattern.data(3 + iComponent);
+        errors::assertMsgCritical(ncgtos_d > 0, std::string("GtoBlock: getAtomicOrbitalsIndexesForCartesian needs to know ncgtos of d-orbitals"));
     }
 
-    return nullptr;
-}
+    std::vector<int> ao_inds;
 
-int32_t*
-CGtoBlock::getIdentifiers(const int32_t iComponent)
-{
-    if (iComponent < angmom::to_SphericalComponents(_angularMomentum))
+    int orb_ind_shift = 0;
+
+    // take into account the shifting of cart_ind due to 6 d Cartesian components
+    if (_angular_momentum == 3) orb_ind_shift = ncgtos_d;
+
+    // go through Cartesian components
+
+    for (int comp = 0; comp < (_angular_momentum + 1) * (_angular_momentum + 2) / 2; comp++)
     {
-        return _contrPattern.data(3 + iComponent);
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            ao_inds.push_back(comp * _orb_indices[0] + _orb_indices[ind] + orb_ind_shift);
+        }
     }
 
-    return nullptr;
+    return ao_inds;
 }
 
-const double*
-CGtoBlock::getExponents() const
+auto
+CGtoBlock::getCartesianToSphericalMappingForP() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>
 {
-    return _gtoPrimitives.data(0);
-}
+    errors::assertMsgCritical(_angular_momentum == 1, std::string("GtoBlock: getCartesianToSphericalMappingForP only works for p-orbitals"));
 
-double*
-CGtoBlock::getExponents()
-{
-    return _gtoPrimitives.data(0);
-}
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_p;
 
-const double*
-CGtoBlock::getNormFactors() const
-{
-    return _gtoPrimitives.data(1);
-}
+    // p-1 (0) <- py (1)
+    // p_0 (1) <- pz (2)
+    // p+1 (2) <- px (0)
 
-double*
-CGtoBlock::getNormFactors()
-{
-    return _gtoPrimitives.data(1);
-}
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
 
-const double*
-CGtoBlock::getCoordinatesX() const
-{
-    return _gtoPrimitives.data(2);
-}
+    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{2, 1.0}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, 1.0}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{1, 1.0}});
 
-double*
-CGtoBlock::getCoordinatesX()
-{
-    return _gtoPrimitives.data(2);
-}
-
-const double*
-CGtoBlock::getCoordinatesY() const
-{
-    return _gtoPrimitives.data(3);
-}
-
-double*
-CGtoBlock::getCoordinatesY()
-{
-    return _gtoPrimitives.data(3);
-}
-
-const double*
-CGtoBlock::getCoordinatesZ() const
-{
-    return _gtoPrimitives.data(4);
-}
-
-double*
-CGtoBlock::getCoordinatesZ()
-{
-    return _gtoPrimitives.data(4);
-}
-
-int32_t
-CGtoBlock::getMaxContractionDepth() const
-{
-    int32_t ndim = 0;
-
-    auto spos = getStartPositions();
-
-    auto epos = getEndPositions();
-
-    for (int32_t i = 0; i < getNumberOfContrGtos(); i++)
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
     {
-        auto cdim = epos[i] - spos[i];
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
 
-        if (cdim > ndim) ndim = cdim;
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+
+            cart_sph_p[cart_ind] = std::vector<std::pair<int, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
+            {
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
+
+                auto sph_ind = sph_comp * _orb_indices[0] + _orb_indices[ind];
+
+                cart_sph_p[cart_ind].push_back(std::pair<int, double>({sph_ind, sph_coef}));
+            }
+        }
     }
 
-    return ndim;
+    return cart_sph_p;
 }
 
-std::ostream&
-operator<<(std::ostream& output, const CGtoBlock& source)
+auto
+CGtoBlock::getCartesianToSphericalMappingForD() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>
 {
-    output << std::endl;
+    errors::assertMsgCritical(_angular_momentum == 2, std::string("GtoBlock: getCartesianToSphericalMappingForD only works for d-orbitals"));
 
-    output << "[CCGtoBlock (Object):" << &source << "]" << std::endl;
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_d;
 
-    output << "_angularMomentum: " << source._angularMomentum << std::endl;
+    const double f2_3 = 2.0 * std::sqrt(3.0);
 
-    output << "_contrPattern: " << source._contrPattern << std::endl;
+    // d-2 (0) <- dxy(1) * f2_3
+    // d-1 (1) <- dyz(4) * f2_3
+    // d_0 (2) <- dzz(5) * 2.0 - dxx(0) - dyy(3)
+    // d+1 (3) <- dxz(2) * f2_3
+    // d+2 (4) <- (dxx(0) - dyy(3)) * 0.5 * f2_3
 
-    output << "_gtoPrimitives: " << source._gtoPrimitives << std::endl;
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
 
-    return output;
+    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{2, -1.0}, {4, 0.5 * f2_3}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, f2_3}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{3, f2_3}});
+    cart_sph_comp_map[3] = std::vector<std::pair<int, double>>({{2, -1.0}, {4, -0.5 * f2_3}});
+    cart_sph_comp_map[4] = std::vector<std::pair<int, double>>({{1, f2_3}});
+    cart_sph_comp_map[5] = std::vector<std::pair<int, double>>({{2, 2.0}});
+
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+
+            cart_sph_d[cart_ind] = std::vector<std::pair<int, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
+            {
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
+
+                auto sph_ind = sph_comp * _orb_indices[0] + _orb_indices[ind];
+
+                cart_sph_d[cart_ind].push_back(std::pair<int, double>({sph_ind, sph_coef}));
+            }
+        }
+    }
+
+    return cart_sph_d;
+}
+
+auto
+CGtoBlock::getCartesianToSphericalMappingForF(const int ncgtos_d) const -> std::unordered_map<int, std::vector<std::pair<int, double>>>
+{
+    errors::assertMsgCritical(_angular_momentum == 3, std::string("GtoBlock: getCartesianToSphericalMappingForF only works for f-orbitals"));
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_f;
+
+    const double f3_5 = std::sqrt(2.5);
+    const double f3_15 = 2.0 * std::sqrt(15.0);
+    const double f3_3 = std::sqrt(1.5);
+
+    // xxx : 0
+    // xxy : 1
+    // xxz : 2
+    // xyy : 3
+    // xyz : 4
+    // xzz : 5
+    // yyy : 6
+    // yyz : 7
+    // yzz : 8
+    // zzz : 9
+
+    // f-3 (0) <- fxxy(1) * 3.0 * f3_5  + fyyy(6) * (-f3_5)
+    // f-2 (1) <- fxyz(4) * f3_15
+    // f-1 (2) <- fxxy(1) * (-f3_3)     + fyyy(6) * (-f3_3)        + fyzz(8) * 4.0 * f3_3
+    // f_0 (3) <- fxxz(2) * (-3.0)      + fyyz(7) * (-3.0)         + fzzz(9) * 2.0
+    // f+1 (4) <- fxxx(0) * (-f3_3)     + fxyy(3) * (-f3_3)        + fxzz(5) * 4.0 * f3_3
+    // f+2 (5) <- fxxz(2) * 0.5 * f3_15 + fyyz(7) * (-0.5) * f3_15
+    // f+3 (6) <- fxxx(0) * f3_5        + fxyy(3) * (-3.0) * f3_5
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
+
+    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{4, -f3_3}, {6, f3_5}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, 3.0 * f3_5}, {2, -f3_3}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{3, -3.0}, {5, 0.5 * f3_15}});
+    cart_sph_comp_map[3] = std::vector<std::pair<int, double>>({{4, -f3_3}, {6, -3.0 * f3_5}});
+    cart_sph_comp_map[4] = std::vector<std::pair<int, double>>({{1, f3_15}});
+    cart_sph_comp_map[5] = std::vector<std::pair<int, double>>({{4, 4.0 * f3_3}});
+    cart_sph_comp_map[6] = std::vector<std::pair<int, double>>({{0, -f3_5}, {2, -f3_3}});
+    cart_sph_comp_map[7] = std::vector<std::pair<int, double>>({{3, -3.0}, {5, -0.5 * f3_15}});
+    cart_sph_comp_map[8] = std::vector<std::pair<int, double>>({{2, 4.0 * f3_3}});
+    cart_sph_comp_map[9] = std::vector<std::pair<int, double>>({{3, 2.0}});
+
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
+    {
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indices[0] is the total number of CGTOs of _angular_momentum
+        // which could be larger than the number of CGTOs in this block
+
+        for (size_t ind = 1; ind < _orb_indices.size(); ind++)
+        {
+            auto cart_ind = cart_comp * _orb_indices[0] + _orb_indices[ind];
+
+            // take into account the shifting of cart_ind due to 6 d Cartesian components
+            cart_ind += ncgtos_d;
+
+            cart_sph_f[cart_ind] = std::vector<std::pair<int, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
+            {
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
+
+                auto sph_ind = sph_comp * _orb_indices[0] + _orb_indices[ind];
+
+                cart_sph_f[cart_ind].push_back(std::pair<int, double>({sph_ind, sph_coef}));
+            }
+        }
+    }
+
+    return cart_sph_f;
+}
+
+auto
+CGtoBlock::angular_momentum() const -> int
+{
+    return _angular_momentum;
+}
+
+auto
+CGtoBlock::number_of_primitives() const -> int
+{
+    return _npgtos;
+}
+
+auto
+CGtoBlock::number_of_basis_functions() const -> int
+{
+    return static_cast<int>(_coordinates.size());
 }

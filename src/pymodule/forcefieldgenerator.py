@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -46,7 +45,7 @@ from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
-from .xtbhessiandriver import XtbHessianDriver
+#from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
 
 
@@ -520,7 +519,7 @@ class ForceFieldGenerator:
                                                     ostream=None)
                     else:
                         basis = MolecularBasis()
-                    basis.broadcast(self.rank, self.comm)
+                    basis = self.comm.bcast(basis, root=mpi_master())
                     msg = 'Using 6-31G* basis set for RESP charges...'
                     self.ostream.print_info(msg)
                     self.ostream.flush()
@@ -570,9 +569,12 @@ class ForceFieldGenerator:
         self.partial_charges[max_charge_index] -= excess_charge
 
         if abs(excess_charge) > 1.0e-8:
-            msg = 'Sum of partial charges is not a whole number. Compensating '
-            msg += f'by removing {excess_charge:.3e} from the largest charge.'
-            self.ostream.print_warning(msg)
+            msg = 'Sum of partial charges is not a whole number.'
+            self.ostream.print_info(msg)
+            msg = f'Compensating by removing {excess_charge:.3e}'
+            msg += ' from the largest charge.'
+            self.ostream.print_info(msg)
+            self.ostream.print_blank()
             self.ostream.flush()
 
         # preparing atomtypes and atoms
@@ -650,6 +652,9 @@ class ForceFieldGenerator:
 
         atom_type_params = {}
 
+        use_gaff = False
+        use_uff = False
+
         for at in self.unique_atom_types:
             atom_type_found = False
 
@@ -668,6 +673,7 @@ class ForceFieldGenerator:
                     epsilon = float(atom_ff[1]) * 4.184
                     comment = 'GAFF'
                     atom_type_found = True
+                    use_gaff = True
                     break
 
             if not atom_type_found:
@@ -677,12 +683,13 @@ class ForceFieldGenerator:
                     sigma, epsilon, comment = 0.0, 0.0, 'HW'
                 # Case for atoms in UFF but not in GAFF
                 elif element in self.uff_parameters:
-                    warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
-                    warnmsg += ' Taking sigma and epsilon from UFF.'
-                    self.ostream.print_warning(warnmsg)
+                    uffmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
+                    uffmsg += ' Taking sigma and epsilon from UFF.'
+                    self.ostream.print_info(uffmsg)
                     sigma = self.uff_parameters[element]['sigma']
                     epsilon = self.uff_parameters[element]['epsilon']
                     comment = 'UFF'
+                    use_uff = True
                 else:
                     assert_msg_critical(
                         False,
@@ -695,12 +702,28 @@ class ForceFieldGenerator:
                 'comment': comment
             }
 
+        if use_gaff:
+            self.ostream.print_info('Using GAFF parameters.')
+            gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
+            gaff_ref += ' D. A. Case, J. Comput. Chem. 2004, 25, 1157-1174.'
+            self.ostream.print_reference('Reference: ' + gaff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_uff:
+            self.ostream.print_info('Using UFF parameters.')
+            uff_ref = 'A. K. Rappé, C. J. Casewit, K. S.  Colwell, W. A. Goddard III,'
+            uff_ref += ' W. M. Skiff, J. Am. Chem. Soc. 1992, 114, 10024-10035.'
+            self.ostream.print_reference('Reference: ' + uff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
         # Atoms analysis
 
         self.atoms = {}
 
         atom_names = self.get_atom_names()
-        atom_masses = self.molecule.masses_to_numpy()
+        atom_masses = self.molecule.get_masses()
         equivalent_atoms = list(atomtypeidentifier.equivalent_atoms)
 
         for i in range(n_atoms):

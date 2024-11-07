@@ -1,353 +1,152 @@
-//
-//                           VELOXCHEM 1.0-RC2
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
-//
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
-//
-//  SPDX-License-Identifier: LGPL-3.0-or-later
-//
-//  This file is part of VeloxChem.
-//
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
-//
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-
 #ifndef GtoBlock_hpp
 #define GtoBlock_hpp
 
-#include <tuple>
+#include <vector>
 
-#include "MemBlock.hpp"
-#include "MemBlock2D.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "Point.hpp"
 
-/**
- Class CGtoBlock stores data about basis functions and provides set of methods
- for manipulating with basis functions.
-
- @author Z. Rinkevicius
- */
+/// @brief Class CGtoBlock stores data about basis functions block and provides
+/// set of methods for manipulating with basis functions block.
 class CGtoBlock
 {
-    /**
-     The angular momentum.
-     */
-    int32_t _angularMomentum;
-
-    /**
-     The contraction scheme (contracted basis functions start/end position in
-     primitive Gaussian functions vector, contracted basis functions indexes).
-     */
-    CMemBlock2D<int32_t> _contrPattern;
-
-    /**
-     The primitives Gaussian functions data (exponents, norm. factors and
-     coordinates).
-     */
-    CMemBlock2D<double> _gtoPrimitives;
-
    public:
-    /**
-     Creates an empty GTOs block object.
-     */
+    /// @brief The default constructor.
     CGtoBlock();
 
-    /**
-     Creates a GTOs block object.
+    /// @brief The constructor with basis functions data.
+    /// @param coordinates The vector of basis function Cartesian coordinates.
+    /// @param exponents The vector of primitive basis function exponents.
+    /// @param norms The vector of primitive basis function normalization
+    /// factors.
+    /// @param orb_indices The vector of atomic orbital indices.
+    /// @param atm_indices The vector of atomic indices.
+    /// @param angular_momentum The angular momentum of basis functions.
+    /// @param npgtos The number of primitive basis functions in basis function.
+    CGtoBlock(const std::vector<TPoint<double>> &coordinates,
+              const std::vector<double>         &exponents,
+              const std::vector<double>         &norms,
+              const std::vector<size_t>         &orb_indices,
+              const std::vector<int>            &atm_indices,
+              const int                          angular_momentum,
+              const int                          npgtos);
 
-     @param gtoPrimitives the primitives Gaussian functions data (exponents,
-                          coordinates).
-     @param contrPattern the contraction pattern (contracted basis functions
-                         start/end position in primitive Gaussian functions
-                         vector, basis functions indexes).
-     @param angularMomentum the angular momentum of contracted basis functions.
-     */
-    CGtoBlock(const CMemBlock2D<double>& gtoPrimitives, const CMemBlock2D<int32_t>& contrPattern, const int32_t angularMomentum);
+    /// @brief The constructor molecular basis and molecule.
+    /// @param basis The molecular basis.
+    /// @param molecule The molecule.
+    /// @param angular_momentum The angular momentum of basis functions.
+    /// @param npgtos The number of primitive basis functions in basis function.
+    CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, const int angular_momentum, const int npgtos);
 
-    /**
-     Creates a GTOs block object.
+    /// @brief The constructor molecular basis and molecule for selected atoms in
+    /// molecule.
+    /// @param basis The molecular basis.
+    /// @param molecule The molecule.
+    /// @param atoms The vector of atoms to select.
+    /// @param angular_momentum The angular momentum of basis functions.
+    /// @param npgtos The number of primitive basis functions in basis function.
+    CGtoBlock(const CMolecularBasis &basis, const CMolecule &molecule, const std::vector<int> &atoms, const int angular_momentum, const int npgtos);
 
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param angularMomentum the angular momentum of contracted basis functions.
-     */
-    CGtoBlock(const CMolecule& molecule, const CMolecularBasis& basis, const int32_t angularMomentum);
+    /// @brief The default copy constructor.
+    /// @param other The basis functions block to be copied.
+    CGtoBlock(const CGtoBlock &other);
 
-    /**
-     Creates a GTOs block object from list of atoms in molecule.
+    /// @brief The default move constructor.
+    /// @param other The basis functions block to be moved.
+    CGtoBlock(CGtoBlock &&other) noexcept;
 
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param iAtom the index of first atom in list of atoms.
-     @param nAtoms the number of atoms in list of atoms.
-     @param angularMomentum the angular momentum of contracted basis functions.
-     */
-    CGtoBlock(const CMolecule& molecule, const CMolecularBasis& basis, const int32_t iAtom, const int32_t nAtoms, const int32_t angularMomentum);
+    /// @brief The default destructor.
+    ~CGtoBlock() = default;
 
-    /**
-     Creates a GTOs block object by copying other GTOs block object.
+    /// @brief The default copy assignment operator.
+    /// @param other The basis functions block to be copy assigned.
+    /// @return The assigned basis functions block.
+    auto operator=(const CGtoBlock &other) -> CGtoBlock &;
 
-     @param source the GTOs block object.
-     */
-    CGtoBlock(const CGtoBlock& source);
+    /// @brief The default move assignment operator.
+    /// @param other The basis functions block to be move assigned.
+    /// @return The assigned basis functions block.
+    auto operator=(CGtoBlock &&other) noexcept -> CGtoBlock &;
 
-    /**
-     Creates a GTOs block object by moving other GTOs block object.
+    /// @brief The equality operator.
+    /// @param other The basis functions block to be compared.
+    /// @return True if basis functions blocks are equal, False otherwise.
+    auto operator==(const CGtoBlock &other) const -> bool;
 
-     @param source the GTOs block object.
-     */
-    CGtoBlock(CGtoBlock&& source) noexcept;
+    /// @brief The equality operator.
+    /// @param other The basis functions block to be compared.
+    /// @return True if basis functions blocks are not equal, False otherwise.
+    auto operator!=(const CGtoBlock &other) const -> bool;
 
-    /**
-     Destroys a GTOs block object.
-     */
-    ~CGtoBlock();
+    /// @brief Gets vector of basis function Cartesian coordinates.
+    /// @return The vector of Cartesian coordinates.
+    auto coordinates() const -> std::vector<TPoint<double>>;
 
-    /**
-     Assigns a GTOs block object by copying other GTOs block object.
+    /// @brief Gets vector of basis functions exponents.
+    /// @return The vector of exponents.
+    auto exponents() const -> std::vector<double>;
 
-     @param source the GTOs block object.
-     */
-    CGtoBlock& operator=(const CGtoBlock& source);
+    /// @brief Gets vector of basis functions normalization factors.
+    /// @return The vector of normalization factors.
+    auto normalization_factors() const -> std::vector<double>;
 
-    /**
-     Assigns a GTOs block object by moving other GTOs block object.
+    /// @brief Gets vector of orbital indices of basis functions.
+    /// @return The vector of orbital indices.
+    auto orbital_indices() const -> std::vector<size_t>;
 
-     @param source the GTOs block object.
-     */
-    CGtoBlock& operator=(CGtoBlock&& source) noexcept;
-
-    /**
-     Compares GTOs block object with other GTOs block object.
-
-     @param other the GTOs block object.
-     @return true if GTOs block objects are equal, false otherwise.
-     */
-    bool operator==(const CGtoBlock& other) const;
-
-    /**
-     Compares GTOs block object with other GTOs block object.
-
-     @param other the GTOs block object.
-     @return true if GTOs block objects are not equal, false otherwise.
-     */
-    bool operator!=(const CGtoBlock& other) const;
-
-    /**
-     Set angular momentum of GTOs block.
-
-     @param angularMomentum the angular momentum.
-     */
-    void setAngularMomentum(const int32_t angularMomentum);
+    /// @brief Gets vector of atomic indices of basis functions.
+    /// @return The vector of atomic indices.
+    auto atomic_indices() const -> std::vector<int>;
 
     /**
-     Compresses other GTOs block data into GTOs block object without changing
-     dimensions of GTOs block object. Compression is performed using specified
-     screening pattern.
+     Gets vector of atomic orbitals indexes of contracted GTOs.
 
-     @param source the other GTOs block object.
-     @param screeningFactors the vector of screening factors (absolute values).
-     @param screeningThreshold the screening threshold.
-     @return the number of primitive GTOs functions and number of contracted
-             basis functions.
+     @return the vector of atomic orbitals indexes of GTOs.
      */
-    std::tuple<int32_t, int32_t> compress(const CGtoBlock& source, const CMemBlock<double>& screeningFactors, const double screeningThreshold);
+    auto getAtomicOrbitalsIndexes() const -> std::vector<int>;
 
-    /**
-     Gets angular momentum of GTOs block.
+    auto getAtomicOrbitalsIndexesForCartesian(const int ncgtos_d = 0) const -> std::vector<int>;
 
-     @return the angular momentum.
-     */
-    int32_t getAngularMomentum() const;
+    auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>;
 
-    /**
-     Checks if GTOs block is empty.
+    auto getCartesianToSphericalMappingForD() const -> std::unordered_map<int, std::vector<std::pair<int, double>>>;
 
-     @return true if GTOs block is empty, false otherwise.
-     */
-    bool empty() const;
+    auto getCartesianToSphericalMappingForF(const int ncgtos_d) const -> std::unordered_map<int, std::vector<std::pair<int, double>>>;
 
-    /**
-     Gets number of primitive Gaussian functions in GTOs block.
+    /// @brief Gets angular momentum of basis functions.
+    /// @return The angular momentum of basis functionss.
+    auto angular_momentum() const -> int;
 
-     @return the number of primitive Gaussian functions.
-     */
-    int32_t getNumberOfPrimGtos() const;
+    /// @brief Gets number of primitive basis functions in basis function.
+    /// @return The number of primitive basis functions in basis function.
+    auto number_of_primitives() const -> int;
 
-    /**
-     Gets number of contracted basis functions in GTOs block.
+    /// @brief Gets number of basis functions in basis functions block.
+    /// @return The number of basis functions in basis functions block.
+    auto number_of_basis_functions() const -> int;
 
-     @return the number of contracted basis functions.
-     */
-    int32_t getNumberOfContrGtos() const;
+   private:
+    /// @brief The vector of Cartesian coordinates of basis functions.
+    std::vector<TPoint<double>> _coordinates;
 
-    /**
-     Gets constant pointer to basis function start positions in primitive
-     Gaussian functions vector.
+    /// @brief The vector of exponents of primitive basis functions.
+    std::vector<double> _exponents;
 
-     @return the start positions of basis fucntions.
-     */
-    const int32_t* getStartPositions() const;
+    /// @brief The vector of normalization factors of primitive basis functions.
+    std::vector<double> _norms;
 
-    /**
-     Gets pointer to basis function start positions in primitive
-     Gaussian functions vector.
+    /// @brief The vector of atomic orbitals indices of basis functions.
+    std::vector<size_t> _orb_indices;
 
-     @return the start positions of basis fucntions.
-     */
-    int32_t* getStartPositions();
+    /// @brief The vector of atomic indices of basis functions.
+    std::vector<int> _atm_indices;
 
-    /**
-     Gets constant pointer to basis function end positions in primitive
-     Gaussian functions vector.
+    /// @brief The angular momentum of basis functions.
+    int _angular_momentum;
 
-     @return the end positions of basis fucntions.
-     */
-    const int32_t* getEndPositions() const;
-
-    /**
-     Gets pointer to basis function end positions in primitive
-     Gaussian functions vector.
-
-     @return the end positions of basis fucntions.
-     */
-    int32_t* getEndPositions();
-
-    /**
-     Gets constant pointer to atomic identifiers vector.
-
-     @return the atomic identifiers.
-     */
-    const int32_t* getAtomicIdentifiers() const;
-
-    /**
-     Gets pointer to atomic identifiers vector.
-
-     @return the atomic identifiers.
-     */
-    int32_t* getAtomicIdentifiers();
-
-    /**
-     Gets constant pointer to basis function indexes in full AO basis for
-     specific angular momentum component.
-
-     @param iComponent the component of angular momentum.
-     @return the indexes in full AO basis.
-     */
-    const int32_t* getIdentifiers(const int32_t iComponent) const;
-
-    /**
-     Gets pointer to basis function indexes in full AO basis for
-     specific angular momentum component.
-
-     @param iComponent the component of angular momentum.
-     @return the indexes in full AO basis.
-     */
-    int32_t* getIdentifiers(const int32_t iComponent);
-
-    /**
-     Gets constant pointer to exponents of primitive Gaussian functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    const double* getExponents() const;
-
-    /**
-     Gets pointer to exponents of primitive Gaussian functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    double* getExponents();
-
-    /**
-     Gets constant pointer to normalization factors of primitive Gaussian
-     functions.
-
-     @return the normalization factors of primitive Gaussian functions.
-     */
-    const double* getNormFactors() const;
-
-    /**
-     Gets pointer to normalization factors of primitive Gaussian
-     functions.
-
-     @return the normalization factors of primitive Gaussian functions.
-     */
-    double* getNormFactors();
-
-    /**
-     Gets constant pointer to Cartesian X coordinates of primitive Gaussian
-     functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    const double* getCoordinatesX() const;
-
-    /**
-     Gets pointer to Cartesian X coordinates of primitive Gaussian functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    double* getCoordinatesX();
-
-    /**
-     Gets constant pointer to Cartesian Y coordinates of primitive Gaussian
-     functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    const double* getCoordinatesY() const;
-
-    /**
-     Gets pointer to Cartesian Y coordinates of primitive Gaussian functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    double* getCoordinatesY();
-
-    /**
-     Gets constant pointer to Cartesian Z coordinates of primitive Gaussian
-     functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    const double* getCoordinatesZ() const;
-
-    /**
-     Gets pointer to Cartesian Z coordinates of primitive Gaussian functions.
-
-     @return the exponents of primitive Gaussian functions.
-     */
-    double* getCoordinatesZ();
-
-    /**
-     Gets maximum contraction depth of primitive Gaussian functions i.e. maximum
-     number of primitive Gaussian functions in contracted basis fucntion.
-
-     @return the contraction depth.
-     */
-    int32_t getMaxContractionDepth() const;
-
-    /**
-     Converts GTOs block object to text output and insert it into output
-     text stream.
-
-     @param output the output text stream.
-     @param source the GTOs block object.
-     */
-    friend std::ostream& operator<<(std::ostream& output, const CGtoBlock& source);
+    /// @brief The number of primitive basis functions in basis function.
+    int _npgtos;
 };
 
 #endif /* GtoBlock_hpp */

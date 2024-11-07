@@ -39,8 +39,8 @@
 
 option_with_print(ENABLE_ARCH_FLAGS "Enable architecture-specific compiler flags" ON)
 
-# code needs C++17 at least
-set(CMAKE_CXX_STANDARD 17)
+# code needs C++20 at least
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # do not use compiler extensions to the C++ standard
 set(CMAKE_CXX_EXTENSIONS FALSE)

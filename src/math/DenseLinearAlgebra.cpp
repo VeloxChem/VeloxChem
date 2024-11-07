@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -35,141 +34,148 @@
 
 namespace denblas {  // denblas namespace
 
-CDenseMatrix
-multAB(const CDenseMatrix& matrixA,
-       const CDenseMatrix& matrixB)
+auto
+multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
 
     auto narow = matrixA.getNumberOfRows();
-
     auto nacol = matrixA.getNumberOfColumns();
 
     // set up dimensions of matrix B
 
     auto nbrow = matrixB.getNumberOfRows();
-
     auto nbcol = matrixB.getNumberOfColumns();
 
-    errors::assertMsgCritical(nacol == nbrow,
-                              "denblas::multAB: Inconsistent sizes in matrix multiplication");
+    errors::assertMsgCritical(nacol == nbrow, "denblas::multAB: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
     CDenseMatrix mat(narow, nbcol);
 
+    if ((narow == 0) || (nbcol == 0)) return mat;
+
     // compute matrix-matrix multiplication
+
+    auto narow_int32 = static_cast<int32_t>(narow);
+    auto nacol_int32 = static_cast<int32_t>(nacol);
+    auto nbcol_int32 = static_cast<int32_t>(nbcol);
 
     cblas_dgemm(CblasRowMajor,
                 CblasNoTrans,
                 CblasNoTrans,
-                narow,
-                nbcol,
-                nacol,
+                narow_int32,
+                nbcol_int32,
+                nacol_int32,
                 1.0,
                 matrixA.values(),
-                nacol,
+                nacol_int32,
                 matrixB.values(),
-                nbcol,
+                nbcol_int32,
                 0.0,
                 mat.values(),
-                nbcol);
+                nbcol_int32);
 
     return mat;
 }
 
-CDenseMatrix
-multABt(const CDenseMatrix& matrixA,
-        const CDenseMatrix& matrixB)
+auto
+multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
 
     auto narow = matrixA.getNumberOfRows();
-
     auto nacol = matrixA.getNumberOfColumns();
 
     // set up dimensions of matrix B
 
     auto nbrow = matrixB.getNumberOfRows();
-
     auto nbcol = matrixB.getNumberOfColumns();
 
-    errors::assertMsgCritical(nacol == nbcol,
-                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
+    errors::assertMsgCritical(nacol == nbcol, "denblas::multABt: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
     CDenseMatrix mat(narow, nbrow);
 
+    if ((narow == 0) || (nbrow == 0)) return mat;
+
     // compute matrix-matrix multiplcation
+
+    auto narow_int32 = static_cast<int32_t>(narow);
+    auto nbrow_int32 = static_cast<int32_t>(nbrow);
+    auto nacol_int32 = static_cast<int32_t>(nacol);
+    auto nbcol_int32 = static_cast<int32_t>(nbcol);
 
     cblas_dgemm(CblasRowMajor,
                 CblasNoTrans,
                 CblasTrans,
-                narow,
-                nbrow,
-                nacol,
+                narow_int32,
+                nbrow_int32,
+                nacol_int32,
                 1.0,
                 matrixA.values(),
-                nacol,
+                nacol_int32,
                 matrixB.values(),
-                nbcol,
+                nbcol_int32,
                 0.0,
                 mat.values(),
-                nbrow);
+                nbrow_int32);
 
     return mat;
 }
 
-CDenseMatrix
-multAtB(const CDenseMatrix& matrixA,
-        const CDenseMatrix& matrixB)
+auto
+multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
 
     auto narow = matrixA.getNumberOfRows();
-
     auto nacol = matrixA.getNumberOfColumns();
 
     // set up dimensions of matrix B
 
     auto nbrow = matrixB.getNumberOfRows();
-
     auto nbcol = matrixB.getNumberOfColumns();
 
-    errors::assertMsgCritical(narow == nbrow,
-                              "denblas::multAtB: Inconsistent sizes in matrix multiplication");
+    errors::assertMsgCritical(narow == nbrow, "denblas::multAtB: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
     CDenseMatrix mat(nacol, nbcol);
 
+    if ((nacol == 0) || (nbcol == 0)) return mat;
+
+    // compute matrix-matrix multiplication
+
+    auto narow_int32 = static_cast<int32_t>(narow);
+    auto nacol_int32 = static_cast<int32_t>(nacol);
+    auto nbcol_int32 = static_cast<int32_t>(nbcol);
+
     cblas_dgemm(CblasRowMajor,
                 CblasTrans,
                 CblasNoTrans,
-                nacol,
-                nbcol,
-                narow,
+                nacol_int32,
+                nbcol_int32,
+                narow_int32,
                 1.0,
                 matrixA.values(),
-                nacol,
+                nacol_int32,
                 matrixB.values(),
-                nbcol,
+                nbcol_int32,
                 0.0,
                 mat.values(),
-                nbcol);
+                nbcol_int32);
 
     return mat;
 }
 
-CDenseMatrix
-multDiagByA(const CMemBlock<double>& diagonal,
-            const CDenseMatrix&      matrix)
+auto
+multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix
 {
     // set up dimensions of matrix
 
     auto nrow = matrix.getNumberOfRows();
-
     auto ncol = matrix.getNumberOfColumns();
 
     // allocate results matrix
@@ -179,27 +185,24 @@ multDiagByA(const CMemBlock<double>& diagonal,
     // set up pointers to matrices
 
     auto mval = mat.values();
-
     auto sval = matrix.values();
 
     auto dval = diagonal.data();
 
     // compute matrix multiplication
 
-    for (int32_t i = 0; i < nrow; i++)
+    for (int i = 0; i < nrow; i++)
     {
         // set up local pointers to rows
 
-        auto cmval = &mval[i * ncol];
-
-        auto csval = &sval[i * ncol];
+        auto cmval = mval + i * ncol;
+        auto csval = sval + i * ncol;
 
         // fetch value of diagonal
 
         auto f = dval[i];
 
-        #pragma omp simd
-        for (int32_t j = 0; j < ncol; j++)
+        for (int j = 0; j < ncol; j++)
         {
             cmval[j] = f * csval[j];
         }
@@ -208,14 +211,12 @@ multDiagByA(const CMemBlock<double>& diagonal,
     return mat;
 }
 
-CDenseMatrix
-multDiagByAt(const CMemBlock<double>& diagonal,
-             const CDenseMatrix&      matrix)
+auto
+multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix
 {
     // set up dimensions of matrix
 
     auto nrow = matrix.getNumberOfRows();
-
     auto ncol = matrix.getNumberOfColumns();
 
     // allocate results matrix
@@ -225,18 +226,17 @@ multDiagByAt(const CMemBlock<double>& diagonal,
     // set up pointers to matrices
 
     auto mval = mat.values();
-
     auto sval = matrix.values();
 
     auto dval = diagonal.data();
 
     // compute matrix multiplication
 
-    for (int32_t i = 0; i < ncol; i++)
+    for (int i = 0; i < ncol; i++)
     {
         auto ioff = i * nrow;
 
-        for (int32_t j = 0; j < nrow; j++)
+        for (int j = 0; j < nrow; j++)
         {
             mval[ioff + j] = dval[i] * sval[j * ncol + i];
         }
@@ -245,9 +245,8 @@ multDiagByAt(const CMemBlock<double>& diagonal,
     return mat;
 }
 
-CDenseMatrix
-subAB(const CDenseMatrix& matrixA,
-      const CDenseMatrix& matrixB)
+auto
+subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     errors::assertMsgCritical(matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
                               "denblas::subAB: Inconsistent sizes in matrix subtraction");
@@ -258,15 +257,15 @@ subAB(const CDenseMatrix& matrixA,
 
     // substract matrix
 
-    cblas_daxpy(mat.getNumberOfElements(), -1.0, matrixB.values(), 1, mat.values(), 1);
+    auto nelems_int32 = static_cast<int32_t>(mat.getNumberOfElements());
+
+    cblas_daxpy(nelems_int32, -1.0, matrixB.values(), 1, mat.values(), 1);
 
     return mat;
 }
 
-CDenseMatrix
-addAB(const CDenseMatrix& matrixA,
-      const CDenseMatrix& matrixB,
-      const double        factor)
+auto
+addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix
 {
     errors::assertMsgCritical(matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
                               "denblas::addAB: Inconsistent sizes in matrix addition");
@@ -277,200 +276,25 @@ addAB(const CDenseMatrix& matrixA,
 
     // add scaled matrix
 
-    cblas_daxpy(mat.getNumberOfElements(), factor, matrixB.values(), 1, mat.values(), 1);
+    auto nelems_int32 = static_cast<int32_t>(mat.getNumberOfElements());
+
+    cblas_daxpy(nelems_int32, factor, matrixB.values(), 1, mat.values(), 1);
 
     return mat;
 }
 
-void
-multABt(      CDenseMatrix& matrixC,
-        const double        alpha,
-        const double        beta,
-        const CDenseMatrix& matrixA,
-        const CDenseMatrix& matrixB)
+auto
+dot(const std::vector<double>& vectorA, const std::vector<double>& vectorB) -> double
 {
-    // set up dimensions of matrix A
-
-    auto narow = matrixA.getNumberOfRows();
-
-    auto nacol = matrixA.getNumberOfColumns();
-
-    // set up dimensions of matrix B
-
-    auto nbrow = matrixB.getNumberOfRows();
-
-    auto nbcol = matrixB.getNumberOfColumns();
-
-    errors::assertMsgCritical(nacol == nbcol,
-                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
-
-    errors::assertMsgCritical(narow == matrixC.getNumberOfRows(),
-                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
-
-    errors::assertMsgCritical(nbrow == matrixC.getNumberOfColumns(),
-                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
-
-    cblas_dgemm(CblasRowMajor,
-                CblasNoTrans,
-                CblasTrans,
-                narow,
-                nbrow,
-                nacol,
-                alpha,
-                matrixA.values(),
-                nacol,
-                matrixB.values(),
-                nbcol,
-                beta,
-                matrixC.values(),
-                nbrow);
-}
-    
-void
-multABt(      double*       matrixC,
-        const double        alpha,
-        const double        beta,
-        const CDenseMatrix& matrixA,
-        const CDenseMatrix& matrixB)
-{
-    // set up dimensions of matrix A
-
-    auto narow = matrixA.getNumberOfRows();
-
-    auto nacol = matrixA.getNumberOfColumns();
-
-    // set up dimensions of matrix B
-
-    auto nbrow = matrixB.getNumberOfRows();
-
-    auto nbcol = matrixB.getNumberOfColumns();
-
-    errors::assertMsgCritical(nacol == nbcol,
-                              "denblas::multABt: Inconsistent sizes in matrix multiplication");
-
-    cblas_dgemm(CblasRowMajor,
-                CblasNoTrans,
-                CblasTrans,
-                narow,
-                nbrow,
-                nacol,
-                alpha,
-                matrixA.values(),
-                nacol,
-                matrixB.values(),
-                nbcol,
-                beta,
-                matrixC,
-                nbrow);
-}
-
-void
-multAtB(      double*       matrixC,
-        const double        alpha,
-        const double        beta,
-        const CDenseMatrix& matrixA,
-        const CDenseMatrix& matrixB)
-{
-    // set up dimensions of matrix A
-    
-    auto narow = matrixA.getNumberOfRows();
-    
-    auto nacol = matrixA.getNumberOfColumns();
-    
-    // set up dimensions of matrix B
-    
-    auto nbrow = matrixB.getNumberOfRows();
-    
-    auto nbcol = matrixB.getNumberOfColumns();
-    
-    errors::assertMsgCritical(narow == nbrow,
-                              "denblas::multAtB: Inconsistent sizes in matrix multiplication");
-    
-    // allocate dense matrix
-    
-    CDenseMatrix mat(nacol, nbcol);
-    
-    cblas_dgemm(CblasRowMajor,
-                CblasTrans,
-                CblasNoTrans,
-                nacol,
-                nbcol,
-                narow,
-                alpha,
-                matrixA.values(),
-                nacol,
-                matrixB.values(),
-                nbcol,
-                beta,
-                matrixC,
-                nbcol);
-}
-
-void
-multAB(      double*       matrixC,
-       const double        alpha,
-       const double        beta,
-       const CDenseMatrix& matrixA,
-       const CDenseMatrix& matrixB)
-{
-    // set up dimensions of matrix A
-    
-    auto narow = matrixA.getNumberOfRows();
-    
-    auto nacol = matrixA.getNumberOfColumns();
-    
-    // set up dimensions of matrix B
-    
-    auto nbrow = matrixB.getNumberOfRows();
-    
-    auto nbcol = matrixB.getNumberOfColumns();
-    
-    errors::assertMsgCritical(nacol == nbrow,
-                              "denblas::multAB: Inconsistent sizes in matrix multiplication");
-    
-    // compute matrix-matrix multiplication
-    
-    cblas_dgemm(CblasRowMajor,
-                CblasNoTrans,
-                CblasNoTrans,
-                narow,
-                nbcol,
-                nacol,
-                alpha,
-                matrixA.values(),
-                nacol,
-                matrixB.values(),
-                nbcol,
-                beta,
-                matrixC,
-                nbcol);
-}
-    
-double
-dot(const CMemBlock<double>& vectorA,
-    const CMemBlock<double>& vectorB)
-{
-    errors::assertMsgCritical(vectorA.size() == vectorB.size(),
-                              "denblas::dot: Inconsistent sizes in dot product of vectors");
+    errors::assertMsgCritical(vectorA.size() == vectorB.size(), "denblas::dot: Inconsistent sizes in dot product of vectors");
 
     return cblas_ddot(vectorA.size(), vectorA.data(), 1, vectorB.data(), 1);
 }
 
-double
-dot(const CMemBlock<double>& vectorA,
-    const CDenseMatrix&      matrixB)
+auto
+trace(const CDenseMatrix& matrix) -> double
 {
-    errors::assertMsgCritical(vectorA.size() == matrixB.getNumberOfElements(),
-                              "denblas::dot: Inconsistent sizes in dot product of vector and column matrix");
-
-    return cblas_ddot(vectorA.size(), vectorA.data(), 1, matrixB.values(), 1);
-}
-
-double
-trace(const CDenseMatrix& matrix)
-{
-    errors::assertMsgCritical(matrix.getNumberOfColumns() == matrix.getNumberOfRows(),
-                              "denblas::trace: Expecting a square matrix");
+    errors::assertMsgCritical(matrix.getNumberOfColumns() == matrix.getNumberOfRows(), "denblas::trace: Expecting a square matrix");
 
     auto pvals = matrix.values();
 
@@ -478,17 +302,12 @@ trace(const CDenseMatrix& matrix)
 
     double fsum = 0.0;
 
-    for (int32_t i = 0; i < mdim; i++)
+    for (int i = 0; i < mdim; i++)
+    {
         fsum += pvals[i * mdim + i];
+    }
 
     return fsum;
-}
-
-double
-trace(const CDenseMatrix& matrixA,
-      const CDenseMatrix& matrixB)
-{
-    return denblas::trace(denblas::multAB(matrixA, matrixB));
 }
 
 }  // namespace denblas

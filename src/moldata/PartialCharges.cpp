@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -28,27 +27,28 @@
 
 #include "PartialCharges.hpp"
 
+#include <cmath>
+
 #include "CoordinationNumber.hpp"
 #include "DenseDiagonalizer.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "MathConst.hpp"
-#include "MathFunc.hpp"
 #include "Molecule.hpp"
 
 namespace parchg {  // parchg namespace
 
-std::vector<double>
-getPartialCharges(const CMolecule& molecule, const double netcharge)
+auto
+getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vector<double>
 {
     CDenseMatrix dqdr;
 
     return getPartialCharges(molecule, netcharge, dqdr);
 }
 
-std::vector<double>
-getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatrix& dqdr)
+auto
+getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatrix& dqdr) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -95,13 +95,13 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
                              1.63999999, 1.63999999, 1.47055223, 1.81127084, 1.40189963, 1.54015481, 1.33721475, 1.57165422, 1.04815857, 1.78342098,
                              2.79106396, 1.78160840, 2.47588882, 2.37670734, 1.76613217, 2.66172302, 2.82773085});
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
-    auto ids_elem = molecule.getIdsElemental();
+    auto ids_elem = molecule.identifiers();
 
     std::vector<double> chg_xi, chg_gam, chg_kappa, chg_alpha;
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         chg_xi.push_back(en[ids_elem[i]]);
 
@@ -114,7 +114,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     // form right-hand side vector
 
-    int32_t natoms_1 = natoms + 1;
+    auto natoms_1 = natoms + 1;
 
     CDenseMatrix Xvec(natoms_1, 1);
 
@@ -124,7 +124,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     auto cn = coordnum::getCoordinationNumber(molecule, dcndr);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         double val = chg_kappa[i] / (std::sqrt(cn[i]) + 1.0e-14);
 
@@ -139,21 +139,23 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     CDenseMatrix Amat(natoms_1, natoms_1);
 
-    const double sqrtpi = std::sqrt(mathconst::getPiValue());
+    const double sqrtpi = std::sqrt(mathconst::pi_value());
 
-    const double sqrt2pi = std::sqrt(2.0 / mathconst::getPiValue());
+    const double sqrt2pi = std::sqrt(2.0 / mathconst::pi_value());
 
-    auto xcoord = molecule.getCoordinatesX();
+    auto xyzcoord = molecule.coordinates("bohr");
 
-    auto ycoord = molecule.getCoordinatesY();
-
-    auto zcoord = molecule.getCoordinatesZ();
-
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < i; j++)
+        const auto rixyz = xyzcoord[i].coordinates();
+
+        for (int j = 0; j < i; j++)
         {
-            auto r = mathfunc::distance(xcoord[j], ycoord[j], zcoord[j], xcoord[i], ycoord[i], zcoord[i]);
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rixyz[0] - rjxyz[0], rixyz[1] - rjxyz[1], rixyz[2] - rjxyz[2]});
+
+            double r = std::sqrt(rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2]);
 
             double gamij = 1.0 / std::sqrt(chg_alpha[i] + chg_alpha[j]);
 
@@ -167,7 +169,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
         Amat.values()[i * natoms_1 + i] = chg_gam[i] + sqrt2pi / std::sqrt(chg_alpha[i]);
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         Amat.values()[i * natoms_1 + natoms] = 1.0;
 
@@ -192,7 +194,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     std::vector<double> partialcharges(natoms);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         partialcharges[i] = solution.values()[i];
     }
@@ -204,7 +206,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     // compute derivative of partial charges
 
-    std::string err_size("PartialCharges - Mismatch in dqdr matrix size");
+    std::string err_size("parchg::getPartialCharges: Mismatch in dqdr matrix size");
 
     errors::assertMsgCritical(dqdr.getNumberOfRows() == 3 * natoms, err_size);
 
@@ -216,16 +218,20 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     CDenseMatrix Afac(3, natoms);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
-        for (int32_t dj = 0; dj < 3 * natoms; dj++)
+        for (int dj = 0; dj < 3 * natoms; dj++)
         {
             dXvecdr.values()[dj * natoms_1 + i] = dcndr.values()[dj * natoms + i] * Xfac.values()[i];
         }
 
-        for (int32_t j = 0; j < i; j++)
+        const auto rixyz = xyzcoord[i].coordinates();
+
+        for (int j = 0; j < i; j++)
         {
-            std::vector<double> rij({xcoord[i] - xcoord[j], ycoord[i] - ycoord[j], zcoord[i] - zcoord[j]});
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rixyz[0] - rjxyz[0], rixyz[1] - rjxyz[1], rixyz[2] - rjxyz[2]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
@@ -235,11 +241,11 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
             double dval = 2.0 * gamij * std::exp(-arg) / (sqrtpi * r2) - Amat.values()[j * natoms_1 + i] / r2;
 
-            for (int32_t d = 0; d < 3; d++)
+            for (int d = 0; d < 3; d++)
             {
-                int32_t di = d * natoms + i;
+                auto di = d * natoms + i;
 
-                int32_t dj = d * natoms + j;
+                auto dj = d * natoms + j;
 
                 Afac.values()[di] += dval * rij[d] * partialcharges[j];
 
@@ -252,11 +258,11 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
         }
     }
 
-    for (int32_t d = 0; d < 3; d++)
+    for (int d = 0; d < 3; d++)
     {
-        for (int32_t i = 0; i < natoms; i++)
+        for (int i = 0; i < natoms; i++)
         {
-            int32_t di = d * natoms + i;
+            auto di = d * natoms + i;
 
             dAmatdr.values()[di * natoms_1 + i] += Afac.values()[di];
         }
@@ -268,9 +274,9 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     auto prod_sum = denblas::addAB(prod_dmat, prod_dvec, 1.0);
 
-    for (int32_t dj = 0; dj < 3 * natoms; dj++)
+    for (int dj = 0; dj < 3 * natoms; dj++)
     {
-        for (int32_t i = 0; i < natoms; i++)
+        for (int i = 0; i < natoms; i++)
         {
             dqdr.values()[dj * natoms + i] = -prod_sum.values()[dj * natoms_1 + i];
         }

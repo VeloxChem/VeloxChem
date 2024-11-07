@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -39,10 +38,8 @@ namespace aoindices {  // aoindices namespace
  @param basis_1 the basis set for the first molecule.
  @param basis_2 the basis set for the first molecule.
  @return a vector of vector containing the AO indices of the two molecules.
-
- @author X. Li
  */
-std::vector<std::vector<int32_t>> getDimerAOIndices(const CMolecule&       mol_1,
+std::vector<std::vector<int>> getDimerAOIndices(const CMolecule&       mol_1,
                                                     const CMolecule&       mol_2,
                                                     const CMolecularBasis& basis_1,
                                                     const CMolecularBasis& basis_2);

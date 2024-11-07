@@ -1,394 +1,268 @@
-//
-//                           VELOXCHEM 1.0-RC2
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
-//
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
-//
-//  SPDX-License-Identifier: LGPL-3.0-or-later
-//
-//  This file is part of VeloxChem.
-//
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
-//
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-
 #include "BasisFunction.hpp"
 
+#include <algorithm>
 #include <cmath>
-#include <limits>
-#include <sstream>
-#include <utility>
+#include <ranges>
 
-#include <mpi.h>
-
+#include "CustomViews.hpp"
 #include "MathConst.hpp"
-#include "MpiFunc.hpp"
+#include "MathFunc.hpp"
 
 CBasisFunction::CBasisFunction()
 
-    : _angularMomentum(-1)
+    : _exponents{}
+
+    , _norms{}
+
+    , _angular_momentum(-1)
 {
 }
 
-CBasisFunction::CBasisFunction(const std::vector<double>& exponents, const std::vector<double>& normFactors, const int32_t angularMomentum)
+CBasisFunction::CBasisFunction(const std::vector<double> &exponents, const std::vector<double> &norms, const int angular_momentum)
 
     : _exponents(exponents)
 
-    , _normFactors(normFactors)
+    , _norms(norms)
 
-    , _angularMomentum(angularMomentum)
-
+    , _angular_momentum(angular_momentum)
 {
 }
 
-CBasisFunction::CBasisFunction(const CBasisFunction& source)
+CBasisFunction::CBasisFunction(const CBasisFunction &other)
 
-    : _exponents(source._exponents)
+    : _exponents(other._exponents)
 
-    , _normFactors(source._normFactors)
+    , _norms(other._norms)
 
-    , _angularMomentum(source._angularMomentum)
+    , _angular_momentum(other._angular_momentum)
 {
 }
 
-CBasisFunction::CBasisFunction(CBasisFunction&& source) noexcept
+CBasisFunction::CBasisFunction(CBasisFunction &&other) noexcept
 
-    : _exponents(std::move(source._exponents))
+    : _exponents(std::move(other._exponents))
 
-    , _normFactors(std::move(source._normFactors))
+    , _norms(std::move(other._norms))
 
-    , _angularMomentum(std::move(source._angularMomentum))
+    , _angular_momentum(std::move(other._angular_momentum))
 {
 }
 
-CBasisFunction::~CBasisFunction()
+auto
+CBasisFunction::operator=(const CBasisFunction &other) -> CBasisFunction &
 {
-}
+    _exponents = other._exponents;
 
-CBasisFunction&
-CBasisFunction::operator=(const CBasisFunction& source)
-{
-    if (this == &source) return *this;
+    _norms = other._norms;
 
-    _exponents = source._exponents;
-
-    _normFactors = source._normFactors;
-
-    _angularMomentum = source._angularMomentum;
+    _angular_momentum = other._angular_momentum;
 
     return *this;
 }
 
-CBasisFunction&
-CBasisFunction::operator=(CBasisFunction&& source) noexcept
+auto
+CBasisFunction::operator=(CBasisFunction &&other) noexcept -> CBasisFunction &
 {
-    if (this == &source) return *this;
+    if (this != &other)
+    {
+        _exponents = std::move(other._exponents);
 
-    _exponents = std::move(source._exponents);
+        _norms = std::move(other._norms);
 
-    _normFactors = std::move(source._normFactors);
-
-    _angularMomentum = std::move(source._angularMomentum);
+        _angular_momentum = std::move(other._angular_momentum);
+    }
 
     return *this;
 }
 
-bool
-CBasisFunction::operator==(const CBasisFunction& other) const
+auto
+CBasisFunction::operator==(const CBasisFunction &other) const -> bool
 {
-    if (_exponents.size() != other._exponents.size()) return false;
-
-    for (size_t i = 0; i < _exponents.size(); i++)
+    if (_angular_momentum != other._angular_momentum)
     {
-        if (std::fabs(_exponents[i] - other._exponents[i]) > 1.0e-13)
-        {
-            return false;
-        }
+        return false;
     }
-
-    if (_normFactors.size() != other._normFactors.size()) return false;
-
-    for (size_t i = 0; i < _normFactors.size(); i++)
+    else if (!std::ranges::equal(
+                 _exponents, other._exponents, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); }))
     {
-        if (std::fabs(_normFactors[i] - other._normFactors[i]) > 1.0e-13)
-        {
-            return false;
-        }
+        return false;
     }
-
-    if (_angularMomentum != other._angularMomentum) return false;
-
-    return true;
+    else
+    {
+        return std::ranges::equal(_norms, other._norms, [](auto lhs, auto rhs) -> bool { return mathfunc::equal(lhs, rhs, 1.0e-12, 1.0e-12); });
+    }
 }
 
-bool
-CBasisFunction::operator!=(const CBasisFunction& other) const
+auto
+CBasisFunction::operator!=(const CBasisFunction &other) const -> bool
 {
     return !(*this == other);
 }
 
-void
-CBasisFunction::setExponents(const std::vector<double>& exponents)
+auto
+CBasisFunction::set_exponents(const std::vector<double> &exponents) -> void
 {
     _exponents = exponents;
 }
 
-void
-CBasisFunction::setNormalizationFactors(const std::vector<double>& normFactors)
+auto
+CBasisFunction::set_normalization_factors(const std::vector<double> &norms) -> void
 {
-    _normFactors = normFactors;
+    _norms = norms;
 }
 
-void
-CBasisFunction::setAngularMomentum(const int32_t angularMomentum)
+auto
+CBasisFunction::set_angular_momentum(const int angular_momentum) -> void
 {
-    _angularMomentum = angularMomentum;
+    _angular_momentum = angular_momentum;
 }
 
-void
-CBasisFunction::add(const double exponent, const double normFactor)
+auto
+CBasisFunction::add(const double exponent, const double norm) -> void
 {
     _exponents.push_back(exponent);
 
-    _normFactors.push_back(normFactor);
+    _norms.push_back(norm);
 }
 
-void
-CBasisFunction::normalize()
+auto
+CBasisFunction::normalize() -> void
 {
-    // NOTE: Currently implemented for l = 0..6
+    // TODO: Implemented for l > 6
+    if (_angular_momentum > 6) return;
 
-    if (_angularMomentum > 6) return;
-
-    // uncontracted basis, set expansion coeficient to 1.0
-
-    if (_normFactors.size() == 1) _normFactors[0] = 1.0;
-
-    // normalize primitive GBFs
+    if (_exponents.size() == 1) _norms[0] = 1.0;
 
     _rescale();
 
-    // compute overlap
+    double fact = 0.0;
 
-    auto sz = _exponents.size();
+    std::ranges::for_each(views::triangular(_exponents.size()), [&](const auto &index) { fact += _overlap(index); });
 
-    double ovl = 0.0;
+    fact = 1.0 / std::sqrt(fact);
 
-    for (size_t i = 0; i < sz; i++)
-    {
-        ovl += _overlap(i, i);
-
-        for (size_t j = i + 1; j < sz; j++)
-        {
-            ovl += 2.0 * _overlap(i, j);
-        }
-    }
-
-    // renormaliza primitive BFs
-
-    ovl = 1.0 / std::sqrt(ovl);
-
-    for (size_t i = 0; i < sz; i++)
-    {
-        _normFactors[i] *= ovl;
-    }
+    std::ranges::for_each(_norms, [=](double &norm) { norm *= fact; });
 }
 
-std::vector<double>
-CBasisFunction::getExponents() const
+auto
+CBasisFunction::get_exponents() const -> std::vector<double>
 {
     return _exponents;
 }
 
-std::vector<double>
-CBasisFunction::getNormalizationFactors() const
+auto
+CBasisFunction::get_normalization_factors() const -> std::vector<double>
 {
-    return _normFactors;
+    return _norms;
 }
 
-int32_t
-CBasisFunction::getAngularMomentum() const
+auto
+CBasisFunction::get_angular_momentum() const -> int
 {
-    return _angularMomentum;
+    return _angular_momentum;
 }
 
-int32_t
-CBasisFunction::getNumberOfPrimitiveFunctions() const
+auto
+CBasisFunction::number_of_primitive_functions() const -> size_t
 {
-    return static_cast<int32_t>(_exponents.size());
+    return _exponents.size();
 }
 
-void
-CBasisFunction::_rescale()
+auto
+CBasisFunction::_rescale() -> void
 {
-    auto fpi = 2.0 / mathconst::getPiValue();
+    constexpr auto fpi = 2.0 / mathconst::pi_value();
 
-    for (size_t i = 0; i < _exponents.size(); i++)
+    std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= std::pow(_exponents[i] * fpi, 0.75); });
+
+    if (_angular_momentum == 1)
     {
-        _normFactors[i] *= std::pow(_exponents[i] * fpi, 0.75);
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= 2.0 * std::sqrt(_exponents[i]); });
     }
-
-    if (_angularMomentum == 1)
+    else if (_angular_momentum == 2)
     {
-        for (size_t i = 0; i < _exponents.size(); i++)
-        {
-            _normFactors[i] *= 2.0 * std::sqrt(_exponents[i]);
-        }
+        const double fact = 2.0 / std::sqrt(3.0);
 
-        return;
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= fact * _exponents[i]; });
     }
-
-    if (_angularMomentum == 2)
+    else if (_angular_momentum == 3)
     {
-        double f = 2.0 / std::sqrt(3.0);
+        const double fact = 4.0 / std::sqrt(15.0);
 
-        for (size_t i = 0; i < _exponents.size(); i++)
-        {
-            _normFactors[i] *= f * _exponents[i];
-        }
-
-        return;
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
+                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * std::sqrt(_exponents[i]); });
     }
-
-    if (_angularMomentum == 3)
+    else if (_angular_momentum == 4)
     {
-        double f = 4.0 / std::sqrt(15.0);
+        const double fact = 2.0 / std::sqrt(105.0);
 
-        for (size_t i = 0; i < _exponents.size(); i++)
-        {
-            _normFactors[i] *= f * _exponents[i] * std::sqrt(_exponents[i]);
-        }
-
-        return;
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
+                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i]; });
     }
-
-    if (_angularMomentum == 4)
+    else if (_angular_momentum == 5)
     {
-        double f = 2.0 / std::sqrt(105.0);
+        const double fact = 4.0 / std::sqrt(945.0);
 
-        for (size_t i = 0; i < _exponents.size(); i++)
-        {
-            _normFactors[i] *= f * _exponents[i] * _exponents[i];
-        }
-
-        return;
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
+                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * std::sqrt(_exponents[i]); });
     }
-
-    if (_angularMomentum == 5)
+    else if (_angular_momentum == 6)
     {
-        double f = 4.0 / std::sqrt(945.0);
+        const double fact = 4.0 / std::sqrt(10395.0);
 
-        for (size_t i = 0; i < _exponents.size(); i++)
-        {
-            _normFactors[i] *= f * _exponents[i] * _exponents[i]
-
-                               * std::sqrt(_exponents[i]);
-        }
-
-        return;
+        std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
+                              [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * _exponents[i]; });
     }
-
-    if (_angularMomentum == 6)
+    else
     {
-        double f = 4.0 / std::sqrt(10395.0);
-
-        for (size_t i = 0; i < _exponents.size(); i++)
-        {
-            _normFactors[i] *= f * _exponents[i] * _exponents[i]
-
-                               * _exponents[i];
-        }
-
-        return;
+        // TODO: implement l > 6
     }
 }
 
-double
-CBasisFunction::_overlap(const size_t iComponent, const size_t jComponent) const
+auto
+CBasisFunction::_overlap(const std::pair<size_t, size_t> &index) const -> double
 {
-    auto fab = 1.0 / (_exponents[iComponent] + _exponents[jComponent]);
+    const auto [i, j] = index;
 
-    auto ovl = _normFactors[iComponent] * _normFactors[jComponent]
+    const auto fab = 1.0 / (_exponents[i] + _exponents[j]);
 
-               * std::pow(mathconst::getPiValue() * fab, 1.5);
+    auto fovl = mathconst::pi_value() * fab;
 
-    if (_angularMomentum == 0) return ovl;
+    fovl = _norms[i] * _norms[j] * fovl * std::sqrt(fovl);
 
-    if (_angularMomentum == 1) return 0.5 * fab * ovl;
+    if (i != j) fovl *= 2.0;
 
-    auto fab2 = fab * fab;
-
-    if (_angularMomentum == 2) return 3.0 * fab2 * ovl;
-
-    if (_angularMomentum == 3) return 7.5 * fab2 * fab * ovl;
-
-    if (_angularMomentum == 4) return 420.0 * fab2 * fab2 * ovl;
-
-    if (_angularMomentum == 5) return 1890.0 * fab2 * fab2 * fab * ovl;
-
-    if (_angularMomentum == 6) return 41580.0 * fab2 * fab2 * fab2 * ovl;
-
-    return std::numeric_limits<double>::quiet_NaN();
-}
-
-void
-CBasisFunction::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if constexpr (ENABLE_MPI)
+    if (_angular_momentum == 0)
     {
-        mpi::bcast(_angularMomentum, comm);
-
-        mpi::bcast(_exponents, rank, comm);
-
-        mpi::bcast(_normFactors, rank, comm);
+        return fovl;
     }
-}
-
-std::string
-CBasisFunction::repr() const
-{
-    std::ostringstream os;
-
-    os << std::endl;
-
-    os << "[CBasisFunction (Object):" << this << "]" << std::endl;
-
-    os << "_angularMomentum: " << _angularMomentum << std::endl;
-
-    os << "_exponents: " << std::endl;
-
-    for (size_t i = 0; i < _exponents.size(); i++)
+    else if (_angular_momentum == 1)
     {
-        os << "_exponents[" << i << "]: " << std::endl;
-
-        os << _exponents[i] << std::endl;
+        return 0.5 * fab * fovl;
     }
-
-    os << "_normFactors: " << std::endl;
-
-    for (size_t i = 0; i < _normFactors.size(); i++)
+    else if (_angular_momentum == 2)
     {
-        os << "_normFactors[" << i << "]: " << std::endl;
-
-        os << _normFactors[i] << std::endl;
+        return 3.0 * fab * fab * fovl;
     }
-
-    return os.str();
-}
-
-std::ostream&
-operator<<(std::ostream& output, const CBasisFunction& source)
-{
-    return (output << source.repr());
+    else if (_angular_momentum == 3)
+    {
+        return 7.5 * fab * fab * fab * fovl;
+    }
+    else if (_angular_momentum == 4)
+    {
+        return 420.0 * fab * fab * fab * fab * fovl;
+    }
+    else if (_angular_momentum == 5)
+    {
+        return 1890.0 * fab * fab * fab * fab * fab * fovl;
+    }
+    else if (_angular_momentum == 6)
+    {
+        return 41580.0 * fab * fab * fab * fab * fab * fab * fovl;
+    }
+    else
+    {
+        // TODO: implement l > 6
+        return 0.0;
+    }
 }

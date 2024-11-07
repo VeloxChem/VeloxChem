@@ -1,367 +1,293 @@
-//
-//                           VELOXCHEM 1.0-RC2
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
-//
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
-//
-//  SPDX-License-Identifier: LGPL-3.0-or-later
-//
-//  This file is part of VeloxChem.
-//
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
-//
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-
 #include "AtomBasis.hpp"
 
-#include <sstream>
-
-#include <mpi.h>
+#include <algorithm>
+#include <numeric>
+#include <ranges>
 
 #include "ChemicalElement.hpp"
-#include "MpiFunc.hpp"
-#include "StringFormat.hpp"
+#include "TensorLabels.hpp"
 
 CAtomBasis::CAtomBasis()
 
-    : _idElemental(-1)
+    : _functions{}
 
-    , _maxAngularMomentum(-1)
+    , _name{}
+
+    , _ecp_label{}
+
+    , _identifier{-1}
 {
 }
 
-CAtomBasis::CAtomBasis(const CAtomBasis& source)
+CAtomBasis::CAtomBasis(const std::vector<CBasisFunction> &functions, const std::string &name, const std::string &ecp_label, const int identifier)
 
-    : _basisFunctions(source._basisFunctions)
+    : _functions(functions)
 
-    , _idElemental(source._idElemental)
+    , _name(name)
 
-    , _maxAngularMomentum(source._maxAngularMomentum)
+    , _ecp_label(ecp_label)
+
+    , _identifier(identifier)
 {
 }
 
-CAtomBasis::CAtomBasis(CAtomBasis&& source) noexcept
+CAtomBasis::CAtomBasis(const CAtomBasis &other)
 
-    : _basisFunctions(std::move(source._basisFunctions))
+    : _functions(other._functions)
 
-    , _idElemental(std::move(source._idElemental))
+    , _name(other._name)
 
-    , _maxAngularMomentum(std::move(source._maxAngularMomentum))
+    , _ecp_label(other._ecp_label)
+
+    , _identifier(other._identifier)
 {
 }
 
-CAtomBasis::~CAtomBasis()
+CAtomBasis::CAtomBasis(CAtomBasis &&other) noexcept
+
+    : _functions(std::move(other._functions))
+
+    , _name(std::move(other._name))
+
+    , _ecp_label(std::move(other._ecp_label))
+
+    , _identifier(std::move(other._identifier))
 {
 }
 
-CAtomBasis&
-CAtomBasis::operator=(const CAtomBasis& source)
+auto
+CAtomBasis::operator=(const CAtomBasis &other) -> CAtomBasis &
 {
-    if (this == &source) return *this;
+    _functions = other._functions;
 
-    _basisFunctions = source._basisFunctions;
+    _name = other._name;
 
-    _idElemental = source._idElemental;
+    _ecp_label = other._ecp_label;
 
-    _maxAngularMomentum = source._maxAngularMomentum;
+    _identifier = other._identifier;
 
     return *this;
 }
 
-CAtomBasis&
-CAtomBasis::operator=(CAtomBasis&& source) noexcept
+auto
+CAtomBasis::operator=(CAtomBasis &&other) noexcept -> CAtomBasis &
 {
-    if (this == &source) return *this;
+    if (this != &other)
+    {
+        _functions = std::move(other._functions);
 
-    _basisFunctions = std::move(source._basisFunctions);
+        _name = std::move(other._name);
 
-    _idElemental = std::move(source._idElemental);
+        _ecp_label = std::move(other._ecp_label);
 
-    _maxAngularMomentum = std::move(source._maxAngularMomentum);
+        _identifier = std::move(other._identifier);
+    }
 
     return *this;
 }
 
-bool
-CAtomBasis::operator==(const CAtomBasis& other) const
+auto
+CAtomBasis::operator==(const CAtomBasis &other) const -> bool
 {
-    if (_basisFunctions.size() != other._basisFunctions.size()) return false;
-
-    for (size_t i = 0; i < _basisFunctions.size(); i++)
+    if (_identifier != other._identifier)
     {
-        if (_basisFunctions[i] != other._basisFunctions[i]) return false;
+        return false;
     }
-
-    if (_idElemental != other._idElemental) return false;
-
-    if (_maxAngularMomentum != other._maxAngularMomentum) return false;
-
-    return true;
-}
-
-bool
-CAtomBasis::operator!=(const CAtomBasis& other) const
-{
-    return !(*this == other);
-}
-
-void
-CAtomBasis::setIdElemental(const int32_t idElemental)
-{
-    _idElemental = idElemental;
-}
-
-void
-CAtomBasis::setMaxAngularMomentum(const int32_t maxAngularMomentum)
-{
-    _maxAngularMomentum = maxAngularMomentum;
-}
-
-void
-CAtomBasis::addBasisFunction(const CBasisFunction& basisFunction)
-{
-    _basisFunctions.push_back(basisFunction);
-
-    auto bAngularMomentum = basisFunction.getAngularMomentum();
-
-    if (bAngularMomentum > _maxAngularMomentum)
+    else if (_name != other._name)
     {
-        _maxAngularMomentum = bAngularMomentum;
+        return false;
+    }
+    else if (_ecp_label != other._ecp_label)
+    {
+        return false;
+    }
+    else
+    {
+        return _functions == other._functions;
     }
 }
 
-int32_t
-CAtomBasis::getIdElemental() const
+auto
+CAtomBasis::set_identifier(const int identifier) -> void
 {
-    return _idElemental;
+    _identifier = identifier;
 }
 
-int32_t
-CAtomBasis::getMaxAngularMomentum() const
+auto
+CAtomBasis::set_name(const std::string &name) -> void
 {
-    return _maxAngularMomentum;
+    _name = name;
 }
 
-int32_t
-CAtomBasis::getNumberOfBasisFunctions(const int32_t angularMomentum) const
+auto
+CAtomBasis::set_ecp_label(const std::string &label) -> void
 {
-    if (angularMomentum > _maxAngularMomentum) return 0;
+    _ecp_label = label;
+}
 
-    int32_t nbfuncs = 0;
+auto
+CAtomBasis::add(const CBasisFunction &function) -> void
+{
+    _functions.push_back(function);
+}
 
-    for (size_t i = 0; i < _basisFunctions.size(); i++)
-    {
-        if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
+auto
+CAtomBasis::reduce_to_valence_basis() const -> CAtomBasis
+{
+    CAtomBasis vbasis;
+
+    vbasis.set_identifier(_identifier);
+
+    vbasis.set_name(_name + "(Valence)");
+
+    vbasis.set_ecp_label(_ecp_label);
+
+    const auto mang = chem_elem::max_angular_momentum(_identifier);
+
+    std::ranges::for_each(_functions, [&](const auto &bf) {
+        if (bf.get_angular_momentum() <= mang) vbasis.add(bf);
+    });
+
+    return vbasis;
+}
+
+auto
+CAtomBasis::basis_functions() const -> std::vector<CBasisFunction>
+{
+    return _functions;
+}
+
+auto
+CAtomBasis::basis_functions(const int angular_momentum) const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    bfs.reserve(_functions.size());
+
+    std::ranges::copy_if(_functions, std::back_inserter(bfs), [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; });
+
+    return bfs;
+}
+
+auto
+CAtomBasis::basis_functions(const int angular_momentum, const size_t npgtos) const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    bfs.reserve(_functions.size());
+
+    std::ranges::copy_if(_functions, std::back_inserter(bfs), [=](const auto &bf) {
+        return (bf.get_angular_momentum() == angular_momentum) && (bf.number_of_primitive_functions() == npgtos);
+    });
+
+    return bfs;
+}
+
+auto
+CAtomBasis::get_identifier() const -> int
+{
+    return _identifier;
+}
+
+auto
+CAtomBasis::get_name() const -> std::string
+{
+    return _name;
+}
+
+auto
+CAtomBasis::get_ecp_label() const -> std::string
+{
+    return _ecp_label;
+}
+
+auto
+CAtomBasis::need_ecp() const -> bool
+{
+    return !(_ecp_label.empty());
+}
+
+auto
+CAtomBasis::max_angular_momentum() const -> int
+{
+    auto pos = std::ranges::max_element(_functions,
+                                        [&](const auto &lbf, const auto &rbf) { return lbf.get_angular_momentum() < rbf.get_angular_momentum(); });
+
+    return (pos == _functions.end()) ? -1 : pos->get_angular_momentum();
+}
+
+auto
+CAtomBasis::number_of_basis_functions(const int angular_momentum) const -> size_t
+{
+    return static_cast<size_t>(std::ranges::count_if(_functions, [=](const auto &bf) { return bf.get_angular_momentum() == angular_momentum; }));
+}
+
+auto
+CAtomBasis::number_of_basis_functions(const int angular_momentum, const size_t npgtos) const -> size_t
+{
+    return static_cast<size_t>(std::ranges::count_if(_functions, [=](const auto &bf) {
+        return (bf.get_angular_momentum() == angular_momentum) && (bf.number_of_primitive_functions() == npgtos);
+    }));
+}
+
+auto
+CAtomBasis::number_of_primitive_functions(const int angular_momentum) const -> size_t
+{
+    return std::accumulate(_functions.begin(), _functions.end(), size_t{0}, [=](const size_t &sum, const auto &bf) {
+        return (bf.get_angular_momentum() == angular_momentum) ? sum + bf.number_of_primitive_functions() : sum;
+    });
+}
+
+auto
+CAtomBasis::contraction_depths(const int angular_momentum) const -> std::set<size_t>
+{
+    std::set<size_t> depths;
+
+    std::ranges::for_each(_functions, [&](const auto &bf) {
+        if (bf.get_angular_momentum() == angular_momentum) depths.insert(bf.number_of_primitive_functions());
+    });
+
+    return depths;
+}
+
+auto
+CAtomBasis::contraction_string() const -> std::string
+{
+    auto str = std::string("(");
+
+    auto mang = max_angular_momentum();
+
+    std::ranges::for_each(std::views::iota(0, mang + 1), [&](const int i) {
+        if (const auto ncgtos = number_of_basis_functions(i); ncgtos > 0)
         {
-            nbfuncs++;
+            str.append(std::to_string(ncgtos));
+            str.append(1, tensor::label(i));
+            if (i != mang) str.append(",");
         }
-    }
-
-    return nbfuncs;
-}
-
-int32_t
-CAtomBasis::getNumberOfBasisFunctions(const int32_t angularMomentum,
-                                      const int32_t nPrimitiveGtos) const
-{
-    if (angularMomentum > _maxAngularMomentum) return 0;
-
-    int32_t nbfuncs = 0;
-
-    for (size_t i = 0; i < _basisFunctions.size(); i++)
-    {
-        if ((_basisFunctions[i].getAngularMomentum() == angularMomentum) &&
-            (_basisFunctions[i].getNumberOfPrimitiveFunctions() == nPrimitiveGtos))
-        {
-            nbfuncs++;
-        }
-    }
-
-    return nbfuncs;
-}
-
-int32_t
-CAtomBasis::getNumberOfPrimitiveFunctions(const int32_t angularMomentum) const
-{
-    if (angularMomentum > _maxAngularMomentum) return 0;
-
-    int32_t npfuncs = 0;
-
-    for (size_t i = 0; i < _basisFunctions.size(); i++)
-    {
-        if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
-        {
-            npfuncs += _basisFunctions[i].getNumberOfPrimitiveFunctions();
-        }
-    }
-
-    return npfuncs;
-}
-
-std::set<int32_t>
-CAtomBasis::getContractionDepths(const int32_t angularMomentum) const
-{
-    std::set<int32_t> cnums;
-    
-    for (const auto& bfunc : _basisFunctions)
-    {
-        if (bfunc.getAngularMomentum() == angularMomentum)
-        {
-            cnums.insert(bfunc.getNumberOfPrimitiveFunctions());
-        }
-    }
-    
-    return cnums;
-}
-
-std::string
-CAtomBasis::getContractionString() const
-{
-    std::string str("(");
-
-    for (int32_t i = 0; i <= _maxAngularMomentum; i++)
-    {
-        str.append(std::to_string(getNumberOfBasisFunctions(i)));
-
-        str.append(fstr::to_AngularMomentum(i));
-
-        if (i != _maxAngularMomentum) str.append(",");
-    }
+    });
 
     str.append(")");
 
     return str;
 }
 
-std::string
-CAtomBasis::getPrimitivesString() const
+auto
+CAtomBasis::primitives_string() const -> std::string
 {
-    std::string str("(");
+    auto str = std::string("(");
 
-    for (int32_t i = 0; i <= _maxAngularMomentum; i++)
-    {
-        str.append(std::to_string(getNumberOfPrimitiveFunctions(i)));
+    const auto mang = max_angular_momentum();
 
-        str.append(fstr::to_AngularMomentum(i));
-
-        if (i != _maxAngularMomentum) str.append(",");
-    }
+    std::ranges::for_each(std::views::iota(0, mang + 1), [&](const int i) {
+        if (const auto npgtos = number_of_primitive_functions(i); npgtos > 0)
+        {
+            str.append(std::to_string(npgtos));
+            str.append(1, tensor::label(i));
+            if (i != mang) str.append(",");
+        }
+    });
 
     str.append(")");
 
     return str;
-}
-
-std::vector<CBasisFunction>
-CAtomBasis::getBasisFunctions(const int32_t angularMomentum) const
-{
-    std::vector<CBasisFunction> basvector;
-
-    for (size_t i = 0; i < _basisFunctions.size(); i++)
-    {
-        if (_basisFunctions[i].getAngularMomentum() == angularMomentum)
-        {
-            basvector.push_back(_basisFunctions[i]);
-        }
-    }
-
-    return basvector;
-}
-
-CAtomBasis
-CAtomBasis::reduceToValenceBasis() const
-{
-    // set atomic shell max. angular momentum
-
-    CChemicalElement chemele;
-
-    chemele.setAtomType(_idElemental);
-
-    auto mang = chemele.getMaxAngularMomentum();
-
-    // generate valence basis
-
-    CAtomBasis valbas;
-
-    valbas.setIdElemental(_idElemental);
-
-    for (size_t i = 0; i < _basisFunctions.size(); i++)
-    {
-        if (_basisFunctions[i].getAngularMomentum() <= mang)
-        {
-            valbas.addBasisFunction(_basisFunctions[i]);
-        }
-    }
-
-    return valbas;
-}
-
-void
-CAtomBasis::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if constexpr (ENABLE_MPI)
-    {
-        mpi::bcast(_idElemental, comm);
-
-        mpi::bcast(_maxAngularMomentum, comm);
-
-        int32_t nbasfuncs = static_cast<int32_t>(_basisFunctions.size());
-
-        mpi::bcast(nbasfuncs, comm);
-
-        for (int32_t i = 0; i < nbasfuncs; i++)
-        {
-            CBasisFunction bfunc;
-
-            if (rank == mpi::master()) bfunc = _basisFunctions[i];
-
-            bfunc.broadcast(rank, comm);
-
-            if (rank != mpi::master()) addBasisFunction(bfunc);
-
-            MPI_Barrier(comm);
-        }
-    }
-}
-
-std::string CAtomBasis::repr() const {
-    std::ostringstream os;
-
-    os << std::endl;
-
-    os << "[CAtomBasis (Object):" << this << "]" << std::endl;
-
-    os << "_idElemental: " << _idElemental << std::endl;
-
-    os << "_maxAngularMomentum: " << _maxAngularMomentum;
-
-    os << std::endl;
-
-    os << "_basisFunctions: " << std::endl;
-
-    for (size_t i = 0; i < _basisFunctions.size(); i++)
-    {
-        os << "_basisFunctions[" << i << "]: " << std::endl;
-
-        os << _basisFunctions[i] << std::endl;
-    }
-
-    return os.str();
-}
-
-std::ostream&
-operator<<(std::ostream& output, const CAtomBasis& source)
-{
-    return (output << source.repr());
 }
