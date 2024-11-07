@@ -1,14 +1,12 @@
 # import veloxchem as vlx
-from .molecule import Molecule
-from .veloxchemlib import OverlapIntegralsDriver
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import ao_matrix_to_veloxchem
-from .veloxchemlib import ao_matrix_to_dalton
-from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .molecule import Molecule
+from .aoindices import ao_matrix_to_veloxchem
+from .aoindices import ao_matrix_to_dalton
+#from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import xcfun
-from .veloxchemlib import XCMolecularHessian
-from .veloxchemlib import GridDriver
+#from .veloxchemlib import XCMolecularHessian
+from .griddriver import GridDriver
 from .dftutils import get_default_grid_level
 import numpy as np
 import sys
@@ -107,7 +105,7 @@ def get_molecule_string(molecule):
     for i in range(molecule.number_of_atoms()):
         mol_string += molecule.get_labels()[i] + " "
         for j in range(3):
-            mol_string += str(molecule.get_coordinates()[i][j]) + " "
+            mol_string += str(molecule.get_coordinates_in_bohr()[i][j]) + " "
 
         mol_string += "\n"
 

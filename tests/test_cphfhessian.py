@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import unittest
 import pytest
 import sys
 import h5py
@@ -17,7 +16,7 @@ except ImportError:
     pass
 
 
-class TestCphfSolver(unittest.TestCase):
+class TestCphfSolver:
 
     def run_cphfsolver(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
@@ -48,9 +47,8 @@ class TestCphfSolver(unittest.TestCase):
 
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            self.assertTrue(
-                np.max(np.abs(cphf_coefficients) -
-                       np.abs(cphf_reference)) < 1.0e-6)
+            assert np.max(np.abs(cphf_coefficients) -
+                          np.abs(cphf_reference)) < 1.0e-6
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
                         reason='pyscf for integral derivatives not available')

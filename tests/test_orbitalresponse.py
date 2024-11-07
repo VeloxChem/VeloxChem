@@ -1,7 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
-import unittest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -12,7 +11,7 @@ from veloxchem.tddftorbitalresponse import TddftOrbitalResponse
 from veloxchem.checkpoint import read_rsp_hdf5
 
 
-class TestOrbitalResponse(unittest.TestCase):
+class TestOrbitalResponse:
 
     def run_orbitalresponse(self, inpfile, potfile, xcfun_label,
                             orbrsp_ref_file, is_tda):
@@ -86,10 +85,9 @@ class TestOrbitalResponse(unittest.TestCase):
             lambda_ov = orb_resp_results['cphf_ov']
             lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, lambda_ov, mo_vir)
 
-            self.assertTrue(
-                np.max(np.abs(lambda_ao[0] - ref_lambda_ao)) < 5.0e-4)
+            assert np.max(np.abs(lambda_ao[0] - ref_lambda_ao)) < 5.0e-4
             # TODO: uncomment once TDDFT gradients are working
-            #self.assertTrue(np.max(np.abs(omega_ao[0] - ref_omega_ao)) < 5.0e-4)
+            #assert np.max(np.abs(omega_ao[0] - ref_omega_ao)) < 5.0e-4
 
     def test_tda_hf(self):
 
@@ -116,7 +114,3 @@ class TestOrbitalResponse(unittest.TestCase):
 
         self.run_orbitalresponse(inpfile, potfile, xcfun_label, orbrsp_ref_file,
                                  False)
-
-
-if __name__ == "__main__":
-    unittest.main()

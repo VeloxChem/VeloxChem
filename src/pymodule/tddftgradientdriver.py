@@ -27,9 +27,7 @@ import time as tm
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
 from .veloxchemlib import XCIntegrator
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .molecule import Molecule

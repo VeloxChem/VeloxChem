@@ -444,14 +444,14 @@ class TddftOrbitalResponse(CphfSolver):
             # Get overlap, MO coefficients from scf_tensors
             ovlp = scf_tensors['S']
             nocc = molecule.number_of_alpha_electrons()
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nocc = mo_occ.shape[1]
             nvir = mo_vir.shape[1]
             nao = mo_occ.shape[0]
 
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             evir = mo_energies[nocc:]
             eo_diag = np.diag(eocc)
@@ -476,10 +476,8 @@ class TddftOrbitalResponse(CphfSolver):
             fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
             fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_rhs_x_plus_y[ifock] = (
-                        fock_ao_rhs.alpha_to_numpy(ifock+dof) )
-                fock_ao_rhs_x_minus_y[ifock] = (
-                        fock_ao_rhs.alpha_to_numpy(ifock+2*dof) )
+                fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs[ifock+dof]
+                fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs[ifock+2*dof]
 
             Fp1_vv = np.zeros((dof, nao, nao))
             Fm1_vv = np.zeros((dof, nao, nao))
@@ -523,13 +521,12 @@ class TddftOrbitalResponse(CphfSolver):
                 for x in range(dof)
             ])
             lambda_ao_list = list([lambda_ao[s] for s in range(dof)])
-            ao_density_lambda = AODensityMatrix(lambda_ao_list, denmat.rest)
         else:
-            ao_density_lambda = AODensityMatrix()
+            lambda_ao_list = None
 
-        ao_density_lambda.broadcast(self.rank, self.comm)
+        lambda_ao_list = self.comm.bcast(lambda_ao_list, root=mpi_master())
 
-        fock_lambda = self._comp_lr_fock(ao_density_lambda, molecule, basis,
+        fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
                            eri_dict, dft_dict, pe_dict, self.profiler)
 
         if self.rank == mpi_master():
