@@ -363,13 +363,15 @@ class GradientDriver:
             The exchange-correlation contribution to TDDFT gradient.
         """
 
+        # TODO: take mol_grid from arguments
+
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xcgrad_drv = XCMolecularGradient(self.comm)
+        xcgrad_drv = XCMolecularGradient()
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
         tddft_xcgrad += xcgrad_drv.integrate_fxc_gradient(
