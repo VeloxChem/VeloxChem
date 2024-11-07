@@ -38,6 +38,7 @@ class TestGrad:
 
         scf_drv.update_settings(scf_dict, method_dict)
 
+        scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)
 
         if tamm_dancoff:
@@ -55,12 +56,15 @@ class TestGrad:
         rsp_solver.conv_thresh = 1e-5
         rsp_solver.nstates = 3
 
+        rsp_solver.ostream.mute()
         rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_tensors)
 
         tddft_grad = TddftGradientDriver()
 
         orbrsp_dict = {"conv_thresh": 1e-7}
         tddft_grad.update_settings({}, rsp_dict, orbrsp_dict, method_dict)
+
+        tddft_grad.ostream.mute()
         tddft_grad.compute(molecule, basis, scf_drv, rsp_solver, rsp_results)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():

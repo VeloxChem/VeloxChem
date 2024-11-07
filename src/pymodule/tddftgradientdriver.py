@@ -344,27 +344,23 @@ class TddftGradientDriver(GradientDriver):
             for s in range(dof):
                 if self.rank == mpi_master():
                     gs_dm = scf_drv.scf_tensors['D_alpha']
-                    gs_density = AODensityMatrix([gs_dm], denmat.rest)
 
                     rhow_dm = 0.5 * relaxed_density_ao[s]
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
-                    rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
 
                     x_minus_y_sym = 0.5 * (x_minus_y_ao[s] + x_minus_y_ao[s].T)
-                    x_minus_y_den_sym = AODensityMatrix([x_minus_y_sym],
-                                                        denmat.rest)
                 else:
-                    gs_density = AODensityMatrix()
-                    rhow_den_sym = AODensityMatrix()
-                    x_minus_y_den_sym = AODensityMatrix()
+                    gs_dm = None
+                    rhow_dm_sym = None
+                    x_minus_y_sym = None
 
-                gs_density.broadcast(self.comm)
-                rhow_den_sym.broadcast(self.comm)
-                x_minus_y_den_sym.broadcast(self.comm)
+                gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
+                rhow_dm_sym = self.comm.bcast(rhow_dm_sym, root=mpi_master())
+                x_minus_y_sym = self.comm.bcast(x_minus_y_sym, root=mpi_master())
 
                 tddft_xcgrad = self.grad_tddft_xc_contrib(molecule, basis,
-                                               rhow_den_sym, x_minus_y_den_sym,
-                                               gs_density, xcfun_label)
+                                               [rhow_dm_sym], [x_minus_y_sym],
+                                               [gs_dm], xcfun_label)
 
                 if self.rank == mpi_master():
                     self.gradient[s] += tddft_xcgrad
