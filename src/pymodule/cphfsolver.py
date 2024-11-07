@@ -30,18 +30,14 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import XCMolecularHessian
+#from .veloxchemlib import XCMolecularHessian
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
-from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .dftutils import get_default_grid_level
@@ -188,7 +184,7 @@ class CphfSolver(LinearSolver):
         timing_dict = {}
 
         if self.rank == mpi_master():
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
@@ -410,7 +406,7 @@ class CphfSolver(LinearSolver):
             natm = molecule.number_of_atoms()
             mo = scf_tensors['C_alpha']
             nao = mo.shape[0]
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
@@ -453,18 +449,14 @@ class CphfSolver(LinearSolver):
                     vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     vec_list.append(vec_ao)
 
-            if self.rank == mpi_master():
-                # create density matrices
-                dens = AODensityMatrix(vec_list, denmat.rest)
-            else:
-                dens = AODensityMatrix()
+            if self.rank != mpi_master():
+                vec_list = None
 
-            dens.broadcast(self.rank, self.comm)
+            # TODO: bcast array by array
+            vec_list = self.comm.bcast(vec_list, root=mpi_master())
 
             # create Fock matrices and contract with two-electron integrals
-            fock = AOFockMatrix(dens)
-
-            self._comp_lr_fock(fock, dens, molecule, basis, eri_dict,
+            fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
                               dft_dict, pe_dict, self.profiler)
 
             sigmas = None
@@ -477,7 +469,7 @@ class CphfSolver(LinearSolver):
                 vec = dist_trials.get_full_vector(ifock)
 
                 if self.rank == mpi_master():
-                    fock_vec = fock.alpha_to_numpy(ifock)
+                    fock_vec = fock[ifock]
                     cphf_mo = (
                         - np.linalg.multi_dot([mo_occ.T, fock_vec, mo_vir])
                         - np.linalg.multi_dot([mo_vir.T, fock_vec, mo_occ]).T
@@ -752,9 +744,6 @@ class CphfSolver(LinearSolver):
         ao_density_cphf.broadcast(self.rank, self.comm)
 
 
-        # Create a Fock Matrix Object (initialized with zeros)
-        fock_cphf = AOFockMatrix(ao_density_cphf)
-
         # Matrix-vector product of orbital Hessian with trial vector
         def cphf_matvec(v):
             """
@@ -778,7 +767,7 @@ class CphfSolver(LinearSolver):
                 ao_density_cphf = AODensityMatrix()
             ao_density_cphf.broadcast(self.rank, self.comm)
 
-            self._comp_lr_fock(fock_cphf, ao_density_cphf, molecule,
+            fock_cphf = self._comp_lr_fock(ao_density_cphf, molecule,
                               basis, eri_dict, dft_dict, pe_dict, self.profiler)
 
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
@@ -786,7 +775,7 @@ class CphfSolver(LinearSolver):
             if self.rank == mpi_master():
                 cphf_mo = np.zeros((dof, nocc, nvir))
                 for i in range(dof):
-                    fock_cphf_numpy = fock_cphf.to_numpy(i)
+                    fock_cphf_numpy = fock_cphf[i]
                     cphf_mo[i] = ( - np.linalg.multi_dot([mo_occ.T,
                                                         fock_cphf_numpy,
                                                         mo_vir])

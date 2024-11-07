@@ -30,18 +30,15 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import XCMolecularHessian
+#from .veloxchemlib import ElectronRepulsionIntegralsDriver
+#from .veloxchemlib import XCMolecularHessian
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
-from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .dftutils import get_default_grid_level
@@ -126,7 +123,7 @@ class HessianOrbitalResponse(CphfSolver):
 
             density = scf_tensors['D_alpha']
             mo = scf_tensors['C_alpha']
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             nao = mo.shape[0]
 
             # nmo is sometimes different than nao (because of linear
@@ -221,15 +218,13 @@ class HessianOrbitalResponse(CphfSolver):
             uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
 
             # create AODensity and Fock matrix objects, contract with ERI
-            ao_density_uij = AODensityMatrix(uij_ao_list, denmat.rest)
         else:
-            ao_density_uij = AODensityMatrix()
+            uij_ao_list = None
 
-        ao_density_uij.broadcast(self.rank, self.comm)
+        # TODO: bcast array by array
+        uij_ao_list = self.comm.bcast(uij_ao_list, root=mpi_master())
 
-        fock_uij = AOFockMatrix(ao_density_uij)
-
-        self._comp_lr_fock(fock_uij, ao_density_uij, molecule, basis,
+        fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis,
                            eri_dict, dft_dict, pe_dict, self.profiler)
        
         t2 = tm.time() 
@@ -244,7 +239,7 @@ class HessianOrbitalResponse(CphfSolver):
             fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
             for i in range(natm):
                 for x in range(3):
-                    fock_uij_numpy[i,x] = fock_uij.to_numpy(3*i + x)
+                    fock_uij_numpy[i,x] = fock_uij[3*i + x]
                     # transform to MO basis
                     fock_uij_mo[i,x] = np.linalg.multi_dot([
                         mo_occ.T, fock_uij_numpy[i, x], mo_vir

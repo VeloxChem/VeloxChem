@@ -24,6 +24,8 @@
 
 import numpy as np
 
+from .veloxchemlib import DenseMatrix
+
 
 def get_basis_function_indices_of_atoms(molecule, basis):
     """
@@ -83,18 +85,25 @@ def get_basis_function_indices_of_atoms(molecule, basis):
     return flat_inds
 
 
-def ao_matrix_to_dalton(array, molecule, basis):
+def ao_matrix_to_dalton(array, basis, molecule):
 
     bf_indices = get_basis_function_indices_of_atoms(molecule, basis)
 
-    return array[bf_indices, :][:, bf_indices]
+    if isinstance(array, DenseMatrix):
+        return DenseMatrix(array.to_numpy()[bf_indices, :][:, bf_indices])
+    else:
+        return array[bf_indices, :][:, bf_indices]
 
 
-def ao_matrix_to_veloxchem(array, molecule, basis):
+def ao_matrix_to_veloxchem(array, basis, molecule):
 
     bf_indices = get_basis_function_indices_of_atoms(molecule, basis)
 
     reverse_indices = [(x, i) for i, x in enumerate(bf_indices)]
     reverse_indices = [x[1] for x in sorted(reverse_indices)]
 
-    return array[reverse_indices, :][:, reverse_indices]
+    if isinstance(array, DenseMatrix):
+        return DenseMatrix(
+            array.to_numpy()[reverse_indices, :][:, reverse_indices])
+    else:
+        return array[reverse_indices, :][:, reverse_indices]
