@@ -159,9 +159,11 @@ class SystemBuilder:
         self.ostream.print_info(f"Solvating the solute with {solvent} molecules")
         self.ostream.print_info(f"Padding: {padding} nm")
         self.ostream.print_blank()
+        self.ostream.flush()
         if equilibrate:
             self.ostream.print_info("NPT Equilibration of the box requested")
             self.ostream.print_blank()
+            self.ostream.flush()
 
         # Add the solute to the system
         self._load_solute_molecule(solute)
@@ -172,14 +174,17 @@ class SystemBuilder:
         # Determine the solute volume and convert it to nm^3
         solute_volume = self._get_volume(solute) * 1e-3
         self.ostream.print_info("The volume of the solute is: {:.2f} nm^3".format(solute_volume))
+        self.ostream.flush()
 
         # Define the box
         self._define_box(box_size, box_size, box_size)
         self.ostream.print_info("The box size is: {:.2f} x {:.2f} x {:.2f} nm^3".format(box_size * 0.1 , box_size * 0.1, box_size * 0.1))
+        self.ostream.flush()
 
         # Accesible volume for the solvent
         volume_nm3 = box_size ** 3 * 0.001  - solute_volume
         self.ostream.print_info("The volume available for the solvent is: {:.2f} nm^3".format(volume_nm3))
+        self.ostream.flush()
 
         if solvent == 'other':
 
@@ -188,13 +193,14 @@ class SystemBuilder:
             if target_density is None:
                 raise ValueError(f"The target density must be provided if the solvent is 'other'")
             self.ostream.print_info(f"The target density of the solvent is: {target_density} kg/m^3")
-
+            self.ostream.flush()
             # Register the solvent molecule and its quantity to be added to the system
             mols_per_nm3 = self._density_to_mols_per_nm3(solvent_molecule, target_density)
 
             # Calculate the number of solvent molecules to be added (rounded to the nearest integer)
             number_of_solvents = int(mols_per_nm3 * volume_nm3)
             self.ostream.print_info(f"The number of solvent molecules to be added to match the target density is: {number_of_solvents}")
+            self.ostream.flush()
 
             # Register the solvent molecule and its quantity to be added to the system
             self._load_solvent_molecule(solvent_molecule, number_of_solvents)
@@ -204,7 +210,8 @@ class SystemBuilder:
             if target_density is None:
                 raise ValueError(f"The target density must be provided if the solvent is 'itself'")
             self.ostream.print_info(f"The target density of the solvent is: {target_density} kg/m^3")
-
+            self.ostream.flush()
+            
             solvent_molecule = solute
             # Extract the properties of the solute
             mols_per_nm3 = self._density_to_mols_per_nm3(solvent_molecule, target_density)
@@ -212,7 +219,8 @@ class SystemBuilder:
             # Calculate the number of solvent molecules to be added (rounded to the nearest integer)
             number_of_solvents = int(mols_per_nm3 * volume_nm3)
             self.ostream.print_info(f"The number of solvent molecules to be added to match the target density is: {number_of_solvents}")
-
+            self.ostream.flush()
+            
             # Register the solvent molecule and its quantity to be added to the system
             self._load_solvent_molecule(solute, number_of_solvents)
 
@@ -223,6 +231,7 @@ class SystemBuilder:
             # Calculate the number of solvent molecules to be added (rounded to the nearest integer)
             number_of_solvents = int(mols_per_nm3 * volume_nm3)
             self.ostream.print_info(f"The experimental density of {solvent} is: {density} kg/m^3")
+            self.ostream.flush()
 
             # Register the solvent molecule and its quantity to be added to the system
             solvent_molecule = Molecule.read_smiles(smiles_code)
@@ -256,14 +265,21 @@ class SystemBuilder:
 
             if charge == 0:
                 self.ostream.print_info("The solute is neutral, no counterions will be added")
+                self.ostream.flush()
+
             elif charge > 0:
                 self.ostream.print_info(f"The solute has a charge of {charge}, adding {abs(charge)}{self.ncharge} counterions")
+                self.ostream.flush()
+
                 self.ion_name = self.ncharge
                 self.counterion = self._counterion_molecules()
                 # Update the required number of solvents
                 number_of_solvents -= abs(charge)
+
             elif charge < 0:
                 self.ostream.print_info(f"The solute has a charge of {charge}, adding {abs(charge)} {self.pcharge} counterions")
+                self.ostream.flush()
+
                 self.ion_name = self.pcharge
                 self.counterion = self._counterion_molecules()
                 number_of_solvents -= abs(charge)
@@ -318,9 +334,11 @@ class SystemBuilder:
             self.added_solvent_counts.append(added_count)
             msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
             self.ostream.print_info(msg)
+            self.ostream.flush()
 
         end = time.time()
         self.ostream.print_info(f"Time to solvate the system: {end - start:.2f} s")
+        self.ostream.flush()
         # Print results
         self.ostream.print_info(f'The density of the solvent after packing is:{self._check_density(solvent_molecule, self.added_solvent_counts[0], volume_nm3)} kg/m^3')
         self.ostream.flush()
@@ -332,13 +350,18 @@ class SystemBuilder:
             self.ostream.print_blank()
             self.ostream.print_info("Equilibrating the system")
             self.ostream.print_blank()
+            self.ostream.flush()
             self.ostream.print_info(f"Duration: {self.steps/1000} ps")
+            self.ostream.flush()
             self.ostream.print_info(f"Temperature: {self.temperature} K")
+            self.ostream.flush()
             self.ostream.print_info(f"Pressure: {self.pressure} bar")
+            self.ostream.flush()
             self.ostream.print_blank()
             start = time.time()
             self.perform_equilibration()
             self.ostream.print_info("Equilibration completed, system saved as 'equilibrated_system.pdb'")
+            self.ostream.flush()
             end = time.time()
             self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
             self.ostream.flush()
@@ -408,11 +431,12 @@ class SystemBuilder:
             self.added_solvent_counts[i] = added_count
             msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
             self.ostream.print_info(msg)
+            self.ostream.flush()
 
         self.system_molecule = self._save_molecule()
 
     
-    def write_gromacs_files(self, solute_ff=None, solvent_ffs=None):
+    def write_gromacs_files(self, solute_ff=None, solvent_ffs=None, equilibration=False):
         '''
         Generates the ForceField for the system
 
@@ -420,9 +444,12 @@ class SystemBuilder:
             The ForceField object of the solute
         :param solvent_ffs:
             The list of ForceField objects of the solvent molecules
+        :param equilibration:
+            Boolean flag to indicate if the gromacs files will be used for equilibration.
+            If True, printouts will not be displayed.
         '''
 
-        self._generate_forcefields(solute_ff, solvent_ffs)
+        self._generate_forcefields(solute_ff, solvent_ffs, equilibration)
 
         # Special case for 'itself' solvent
         if self.solvent_name == 'itself':
@@ -440,22 +467,29 @@ class SystemBuilder:
                         break
                     else:
                         f.write(line)
-            
-            self.ostream.print_info("liquid.itp, liquid.top, and solute.top files written")
-            # Write the system GRO file
-            self._write_system_gro(filename='liquid.gro')
-            self.ostream.flush()
 
+            if not equilibration:
+                self.ostream.print_info("liquid.itp, liquid.top, and solute.top files written")
+                # Write the system GRO file
+                self.ostream.flush()
+
+            self._write_system_gro(filename='liquid.gro')
+        
         else:
             # Write the itp files
             self.solute_ff.write_itp('solute.itp', 'MOL')
-            self.ostream.print_info("solute.itp file written")
-                
+            
+            if not equilibration:
+                self.ostream.print_info("solute.itp file written")
+                self.ostream.flush()
+
             # Only write the solvent itp files if they are not SPCE or TIP3P
             if self.solvent_ffs:
                 for i, solvent_ff in enumerate(self.solvent_ffs):
                     solvent_ff.write_itp(f'solvent_{i+1}.itp', f'SOL{i+1}')
-                    self.ostream.print_info(f"solvent_{i+1}.itp file written")
+                    if not equilibration:
+                        self.ostream.print_info(f"solvent_{i+1}.itp file written")
+                        self.ostream.flush()
 
             # Post-treatment of the files to ensure compatibility with GROMACS parsing.
             # Extract the atom types from the itp files
@@ -517,7 +551,9 @@ class SystemBuilder:
                     if self.counterion:
                         residue_name = self.ion_name.upper()
                         f.write(f'{residue_name} {abs(self.added_counterions)}\n')
-                self.ostream.print_info("system.top file written")
+                if not equilibration:
+                    self.ostream.print_info("system.top file written")
+                    self.ostream.flush()
 
             else:
                 # Write the top file based on the forcefields generated
@@ -543,12 +579,16 @@ class SystemBuilder:
                         f.write(f'SOL{i+1} {count}\n')
                     if self.counterion:
                         f.write('ION 1\n')
-                self.ostream.print_info("system.top file written")
+                if not equilibration:
+                    self.ostream.print_info("system.top file written")
+                    self.ostream.flush()
 
             # Write the system GRO file
             self._write_system_gro()
-            self.ostream.print_info("system.gro file written")
-            self.ostream.flush()
+         
+            if not equilibration:
+                self.ostream.print_info("system.gro file written")
+                self.ostream.flush()
 
     def write_openmm_files(self, solute_ff=None, solvent_ffs=None):
         '''
@@ -572,20 +612,24 @@ class SystemBuilder:
             # Write the system PDB file
             self._write_system_pdb(filename='liquid.pdb')
             self.ostream.print_info("liquid.pdb file written")
+            self.ostream.flush()
 
         else:
             # Solute
             self.solute_ff.write_openmm_files('solute', 'MOL')
             self.ostream.print_info("system.pdb, solute.pdb, and solute.xml files written")
-            
+            self.ostream.flush()
+
             # Not standard solvents
             if self.solvent_name not in ['spce', 'tip3p']:
                 for i, solvent_ff in enumerate(self.solvent_ffs):
                     solvent_ff.write_openmm_files(f'solvent_{i+1}', f'S{i+1:02d}')
                     self.ostream.print_info(f"solvent_{i+1}.pdb and solvent_{i+1}.xml files written")
+                    self.ostream.flush()
             else:
                 self.ostream.print_info(f"Using standard AMBER {self.solvent_name} forcefield, no solvent xml files will be written")
                 self.ostream.print_info(f'Remember to include amber03.xml and the {self.solvent_name}.xml file while creating the OpenMM system')
+                self.ostream.flush()
 
             # Write the system PDB file
             self._write_system_pdb()
@@ -605,42 +649,68 @@ class SystemBuilder:
         except ImportError:
             raise ImportError("OpenMM is required for this functionality")
         
-        self.ostream.print_info("OpenMM files will be written")
+        # Generate the forcefields using semiempirical charges.
 
-        # TODO: Use semiempirical charges for the forcefield in the equilibrate function
+        solute_ff = ForceFieldGenerator()
+        solute_ff.ostream.mute()
+        solute_ff.partial_charges = self.solute.get_partial_charges(self.solute.get_charge())
+        solute_ff.create_topology(self.solute)
 
-        self.write_openmm_files()
+        if self.solvent_name == 'itself':
+            solvent_ffs = []
+
+        elif self.solvent_name in ['spce', 'tip3p']:
+            solvent_ffs = None
+        else:
+            solvent_ffs = []
+            for i in range(len(self.solvents)):
+                solvent_ff = ForceFieldGenerator()
+                solvent_ff.ostream.mute()
+                solvent_ff.partial_charges = self.solvents[i].get_partial_charges(self.solvents[i].get_charge())
+                solvent_ff.create_topology(self.solvents[i])
+                solvent_ffs.append(solvent_ff)
+
+        self.write_gromacs_files(solute_ff, solvent_ffs, equilibration=True)
 
         # Load the system
         if self.solvent_name == 'itself':
-            pdb = app.PDBFile('liquid.pdb')
+            gro = app.GromacsGroFile('liquid.gro')
         else:
-            pdb = app.PDBFile('system.pdb')
+            gro = app.GromacsGroFile('system.gro')
 
-        # Append a list of force fields for different cases:
-        force_fields = ['solute.xml']
-        if self.solvent_name == "spce":
-            force_fields.append('amber03.xml')
-            force_fields.append('spce.xml')
-        elif self.solvent_name == "tip3p":
-            force_fields.append('amber03.xml')
-            force_fields.append('tip3p.xml')
-        else:
-            if self.solvent_name != 'itself':
-                for i in range(len(self.solvent_ffs)):
-                    force_fields.append(f'solvent_{i+1}.xml')
+        # # Append a list of force fields for different cases:
+        # force_fields = ['solute.xml']
+        # if self.solvent_name == "spce":
+        #     force_fields.append('amber03.xml')
+        #     force_fields.append('spce.xml')
+        # elif self.solvent_name == "tip3p":
+        #     force_fields.append('amber03.xml')
+        #     force_fields.append('tip3p.xml')
+        # else:
+        #     if self.solvent_name != 'itself':
+        #         for i in range(len(self.solvent_ffs)):
+        #             force_fields.append(f'solvent_{i+1}.xml')
 
-        if self.counterion:
-            if self.solvent_name in ['spce', 'tip3p']:
-                pass
-            else:
-                force_fields.append('amber03.xml')
+        # if self.counterion:
+        #     if self.solvent_name in ['spce', 'tip3p']:
+        #         pass
+        #     else:
+        #         force_fields.append('amber03.xml')
         
+        # # Create the force field
+        if self.solvent_name == 'itself':
+            forcefield = app.GromacsTopFile('liquid.top', periodicBoxVectors=gro.getPeriodicBoxVectors())
+        else:
+            forcefield = app.GromacsTopFile('system.top', periodicBoxVectors=gro.getPeriodicBoxVectors())
+
+        topology = forcefield.topology
+        positions = gro.positions
+
         # Create the force field
-        forcefield = app.ForceField(*force_fields)
+        #forcefield = app.ForceField(*force_fields)
 
         # Create the OpenMM system
-        system = forcefield.createSystem(pdb.topology,
+        system = forcefield.createSystem(
                                         nonbondedMethod=app.PME, 
                                         nonbondedCutoff=1.0*unit.nanometers, 
                                         constraints=app.HBonds, 
@@ -652,8 +722,8 @@ class SystemBuilder:
         system.addForce(barostat)
 
         # Create the simulation
-        simulation = app.Simulation(pdb.topology, system, integrator)
-        simulation.context.setPositions(pdb.positions)
+        simulation = app.Simulation(topology, system, integrator)
+        simulation.context.setPositions(positions)
 
         # Minimize the energy
         simulation.minimizeEnergy()
@@ -662,7 +732,7 @@ class SystemBuilder:
         simulation.reporters.append(app.StateDataReporter('equilibration.log', 1000, step=True, potentialEnergy=True, temperature=True, volume=True))
         simulation.step(self.steps)
 
-        # Save the equilibrated system as a GROMACS file
+        # Get the final positions
         positions = simulation.context.getState(getPositions=True).getPositions()
 
         # Exctract the new box size from the simulation context
@@ -670,16 +740,26 @@ class SystemBuilder:
         # Update the box size
         self.box = [box_vectors[0][0].value_in_unit(unit.nanometer), box_vectors[1][1].value_in_unit(unit.nanometer), box_vectors[2][2].value_in_unit(unit.nanometer)]
         self.ostream.print_info(f'The box size after equilibration is: {self.box[0]:.2f} x {self.box[1]:.2f} x {self.box[2]:.2f} nm^3')
-
+        self.ostream.flush()
         # Recalculate the available volume for the solvent
         volume_nm3 = self.box[0] * self.box[1] * self.box[2] - self._get_volume(self.solute) * 1e-3
 
         # Recalculate the density of the solvent
         self.ostream.print_info(f'The density of the solvent after equilibration is: {self._check_density(self.solvents[0], self.added_solvent_counts[0], volume_nm3)} kg/m^3')
-
+        self.ostream.flush()
         # Write the PDB file
         with open('equilibrated_system.pdb', 'w') as f:
             app.PDBFile.writeFile(simulation.topology, positions, f)
+
+        # Delete the produced gro and top files
+            #if self.solvent_name == 'itself':
+            #os.remove('liquid.gro')
+            #os.remove('liquid.top')
+            #os.remove('liquid.itp')
+            #else:
+            #os.remove('system.gro')
+            #os.remove('system.top')
+        #os.remove('solute.itp')
 
         # Update the system molecule
         self.system_molecule = Molecule.read_pdb_file('equilibrated_system.pdb')
@@ -1001,7 +1081,7 @@ class SystemBuilder:
 
         return mols_per_nm3
     
-    def _generate_forcefields(self, solute_ff, solvent_ffs):
+    def _generate_forcefields(self, solute_ff, solvent_ffs, equilibration=False):
         """
         Generate the force fields for the solute and solvent molecules.
         The forcefields get stored in the solute_ff and solvent_ffs attributes (lists).
@@ -1010,33 +1090,45 @@ class SystemBuilder:
             The ForceField object of the solute.
         :param solvent_ffs:
             The list of ForceField objects of the solvent molecules.
+        :param equilibration:
+            Boolean flag to indicate if the gromacs files will be used for equilibration.
+            If True, printouts will not be displayed.
         """
-
+        
         # Solute
         if not solute_ff:
             self.solute_ff = ForceFieldGenerator()
             self.solute_ff.ostream.mute()
-            self.ostream.print_info('Generating the ForceField for the solute')
+            if not equilibration:
+                self.ostream.print_info('Generating the ForceField for the solute')
+                self.ostream.flush()
             self.solute_ff.create_topology(self.solute)
-            self.ostream.print_info('Generated the ForceField for the solute')
+            if not equilibration:
+                self.ostream.print_info('Generated the ForceField for the solute')
+                self.ostream.flush()
         else:
             self.solute_ff = solute_ff
 
         # Solvents
         # Special case for itself
-        if self.solvent_name == 'itself':
-            self.solvent_ffs = []
-            self.solvent_ffs.append(self.solute_ff)
-        # Non-water solvents
-        if self.solvent_name not in ['spce', 'tip3p']:
-            self.solvent_ffs = []
-            for solvent in self.solvents:
-                solvent_ff = ForceFieldGenerator()
-                solvent_ff.ostream.mute()
-                self.ostream.print_info(f'Generating the ForceField for the solvent')
-                solvent_ff.create_topology(solvent)
-                self.ostream.print_info(f'Generated the ForceField for the solvent')
-                self.solvent_ffs.append(solvent_ff)
+        if not solvent_ffs:
+            if self.solvent_name == 'itself':
+                self.solvent_ffs = []
+                self.solvent_ffs.append(self.solute_ff)
+            # Non-water solvents
+            if self.solvent_name not in ['spce', 'tip3p']:
+                self.solvent_ffs = []
+                for solvent in self.solvents:
+                    solvent_ff = ForceFieldGenerator()
+                    solvent_ff.ostream.mute()
+                    if not equilibration:
+                        self.ostream.print_info(f'Generating the ForceField for the solvent')
+                        self.ostream.flush()
+                    solvent_ff.create_topology(solvent)
+                    if not equilibration:
+                        self.ostream.print_info(f'Generated the ForceField for the solvent')
+                        self.ostream.flush()
+                    self.solvent_ffs.append(solvent_ff)
         else:
             self.solvent_ffs = solvent_ffs
 
@@ -1055,22 +1147,26 @@ class SystemBuilder:
                 f.write('Generated by VeloxChem\n')
                 f.write(f'{self.system_molecule.number_of_atoms()}\n')
 
+                # Initialize residue_offset before the molecule loop
+                residue_offset = 0
+                atom_counter = 1
                 # Atoms
                 for mols in range(self.added_solvent_counts[0] + 1):
+                    residue_number = mols + 1
                     for i, atom in self.solute_ff.atoms.items():
                         atom_name = atom['name']
-                        residue_number = mols + 1
-                        residue_offset = 0
-                        line_str = f'{residue_number:>5d}{"MOL":<5s}{atom_name:<5s}{i + 1:>5d}'
+                        line_str = f'{residue_number:>5d}{"MOL":<5s}{atom_name:<5s}{atom_counter:>5d}'
                         for d in range(3):
-                            line_str += f'{coords_in_nm[i + residue_offset][d]:{8}.{3}f}'
+                            line_str += f'{coords_in_nm[residue_offset + i][d]:{8}.{3}f}'
                         line_str += '\n'
                         f.write(line_str)
+                        atom_counter += 1
+                    # Increment residue_offset after each molecule
                     residue_offset += len(self.solute_ff.atoms)
 
                 # Box
                 for d in range(3):
-                    f.write(f'{self.box[d]:{10}.{5}f}')
+                    f.write(f'{self.box[d]*0.1:{10}.{5}f}')
 
         else:
             with open(filename, 'w') as f:

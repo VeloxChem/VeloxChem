@@ -424,7 +424,9 @@ class OpenMMDynamics:
                                 padding=self.padding,
                                 equilibrate=True
                                 )
-            #sys_builder.write_openmm_files(solute_ff=ff_gen)
+            
+            sys_builder.write_openmm_files(solute_ff=ff_gen)
+            
             if solvent == 'spce':
                 self.water_ff = 'spce.xml'
                 forcefield_files = [f'{filename}.xml', self.parent_ff, self.water_ff]
