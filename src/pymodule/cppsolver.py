@@ -287,7 +287,7 @@ class ComplexResponse(LinearSolver):
 
         :return:
             A dictionary containing response functions, solutions and a
-            dictionarry containing solutions and kappa values when called from
+            dictionary containing solutions and kappa values when called from
             a non-linear response module.
         """
 

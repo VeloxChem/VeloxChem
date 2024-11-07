@@ -150,7 +150,7 @@ class LinearSolver:
         self._ostream = ostream
 
         # restart information
-        self.restart = False
+        self.restart = True
         self.checkpoint_file = None
         self.force_checkpoint = False
         self.save_solutions = True
