@@ -296,23 +296,20 @@ class TddftOrbitalResponse(CphfSolver):
                     zero_dm_ao_list.extend([0 * x_minus_y_ao[s],
                                             0 * x_minus_y_ao[s]])
 
-                perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
-                                                  denmat.rest)
-
-                # corresponds to rho^{omega_b,omega_c} in quadratic response,
-                # which is zero for TDDFT orbital response
-                zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
         else:
             dof = None
             dm_ao_rhs = None
             if self._dft:
-                perturbed_dm_ao = AODensityMatrix()
-                zero_dm_ao =  AODensityMatrix()
+                perturbed_dm_ao_list = None
+                zero_dm_ao_list =  None
 
         dof = self.comm.bcast(dof, root=mpi_master())
 
-        # TODO: bcast array by array
-        dm_ao_list = self.comm.bcast(dm_ao_list, root=mpi_master())
+        if self._dft:
+            # TODO: bcast array by array
+            perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list, root=mpi_master())
+            # TODO: bcast array by array
+            dm_ao_list = self.comm.bcast(dm_ao_list, root=mpi_master())
 
 
         molgrid = dft_dict['molgrid']
@@ -322,30 +319,26 @@ class TddftOrbitalResponse(CphfSolver):
                           eri_dict, dft_dict, pe_dict, self.profiler)
 
         if self._dft:
-            perturbed_dm_ao.broadcast(self.rank, self.comm)
-            zero_dm_ao.broadcast(self.rank, self.comm)
             # Fock matrix for computing gxc
             fock_gxc_ao = []
-            for i_mat in range(zero_dm_ao.number_of_density_matrices()):
-                fock_gxc_ao.append(zero_dm_ao.alpha_to_numpy(i_mat))
+            for i_mat in range(len(zero_dm_ao_list)):
+                fock_gxc_ao.append(zero_dm_ao_list[i_mat].copy())
         else:
             fock_gxc_ao = None
 
         if self._dft:
-            if not self.xcfun.is_hybrid():
-                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                    fock_gxc_ao.scale(2.0, ifock)
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv = XCIntegrator()
-            molgrid.partition_grid_points()
-            molgrid.distribute_counts_and_displacements(self.rank,
-                                                self.nodes, self.comm)
+            #molgrid.partition_grid_points()
+            #molgrid.distribute_counts_and_displacements(self.rank,
+            #                                    self.nodes, self.comm)
             xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis, 
-                                      perturbed_dm_ao, zero_dm_ao,
+                                      perturbed_dm_ao_list, zero_dm_ao_list,
                                       gs_density, molgrid,
                                       self.xcfun.get_func_label(), "qrf")
 
-            fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
+            for idx in range(len(fock_gxc_ao)):
+                fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx], root=mpi_master())
 
         # Calculate the RHS and transform it to the MO basis
         if self.rank == mpi_master():
@@ -396,7 +389,7 @@ class TddftOrbitalResponse(CphfSolver):
                 gxc_ao = np.zeros((dof, nao, nao))
                 gxc_mo = np.zeros((dof, nocc, nvir))
                 for ifock in range(dof):
-                    gxc_ao[ifock] = fock_gxc_ao.alpha_to_numpy(2*ifock)
+                    gxc_ao[ifock] = fock_gxc_ao[2*ifock]
                     gxc_mo[ifock] = np.linalg.multi_dot([mo_occ.T, gxc_ao[ifock],
                                                          mo_vir])
                 rhs_mo += 0.25 * gxc_mo
@@ -596,7 +589,7 @@ class TddftOrbitalResponse(CphfSolver):
             if fock_gxc_ao is not None:
                 factor = -0.25
                 for ifock in range(dof):
-                    fock_gxc_ao_np = fock_gxc_ao.alpha_to_numpy(2*ifock)
+                    fock_gxc_ao_np = fock_gxc_ao[2*ifock]
                     omega[ifock] += factor * np.linalg.multi_dot([
                         D_occ, fock_gxc_ao_np, D_occ
                         ])

@@ -225,7 +225,7 @@ class TddftGradientDriver(GradientDriver):
             gs_dm = scf_drv.scf_tensors['D_alpha']
             nocc = molecule.number_of_alpha_electrons()
             natm = molecule.number_of_atoms()
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nocc = mo_occ.shape[1]
@@ -259,7 +259,7 @@ class TddftGradientDriver(GradientDriver):
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
         gs_grad_drv.ostream.mute()
-        gs_grad_drv.compute(molecule, basis)
+        gs_grad_drv.compute(molecule, basis, scf_drv.scf_tensors)
         gs_grad_drv.ostream.unmute()
         t2 = tm.time()
 
@@ -358,9 +358,9 @@ class TddftGradientDriver(GradientDriver):
                     rhow_den_sym = AODensityMatrix()
                     x_minus_y_den_sym = AODensityMatrix()
 
-                gs_density.broadcast(self.rank, self.comm)
-                rhow_den_sym.broadcast(self.rank, self.comm)
-                x_minus_y_den_sym.broadcast(self.rank, self.comm)
+                gs_density.broadcast(self.comm)
+                rhow_den_sym.broadcast(self.comm)
+                x_minus_y_den_sym.broadcast(self.comm)
 
                 tddft_xcgrad = self.grad_tddft_xc_contrib(molecule, basis,
                                                rhow_den_sym, x_minus_y_den_sym,

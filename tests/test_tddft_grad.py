@@ -1,8 +1,9 @@
+from mpi4py import MPI
 import numpy as np
-import sys
 import pytest
+import sys
 
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -62,7 +63,7 @@ class TestGrad:
         tddft_grad.update_settings({}, rsp_dict, orbrsp_dict, method_dict)
         tddft_grad.compute(molecule, basis, scf_drv, rsp_solver, rsp_results)
 
-        if is_mpi_master():
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
             grad = tddft_grad.get_gradient()[0]
             assert np.max(np.abs(grad - ref_grad)) < 1.0e-6
 

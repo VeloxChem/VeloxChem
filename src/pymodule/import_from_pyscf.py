@@ -1,6 +1,7 @@
 # import veloxchem as vlx
 from .veloxchemlib import DenseMatrix
 from .molecule import Molecule
+from .aoindices import get_basis_function_indices_of_atoms
 from .aoindices import ao_matrix_to_veloxchem
 from .aoindices import ao_matrix_to_dalton
 #from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -553,10 +554,10 @@ def import_2e_integral_braket(bra1_molecule, bra1_basis, bra2_molecule, bra2_bas
     # Transform integral to veloxchem format
     vlx_int = np.zeros_like(pyscf_int)
 
-    basis_set_map1 = bra1_basis.get_index_map(bra1_molecule)
-    basis_set_map2 = bra2_basis.get_index_map(bra2_molecule)
-    basis_set_map3 = ket1_basis.get_index_map(ket1_molecule)
-    basis_set_map4 = ket2_basis.get_index_map(ket2_molecule)
+    basis_set_map1 = get_basis_function_indices_of_atoms(bra1_molecule, bra1_basis)
+    basis_set_map2 = get_basis_function_indices_of_atoms(bra2_molecule, bra2_basis)
+    basis_set_map3 = get_basis_function_indices_of_atoms(ket1_molecule, ket1_basis)
+    basis_set_map4 = get_basis_function_indices_of_atoms(ket2_molecule, ket2_basis)
 
     for m in range(nao1):
         for n in range(nao2):
@@ -639,7 +640,7 @@ def import_2e_integral(molecule, basis, int_type, atom1=None, shell1=None,
     # Transform integral to veloxchem format
     vlx_int = np.zeros_like(pyscf_int)
 
-    basis_set_map = basis.get_index_map(molecule)
+    basis_set_map = get_basis_function_indices_of_atoms(molecule, basis)
     for m in range(nao):
         for n in range(nao):
             for t in range(nao):
@@ -1453,10 +1454,10 @@ def import_2e_integral_derivative_braket(bra1_molecule, bra1_basis, bra2_molecul
     # Transform integral to veloxchem format
     vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atom_i)
 
-    basis_set_map1 = bra1_basis.get_index_map(bra1_molecule)
-    basis_set_map2 = bra2_basis.get_index_map(bra2_molecule)
-    basis_set_map3 = ket1_basis.get_index_map(ket1_molecule)
-    basis_set_map4 = ket2_basis.get_index_map(ket2_molecule)
+    basis_set_map1 = get_basis_function_indices_of_atoms(bra1_molecule, bra1_basis)
+    basis_set_map2 = get_basis_function_indices_of_atoms(bra2_molecule, bra2_basis)
+    basis_set_map3 = get_basis_function_indices_of_atoms(ket1_molecule, ket1_basis)
+    basis_set_map4 = get_basis_function_indices_of_atoms(ket2_molecule, ket2_basis)
 
     for m in range(nao1):
         for n in range(nao2):
@@ -1555,7 +1556,7 @@ def import_2e_integral_derivative(molecule, basis, int_type, atomi, atom1=None,
     # Transform integral to veloxchem format
     vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atom_i)
 
-    basis_set_map = basis.get_index_map(molecule)
+    basis_set_map = get_basis_function_indices_of_atoms(molecule, basis)
     for m in range(nao):
         for n in range(nao):
             for t in range(nao):
@@ -1778,10 +1779,10 @@ def import_2e_second_order_integral_derivative_braket(bra1_molecule, bra1_basis,
     # Transform integral to veloxchem format
     vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atoms_ij)
 
-    basis_set_map1 = bra1_basis.get_index_map(bra1_molecule)
-    basis_set_map2 = bra2_basis.get_index_map(bra2_molecule)
-    basis_set_map3 = ket1_basis.get_index_map(ket1_molecule)
-    basis_set_map4 = ket2_basis.get_index_map(ket2_molecule)
+    basis_set_map1 = get_basis_function_indices_of_atoms(bra1_molecule, bra1_basis)
+    basis_set_map2 = get_basis_function_indices_of_atoms(bra2_molecule, bra2_basis)
+    basis_set_map3 = get_basis_function_indices_of_atoms(ket1_molecule, ket1_basis)
+    basis_set_map4 = get_basis_function_indices_of_atoms(ket2_molecule, ket2_basis)
     for m in range(nao1):
         for n in range(nao2):
             for t in range(nao3):
@@ -1915,7 +1916,7 @@ def import_2e_second_order_integral_derivative(molecule, basis, int_type,
     # Transform integral to veloxchem format
     vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atoms_ij)
 
-    basis_set_map = basis.get_index_map(molecule)
+    basis_set_map = get_basis_function_indices_of_atoms(molecule, basis)
     for m in range(nao):
         for n in range(nao):
             for t in range(nao):
@@ -2856,7 +2857,7 @@ def eri_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
     molecule_string = get_molecule_string(molecule)
     basis_set_label = basis.get_label()
 
-    basis_set_map = basis.get_index_map(molecule)
+    basis_set_map = get_basis_function_indices_of_atoms(molecule, basis)
 
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
@@ -3203,7 +3204,7 @@ def eri_second_deriv(molecule, basis, i=0, j=0, unit="au"):
     # number of atomic orbitals
     nao = pyscf_molecule.nao
 
-    basis_set_map = basis.get_index_map(molecule)
+    basis_set_map = get_basis_function_indices_of_atoms(molecule, basis)
 
     # terms with nabla squared
     pyscf_eri_deriv_ii = pyscf_molecule.intor('int2e_ipip1', aosym='s1').reshape(
@@ -3309,7 +3310,7 @@ def eri_second_deriv_archetypes(molecule, basis, i=0, j=0, unit="au"):
     # number of atomic orbitals
     nao = pyscf_molecule.nao
 
-    basis_set_map = basis.get_index_map(molecule)
+    basis_set_map = get_basis_function_indices_of_atoms(molecule, basis)
 
     # terms with nabla squared
     pyscf_eri_deriv_ii = pyscf_molecule.intor('int2e_ipip1', aosym='s1').reshape(
