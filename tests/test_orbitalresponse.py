@@ -1,11 +1,7 @@
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import unittest
-from pathlib import Path
-try:
-    import cppe
-except ImportError:
-    pass
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
@@ -19,7 +15,7 @@ from veloxchem.checkpoint import read_rsp_hdf5
 class TestOrbitalResponse(unittest.TestCase):
 
     def run_orbitalresponse(self, inpfile, potfile, xcfun_label,
-                               orbrsp_ref_file, is_tda):
+                            orbrsp_ref_file, is_tda):
 
         task = MpiTask([inpfile, None], MPI.COMM_WORLD)
         task.input_dict['scf']['checkpoint_file'] = None
@@ -65,10 +61,10 @@ class TestOrbitalResponse(unittest.TestCase):
             omega_ref = 'omega_rpa'
 
         orb_resp.update_settings(orbrsp_dict,
-            task.input_dict['method_settings'])
+                                 task.input_dict['method_settings'])
 
-        orb_resp.compute(task.molecule, task.ao_basis,
-                         scf_drv.scf_tensors, rsp_results)
+        orb_resp.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+                         rsp_results)
         orb_resp_results = orb_resp.cphf_results
         #omega_ao = orb_resp.compute_omega(task.molecule, task.ao_basis,
         #                                  scf_drv.scf_tensors)
@@ -81,18 +77,17 @@ class TestOrbitalResponse(unittest.TestCase):
                                                     task.molecule,
                                                     task.ao_basis, dft_dict,
                                                     pe_dict, task.ostream)
-        print("ref_omega_ao:\n", ref_omega_ao)
 
         if task.mpi_rank == mpi_master():
             nocc = task.molecule.number_of_alpha_electrons()
-            mo = scf_drv.scf_tensors['C']
+            mo = scf_drv.scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             lambda_ov = orb_resp_results['cphf_ov']
             lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, lambda_ov, mo_vir)
 
-            self.assertTrue(np.max(np.abs(lambda_ao[0] - ref_lambda_ao))
-                             < 5.0e-4)
+            self.assertTrue(
+                np.max(np.abs(lambda_ao[0] - ref_lambda_ao)) < 5.0e-4)
             # TODO: uncomment once TDDFT gradients are working
             #self.assertTrue(np.max(np.abs(omega_ao[0] - ref_omega_ao)) < 5.0e-4)
 
@@ -106,8 +101,8 @@ class TestOrbitalResponse(unittest.TestCase):
 
         xcfun_label = None
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
-                                    orbrsp_ref_file, True)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label, orbrsp_ref_file,
+                                 True)
 
     def test_rpa_hf(self):
 
@@ -119,8 +114,8 @@ class TestOrbitalResponse(unittest.TestCase):
 
         xcfun_label = None
 
-        self.run_orbitalresponse(inpfile, potfile, xcfun_label,
-                                    orbrsp_ref_file, False)
+        self.run_orbitalresponse(inpfile, potfile, xcfun_label, orbrsp_ref_file,
+                                 False)
 
 
 if __name__ == "__main__":
