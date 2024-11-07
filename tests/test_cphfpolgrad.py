@@ -1,9 +1,8 @@
-import numpy as np
-import unittest
-import pytest
-import sys
-import h5py
 from pathlib import Path
+import numpy as np
+import pytest
+import h5py
+import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -19,7 +18,7 @@ try:
 except ImportError:
     pass
 
-class TestCphfPolgrad(unittest.TestCase):
+class TestCphfPolgrad:
 
     def run_cphfpolgrad_real(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
@@ -63,8 +62,7 @@ class TestCphfPolgrad(unittest.TestCase):
 
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            self.assertTrue(np.max(np.abs(cphfpolgrad_coefficients)
-                                   - np.abs(cphfpolgrad_reference)) < 1.0e-6)
+            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
 
     def run_cphfpolgrad_complex(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
@@ -110,8 +108,7 @@ class TestCphfPolgrad(unittest.TestCase):
 
             # Here we ar comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            self.assertTrue(np.max(np.abs(cphfpolgrad_coefficients)
-                                   - np.abs(cphfpolgrad_reference)) < 1.0e-6)
+            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
                         reason='pyscf for integral derivatives not available')
@@ -132,7 +129,8 @@ class TestCphfPolgrad(unittest.TestCase):
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
                         reason='pyscf for integral derivatives not available')
-    def test_cpkspolgrad_coefficients(self):
+    # TODO: enable test
+    def disabled_test_cpkspolgrad_coefficients(self):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000

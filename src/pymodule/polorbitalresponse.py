@@ -1,14 +1,13 @@
 import numpy as np
 import time as tm
 
-#from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
-from .inputparser import parse_input
+from .veloxchemlib import mpi_master, denmat
 from .cphfsolver import CphfSolver
+from .inputparser import parse_input
 from .sanitychecks import polgrad_sanity_check
+from .oneeints import compute_electric_dipole_integrals
 
 
 class PolOrbitalResponse(CphfSolver):
@@ -189,7 +188,7 @@ class PolOrbitalResponse(CphfSolver):
                 self.ostream.flush()
 
                 ovlp = scf_tensors['S']
-                mo = scf_tensors['C']  # only alpha part
+                mo = scf_tensors['C_alpha']  # only alpha part
 
                 nao = mo.shape[0]
                 nocc = molecule.number_of_alpha_electrons()
@@ -249,10 +248,8 @@ class PolOrbitalResponse(CphfSolver):
                     np.array(unrel_dm_ao.imag).reshape(dof**2, nao, nao))
 
                 # density matrix for RHS
-                dm_ao_rhs_real = AODensityMatrix(
-                    dm_ao_list_real + xpmy_ao_list_real, denmat.rest)
-                dm_ao_rhs_imag = AODensityMatrix(
-                    dm_ao_list_imag + xpmy_ao_list_imag, denmat.rest)
+                dm_ao_rhs_real_list = dm_ao_list_real + xpmy_ao_list_real
+                dm_ao_rhs_imag_list = dm_ao_list_imag + xpmy_ao_list_imag
 
                 if self._dft:
                     # construct density matrices for E[3] term
@@ -266,8 +263,8 @@ class PolOrbitalResponse(CphfSolver):
                     zero_dm_ao = dm_zero
             else:
                 dof = None
-                dm_ao_rhs_real = AODensityMatrix()
-                dm_ao_rhs_imag = AODensityMatrix()
+                dm_ao_rhs_real_list = None
+                dm_ao_rhs_imag_list = None
                 if self._dft:
                     perturbed_dm_ao_rere = AODensityMatrix()
                     perturbed_dm_ao_imim = AODensityMatrix()
@@ -277,20 +274,15 @@ class PolOrbitalResponse(CphfSolver):
 
             dof = self.comm.bcast(dof, root=mpi_master())
 
-            dm_ao_rhs_real.broadcast(self.rank, self.comm)
-            dm_ao_rhs_imag.broadcast(self.rank, self.comm)
+            dm_ao_rhs_real_list = self.comm.bcast(dm_ao_rhs_real_list, root=mpi_master())
+            dm_ao_rhs_imag_list = self.comm.bcast(dm_ao_rhs_imag_list, root=mpi_master())
 
             molgrid = dft_dict['molgrid']
             gs_density = dft_dict['gs_density']
 
             # Fock matrices with corresponding type
-            fock_ao_rhs_real = AOFockMatrix(dm_ao_rhs_real)
-            fock_ao_rhs_imag = AOFockMatrix(dm_ao_rhs_imag)
             # set the vector-related components to general Fock matrix
             # (not 1PDM part)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs_real.set_fock_type(fockmat.rgenjk, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.rgenjk, ifock)
 
             if self._dft:
                 perturbed_dm_ao_rere.broadcast(self.rank, self.comm)
@@ -342,10 +334,10 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_reim.reduce_sum(self.rank, self.nodes, self.comm)
                 fock_gxc_ao_imre.reduce_sum(self.rank, self.nodes, self.comm)
 
-            self._comp_lr_fock(fock_ao_rhs_real, dm_ao_rhs_real, molecule,
+            fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
                                basis, eri_dict, dft_dict, pe_dict,
                                self.profiler)
-            self._comp_lr_fock(fock_ao_rhs_imag, dm_ao_rhs_imag, molecule,
+            fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
                                basis, eri_dict, dft_dict, pe_dict,
                                self.profiler)
 
@@ -356,8 +348,8 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_1pdm_real = np.zeros((dof**2, nao, nao))
                 fock_ao_rhs_1pdm_imag = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
-                    fock_ao_rhs_1pdm_real[i] = fock_ao_rhs_real.alpha_to_numpy(i)
-                    fock_ao_rhs_1pdm_imag[i] = fock_ao_rhs_imag.alpha_to_numpy(i)
+                    fock_ao_rhs_1pdm_real[i] = fock_ao_rhs_real[i]
+                    fock_ao_rhs_1pdm_imag[i] = fock_ao_rhs_imag[i]
                 # combine to complex array
                 fock_ao_rhs_1pdm = fock_ao_rhs_1pdm_real + 1j * fock_ao_rhs_1pdm_imag
 
@@ -374,14 +366,10 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_plus_y_imag = np.zeros((dof, nao, nao))
                 fock_ao_rhs_x_minus_y_imag = np.zeros((dof, nao, nao))
                 for i in range(dof):
-                    fock_ao_rhs_x_plus_y_real[i] = fock_ao_rhs_real.alpha_to_numpy(
-                            dof**2 + i)
-                    fock_ao_rhs_x_minus_y_real[i] = fock_ao_rhs_real.alpha_to_numpy(
-                            dof**2 + dof + i)
-                    fock_ao_rhs_x_plus_y_imag[i] = fock_ao_rhs_imag.alpha_to_numpy(
-                            dof**2 + i)
-                    fock_ao_rhs_x_minus_y_imag[i] = fock_ao_rhs_imag.alpha_to_numpy(
-                            dof**2 + dof + i)
+                    fock_ao_rhs_x_plus_y_real[i] = fock_ao_rhs_real[ dof**2 + i]
+                    fock_ao_rhs_x_minus_y_real[i] = fock_ao_rhs_real[ dof**2 + dof + i]
+                    fock_ao_rhs_x_plus_y_imag[i] = fock_ao_rhs_imag[ dof**2 + i]
+                    fock_ao_rhs_x_minus_y_imag[i] = fock_ao_rhs_imag[ dof**2 + dof + i]
                 # combine to complex
                 fock_ao_rhs_x_plus_y = (fock_ao_rhs_x_plus_y_real +
                                         1j * fock_ao_rhs_x_plus_y_imag)
@@ -501,7 +489,7 @@ class PolOrbitalResponse(CphfSolver):
                 self.ostream.flush()
 
                 ovlp = scf_tensors['S']
-                mo = scf_tensors['C']  # only alpha part
+                mo = scf_tensors['C_alpha']  # only alpha part
                 nao = mo.shape[0]
                 nocc = molecule.number_of_alpha_electrons()
                 mo_occ = mo[:, :nocc].copy()
@@ -554,8 +542,7 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
                 # density matrix for RHS
-                dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list,
-                                            denmat.rest)
+                dm_ao_rhs_list = dm_ao_list + xpmy_ao_list
 
                 if self._dft:
                     # construct density matrices for E[3] term:
@@ -564,25 +551,17 @@ class PolOrbitalResponse(CphfSolver):
                     zero_dm_ao = dm_zero
             else:
                 dof = None
-                dm_ao_rhs = AODensityMatrix()
+                dm_ao_rhs_list = None
                 if self._dft:
                     perturbed_dm_ao = AODensityMatrix()
                     zero_dm_ao = AODensityMatrix()
 
             dof = self.comm.bcast(dof, root=mpi_master())
 
-            dm_ao_rhs.broadcast(self.rank, self.comm)
+            dm_ao_rhs_list = self.comm.bcast(dm_ao_rhs_list, root=mpi_master())
 
             molgrid = dft_dict['molgrid']
             gs_density = dft_dict['gs_density']
-
-            # Fock matrices with corresponding type
-            fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
-
-            # set the vector-related components to general Fock matrix
-            # (not 1PDM part)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
 
             if self._dft:
                 perturbed_dm_ao.broadcast(self.rank, self.comm)
@@ -600,7 +579,9 @@ class PolOrbitalResponse(CphfSolver):
                                                       perturbed_dm_ao, fock_gxc_ao)
                 fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 
-            self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis,
+            # vector-related components to general Fock matrix
+            # (not 1PDM part)
+            fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
                                eri_dict, dft_dict, pe_dict, self.profiler)
 
             # calculate the RHS
@@ -608,7 +589,7 @@ class PolOrbitalResponse(CphfSolver):
                 # extract the 1PDM contributions
                 fock_ao_rhs_1pdm = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
-                    fock_ao_rhs_1pdm[i] = fock_ao_rhs.alpha_to_numpy(i)
+                    fock_ao_rhs_1pdm[i] = fock_ao_rhs[i]
 
                 # transform to MO basis: mi,xmn,na->xia
                 fock_mo_rhs_1pdm = np.array([
@@ -621,10 +602,8 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
                 fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
                 for i in range(dof):
-                    fock_ao_rhs_x_plus_y[i] = fock_ao_rhs.alpha_to_numpy(
-                        dof**2 + i)
-                    fock_ao_rhs_x_minus_y[i] = fock_ao_rhs.alpha_to_numpy(
-                        dof**2 + dof + i)
+                    fock_ao_rhs_x_plus_y[i] = fock_ao_rhs[ dof**2 + i]
+                    fock_ao_rhs_x_minus_y[i] = fock_ao_rhs[ dof**2 + dof + i]
 
                 # calculate 2-particle density matrix contribution
                 fock_mo_rhs_2pdm = self.calculate_rhs_2pdm_contrib(molecule, scf_tensors,
@@ -713,7 +692,7 @@ class PolOrbitalResponse(CphfSolver):
         ovlp = scf_tensors['S']
 
         # MO coefficients
-        mo = scf_tensors['C']  # only alpha part
+        mo = scf_tensors['C_alpha']  # only alpha part
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
@@ -796,7 +775,7 @@ class PolOrbitalResponse(CphfSolver):
         ovlp = scf_tensors['S']
 
         # MO coefficients
-        mo = scf_tensors['C']  # only alpha part
+        mo = scf_tensors['C_alpha']  # only alpha part
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
@@ -936,7 +915,7 @@ class PolOrbitalResponse(CphfSolver):
         dof = len(self.vector_components)
 
         # MO coefficients
-        mo = scf_tensors['C']  # only alpha part
+        mo = scf_tensors['C_alpha']  # only alpha part
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
@@ -952,18 +931,18 @@ class PolOrbitalResponse(CphfSolver):
             rhs_dt = np.float_
 
         # get the dipole integrals in AO basis
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, basis)
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
+
         dipole_ints_ao = np.zeros((dof, nao, nao))
         k = 0
         if 'x' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+            dipole_ints_ao[k] = dipole_mats[0]
             k += 1
         if 'y' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+            dipole_ints_ao[k] = dipole_mats[1]
             k += 1
         if 'z' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+            dipole_ints_ao[k] = dipole_mats[2]
 
         # transform to MO basis (oo and vv blocks only)
         dipole_ints_oo = np.array([
@@ -1790,18 +1769,18 @@ class PolOrbitalResponse(CphfSolver):
             omega_dt = np.float_
 
         # get dipole moment integrals
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, basis)
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
+
         dipole_ints_ao = np.zeros((dof, nao, nao))
         k = 0
         if 'x' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+            dipole_ints_ao[k] = dipole_mats[0]
             k += 1
         if 'y' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+            dipole_ints_ao[k] = dipole_mats[1]
             k += 1
         if 'z' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+            dipole_ints_ao[k] = dipole_mats[2]
 
         # transform to MO basis (oo and ov blocks only)
         dipole_ints_oo = np.array([

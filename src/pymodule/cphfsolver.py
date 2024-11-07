@@ -613,7 +613,7 @@ class CphfSolver(LinearSolver):
         self.profiler.start_timer('CPHF RHS')
 
         if self.rank == mpi_master():
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
@@ -707,9 +707,9 @@ class CphfSolver(LinearSolver):
         dof = cphf_rhs.shape[0]
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             nao = mo.shape[0]
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
 
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
@@ -737,11 +737,6 @@ class CphfSolver(LinearSolver):
             ])
 
             cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
-            # create AODensityMatrix object
-            ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
-        else:
-            ao_density_cphf = AODensityMatrix()
-        ao_density_cphf.broadcast(self.rank, self.comm)
 
 
         # Matrix-vector product of orbital Hessian with trial vector
@@ -762,12 +757,12 @@ class CphfSolver(LinearSolver):
                         mo_occ, v.reshape(dof,nocc,nvir)[i], mo_vir.T
                         ])
                 cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
-                ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
             else:
-                ao_density_cphf = AODensityMatrix()
-            ao_density_cphf.broadcast(self.rank, self.comm)
+                cphf_ao_list = None
 
-            fock_cphf = self._comp_lr_fock(ao_density_cphf, molecule,
+            cphf_ao_list = self.comm.bcast(cphf_ao_list, root=mpi_master())
+
+            fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule,
                               basis, eri_dict, dft_dict, pe_dict, self.profiler)
 
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
