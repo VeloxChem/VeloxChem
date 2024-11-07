@@ -29,12 +29,13 @@ from io import StringIO
 import numpy as np
 import sys
 
-from .veloxchemlib import GridDriver, XCMolecularHessian
+#from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
+from .griddriver import GridDriver
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input

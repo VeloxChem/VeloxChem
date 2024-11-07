@@ -29,6 +29,7 @@ import time as tm
 import sys
 
 from .molecule import Molecule
+from .griddriver import GridDriver
 from .gradientdriver import GradientDriver
 from .hessiandriver import HessianDriver
 from .scfgradientdriver import ScfGradientDriver
@@ -40,18 +41,13 @@ from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .profiler import Profiler
-from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level
 from .veloxchemlib import mpi_master
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
-from .veloxchemlib import ElectricDipoleIntegralsDriver
+#from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import xcfun
-from .veloxchemlib import XCMolecularHessian
-from .veloxchemlib import GridDriver
+#from .veloxchemlib import XCMolecularHessian
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input

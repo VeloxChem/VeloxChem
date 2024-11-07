@@ -7,13 +7,14 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import MolecularGrid
-from .veloxchemlib import GridDriver, XCMolecularGradient
+from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import hartree_in_wavenumber
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .molecule import Molecule
 from .outputstream import OutputStream
+from .griddriver import GridDriver
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check, polgrad_sanity_check
 from .dftutils import get_default_grid_level
@@ -953,7 +954,7 @@ class PolarizabilityGradient():
         labels = molecule.get_labels()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # number of frequencies
         n_freqs = len(self.frequencies)

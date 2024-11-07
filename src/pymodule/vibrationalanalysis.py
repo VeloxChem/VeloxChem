@@ -38,12 +38,13 @@ from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
-from .veloxchemlib import GridDriver, XCMolecularHessian
+#from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
+from .griddriver import GridDriver
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
@@ -524,14 +525,14 @@ class VibrationalAnalysis:
         # perform a linear response calculation
         if self.do_resonance_raman:
             polgrad_drv.is_complex = True
-            lr_drv = ComplexResponse()
+            lr_drv = ComplexResponse(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.damping = polgrad_drv.damping
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = polgrad_drv.frequencies
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
         else:
-            lr_drv = LinearResponseSolver()
+            lr_drv = LinearResponseSolver(self.comm, self.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             if 'frequencies' not in self.rsp_dict:
                 lr_drv.frequencies = self.frequencies

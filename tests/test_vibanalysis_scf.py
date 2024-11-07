@@ -2,10 +2,9 @@ from pathlib import Path
 import numpy as np
 import h5py
 
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.scfhessiandriver import ScfHessianDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 
@@ -22,15 +21,19 @@ class TestScfVibrationalAnalysisDriver:
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        vib_settings = {'do_ir': 'yes', 'do_raman': 'yes', 'numerical_hessian':'yes',
-                        'numerical_raman': 'yes'}
+        vib_settings = {
+            'do_ir': 'yes',
+            'do_raman': 'yes',
+            'numerical_hessian': 'yes',
+            'numerical_raman': 'yes'
+        }
         method_settings = {}
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.update_settings(method_settings, vib_settings)
         vibanalysis_drv.ostream.mute()
         vibanalysis_drv.compute(task.molecule, task.ao_basis)
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
 
             hf = h5py.File(h5file)
             ref_hessian = np.array(hf.get('hessian'))
@@ -67,20 +70,27 @@ class TestScfVibrationalAnalysisDriver:
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        vib_settings = {'do_ir': 'no', 'do_resonance_raman': 'yes', 'numerical_hessian':'yes',
-                        'numerical_raman': 'yes', 'frequencies': (0.0, 0.4), 'rr_damping': 0.05}
+        vib_settings = {
+            'do_ir': 'no',
+            'do_resonance_raman': 'yes',
+            'numerical_hessian': 'yes',
+            'numerical_raman': 'yes',
+            'frequencies': (0.0, 0.4),
+            'rr_damping': 0.05
+        }
         method_settings = {}
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.update_settings(method_settings, vib_settings)
         vibanalysis_drv.ostream.mute()
         vibanalysis_drv.compute(task.molecule, task.ao_basis)
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
 
             hf = h5py.File(h5file)
             ref_frequencies = np.array(hf.get('frequencies'))
             hf_rr = hf['resonance_raman']
-            ref_raman_intensities = np.array([hf_rr.get('0.0'), hf_rr.get('0.4')])
+            ref_raman_intensities = np.array(
+                [hf_rr.get('0.0'), hf_rr.get('0.4')])
             hf.close()
 
             rel_diff_freq = np.max(
@@ -95,4 +105,3 @@ class TestScfVibrationalAnalysisDriver:
             assert rel_diff_freq < 1.0e-3
             assert rel_diff_raman_static < 1.0e-3
             assert rel_diff_raman_dyn < 1.0e-3
-
