@@ -325,13 +325,15 @@ class GradientDriver:
             The 3rd-order exchange-correlation contribution to the gradient.
         """
 
+        # TODO: take mol_grid from arguments
+
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient()
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)

@@ -152,3 +152,45 @@ CXCMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
 
     return CDenseMatrix();
 }
+
+CDenseMatrix
+CXCMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const std::vector<const double*>& rwDensityPointersOne,
+                                           const std::vector<const double*>& rwDensityPointersTwo,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (gsDensityPointers.size() == 1)
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return xcgradlda::integrateKxcGradientForLDA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        /*
+        else if (xcfuntype == xcfun::gga)
+        {
+            return _integrateKxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCMolecularGradient.integrateKxcGradient: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+        */
+    }
+    else
+    {
+        std::string erropenshell("XCMolecularGradient.integrateKxcGradient: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    return CDenseMatrix();
+}

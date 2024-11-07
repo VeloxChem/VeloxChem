@@ -347,6 +347,37 @@ CXCIntegrator_integrate_fxc_gradient(CXCMolecularGradient&      self,
     return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
 }
 
+auto
+CXCIntegrator_integrate_kxc_gradient(CXCMolecularGradient&      self,
+                                     const CMolecule&           molecule,
+                                     const CMolecularBasis&     basis,
+                                     const std::vector<py::array_t<double>>& rwDensityArraysOne,
+                                     const std::vector<py::array_t<double>>& rwDensityArraysTwo,
+                                     const std::vector<py::array_t<double>>& gsDensityArrays,
+                                     const CMolecularGrid&      molecularGrid,
+                                     const std::string&         xcFuncLabel) -> py::array_t<double>
+{
+    auto        num_rw_dens_one = static_cast<int>(rwDensityArraysOne.size());
+    auto        num_rw_dens_two = static_cast<int>(rwDensityArraysTwo.size());
+    auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
+    std::string errnum("integrate_kxc_gradient: Inconsistent number of numpy arrays");
+    errors::assertMsgCritical((num_rw_dens_one == num_gs_dens) && (num_rw_dens_two == num_gs_dens), errnum);
+    errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
+
+    auto nao = basis.dimensions_of_basis();
+    check_arrays("integrate_kxc_gradient", rwDensityArraysOne, nao);
+    check_arrays("integrate_kxc_gradient", rwDensityArraysTwo, nao);
+    check_arrays("integrate_kxc_gradient", gsDensityArrays, nao);
+
+    auto rw_dens_pointers_one = arrays_to_const_pointers(rwDensityArraysOne);
+    auto rw_dens_pointers_two = arrays_to_const_pointers(rwDensityArraysTwo);
+    auto gs_dens_pointers     = arrays_to_const_pointers(gsDensityArrays);
+    auto molgrad              = self.integrateKxcGradient(molecule, basis, rw_dens_pointers_one, rw_dens_pointers_two, gs_dens_pointers, molecularGrid, xcFuncLabel);
+    return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
+}
+
+// Exports classes/functions in src/dft to python
+
 // Exports classes/functions in src/dft to python
 
 void
@@ -618,7 +649,27 @@ export_dft(py::module& m)
                const std::string&         xcFuncLabel) -> py::array_t<double> {
                 return CXCIntegrator_integrate_fxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
-            "Integrates end-order exchange-correlation contribution to molecular gradient.",
+            "Integrates 2nd-order exchange-correlation contribution to molecular gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "rwDensityArraysOne"_a,
+            "rwDensityArraysTwo"_a,
+            "gsDensityArrays"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_kxc_gradient",
+            [](CXCMolecularGradient&      self,
+               const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const std::vector<py::array_t<double>>& rwDensityArraysOne,
+               const std::vector<py::array_t<double>>& rwDensityArraysTwo,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
+               const CMolecularGrid&      molecularGrid,
+               const std::string&         xcFuncLabel) -> py::array_t<double> {
+                return CXCIntegrator_integrate_kxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
+            },
+            "Integrates 3rd-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
             "basis"_a,
             "rwDensityArraysOne"_a,

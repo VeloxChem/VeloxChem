@@ -100,6 +100,14 @@ class CXCMolecularGradient
                                       const std::vector<const double*>& gsDensityPointers,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
+
+    CDenseMatrix integrateKxcGradient(const CMolecule&        molecule,
+                                      const CMolecularBasis&  basis,
+                                      const std::vector<const double*>& rwDensityPointersOne,
+                                      const std::vector<const double*>& rwDensityPointersTwo,
+                                      const std::vector<const double*>& gsDensityPointers,
+                                      const CMolecularGrid&   molecularGrid,
+                                      const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCMolecularGradient_hpp */
