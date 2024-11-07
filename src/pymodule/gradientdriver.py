@@ -248,13 +248,15 @@ class GradientDriver:
             The vxc exchange-correlation contribution to the gradient.
         """
 
+        # TODO: take mol_grid from arguments
+
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient()
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_density, gs_density, mol_grid, xcfun_label)
         vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
@@ -283,13 +285,15 @@ class GradientDriver:
             The 2nd-order exchange-correlation contribution to the gradient.
         """
 
+        # TODO: take mol_grid from arguments
+
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient()
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)

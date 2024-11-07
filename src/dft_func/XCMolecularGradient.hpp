@@ -50,41 +50,6 @@ class CXCMolecularGradient
      */
     double _screeningThresholdForGTOValues;
 
-    /**
-     Integrates first-order GGA exchnage-correlation functional contribution to
-     molecular gradient.
-
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param rwDensityMatrix the perturbed AO density matrix.
-     @param gsDensityMatrix the ground state AO density matrix.
-     @param molecularGrid the molecular grid.
-     @param xcFunctional the exchange-correlation functional.
-     @return the molecular gradient.
-     */
-    auto _integrateVxcGradientForGGA(const CMolecule&        molecule,
-                                     const CMolecularBasis&  basis,
-                                     const std::vector<const double*>& rwDensityPointers,
-                                     const std::vector<const double*>& gsDensityPointers,
-                                     const CMolecularGrid&   molecularGrid,
-                                     const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
-
-    auto _integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const std::vector<const double*>& rwDensityPointers,
-                                              const std::vector<const double*>& gsDensityPointers,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
-
-    /**
-     Computes AO-to-atom mapping.
-
-     @param ao_to_atom_ids the vector for storing the mapping.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     */
-    void _computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) const;
-
    public:
     /**
      Creates an XC integrator object.
@@ -124,6 +89,14 @@ class CXCMolecularGradient
     CDenseMatrix integrateVxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const std::vector<const double*>& rwDensityPointers,
+                                      const std::vector<const double*>& gsDensityPointers,
+                                      const CMolecularGrid&   molecularGrid,
+                                      const std::string&      xcFuncLabel) const;
+
+    CDenseMatrix integrateFxcGradient(const CMolecule&        molecule,
+                                      const CMolecularBasis&  basis,
+                                      const std::vector<const double*>& rwDensityPointersOne,
+                                      const std::vector<const double*>& rwDensityPointersTwo,
                                       const std::vector<const double*>& gsDensityPointers,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
