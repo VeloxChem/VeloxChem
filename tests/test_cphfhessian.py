@@ -69,8 +69,7 @@ class TestCphfSolver:
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
                         reason='pyscf for integral derivatives not available')
-    # TODO: enable test
-    def disabled_test_cpks_coefficients(self):
+    def test_cpks_coefficients(self):
         nh3_xyz = """4
 
         N     0.000000000     0.000000000     0.000000000

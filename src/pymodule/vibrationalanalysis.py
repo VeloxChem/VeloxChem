@@ -37,7 +37,6 @@ from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
-#from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)

@@ -82,7 +82,6 @@ class TestXCMolHess:
         self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2,
                              ref_vxc_deriv_1)
 
-    # TODO: enable test
     def test_xc_mol_hess_gga(self):
 
         molecule_string = """
