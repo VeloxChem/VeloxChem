@@ -193,8 +193,7 @@ class FirstOrderProperties:
                 valstr += '{:17.6f} Debye   '.format(dip_debye[i])
                 self.ostream.print_header(valstr)
         else:
-            index = 0
-            for s in states:
+            for index, s in enumerate(states):
                 self.ostream.print_blank()
                 state_text = 'Excited State %d' % s
                 self.ostream.print_header(state_text)
@@ -207,7 +206,6 @@ class FirstOrderProperties:
                     valstr += '{:17.6f} a.u.'.format(dip_au[i])
                     valstr += '{:17.6f} Debye   '.format(dip_debye[i])
                     self.ostream.print_header(valstr)
-                index += 1
 
         self.ostream.print_blank()
         self.ostream.flush()

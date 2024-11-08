@@ -78,12 +78,10 @@ class GradientDriver:
 
         self.gradient = None
         self.flag = None
-        self.delta_h = 0.001
-
-        # TODO: double check self.numerical
 
         self.numerical = False
         self.do_four_point = False
+        self.delta_h = 0.001
 
         self._dft = False
         self.grid_level = None
@@ -143,8 +141,6 @@ class GradientDriver:
         :param args:
             The arguments.
         """
-
-        dft_sanity_check(self, 'compute')
 
         return
 
@@ -222,8 +218,6 @@ class GradientDriver:
         :return:
             The energy.
         """
-
-        # TODO: remove compute_energy and use grad_drv.get_energy()
 
         return
 
@@ -478,9 +472,8 @@ class GradientDriver:
                     valstr += '{:22.12f}'.format(self.gradient[i, d])
                 self.ostream.print_header(valstr)
         else:
-            index = 0
             gradient_shape = self.gradient.shape
-            for s in state_deriv_index:
+            for index, s in enumerate(state_deriv_index):
                 self.ostream.print_blank()
                 state = 'Excited State %d' % s
                 self.ostream.print_header(state)
@@ -501,7 +494,6 @@ class GradientDriver:
                             valstr += '{:22.12f}'.format(self.gradient[index, i,
                                                                        d])
                     self.ostream.print_header(valstr)
-                index += 1
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -547,11 +539,11 @@ class GradientDriver:
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if state_deriv_index is not None:
-            if type(state_deriv_index) is int:
+            if isinstance(state_deriv_index, int):
                 cur_str = ('Excited State of Interest       : ' +
                            str(state_deriv_index + 1))
                 self.ostream.print_header(cur_str.ljust(str_width))
-            elif type(state_deriv_index) is tuple:
+            elif isinstance(state_deriv_index, tuple):
                 states_txt = ""
                 for i in range(len(state_deriv_index)):
                     s = state_deriv_index[i]
