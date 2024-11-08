@@ -322,7 +322,8 @@ class TddftOrbitalResponse(CphfSolver):
 
         else:
             dof = None
-            dm_ao_rhs = None
+            dm_ao_list = None
+
             if self._dft:
                 perturbed_dm_ao_list = None
                 zero_dm_ao_list =  None
@@ -334,6 +335,9 @@ class TddftOrbitalResponse(CphfSolver):
             perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list, root=mpi_master())
             # TODO: bcast array by array
             dm_ao_list = self.comm.bcast(dm_ao_list, root=mpi_master())
+            # TODO: bcast array by array
+            # TODO: consider only bcast size of zero dm
+            zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
 
 
         molgrid = dft_dict['molgrid']
