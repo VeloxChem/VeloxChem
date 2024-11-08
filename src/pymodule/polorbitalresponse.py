@@ -1522,7 +1522,7 @@ class PolOrbitalResponse(CphfSolver):
 
                         if self._dft:
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
-                                scf_tensors, fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)),
+                                scf_tensors, fock_gxc_ao[2 * (m * dof + n)],
                                 D_occ)
 
                             omega[m * dof + n] += omega_gxc_contrib
@@ -1732,10 +1732,10 @@ class PolOrbitalResponse(CphfSolver):
 
                         if self._dft:
                             fock_gxc_ao_mn_list = [
-                                fock_gxc_ao_rere.alpha_to_numpy(2 * (m * dof + n)),
-                                fock_gxc_ao_imim.alpha_to_numpy(2 * (m * dof + n)),
-                                fock_gxc_ao_reim.alpha_to_numpy(2 * (m * dof + n)),
-                                fock_gxc_ao_imre.alpha_to_numpy(2 * (m * dof + n)),
+                                fock_gxc_ao_rere[2 * (m * dof + n)],
+                                fock_gxc_ao_imim[2 * (m * dof + n)],
+                                fock_gxc_ao_reim[2 * (m * dof + n)],
+                                fock_gxc_ao_imre[2 * (m * dof + n)],
                             ]
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_complex(
                                 fock_gxc_ao_mn_list, D_occ
