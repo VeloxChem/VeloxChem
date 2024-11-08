@@ -46,7 +46,7 @@ from .veloxchemlib import denmat
 from .veloxchemlib import AODensityMatrix
 #from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import xcfun
-#from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import XCMolecularHessian
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
@@ -351,11 +351,9 @@ class ScfHessianDriver(HessianDriver):
             eoo = eocc.reshape(-1, 1) + eocc #ei+ej
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
-            gs_density = AODensityMatrix([density], denmat.rest)
         else:
-            gs_density = AODensityMatrix()
-
-        gs_density.broadcast(self.comm)
+            density = None
+        density = self.comm.bcast(density, root=mpi_master())
 
         # Set up a CPHF solver
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
@@ -457,7 +455,7 @@ class ScfHessianDriver(HessianDriver):
 
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule,
                                                 ao_basis,
-                                                gs_density, mol_grid,
+                                                [density], mol_grid,
                                                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
@@ -640,7 +638,6 @@ class ScfHessianDriver(HessianDriver):
             # TODO: consider if using the transpose makes the
             # computation faster; consider using cphf coefficients in AO
             # to compute the perturbed density matrix.
-            gs_density = AODensityMatrix([density], denmat.rest)
 
             orben_perturbed_density = np.zeros((natm, dof, nao, nao))
             mo_e_occ = np.multiply(mo_occ, eocc)
@@ -662,7 +659,6 @@ class ScfHessianDriver(HessianDriver):
                             )
         else:
             density = None
-            gs_density = AODensityMatrix()
 
         if self._dft:
             grid_drv = GridDriver()
@@ -670,8 +666,6 @@ class ScfHessianDriver(HessianDriver):
                           if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
-
-        gs_density.broadcast(self.comm)
 
         density = self.comm.bcast(density, root=mpi_master())
 
@@ -727,7 +721,7 @@ class ScfHessianDriver(HessianDriver):
                 if self._dft:
                     # First derivative of the Vxc matrix elements
                     vxc_deriv_j = xc_mol_hess.integrate_vxc_fock_gradient(
-                                    molecule, ao_basis, gs_density, mol_grid,
+                                    molecule, ao_basis, [density], mol_grid,
                                     self.scf_driver.xcfun.get_func_label(), j)
                     vxc_deriv_j = self.comm.reduce(vxc_deriv_j,
                                                    root=mpi_master())
@@ -798,10 +792,8 @@ class ScfHessianDriver(HessianDriver):
             mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
-            gs_density = AODensityMatrix([density], denmat.rest)
         else:
             density = None
-            gs_density = AODensityMatrix()
             scf_tensors = None
 
         if self._dft:
@@ -811,7 +803,6 @@ class ScfHessianDriver(HessianDriver):
             grid_drv.set_level(grid_level)
 
             mol_grid = grid_drv.generate(molecule)
-        gs_density.broadcast(self.comm)
 
         density = self.comm.bcast(density, root=mpi_master())
         scf_tensors = self.comm.bcast(scf_tensors, root=mpi_master())
@@ -853,7 +844,7 @@ class ScfHessianDriver(HessianDriver):
             # First derivative of the Vxc matrix elements
             if self._dft:
                 vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
-                                molecule, ao_basis, gs_density, mol_grid,
+                                molecule, ao_basis, [density], mol_grid,
                                 self.scf_driver.xcfun.get_func_label(), i)
                 vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
             if self.rank == mpi_master():
@@ -868,7 +859,7 @@ class ScfHessianDriver(HessianDriver):
                 # First derivative of the Vxc matrix elements
                 if self._dft:
                     vxc_deriv_j = xc_mol_hess.integrate_vxc_fock_gradient(
-                                    molecule, ao_basis, gs_density, mol_grid,
+                                    molecule, ao_basis, [density], mol_grid,
                                     self.scf_driver.xcfun.get_func_label(), j)
                     vxc_deriv_j = self.comm.reduce(vxc_deriv_j,
                                                     root=mpi_master())

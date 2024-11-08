@@ -31,7 +31,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import AODensityMatrix
 #from .veloxchemlib import ElectronRepulsionIntegralsDriver
-#from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import XCMolecularHessian
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray

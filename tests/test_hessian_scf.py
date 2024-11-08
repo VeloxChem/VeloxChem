@@ -119,8 +119,7 @@ class TestScfHessianDriver:
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
                         reason='pyscf for integral derivatives not available')
-    # TODO: enable test
-    def disabled_test_analytical_pbe_hessian_pople(self):
+    def test_analytical_pbe_hessian_pople(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
         h5file = str(here / 'data' / 'water_analytical_hessian_pbe.h5')
@@ -150,8 +149,7 @@ class TestScfHessianDriver:
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
                         reason='pyscf for integral derivatives not available')
-    # TODO: enable test
-    def disabled_test_analytical_pbe_hessian_furche(self):
+    def test_analytical_pbe_hessian_furche(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
         h5file = str(here / 'data' / 'water_analytical_hessian_pbe.h5')
