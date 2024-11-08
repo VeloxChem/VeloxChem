@@ -1,9 +1,8 @@
-import numpy as np
-import unittest
-import pytest
-import sys
-import h5py
 from pathlib import Path
+import numpy as np
+import pytest
+import h5py
+import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -18,7 +17,7 @@ try:
 except ImportError:
     pass
 
-class TestPolgrad(unittest.TestCase):
+class TestPolgrad:
 
     def run_polgrad_real(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
@@ -64,10 +63,8 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            self.assertTrue(np.max(np.abs(polgrad_static)
-                                   - np.abs(polgrad_static_reference)) < 1.0e-6)
-            self.assertTrue(np.max(np.abs(polgrad_dynamic)
-                                   - np.abs(polgrad_dynamic_reference)) < 1.0e-6)
+            assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
+            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
         # test real numerical gradient
         num_polgrad_drv = PolarizabilityGradient()
@@ -91,8 +88,7 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            self.assertTrue(np.max(np.abs(polgrad_dynamic)
-                                   - np.abs(polgrad_dynamic_reference)) < 1.0e-6)
+            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
     def run_polgrad_complex(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
@@ -140,10 +136,8 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            self.assertTrue(np.max(np.abs(polgrad_static)
-                                   - np.abs(polgrad_static_reference)) < 1.0e-6)
-            self.assertTrue(np.max(np.abs(polgrad_dynamic)
-                                   - np.abs(polgrad_dynamic_reference)) < 1.0e-6)
+            assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
+            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
         # test complex numerical gradient
         num_polgrad_drv = PolarizabilityGradient()
@@ -167,10 +161,8 @@ class TestPolgrad(unittest.TestCase):
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            self.assertTrue(np.max(np.abs(polgrad_static)
-                                   - np.abs(polgrad_static_reference)) < 1.0e-6)
-            self.assertTrue(np.max(np.abs(polgrad_dynamic)
-                                   - np.abs(polgrad_dynamic_reference)) < 1.0e-6)
+            assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
+            assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
