@@ -67,7 +67,7 @@ class PolarizabilityGradient():
         self.delta_h = 0.001
 
         self.is_complex = False
-        self.grad_dt = np.float_  # data type for pol. gradient (real/complex)
+        self.grad_dt = np.dtype('float64')  # data type for pol. gradient (real/complex)
         self.damping = 1000.0 / hartree_in_wavenumber()
 
         self.numerical = False
@@ -165,7 +165,7 @@ class PolarizabilityGradient():
 
         # set data type of pol. gradient for use in compute_analytical()
         if self.is_complex:
-            self.grad_dt = np.complex_
+            self.grad_dt = np.dtype('complex128')
 
         # sanity check
         dft_sanity_check(self, 'compute')
@@ -686,7 +686,7 @@ class PolarizabilityGradient():
 
         natm = molecule.number_of_atoms()
         dof = len(self.vector_components)
-        xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.complex_)
+        xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
 
         for m in range(dof):
             for n in range(dof):
@@ -1239,7 +1239,7 @@ class PolarizabilityGradient():
 
         response_functions = lr_results.get('response_functions', None)
         keys = list(response_functions.keys())
-        is_complex_response = (type(response_functions[keys[0]]) is np.complex_)
+        is_complex_response = (type(response_functions[keys[0]]) is np.dtype('complex128'))
 
         if (is_complex_response != self.is_complex):
             error_text = 'Mismatch between LR results and polgrad settings!'
