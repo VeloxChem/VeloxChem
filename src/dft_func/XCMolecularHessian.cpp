@@ -27,6 +27,7 @@
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "XCMolecularHessianForLDA.hpp"
+#include "XCMolecularHessianForGGA.hpp"
 
 CXCMolecularHessian::CXCMolecularHessian()
 
@@ -53,7 +54,7 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
         }
         else if (xcfuntype == xcfun::gga)
         {
-            //return _integrateExcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
+            return xchessgga::integrateExcHessianForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
         {
@@ -92,7 +93,7 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
         }
         else if (xcfuntype == xcfun::gga)
         {
-            //return _integrateVxcFockGradientForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc, atomIdx);
+            return xchessgga::integrateVxcFockGradientForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdx);
         }
         else
         {

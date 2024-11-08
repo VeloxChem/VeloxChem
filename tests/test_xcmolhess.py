@@ -83,7 +83,7 @@ class TestXCMolHess:
                              ref_vxc_deriv_1)
 
     # TODO: enable test
-    def disabled_test_xc_mol_hess_gga(self):
+    def test_xc_mol_hess_gga(self):
 
         molecule_string = """
         O   0.0   0.0   0.0

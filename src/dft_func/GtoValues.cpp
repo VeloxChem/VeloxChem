@@ -132,4 +132,33 @@ get_gto_values_for_mgga(const CGtoBlock&            gto_block,
     return CMatrix();
 }
 
+auto
+get_gto_values_for_3rd_order(const CGtoBlock&            gto_block,
+                             const std::vector<double>&  grid_coords_x,
+                             const std::vector<double>&  grid_coords_y,
+                             const std::vector<double>&  grid_coords_z,
+                             const std::vector<int>& gtos_mask) -> CMatrix
+{
+    auto gto_ang = gto_block.angular_momentum();
+
+    if (gto_ang == 0)
+    {
+        return gtoval::get_3rd_order_values_rec_s(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
+    else if (gto_ang == 1)
+    {
+        return gtoval::get_3rd_order_values_rec_p(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
+    else if (gto_ang == 2)
+    {
+        return gtoval::get_3rd_order_values_rec_d(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
+
+    std::string errangmom("get_gto_values_for_3rd_order: Only implemented up to d-orbitals");
+
+    errors::assertMsgCritical(false, errangmom);
+
+    return CMatrix();
+}
+
 }  // namespace gtoval
