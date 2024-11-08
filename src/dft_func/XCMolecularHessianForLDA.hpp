@@ -27,33 +27,62 @@
 
 #include <vector>
 
-#include "AODensityMatrix.hpp"
-#include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
-#include "GridBox.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
-#include "MultiTimer.hpp"
 #include "XCFunctional.hpp"
 
 namespace xchesslda {  // xchesslda namespace
 
-auto integrateExcHessianForLDA(const CMolecule&        molecule,
-                               const CMolecularBasis&  basis,
+/**
+ Integrates LDA exchnage-correlation functional contribution to molecular
+ Hessian.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular Hessian.
+ */
+auto integrateExcHessianForLDA(const CMolecule&                  molecule,
+                               const CMolecularBasis&            basis,
                                const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&   molecularGrid,
-                               const double            screeningThresholdForGTOValues,
-                               const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                               const CMolecularGrid&             molecularGrid,
+                               const double                      screeningThresholdForGTOValues,
+                               const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
-auto integrateVxcFockGradientForLDA(const CMolecule&        molecule,
-                                    const CMolecularBasis&  basis,
+/**
+ Integrates LDA exchnage-correlation functional contribution to molecular
+ gradient of Vxc matrix element.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @param atomIdx the index of the atom with respect to which gradient is
+ computed.
+ @return the Vxc gradient.
+ */
+auto integrateVxcFockGradientForLDA(const CMolecule&                  molecule,
+                                    const CMolecularBasis&            basis,
                                     const std::vector<const double*>& gsDensityPointers,
-                                    const CMolecularGrid&   molecularGrid,
-                                    const double            screeningThresholdForGTOValues,
-                                    const CXCFunctional&    xcFunctional,
-                                    const int32_t           atomIdx) -> std::vector<CDenseMatrix>;
+                                    const CMolecularGrid&             molecularGrid,
+                                    const double                      screeningThresholdForGTOValues,
+                                    const CXCFunctional&              xcFunctional,
+                                    const int32_t                     atomIdx) -> std::vector<CDenseMatrix>;
 
+/**
+ Computes AO-to-atom mapping.
+
+ @param ao_to_atom_ids the vector for storing the mapping.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ */
 auto computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
 }  // namespace xchesslda

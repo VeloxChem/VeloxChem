@@ -51,6 +51,7 @@ namespace xcgradlda {  // xcgradlda namespace
         with GTO gradient).
  @param gsDensityMatrix the ground state AO density matrix.
  @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
  @return the molecular gradient.
  */
@@ -62,32 +63,83 @@ auto integrateVxcGradientForLDA(const CMolecule&        molecule,
                                 const double            screeningThresholdForGTOValues,
                                 const CXCFunctional&    xcFunctional) -> CDenseMatrix;
 
-auto integrateVxcGradientForLDAOpenShell(const CMolecule&        molecule,
-                                         const CMolecularBasis&  basis,
+/**
+ Integrates first-order LDA exchnage-correlation functional contribution to
+ open-shell molecular gradient.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointers the pointers to perturbed AO density matrix (to be contracted
+        with GTO gradient).
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular gradient.
+ */
+auto integrateVxcGradientForLDAOpenShell(const CMolecule&                  molecule,
+                                         const CMolecularBasis&            basis,
                                          const std::vector<const double*>& rwDensityPointers,
                                          const std::vector<const double*>& gsDensityPointers,
-                                         const CMolecularGrid&   molecularGrid,
-                                         const double            screeningThresholdForGTOValues,
-                                         const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                                         const CMolecularGrid&             molecularGrid,
+                                         const double                      screeningThresholdForGTOValues,
+                                         const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
-auto integrateFxcGradientForLDA(const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
+/**
+ Integrates second-order LDA exchnage-correlation functional contribution
+ to molecular gradient.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointersOne the pointers to perturbed AO density matrix.
+ @param rwDensityPointersTwo the pointers to perturbed AO density matrix (to be
+        contracted with GTO gradient).
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular gradient.
+ */
+auto integrateFxcGradientForLDA(const CMolecule&                  molecule,
+                                const CMolecularBasis&            basis,
                                 const std::vector<const double*>& rwDensityPointersOne,
                                 const std::vector<const double*>& rwDensityPointersTwo,
                                 const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&   molecularGrid,
-                                const double            screeningThresholdForGTOValues,
-                                const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                                const CMolecularGrid&             molecularGrid,
+                                const double                      screeningThresholdForGTOValues,
+                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
-auto integrateKxcGradientForLDA(const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
+/**
+ Integrates third-order LDA exchnage-correlation functional contribution to
+ molecular gradient.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointersOne the pointers to perturbed AO density matrix.
+ @param rwDensityPointersTwo the pointers to perturbed AO density matrix.
+ @param gsDensityPointers the pointers to ground state AO density matrix (to be
+        contracted with GTO gradient).
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular gradient.
+ */
+auto integrateKxcGradientForLDA(const CMolecule&                  molecule,
+                                const CMolecularBasis&            basis,
                                 const std::vector<const double*>& rwDensityPointersOne,
                                 const std::vector<const double*>& rwDensityPointersTwo,
                                 const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&   molecularGrid,
-                                const double            screeningThresholdForGTOValues,
-                                const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                                const CMolecularGrid&             molecularGrid,
+                                const double                      screeningThresholdForGTOValues,
+                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
+/**
+ Computes AO-to-atom mapping.
+
+ @param ao_to_atom_ids the vector for storing the mapping.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ */
 auto computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
 }  // namespace xcgradlda

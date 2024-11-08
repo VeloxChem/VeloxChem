@@ -61,11 +61,11 @@ class CXCMolecularHessian
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular Hessian.
      */
-    CDenseMatrix integrateExcHessian(const CMolecule&        molecule,
-                                     const CMolecularBasis&  basis,
+    CDenseMatrix integrateExcHessian(const CMolecule&                  molecule,
+                                     const CMolecularBasis&            basis,
                                      const std::vector<const double*>& gsDensityPointers,
-                                     const CMolecularGrid&   molecularGrid,
-                                     const std::string&      xcFuncLabel) const;
+                                     const CMolecularGrid&             molecularGrid,
+                                     const std::string&                xcFuncLabel) const;
 
     /**
      Integrates exchnage-correlation functional contribution to molecular
@@ -78,14 +78,14 @@ class CXCMolecularHessian
      @param xcFuncLabel the label of exchange-correlation functional.
      @param atomIdx the index of the atom with respect to which gradient is
      computed.
-     @return the molecular Hessian.
+     @return the Vxc gradient.
      */
-    std::vector<CDenseMatrix> integrateVxcFockGradient(const CMolecule&        molecule,
-                                                       const CMolecularBasis&  basis,
+    std::vector<CDenseMatrix> integrateVxcFockGradient(const CMolecule&                  molecule,
+                                                       const CMolecularBasis&            basis,
                                                        const std::vector<const double*>& gsDensityPointers,
-                                                       const CMolecularGrid&   molecularGrid,
-                                                       const std::string&      xcFuncLabel,
-                                                       const int               atomIdx) const;
+                                                       const CMolecularGrid&             molecularGrid,
+                                                       const std::string&                xcFuncLabel,
+                                                       const int                         atomIdx) const;
 };
 
 #endif /* XCMolecularHessian_hpp */

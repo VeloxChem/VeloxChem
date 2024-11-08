@@ -50,43 +50,94 @@ namespace xcgradgga {  // xcgradgga namespace
  @param rwDensityMatrix the perturbed AO density matrix.
  @param gsDensityMatrix the ground state AO density matrix.
  @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
  @return the molecular gradient.
  */
-auto integrateVxcGradientForGGA(const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
+auto integrateVxcGradientForGGA(const CMolecule&                  molecule,
+                                const CMolecularBasis&            basis,
                                 const std::vector<const double*>& rwDensityPointers,
                                 const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&   molecularGrid,
-                                const double            screeningThresholdForGTOValues,
-                                const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                                const CMolecularGrid&             molecularGrid,
+                                const double                      screeningThresholdForGTOValues,
+                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
-auto integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
-                                         const CMolecularBasis&  basis,
+/**
+ Integrates first-order GGA exchnage-correlation functional contribution to
+ open-shell molecular gradient.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointers the pointers to perturbed AO density matrix.
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular gradient.
+ */
+auto integrateVxcGradientForGGAOpenShell(const CMolecule&                  molecule,
+                                         const CMolecularBasis&            basis,
                                          const std::vector<const double*>& rwDensityPointers,
                                          const std::vector<const double*>& gsDensityPointers,
-                                         const CMolecularGrid&   molecularGrid,
-                                         const double            screeningThresholdForGTOValues,
-                                         const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                                         const CMolecularGrid&             molecularGrid,
+                                         const double                      screeningThresholdForGTOValues,
+                                         const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
-auto integrateFxcGradientForGGA(const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
+/**
+ Integrates second-order GGA exchnage-correlation functional contribution
+ to molecular gradient.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointersOne the pointers to perturbed AO density matrix.
+ @param rwDensityPointersTwo the pointers to perturbed AO density matrix (to be
+        contracted with GTO gradient).
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular gradient.
+ */
+auto integrateFxcGradientForGGA(const CMolecule&                  molecule,
+                                const CMolecularBasis&            basis,
                                 const std::vector<const double*>& rwDensityPointersOne,
                                 const std::vector<const double*>& rwDensityPointersTwo,
                                 const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&   molecularGrid,
-                                const double            screeningThresholdForGTOValues,
-                                const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                                const CMolecularGrid&             molecularGrid,
+                                const double                      screeningThresholdForGTOValues,
+                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
-auto integrateKxcGradientForGGA(const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
+/**
+ Integrates third-order GGA exchnage-correlation functional contribution to
+ molecular gradient.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointersOne the pointers to perturbed AO density matrix.
+ @param rwDensityPointersTwo the pointers to perturbed AO density matrix.
+ @param gsDensityPointers the pointers to ground state AO density matrix (to be
+        contracted with GTO gradient).
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular gradient.
+ */
+auto integrateKxcGradientForGGA(const CMolecule&                  molecule,
+                                const CMolecularBasis&            basis,
                                 const std::vector<const double*>& rwDensityPointersOne,
                                 const std::vector<const double*>& rwDensityPointersTwo,
                                 const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&   molecularGrid,
-                                const double            screeningThresholdForGTOValues,
-                                const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+                                const CMolecularGrid&             molecularGrid,
+                                const double                      screeningThresholdForGTOValues,
+                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
+/**
+ Computes AO-to-atom mapping.
+
+ @param ao_to_atom_ids the vector for storing the mapping.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ */
 auto computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
 }  // namespace xcgradgga

@@ -108,7 +108,7 @@ CXCIntegrator_integrate_vxc_fock(const CXCIntegrator&                    self,
     std::string errsize("integrate_vxc_fock: Expecting a list of 1 or 2 numpy arrays");
     errors::assertMsgCritical((numdensities == 1) || (numdensities == 2), errsize);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_vxc_fock", gsDensityArrays, nao);
 
     auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
@@ -132,7 +132,7 @@ CXCIntegrator_integrate_fxc_fock(const CXCIntegrator&                    self,
     errors::assertMsgCritical(num_rw_dens == num_focks, errnum);
     errors::assertMsgCritical(num_gs_dens == 1, errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_fxc_fock", aoFockArrays, nao);
     check_arrays("integrate_fxc_fock", rwDensityArrays, nao);
     check_arrays("integrate_fxc_fock", gsDensityArrays, nao);
@@ -162,7 +162,7 @@ CXCIntegrator_integrate_kxc_fock(const CXCIntegrator&                    self,
     errors::assertMsgCritical(num_rw2_dens == num_focks, errnum);
     errors::assertMsgCritical(num_gs_dens == 1, errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_kxc_fock", aoFockArrays, nao);
     check_arrays("integrate_kxc_fock", rwDensityArrays, nao);
     check_arrays("integrate_kxc_fock", rw2DensityArrays, nao);
@@ -196,7 +196,7 @@ CXCIntegrator_integrate_kxclxc_fock(const CXCIntegrator&              self,
     errors::assertMsgCritical(num_rw2_dens + num_rw3_dens == num_focks, errnum);
     errors::assertMsgCritical(num_gs_dens == 1, errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_kxclxc_fock", aoFockArrays, nao);
     check_arrays("integrate_kxclxc_fock", rwDensityArrays, nao);
     check_arrays("integrate_kxclxc_fock", rw2DensityArrays, nao);
@@ -295,13 +295,13 @@ CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
 }
 
 auto
-CXCIntegrator_integrate_vxc_gradient(CXCMolecularGradient&      self,
-                                     const CMolecule&           molecule,
-                                     const CMolecularBasis&     basis,
-                                     const std::vector<py::array_t<double>>& rwDensityArrays,
-                                     const std::vector<py::array_t<double>>& gsDensityArrays,
-                                     const CMolecularGrid&      molecularGrid,
-                                     const std::string&         xcFuncLabel) -> py::array_t<double>
+CXCMolecularGradient_integrate_vxc_gradient(CXCMolecularGradient&                   self,
+                                            const CMolecule&                        molecule,
+                                            const CMolecularBasis&                  basis,
+                                            const std::vector<py::array_t<double>>& rwDensityArrays,
+                                            const std::vector<py::array_t<double>>& gsDensityArrays,
+                                            const CMolecularGrid&                   molecularGrid,
+                                            const std::string&                      xcFuncLabel) -> py::array_t<double>
 {
     auto        num_rw_dens = static_cast<int>(rwDensityArrays.size());
     auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
@@ -309,7 +309,7 @@ CXCIntegrator_integrate_vxc_gradient(CXCMolecularGradient&      self,
     errors::assertMsgCritical(num_rw_dens == num_gs_dens, errnum);
     errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_vxc_gradient", rwDensityArrays, nao);
     check_arrays("integrate_vxc_gradient", gsDensityArrays, nao);
 
@@ -320,14 +320,14 @@ CXCIntegrator_integrate_vxc_gradient(CXCMolecularGradient&      self,
 }
 
 auto
-CXCIntegrator_integrate_fxc_gradient(CXCMolecularGradient&      self,
-                                     const CMolecule&           molecule,
-                                     const CMolecularBasis&     basis,
-                                     const std::vector<py::array_t<double>>& rwDensityArraysOne,
-                                     const std::vector<py::array_t<double>>& rwDensityArraysTwo,
-                                     const std::vector<py::array_t<double>>& gsDensityArrays,
-                                     const CMolecularGrid&      molecularGrid,
-                                     const std::string&         xcFuncLabel) -> py::array_t<double>
+CXCMolecularGradient_integrate_fxc_gradient(CXCMolecularGradient&                   self,
+                                            const CMolecule&                        molecule,
+                                            const CMolecularBasis&                  basis,
+                                            const std::vector<py::array_t<double>>& rwDensityArraysOne,
+                                            const std::vector<py::array_t<double>>& rwDensityArraysTwo,
+                                            const std::vector<py::array_t<double>>& gsDensityArrays,
+                                            const CMolecularGrid&                   molecularGrid,
+                                            const std::string&                      xcFuncLabel) -> py::array_t<double>
 {
     auto        num_rw_dens_one = static_cast<int>(rwDensityArraysOne.size());
     auto        num_rw_dens_two = static_cast<int>(rwDensityArraysTwo.size());
@@ -336,7 +336,7 @@ CXCIntegrator_integrate_fxc_gradient(CXCMolecularGradient&      self,
     errors::assertMsgCritical((num_rw_dens_one == num_gs_dens) && (num_rw_dens_two == num_gs_dens), errnum);
     errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_fxc_gradient", rwDensityArraysOne, nao);
     check_arrays("integrate_fxc_gradient", rwDensityArraysTwo, nao);
     check_arrays("integrate_fxc_gradient", gsDensityArrays, nao);
@@ -349,14 +349,14 @@ CXCIntegrator_integrate_fxc_gradient(CXCMolecularGradient&      self,
 }
 
 auto
-CXCIntegrator_integrate_kxc_gradient(CXCMolecularGradient&      self,
-                                     const CMolecule&           molecule,
-                                     const CMolecularBasis&     basis,
-                                     const std::vector<py::array_t<double>>& rwDensityArraysOne,
-                                     const std::vector<py::array_t<double>>& rwDensityArraysTwo,
-                                     const std::vector<py::array_t<double>>& gsDensityArrays,
-                                     const CMolecularGrid&      molecularGrid,
-                                     const std::string&         xcFuncLabel) -> py::array_t<double>
+CXCMolecularGradient_integrate_kxc_gradient(CXCMolecularGradient&                   self,
+                                            const CMolecule&                        molecule,
+                                            const CMolecularBasis&                  basis,
+                                            const std::vector<py::array_t<double>>& rwDensityArraysOne,
+                                            const std::vector<py::array_t<double>>& rwDensityArraysTwo,
+                                            const std::vector<py::array_t<double>>& gsDensityArrays,
+                                            const CMolecularGrid&                   molecularGrid,
+                                            const std::string&                      xcFuncLabel) -> py::array_t<double>
 {
     auto        num_rw_dens_one = static_cast<int>(rwDensityArraysOne.size());
     auto        num_rw_dens_two = static_cast<int>(rwDensityArraysTwo.size());
@@ -365,7 +365,7 @@ CXCIntegrator_integrate_kxc_gradient(CXCMolecularGradient&      self,
     errors::assertMsgCritical((num_rw_dens_one == num_gs_dens) && (num_rw_dens_two == num_gs_dens), errnum);
     errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_kxc_gradient", rwDensityArraysOne, nao);
     check_arrays("integrate_kxc_gradient", rwDensityArraysTwo, nao);
     check_arrays("integrate_kxc_gradient", gsDensityArrays, nao);
@@ -389,7 +389,7 @@ CXCMolecularHessian_integrate_exc_hessian(CXCMolecularHessian&       self,
     std::string errnum("integrate_exc_hessian: Inconsistent number of numpy arrays");
     errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_exc_hessian", gsDensityArrays, nao);
 
     auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
@@ -404,26 +404,24 @@ CXCMolecularHessian_integrate_vxc_fock_gradient(CXCMolecularHessian&       self,
                                                 const std::vector<py::array_t<double>>& gsDensityArrays,
                                                 const CMolecularGrid&      molecularGrid,
                                                 const std::string&         xcFuncLabel,
-                                                const int                  atomIdx) -> py::array_t<double>
+                                                const int                  atomIdx) -> py::list
 {
     auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
     std::string errnum("integrate_vxc_fock_gradient: Inconsistent number of numpy arrays");
     errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
 
-    auto nao = basis.dimensions_of_basis();
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
     check_arrays("integrate_vxc_fock_gradient", gsDensityArrays, nao);
 
     auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
     auto vxcgrad          = self.integrateVxcFockGradient(molecule, basis, gs_dens_pointers, molecularGrid, xcFuncLabel, atomIdx);
 
     py::list ret;
-    ret.append(vlx_general::pointer_to_numpy(vxcgrad[0].values(), {vxcgrad[0].getNumberOfRows(), vxcgrad[0].getNumberOfColumns()}));
-    ret.append(vlx_general::pointer_to_numpy(vxcgrad[1].values(), {vxcgrad[1].getNumberOfRows(), vxcgrad[1].getNumberOfColumns()}));
-    ret.append(vlx_general::pointer_to_numpy(vxcgrad[2].values(), {vxcgrad[2].getNumberOfRows(), vxcgrad[2].getNumberOfColumns()}));
+    ret.append(vlx_general::pointer_to_numpy(vxcgrad[0].values(), {nao, nao}));
+    ret.append(vlx_general::pointer_to_numpy(vxcgrad[1].values(), {nao, nao}));
+    ret.append(vlx_general::pointer_to_numpy(vxcgrad[2].values(), {nao, nao}));
     return ret;
 }
-
-// Exports classes/functions in src/dft to python
 
 // Exports classes/functions in src/dft to python
 
@@ -658,7 +656,7 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&      molecularGrid,
                const std::string&         xcFuncLabel) -> py::array_t<double> {
-                return CXCIntegrator_integrate_vxc_gradient(self, molecule, basis, gsDensityArrays, gsDensityArrays, molecularGrid, xcFuncLabel);
+                return CXCMolecularGradient_integrate_vxc_gradient(self, molecule, basis, gsDensityArrays, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
             "Integrates 1st-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
@@ -675,7 +673,7 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&      molecularGrid,
                const std::string&         xcFuncLabel) -> py::array_t<double> {
-                return CXCIntegrator_integrate_vxc_gradient(self, molecule, basis, rwDensityArrays, gsDensityArrays, molecularGrid, xcFuncLabel);
+                return CXCMolecularGradient_integrate_vxc_gradient(self, molecule, basis, rwDensityArrays, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
             "Integrates 1st-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
@@ -694,7 +692,7 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&      molecularGrid,
                const std::string&         xcFuncLabel) -> py::array_t<double> {
-                return CXCIntegrator_integrate_fxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
+                return CXCMolecularGradient_integrate_fxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
             "Integrates 2nd-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
@@ -714,7 +712,7 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&      molecularGrid,
                const std::string&         xcFuncLabel) -> py::array_t<double> {
-                return CXCIntegrator_integrate_kxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
+                return CXCMolecularGradient_integrate_kxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
             "Integrates 3rd-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
@@ -731,12 +729,12 @@ export_dft(py::module& m)
         .def(py::init<>())
         .def(
             "integrate_exc_hessian",
-            [](CXCMolecularHessian&      self,
-               const CMolecule&           molecule,
-               const CMolecularBasis&     basis,
+            [](CXCMolecularHessian&                    self,
+               const CMolecule&                        molecule,
+               const CMolecularBasis&                  basis,
                const std::vector<py::array_t<double>>& gsDensityArrays,
-               const CMolecularGrid&      molecularGrid,
-               const std::string&         xcFuncLabel) -> py::array_t<double> {
+               const CMolecularGrid&                   molecularGrid,
+               const std::string&                      xcFuncLabel) -> py::array_t<double> {
                 return CXCMolecularHessian_integrate_exc_hessian(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel);
             },
             "Integrates exchange-correlation contribution to molecular Hessian.",
@@ -747,13 +745,13 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_vxc_fock_gradient",
-            [](CXCMolecularHessian&      self,
-               const CMolecule&           molecule,
-               const CMolecularBasis&     basis,
+            [](CXCMolecularHessian&                    self,
+               const CMolecule&                        molecule,
+               const CMolecularBasis&                  basis,
                const std::vector<py::array_t<double>>& gsDensityArrays,
-               const CMolecularGrid&      molecularGrid,
-               const std::string&         xcFuncLabel,
-               const int                  atomIdx) -> py::array_t<double> {
+               const CMolecularGrid&                   molecularGrid,
+               const std::string&                      xcFuncLabel,
+               const int                               atomIdx) -> py::list {
                 return CXCMolecularHessian_integrate_vxc_fock_gradient(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel, atomIdx);
             },
             "Integrates exchange-correlation contribution to Vxc gradient.",
