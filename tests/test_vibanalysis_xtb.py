@@ -1,19 +1,18 @@
 from pathlib import Path
-
-import h5py
 import numpy as np
-from veloxchem.mpitask import MpiTask
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.xtbdriver import XtbDriver
-from veloxchem.xtbhessiandriver import XtbHessianDriver
-from veloxchem.vibrationalanalysis import VibrationalAnalysis
+import pytest
+import h5py
 
-from .addons import using_xtb
+from veloxchem.mpitask import MpiTask
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.xtbdriver import XtbDriver
+from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 
 class TestXtbVibrationalAnalysisDriver:
 
-    @using_xtb
+    @pytest.mark.skipif(not XtbDriver.is_available(),
+                        reason='xtb not available')
     def test_xtb_vibrational_analysis_driver(self):
 
         here = Path(__file__).parent
@@ -30,13 +29,13 @@ class TestXtbVibrationalAnalysisDriver:
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule)
 
-        vib_settings = {'do_ir': 'yes', 'numerical_hessian':'yes'}
+        vib_settings = {'do_ir': 'yes', 'numerical_hessian': 'yes'}
         vibanalysis_drv = VibrationalAnalysis(xtb_drv)
-        vibanalysis_drv.update_settings(vib_dict = vib_settings)
+        vibanalysis_drv.update_settings(vib_dict=vib_settings)
         vibanalysis_drv.ostream.mute()
         vibanalysis_drv.compute(task.molecule)
 
-        if is_mpi_master(task.mpi_comm):
+        if task.mpi_rank == mpi_master():
 
             hf = h5py.File(h5file)
             ref_hessian = np.array(hf.get('hessian'))
