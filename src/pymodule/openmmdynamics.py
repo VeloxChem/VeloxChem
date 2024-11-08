@@ -37,6 +37,7 @@ import openmm.app as app
 import openmm.unit as unit
 
 from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .outputstream import OutputStream
@@ -569,12 +570,12 @@ class OpenMMDynamics:
         self.phase = 'gas'
 
     def create_qmmm_system_from_files(self, 
-                               pdb_file, 
-                               xml_file, 
-                               qm_residue, 
-                               ff_gen_qm=None,
-                               qm_atoms='all', 
-                               filename='qmmm'):
+                            pdb_file, 
+                            xml_file, 
+                            qm_residue, 
+                            ff_gen_qm=None, 
+                            qm_atoms='all', 
+                            filename='custom'):
         """
         Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
         
@@ -715,6 +716,7 @@ class OpenMMDynamics:
                                 snapshots=10,
                                 lowest_conformations=None,
                                 qm_driver=None,
+                                basis=None,
                                 constraints=None,
                                 minimize=True):
 
@@ -734,7 +736,9 @@ class OpenMMDynamics:
         :param lowest_conformations:
             Number of lowest energy conformations to save. Default is None.
         :param qm_minimization:
-            QM driver object for energy minimization. Default is None. 
+            QM driver object for energy minimization. Default is None.
+        :param basis:
+            Basis set for the SCF driver if qm_driver is not None.    
         :param minimize:
             If True, the energy of the conformations will be minimized. Default is True.
 
@@ -784,7 +788,8 @@ class OpenMMDynamics:
                 self.simulation.context.setPositions(coordinates)
 
                 if minimize:
-                    print(f'Step: {step}, Potential energy: {energy}')
+                    self.ostream.print_info(f'Step: {step}, Potential energy: {energy}')
+                    self.ostream.flush()
                     self.simulation.minimizeEnergy()
                     minimized_state = self.simulation.context.getState(getPositions=True, getEnergy=True)
                     minimized_energy = minimized_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
@@ -792,25 +797,31 @@ class OpenMMDynamics:
 
                     # Create a xyz with the minimized coordinates
                     energies.append(minimized_energy)
-                    print(f'Minimized energy: {minimized_energy}')
+                    self.ostream.print_info(f'Minimized energy: {minimized_energy}')
+                    self.ostream.flush()
                     xyz = f"{len(self.labels)}\n\n"
                     for label, coord in zip(self.labels, minimized_coordinates):
                         xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
-                    print('Saved coordinates for step', step)
+                    self.ostream.print_info(f'Saved coordinates for step {step}')
+                    self.ostream.flush()
                     opt_coordinates.append(xyz)
 
                 else:
                     # Create a xyz with the coordinates
-                    print('Energy of the conformation:', energy)
+                    self.ostream.print_info(f'Step: {step}, Potential energy: {energy}')
+                    self.ostream.flush()
+                    self.ostream.print_info(f'Energy of the conformation: {energy}')
+                    self.ostream.flush()
                     xyz = f"{len(self.labels)}\n\n"
                     for label, coord in zip(self.labels, coordinates):
                         xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
                     opt_coordinates.append(xyz)
                     energies.append(energy)
-                    print('Saved coordinates for step', step)
+                    self.ostream.print_info(f'Saved coordinates for step {step}')
 
-        print('Conformational sampling completed!')
-        print(f'Number of conformations: {len(opt_coordinates)}')
+        self.ostream.print_info('Conformational sampling completed!')
+        self.ostream.print_info(f'Number of conformations: {len(opt_coordinates)}')
+        self.ostream.flush()
 
         if lowest_conformations:
             msg = f'Looking for the {lowest_conformations} lowest energy conformations.'
@@ -826,7 +837,7 @@ class OpenMMDynamics:
                     if i != j:
                         molecule2 = Molecule.from_xyz_string(coord2)
                         molecule2_coords = molecule2.get_coordinates_in_angstrom()
-                        rmsd = molecule.rmsd(molecule2)
+                        rmsd = np.sqrt(np.mean((molecule_coords - molecule2_coords) ** 2))
                         if rmsd < 0.1:
                             if energies[j] < energy:
                                 energies[i] = energies[j]
@@ -848,8 +859,11 @@ class OpenMMDynamics:
                 drv_name = 'RSCF Driver'
             elif isinstance(qm_driver, ScfUnrestrictedDriver):
                 drv_name = 'USCF Driver'
-            elif instance(qm_driver, ScfRestrictedOpenDriver):
+            elif isinstance(qm_driver, ScfRestrictedOpenDriver):
                 drv_name = 'ROSCF Driver'
+
+            if drv_name != 'XTB Driver' and basis is None:
+                raise ValueError('Basis set is required for the SCF driver.')
 
             msg = f'Requested QM minimization with {drv_name}'
             self.ostream.print_info(msg)
@@ -857,9 +871,10 @@ class OpenMMDynamics:
             qm_energies = []
             qm_opt_coordinates = []
             for conf , coords in enumerate(opt_coordinates):
-                print(f'Conformation {conf}')
+                self.ostream.print_info(f'Conformation {conf}')
+                self.ostream.flush()
                 molecule = Molecule.from_xyz_string(coords)
-                qm_energy, qm_coords = self.qm_minimization(molecule, qm_driver, constraints)
+                qm_energy, qm_coords = self.qm_minimization(molecule, basis, qm_driver, constraints)
                 qm_energies.append(qm_energy)
                 qm_opt_coordinates.append(qm_coords)
                 msg = f'Energy of the conformation: {qm_energy}'
@@ -1066,7 +1081,7 @@ class OpenMMDynamics:
         :param grad_driver:
             Gradient driver object from VeloxChem.
         :param basis:
-            Molecular basis object from Veloxchem.
+            Molecular basis string.
         :param restart_file:
             Last state of the simulation to restart from. Default is None.
         :param ensemble:
@@ -1333,12 +1348,14 @@ class OpenMMDynamics:
     
     # Other methods:
     
-    def qm_minimization(self, molecule, scf_drv, constraints=None):
+    def qm_minimization(self, molecule, basis, scf_drv, constraints=None):
         """
         Minimizes the energy using a QM driver.
 
         :param molecule:
             VeloxChem Molecule object.
+        :param basis:
+            Basis set for the SCF driver.
         :param scf_drv:
             VeloxChem SCF driver object.
         :param constraints:
@@ -1351,7 +1368,11 @@ class OpenMMDynamics:
         if constraints:
             opt_drv.constraints(constraints)
 
-        results = opt_drv.compute(molecule)
+        basis = MolecularBasis.read(molecule, basis)
+
+        scf_results = scf_drv.compute(molecule, basis)
+
+        results = opt_drv.compute(molecule, basis, scf_results)
 
         min_energy = results['opt_energies'][-1]
         min_coords = results['opt_geometries'][-1]
@@ -2077,8 +2098,9 @@ class OpenMMDynamics:
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
 
         if self.basis is not None:
-            scf_result = self.qm_driver.compute(new_molecule, self.basis)
-            gradient = self.grad_driver.compute(new_molecule, self.basis, scf_result)
+            basis = MolecularBasis.read(new_molecule, self.basis)
+            scf_result = self.qm_driver.compute(new_molecule, basis)
+            gradient = self.grad_driver.compute(new_molecule, basis, scf_result)
             potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
             gradient = self.grad_driver.get_gradient()
         else:
