@@ -31,7 +31,7 @@ class TestAOIndices:
         ovl_drv = OverlapDriver()
         smat = ovl_drv.compute(molecule, basis).to_numpy()
 
-        sdal = ao_matrix_to_dalton(smat, molecule, basis)
+        sdal = ao_matrix_to_dalton(smat, basis, molecule)
         sdal2 = smat[bf_indices, :][:, bf_indices]
 
         assert np.max(np.abs(sdal - sdal2)) < 1.0e-12
@@ -39,7 +39,7 @@ class TestAOIndices:
         reverse_indices = [(x, i) for i, x in enumerate(bf_indices)]
         reverse_indices = [x[1] for x in sorted(reverse_indices)]
 
-        svlx = ao_matrix_to_veloxchem(sdal, molecule, basis)
+        svlx = ao_matrix_to_veloxchem(sdal, basis, molecule)
         svlx2 = sdal[reverse_indices, :][:, reverse_indices]
 
         assert np.max(np.abs(svlx - svlx2)) < 1.0e-12

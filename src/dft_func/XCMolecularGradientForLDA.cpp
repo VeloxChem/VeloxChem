@@ -1136,7 +1136,7 @@ integrateKxcGradientForLDA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -1334,7 +1334,7 @@ integrateKxcGradientForLDA(const CMolecule&        molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < aocount; nu++)
+            for (int nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -1343,7 +1343,7 @@ integrateKxcGradientForLDA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -1392,14 +1392,14 @@ integrateKxcGradientForLDA(const CMolecule&        molecule,
 
             auto gatm = molgrad_threads.row(thread_id);
 
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            for (int iatom = 0; iatom < natoms; iatom++)
             {
                 auto atom_offset = iatom * npoints;
 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
                 #pragma omp simd reduction(+ : gatmx, gatmy, gatmz)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -1430,9 +1430,9 @@ integrateKxcGradientForLDA(const CMolecule&        molecule,
 
     CDenseMatrix molgrad(natoms, 3);
 
-    for (int32_t iatom = 0; iatom < natoms; iatom++)
+    for (int iatom = 0; iatom < natoms; iatom++)
     {
-        for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+        for (int thread_id = 0; thread_id < nthreads; thread_id++)
         {
             molgrad.row(iatom)[0] += molgrad_threads.row(thread_id)[iatom * 3 + 0];
             molgrad.row(iatom)[1] += molgrad_threads.row(thread_id)[iatom * 3 + 1];

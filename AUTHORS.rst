@@ -16,17 +16,18 @@ Development lead
 Contributors
 ------------
 
+* Josefine H. Andersen
+* Iulia E. Brumboiu
 * Roberto Di Remigio
-* Karan Ahmadazdeh
+* Manuel Hodecker
 * Mickael Delcey
+* Karan Ahmadazdeh
 * Olav Vahtras
 * Manuel Brand
 * Juan de Gracia
-* Iulia E. Brumboiu
 * Nanna H. List
 * Xiaoyu Chen
 * Lukas Lampe
-* Manuel Hodecker
 * Noah Deveaux
 * Magnus Ringholm
 * Thomas Fransson
@@ -38,4 +39,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2024-10-11 by ``git shortlog -sn``
+The list of contributors was obtained 2024-11-08 by ``git shortlog -sn``
