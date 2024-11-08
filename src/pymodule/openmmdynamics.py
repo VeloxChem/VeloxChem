@@ -342,7 +342,7 @@ class OpenMMDynamics:
             self.ostream.flush()
             
     # Method to generate OpenMM system from VeloxChem objects
-    def system_from_molecule(self, 
+    def create_system_from_molecule(self, 
                              molecule, 
                              ff_gen, 
                              solvent='gas', 
@@ -350,7 +350,7 @@ class OpenMMDynamics:
                              filename='residue', 
                              residue_name='MOL'):
         """
-        Generates an OpenMM system from a VeloxChem molecule and a forcefield generator.
+        Creates an OpenMM system from a VeloxChem molecule and a forcefield generator.
         
         :param molecule:
             VeloxChem molecule object.
@@ -408,7 +408,6 @@ class OpenMMDynamics:
         elif qm_atoms is None:
             ff_gen.write_openmm_files(filename, residue_name)
 
-        # TODO: Incorporate the SystemBuilder here to avoid using the Modeller.
         if solvent == 'gas':
             phase = 'gas'
             self.pdb = app.PDBFile(f'{filename}.pdb')     
@@ -491,12 +490,12 @@ class OpenMMDynamics:
         self.phase = phase
 
     # Methods to build a custom system from a PDB file and custom XML files
-    def md_system_from_files(self, 
+    def create_md_system_from_files(self, 
                             pdb_file, 
                             xml_file,
                             filename='custom'):
         """
-        Builds a system from a PDB file containing multiple residues and custom XML files.
+        Creates a system from a PDB file containing multiple residues and custom XML files.
         
         :param system_pdb:
             PDB file containing the system or a list of PDB files.
@@ -569,7 +568,7 @@ class OpenMMDynamics:
 
         self.phase = 'gas'
 
-    def qmmm_system_from_files(self, 
+    def create_qmmm_system_from_files(self, 
                                pdb_file, 
                                xml_file, 
                                qm_residue, 
@@ -707,230 +706,7 @@ class OpenMMDynamics:
         # Correct phase setting
         self.phase = 'gas'
 
-    def add_bias_force(self, atoms, force_constant, target):
-        """
-        Method to add a biasing force to the system.
-
-        :param atoms:
-            List of atom indices to apply the force.
-        :param force_constant:
-            Force constant for the biasing force.
-        :param target:
-            Target equilibrium parameter (distance (nm), angle and torsion (deg))
-        """
-
-        if len(atoms) == 2:
-            msg = f'Adding stretch force between atoms {atoms[0]} and {atoms[1]} with force constant {force_constant}.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            force = mm.CustomBondForce('0.5*k*(r-r0)^2')
-            force.addGlobalParameter('k', force_constant)
-            force.addGlobalParameter('r0', target)
-            force.addBond(atoms[0], atoms[1])
-            self.system.addForce(force)
-        elif len(atoms) == 3:
-            target_rad = target * np.pi / 180
-            msg = f'Adding bend force between atoms {atoms[0]}, {atoms[1]}, and {atoms[2]} with force constant {force_constant}.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            force = mm.CustomAngleForce('0.5*k*(theta-theta0)^2')
-            force.addGlobalParameter('k', force_constant)
-            force.addGlobalParameter('theta0', target_rad)
-            force.addAngle(atoms[0], atoms[1], atoms[2])
-            self.system.addForce(force)
-        elif len(atoms) == 4:
-            target_rad = target * np.pi / 180
-            msg = f'Adding torsion force between atoms {atoms[0]}, {atoms[1]}, {atoms[2]}, and {atoms[3]} with force constant {force_constant}.'        
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            force = mm.CustomTorsionForce('0.5*k*(theta-theta0)^2')
-            force.addGlobalParameter('k', force_constant)
-            force.addGlobalParameter('theta0', target_rad)
-            force.addTorsion(atoms[0], atoms[1], atoms[2], atoms[3])
-            self.system.addForce(force)
-        else:
-            raise ValueError('Invalid number of atoms for the biasing force.')
-
     # Simulation methods
-    def energy_minimization(self, max_iter=0, tol=10.0):
-        """
-        Minimizes the energy of the system using the specified parameters.
-
-        Args:
-            max_iter (int): Maximum number of iterations for the minimization. Default is 0 (no limit).
-            tol (float): Tolerance for the energy minimization, in kJ/mol. Default is 10.0.
-
-        Raises:
-            RuntimeError: If the system has not been created prior to the call.
-
-        Returns:
-            float: The minimized potential energy of the system.
-            str: XYZ format string of the relaxed coordinates.
-        """
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-
-        # Create an integrator and simulation object
-        self.integrator = self._create_integrator()
-
-        self.simulation = app.Simulation(self.modeller.topology if 
-                                         self.phase in ['water', 'custom', 'periodic'] else
-                                         self.pdb.topology,
-                                        self.system, self.integrator)
-        
-        self.simulation.context.setPositions(self.modeller.positions if 
-                                             self.phase in ['water', 'custom', 'periodic'] else
-                                             self.pdb.positions)
-
-        # Perform energy minimization
-        self.simulation.minimizeEnergy(tolerance=tol * unit.kilojoules_per_mole / unit.nanometer, maxIterations=max_iter)
-        
-        # Retrieve and process the final state of the system
-        state = self.simulation.context.getState(getEnergy=True, getPositions=True)
-        energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-        coordinates = np.array(state.getPositions().value_in_unit(unit.nanometer)) * 10  # Convert nm to Angstroms
-
-        # Construct XYZ format string for the coordinates
-        xyz = f"{len(self.labels)}\n\n"
-        xyz += "\n".join(f"{label} {x} {y} {z}" for label, (x, y, z) in zip(self.labels, coordinates))
-        
-        return energy, xyz
-    
-    def steepest_descent(self, max_iter=1000, learning_rate=0.0001, convergence_threshold=1.0e-2):
-        """
-        Performs a steepest descent minimization on the system.
-
-        :param max_iter: 
-            Maximum number of iterations. Default is 1000.
-        :param learning_rate:
-            Initial learning rate for the optimization. Default is 0.01.
-        :param convergence_threshold:
-            Convergence threshold for the optimization. Default is 1e-3.
-
-        :return:
-            Tuple containing the XYZ format string of the relaxed coordinates and the final energy.
-        """
-            
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-        
-        # Create an integrator and simulation object
-        self.integrator = mm.VerletIntegrator(0.002 * unit.picoseconds)
-
-        self.simulation = app.Simulation(self.modeller.topology if 
-                                         self.phase in ['water', 'custom', 'periodic'] else
-                                         self.pdb.topology,
-                                        self.system, self.integrator)
-        
-        # Get initial positions
-        positions = self.modeller.positions if self.phase in ['water', 'custom', 'periodic'] else self.pdb.positions
-        positions = np.array(positions.value_in_unit(unit.nanometer))
-
-        # Define the energy and gradient functions
-        def compute_energy_and_gradient(positions):
-
-            self.simulation.context.setPositions(positions)
-            state = self.simulation.context.getState(
-                getPositions=True,
-                getEnergy=True, 
-                getForces=True)
-            
-            energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-            gradient = -1.0 * state.getForces(asNumpy=True).value_in_unit(unit.kilojoules_per_mole / unit.nanometer)
-
-            return energy, gradient
-
-        for iteration in range(max_iter):
-            energy, gradients = compute_energy_and_gradient(positions)
-            print("Gradient norm:", np.linalg.norm(gradients))
-
-            # Optional: Normalize gradients
-            norm = np.linalg.norm(gradients)
-            if norm > 0:
-                gradients /= norm
-
-            # Update positions
-            new_positions = positions - learning_rate * gradients
-
-            # Adaptive learning rate adjustment
-            if iteration > 0 and energy > previous_energy:
-                learning_rate *= 0.5
-                print("Reducing learning rate to:", learning_rate)
-
-            previous_energy = energy
-
-            # Check for convergence
-            if np.linalg.norm(new_positions - positions) < convergence_threshold:
-                print(f"Convergence reached after {iteration+1} iterations.")
-                break
-
-            positions = new_positions
-            print(f"Iteration {iteration+1}: Energy = {energy}")
-
-        # Once converged, return the final energy and positions
-        # The positions shall be written in XYZ format in angstroms
-        final_positions = positions * 10
-        # Construct XYZ format string for the coordinates
-        xyz = f"{len(self.labels)}\n\n"
-        xyz += "\n".join(f"{label} {x} {y} {z}" for label, (x, y, z) in zip(self.labels, final_positions))
-
-        return energy, xyz
-    
-    def steepest_gradient(self):
-        """
-        Minimize the energy using the steepest descent algorithm.
-        Requires additional openmmtools package.
-        """
-
-        try:
-            from openmmtools.integrators import GradientDescentMinimizationIntegrator
-        except ImportError:
-            raise ImportError('The openmmtools package is required for this method.')
-        
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-
-        self.integrator = GradientDescentMinimizationIntegrator()
-        self.simulation = app.Simulation(self.modeller.topology if self.phase in ['water', 'custom', 'periodic'] else self.pdb.topology,
-                                         self.system, self.integrator)
-        self.simulation.context.setPositions(self.modeller.positions if self.phase in ['water', 'custom', 'periodic'] else self.pdb.positions)
-
-        self.simulation.minimizeEnergy()
-
-        state = self.simulation.context.getState(getEnergy=True, getPositions=True)
-
-        energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-        coordinates = np.array(state.getPositions().value_in_unit(unit.nanometer)) * 10  # Convert nm to Angstroms
-
-        xyz = f"{len(self.labels)}\n\n"
-        xyz += "\n".join(f"{label} {x} {y} {z}" for label, (x, y, z) in zip(self.labels, coordinates))
-
-        return energy, xyz
-
-    def qm_minimization(self, molecule, scf_drv, constraints=None):
-        """
-        Minimizes the energy using a QM driver.
-
-        :param molecule:
-            VeloxChem Molecule object.
-        :param scf_drv:
-            VeloxChem SCF driver object.
-        :param constraints:
-            Constraints for the optimization. Default is None. Format example: ["set dihedral 6 1 2 3 0.0", "freeze distance 6 1", ...]
-        """
-
-        opt_drv = OptimizationDriver(scf_drv)
-        opt_drv.ostream.mute()
-
-        if constraints:
-            opt_drv.constraints(constraints)
-
-        results = opt_drv.compute(molecule)
-
-        min_energy = results['opt_energies'][-1]
-        min_coords = results['opt_geometries'][-1]
-
-        return min_energy, min_coords
      
     def conformational_sampling(self, 
                                 ensemble='NVT', 
@@ -1041,10 +817,27 @@ class OpenMMDynamics:
             msg = f'Looking for the {lowest_conformations} lowest energy conformations.'
             self.ostream.print_info(msg)
             self.ostream.flush()
-            # Get the lowest energy conformations based on the number of conformations requested
+
+            # Filter out the conformations with RMSD < 0.1 and keep the lowest energy one.
+            for i, coord in enumerate(opt_coordinates):
+                molecule = Molecule.from_xyz_string(coord)
+                molecule_coords = molecule.get_coordinates_in_angstrom()
+                energy = energies[i]
+                for j, coord2 in enumerate(opt_coordinates):
+                    if i != j:
+                        molecule2 = Molecule.from_xyz_string(coord2)
+                        molecule2_coords = molecule2.get_coordinates_in_angstrom()
+                        rmsd = molecule.rmsd(molecule2)
+                        if rmsd < 0.1:
+                            if energies[j] < energy:
+                    energies[i] = energies[j]
+                    opt_coordinates[i] = opt_coordinates[j]
+
             lowest_energies = sorted(energies)[:lowest_conformations]
             lowest_coords = opt_coordinates[:lowest_conformations]
             
+            for coord in lowest
+
             energies = lowest_energies
             opt_coordinates = lowest_coords
 
@@ -1543,6 +1336,77 @@ class OpenMMDynamics:
         viewer.zoomTo()
 
         viewer.show()
+    
+    # Other methods:
+    
+    def qm_minimization(self, molecule, scf_drv, constraints=None):
+        """
+        Minimizes the energy using a QM driver.
+
+        :param molecule:
+            VeloxChem Molecule object.
+        :param scf_drv:
+            VeloxChem SCF driver object.
+        :param constraints:
+            Constraints for the optimization. Default is None. Format example: ["set dihedral 6 1 2 3 0.0", "freeze distance 6 1", ...]
+        """
+
+        opt_drv = OptimizationDriver(scf_drv)
+        opt_drv.ostream.mute()
+
+        if constraints:
+            opt_drv.constraints(constraints)
+
+        results = opt_drv.compute(molecule)
+
+        min_energy = results['opt_energies'][-1]
+        min_coords = results['opt_geometries'][-1]
+
+        return min_energy, min_coords
+    
+    def add_bias_force(self, atoms, force_constant, target):
+        """
+        Method to add a biasing force to the system.
+
+        :param atoms:
+            List of atom indices to apply the force.
+        :param force_constant:
+            Force constant for the biasing force.
+        :param target:
+            Target equilibrium parameter (distance (nm), angle and torsion (deg))
+        """
+
+        if len(atoms) == 2:
+            msg = f'Adding stretch force between atoms {atoms[0]} and {atoms[1]} with force constant {force_constant}.'
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+            force = mm.CustomBondForce('0.5*k*(r-r0)^2')
+            force.addGlobalParameter('k', force_constant)
+            force.addGlobalParameter('r0', target)
+            force.addBond(atoms[0], atoms[1])
+            self.system.addForce(force)
+        elif len(atoms) == 3:
+            target_rad = target * np.pi / 180
+            msg = f'Adding bend force between atoms {atoms[0]}, {atoms[1]}, and {atoms[2]} with force constant {force_constant}.'
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+            force = mm.CustomAngleForce('0.5*k*(theta-theta0)^2')
+            force.addGlobalParameter('k', force_constant)
+            force.addGlobalParameter('theta0', target_rad)
+            force.addAngle(atoms[0], atoms[1], atoms[2])
+            self.system.addForce(force)
+        elif len(atoms) == 4:
+            target_rad = target * np.pi / 180
+            msg = f'Adding torsion force between atoms {atoms[0]}, {atoms[1]}, {atoms[2]}, and {atoms[3]} with force constant {force_constant}.'        
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+            force = mm.CustomTorsionForce('0.5*k*(theta-theta0)^2')
+            force.addGlobalParameter('k', force_constant)
+            force.addGlobalParameter('theta0', target_rad)
+            force.addTorsion(atoms[0], atoms[1], atoms[2], atoms[3])
+            self.system.addForce(force)
+        else:
+            raise ValueError('Invalid number of atoms for the biasing force.')
 
     # Private methods
     def _save_output(self, output_file):
