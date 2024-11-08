@@ -707,7 +707,6 @@ class OpenMMDynamics:
         self.phase = 'gas'
 
     # Simulation methods
-     
     def conformational_sampling(self, 
                                 ensemble='NVT', 
                                 temperature=700, 
@@ -830,17 +829,12 @@ class OpenMMDynamics:
                         rmsd = molecule.rmsd(molecule2)
                         if rmsd < 0.1:
                             if energies[j] < energy:
-                    energies[i] = energies[j]
-                    opt_coordinates[i] = opt_coordinates[j]
+                                energies[i] = energies[j]
+                                opt_coordinates[i] = opt_coordinates[j]
 
-            lowest_energies = sorted(energies)[:lowest_conformations]
-            lowest_coords = opt_coordinates[:lowest_conformations]
+            energies = sorted(energies)[:lowest_conformations]
+            opt_coordinates = opt_coordinates[:lowest_conformations]
             
-            for coord in lowest
-
-            energies = lowest_energies
-            opt_coordinates = lowest_coords
-
             msg = 'Lowest energy conformations saved'
             self.ostream.print_info(msg)
             self.ostream.flush()
