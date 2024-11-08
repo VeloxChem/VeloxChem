@@ -796,16 +796,7 @@ class ScfHessianDriver(HessianDriver):
             density = None
             scf_tensors = None
 
-        if self._dft:
-            grid_drv = GridDriver()
-            grid_level = (get_default_grid_level(self.xcfun)
-                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
-            grid_drv.set_level(grid_level)
-
-            mol_grid = grid_drv.generate(molecule)
-
         density = self.comm.bcast(density, root=mpi_master())
-        scf_tensors = self.comm.bcast(scf_tensors, root=mpi_master())
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
@@ -817,6 +808,9 @@ class ScfHessianDriver(HessianDriver):
         dft_dict = cphf_solver._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = cphf_solver._init_pe(molecule, ao_basis)
+
+        if self._dft:
+            mol_grid = dft_dict['molgrid']
 
         # TODO: the MPI is not done properly here,
         # fix once the new integral code is ready.
@@ -995,6 +989,7 @@ class ScfHessianDriver(HessianDriver):
             # create AODensity and Fock matrix objects, contract with ERI
             uia_ao_list = [uia_ao[x] for x in range(natm * 3)]
         else:
+            scf_tensors = None
             uia_ao_list = None
 
         uia_ao_list = self.comm.bcast(uia_ao_list, root=mpi_master())
