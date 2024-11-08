@@ -42,6 +42,7 @@
 #include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
+#include "XCMolecularHessian.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
@@ -376,6 +377,52 @@ CXCIntegrator_integrate_kxc_gradient(CXCMolecularGradient&      self,
     return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
 }
 
+auto
+CXCMolecularHessian_integrate_exc_hessian(CXCMolecularHessian&       self,
+                                          const CMolecule&           molecule,
+                                          const CMolecularBasis&     basis,
+                                          const std::vector<py::array_t<double>>& gsDensityArrays,
+                                          const CMolecularGrid&      molecularGrid,
+                                          const std::string&         xcFuncLabel) -> py::array_t<double>
+{
+    auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
+    std::string errnum("integrate_exc_hessian: Inconsistent number of numpy arrays");
+    errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
+
+    auto nao = basis.dimensions_of_basis();
+    check_arrays("integrate_exc_hessian", gsDensityArrays, nao);
+
+    auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
+    auto molhess          = self.integrateExcHessian(molecule, basis, gs_dens_pointers, molecularGrid, xcFuncLabel);
+    return vlx_general::pointer_to_numpy(molhess.values(), {molhess.getNumberOfRows(), molhess.getNumberOfColumns()});
+}
+
+auto
+CXCMolecularHessian_integrate_vxc_fock_gradient(CXCMolecularHessian&       self,
+                                                const CMolecule&           molecule,
+                                                const CMolecularBasis&     basis,
+                                                const std::vector<py::array_t<double>>& gsDensityArrays,
+                                                const CMolecularGrid&      molecularGrid,
+                                                const std::string&         xcFuncLabel,
+                                                const int                  atomIdx) -> py::array_t<double>
+{
+    auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
+    std::string errnum("integrate_vxc_fock_gradient: Inconsistent number of numpy arrays");
+    errors::assertMsgCritical((num_gs_dens == 1) || (num_gs_dens == 2), errnum);
+
+    auto nao = basis.dimensions_of_basis();
+    check_arrays("integrate_vxc_fock_gradient", gsDensityArrays, nao);
+
+    auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
+    auto vxcgrad          = self.integrateVxcFockGradient(molecule, basis, gs_dens_pointers, molecularGrid, xcFuncLabel, atomIdx);
+
+    py::list ret;
+    ret.append(vlx_general::pointer_to_numpy(vxcgrad[0].values(), {vxcgrad[0].getNumberOfRows(), vxcgrad[0].getNumberOfColumns()}));
+    ret.append(vlx_general::pointer_to_numpy(vxcgrad[1].values(), {vxcgrad[1].getNumberOfRows(), vxcgrad[1].getNumberOfColumns()}));
+    ret.append(vlx_general::pointer_to_numpy(vxcgrad[2].values(), {vxcgrad[2].getNumberOfRows(), vxcgrad[2].getNumberOfColumns()}));
+    return ret;
+}
+
 // Exports classes/functions in src/dft to python
 
 // Exports classes/functions in src/dft to python
@@ -677,6 +724,45 @@ export_dft(py::module& m)
             "gsDensityArrays"_a,
             "molecularGrid"_a,
             "xcFuncLabel"_a);
+
+    // CXCMolecularHessian class
+
+    PyClass<CXCMolecularHessian>(m, "XCMolecularHessian")
+        .def(py::init<>())
+        .def(
+            "integrate_exc_hessian",
+            [](CXCMolecularHessian&      self,
+               const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
+               const CMolecularGrid&      molecularGrid,
+               const std::string&         xcFuncLabel) -> py::array_t<double> {
+                return CXCMolecularHessian_integrate_exc_hessian(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel);
+            },
+            "Integrates exchange-correlation contribution to molecular Hessian.",
+            "molecule"_a,
+            "basis"_a,
+            "gsDensityArrays"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_vxc_fock_gradient",
+            [](CXCMolecularHessian&      self,
+               const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
+               const CMolecularGrid&      molecularGrid,
+               const std::string&         xcFuncLabel,
+               const int                  atomIdx) -> py::array_t<double> {
+                return CXCMolecularHessian_integrate_vxc_fock_gradient(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel, atomIdx);
+            },
+            "Integrates exchange-correlation contribution to Vxc gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "gsDensityArrays"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a,
+            "atomIdx"_a);
 
     // XCComponent class
     PyClass<CXCComponent>(m, "XCComponent")

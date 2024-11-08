@@ -216,6 +216,34 @@ distributeSubMatrixToFock(const std::vector<double*>& aoFockPointers,
     }
 }
 
+void
+distributeSubMatrixToDenseMatrix(CDenseMatrix&               matrix,
+                                 const CDenseMatrix&         subMatrix,
+                                 const std::vector<int32_t>& aoIndices,
+                                 const int32_t               naos)
+{
+    const auto aocount = static_cast<int>(aoIndices.size());
+
+    if (aocount <= naos)
+    {
+        for (int32_t row = 0; row < subMatrix.getNumberOfRows(); row++)
+        {
+            auto row_orig = aoIndices[row];
+
+            auto mat_row_orig = matrix.row(row_orig);
+
+            auto submat_row = subMatrix.row(row);
+
+            for (int32_t col = 0; col < subMatrix.getNumberOfColumns(); col++)
+            {
+                auto col_orig = aoIndices[col];
+
+                mat_row_orig[col_orig] += submat_row[col];
+            }
+        }
+    }
+}
+
 auto
 distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void
 {

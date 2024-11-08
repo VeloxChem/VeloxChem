@@ -32,6 +32,8 @@ target_sources(vlxobjs
     XCMolecularGradient.cpp
     XCMolecularGradientForLDA.cpp
     XCMolecularGradientForGGA.cpp
+    XCMolecularHessian.cpp
+    XCMolecularHessianForLDA.cpp
   )
 
 target_include_directories(vlxobjs
