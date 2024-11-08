@@ -199,10 +199,10 @@ class PolOrbitalResponse(CphfSolver):
                 # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
-            full_vec = ([
-                self.get_full_solution_vector(lr_results['solutions'][x, w])
+            full_vec = [
+                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
-            ])
+            ]
 
             if self.rank == mpi_master():
                 # number of vector components
@@ -532,10 +532,10 @@ class PolOrbitalResponse(CphfSolver):
                 # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
-            full_vec = ([
-                self.get_full_solution_vector(lr_results['solutions'][x, w])
+            full_vec = [
+                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
-            ])
+            ]
 
             if self.rank == mpi_master():
                 # number of vector components
@@ -971,13 +971,13 @@ class PolOrbitalResponse(CphfSolver):
         dipole_ints_ao = np.zeros((dof, nao, nao))
         k = 0
         if 'x' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats[0]
+            dipole_ints_ao[k] = -1.0*dipole_mats[0]
             k += 1
         if 'y' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats[1]
+            dipole_ints_ao[k] = -1.0*dipole_mats[1]
             k += 1
         if 'z' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats[2]
+            dipole_ints_ao[k] = -1.0*dipole_mats[2]
 
         # transform to MO basis (oo and vv blocks only)
         dipole_ints_oo = np.array([
@@ -1397,10 +1397,10 @@ class PolOrbitalResponse(CphfSolver):
         for f, w in enumerate(self.frequencies):
 
             # get full solution vector
-            full_vec = ([
-                self.get_full_solution_vector(lr_results['solutions'][x, w])
+            full_vec = [
+                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
-            ])
+            ]
 
             if self.rank == mpi_master():
                 self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
@@ -1408,7 +1408,7 @@ class PolOrbitalResponse(CphfSolver):
 
                 # MO coefficients
                 nocc = molecule.number_of_alpha_electrons()
-                mo = scf_tensors['C']
+                mo = scf_tensors['C_alpha']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
                 nvir = mo_vir.shape[1]
@@ -1453,17 +1453,15 @@ class PolOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
                     for x in range(dof**2)
                 ])
-                cphf_ao_list = list([cphf_ao[x] for x in range(dof**2)])
-                ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
+                cphf_ao_list = [cphf_ao[x] for x in range(dof**2)]
             else:
-                ao_density_cphf = AODensityMatrix()
+                cphf_ao_list = None
 
             dof = self.comm.bcast(dof, root=mpi_master())
-            ao_density_cphf.broadcast(self.rank, self.comm)
-            fock_cphf = AOFockMatrix(ao_density_cphf)
+            cphf_ao_list = self.comm.bcast(cphf_ao_list, root=mpi_master())
 
             # TODO: what has to be on MPI master and what not?
-            self._comp_lr_fock(fock_cphf, ao_density_cphf, molecule, basis,
+            fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
                                eri_dict, dft_dict, pe_dict, self.profiler)
 
             # For now we:
@@ -1493,19 +1491,15 @@ class PolOrbitalResponse(CphfSolver):
                         # and its transpose (VV, OV blocks)
                         # this comes from the transformation of the 2PDM contribution
                         # from MO to AO basis
-                        fock_ao_rhs_1_m = fock_ao_rhs.alpha_to_numpy(
-                            dof**2 + m)  # x_plus_y
-                        fock_ao_rhs_2_m = fock_ao_rhs.alpha_to_numpy(
-                            dof**2 + dof + m)  # x_minus_y
+                        fock_ao_rhs_1_m = fock_ao_rhs[ dof**2 + m]  # x_plus_y
+                        fock_ao_rhs_2_m = fock_ao_rhs[ dof**2 + dof + m]  # x_minus_y
 
-                        fock_ao_rhs_1_n = fock_ao_rhs.alpha_to_numpy(
-                            dof**2 + n)  # x_plus_y
-                        fock_ao_rhs_2_n = fock_ao_rhs.alpha_to_numpy(
-                            dof**2 + dof + n)  # x_minus_y
+                        fock_ao_rhs_1_n = fock_ao_rhs[ dof**2 + n]  # x_plus_y
+                        fock_ao_rhs_2_n = fock_ao_rhs[ dof**2 + dof + n]  # x_minus_y
 
-                        fmat = (fock_cphf.alpha_to_numpy(m * dof + n) +
-                                fock_cphf.alpha_to_numpy(m * dof + n).T +
-                                fock_ao_rhs.alpha_to_numpy(m * dof + n))
+                        fmat = (fock_cphf[m * dof + n] +
+                                fock_cphf[m * dof + n].T +
+                                fock_ao_rhs[m * dof + n])
 
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
@@ -1580,17 +1574,17 @@ class PolOrbitalResponse(CphfSolver):
         for f, w in enumerate(self.frequencies):
 
             # get full solution vector
-            full_vec = ([
-                self.get_full_solution_vector(lr_results['solutions'][x, w])
+            full_vec = [
+                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
-            ])
+            ]
 
             if self.rank == mpi_master():
                 self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
                 nocc = molecule.number_of_alpha_electrons()
-                mo = scf_tensors['C']
+                mo = scf_tensors['C_alpha']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
                 nvir = mo_vir.shape[1]
@@ -1639,29 +1633,26 @@ class PolOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
                     for x in range(dof**2)
                 ])
+
+                # TODO: why list np.array list ?
                 cphf_ao_list_real = list(
                     np.array([cphf_ao[x].real for x in range(dof**2)]))
                 cphf_ao_list_imag = list(
                     np.array([cphf_ao[x].imag for x in range(dof**2)]))
-                ao_density_cphf_real = AODensityMatrix(cphf_ao_list_real,
-                                                       denmat.rest)
-                ao_density_cphf_imag = AODensityMatrix(cphf_ao_list_imag,
-                                                       denmat.rest)
             else:
-                ao_density_cphf_real = AODensityMatrix()
-                ao_density_cphf_imag = AODensityMatrix()
+                cphf_ao_list_real = None
+                cphf_ao_list_imag = None
 
             dof = self.comm.bcast(dof, root=mpi_master())
-            ao_density_cphf_real.broadcast(self.rank, self.comm)
-            ao_density_cphf_imag.broadcast(self.rank, self.comm)
-            fock_cphf_real = AOFockMatrix(ao_density_cphf_real)
-            fock_cphf_imag = AOFockMatrix(ao_density_cphf_imag)
+
+            cphf_ao_list_real = self.comm.bcast(cphf_ao_list_real, root=mpi_master())
+            cphf_ao_list_imag = self.comm.bcast(cphf_ao_list_imag, root=mpi_master())
 
             # TODO: what has to be on MPI master and what not?
-            self._comp_lr_fock(fock_cphf_real, ao_density_cphf_real, molecule,
+            fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule,
                                basis, eri_dict, dft_dict, pe_dict,
                                self.profiler)
-            self._comp_lr_fock(fock_cphf_imag, ao_density_cphf_imag, molecule,
+            fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule,
                                basis, eri_dict, dft_dict, pe_dict,
                                self.profiler)
 
@@ -1693,32 +1684,32 @@ class PolOrbitalResponse(CphfSolver):
                         # this comes from the transformation of the 2PDM contribution
                         # from MO to AO basis
                         fock_ao_rhs_1_m = (
-                            fock_ao_rhs_real.alpha_to_numpy(dof**2 + m) +
-                            1j * fock_ao_rhs_imag.alpha_to_numpy(dof**2 + m)
+                            fock_ao_rhs_real[dof**2 + m] +
+                            1j * fock_ao_rhs_imag[dof**2 + m]
                         )  # x_plus_y
                         fock_ao_rhs_2_m = (
-                            fock_ao_rhs_real.alpha_to_numpy(dof**2 + dof + m) +
+                            fock_ao_rhs_real[dof**2 + dof + m] +
                             1j *
-                            fock_ao_rhs_imag.alpha_to_numpy(dof**2 + dof + m)
+                            fock_ao_rhs_imag[dof**2 + dof + m]
                         )  # x_minus_y
 
                         fock_ao_rhs_1_n = (
-                            fock_ao_rhs_real.alpha_to_numpy(dof**2 + n) +
-                            1j * fock_ao_rhs_imag.alpha_to_numpy(dof**2 + n)
+                            fock_ao_rhs_real[dof**2 + n] +
+                            1j * fock_ao_rhs_imag[dof**2 + n]
                         )  # x_plus_y
                         fock_ao_rhs_2_n = (
-                            fock_ao_rhs_real.alpha_to_numpy(dof**2 + dof + n) +
+                            fock_ao_rhs_real[dof**2 + dof + n] +
                             1j *
-                            fock_ao_rhs_imag.alpha_to_numpy(dof**2 + dof + n)
+                            fock_ao_rhs_imag[dof**2 + dof + n]
                         )  # x_minus_y
 
-                        fmat = ((fock_cphf_real.alpha_to_numpy(m * dof + n) +
-                                 fock_cphf_real.alpha_to_numpy(m * dof + n).T +
-                                 fock_ao_rhs_real.alpha_to_numpy(m * dof + n)) +
+                        fmat = ((fock_cphf_real[m * dof + n] +
+                                 fock_cphf_real[m * dof + n].T +
+                                 fock_ao_rhs_real[m * dof + n]) +
                                 1j *
-                                (fock_cphf_imag.alpha_to_numpy(m * dof + n) +
-                                 fock_cphf_imag.alpha_to_numpy(m * dof + n).T +
-                                 fock_ao_rhs_imag.alpha_to_numpy(m * dof + n)))
+                                (fock_cphf_imag[m * dof + n] +
+                                 fock_cphf_imag[m * dof + n].T +
+                                 fock_ao_rhs_imag[m * dof + n]))
 
                         # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
                         #        (2,0), (2,1), (2,2) * dof
@@ -1778,7 +1769,7 @@ class PolOrbitalResponse(CphfSolver):
         dof = len(self.vector_components)
 
         # MO coefficients
-        mo = scf_tensors['C']  # only alpha part
+        mo = scf_tensors['C_alpha']  # only alpha part
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
@@ -1798,13 +1789,13 @@ class PolOrbitalResponse(CphfSolver):
         dipole_ints_ao = np.zeros((dof, nao, nao))
         k = 0
         if 'x' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats[0]
+            dipole_ints_ao[k] = -1.0*dipole_mats[0]
             k += 1
         if 'y' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats[1]
+            dipole_ints_ao[k] = -1.0*dipole_mats[1]
             k += 1
         if 'z' in self.vector_components:
-            dipole_ints_ao[k] = dipole_mats[2]
+            dipole_ints_ao[k] = -1.0*dipole_mats[2]
 
         # transform to MO basis (oo and ov blocks only)
         dipole_ints_oo = np.array([
@@ -1866,7 +1857,7 @@ class PolOrbitalResponse(CphfSolver):
         dof = len(self.vector_components)
 
         # MO coefficients
-        mo = scf_tensors['C']  # only alpha part
+        mo = scf_tensors['C_alpha']  # only alpha part
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
@@ -1876,7 +1867,7 @@ class PolOrbitalResponse(CphfSolver):
         nao = mo.shape[0]
 
         # orbital energies
-        mo_energies = scf_tensors['E']
+        mo_energies = scf_tensors['E_alpha']
         eocc = mo_energies[:nocc]
         evir = mo_energies[nocc:]
         eo_diag = np.diag(eocc)
@@ -1941,7 +1932,7 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         # MO coefficients
-        mo = scf_tensors['C']  # only alpha part
+        mo = scf_tensors['C_alpha']  # only alpha part
         nocc = molecule.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()

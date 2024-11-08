@@ -4,11 +4,10 @@ import sys
 from mpi4py import MPI
 
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCMolecularGradient
-from .veloxchemlib import hartree_in_wavenumber
+from .veloxchemlib import mpi_master, hartree_in_wavenumber, denmat
+
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
@@ -239,7 +238,7 @@ class PolarizabilityGradient():
 
             if self.rank == mpi_master():
                 orbrsp_results = all_orbrsp_results[w]
-                mo = scf_tensors['C']  # only alpha part
+                mo = scf_tensors['C_alpha']  # only alpha part
                 nao = mo.shape[0]
                 nocc = molecule.number_of_alpha_electrons()
                 mo_occ = mo[:, :nocc].copy()
@@ -1239,7 +1238,7 @@ class PolarizabilityGradient():
 
         response_functions = lr_results.get('response_functions', None)
         keys = list(response_functions.keys())
-        is_complex_response = (type(response_functions[keys[0]]) is np.dtype('complex128'))
+        is_complex_response = (type(response_functions[keys[0]]) == np.dtype('complex128'))
 
         if (is_complex_response != self.is_complex):
             error_text = 'Mismatch between LR results and polgrad settings!'
