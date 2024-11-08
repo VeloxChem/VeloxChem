@@ -199,7 +199,7 @@ class HessianDriver:
         coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
-        nuclear_charges = molecule.elem_ids_to_numpy()
+        nuclear_charges = molecule.get_element_ids()
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):

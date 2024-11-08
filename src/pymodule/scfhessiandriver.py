@@ -347,7 +347,7 @@ class ScfHessianDriver(HessianDriver):
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nvir = mo_vir.shape[1]
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             eoo = eocc.reshape(-1, 1) + eocc #ei+ej
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
@@ -356,7 +356,7 @@ class ScfHessianDriver(HessianDriver):
         else:
             gs_density = AODensityMatrix()
 
-        gs_density.broadcast(self.rank, self.comm)
+        gs_density.broadcast(self.comm)
 
         # Set up a CPHF solver
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
@@ -625,12 +625,12 @@ class ScfHessianDriver(HessianDriver):
 
         if self.rank == mpi_master():
             scf_tensors = self.scf_driver.scf_tensors
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nao = mo.shape[0]
             density = scf_tensors['D_alpha']
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             eo_diag = np.diag(eocc)
             epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
@@ -672,7 +672,7 @@ class ScfHessianDriver(HessianDriver):
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
 
-        gs_density.broadcast(self.rank, self.comm)
+        gs_density.broadcast(self.comm)
 
         density = self.comm.bcast(density, root=mpi_master())
 
@@ -790,13 +790,13 @@ class ScfHessianDriver(HessianDriver):
         nocc = molecule.number_of_alpha_electrons()
         if self.rank == mpi_master():
             scf_tensors = self.scf_driver.scf_tensors
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
             nao = mo.shape[0]
             density = scf_tensors['D_alpha']
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
             gs_density = AODensityMatrix([density], denmat.rest)
@@ -812,7 +812,7 @@ class ScfHessianDriver(HessianDriver):
             grid_drv.set_level(grid_level)
 
             mol_grid = grid_drv.generate(molecule)
-        gs_density.broadcast(self.rank, self.comm)
+        gs_density.broadcast(self.comm)
 
         density = self.comm.bcast(density, root=mpi_master())
         scf_tensors = self.comm.bcast(scf_tensors, root=mpi_master())
@@ -928,17 +928,14 @@ class ScfHessianDriver(HessianDriver):
                     # Create a list of 2D numpy arrays to create
                     # AODensityMatrix objects
                     # and calculate auxiliary Fock matrix with ERI driver
-                    P_P_Six_ao_list = list([P_P_Six[x] for x in range(3)])
-                    P_P_Six_dm_ao = AODensityMatrix(P_P_Six_ao_list,
-                                                    denmat.rest)
+                    P_P_Six_ao_list = [P_P_Six[x] for x in range(3)]
                 else:
-                    P_P_Six_dm_ao = AODensityMatrix()
+                    P_P_Six_ao_list = None
 
-                P_P_Six_dm_ao.broadcast(self.rank, self.comm)
+                P_P_Six_ao_list = self.comm.bcast(P_P_Six_ao_list, root=mpi_master())
 
-                P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
                 # MPI issue
-                cphf_solver._comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
+                P_P_Six_fock_ao = cphf_solver._comp_lr_fock(P_P_Six_ao_list,
                                           molecule, ao_basis, eri_dict,
                                           dft_dict, pe_dict, profiler)
 
@@ -947,7 +944,7 @@ class ScfHessianDriver(HessianDriver):
                     # for further use
                     np_P_P_Six_fock = np.zeros((3,nao,nao))
                     for k in range(3):
-                        np_P_P_Six_fock[k] = P_P_Six_fock_ao.to_numpy(k)
+                        np_P_P_Six_fock[k] = P_P_Six_fock_ao[k]
 
                     for x in range(3):
                         for y in range(3):
@@ -988,12 +985,12 @@ class ScfHessianDriver(HessianDriver):
 
         if self.rank == mpi_master():
             scf_tensors = self.scf_driver.scf_tensors
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nao = mo.shape[0]
             density = scf_tensors['D_alpha']
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             eo_diag = np.diag(eocc)
             epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
@@ -1006,18 +1003,11 @@ class ScfHessianDriver(HessianDriver):
             uia_ao = uia_ao.reshape(3*natm, nao, nao)
             
             # create AODensity and Fock matrix objects, contract with ERI
-            uia_ao_list = list([uia_ao[x] for x in range(natm * 3)])
-            ao_density_uia = AODensityMatrix(uia_ao_list, denmat.rest)
+            uia_ao_list = [uia_ao[x] for x in range(natm * 3)]
         else:
-            ao_density_uia = AODensityMatrix()
+            uia_ao_list = None
 
-        ao_density_uia.broadcast(self.rank, self.comm)
-
-        fock_uia = AOFockMatrix(ao_density_uia)
-
-        fock_flag = fockmat.rgenjk
-        for i in range(natm*3):
-            fock_uia.set_fock_type(fock_flag, i)
+        uia_ao_list = self.comm.bcast(uia_ao_list, root=mpi_master())
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
@@ -1037,7 +1027,7 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
 
-        cphf_solver._comp_lr_fock(fock_uia, ao_density_uia, molecule, ao_basis,
+        fock_uia = cphf_solver._comp_lr_fock(uia_ao_list, molecule, ao_basis,
                                  eri_dict, dft_dict, pe_dict, profiler)
 
         if self.rank == mpi_master():
@@ -1045,7 +1035,7 @@ class ScfHessianDriver(HessianDriver):
             fock_uia_numpy = np.zeros((natm,3,nao,nao))
             for i in range(natm):
                 for x in range(3):
-                    fock_uia_numpy[i,x] = fock_uia.to_numpy(3*i + x)
+                    fock_uia_numpy[i,x] = fock_uia[3*i + x]
 
             return fock_uia_numpy
         else:
