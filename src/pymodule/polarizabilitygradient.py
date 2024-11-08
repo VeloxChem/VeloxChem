@@ -303,6 +303,8 @@ class PolarizabilityGradient():
                 x_minus_y = None
                 pol_gradient = None
 
+            gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
+
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
                 # compute the XC contribution
@@ -906,7 +908,10 @@ class PolarizabilityGradient():
         polgrad_xcgrad_imag = self.comm.reduce(polgrad_xcgrad_imag,
                                                root=mpi_master())
 
-        return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
+        if self.rank == mpi_master():
+            return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
+        else:
+            return None
 
     def get_k_fraction(self):
         """

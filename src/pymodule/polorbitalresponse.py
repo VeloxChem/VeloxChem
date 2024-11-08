@@ -223,13 +223,17 @@ class PolOrbitalResponse(CphfSolver):
                 # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
-            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
-                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
             ]
 
             if self.rank == mpi_master():
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx in range(len(full_vec)):
+                    full_vec[idx] *= -1.0
+
                 # number of vector components
                 dof = len(self.vector_components)
 
@@ -557,13 +561,17 @@ class PolOrbitalResponse(CphfSolver):
                 # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
-            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
-                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
             ]
 
             if self.rank == mpi_master():
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx in range(len(full_vec)):
+                    full_vec[idx] *= -1.0
+
                 # number of vector components
                 dof = len(self.vector_components)
 
@@ -1425,13 +1433,17 @@ class PolOrbitalResponse(CphfSolver):
 
         for f, w in enumerate(self.frequencies):
 
-            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
-                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
             ]
 
             if self.rank == mpi_master():
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx in range(len(full_vec)):
+                    full_vec[idx] *= -1.0
+
                 self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
@@ -1602,13 +1614,17 @@ class PolOrbitalResponse(CphfSolver):
 
         for f, w in enumerate(self.frequencies):
 
-            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
-                -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
             ]
 
             if self.rank == mpi_master():
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx in range(len(full_vec)):
+                    full_vec[idx] *= -1.0
+
                 self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
