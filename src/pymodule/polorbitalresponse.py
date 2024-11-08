@@ -199,6 +199,7 @@ class PolOrbitalResponse(CphfSolver):
                 # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
                 -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -532,6 +533,7 @@ class PolOrbitalResponse(CphfSolver):
                 # check if response vectors exist for desired frequency of gradient
                 polgrad_sanity_check(self, self.flag, lr_results)
 
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
                 -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -971,12 +973,15 @@ class PolOrbitalResponse(CphfSolver):
         dipole_ints_ao = np.zeros((dof, nao, nao))
         k = 0
         if 'x' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             dipole_ints_ao[k] = -1.0*dipole_mats[0]
             k += 1
         if 'y' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             dipole_ints_ao[k] = -1.0*dipole_mats[1]
             k += 1
         if 'z' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             dipole_ints_ao[k] = -1.0*dipole_mats[2]
 
         # transform to MO basis (oo and vv blocks only)
@@ -1396,7 +1401,7 @@ class PolOrbitalResponse(CphfSolver):
 
         for f, w in enumerate(self.frequencies):
 
-            # get full solution vector
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
                 -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -1573,7 +1578,7 @@ class PolOrbitalResponse(CphfSolver):
 
         for f, w in enumerate(self.frequencies):
 
-            # get full solution vector
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             full_vec = [
                 -1.0*self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
@@ -1789,12 +1794,15 @@ class PolOrbitalResponse(CphfSolver):
         dipole_ints_ao = np.zeros((dof, nao, nao))
         k = 0
         if 'x' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             dipole_ints_ao[k] = -1.0*dipole_mats[0]
             k += 1
         if 'y' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             dipole_ints_ao[k] = -1.0*dipole_mats[1]
             k += 1
         if 'z' in self.vector_components:
+            # Note: polorbitalresponse uses r instead of mu for dipole operator
             dipole_ints_ao[k] = -1.0*dipole_mats[2]
 
         # transform to MO basis (oo and ov blocks only)
