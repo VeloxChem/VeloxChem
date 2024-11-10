@@ -71,7 +71,8 @@ class DensityViewer:
         self.dm_element_threshold = 1e-4
 
         # flag for using interpolation when computing densities
-        self.use_visualization_driver = True
+        self.use_visualization_driver = False
+        self.loop_over_atoms = True
 
         # flag for the type of density
         self.den_type = denmat.rest
@@ -95,6 +96,7 @@ class DensityViewer:
 
         # AOs and density
         self._ao_to_atom = None
+        self._atom_to_ao = None
         self._ao_dict = None
         self._i_den = None
         self._density_list = None
@@ -213,6 +215,7 @@ class DensityViewer:
 
         # Create reverse atomic map
         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
+        self._atom_to_ao = atom_to_ao
         self._ao_to_atom = [[] for i in range(len(ao_info))]
         for i_atom, atom_orbs in enumerate(atom_to_ao):
             for i_orb, orb in enumerate(atom_orbs):
@@ -245,7 +248,10 @@ class DensityViewer:
         if self.use_visualization_driver:
             return self.compute_density_vis_drv(density_matrix)
         else:
-            return self.compute_density_simple(density_matrix)
+            if self.loop_over_atoms:
+                return self.compute_density_simple_loop_atoms(density_matrix)
+            else:
+                return self.compute_density_simple(density_matrix)
 
     def compute_density_vis_drv(self, density_matrix):
         """
@@ -263,6 +269,114 @@ class DensityViewer:
         vis_drv.compute(self._grid, self._molecule, self._basis, dm_ao, 0, "alpha")
 
         return self._grid.values_to_numpy()
+
+    def compute_density_simple_loop_atoms(self, density_matrix):
+        """
+        Compute the density by shifting atom grids.
+        Loops over atoms and sums all AOs in one shot.
+
+        :param density_matrix:
+            A numpy array containing the density matrix.
+
+        :return:
+            A numpy array with the value of the density on the grid.
+        """
+
+        nx, ny, nz = self._atom_npoints
+        natms = self._molecule.number_of_atoms()
+
+        # Initialize the density on the molecular grid
+        np_density = np.zeros(self.npoints)
+
+        nao = density_matrix.shape[0]
+        identifiers = np.array(self._molecule.get_identifiers()) - 1
+
+        # Loop over atoms
+        for i_atom in range(natms):
+            ao_indices_i = self._atom_to_ao[i_atom]
+            atom_id_i = identifiers[i_atom]
+            atom_orbs_i = np.array(self._ao_dict[atom_id_i])
+            for j_atom in range(natms):
+                ao_indices_j = self._atom_to_ao[j_atom]
+                atom_id_j = identifiers[j_atom]
+                atom_orbs_j = np.array(self._ao_dict[atom_id_j])
+                # Translate the atomic grid from the origin to the position of 
+                # the current atom in the molecular grid and find the indices
+                # of the atomic grid origin in the molecular grid.
+                ti = np.round(
+                         (self._coords[i_atom] - self.origin 
+                        + self._atom_origin) /
+                              self.stepsize).astype('int')
+                tj = np.round(
+                         (self._coords[j_atom] - self.origin 
+                        + self._atom_origin) /
+                              self.stepsize).astype('int')
+
+                # indices of the origin on the atomic grid i
+                p1_i = [0, 0, 0]
+                # indices of the origin on the atomic grid j
+                p1_j = [0, 0, 0]
+
+                # Compare the i and j grids to find the indices
+                # of an overlaping grid. t is the position of the origin
+                # and no is the number of grid points in the overlap grid.
+                t = np.zeros((3), dtype=int)
+                no = [nx, ny, nz]
+                discard = False
+                for x in range(3):
+                    if ti[x] < tj[x]:
+                        t[x] = tj[x]
+                        no[x] += ti[x] - tj[x]
+                        p1_i[x] = tj[x] - ti[x]
+                    else:
+                        t[x] = ti[x]
+                        no[x] += tj[x] - ti[x]
+                        p1_j[x] = ti[x] - tj[x]
+                    # if the atomic grids do not overlap,
+                    # discard them.
+                    if no[x] <= 0:
+                        discard = True
+                        break
+                # Once we have the overlaping grid, we have to
+                # figure out how it looks in relation with the molecular grid
+                # and keep track of the indices of the points in the
+                # atomic grids i and j.
+                for x in range(3):
+                    # if the overlaping atomic grid is 
+                    # completely outside the 
+                    # molecular grid, discard it.
+                    if t[x] >= self.npoints[x]:
+                        discard = True
+                        break
+                    if t[x] + no[x] < 0:
+                        discard = True
+                        break
+                    # if only some points of the grid are outside, readjust
+                    if t[x] < 0:
+                        p1_i[x] -= t[x]
+                        p1_j[x] -= t[x]
+                        no[x] += t[x]
+                        t[x] = 0
+                    if t[x] + no[x] >= self.npoints[x]:
+                        no[x] = self.npoints[x] - t[x]
+
+                if discard:
+                    continue
+                # Calculate the value of the density on the
+                # overlaping grid
+                density_matrix_slice = density_matrix[ao_indices_i][:, ao_indices_j]
+                i_aos_grid = atom_orbs_i[:, p1_i[0] : p1_i[0] + no[0],
+                                            p1_i[1] : p1_i[1] + no[1],
+                                            p1_i[2] : p1_i[2] + no[2]]
+                j_aos_grid = atom_orbs_j[:, p1_j[0] : p1_j[0] + no[0],
+                                            p1_j[1] : p1_j[1] + no[1],
+                                            p1_j[2] : p1_j[2] + no[2]]
+                np_density[t[0] : t[0] + no[0],
+                           t[1] : t[1] + no[1],
+                           t[2] : t[2] + no[2]] += np.einsum("mxyz,mn,nxyz->xyz",
+                                                              i_aos_grid, density_matrix_slice, j_aos_grid,
+                                                              optimize=True)
+        return np_density
 
     def compute_density_simple(self, density_matrix):
         """
