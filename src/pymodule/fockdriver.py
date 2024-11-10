@@ -84,16 +84,9 @@ class FockDriver:
         Checks that subcomm is a sub-communicator of self.comm.
         """
 
-        ranks = list(range(self.nodes))
-        group = self.comm.Get_group()
+        translated_ranks = subcomm.allgather(self.comm.Get_rank())
 
-        subranks = list(range(subcomm.Get_size()))
-        subgroup = subcomm.Get_group()
-
-        translated_ranks = subgroup.Translate_ranks(subranks, group)
-
-        return all((rank != MPI.UNDEFINED and rank in ranks)
-                   for rank in translated_ranks)
+        return all((rank in range(self.nodes)) for rank in translated_ranks)
 
     def _compute_fock_omp(self, *args):
 

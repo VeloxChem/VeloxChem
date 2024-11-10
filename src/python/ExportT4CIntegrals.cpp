@@ -128,6 +128,7 @@ export_t4cintegrals(py::module& m)
     // CFockGeom1000Driver class
     PyClass<CFockGeomX000Driver<1>>(m, "FockGeom1000Driver")
         .def(py::init<>())
+        .def("_set_block_size_factor", &CFockGeomX000Driver<1>::set_block_size_factor, "Sets block size factor.")
         .def(
             "compute",
             [](const CFockGeomX000Driver<1>& self,
