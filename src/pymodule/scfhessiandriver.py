@@ -22,40 +22,25 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 import numpy as np
 import time as tm
-import sys
 
 from .molecule import Molecule
 from .griddriver import GridDriver
-from .gradientdriver import GradientDriver
 from .hessiandriver import HessianDriver
 from .scfgradientdriver import ScfGradientDriver
-from .outputstream import OutputStream
 from .firstorderprop import FirstOrderProperties
-from .cphfsolver import CphfSolver
 from .hessianorbitalresponse import HessianOrbitalResponse
-from .lrsolver import LinearResponseSolver
-from .cppsolver import ComplexResponse
-from .polarizabilitygradient import PolarizabilityGradient
 from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
-from .veloxchemlib import AODensityMatrix
-#from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import xcfun
 from .veloxchemlib import XCMolecularHessian
 from .errorhandler import assert_msg_critical
-from .dftutils import get_default_grid_level
-from .inputparser import parse_input
-from .sanitychecks import dft_sanity_check
+from .oneeints import compute_electric_dipole_integrals
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import eri_deriv
 from .import_from_pyscf import overlap_second_deriv
 from .import_from_pyscf import hcore_second_deriv
 from .import_from_pyscf import eri_second_deriv
@@ -610,7 +595,7 @@ class ScfHessianDriver(HessianDriver):
         :param orben_ovlp_deriv_oo:
             The oo block of the derivative of the overlap matrix
             with respect to nuclear coordinates, multiplied with
-            orbital energies (ei+ej)S^\chi_ij
+            orbital energies (ei+ej)S^chi_ij
         :param perturbed_density:
             The perturbed density matrix.
         :param profiler:
@@ -1070,7 +1055,7 @@ class ScfHessianDriver(HessianDriver):
         fock_uia_numpy = self.construct_fock_matrix_cphf(molecule, ao_basis,
                                                          cphf_ov)
 
-        # (ei+ej)S^\chi_ij
+        # (ei+ej)S^chi_ij
         orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo, ovlp_deriv_oo)
 
         fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij, mo_occ)
@@ -1277,7 +1262,7 @@ class ScfHessianDriver(HessianDriver):
 
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
-        nuclear_charges = molecule.elem_ids_to_numpy()
+        nuclear_charges = molecule.get_element_ids()
 
         scf_tensors = self.scf_driver.scf_tensors 
         perturbed_density = self.perturbed_density
@@ -1286,11 +1271,13 @@ class ScfHessianDriver(HessianDriver):
         nao = perturbed_density.shape[-1] # need for reshaping
 
         # Dipole integrals
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, ao_basis)
-        dipole_ints = np.array((dipole_mats.x_to_numpy(),
-                                dipole_mats.y_to_numpy(),
-                                dipole_mats.z_to_numpy()))
+        dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis, [0.0, 0.0, 0.0])
+        # Note: compute_dipole_gradient uses r instead of mu for dipole operator
+        dipole_ints = (
+            -1.0 * dipole_mats[0],
+            -1.0 * dipole_mats[1],
+            -1.0 * dipole_mats[2],
+        )
 
         # Initialize a local dipole gradient to zero
         dipole_gradient = np.zeros((3, natm, 3))
