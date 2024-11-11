@@ -19,6 +19,8 @@
 #include "BatchFunc.hpp"
 #include "GtoPairBlock.hpp"
 
+#include "T4CDebug.hpp"
+
 namespace erirec { // erirec namespace
 
 /// @brief Computes d^(2)/dA^(2)(SS|1/|r-r'||SS)  integral derivatives.
@@ -247,7 +249,7 @@ comp_electron_repulsion_geom2000_ssss(T& distributor,
 
             erirec::comp_bra_hrr_electron_repulsion_dsxx(skbuffer, 29, 17, 20, r_ab, 0, 0);
 
-            erirec::comp_bra_geom20_hrr_electron_repulsion_sxxx(skbuffer, 0, 6, 29, r_ab, 0, 0, 0);
+            erirec::comp_bra_geom20_hrr_electron_repulsion_sxxx(skbuffer, 0, 6, 29, 0, 0, 0);
 
             t4cfunc::bra_transform<0, 0>(sbuffer, 0, skbuffer, 0, 0, 0);
 
@@ -260,7 +262,10 @@ comp_electron_repulsion_geom2000_ssss(T& distributor,
             t4cfunc::bra_transform<0, 0>(sbuffer, 4, skbuffer, 4, 0, 0);
 
             t4cfunc::bra_transform<0, 0>(sbuffer, 5, skbuffer, 5, 0, 0);
-
+            
+            distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 0, 0, 0, 0, j, ket_range);
+            
+            t4cfunc::dump_buffer(sbuffer, bra_gto_pair_block, ket_gto_pair_block, ket_range, j, 6);
         }
     }
 

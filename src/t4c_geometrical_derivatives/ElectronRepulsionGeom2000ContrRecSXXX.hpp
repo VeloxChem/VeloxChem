@@ -13,7 +13,6 @@ namespace erirec { // erirec namespace
 /// @param idx_geom_20_sxxx The contracted integrals buffer.
 /// @param idx_sxxx The contracted integrals buffer.
 /// @param idx_dxxx The contracted integrals buffer.
-/// @param r_ab The Cartesian distance R(AB) = A - B.
 /// @param b_angmom The angular momentum on center B.
 /// @param c_angmom The angular momentum on center C.
 /// @param d_angmom The angular momentum on center D.
@@ -22,7 +21,6 @@ comp_bra_geom20_hrr_electron_repulsion_sxxx(CSimdArray<double>& cbuffer,
                                             const size_t idx_geom_20_sxxx,
                                             const size_t idx_sxxx,
                                             const size_t idx_dxxx,
-                                            const TPoint<double>& r_ab,
                                             const int b_angmom,
                                             const int c_angmom,
                                             const int d_angmom) -> void;

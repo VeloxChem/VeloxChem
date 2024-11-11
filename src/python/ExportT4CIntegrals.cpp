@@ -113,6 +113,23 @@ export_t4cintegrals(py::module& m)
                 return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
             },
             "Computes gradient of Fock matrix of requested type for given molecule and basis.");
+    
+    // CFockGeom2000Driver class
+    PyClass<CFockGeomX000Driver<2>>(m, "FockGeom2000Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CFockGeomX000Driver<2>& fock_drv,
+               const CMolecularBasis&        basis,
+               const CMolecule&              molecule,
+               const CMatrix&                density,
+               const int                     iatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega) -> std::shared_ptr<CMatrices> {
+                return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
+            },
+            "Computes hessian of Fock matrix of requested type for given molecule and basis.");
 }
 
 }  // namespace vlx_t4cintegrals

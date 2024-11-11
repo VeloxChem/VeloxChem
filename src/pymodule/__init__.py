@@ -25,6 +25,7 @@ from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
+from .veloxchemlib import FockGeom2000Driver
 
 # C++ functions
 from .veloxchemlib import upper_case
