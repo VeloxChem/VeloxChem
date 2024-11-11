@@ -4,6 +4,7 @@
 #include <string>
 
 #include "ElectronRepulsionGeom1000Func.hpp"
+#include "ElectronRepulsionGeom2000Func.hpp"
 #include "GtoFunc.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "Matrices.hpp"
@@ -85,7 +86,7 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
 
     auto fock_mats = matfunc::make_matrices(
         std::array<int, 1>{
-            1,
+            N,
         },
         basis,
         mat_t::general);
@@ -141,7 +142,14 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis &basis,
                     distributor.set_indices(bra_gpairs, ket_gpairs);
                     auto bra_range = std::pair<size_t, size_t>(0, bra_gpairs.number_of_contracted_pairs());
                     auto ket_range = std::pair<size_t, size_t>(0, ket_gpairs.number_of_contracted_pairs());
-                    erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    if constexpr (N == 1)
+                    {
+                        erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    }
+                    if constexpr (N == 2)
+                    {
+                        erifunc::compute_geom_2000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    }
                     distributor.accumulate(bra_gpairs, ket_gpairs);
                 }
             });
