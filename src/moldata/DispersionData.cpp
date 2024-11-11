@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -32,12 +31,12 @@
 
 namespace dispdata {  // dispdata namespace
 
-std::vector<int32_t>
+std::vector<int>
 getRefN()
 {
     // Reference: dftd4 (v2.4.0), H-Rn
 
-    return std::vector<int32_t>({
+    return std::vector<int>({
         0,                             // dummy atom
         2, 1, 3, 4, 5, 7, 5, 4, 2, 1,  // H-Ne
         3, 4, 4, 5, 4, 3, 2, 1, 3, 4,  // Na-Ca
@@ -51,12 +50,12 @@ getRefN()
     });
 }
 
-std::vector<int32_t>
+std::vector<int>
 getZeff()
 {
     // Reference: dftd4 (v2.4.0), H-Rn
 
-    return std::vector<int32_t>({
+    return std::vector<int>({
         0,                                                                       // dummy atom
         1,  2,                                                                   // H-He
         3,  4,  5,  6,  7,  8,  9,  10,                                          // Li-Ne
@@ -121,7 +120,7 @@ getR4R2()
 
     std::vector<double> r4r2;
 
-    for (int32_t i = 0; i < static_cast<int32_t>(r4_over_r2.size()); i++)
+    for (int i = 0; i < static_cast<int>(r4_over_r2.size()); i++)
     {
         r4r2.push_back(std::sqrt(0.5 * (r4_over_r2[i] * std::sqrt(static_cast<double>(i)))));
     }
@@ -129,12 +128,12 @@ getR4R2()
     return r4r2;
 }
 
-std::vector<std::vector<int32_t>>
+std::vector<std::vector<int>>
 getRefSys()
 {
     // Reference: dftd4 (v2.4.0), H-Rn, refsys
 
-    return std::vector<std::vector<int32_t>>({
+    return std::vector<std::vector<int>>({
         {},  // dummy atom
         {1, 1},
         {1},
@@ -1740,7 +1739,7 @@ getAlphaiw()
 }
 
 double
-getSscale(int32_t index)
+getSscale(int index)
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -1770,7 +1769,7 @@ getSscale(int32_t index)
 }
 
 std::vector<double>
-getSecaiw(int32_t index)
+getSecaiw(int index)
 {
     // Reference: dftd4 (v2.4.0)
 

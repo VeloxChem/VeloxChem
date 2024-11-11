@@ -1,19 +1,43 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 import time as tm
 import sys
 from mpi4py import MPI
 
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
 from .veloxchemlib import MolecularGrid
-from .veloxchemlib import GridDriver, XCMolecularGradient
-from .veloxchemlib import hartree_in_wavenumber
+from .veloxchemlib import XCMolecularGradient
+from .veloxchemlib import mpi_master, hartree_in_wavenumber, denmat
+
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .molecule import Molecule
 from .outputstream import OutputStream
+from .griddriver import GridDriver
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check, polgrad_sanity_check
 from .dftutils import get_default_grid_level
@@ -66,7 +90,7 @@ class PolarizabilityGradient():
         self.delta_h = 0.001
 
         self.is_complex = False
-        self.grad_dt = np.float_  # data type for pol. gradient (real/complex)
+        self.grad_dt = np.dtype('float64')  # data type for pol. gradient (real/complex)
         self.damping = 1000.0 / hartree_in_wavenumber()
 
         self.numerical = False
@@ -164,7 +188,7 @@ class PolarizabilityGradient():
 
         # set data type of pol. gradient for use in compute_analytical()
         if self.is_complex:
-            self.grad_dt = np.complex_
+            self.grad_dt = np.dtype('complex128')
 
         # sanity check
         dft_sanity_check(self, 'compute')
@@ -238,7 +262,7 @@ class PolarizabilityGradient():
 
             if self.rank == mpi_master():
                 orbrsp_results = all_orbrsp_results[w]
-                mo = scf_tensors['C']  # only alpha part
+                mo = scf_tensors['C_alpha']  # only alpha part
                 nao = mo.shape[0]
                 nocc = molecule.number_of_alpha_electrons()
                 mo_occ = mo[:, :nocc].copy()
@@ -278,6 +302,8 @@ class PolarizabilityGradient():
                 rel_dm_ao = None
                 x_minus_y = None
                 pol_gradient = None
+
+            gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
 
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
@@ -621,39 +647,29 @@ class PolarizabilityGradient():
         for m in range(dof):
             for n in range(dof):
                 if self.rank == mpi_master():
-                    gs_density = AODensityMatrix([gs_dm], denmat.rest)
-
                     rhow_dm = 1.0 * rel_dm_ao[m, n]
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
-                    rhow_den_sym = AODensityMatrix([rhow_dm_sym],
-                                                   denmat.rest)
 
                     # symmetrize
                     x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
                                                           x_minus_y[m].T)
-                    x_minus_y_den_sym_m = AODensityMatrix([x_minus_y_sym_m],
-                                                          denmat.rest)
                     x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y[n] +
                                                           x_minus_y[n].T)
-                    x_minus_y_den_sym_n = AODensityMatrix([x_minus_y_sym_n],
-                                                          denmat.rest)
 
                 else:
-                    gs_density = AODensityMatrix()
-                    rhow_den_sym = AODensityMatrix()
-                    x_minus_y_den_sym_m = AODensityMatrix()
-                    x_minus_y_den_sym_n = AODensityMatrix()
+                    rhow_dm_sym = None
+                    x_minus_y_sym_m = None
+                    x_minus_y_sym_n = None
 
-                gs_density.broadcast(self.rank, self.comm)
-                rhow_den_sym.broadcast(self.rank, self.comm)
-                x_minus_y_den_sym_m.broadcast(self.rank, self.comm)
-                x_minus_y_den_sym_n.broadcast(self.rank, self.comm)
+                rhow_dm_sym = self.comm.bcast(rhow_dm_sym, root=mpi_master())
+                x_minus_y_sym_m = self.comm.bcast(x_minus_y_sym_m, root=mpi_master())
+                x_minus_y_sym_n = self.comm.bcast(x_minus_y_sym_n, root=mpi_master())
 
                 #polgrad_xcgrad = self.grad_polgrad_xc_contrib_real(
                 polgrad_xcgrad = self.calculate_xc_mn_contrib_real(
-                    molecule, ao_basis, rhow_den_sym,
-                    x_minus_y_den_sym_m, x_minus_y_den_sym_n,
-                    gs_density, xcfun_label)
+                    molecule, ao_basis, [rhow_dm_sym],
+                    [x_minus_y_sym_m], [x_minus_y_sym_n],
+                    [gs_dm], xcfun_label)
 
                 if self.rank == mpi_master():
                     xc_pol_gradient[m, n] += polgrad_xcgrad
@@ -685,70 +701,52 @@ class PolarizabilityGradient():
 
         natm = molecule.number_of_atoms()
         dof = len(self.vector_components)
-        xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.complex_)
+        xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
 
         for m in range(dof):
             for n in range(dof):
                 if self.rank == mpi_master():
-                    gs_density = AODensityMatrix([gs_dm], denmat.rest)
-
                     rhow_dm = 1.0 * rel_dm_ao[m, n]
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
 
                     rhow_dm_sym_list_real = [np.array(rhow_dm_sym.real)]
                     rhow_dm_sym_list_imag = [np.array(rhow_dm_sym.imag)]
 
-                    rhow_den_sym_real = AODensityMatrix(
-                        rhow_dm_sym_list_real, denmat.rest)
-                    rhow_den_sym_imag = AODensityMatrix(
-                        rhow_dm_sym_list_imag, denmat.rest)
-
                     # symmetrize
                     x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
                                                           x_minus_y[m].T)
-                    x_minus_y_sym_m_list_real = [
-                        np.array(x_minus_y_sym_m.real)
-                    ]
-                    x_minus_y_sym_m_list_imag = [
-                        np.array(x_minus_y_sym_m.imag)
-                    ]
+                    x_minus_y_sym_m_list_real = [ np.array(x_minus_y_sym_m.real) ]
+                    x_minus_y_sym_m_list_imag = [ np.array(x_minus_y_sym_m.imag) ]
 
                     x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y[n] +
                                                           x_minus_y[n].T)
                     x_minus_y_sym_n_list_real = [np.array(x_minus_y_sym_n.real)]
                     x_minus_y_sym_n_list_imag = [np.array(x_minus_y_sym_n.imag)]
 
-                    x_minus_y_den_sym_real_m = AODensityMatrix(
-                        x_minus_y_sym_m_list_real, denmat.rest)
-                    x_minus_y_den_sym_imag_m = AODensityMatrix(
-                        x_minus_y_sym_m_list_imag, denmat.rest)
-                    x_minus_y_den_sym_real_n = AODensityMatrix(
-                        x_minus_y_sym_n_list_real, denmat.rest)
-                    x_minus_y_den_sym_imag_n = AODensityMatrix(
-                        x_minus_y_sym_n_list_imag, denmat.rest)
-
                 else:
-                    gs_density = AODensityMatrix()
-                    rhow_den_sym_real = AODensityMatrix()
-                    rhow_den_sym_imag = AODensityMatrix()
-                    x_minus_y_den_sym_real_m = AODensityMatrix()
-                    x_minus_y_den_sym_imag_m = AODensityMatrix()
-                    x_minus_y_den_sym_real_n = AODensityMatrix()
-                    x_minus_y_den_sym_imag_n = AODensityMatrix()
+                    rhow_dm_sym_list_real = None
+                    rhow_dm_sym_list_imag = None
+                    x_minus_y_sym_m_list_real = None
+                    x_minus_y_sym_m_list_imag = None
+                    x_minus_y_sym_n_list_real = None
+                    x_minus_y_sym_n_list_imag = None
 
-                gs_density.broadcast(self.rank, self.comm)
-                rhow_den_sym_real.broadcast(self.rank, self.comm)
-                rhow_den_sym_imag.broadcast(self.rank, self.comm)
-                x_minus_y_den_sym_real_m.broadcast(self.rank, self.comm)
-                x_minus_y_den_sym_imag_m.broadcast(self.rank, self.comm)
-                x_minus_y_den_sym_real_n.broadcast(self.rank, self.comm)
-                x_minus_y_den_sym_imag_n.broadcast(self.rank, self.comm)
+                rhow_dm_sym_list_real = self.comm.bcast(rhow_dm_sym_list_real, root=mpi_master())
+                rhow_dm_sym_list_imag = self.comm.bcast(rhow_dm_sym_list_imag, root=mpi_master())
+                x_minus_y_sym_m_list_real = self.comm.bcast(x_minus_y_sym_m_list_real, root=mpi_master())
+                x_minus_y_sym_m_list_imag = self.comm.bcast(x_minus_y_sym_m_list_imag, root=mpi_master())
+                x_minus_y_sym_n_list_real = self.comm.bcast(x_minus_y_sym_n_list_real, root=mpi_master())
+                x_minus_y_sym_n_list_imag = self.comm.bcast(x_minus_y_sym_n_list_imag, root=mpi_master())
 
                 #polgrad_xcgrad = self.grad_polgrad_xc_contrib_complex(
                 polgrad_xcgrad = self.calculate_xc_mn_contrib_complex(
-                    molecule, ao_basis, rhow_den_sym_real,
-                    rhow_den_sym_imag, x_minus_y_den_sym_real_m, x_minus_y_den_sym_real_n,
-                    x_minus_y_den_sym_imag_m, x_minus_y_den_sym_imag_n, gs_density, xcfun_label)
+                    molecule, ao_basis, rhow_dm_sym_list_real,
+                    rhow_dm_sym_list_imag,
+                    x_minus_y_sym_m_list_real,
+                    x_minus_y_sym_n_list_real,
+                    x_minus_y_sym_m_list_imag,
+                    x_minus_y_sym_n_list_imag,
+                    [gs_dm], xcfun_label)
 
                 if self.rank == mpi_master():
                     xc_pol_gradient[m, n] += polgrad_xcgrad
@@ -783,7 +781,7 @@ class PolarizabilityGradient():
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xcgrad_drv = XCMolecularGradient(self.comm)
+        xcgrad_drv = XCMolecularGradient()
         polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
         polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
@@ -834,7 +832,7 @@ class PolarizabilityGradient():
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xcgrad_drv = XCMolecularGradient(self.comm)
+        xcgrad_drv = XCMolecularGradient()
 
         # real contribution
         polgrad_xcgrad_real = xcgrad_drv.integrate_vxc_gradient(  # Re DM
@@ -910,7 +908,10 @@ class PolarizabilityGradient():
         polgrad_xcgrad_imag = self.comm.reduce(polgrad_xcgrad_imag,
                                                root=mpi_master())
 
-        return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
+        if self.rank == mpi_master():
+            return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
+        else:
+            return None
 
     def get_k_fraction(self):
         """
@@ -953,7 +954,7 @@ class PolarizabilityGradient():
         labels = molecule.get_labels()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # number of frequencies
         n_freqs = len(self.frequencies)
@@ -1238,7 +1239,7 @@ class PolarizabilityGradient():
 
         response_functions = lr_results.get('response_functions', None)
         keys = list(response_functions.keys())
-        is_complex_response = (type(response_functions[keys[0]]) is np.complex_)
+        is_complex_response = (type(response_functions[keys[0]]) == np.dtype('complex128'))
 
         if (is_complex_response != self.is_complex):
             error_text = 'Mismatch between LR results and polgrad settings!'

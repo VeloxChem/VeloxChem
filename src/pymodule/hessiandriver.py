@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -29,12 +28,13 @@ from io import StringIO
 import numpy as np
 import sys
 
-from .veloxchemlib import GridDriver, XCMolecularHessian
+#from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
+from .griddriver import GridDriver
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
@@ -198,7 +198,7 @@ class HessianDriver:
         coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
-        nuclear_charges = molecule.elem_ids_to_numpy()
+        nuclear_charges = molecule.get_element_ids()
 
         # loop over all distinct atom pairs and add energy contribution
         for i in range(natm):

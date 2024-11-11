@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -25,12 +24,8 @@
 
 #include "AODensityMatrix.hpp"
 
-#include <mpi.h>
-
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
-#include "MpiFunc.hpp"
-#include "StringFormat.hpp"
 
 CAODensityMatrix::CAODensityMatrix()
 
@@ -44,7 +39,7 @@ CAODensityMatrix::CAODensityMatrix(const std::vector<CDenseMatrix>& denMatrices,
 
     , _denType(denType)
 {
-    if ((denType == denmat::unrest) || (denType == denmat::umoij))
+    if (!isClosedShell())
     {
         errors::assertMsgCritical(denMatrices.size() % 2 == 0,
                                   "AODensityMatrix: Odd number of matrices for unrestricted or restricted open-shell density");
@@ -116,98 +111,23 @@ CAODensityMatrix::operator!=(const CAODensityMatrix& other) const
     return !(*this == other);
 }
 
-int32_t
-CAODensityMatrix::_getNumberOfMatricesPerDensity() const
-{
-    if ((_denType == denmat::rest) || (_denType == denmat::rmoij) || (_denType == denmat::rgen))
-    {
-        return 1;
-    }
-
-    if ((_denType == denmat::unrest) || (_denType == denmat::umoij))
-    {
-        return 2;
-    }
-
-    return 1;
-}
-
 bool
 CAODensityMatrix::isClosedShell() const
 {
-    return (_getNumberOfMatricesPerDensity() == 1);
+    return (_denType == denmat::rest);
 }
 
-int32_t
-CAODensityMatrix::_getMatrixID(const int32_t iDensityMatrix, const std::string& spin) const
-{
-    if (isClosedShell())
-    {
-        return iDensityMatrix;
-    }
-    else
-    {
-        if (fstr::upcase(spin) == std::string("ALPHA"))
-        {
-            return 2 * iDensityMatrix;
-        }
-        else
-        {
-            return 2 * iDensityMatrix + 1;
-        }
-    }
-}
-
-void
-CAODensityMatrix::setDensityType(const denmat denType)
-{
-    _denType = denType;
-}
-
-void
-CAODensityMatrix::append(const CAODensityMatrix& other)
-{
-    if (_denType == other._denType)
-    {
-        for (size_t i = 0; i < other._denMatrices.size(); i++)
-        {
-            _denMatrices.push_back(other._denMatrices[i]);
-        }
-    }
-}
-
-CAODensityMatrix
-CAODensityMatrix::sub(const CAODensityMatrix& other) const
-{
-    std::vector<CDenseMatrix> dmats;
-
-    for (size_t i = 0; i < _denMatrices.size(); i++)
-    {
-        dmats.push_back(denblas::subAB(_denMatrices[i], other._denMatrices[i]));
-    }
-
-    return CAODensityMatrix(dmats, _denType);
-}
-
-int32_t
+int
 CAODensityMatrix::getNumberOfDensityMatrices() const
 {
     if (isClosedShell())
     {
-        return static_cast<int32_t>(_denMatrices.size());
+        return static_cast<int>(_denMatrices.size());
     }
     else
     {
-        return static_cast<int32_t>(_denMatrices.size()) / 2;
+        return static_cast<int>(_denMatrices.size()) / 2;
     }
-
-    return 0;
-}
-
-int32_t
-CAODensityMatrix::getNumberOfMatrices() const
-{
-    return static_cast<int32_t>(_denMatrices.size());
 }
 
 denmat
@@ -216,8 +136,8 @@ CAODensityMatrix::getDensityType() const
     return _denType;
 }
 
-int32_t
-CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
+int
+CAODensityMatrix::getNumberOfRows(const int iDensityMatrix) const
 {
     if (iDensityMatrix < getNumberOfDensityMatrices())
     {
@@ -234,8 +154,8 @@ CAODensityMatrix::getNumberOfRows(const int32_t iDensityMatrix) const
     return 0;
 }
 
-int32_t
-CAODensityMatrix::getNumberOfColumns(const int32_t iDensityMatrix) const
+int
+CAODensityMatrix::getNumberOfColumns(const int iDensityMatrix) const
 {
     if (iDensityMatrix < getNumberOfDensityMatrices())
     {
@@ -252,8 +172,8 @@ CAODensityMatrix::getNumberOfColumns(const int32_t iDensityMatrix) const
     return 0;
 }
 
-int32_t
-CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
+int
+CAODensityMatrix::getNumberOfElements(const int iDensityMatrix) const
 {
     if (iDensityMatrix < getNumberOfDensityMatrices())
     {
@@ -271,7 +191,7 @@ CAODensityMatrix::getNumberOfElements(const int32_t iDensityMatrix) const
 }
 
 const double*
-CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
+CAODensityMatrix::alphaDensity(const int iDensityMatrix) const
 {
     if (iDensityMatrix < getNumberOfDensityMatrices())
     {
@@ -289,7 +209,7 @@ CAODensityMatrix::alphaDensity(const int32_t iDensityMatrix) const
 }
 
 const double*
-CAODensityMatrix::betaDensity(const int32_t iDensityMatrix) const
+CAODensityMatrix::betaDensity(const int iDensityMatrix) const
 {
     if (iDensityMatrix < getNumberOfDensityMatrices())
     {
@@ -306,91 +226,8 @@ CAODensityMatrix::betaDensity(const int32_t iDensityMatrix) const
     return nullptr;
 }
 
-const double*
-CAODensityMatrix::getDensity(const int32_t iDensityMatrix) const
-{
-    if (iDensityMatrix < static_cast<int32_t>(_denMatrices.size()))
-    {
-        return _denMatrices[iDensityMatrix].values();
-    }
-
-    return nullptr;
-}
-
 const CDenseMatrix&
-CAODensityMatrix::getReferenceToDensity(const int32_t iDensityMatrix) const
+CAODensityMatrix::getReferenceToDensity(const int iDensityMatrix) const
 {
     return _denMatrices[iDensityMatrix];
-}
-
-std::string
-CAODensityMatrix::getString() const
-{
-    std::string dmat_str;
-
-    dmat_str += "Density Type: " + to_string(_denType) + "\n";
-
-    for (size_t i = 0; i < _denMatrices.size(); i++)
-    {
-        dmat_str += _denMatrices[i].getString();
-    }
-
-    return dmat_str;
-}
-
-void
-CAODensityMatrix::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if constexpr (ENABLE_MPI)
-    {
-        // broadcast density matrix type
-
-        int32_t dmtyp = 0;
-
-        if (rank == mpi::master()) dmtyp = to_int(_denType);
-
-        mpi::bcast(dmtyp, comm);
-
-        if (rank != mpi::master()) _denType = to_denmat(dmtyp);
-
-        // broadcast vector of AO density matrices
-
-        int32_t ndmat = static_cast<int32_t>(_denMatrices.size());
-
-        mpi::bcast(ndmat, comm);
-
-        for (int32_t i = 0; i < ndmat; i++)
-        {
-            CDenseMatrix dmat;
-
-            if (rank == mpi::master()) dmat = _denMatrices[i];
-
-            dmat.broadcast(rank, comm);
-
-            if (rank != mpi::master()) _denMatrices.push_back(dmat);
-
-            MPI_Barrier(comm);
-        }
-    }
-}
-
-std::ostream&
-operator<<(std::ostream& output, const CAODensityMatrix& source)
-{
-    output << std::endl;
-
-    output << "[CAODensityMatrix (Object):" << &source << "]" << std::endl;
-
-    output << "_denType: " << to_string(source._denType);
-
-    output << "_denMatrices: " << std::endl;
-
-    for (size_t i = 0; i < source._denMatrices.size(); i++)
-    {
-        output << "_denMatrices[" << i << "]: " << std::endl;
-
-        output << source._denMatrices[i] << std::endl;
-    }
-
-    return output;
 }

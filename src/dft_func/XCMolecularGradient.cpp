@@ -1,0 +1,194 @@
+//
+//                              VELOXCHEM
+//         ----------------------------------------------------
+//                     An Electronic Structure Code
+//
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//
+//  SPDX-License-Identifier: LGPL-3.0-or-later
+//
+//  This file is part of VeloxChem.
+//
+//  VeloxChem is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU Lesser General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or (at your option)
+//  any later version.
+//
+//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+//  License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
+#include "XCMolecularGradient.hpp"
+
+#include <omp.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+
+#include "AODensityMatrix.hpp"
+#include "DenseLinearAlgebra.hpp"
+#include "DensityGridGenerator.hpp"
+#include "DftSubMatrix.hpp"
+#include "ErrorHandler.hpp"
+#include "FunctionalParser.hpp"
+#include "GridScreener.hpp"
+#include "GtoFunc.hpp"
+#include "GtoValues.hpp"
+#include "Prescreener.hpp"
+#include "XCFunctional.hpp"
+#include "XCMolecularGradientForLDA.hpp"
+#include "XCMolecularGradientForGGA.hpp"
+
+CXCMolecularGradient::CXCMolecularGradient()
+
+    : _screeningThresholdForGTOValues(1.0e-12)
+{
+}
+
+CDenseMatrix
+CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
+{
+    return integrateVxcGradient(molecule, basis, gsDensityPointers, gsDensityPointers, molecularGrid, xcFuncLabel);
+}
+
+CDenseMatrix
+CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const std::vector<const double*>& rwDensityPointers,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (gsDensityPointers.size() == 1)
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return xcgradlda::integrateVxcGradientForLDA(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xcgradgga::integrateVxcGradientForGGA(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return xcgradlda::integrateVxcGradientForLDAOpenShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xcgradgga::integrateVxcGradientForGGAOpenShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+
+    return CDenseMatrix();
+}
+
+CDenseMatrix
+CXCMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const std::vector<const double*>& rwDensityPointersOne,
+                                           const std::vector<const double*>& rwDensityPointersTwo,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (gsDensityPointers.size() == 1)
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return xcgradlda::integrateFxcGradientForLDA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xcgradgga::integrateFxcGradientForGGA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCMolecularGradient.integrateFxcGradient: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCMolecularGradient.integrateFxcGradient: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    return CDenseMatrix();
+}
+
+CDenseMatrix
+CXCMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const std::vector<const double*>& rwDensityPointersOne,
+                                           const std::vector<const double*>& rwDensityPointersTwo,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (gsDensityPointers.size() == 1)
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return xcgradlda::integrateKxcGradientForLDA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return xcgradgga::integrateKxcGradientForGGA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCMolecularGradient.integrateKxcGradient: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCMolecularGradient.integrateKxcGradient: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    return CDenseMatrix();
+}

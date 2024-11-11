@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -30,12 +29,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "MemBlock.hpp"
-
 /**
  Class CCubicGrid contains cubic grid points.
-
- @author X. Li
  */
 class CCubicGrid
 {
@@ -52,12 +47,12 @@ class CCubicGrid
     /**
      Number of points in three dimensions.
      */
-    std::array<int32_t, 3> _numPoints;
+    std::array<int, 3> _numPoints;
 
     /**
      Values at the grid points.
      */
-    CMemBlock<double> _values;
+    std::vector<double> _values;
 
    public:
     /**
@@ -69,7 +64,7 @@ class CCubicGrid
      Creates a cubic grid object from origin, step size, and
      number of points.
      */
-    CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int32_t, 3>& numPoints);
+    CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int, 3>& numPoints);
 
     /**
      Creates a cubic grid object by copying other cubic grid object.
@@ -139,7 +134,7 @@ class CCubicGrid
 
      @return number of points in X, Y and Z direction.
      */
-    std::array<int32_t, 3> getNumPoints() const;
+    std::array<int, 3> getNumPoints() const;
 
     /**
      Gets constant pointer to first element of cubic grid values.

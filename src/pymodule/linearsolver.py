@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -27,28 +26,28 @@ from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
+import math
 import sys
 
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import LinearMomentumIntegralsDriver
-from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import DenseMatrix
-from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
-from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
-from .veloxchemlib import denmat, fockmat, molorb
-from .aodensitymatrix import AODensityMatrix
-from .aofockmatrix import AOFockMatrix
+from .oneeints import compute_electric_dipole_integrals
+from .veloxchemlib import (compute_linear_momentum_integrals,
+                           compute_angular_momentum_integrals)
+from .veloxchemlib import T4CScreener
+from .veloxchemlib import MolecularGrid, XCIntegrator
+from .veloxchemlib import mpi_master, hartree_in_ev
+from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import make_matrix, mat_t
+from .matrix import Matrix
 from .distributedarray import DistributedArray
-from .subcommunicators import SubCommunicators
-from .molecularorbitals import MolecularOrbitals
+from .fockdriver import FockDriver
+from .griddriver import GridDriver
+from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
+from .profiler import Profiler
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .qqscheme import get_qq_scheme
-from .qqscheme import get_qq_type
 from .dftutils import get_default_grid_level, print_libxc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
@@ -66,7 +65,6 @@ class LinearSolver:
 
     Instance variables
         - eri_thresh: The electron repulsion integrals screening threshold.
-        - qq_type: The electron repulsion integrals screening scheme.
         - batch_size: The batch size for computation of Fock matrices.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
@@ -113,7 +111,6 @@ class LinearSolver:
 
         # ERI settings
         self.eri_thresh = 1.0e-15
-        self.qq_type = 'QQ_DEN'
         self.batch_size = None
 
         # dft
@@ -150,7 +147,7 @@ class LinearSolver:
         self._ostream = ostream
 
         # restart information
-        self.restart = False
+        self.restart = True
         self.checkpoint_file = None
         self.force_checkpoint = False
         self.save_solutions = True
@@ -181,11 +178,13 @@ class LinearSolver:
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        self._debug = False
+        self._block_size_factor = 16
+
         # input keywords
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
-                'qq_type': ('str_upper', 'ERI screening scheme'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
@@ -202,13 +201,15 @@ class LinearSolver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
+                '_debug': ('bool', 'print debug info'),
+                '_block_size_factor': ('int', 'block size factor for ERI'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
-                'use_split_comm': ('bool', 'use split communicators'),
+                # 'use_split_comm': ('bool', 'use split communicators'),
             },
         }
 
@@ -383,9 +384,15 @@ class LinearSolver:
                 'Using sub-communicators for {}.'.format(valstr))
             self.ostream.print_blank()
         else:
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                        self.eri_thresh, molecule, basis)
+            self._print_mem_debug_info('before screener')
+            if self.rank == mpi_master():
+                screening = T4CScreener()
+                screening.partition(basis, molecule, 'eri')
+            else:
+                screening = None
+            self._print_mem_debug_info('after  screener')
+            screening = self.comm.bcast(screening, root=mpi_master())
+            self._print_mem_debug_info('after  bcast screener')
 
         return {
             'screening': screening,
@@ -422,16 +429,16 @@ class LinearSolver:
             self.ostream.print_blank()
 
             if self.rank == mpi_master():
-                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
-                                             denmat.rest)
+                # Note: make gs_density a tuple
+                gs_density = (scf_tensors['D_alpha'].copy(),)
             else:
-                gs_density = AODensityMatrix()
-            gs_density.broadcast(self.rank, self.comm)
+                gs_density = None
+            gs_density = self.comm.bcast(gs_density, root=mpi_master())
 
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
             molgrid = MolecularGrid()
-            gs_density = AODensityMatrix()
+            gs_density = None
             dft_func_label = 'HF'
 
         return {
@@ -580,6 +587,20 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
+    def _print_mem_debug_info(self, label):
+        """
+        Prints memory debug information.
+
+        :param label:
+            The label of memory debug information.
+        """
+
+        if self._debug:
+            profiler = Profiler()
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
+                                    profiler.get_available_memory())
+            self.ostream.flush()
+
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the linear equations.
@@ -638,7 +659,10 @@ class LinearSolver:
 
         n_ger = vecs_ger.shape(1)
         n_ung = vecs_ung.shape(1)
-        n_total = n_ger + n_ung
+
+        n_general = min(n_ger, n_ung)
+        n_extra_ger = n_ger - n_general
+        n_extra_ung = n_ung - n_general
 
         # prepare molecular orbitals
 
@@ -671,21 +695,33 @@ class LinearSolver:
 
         n_ao = mo.shape[0] if self.rank == mpi_master() else None
 
+        n_total = n_general + n_extra_ger + n_extra_ung
+
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # go through batches
 
         if self.rank == mpi_master():
-            batch_str = 'Processing Fock builds...'
-            batch_str += ' (batch size: {:d})'.format(batch_size)
+            batch_str = f'Processing {n_total} Fock build'
+            if n_total > 1:
+                batch_str += 's'
+            batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.flush()
+
+        if self._debug:
+            self.ostream.print_info(
+                '==DEBUG== batch_size: {}'.format(batch_size))
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         for batch_ind in range(num_batches):
 
-            self.ostream.print_info('  batch {}/{}'.format(
-                batch_ind + 1, num_batches))
-            self.ostream.flush()
+            if self._debug:
+                self.ostream.print_info('==DEBUG== batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
 
             # form density matrices
 
@@ -695,18 +731,43 @@ class LinearSolver:
             if self.rank == mpi_master():
                 dks = []
                 kns = []
+            else:
+                dks = None
 
             for col in range(batch_start, batch_end):
-                if col < n_ger:
+
+                # determine vec_type
+
+                if col < n_general:
+                    vec_type = 'general'
+                elif n_extra_ger > 0:
+                    vec_type = 'gerade'
+                elif n_extra_ung > 0:
+                    vec_type = 'ungerade'
+
+                # form full-size vec
+
+                if vec_type == 'general':
+                    v_ger = vecs_ger.get_full_vector(col)
+                    v_ung = vecs_ung.get_full_vector(col)
+                    if self.rank == mpi_master():
+                        # full-size trial vector
+                        vec = np.hstack((v_ger, v_ger))
+                        vec += np.hstack((v_ung, -v_ung))
+
+                elif vec_type == 'gerade':
                     v_ger = vecs_ger.get_full_vector(col)
                     if self.rank == mpi_master():
                         # full-size gerade trial vector
                         vec = np.hstack((v_ger, v_ger))
-                else:
-                    v_ung = vecs_ung.get_full_vector(col - n_ger)
+
+                elif vec_type == 'ungerade':
+                    v_ung = vecs_ung.get_full_vector(col)
                     if self.rank == mpi_master():
                         # full-size ungerade trial vector
                         vec = np.hstack((v_ung, -v_ung))
+
+                # build density
 
                 if self.rank == mpi_master():
                     half_size = vec.shape[0] // 2
@@ -729,18 +790,44 @@ class LinearSolver:
                     dks.append(dak)
                     kns.append(kn)
 
-            if self.rank == mpi_master():
-                dens = AODensityMatrix(dks, denmat.rest)
-            else:
-                dens = AODensityMatrix()
-            dens.broadcast(self.rank, self.comm)
-
             # form Fock matrices
 
-            fock = AOFockMatrix(dens)
+            self._print_mem_debug_info('before Fock build')
 
-            self._comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
-                               pe_dict, profiler)
+            fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
+                                      pe_dict, profiler)
+
+            self._print_mem_debug_info('after  Fock build')
+
+            if self.rank == mpi_master():
+                raw_fock_ger = []
+                raw_fock_ung = []
+
+                raw_kns_ger = []
+                raw_kns_ung = []
+
+                for col in range(batch_start, batch_end):
+                    ifock = col - batch_start
+
+                    if col < n_general:
+                        raw_fock_ger.append(0.5 * (fock[ifock] - fock[ifock].T))
+                        raw_fock_ung.append(0.5 * (fock[ifock] + fock[ifock].T))
+                        raw_kns_ger.append(0.5 * (kns[ifock] + kns[ifock].T))
+                        raw_kns_ung.append(0.5 * (kns[ifock] - kns[ifock].T))
+
+                    elif n_extra_ger > 0:
+                        raw_fock_ger.append(0.5 * (fock[ifock] - fock[ifock].T))
+                        raw_kns_ger.append(0.5 * (kns[ifock] + kns[ifock].T))
+
+                    elif n_extra_ung > 0:
+                        raw_fock_ung.append(0.5 * (fock[ifock] + fock[ifock].T))
+                        raw_kns_ung.append(0.5 * (kns[ifock] - kns[ifock].T))
+
+                fock = raw_fock_ger + raw_fock_ung
+                kns = raw_kns_ger + raw_kns_ung
+
+                batch_ger = len(raw_fock_ger)
+                batch_ung = len(raw_fock_ung)
 
             e2_ger = None
             e2_ung = None
@@ -750,13 +837,6 @@ class LinearSolver:
 
             if self.rank == mpi_master():
 
-                batch_ger, batch_ung = 0, 0
-                for col in range(batch_start, batch_end):
-                    if col < n_ger:
-                        batch_ger += 1
-                    else:
-                        batch_ung += 1
-
                 e2_ger = np.zeros((half_size, batch_ger))
                 e2_ung = np.zeros((half_size, batch_ung))
 
@@ -765,7 +845,7 @@ class LinearSolver:
                     fock_ung = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
-                    fak = fock.alpha_to_numpy(ifock)
+                    fak = fock[ifock]
 
                     if getattr(self, 'core_excitation', False):
                         core_exc_orb_inds = list(range(
@@ -818,7 +898,6 @@ class LinearSolver:
         self.ostream.print_blank()
 
     def _comp_lr_fock(self,
-                      fock,
                       dens,
                       molecule,
                       basis,
@@ -829,8 +908,6 @@ class LinearSolver:
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
-        :param fock:
-            The Fock matrix (2e part).
         :param dens:
             The density matrix.
         :param molecule:
@@ -845,6 +922,9 @@ class LinearSolver:
             The dictionary containing PE information.
         :param profiler:
             The profiler.
+
+        :return:
+            The Fock matrix (2e part).
         """
 
         screening = eri_dict['screening']
@@ -852,62 +932,111 @@ class LinearSolver:
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        V_es = pe_dict['V_es']
-        pe_drv = pe_dict['pe_drv']
+        #V_es = pe_dict['V_es']
+        #pe_drv = pe_dict['pe_drv']
 
-        # set flags for Fock matrices
+        if self.rank == mpi_master():
+            num_densities = len(dens)
+        else:
+            num_densities = None
+        num_densities = self.comm.bcast(num_densities, root=mpi_master())
 
-        fock_flag = fockmat.rgenjk
+        if self.rank != mpi_master():
+            dens = [None for idx in range(num_densities)]
+
+        for idx in range(num_densities):
+            dens[idx] = self.comm.bcast(dens[idx], root=mpi_master())
+
+        thresh_int = int(-math.log10(self.eri_thresh))
+
+        t0 = tm.time()
+
+        fock_drv = FockDriver(self.comm)
+
+        fock_drv._set_block_size_factor(self._block_size_factor,
+                                        basis.get_dimensions_of_basis())
+
+        # determine fock_type and exchange_scaling_factor
+        fock_type = '2jk'
+        exchange_scaling_factor = 1.0
         if self._dft:
             if self.xcfun.is_hybrid():
-                fock_flag = fockmat.rgenjkx
-                fact_xc = self.xcfun.get_frac_exact_exchange()
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_scale_factor(fact_xc, i)
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
             else:
-                fock_flag = fockmat.rgenj
-        for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fock_flag, i)
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
 
-        # calculate Fock on subcommunicators
-
-        if self.use_split_comm:
-            self._comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, profiler)
-
+        # further determine exchange_scaling_factor, erf_k_coef and omega
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
+                                       self.xcfun.get_rs_beta())
+            erf_k_coef = -self.xcfun.get_rs_beta()
+            omega = self.xcfun.get_rs_omega()
         else:
+            erf_k_coef, omega = None, None
+
+        fock_arrays = []
+
+        for idx in range(num_densities):
+            den_mat_for_fock = make_matrix(basis, mat_t.general)
+            den_mat_for_fock.set_values(dens[idx])
+
+            self._print_mem_debug_info('before restgen Fock build')
+            fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+            self._print_mem_debug_info('after  restgen Fock build')
+
+            fock_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            if fock_type == 'j':
+                # for pure functional
+                fock_np *= 2.0
+
+            if need_omega:
+                # for range-separated functional
+                self._print_mem_debug_info('before restgen erf Fock build')
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            'kx_rs', erf_k_coef, omega,
+                                            thresh_int)
+                self._print_mem_debug_info('after  restgen erf Fock build')
+
+                fock_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            fock_arrays.append(fock_np)
+
+        if profiler is not None:
+            profiler.add_timing_info('FockERI', tm.time() - t0)
+
+        if self._dft:
             t0 = tm.time()
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            eri_drv.compute(fock, dens, molecule, basis, screening)
+            xc_drv = XCIntegrator()
+            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
+                                      gs_density, molgrid, self.xcfun)
+
             if profiler is not None:
-                profiler.add_timing_info('FockERI', tm.time() - t0)
+                profiler.add_timing_info('FockXC', tm.time() - t0)
 
-            if self._dft:
-                t0 = tm.time()
-                if not self.xcfun.is_hybrid():
-                    for ifock in range(fock.number_of_fock_matrices()):
-                        fock.scale(2.0, ifock)
+        if self._pe:
+            t0 = tm.time()
+            # TODO: add PE contribution
+            if profiler is not None:
+                profiler.add_timing_info('FockPE', tm.time() - t0)
 
-                xc_drv = XCIntegrator(self.comm)
-                xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
-                                          gs_density, molgrid,
-                                          self.xcfun.get_func_label())
+        # TODO: look into split communicator
 
-                if profiler is not None:
-                    profiler.add_timing_info('FockXC', tm.time() - t0)
+        for idx in range(len(fock_arrays)):
+            fock_arrays[idx] = self.comm.reduce(fock_arrays[idx],
+                                                root=mpi_master())
 
-            if self._pe:
-                t0 = tm.time()
-                pe_drv.V_es = V_es.copy()
-                for ifock in range(fock.number_of_fock_matrices()):
-                    dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
-                    e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                    if self.rank == mpi_master():
-                        fock.add_matrix(DenseMatrix(V_pe), ifock)
-                if profiler is not None:
-                    profiler.add_timing_info('FockPE', tm.time() - t0)
-
-            fock.reduce_sum(self.rank, self.nodes, self.comm)
+        if self.rank == mpi_master():
+            return fock_arrays
+        else:
+            return None
 
     def _comp_lr_fock_split_comm(self,
                                  fock,
@@ -939,122 +1068,10 @@ class LinearSolver:
             The profiler.
         """
 
-        molgrid = dft_dict['molgrid']
-        gs_density = dft_dict['gs_density']
-
-        V_es = pe_dict['V_es']
-        pe_drv = pe_dict['pe_drv']
-
-        if self._split_comm_ratio is None:
-            if self._dft and self._pe:
-                self._split_comm_ratio = [0.34, 0.33, 0.33]
-            elif self._dft:
-                self._split_comm_ratio = [0.5, 0.5, 0.0]
-            elif self._pe:
-                self._split_comm_ratio = [0.5, 0.0, 0.5]
-            else:
-                self._split_comm_ratio = [1.0, 0.0, 0.0]
-
-        if self._dft:
-            dft_nodes = int(float(self.nodes) * self._split_comm_ratio[1] + 0.5)
-            dft_nodes = max(1, dft_nodes)
-        else:
-            dft_nodes = 0
-
-        if self._pe:
-            pe_nodes = int(float(self.nodes) * self._split_comm_ratio[2] + 0.5)
-            pe_nodes = max(1, pe_nodes)
-        else:
-            pe_nodes = 0
-
-        eri_nodes = max(1, self.nodes - dft_nodes - pe_nodes)
-
-        if eri_nodes == max(eri_nodes, dft_nodes, pe_nodes):
-            eri_nodes = self.nodes - dft_nodes - pe_nodes
-        elif dft_nodes == max(eri_nodes, dft_nodes, pe_nodes):
-            dft_nodes = self.nodes - eri_nodes - pe_nodes
-        else:
-            pe_nodes = self.nodes - eri_nodes - dft_nodes
-
-        node_grps = [0] * eri_nodes + [1] * dft_nodes + [2] * pe_nodes
-        eri_comm = (node_grps[self.rank] == 0)
-        dft_comm = (node_grps[self.rank] == 1)
-        pe_comm = (node_grps[self.rank] == 2)
-
-        subcomms = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomms.local_comm
-        cross_comm = subcomms.cross_comm
-
-        # reset molecular grid for DFT and V_es for PE
-        if self.rank != mpi_master():
-            molgrid = MolecularGrid()
-            V_es = np.zeros(0)
-        if self._dft:
-            if local_comm.Get_rank() == mpi_master():
-                molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self._pe:
-            if local_comm.Get_rank() == mpi_master():
-                V_es = cross_comm.bcast(V_es, root=mpi_master())
-
-        t0 = tm.time()
-
-        # calculate Fock on ERI nodes
-        if eri_comm:
-            eri_drv = ElectronRepulsionIntegralsDriver(local_comm)
-            local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                              self.eri_thresh, molecule, basis)
-            eri_drv.compute(fock, dens, molecule, basis, local_screening)
-            if self._dft and not self.xcfun.is_hybrid():
-                for ifock in range(fock.number_of_fock_matrices()):
-                    fock.scale(2.0, ifock)
-
-        # calculate Fxc on DFT nodes
-        if dft_comm:
-            xc_drv = XCIntegrator(local_comm)
-            molgrid.re_distribute_counts_and_displacements(
-                local_comm.Get_rank(), local_comm.Get_size(), local_comm)
-            xc_drv.integrate_fxc_fock(fock, molecule, basis, dens, gs_density,
-                                      molgrid, self.xcfun.get_func_label())
-
-        # calculate e_pe and V_pe on PE nodes
-        if pe_comm:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.pe_options, local_comm)
-            pe_drv.V_es = V_es.copy()
-            for ifock in range(fock.number_of_fock_matrices()):
-                dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
-                e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
-                if local_comm.Get_rank() == mpi_master():
-                    fock.add_matrix(DenseMatrix(V_pe), ifock)
-
-        dt = tm.time() - t0
-
-        if profiler is not None:
-            profiler.add_timing_info('FockBuild', dt)
-
-        # collect Fock on master node
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
-
-        if local_comm.Get_rank() == mpi_master():
-            dt = cross_comm.gather(dt, root=mpi_master())
-
-        if self.rank == mpi_master():
-            time_eri = dt[0] * eri_nodes
-            time_dft = 0.0
-            if self._dft:
-                time_dft = dt[1] * dft_nodes
-            time_pe = 0.0
-            if self._pe:
-                pe_root = 2 if self._dft else 1
-                time_pe = dt[pe_root] * pe_nodes
-            time_sum = time_eri + time_dft + time_pe
-            self._split_comm_ratio = [
-                time_eri / time_sum,
-                time_dft / time_sum,
-                time_pe / time_sum,
-            ]
-        self._split_comm_ratio = self.comm.bcast(self._split_comm_ratio,
-                                                 root=mpi_master())
+        assert_msg_critical(
+            False,
+            'LinearSolver: Linear response with split communicator not implemented'
+        )
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -1202,16 +1219,9 @@ class LinearSolver:
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = 'ERI Screening Scheme            : ' + get_qq_type(
-            self.qq_type)
-        self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
             self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-        if self.batch_size is not None:
-            cur_str = 'Batch Size of Fock Matrices     : {:d}'.format(
-                self.batch_size)
-            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
@@ -1416,45 +1426,45 @@ class LinearSolver:
             ], f'LinearSolver.get_prop_grad: unsupported operator {operator}')
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
-            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_mats = dipole_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                             dipole_mats.z_to_numpy())
+                dipole_mats = compute_electric_dipole_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = tuple(dipole_mats)
             else:
                 integrals = tuple()
 
         elif operator in ['linear_momentum', 'linear momentum']:
-            linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-            linmom_mats = linmom_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (-1.0 * linmom_mats.x_to_numpy(),
-                             -1.0 * linmom_mats.y_to_numpy(),
-                             -1.0 * linmom_mats.z_to_numpy())
+                linmom_mats = compute_linear_momentum_integrals(molecule, basis)
+                integrals = (
+                    -1.0 * linmom_mats[0],
+                    -1.0 * linmom_mats[1],
+                    -1.0 * linmom_mats[2],
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['angular_momentum', 'angular momentum']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (-1.0 * angmom_mats.x_to_numpy(),
-                             -1.0 * angmom_mats.y_to_numpy(),
-                             -1.0 * angmom_mats.z_to_numpy())
+                angmom_mats = compute_angular_momentum_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = (
+                    -1.0 * angmom_mats[0],
+                    -1.0 * angmom_mats[1],
+                    -1.0 * angmom_mats[2],
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (0.5 * angmom_mats.x_to_numpy(),
-                             0.5 * angmom_mats.y_to_numpy(),
-                             0.5 * angmom_mats.z_to_numpy())
+                angmom_mats = compute_angular_momentum_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = (
+                    0.5 * angmom_mats[0],
+                    0.5 * angmom_mats[1],
+                    0.5 * angmom_mats[2],
+                )
             else:
                 integrals = tuple()
 
@@ -1485,7 +1495,7 @@ class LinearSolver:
             else:
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo.T, P, mo]), nocc)
+                        np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
                     for P in integral_comps
                 ]
                 gradients = tuple(
@@ -1528,46 +1538,49 @@ class LinearSolver:
         )
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
-            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_mats = dipole_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (dipole_mats.x_to_numpy() + 0j,
-                             dipole_mats.y_to_numpy() + 0j,
-                             dipole_mats.z_to_numpy() + 0j)
+                dipole_mats = compute_electric_dipole_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = (
+                    dipole_mats[0] + 0j,
+                    dipole_mats[1] + 0j,
+                    dipole_mats[2] + 0j,
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['linear_momentum', 'linear momentum']:
-            linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-            linmom_mats = linmom_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (-1j * linmom_mats.x_to_numpy(),
-                             -1j * linmom_mats.y_to_numpy(),
-                             -1j * linmom_mats.z_to_numpy())
+                linmom_mats = compute_linear_momentum_integrals(molecule, basis)
+                integrals = (
+                    -1j * linmom_mats[0],
+                    -1j * linmom_mats[1],
+                    -1j * linmom_mats[2],
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['angular_momentum', 'angular momentum']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (-1j * angmom_mats.x_to_numpy(),
-                             -1j * angmom_mats.y_to_numpy(),
-                             -1j * angmom_mats.z_to_numpy())
+                angmom_mats = compute_angular_momentum_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = (
+                    -1j * angmom_mats[0],
+                    -1j * angmom_mats[1],
+                    -1j * angmom_mats[2],
+                )
             else:
                 integrals = tuple()
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
-            angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-            angmom_mats = angmom_drv.compute(molecule, basis)
-
             if self.rank == mpi_master():
-                integrals = (0.5j * angmom_mats.x_to_numpy(),
-                             0.5j * angmom_mats.y_to_numpy(),
-                             0.5j * angmom_mats.z_to_numpy())
+                angmom_mats = compute_angular_momentum_integrals(
+                    molecule, basis, [0.0, 0.0, 0.0])
+                integrals = (
+                    0.5j * angmom_mats[0],
+                    0.5j * angmom_mats[1],
+                    0.5j * angmom_mats[2],
+                )
             else:
                 integrals = tuple()
 
@@ -1583,8 +1596,8 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) *
-                self.commut_mo_density(np.linalg.multi_dot([mo.T, P, mo]), nocc)
+                factor * (-1.0) * self.commut_mo_density(
+                    np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
                 for P in integral_comps
             ]
 
@@ -1986,9 +1999,11 @@ class LinearSolver:
 
             self.ostream.print_info('  lambda: {:.4f}'.format(lam_diag[i_nto]))
 
+            nto_coefs = nto_mo.alpha_to_numpy()
+
             # hole
             ind_occ = nocc - i_nto - 1
-            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_occ,
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_occ,
                             'alpha')
 
             if self.rank == mpi_master():
@@ -2004,7 +2019,7 @@ class LinearSolver:
 
             # electron
             ind_vir = nocc + i_nto
-            vis_drv.compute(cubic_grid, molecule, basis, nto_mo, ind_vir,
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_vir,
                             'alpha')
 
             if self.rank == mpi_master():
@@ -2136,9 +2151,9 @@ class LinearSolver:
 
         for i in range(nocc):
             if getattr(self, 'core_excitation', False):
-                homo_str = f'core_{i+1}'
+                homo_str = f'core_{i + 1}'
             else:
-                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
+                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'
 
             for a in range(nvir):
                 lumo_str = 'LUMO' if a == 0 else f'LUMO+{a}'

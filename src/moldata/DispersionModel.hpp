@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -32,14 +31,11 @@
 #include <vector>
 
 #include "DenseMatrix.hpp"
-#include "MemBlock.hpp"
 #include "Molecule.hpp"
 
 /**
  Class CDispersionModel implements the D4 dispersion correction
  (reference: dftd4 v2.4.0).
-
- @author X. Li
  */
 class CDispersionModel
 {
@@ -71,17 +67,17 @@ class CDispersionModel
     /**
      The atoms data of the dispersion model.
      */
-    std::vector<int32_t> _atoms;
+    std::vector<int> _atoms;
 
     /**
      The nref data of the dispersion model.
      */
-    std::vector<int32_t> _nref;
+    std::vector<int> _nref;
 
     /**
      The ncount data of the dispersion model.
      */
-    std::vector<std::vector<int32_t>> _ncount;
+    std::vector<std::vector<int>> _ncount;
 
     /**
      The cn data of the dispersion model.
@@ -106,7 +102,7 @@ class CDispersionModel
     /**
      The ndim parameter (calculation dimension) of the dispersion model.
      */
-    int32_t _ndim;
+    int _ndim;
 
     /**
      The gw data (Gaussian weights) of the dispersion model.
@@ -160,7 +156,7 @@ class CDispersionModel
 
      @return the weights.
      */
-    CMemBlock<double> _getWeights();
+    std::vector<double> _getWeights();
 
     /**
      Gets the maximum value in a 2d vector.
@@ -176,7 +172,7 @@ class CDispersionModel
      @param value the input value.
      @return the nearest integer value.
      */
-    int32_t _getRound(double value);
+    int _getRound(double value);
 
     /**
      Initializes the dispersion model.

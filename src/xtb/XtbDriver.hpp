@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -26,8 +25,6 @@
 #ifndef XtbDriver_hpp
 #define XtbDriver_hpp
 
-#include <mpi.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -36,30 +33,13 @@
 #include <xtb.h>
 #endif
 
-class CMolecule;
+#include "Molecule.hpp"
 
 /**
  Class CXtbDriver enables DFT-B computations using XTB package from Grimme group.
-
- @author Z. Rinkevicius
  */
 class CXtbDriver
 {
-    /**
-     The rank of associated local MPI process.
-     */
-    int32_t _locRank;
-
-    /**
-     The total number of local MPI processes.
-     */
-    int32_t _locNodes;
-
-    /**
-     The MPI communicator.
-     */
-    MPI_Comm _locComm;
-
     /**
      The name of the XTB output file.
      */
@@ -112,11 +92,9 @@ class CXtbDriver
 
    public:
     /**
-     Creates a XTB driver object using MPI info.
-
-     @param comm the MPI communicator.
+     Creates a XTB driver object.
      */
-    CXtbDriver(MPI_Comm comm);
+    CXtbDriver();
 
     /**
      Destroys a XTB driver object.
@@ -181,13 +159,6 @@ class CXtbDriver
 #endif
         return false;
     }
-
-    /**
-     Checks if XTB driver is running on master node.
-
-     @return true if XTB driver is running on master node, false otherwise.
-     */
-    bool isMasterNode() const;
 
     /**
      Gets state of XTB environment.
@@ -257,14 +228,14 @@ class CXtbDriver
 
      @return the number of Atoms.
     */
-    int32_t getNumberOfAtoms() const;
+    int getNumberOfAtoms() const;
 
     /**
      Gets number of AOs.
 
      @return the number of AOs.
     */
-    int32_t getNumberOfAOs() const;
+    int getNumberOfAOs() const;
 
     /**
      Gets orbital energies as vector (order: naos).

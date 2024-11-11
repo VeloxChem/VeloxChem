@@ -1,438 +1,542 @@
-//
-//                           VELOXCHEM 1.0-RC2
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
-//
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
-//
-//  SPDX-License-Identifier: LGPL-3.0-or-later
-//
-//  This file is part of VeloxChem.
-//
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
-//
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-
 #include "MolecularBasis.hpp"
 
-#include <array>
+#include <algorithm>
+#include <numeric>
+#include <ranges>
 #include <sstream>
 
-#include <mpi.h>
-
-#include "AngularMomentum.hpp"
 #include "ChemicalElement.hpp"
-#include "MpiFunc.hpp"
 #include "StringFormat.hpp"
+#include "TensorComponents.hpp"
+#include "TensorLabels.hpp"
 
 CMolecularBasis::CMolecularBasis()
 
-    : _maxAngularMomentum(-1)
+    : _basis_sets{}
+
+    , _indices{}
 {
 }
 
-CMolecularBasis::CMolecularBasis(const CMolecularBasis& source)
+CMolecularBasis::CMolecularBasis(const std::vector<CAtomBasis> &basis_sets, const std::vector<int> &indices)
 
-    : _atomicBasisSets(source._atomicBasisSets)
+    : _basis_sets(basis_sets)
 
-    , _maxAngularMomentum(source._maxAngularMomentum)
-
-    , _label(source._label)
+    , _indices(indices)
 {
 }
 
-CMolecularBasis::CMolecularBasis(CMolecularBasis&& source) noexcept
+CMolecularBasis::CMolecularBasis(const CMolecularBasis &other)
 
-    : _atomicBasisSets(std::move(source._atomicBasisSets))
+    : _basis_sets(other._basis_sets)
 
-    , _maxAngularMomentum(std::move(source._maxAngularMomentum))
-
-    , _label(std::move(source._label))
+    , _indices(other._indices)
 {
 }
 
-CMolecularBasis::~CMolecularBasis()
+CMolecularBasis::CMolecularBasis(CMolecularBasis &&other) noexcept
+
+    : _basis_sets(std::move(other._basis_sets))
+
+    , _indices(std::move(other._indices))
 {
 }
 
-CMolecularBasis&
-CMolecularBasis::operator=(const CMolecularBasis& source)
+auto
+CMolecularBasis::operator=(const CMolecularBasis &other) -> CMolecularBasis &
 {
-    if (this == &source) return *this;
+    _basis_sets = other._basis_sets;
 
-    _atomicBasisSets = source._atomicBasisSets;
-
-    _maxAngularMomentum = source._maxAngularMomentum;
-
-    _label = source._label;
+    _indices = other._indices;
 
     return *this;
 }
 
-CMolecularBasis&
-CMolecularBasis::operator=(CMolecularBasis&& source) noexcept
+auto
+CMolecularBasis::operator=(CMolecularBasis &&other) noexcept -> CMolecularBasis &
 {
-    if (this == &source) return *this;
-
-    _atomicBasisSets = std::move(source._atomicBasisSets);
-
-    _maxAngularMomentum = std::move(source._maxAngularMomentum);
-
-    _label = std::move(source._label);
-
-    return *this;
-}
-
-bool
-CMolecularBasis::operator==(const CMolecularBasis& other) const
-{
-    if (_atomicBasisSets.size() != other._atomicBasisSets.size()) return false;
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    if (this != &other)
     {
-        if (_atomicBasisSets[i] != other._atomicBasisSets[i]) return false;
+        _basis_sets = std::move(other._basis_sets);
+
+        _indices = std::move(other._indices);
     }
 
-    if (_maxAngularMomentum != other._maxAngularMomentum) return false;
-
-    if (_label != other._label) return false;
-
-    return true;
+    return *this;
 }
 
-bool
-CMolecularBasis::operator!=(const CMolecularBasis& other) const
+auto
+CMolecularBasis::operator==(const CMolecularBasis &other) const -> bool
+{
+    if (_indices != other._indices)
+    {
+        return false;
+    }
+    else
+    {
+        return _basis_sets == other._basis_sets;
+    }
+}
+
+auto
+CMolecularBasis::operator!=(const CMolecularBasis &other) const -> bool
 {
     return !(*this == other);
 }
 
-void
-CMolecularBasis::setMaxAngularMomentum(const int32_t maxAngularMomentum)
+auto
+CMolecularBasis::add(const CAtomBasis &basis) -> void
 {
-    _maxAngularMomentum = maxAngularMomentum;
-}
+    auto pos = std::ranges::find_if(
+        _basis_sets, [&](const auto &abas) { return (abas.get_name() == basis.get_name()) && (abas.get_identifier() == basis.get_identifier()); });
 
-void
-CMolecularBasis::setLabel(const std::string& label)
-{
-    _label = label;
-}
-
-void
-CMolecularBasis::addAtomBasis(const CAtomBasis& atomBasis)
-{
-    _atomicBasisSets.push_back(atomBasis);
-
-    auto mAngularMomentum = atomBasis.getMaxAngularMomentum();
-
-    if (mAngularMomentum > _maxAngularMomentum)
+    if (pos == _basis_sets.end())
     {
-        _maxAngularMomentum = mAngularMomentum;
+        _indices.push_back(static_cast<int>(_basis_sets.size()));
+
+        _basis_sets.push_back(basis);
+    }
+    else
+    {
+        _indices.push_back(static_cast<int>(std::distance(_basis_sets.begin(), pos)));
     }
 }
 
-CMolecularBasis
-CMolecularBasis::reduceToValenceBasis() const
+auto
+CMolecularBasis::reduce_to_valence_basis() const -> CMolecularBasis
 {
-    CMolecularBasis molbas;
+    std::vector<CAtomBasis> rbasis_sets;
 
-    auto strlbl = _label;
+    rbasis_sets.reserve(_basis_sets.size());
 
-    strlbl.append("(VAL)");
+    std::ranges::transform(_basis_sets, std::back_inserter(rbasis_sets), [](const auto &abas) { return abas.reduce_to_valence_basis(); });
 
-    molbas.setLabel(strlbl);
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        molbas.addAtomBasis(_atomicBasisSets[i].reduceToValenceBasis());
-    }
-
-    return molbas;
+    return CMolecularBasis(rbasis_sets, _indices);
 }
 
-int32_t
-CMolecularBasis::getMaxAngularMomentum() const
+auto
+CMolecularBasis::slice(const std::vector<int> &atoms) const -> CMolecularBasis
 {
-    return _maxAngularMomentum;
+    CMolecularBasis mbasis;
+
+    std::ranges::for_each(atoms, [&](const int i) { mbasis.add(_basis_sets[_indices.at(i)]); });
+
+    return mbasis;
 }
 
-int32_t
-CMolecularBasis::getMaxAngularMomentum(const int32_t idElemental) const
+auto
+CMolecularBasis::basis_sets() const -> std::vector<CAtomBasis>
 {
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    return _basis_sets;
+}
+
+auto
+CMolecularBasis::basis_sets_indices() const -> std::vector<int>
+{
+    return _indices;
+}
+
+auto
+CMolecularBasis::max_angular_momentum() const -> int
+{
+    auto pos = std::ranges::max_element(
+        _basis_sets, [&](const auto &lbas, const auto &rbas) { return lbas.max_angular_momentum() < rbas.max_angular_momentum(); });
+
+    return (pos == _basis_sets.end()) ? -1 : pos->max_angular_momentum();
+}
+
+auto
+CMolecularBasis::max_angular_momentum(const std::vector<int> &atoms) const -> int
+{
+    auto pos = std::ranges::max_element(atoms, [&](const int i, const int j) {
+        return _basis_sets[_indices[i]].max_angular_momentum() < _basis_sets[_indices[j]].max_angular_momentum();
+    });
+
+    return (pos == atoms.end()) ? -1 : _basis_sets[_indices[*pos]].max_angular_momentum();
+}
+
+auto
+CMolecularBasis::basis_functions() const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    std::ranges::for_each(_indices, [&](const int i) {
+        auto cbfs = _basis_sets[i].basis_functions();
+        bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
+    });
+
+    return bfs;
+}
+
+auto
+CMolecularBasis::basis_functions(const int angular_momentum) const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    std::ranges::for_each(_indices, [&](const int i) {
+        auto cbfs = _basis_sets[i].basis_functions(angular_momentum);
+        bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
+    });
+
+    return bfs;
+}
+
+auto
+CMolecularBasis::basis_functions(const int angular_momentum, const size_t npgtos) const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    std::ranges::for_each(_indices, [&](const int i) {
+        auto cbfs = _basis_sets[i].basis_functions(angular_momentum, npgtos);
+        bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
+    });
+
+    return bfs;
+}
+
+auto
+CMolecularBasis::basis_functions(const std::vector<int> &atoms) const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    std::ranges::for_each(atoms, [&](const int i) {
+        auto cbfs = _basis_sets[_indices.at(i)].basis_functions();
+        bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
+    });
+
+    return bfs;
+}
+
+auto
+CMolecularBasis::basis_functions(const std::vector<int> &atoms, const int angular_momentum) const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    std::ranges::for_each(atoms, [&](const int i) {
+        auto cbfs = _basis_sets[_indices.at(i)].basis_functions(angular_momentum);
+        bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
+    });
+
+    return bfs;
+}
+
+auto
+CMolecularBasis::basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<CBasisFunction>
+{
+    std::vector<CBasisFunction> bfs;
+
+    std::ranges::for_each(atoms, [&](const int i) {
+        auto cbfs = _basis_sets[_indices.at(i)].basis_functions(angular_momentum, npgtos);
+        bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
+    });
+
+    return bfs;
+}
+
+auto
+CMolecularBasis::atomic_indices() const -> std::vector<int>
+{
+    std::vector<int> atom_indices;
+
+    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
+        const auto cbfs     = _basis_sets[_indices[i]].basis_functions();
+        auto       cindices = std::vector<int>(cbfs.size(), i);
+        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+    });
+
+    return atom_indices;
+}
+
+auto
+CMolecularBasis::atomic_indices(const int angular_momentum) const -> std::vector<int>
+{
+    std::vector<int> atom_indices;
+
+    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
+        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum);
+        auto       cindices = std::vector<int>(cbfs.size(), i);
+        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+    });
+
+    return atom_indices;
+}
+
+auto
+CMolecularBasis::atomic_indices(const int angular_momentum, const size_t npgtos) const -> std::vector<int>
+{
+    std::vector<int> atom_indices;
+
+    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
+        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum, npgtos);
+        auto       cindices = std::vector<int>(cbfs.size(), i);
+        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+    });
+
+    return atom_indices;
+}
+
+auto
+CMolecularBasis::atomic_indices(const std::vector<int> &atoms) const -> std::vector<int>
+{
+    std::vector<int> atom_indices;
+
+    std::ranges::for_each(atoms, [&](const int i) {
+        const auto cbfs     = _basis_sets[_indices[i]].basis_functions();
+        auto       cindices = std::vector<int>(cbfs.size(), i);
+        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+    });
+
+    return atom_indices;
+}
+
+auto
+CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular_momentum) const -> std::vector<int>
+{
+    std::vector<int> atom_indices;
+
+    std::ranges::for_each(atoms, [&](const int i) {
+        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum);
+        auto       cindices = std::vector<int>(cbfs.size(), i);
+        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+    });
+
+    return atom_indices;
+}
+
+auto
+CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<int>
+{
+    std::vector<int> atom_indices;
+
+    std::ranges::for_each(atoms, [&](const int i) {
+        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum, npgtos);
+        auto       cindices = std::vector<int>(cbfs.size(), i);
+        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+    });
+
+    return atom_indices;
+}
+
+auto
+CMolecularBasis::number_of_basis_functions(const int angular_momentum) const -> size_t
+{
+    return std::accumulate(_indices.begin(), _indices.end(), size_t{0}, [&](const int &sum, const int &i) {
+        return sum + _basis_sets[i].number_of_basis_functions(angular_momentum);
+    });
+}
+
+auto
+CMolecularBasis::number_of_basis_functions(const int angular_momentum, const size_t npgtos) const -> size_t
+{
+    return std::accumulate(_indices.begin(), _indices.end(), size_t{0}, [&](const size_t &sum, const int &i) {
+        return sum + _basis_sets[i].number_of_basis_functions(angular_momentum, npgtos);
+    });
+}
+
+auto
+CMolecularBasis::number_of_basis_functions(const std::vector<int> &atoms, const int angular_momentum) const -> size_t
+{
+    return std::accumulate(atoms.begin(), atoms.end(), size_t{0}, [&](const size_t &sum, const int &i) {
+        return sum + _basis_sets[_indices.at(i)].number_of_basis_functions(angular_momentum);
+    });
+}
+
+auto
+CMolecularBasis::number_of_basis_functions(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> size_t
+{
+    return std::accumulate(atoms.begin(), atoms.end(), size_t{0}, [&](const size_t &sum, const int &i) {
+        return sum + _basis_sets[_indices.at(i)].number_of_basis_functions(angular_momentum, npgtos);
+    });
+}
+
+auto
+CMolecularBasis::number_of_primitive_functions(const int angular_momentum) const -> size_t
+{
+    return std::accumulate(_indices.begin(), _indices.end(), size_t{0}, [&](const size_t &sum, const int &i) {
+        return sum + _basis_sets[i].number_of_primitive_functions(angular_momentum);
+    });
+}
+
+auto
+CMolecularBasis::number_of_primitive_functions(const std::vector<int> &atoms, const int angular_momentum) const -> size_t
+{
+    return std::accumulate(atoms.begin(), atoms.end(), size_t{0}, [&](const size_t &sum, const int &i) {
+        return sum + _basis_sets[_indices.at(i)].number_of_primitive_functions(angular_momentum);
+    });
+}
+
+auto
+CMolecularBasis::contraction_depths(const int angular_momentum) const -> std::set<size_t>
+{
+    std::set<size_t> depths;
+
+    std::ranges::for_each(_basis_sets, [&](const auto &abas) {
+        auto cdepths = abas.contraction_depths(angular_momentum);
+        depths.insert(cdepths.begin(), cdepths.end());
+    });
+
+    return depths;
+}
+
+auto
+CMolecularBasis::contraction_depths(const std::vector<int> &atoms, const int angular_momentum) const -> std::set<size_t>
+{
+    std::set<size_t> depths;
+
+    std::ranges::for_each(atoms, [&](const int i) {
+        auto cdepths = _basis_sets[_indices.at(i)].contraction_depths(angular_momentum);
+        depths.insert(cdepths.begin(), cdepths.end());
+    });
+
+    return depths;
+}
+
+auto
+CMolecularBasis::dimensions_of_basis() const -> size_t
+{
+    return dimensions_of_basis(max_angular_momentum() + 1);
+}
+
+auto
+CMolecularBasis::dimensions_of_basis(const int angular_momentum) const -> size_t
+{
+    size_t naos = 0;
+
+    std::ranges::for_each(std::views::iota(0, angular_momentum),
+                          [&](const int i) { naos += number_of_basis_functions(i) * tensor::number_of_spherical_components(std::array<int, 1>{i}); });
+
+    return naos;
+}
+
+auto
+CMolecularBasis::dimensions_of_primitive_basis() const -> size_t
+{
+    size_t npaos = 0;
+
+    std::ranges::for_each(std::views::iota(0, max_angular_momentum() + 1), [&](const int i) {
+        npaos += number_of_primitive_functions(i) * tensor::number_of_spherical_components(std::array<int, 1>{i});
+    });
+
+    return npaos;
+}
+
+auto
+CMolecularBasis::get_label() const -> std::string
+{
+    std::vector<std::string> bas_names;
+
+    for(const auto& bas : _basis_sets)
     {
-        if (_atomicBasisSets[i].getIdElemental() == idElemental)
+        auto name = bas.get_name();
+
+        if (std::find(bas_names.begin(), bas_names.end(), name) == bas_names.end())
         {
-            return _atomicBasisSets[i].getMaxAngularMomentum();
+            bas_names.push_back(name);
         }
     }
 
-    return -1;
-}
-
-int32_t
-CMolecularBasis::getMolecularMaxAngularMomentum(const CMolecule& molecule) const
-{
-    int32_t max_angl = 0;
-
-    auto elmlst = molecule.getElementalComposition();
-
-    for (auto i = elmlst.cbegin(); i != elmlst.cend(); ++i)
+    if (bas_names.size() == 0)
     {
-        int32_t elem_angl = getMaxAngularMomentum(*i);
-
-        if (max_angl < elem_angl)
-        {
-            max_angl = elem_angl;
-        }
+        return std::string("");
     }
-
-    return max_angl;
-}
-
-std::string
-CMolecularBasis::getLabel() const
-{
-    return _label;
-}
-
-int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const int32_t idElemental,
-                                           const int32_t angularMomentum) const
-{
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    else if (bas_names.size() == 1)
     {
-        if (_atomicBasisSets[i].getIdElemental() == idElemental)
-        {
-            return _atomicBasisSets[i].getNumberOfBasisFunctions(angularMomentum);
-        }
+        return format::upper_case(bas_names[0]);
     }
-
-    return 0;
-}
-
-int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
-                                           const int32_t    angularMomentum) const
-{
-    return getNumberOfBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(), angularMomentum);
-}
-
-int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
-                                           const int32_t    iAtom,
-                                           const int32_t    nAtoms,
-                                           const int32_t    angularMomentum) const
-{
-    int32_t nbfuncs = 0;
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
+    else
     {
-        nbfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
-
-                   * _atomicBasisSets[i].getNumberOfBasisFunctions(angularMomentum);
+        return std::string("MIXED-BASIS-SETS");
     }
-
-    return nbfuncs;
 }
 
-int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
-                                           const int32_t    angularMomentum,
-                                           const int32_t    nPrimitiveGtos) const
+auto
+CMolecularBasis::index_map(const int angular_momentum, const size_t npgtos) const -> std::vector<size_t>
 {
-    return getNumberOfBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(), angularMomentum, nPrimitiveGtos);
+    std::vector<size_t> ao_indices;
+
+    ao_indices.push_back(number_of_basis_functions(angular_momentum));
+
+    auto offset = dimensions_of_basis(angular_momentum);
+
+    auto bf_index = [&](const auto &bf) {
+        if (bf.number_of_primitive_functions() == npgtos) ao_indices.push_back(offset);
+        offset++;
+    };
+
+    std::ranges::for_each(_indices, [&](const int i) { std::ranges::for_each(_basis_sets[i].basis_functions(angular_momentum), bf_index); });
+
+    return ao_indices;
 }
 
-int32_t
-CMolecularBasis::getNumberOfBasisFunctions(const CMolecule& molecule,
-                                           const int32_t    iAtom,
-                                           const int32_t    nAtoms,
-                                           const int32_t    angularMomentum,
-                                           const int32_t    nPrimitiveGtos) const
+auto
+CMolecularBasis::index_map(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<size_t>
 {
-    int32_t nbfuncs = 0;
+    std::vector<size_t> ao_indices;
 
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        nbfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
+    ao_indices.push_back(number_of_basis_functions(angular_momentum));
 
-                 * _atomicBasisSets[i].getNumberOfBasisFunctions(angularMomentum, nPrimitiveGtos);
-    }
+    auto offset = dimensions_of_basis(angular_momentum);
 
-    return nbfuncs;
+    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
+        bool not_found = true;
+        std::ranges::for_each(atoms, [&](const int j) {
+            if (j == i)
+            {
+                std::ranges::for_each(_basis_sets[_indices[i]].basis_functions(angular_momentum), [&](const auto &bf) {
+                    if (bf.number_of_primitive_functions() == npgtos) ao_indices.push_back(offset);
+                    offset++;
+                });
+                not_found = false;
+            }
+        });
+        if (not_found) offset += _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum);
+    });
+
+    return ao_indices;
 }
 
-int32_t
-CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
-                                                    const int32_t    angularMomentum) const
+auto
+CMolecularBasis::main_basis_label() const -> std::string
 {
-    return getNumberOfPrimitiveBasisFunctions(molecule, 0, molecule.getNumberOfAtoms(), angularMomentum);
+    auto mlabels = _labels_frequency_map();
+
+    auto pos = std::ranges::max_element(mlabels, [&](const auto &lhs, const auto rhs) { return lhs.second < rhs.second; });
+
+    return (pos == mlabels.end()) ? std::string() : pos->first;
 }
 
-int32_t
-CMolecularBasis::getNumberOfPrimitiveBasisFunctions(const CMolecule& molecule,
-                                                    const int32_t    iAtom,
-                                                    const int32_t    nAtoms,
-                                                    const int32_t    angularMomentum) const
+auto
+CMolecularBasis::_labels_frequency_map() const -> std::unordered_map<std::string, int>
 {
-    int32_t npfuncs = 0;
+    std::unordered_map<std::string, int> freqmap;
 
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        npfuncs += molecule.getNumberOfAtoms(iAtom, nAtoms, _atomicBasisSets[i].getIdElemental())
+    std::ranges::for_each(_indices, [&](const int i) { freqmap[_basis_sets[i].get_name()]++; });
 
-                   * _atomicBasisSets[i].getNumberOfPrimitiveFunctions(angularMomentum);
-    }
-
-    return npfuncs;
+    return freqmap;
 }
 
-int32_t
-CMolecularBasis::getDimensionsOfBasis(const CMolecule& molecule) const
-{
-    int32_t ndim = 0;
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        auto idelem = _atomicBasisSets[i].getIdElemental();
-
-        auto natoms = molecule.getNumberOfAtoms(idelem);
-
-        auto mang = _atomicBasisSets[i].getMaxAngularMomentum();
-
-        for (int32_t j = 0; j <= mang; j++)
-        {
-            ndim += natoms * angmom::to_SphericalComponents(j)
-
-                    * _atomicBasisSets[i].getNumberOfBasisFunctions(j);
-        }
-    }
-
-    return ndim;
-}
-
-int32_t
-CMolecularBasis::getPartialDimensionsOfBasis(const CMolecule& molecule,
-                                             const int32_t    angularMomentum) const
-{
-    int32_t ndim = 0;
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        auto idelem = _atomicBasisSets[i].getIdElemental();
-
-        auto natoms = molecule.getNumberOfAtoms(idelem);
-
-        for (int32_t j = 0; j < angularMomentum; j++)
-        {
-            ndim += natoms * angmom::to_SphericalComponents(j)
-
-                    * _atomicBasisSets[i].getNumberOfBasisFunctions(j);
-        }
-    }
-
-    return ndim;
-}
-
-int32_t
-CMolecularBasis::getDimensionsOfPrimitiveBasis(const CMolecule& molecule) const
-{
-    int32_t ndim = 0;
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        auto idelem = _atomicBasisSets[i].getIdElemental();
-
-        auto natoms = molecule.getNumberOfAtoms(idelem);
-
-        auto mang = _atomicBasisSets[i].getMaxAngularMomentum();
-
-        for (int32_t j = 0; j <= mang; j++)
-        {
-            ndim += natoms * angmom::to_SphericalComponents(j)
-
-                    * _atomicBasisSets[i].getNumberOfPrimitiveFunctions(j);
-        }
-    }
-
-    return ndim;
-}
-
-std::set<int32_t>
-CMolecularBasis::getContractionDepths(const int32_t angularMomentum) const
-{
-    std::set<int32_t> cnums;
-    
-    for (const auto& abasis : _atomicBasisSets)
-    {
-        const auto anums = abasis.getContractionDepths(angularMomentum);
-        
-        cnums.insert(anums.begin(), anums.end());
-    }
-    
-    return cnums;
-}
-
-CAtomBasis
-CMolecularBasis::getAtomBasis(const int32_t idElemental) const
-{
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        if (_atomicBasisSets[i].getIdElemental() == idElemental)
-        {
-            return _atomicBasisSets[i];
-        }
-    }
-
-    return CAtomBasis();
-}
-
-std::vector<CBasisFunction>
-CMolecularBasis::getBasisFunctions(const int32_t idElemental,
-                                   const int32_t angularMomentum) const
-{
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        if (_atomicBasisSets[i].getIdElemental() == idElemental)
-        {
-            return _atomicBasisSets[i].getBasisFunctions(angularMomentum);
-        }
-    }
-
-    return std::vector<CBasisFunction>();
-}
-
-std::vector<std::string>
-CMolecularBasis::getAOBasisMap(const CMolecule& molecule) const
+auto
+CMolecularBasis::get_ao_basis_map(const CMolecule& molecule) const -> std::vector<std::string>
 {
     std::vector<std::string> strmap;
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
-    auto idselm = molecule.getIdsElemental();
+    auto idselm = molecule.identifiers();
 
-    for (int32_t i = 0; i <= _maxAngularMomentum; i++)
+    for (int i = 0; i <= max_angular_momentum(); i++)
     {
-        for (int32_t j = 0; j < angmom::to_SphericalComponents(i); j++)
+        for (int j = 0; j < tensor::number_of_spherical_components(std::array<int, 1>{i}); j++)
         {
-            for (int32_t k = 0; k < natoms; k++)
+            for (int k = 0; k < natoms; k++)
             {
-                auto gtos = getBasisFunctions(idselm[k], i);
+                std::vector<int> atom_ids({k});
 
-                auto ngtos = static_cast<int32_t>(gtos.size());
+                auto gtos = basis_functions(atom_ids, i);
 
-                for (int32_t l = 0; l < ngtos; l++)
+                auto ngtos = static_cast<int>(gtos.size());
+
+                for (int l = 0; l < ngtos; l++)
                 {
                     std::stringstream st;
 
@@ -444,7 +548,7 @@ CMolecularBasis::getAOBasisMap(const CMolecule& molecule) const
 
                     st << " ";
 
-                    auto lbl = molecule.getLabel(k);
+                    auto lbl = molecule.label(k);
 
                     st << lbl;
 
@@ -458,7 +562,11 @@ CMolecularBasis::getAOBasisMap(const CMolecule& molecule) const
 
                     st << l + 1;
 
-                    st << angmom::getStringOfAngularMomentum(i, j);
+                    st.setf(std::ios::left);
+
+                    st.width(3);
+
+                    st << format::lower_case(tensor::spherical_labels(i)[j]);
 
                     strmap.push_back(st.str());
                 }
@@ -467,237 +575,4 @@ CMolecularBasis::getAOBasisMap(const CMolecule& molecule) const
     }
 
     return strmap;
-}
-
-CMemBlock2D<int32_t>
-CMolecularBasis::getIndexMapForDalton(const CMolecule &molecule) const
-{
-    // allocates index map
-    
-    auto natoms = molecule.getNumberOfAtoms();
-    
-    CMemBlock2D<int32_t> idsmap(getDimensionsOfBasis(molecule), 2);
-    
-    // set up pointers to index map
-    
-    auto vlxidx = idsmap.data(0);
-    
-    auto dalidx = idsmap.data(1);
-    
-    // set up pointer to chemical element data
-    
-    auto idselm = molecule.getIdsElemental();
-    
-    // indexing map for p-functions
-    
-    std::array<int32_t, 3> pord({2, 0, 1});
-    
-    // loop over atoms
-    
-    int32_t curgto = 0;
-    
-    for (int32_t i = 0; i < natoms; i++)
-    {
-        auto atmbas = getAtomBasis(idselm[i]);
-        
-        for (int32_t j = 0; j <= atmbas.getMaxAngularMomentum(); j++)
-        {
-            auto gtopos = getPartialDimensionsOfBasis(molecule, j);
-            
-            auto blkpos = getPositionInAngularBlock(molecule, i, j);
-            
-            auto ngtos = getNumberOfBasisFunctions(molecule, j); 
-            
-            for (int32_t k = 0; k < atmbas.getNumberOfBasisFunctions(j); k++)
-            {
-                for (int32_t l = 0; l < angmom::to_SphericalComponents(j); l++)
-                {
-                    dalidx[curgto] = curgto;
-                    
-                    if (j == 1)
-                    {
-                        vlxidx[curgto] = gtopos + ngtos * pord[l] + blkpos + k;
-                    }
-                    else
-                    {
-                        vlxidx[curgto] = gtopos + ngtos * l + blkpos + k;
-                    }
-                    
-                    curgto++;
-                }
-            }
-        }
-    }
-    
-    return idsmap;
-}
-
-std::vector<int32_t>
-CMolecularBasis::getIndexMap(const CMolecule& molecule) const
-{
-    const auto idsmap = getIndexMapForDalton(molecule);
-    
-    const auto ndim = idsmap.size(0);
-    
-    auto vlxidx = idsmap.data(0);
-    
-    std::vector<int32_t> indexes(ndim);
-    
-    for (int32_t i = 0; i < ndim; i++) indexes[i] = vlxidx[i];
-    
-    return indexes;
-}
-
-int32_t
-CMolecularBasis::getPositionInAngularBlock(const CMolecule& molecule,
-                                           const int32_t    iAtom,
-                                           const int32_t    angularMomentum) const
-{
-    if ((iAtom < molecule.getNumberOfAtoms()) && (angularMomentum <= getMaxAngularMomentum()))
-    {
-        auto idselm = molecule.getIdsElemental();
-        
-        int32_t bfpos = 0;
-        
-        for (int32_t i = 0; i < iAtom; i++)
-        {
-            bfpos += getNumberOfBasisFunctions(idselm[i], angularMomentum);
-        }
-        
-        return bfpos; 
-    }
-
-    return -1;
-}
-
-std::string
-CMolecularBasis::printBasis(const std::string& title,
-                            const CMolecule&   molecule) const
-{
-    std::string str = "Molecular Basis (" + title + ")";
-
-    std::stringstream ss;
-
-    ss << str << "\n";
-
-    ss << std::string(str.size() + 2, '=') << "\n\n";
-
-    str.assign("Basis: ");
-
-    str.append(_label);
-
-    ss << fstr::format(str, 60, fmt::left) << "\n\n";
-
-    ss << "  Atom ";
-
-    ss << fstr::format(std::string("Contracted GTOs"), 26, fmt::left);
-
-    ss << fstr::format(std::string("Primitive GTOs"), 30, fmt::left);
-
-    ss << "\n\n";
-
-    for (auto i = _atomicBasisSets.cbegin(); i != _atomicBasisSets.cend(); ++i)
-    {
-        std::string lbl("  ");
-
-        CChemicalElement ce;
-
-        ce.setAtomType(i->getIdElemental());
-
-        lbl.append(ce.getName());
-
-        ss << fstr::format(lbl, 6, fmt::left);
-
-        ss << fstr::format(i->getContractionString(), 26, fmt::left);
-
-        ss << fstr::format(i->getPrimitivesString(), 30, fmt::left);
-
-        ss << "\n";
-    }
-
-    ss << "\n";
-
-    str.assign("Contracted Basis Functions : ");
-
-    str.append(std::to_string(getDimensionsOfBasis(molecule)));
-
-    ss << fstr::format(str, 60, fmt::left) << "\n";
-
-    str.assign("Primitive Basis Functions  : ");
-
-    str.append(std::to_string(getDimensionsOfPrimitiveBasis(molecule)));
-
-    ss << fstr::format(str, 60, fmt::left) << "\n";
-
-    ss << "\n";
-
-    return ss.str();
-}
-
-std::string
-CMolecularBasis::printBasis(const CMolecule& molecule) const
-{
-    return printBasis(std::string("Atomic Basis"), molecule);
-}
-
-void
-CMolecularBasis::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if constexpr (ENABLE_MPI)
-    {
-        mpi::bcast(_maxAngularMomentum, comm);
-
-        mpi::bcast(_label, rank, comm);
-
-        int32_t natombases = static_cast<int32_t>(_atomicBasisSets.size());
-
-        mpi::bcast(natombases, comm);
-
-        for (int32_t i = 0; i < natombases; i++)
-        {
-            CAtomBasis atmbasis;
-
-            if (rank == mpi::master()) atmbasis = _atomicBasisSets[i];
-
-            atmbasis.broadcast(rank, comm);
-
-            if (rank != mpi::master()) addAtomBasis(atmbasis);
-
-            MPI_Barrier(comm);
-        }
-    }
-}
-
-std::string
-CMolecularBasis::repr() const
-{
-    std::ostringstream os;
-
-    os << std::endl;
-
-    os << "[CMolecularBasis (Object):" << this << "]" << std::endl;
-
-    os << "_label: " << _label << std::endl;
-
-    os << "_maxAngularMomentum: " << _maxAngularMomentum;
-
-    os << std::endl;
-
-    os << "_atomicBasisSets: " << std::endl;
-
-    for (size_t i = 0; i < _atomicBasisSets.size(); i++)
-    {
-        os << "_atomicBasisSets[" << i << "]: " << std::endl;
-
-        os << _atomicBasisSets[i] << std::endl;
-    }
-
-    return os.str();
-}
-
-std::ostream&
-operator<<(      std::ostream&    output,
-           const CMolecularBasis& source)
-{
-    return (output << source.repr());
 }

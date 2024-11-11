@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -29,7 +28,7 @@ import numpy as np
 import time
 import sys
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -41,14 +40,8 @@ from .firstorderprop import FirstOrderProperties
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import check_distributed_focks
-from .checkpoint import read_distributed_focks
-from .checkpoint import write_distributed_focks
-from .inputparser import parse_input
-from pathlib import Path
-from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
-from .veloxchemlib import parse_xc_func
+from .checkpoint import (check_distributed_focks, read_distributed_focks,
+                         write_distributed_focks)
 
 
 class ShgDriver(NonlinearSolver):
@@ -195,8 +188,15 @@ class ShgDriver(NonlinearSolver):
         norb = self.comm.bcast(norb, root=mpi_master())
 
         # Computing first-order gradient vectors
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, ao_basis)
+        if self.rank == mpi_master():
+            mu_dipole_mats = compute_electric_dipole_integrals(
+                molecule, ao_basis)
+            # Note: nonliear response uses r instead of mu for dipole operator
+            dipole_mats = (mu_dipole_mats[0] * (-1.0),
+                           mu_dipole_mats[1] * (-1.0),
+                           mu_dipole_mats[2] * (-1.0))
+        else:
+            dipole_mats = tuple()
 
         linear_solver = LinearSolver(self.comm, self.ostream)
         a_grad = linear_solver.get_complex_prop_grad(self.a_operator,
@@ -214,10 +214,16 @@ class ShgDriver(NonlinearSolver):
             a_grad = list(a_grad)
             for ind in range(len(a_grad)):
                 a_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if self.a_operator == 'dipole':
+                    a_grad[ind] *= -1.0
 
             b_grad = list(b_grad)
             for ind in range(len(b_grad)):
                 b_grad[ind] *= inv_sqrt_2
+                # Note: nonliear response uses r instead of mu for dipole operator
+                if self.b_operator == 'dipole':
+                    b_grad[ind] *= -1.0
 
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
@@ -239,9 +245,9 @@ class ShgDriver(NonlinearSolver):
             AB.update(B)
 
             X = {
-                'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
-                'y': 2 * self.ao2mo(mo, dipole_mats.y_to_numpy()),
-                'z': 2 * self.ao2mo(mo, dipole_mats.z_to_numpy())
+                'x': 2 * self.ao2mo(mo, dipole_mats[0]),
+                'y': 2 * self.ao2mo(mo, dipole_mats[1]),
+                'z': 2 * self.ao2mo(mo, dipole_mats[2])
             }
         else:
             X = None
@@ -253,9 +259,10 @@ class ShgDriver(NonlinearSolver):
 
         cpp_keywords = [
             'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
-            'conv_thresh', 'max_iter', 'eri_thresh', 'qq_type', 'timing',
+            'conv_thresh', 'max_iter', 'eri_thresh', 'timing',
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
-            'potfile', 'electric_field', 'program_end_time'
+            'potfile', 'electric_field', 'program_end_time', '_debug',
+            '_block_size_factor'
         ]
 
         for key in cpp_keywords:

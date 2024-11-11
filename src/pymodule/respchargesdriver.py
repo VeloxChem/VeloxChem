@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -28,12 +27,9 @@ from pathlib import Path
 import numpy as np
 import sys
 
-from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import bohr_in_angstrom
-from .veloxchemlib import boltzmann_in_evperkelvin
-from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import mpi_master
-from .subcommunicators import SubCommunicators
+from .veloxchemlib import compute_nuclear_potential_values
+from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
+                           boltzmann_in_evperkelvin)
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -368,8 +364,8 @@ class RespChargesDriver:
                     bas = MolecularBasis()
 
                 # broadcast molecule and basis set
-                mol.broadcast(self.rank, self.comm)
-                bas.broadcast(self.rank, self.comm)
+                mol = self.comm.bcast(mol, root=mpi_master())
+                bas = self.comm.bcast(bas, root=mpi_master())
 
                 molecules.append(mol)
                 basis_sets.append(bas)
@@ -420,13 +416,13 @@ class RespChargesDriver:
 
         for ind, (mol, bas) in enumerate(zip(molecules, basis_sets)):
             if use_xyz_file:
-                info_text = f'Processing conformer {ind+1}...'
+                info_text = f'Processing conformer {ind + 1}...'
                 self.ostream.print_info(info_text)
                 self.ostream.print_blank()
                 self.ostream.print_block(mol.get_string())
                 self.ostream.print_block(mol.more_info())
                 self.ostream.print_blank()
-                self.ostream.print_block(bas.get_string('Atomic Basis', mol))
+                self.ostream.print_block(bas.get_string('Atomic Basis'))
                 self.ostream.flush()
 
             nalpha = mol.number_of_alpha_electrons()
@@ -459,7 +455,7 @@ class RespChargesDriver:
                     output_dir.mkdir(parents=True, exist_ok=True)
                 self.comm.barrier()
 
-                ostream_fname = str(output_dir / f'conformer_{ind+1}')
+                ostream_fname = str(output_dir / f'conformer_{ind + 1}')
                 ostream = OutputStream(ostream_fname + '.out')
 
                 # select SCF driver
@@ -783,7 +779,7 @@ class RespChargesDriver:
         assert_msg_critical(fitting_converged, errmsg)
 
         cur_str = '*** Charge fitting converged in '
-        cur_str += f'{current_iteration+1} iterations.'
+        cur_str += f'{current_iteration + 1} iterations.'
         self.ostream.print_header(cur_str.ljust(40))
         self.ostream.print_blank()
 
@@ -1155,7 +1151,7 @@ class RespChargesDriver:
         # classical electrostatic potential
 
         coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.elem_ids_to_numpy()
+        elem_ids = molecule.get_element_ids()
 
         if self.rank == mpi_master():
             for i in range(esp.size):
@@ -1164,34 +1160,20 @@ class RespChargesDriver:
 
         # electrostatic potential integrals
 
-        node_grps = [p for p in range(self.nodes)]
-        subcomm = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomm.local_comm
-        cross_comm = subcomm.cross_comm
-
         ave, res = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
 
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        epi_drv = NuclearPotentialIntegralsDriver(local_comm)
-        local_esp = np.zeros(end - start)
+        elec_esp = compute_nuclear_potential_values(molecule, basis,
+                                                    grid[start:end, :], D)
 
-        for i in range(start, end):
-            epi_matrix = epi_drv.compute(molecule, basis, np.array([1.0]),
-                                         np.array([grid[i]]))
-            if local_comm.Get_rank() == mpi_master():
-                local_esp[i - start] -= np.sum(epi_matrix.to_numpy() * D)
-
-        if local_comm.Get_rank() == mpi_master():
-            local_esp = cross_comm.gather(local_esp, root=mpi_master())
+        elec_esp_arrays = self.comm.gather(elec_esp, root=mpi_master())
 
         if self.rank == mpi_master():
-            for i in range(self.nodes):
-                start = sum(counts[:i])
-                end = sum(counts[:i + 1])
-                esp[start:end] += local_esp[i]
+            elec_esp_arrays = [arr for arr in elec_esp_arrays if arr.size > 0]
+            esp += np.hstack(elec_esp_arrays)
             return esp
         else:
             return None

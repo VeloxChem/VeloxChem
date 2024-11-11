@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -28,10 +27,9 @@ from copy import deepcopy
 import numpy as np
 import sys
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import molorb, fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .molecularorbitals import MolecularOrbitals
+from .veloxchemlib import mpi_master
+from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
@@ -87,14 +85,14 @@ class ScfUnrestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            smat = ovl_mat.to_numpy()
-            tmat = oao_mat.to_numpy()
+            smat = ovl_mat
+            tmat = oao_mat
 
-            dmat_a = den_mat.alpha_to_numpy(0)
-            dmat_b = den_mat.beta_to_numpy(0)
+            dmat_a = den_mat[0]
+            dmat_b = den_mat[1]
 
-            fmat_a = fock_mat.alpha_to_numpy(0)
-            fmat_b = fock_mat.beta_to_numpy(0)
+            fmat_a = fock_mat[0]
+            fmat_b = fock_mat[1]
 
             fds_a = np.matmul(fmat_a, np.matmul(dmat_a, smat))
             fds_b = np.matmul(fmat_b, np.matmul(dmat_b, smat))
@@ -128,9 +126,8 @@ class ScfUnrestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            diff_mat = den_mat.sub(old_den_mat)
-            ddmat_a = diff_mat.alpha_to_numpy(0)
-            ddmat_b = diff_mat.beta_to_numpy(0)
+            ddmat_a = den_mat[0] - old_den_mat[0]
+            ddmat_b = den_mat[1] - old_den_mat[1]
 
             diff_den_a = np.linalg.norm(ddmat_a)
             diff_den_b = np.linalg.norm(ddmat_b)
@@ -167,11 +164,11 @@ class ScfUnrestrictedDriver(ScfDriver):
                 self._density_matrices_alpha.popleft()
                 self._density_matrices_beta.popleft()
 
-            self._fock_matrices_alpha.append(fock_mat.alpha_to_numpy(0))
-            self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
+            self._fock_matrices_alpha.append(fock_mat[0].copy())
+            self._fock_matrices_beta.append(fock_mat[1].copy())
 
-            self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
-            self._density_matrices_beta.append(den_mat.beta_to_numpy(0))
+            self._density_matrices_alpha.append(den_mat[0].copy())
+            self._density_matrices_beta.append(den_mat[1].copy())
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -210,9 +207,9 @@ class ScfUnrestrictedDriver(ScfDriver):
 
                 return self._get_scaled_fock(weights)
 
-            return fock_mat.alpha_to_numpy(0), fock_mat.beta_to_numpy(0)
+            return tuple(fock_mat)
 
-        return None, None
+        return (None, None)
 
     def _get_scaled_fock(self, weights):
         """
@@ -235,9 +232,9 @@ class ScfUnrestrictedDriver(ScfDriver):
             effmat_a += w * fa
             effmat_b += w * fb
 
-        return effmat_a, effmat_b
+        return (effmat_a, effmat_b)
 
-    def _gen_molecular_orbitals(self, molecule, fock_mat, oao_mat):
+    def _gen_molecular_orbitals(self, molecule, eff_fock_mat, oao_mat):
         """
         Generates spin unrestricted molecular orbital by diagonalizing
         spin unrestricted open shell Fock/Kohn-Sham matrix. Overloaded base
@@ -245,8 +242,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         :param molecule:
             The molecule.
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
+        :param eff_fock_mat:
+            The effective Fock/Kohn-Sham matrix.
         :param oao_mat:
             The orthogonalization matrix.
 
@@ -255,18 +252,14 @@ class ScfUnrestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-
-            tmat = oao_mat.to_numpy()
-
-            fmo_a = np.matmul(tmat.T, np.matmul(fock_mat[0], tmat))
-            fmo_b = np.matmul(tmat.T, np.matmul(fock_mat[1], tmat))
-
-            eigs_a, evecs_a = np.linalg.eigh(fmo_a)
-            eigs_b, evecs_b = np.linalg.eigh(fmo_b)
+            tmat = oao_mat
+            eigs_a, evecs_a = np.linalg.eigh(
+                np.linalg.multi_dot([tmat.T, eff_fock_mat[0], tmat]))
+            eigs_b, evecs_b = np.linalg.eigh(
+                np.linalg.multi_dot([tmat.T, eff_fock_mat[1], tmat]))
 
             orb_coefs_a = np.matmul(tmat, evecs_a)
             orb_coefs_b = np.matmul(tmat, evecs_b)
-
             orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
@@ -294,28 +287,6 @@ class ScfUnrestrictedDriver(ScfDriver):
             return "Spin-Unrestricted Kohn-Sham" + pe_type
 
         return "Spin-Unrestricted Hartree-Fock" + pe_type
-
-    def _update_fock_type(self, fock_mat):
-        """
-        Updates Fock matrix to fit selected functional in Kohn-Sham
-        calculations.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        """
-
-        if self.xcfun.is_hybrid():
-            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'alpha')
-            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
-                                      'alpha')
-            fock_mat.set_fock_type(fockmat.unrestjkx, 0, 'beta')
-            fock_mat.set_scale_factor(self.xcfun.get_frac_exact_exchange(), 0,
-                                      'beta')
-        else:
-            fock_mat.set_fock_type(fockmat.unrestj, 0, 'alpha')
-            fock_mat.set_fock_type(fockmat.unrestj, 0, 'beta')
-
-        return
 
     def natural_orbitals(self, scf_tensors=None):
         """

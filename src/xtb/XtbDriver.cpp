@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -25,25 +24,16 @@
 
 #include "XtbDriver.hpp"
 
-#include <mpi.h>
-
 #include <fstream>
 #include <iostream>
 
-#include "Molecule.hpp"
-#include "MpiFunc.hpp"
+#include "ErrorHandler.hpp"
 
-CXtbDriver::CXtbDriver(MPI_Comm comm)
+CXtbDriver::CXtbDriver()
     : _outputFilename(std::string("STDOUT"))
 
     , _xtbMethod(std::string("gfn2"))
 {
-    _locRank = mpi::rank(comm);
-
-    _locNodes = mpi::nodes(comm);
-
-    _locComm = comm;
-
     _electronicTemp = 300.0;
 
     _maxIterations = 280;
@@ -100,7 +90,7 @@ void
 CXtbDriver::mute()
 {
 #ifdef ENABLE_XTB
-    if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_MUTED);
+    xtb_setVerbosity(_environment, XTB_VERBOSITY_MUTED);
 #endif
 }
 
@@ -108,7 +98,7 @@ void
 CXtbDriver::unmute()
 {
 #ifdef ENABLE_XTB
-    if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
+    xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL);
 #endif
 }
 
@@ -116,7 +106,7 @@ void
 CXtbDriver::compute(const CMolecule& molecule)
 {
 #ifdef ENABLE_XTB
-    if (isMasterNode())
+
     {
         // set up output stream
 
@@ -166,12 +156,6 @@ CXtbDriver::compute(const CMolecule& molecule)
         xtb_releaseOutput(_environment);
     }
 #endif
-}
-
-bool
-CXtbDriver::isMasterNode() const
-{
-    return _locRank == mpi::master();
 }
 
 bool
@@ -226,7 +210,6 @@ CXtbDriver::getEnergy() const
 {
     double energy = 0.0;
 
-    if (isMasterNode())
     {
 #ifdef ENABLE_XTB
         xtb_getEnergy(_environment, _results, &energy);
@@ -241,7 +224,7 @@ CXtbDriver::getGradient() const
 {
     std::vector<double> grad;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         grad = std::vector<double>(_natoms * 3, 0.0);
@@ -258,7 +241,7 @@ CXtbDriver::getDipole() const
 {
     std::vector<double> dipole;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         dipole = std::vector<double>(3, 0.0);
@@ -275,7 +258,7 @@ CXtbDriver::getPartialCharges() const
 {
     std::vector<double> partial_charges;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         partial_charges = std::vector<double>(_natoms, 0.0);
@@ -292,7 +275,7 @@ CXtbDriver::getBondOrders() const
 {
     std::vector<double> bond_orders;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         bond_orders = std::vector<double>(_natoms * _natoms, 0.0);
@@ -304,25 +287,25 @@ CXtbDriver::getBondOrders() const
     return bond_orders;
 }
 
-int32_t
+int
 CXtbDriver::getNumberOfAtoms() const
 {
     return _natoms;
 }
 
-int32_t
+int
 CXtbDriver::getNumberOfAOs() const
 {
     int nao = 0;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         xtb_getNao(_environment, _results, &nao);
 #endif
     }
 
-    return static_cast<int32_t>(nao);
+    return static_cast<int>(nao);
 }
 
 std::vector<double>
@@ -330,7 +313,7 @@ CXtbDriver::getOrbitalEnergies() const
 {
     std::vector<double> orbital_energies;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         auto nao = getNumberOfAOs();
@@ -349,7 +332,7 @@ CXtbDriver::getOrbitalOccupations() const
 {
     std::vector<double> orbital_occupations;
 
-    if ((_natoms > 0) && isMasterNode())
+    if (_natoms > 0)
     {
 #ifdef ENABLE_XTB
         auto nao = getNumberOfAOs();
@@ -367,11 +350,11 @@ CXtbDriver::getOrbitalOccupations() const
 xtb_TMolecule
 CXtbDriver::_set_molecule(const CMolecule& molecule)
 {
-    _natoms = static_cast<int>(molecule.getNumberOfAtoms());
+    _natoms = static_cast<int>(molecule.number_of_atoms());
 
-    double charge = molecule.getCharge();
+    double charge = molecule.get_charge();
 
-    int mult = static_cast<int>(molecule.getMultiplicity());
+    int mult = static_cast<int>(molecule.get_multiplicity());
 
     int uhf = (mult > 1) ? mult - 1 : 0;
 
@@ -381,23 +364,21 @@ CXtbDriver::_set_molecule(const CMolecule& molecule)
 
     // reformat molecular data
 
-    auto eleids = molecule.getIdsElemental();
+    auto eleids = molecule.identifiers();
 
-    auto rx = molecule.getCoordinatesX();
-
-    auto ry = molecule.getCoordinatesY();
-
-    auto rz = molecule.getCoordinatesZ();
+    auto rxyz = molecule.coordinates();
 
     for (int i = 0; i < _natoms; i++)
     {
         atoms.at(i) = static_cast<int>(eleids[i]);
 
-        coords.at(3 * i) = rx[i];
+        auto xyz = rxyz[i].coordinates(); 
 
-        coords.at(3 * i + 1) = ry[i];
+        coords.at(3 * i + 0) = xyz[0];
 
-        coords.at(3 * i + 2) = rz[i];
+        coords.at(3 * i + 1) = xyz[1];
+
+        coords.at(3 * i + 2) = xyz[2];
     }
 
     return xtb_newMolecule(_environment, &_natoms, atoms.data(), coords.data(), &charge, &uhf, nullptr, nullptr);

@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -34,8 +33,6 @@
 /**
  Class CDispersionParameters implements the density functional parameters for
  the D4 dispersion correction (reference: dftd4 v2.4.0).
-
- @author X. Li
  */
 class CDispersionParameters
 {
@@ -72,7 +69,7 @@ class CDispersionParameters
     /**
      The alp parameter (exponent of zero damping).
      */
-    int32_t _alp;
+    int _alp;
 
     /**
      The beta parameter (range separation parameter for Fermi-damping).
@@ -159,7 +156,7 @@ class CDispersionParameters
 
      @return the alp parameter.
      */
-    int32_t getAlp() const;
+    int getAlp() const;
 };
 
 #endif /* DispersionParameters_hpp */

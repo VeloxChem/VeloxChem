@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -29,8 +28,11 @@ from pathlib import Path
 from .errorhandler import assert_msg_critical
 from .inputparser import InputParser
 from .outputstream import OutputStream
-from .veloxchemlib import (AtomBasis, BasisFunction, ChemicalElement,
-                           MolecularBasis, to_angular_momentum)
+from .veloxchemlib import AtomBasis
+from .veloxchemlib import BasisFunction
+from .veloxchemlib import MolecularBasis
+from .veloxchemlib import tensor_order
+from .veloxchemlib import chemical_element_name
 
 
 def _known_aliases_for_basis_sets():
@@ -106,16 +108,70 @@ def _basis_file_to_name(fname):
         return str(fname)
 
 
-@staticmethod
-def _MolecularBasis_read(mol,
-                         basis_name,
-                         basis_path='.',
-                         ostream=OutputStream()):
+def _read_atom_basis(basis_data, elem_id, basis_name):
     """
-    Reads AO basis set from file.
+    Reads basis set data for single atom.
 
-    :param mol:
-        The molecule.
+    :param basis_data:
+        List with atomic basis data.
+    :param elem_id:
+        The chemical element identifier.
+    :param basis_name:
+        Name of the basis set.
+
+    :return:
+        The atom basis set.
+    """
+
+    atom_basis = AtomBasis()
+
+    basis_data_copy = list(basis_data)
+
+    while basis_data_copy:
+        shell_title = basis_data_copy.pop(0).split()
+        assert_msg_critical(
+            len(shell_title) == 2 or len(shell_title) == 3,
+            'Basis set parser: {}'.format(' '.join(shell_title)))
+
+        if len(shell_title) == 3:
+            ncgto = int(shell_title[2])
+            err_gc = 'MolcularBasis.read: '
+            err_gc += 'General contraction format is currently not supported'
+            assert_msg_critical(ncgto == 1, err_gc)
+
+        if shell_title[0] == 'ECP':
+            atom_basis.set_ecp_label(shell_title)
+        else:
+            angl = tensor_order(shell_title[0])
+            npgto = int(shell_title[1])
+
+            expons = [0.0] * npgto
+            coeffs = [0.0] * npgto
+
+            for i in range(npgto):
+                prims = basis_data_copy.pop(0).split()
+                assert_msg_critical(
+                    len(prims) == 2,
+                    'Basis set parser: {}'.format(' '.join(prims)))
+
+                expons[i] = float(prims[0])
+                coeffs[i] = float(prims[1])
+
+            bf = BasisFunction(expons, coeffs, angl)
+            bf.normalize()
+
+            atom_basis.add(bf)
+
+    atom_basis.set_identifier(elem_id)
+    atom_basis.set_name(basis_name.upper())
+
+    return atom_basis
+
+
+def _read_basis_file(basis_name, basis_path, ostream):
+    """
+    Reads basis set from given file.
+
     :param basis_name:
         Name of the basis set.
     :param basis_path:
@@ -124,14 +180,8 @@ def _MolecularBasis_read(mol,
         The output stream.
 
     :return:
-        The AO basis set.
+        The dictionary with basis set.
     """
-
-    if ostream is None:
-        ostream = OutputStream(None)
-
-    err_gc = 'MolcularBasis.read: '
-    err_gc += 'General contraction currently is not supported'
 
     # de-alias basis set name to basis set file
     fname = _basis_name_to_file(basis_name.upper())
@@ -155,78 +205,157 @@ def _MolecularBasis_read(mol,
 
     basis_dict = InputParser(str(basis_file)).input_dict
 
+    assert_msg_critical(fname.upper() == basis_dict['basis_set_name'].upper(),
+                        '_read_basis_file: Inconsistent basis set name')
+
+    return basis_dict
+
+
+def _gen_basis_key(elem_id, basis_dict):
+    """
+    Generates basis set key for given chemical element.
+
+    :param elem_id:
+        The chemical element identifier.
+    :param basis_dict:
+        The basis set dictionary.
+
+    :return:
+        The basis set key.
+    """
+
+    basis_key = 'atombasis_{}'.format(chemical_element_name(elem_id).lower())
     assert_msg_critical(
-        fname.upper() == basis_dict['basis_set_name'].upper(),
-        'MolecularBasis.read: Inconsistent basis set name',
-    )
+        basis_key in basis_dict,
+        'MolecularBasis.read: Unsupported chemical element ' +
+        f'{chemical_element_name(elem_id)} in ' +
+        basis_dict['basis_set_name'].upper())
+
+    return basis_key
+
+
+@staticmethod
+def _MolecularBasis_read(molecule,
+                         basis_name,
+                         basis_path='.',
+                         ostream=None,
+                         verbose=False):
+    """
+    Reads AO basis set from file for given molecule.
+
+    :param molecule:
+        The molecule.
+    :param basis_name:
+        Name of the basis set.
+    :param basis_path:
+        Path to the basis set.
+    :param ostream:
+        The output stream.
+
+    :return:
+        The molecular basis set.
+    """
+
+    if ostream is None:
+        if verbose:
+            ostream = OutputStream()
+        else:
+            ostream = OutputStream(None)
+
+    basis_dict = {}
+
+    atom_basis_labels = molecule.get_atom_basis_labels()
+
+    # read atom basis sets defined in molecule
+    for atom_bas_label in set(atom_basis_labels):
+        if atom_bas_label != '':
+            basis_dict[atom_bas_label.upper()] = _read_basis_file(
+                atom_bas_label, basis_path, ostream)
+
+    # read default basis set
+    if basis_name.upper() not in basis_dict:
+        basis_dict[basis_name.upper()] = _read_basis_file(
+            basis_name, basis_path, ostream)
 
     mol_basis = MolecularBasis()
 
-    elem_comp = mol.get_elemental_composition()
+    for idx, elem_id in enumerate(molecule.get_identifiers()):
+        if basis_name.upper() == 'AO-START-GUESS':
+            atom_bas_label = basis_name.upper()
+        else:
+            atom_bas_label = atom_basis_labels[idx].upper()
+            if atom_bas_label == '':
+                atom_bas_label = basis_name.upper()
 
-    for elem_id in elem_comp:
+        basis_key = _gen_basis_key(elem_id, basis_dict[atom_bas_label])
 
-        elem = ChemicalElement()
-        success = elem.set_atom_type(elem_id)
-        assert_msg_critical(
-            success,
-            'MolecularBasis.read: ChemicalElement.set_atom_type failed')
+        atom_basis = _read_atom_basis(basis_dict[atom_bas_label][basis_key],
+                                      elem_id, atom_bas_label)
 
-        basis_key = 'atombasis_{}'.format(elem.get_name().lower())
-        basis_list = [entry for entry in basis_dict[basis_key]]
+        mol_basis.add(atom_basis)
 
-        atom_basis = AtomBasis()
-
-        while basis_list:
-            shell_title = basis_list.pop(0).split()
-            assert_msg_critical(
-                len(shell_title) == 3,
-                'Basis set parser (shell): {}'.format(' '.join(shell_title)),
-            )
-
-            angl = to_angular_momentum(shell_title[0])
-            npgto = int(shell_title[1])
-            ncgto = int(shell_title[2])
-
-            assert_msg_critical(ncgto == 1, err_gc)
-
-            expons = [0.0] * npgto
-            coeffs = [0.0] * npgto * ncgto
-
-            for i in range(npgto):
-                prims = basis_list.pop(0).split()
-                assert_msg_critical(
-                    len(prims) == ncgto + 1,
-                    'Basis set parser (primitive): {}'.format(' '.join(prims)),
-                )
-
-                expons[i] = float(prims[0])
-                for k in range(ncgto):
-                    coeffs[k * npgto + i] = float(prims[k + 1])
-
-            bf = BasisFunction(expons, coeffs, angl)
-            bf.normalize()
-
-            atom_basis.add_basis_function(bf)
-
-        atom_basis.set_elemental_id(elem_id)
-
-        mol_basis.add_atom_basis(atom_basis)
-
-    mol_basis.set_label(basis_name.upper())
-
-    ostream.print_block(mol_basis.get_string('Atomic Basis', mol))
-
+    ostream.print_block(mol_basis.info_str('Atomic Basis'))
     ostream.flush()
 
     return mol_basis
 
 
 @staticmethod
-def _MolecularBasis_get_avail_basis(element_label=None):
+def _MolecularBasis_read_dict(molecule,
+                              basis_name,
+                              basis_dict,
+                              basis_path='.',
+                              ostream=OutputStream()):
+    """
+    Reads AO basis set from file for given molecule.
+
+    :param molecule:
+        The molecule.
+    :param basis_name:
+        Name of the basis set.
+    :param basis_dict:
+        Dictionary with additional basis set input.
+    :param basis_path:
+        Path to the basis set.
+    :param ostream:
+        The output stream.
+
+    :return:
+        The molecular basis set.
+    """
+
+    if ostream is None:
+        ostream = OutputStream(None)
+
+    mbasis_dict = _read_basis_file(basis_name, basis_path, ostream)
+
+    mol_basis = MolecularBasis()
+
+    for index, elem_id in enumerate(molecule.get_identifiers()):
+        idxstr = str(index + 1)
+        if idxstr in basis_dict:
+            lbasis_name = basis_dict[idxstr]
+            lbasis_dict = _read_basis_file(lbasis_name, basis_path, ostream)
+            basis_key = _gen_basis_key(elem_id, lbasis_dict)
+            atom_basis = _read_atom_basis(lbasis_dict[basis_key], elem_id,
+                                          lbasis_name)
+            mol_basis.add(atom_basis)
+        else:
+            basis_key = _gen_basis_key(elem_id, mbasis_dict)
+            atom_basis = _read_atom_basis(mbasis_dict[basis_key], elem_id,
+                                          basis_name)
+            mol_basis.add(atom_basis)
+
+    ostream.print_block(mol_basis.info_str('Atomic Basis'))
+    ostream.flush()
+
+    return mol_basis
+
+
+@staticmethod
+def _MolecularBasis_get_avail_basis(element_label):
     """
     Gets the names of available basis sets for an element.
-    If no element is provided, return all available basis sets.
 
     :param element_label:
         The label of the chemical element.
@@ -242,37 +371,75 @@ def _MolecularBasis_get_avail_basis(element_label=None):
 
     for x in basis_files:
         name = _basis_file_to_name(x.name)
-        if element_label is None:
-            avail_basis.add(name)
-        else:
-            basis = InputParser(str(x)).input_dict
-            # check that the given element appears as key
-            # and that its value is a non-empty list
-            elem = f'atombasis_{element_label.lower()}'
-            if elem in basis.keys():
-                if basis[elem]:
-                    avail_basis.add(name)
+        basis = InputParser(str(x)).input_dict
+        # check that the given element appears as key
+        # and that its value is a non-empty list
+        elem = f'atombasis_{element_label.lower()}'
+        if elem in basis.keys():
+            if basis[elem]:
+                avail_basis.add(name)
 
     return sorted(list(avail_basis))
 
 
-def _MolecularBasis_deepcopy(self, memo):
+def _MolecularBasis_get_string(self, title):
     """
-    Implements deepcopy.
+    Returns string representation of molecular basis.
 
-    :param memo:
-        The memo dictionary for deepcopy.
+    :param title:
+        The title of molecular basis.
 
     :return:
-        A deepcopy of self.
+        A string with representation of molecular basis.
     """
 
-    return MolecularBasis(self)
+    mlabel = self.get_main_basis_label()
+
+    label = 'Molecular Basis (' + title + ')'
+    bas_str = f'{label:^60s}\n'
+    label = (len(label) + 2) * "="
+    bas_str += f'{label:^60s}\n\n'
+    label = "Basis: " + mlabel
+    bas_str += f'{label:<60s}\n\n'
+    label = 'Contracted GTOs'
+    bas_str += "  Atom " + f'{label:<26}'
+    label = 'Primitive GTOs'
+    bas_str += f'{label:<30}\n\n'
+
+    for abasis in self.basis_sets():
+        if abasis.get_name() == mlabel:
+            id_elem = abasis.get_identifier()
+            bas_str += f'  {chemical_element_name(id_elem):<6s}'
+            bas_str += f'{abasis.contraction_str():<26s}'
+            bas_str += f'{abasis.primitives_str():<30s}\n'
+    bas_str += '\n'
+
+    for abasis in self.basis_sets():
+        if abasis.get_name() != mlabel:
+            label = "Replacement Basis: " + abasis.get_name()
+            bas_str += f'{label:<60s}\n\n'
+            label = 'Contracted GTOs'
+            bas_str += "  Atom " + f'{label:<26}'
+            label = 'Primitive GTOs'
+            bas_str += f'{label:<30}\n\n'
+            id_elem = abasis.get_identifier()
+            bas_str += f'  {chemical_element_name(id_elem):<6s}'
+            bas_str += f'{abasis.contraction_str():<26s}'
+            bas_str += f'{abasis.primitives_str():<30s}\n'
+            bas_str += '\n'
+
+    label = 'Contracted Basis Functions : '
+    label += f'{self.get_dimensions_of_basis()}'
+    bas_str += f'{label:<60s}\n'
+    label = 'Primitive Basis Functions  : '
+    label += f'{self.get_dimensions_of_primitive_basis()}'
+    bas_str += f'{label:<60s}\n\n'
+
+    return bas_str
 
 
 MolecularBasis.read = _MolecularBasis_read
+MolecularBasis.read_dict = _MolecularBasis_read_dict
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
-MolecularBasis.__deepcopy__ = _MolecularBasis_deepcopy
-
-# aliases
-MolecularBasis.get_available_basis = _MolecularBasis_get_avail_basis
+MolecularBasis.get_string = _MolecularBasis_get_string
+MolecularBasis.info_str = _MolecularBasis_get_string

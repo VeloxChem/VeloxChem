@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -30,33 +29,31 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <cstring>
-#include <memory>
+#include <algorithm>
+#include <array>
+#include <utility>
 #include <vector>
 
-#ifdef ENABLE_MKL
-#include <mkl_cblas.h>
-#include <mkl_lapacke.h>
-#else
-#include <cblas.h>
-#include <lapacke.h>
-#endif
-
+#include "CustomViews.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "MathConst.hpp"
-#include "StringFormat.hpp"
+#include "Matrices.hpp"
+#include "MatricesFunc.hpp"
+#include "Matrix.hpp"
+#include "MatrixFunc.hpp"
+#include "MolecularBasis.hpp"
+#include "SubMatrix.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
 
-namespace vlx_math {  // vlx_math namespace
+namespace vlx_math {
 
 // Helper function for CDenseMatrix constructor
-// Not a static function; used in other files
 
-std::shared_ptr<CDenseMatrix>
-CDenseMatrix_from_numpy(const py::array_t<double>& arr)
+auto
+CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDenseMatrix>
 {
     // check dimension
 
@@ -81,11 +78,17 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
 
     // create CDenseMatrix from numpy array
 
-    std::vector<double> vec(arr.size());
+    auto nrows = static_cast<int>(arr.shape(0));
+
+    auto ncols = static_cast<int>(arr.shape(1));
+
+    CDenseMatrix submat(nrows, ncols);
+
+    auto submat_ptr = submat.values();
 
     if (c_style)
     {
-        std::memcpy(vec.data(), arr.data(), arr.size() * sizeof(double));
+        std::memcpy(submat_ptr, arr.data(), arr.size() * sizeof(double));
     }
     else if (f_style)
     {
@@ -93,321 +96,294 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
         {
             for (py::ssize_t j = 0; j < arr.shape(1); j++)
             {
-                vec.data()[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
+                submat_ptr[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
             }
         }
     }
 
-    int32_t nrows = static_cast<int32_t>(arr.shape(0));
-
-    int32_t ncols = static_cast<int32_t>(arr.shape(1));
-
-    return std::make_shared<CDenseMatrix>(vec, nrows, ncols);
+    return std::make_shared<CDenseMatrix>(submat);
 }
 
-// Helper function for CDense4DTensor constructor
-
-std::shared_ptr<CDense4DTensor>
-CDense4DTensor_from_numpy(const py::array_t<double>& arr)
+auto
+export_math(py::module &m) -> void
 {
-    // check dimension
+    // exposing enum from Matrix.hpp
+    // clang-format off
+    py::enum_<mat_t>(m, "mat_t")
+        .value("symmetric", mat_t::symmetric)
+        .value("antisymmetric", mat_t::antisymmetric)
+        .value("general", mat_t::general);
+    // clang-format on
+
+    // exposing functions from MathConst.hpp
+    m.def("pi_value", &mathconst::pi_value, "Gets PI value.");
+
+    // exposing functions from MatrixFunc.hpp
+    m.def(
+        "make_matrix",
+        [](const CMolecularBasis &basis, const mat_t mat_type) -> CMatrix {
+            return matfunc::make_matrix(basis, mat_type);
+        },
+        "Creates matrix for given basis.");
+    m.def(
+        "make_matrix",
+        [](const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrix {
+            return matfunc::make_matrix(bra_basis, ket_basis);
+        },
+        "Creates matrix for given pair of bases.");
+
+    // exposing functions from MatrixFunc.hpp
+    m.def(
+        "make_matrices",
+        [](const int order, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(std::array<int, 1>{order}, basis, mtype);
+        },
+        "Creates matrices for given basis.");
+    m.def(
+        "make_matrices",
+        [](const std::array<int, 2> orders, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(orders, basis, mtype);
+        },
+        "Creates matrices for given basis.");
+    m.def(
+        "make_matrices",
+        [](const std::array<int, 3> orders, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(orders, basis, mtype);
+        },
+        "Creates matrices for given basis.");
+    m.def(
+        "make_matrices",
+        [](const std::array<int, 4> orders, const CMolecularBasis &basis, const mat_t mtype) -> CMatrices {
+            return matfunc::make_matrices(orders, basis, mtype);
+        },
+        "Creates matrices for given basis.");
+    m.def(
+        "make_matrices",
+        [](const int order, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(std::array<int, 1>{order}, bra_basis, ket_basis);
+        },
+        "Creates matrices for given basis.");
+    m.def(
+        "make_matrices",
+        [](const std::array<int, 2> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(orders, bra_basis, ket_basis);
+        },
+        "Creates matrices for given basis.");
+    m.def(
+        "make_matrices",
+        [](const std::array<int, 3> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(orders, bra_basis, ket_basis);
+        },
+        "Creates matrices for given basis.");
+    m.def(
+        "make_matrices",
+        [](const std::array<int, 4> orders, const CMolecularBasis &bra_basis, const CMolecularBasis &ket_basis) -> CMatrices {
+            return matfunc::make_matrices(orders, bra_basis, ket_basis);
+        },
+        "Creates matrices for given basis.");
+
+    // CSubMatrix class
+    PyClass<CSubMatrix>(m, "SubMatrix")
+        .def(py::init<>())
+        .def(py::init<const CSubMatrix &>())
+        .def(py::init<const std::array<size_t, 4> &>())
+        .def(py::init<const std::array<size_t, 4> &, const double>())
+        .def(py::init<const std::vector<double> &, const std::array<size_t, 4> &>())
+        .def(py::pickle([](const CSubMatrix &submat) { return py::make_tuple(submat.get_values(), submat.get_dimensions()); },
+                        [](py::tuple t) { return CSubMatrix(t[0].cast<std::vector<double>>(), t[1].cast<std::array<size_t, 4>>()); }))
+        .def(
+            "at",
+            [](CSubMatrix &self, const std::pair<size_t, size_t> &index, const double value) -> void { self.at(index) = value; },
+            "Sets value of submatrix element using local indexing scheme.")
+        .def(
+            "at",
+            [](const CSubMatrix &self, const std::pair<size_t, size_t> &index) -> double { return self.at(index); },
+            "Gets value of submatrix element using local indexing scheme.")
+        .def("set_offsets", &CSubMatrix::set_offsets, "Sets offsets for rows and columns of submatrix in supermatrix.")
+        .def(
+            "set_values",
+            [](CSubMatrix &self, const py::array_t<double> &values) -> void {
+                if (values.ndim() == 2)
+                {
+                    const auto nrows = self.number_of_rows();
+                    const auto ncols = self.number_of_columns();
+                    if ((nrows == values.shape(0)) && (ncols == values.shape(1)))
+                    {
+                        std::ranges::for_each(views::rectangular(nrows, ncols),
+                                              [&](const auto &index) { self.at(index) = values.at(index.first, index.second); });
+                    }
+                }
+            },
+            "Sets values of submatrix using numpy array.")
+        .def("zero", &CSubMatrix::zero, "Sets values of submatrix to zero.")
+        .def("scale", &CSubMatrix::scale, "Scales values of submatrix by given factor.")
+        .def("symmetrize", &CSubMatrix::symmetrize, "Symmetrizes values of square submatrix.")
+        .def(
+            "to_numpy",
+            [](const CSubMatrix &self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.data(), {static_cast<int>(self.number_of_rows()), static_cast<int>(self.number_of_columns())});
+            },
+            "Converts submatrix to numpy array.")
+        .def("get_dimensions", &CSubMatrix::get_dimensions, "Gets dimensions of submatrix.")
+        .def("offset_of_rows", &CSubMatrix::offset_of_rows, "Gets offset of rows in submatrix.")
+        .def("offset_of_columns", &CSubMatrix::offset_of_columns, "Gets offset of columns in submatrix.")
+        .def("number_of_rows", &CSubMatrix::number_of_rows, "Gets number of rows in submatrix.")
+        .def("number_of_columns", &CSubMatrix::number_of_columns, "Gets number of columns in submatrix.")
+        .def("number_of_elements", &CSubMatrix::number_of_elements, "Gets number of elements in submatrix.")
+        .def("is_square", &CSubMatrix::is_square, "Checks if submatrix is square matrix")
+        .def("__setitem__", [](CSubMatrix &self, const std::pair<size_t, size_t> &index, const double value) { self[index] = value; })
+        .def("__getitem__", [](CSubMatrix &self, const std::pair<size_t, size_t> &index) { return self[index]; })
+        .def("__add__", [](const CSubMatrix &self, const CSubMatrix &other) { return self + other; })
+        .def("__eq__", [](const CSubMatrix &self, const CSubMatrix &other) { return self == other; })
+        .def("__ne__", [](const CSubMatrix &self, const CSubMatrix &other) { return self != other; })
+        .def("__copy__", [](const CSubMatrix &self) { return CSubMatrix(self); })
+        .def("__deepcopy__", [](const CSubMatrix &self, py::dict) { return CSubMatrix(self); });
+
+    // CMatrix class
+    PyClass<CMatrix>(m, "Matrix")
+        .def(py::init<>())
+        .def(py::init<const std::map<std::pair<int, int>, CSubMatrix> &, const mat_t>())
+        .def(py::init<const std::vector<std::pair<int, int>> &, const std::vector<CSubMatrix> &, const mat_t>())
+        .def(py::init<const CMatrix &>())
+        .def(py::pickle([](const CMatrix &mat) { return py::make_tuple(mat.get_type(), mat.angular_pairs(), mat.sub_matrices()); },
+                        [](py::tuple t) {
+                            return CMatrix(t[1].cast<std::vector<std::pair<int, int>>>(), t[2].cast<std::vector<CSubMatrix>>(), t[0].cast<mat_t>());
+                        }))
+        .def("add", py::overload_cast<const CSubMatrix &, const std::pair<int, int> &>(&CMatrix::add), "Adds submatrix to matrix.")
+        .def("add", py::overload_cast<const std::array<size_t, 4> &, const std::pair<int, int> &>(&CMatrix::add), "Adds submatrix to matrix.")
+        .def("set_type", &CMatrix::set_type, "Sets matrix type.")
+        .def("zero", &CMatrix::zero, "Sets values of matrix to zero.")
+        .def("scale", &CMatrix::scale, "Scales matrix values by factor.")
+        .def("symmetrize", &CMatrix::symmetrize, "Symmetrizes values of diagonal blocks of symmetric matrix.")
+        .def(
+            "set_values",
+            [](CMatrix &self, const py::array_t<double> &values) -> void {
+                if (values.ndim() == 2)
+                {
+                    const auto nrows = self.number_of_rows();
+                    const auto ncols = self.number_of_columns();
+                    if ((nrows == values.shape(0)) && (ncols == values.shape(1)))
+                    {
+                        std::ranges::for_each(self.angular_pairs(), [&](const auto &key) {
+                            auto       submat = self.sub_matrix(key);
+                            const auto dims   = submat->get_dimensions();
+                            std::ranges::for_each(views::rectangular(dims[2], dims[3]), [&](const auto &index) {
+                                submat->at(index) = values.at(index.first + dims[0], index.second + dims[1]);
+                            });
+                        });
+                    }
+                }
+            },
+            "Sets values of matrix using numpy array.")
+        .def("get_type", &CMatrix::get_type, "Gets matrix type.")
+        .def("angular_pairs", &CMatrix::angular_pairs, "Gets vector of angular pairs for stored submatrices.")
+        .def(
+            "submatrix",
+            [](const CMatrix &self, const std::pair<int, int> &angpair) -> CSubMatrix {
+                if (auto submat = self.sub_matrix(angpair); submat != nullptr)
+                {
+                    return *submat;
+                }
+                else
+                {
+                    return CSubMatrix();
+                }
+            },
+            "Gets specific submatrix from matrix.")
+        .def("is_angular_order", &CMatrix::is_angular_order, "Checks if submatrix with this angular pair is stored in matrix.")
+        .def("number_of_rows", &CMatrix::number_of_rows, "Number of rows in matrix.")
+        .def("number_of_columns", &CMatrix::number_of_columns, "Number of columns in matrix.")
+        .def(
+            "full_matrix",
+            [](const CMatrix &self) -> CSubMatrix { return self.full_matrix(); },
+            "Creates full matrix representation of matrix.")
+        .def(
+            "to_numpy",
+            [](const CMatrix &self) -> py::array_t<double> {
+                const auto mat = self.full_matrix();
+                return vlx_general::pointer_to_numpy(mat.data(), {static_cast<int>(mat.number_of_rows()), static_cast<int>(mat.number_of_columns())});
+            },
+            "Create full matrix representation of matrix and convert to numpy array.")
+        .def("__add__", [](const CMatrix &self, const CMatrix &other) { return self + other; })
+        .def("__eq__", [](const CMatrix &self, const CMatrix &other) { return self == other; })
+        .def("__ne__", [](const CMatrix &self, const CMatrix &other) { return self != other; })
+        .def("__copy__", [](const CMatrix &self) { return CMatrix(self); })
+        .def("__deepcopy__", [](const CMatrix &self, py::dict) { return CMatrix(self); });
+
+    // CMatrices class
+    PyClass<CMatrices>(m, "Matrices")
+        .def(py::init<>())
+        .def(py::init<const std::map<std::string, CMatrix> &>())
+        .def(py::init<const CMatrices &>())
+        .def("add", py::overload_cast<const CMatrix &, const std::string &>(&CMatrices::add), "Adds matrix to matrix.")
+        .def("add", py::overload_cast<const CMatrix &, const int>(&CMatrices::add), "Adds matrix to matrix.")
+        .def("zero", &CMatrices::zero, "Sets values of matrices to zero.")
+        .def("scale", &CMatrices::scale, "Scales matrices values by factor.")
+        .def("symmetrize", &CMatrices::symmetrize, "Symmetrizes values of diagonal blocks of symmetric matrices.")
+        .def("keys", &CMatrices::keys, "Gets vector of keys for stored matrices.")
+        .def(
+            "matrix",
+            [](const CMatrices &self, const std::string &label) -> CMatrix {
+                if (auto mat = self.matrix(label); mat != nullptr)
+                {
+                    return *mat;
+                }
+                else
+                {
+                    return CMatrix();
+                }
+            },
+            "Gets specific matrix from matrices.")
+        .def(
+            "matrix",
+            [](const CMatrices &self, const int key) -> CMatrix {
+                if (auto mat = self.matrix(key); mat != nullptr)
+                {
+                    return *mat;
+                }
+                else
+                {
+                    return CMatrix();
+                }
+            },
+            "Gets specific matrix from matrices.")
+        .def(
+            "matrix_to_numpy",
+            [](const CMatrices &self, const std::string& key) -> py::array_t<double> {
+                const auto matptr = self.matrix(key);
+                const auto mat = matptr->full_matrix();
+                return vlx_general::pointer_to_numpy(mat.data(), {static_cast<int>(mat.number_of_rows()), static_cast<int>(mat.number_of_columns())});
+            },
+            "Gets specific matrix from matrices and convert to numpy array.")
+        .def(
+            "matrix_to_numpy",
+            [](const CMatrices &self, const int key) -> py::array_t<double> {
+                const auto matptr = self.matrix(key);
+                const auto mat = matptr->full_matrix();
+                return vlx_general::pointer_to_numpy(mat.data(), {static_cast<int>(mat.number_of_rows()), static_cast<int>(mat.number_of_columns())});
+            },
+            "Gets specific matrix from matrices and convert to numpy array.")
+        .def("__eq__", [](const CMatrices &self, const CMatrices &other) { return self == other; })
+        .def("__ne__", [](const CMatrices &self, const CMatrices &other) { return self != other; })
+        .def("__copy__", [](const CMatrices &self) { return CMatrices(self); })
+        .def("__deepcopy__", [](const CMatrices &self, py::dict) { return CMatrices(self); });
 
-    std::string errdim("Dense4DTensor: Expecting a 4D numpy array");
-
-    errors::assertMsgCritical(arr.ndim() == 4, errdim);
-
-    if (arr.data() == nullptr || arr.size() == 0)
-    {
-        return std::make_shared<CDense4DTensor>();
-    }
-
-    // check that the numpy array is c-style contiguous
-
-    std::string errsrc("Dense4DTensor: Expecting a C-style contiguous numpy array");
-
-    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
-
-    errors::assertMsgCritical(c_style, errsrc);
-
-    // create CDense4DTensor from numpy array
-
-    std::vector<double> vec(arr.size());
-
-    std::memcpy(vec.data(), arr.data(), arr.size() * sizeof(double));
-
-    int32_t iIndex = static_cast<int32_t>(arr.shape(0));
-    int32_t jIndex = static_cast<int32_t>(arr.shape(1));
-    int32_t kIndex = static_cast<int32_t>(arr.shape(2));
-    int32_t lIndex = static_cast<int32_t>(arr.shape(3));
-
-    return std::make_shared<CDense4DTensor>(vec, iIndex, jIndex, kIndex, lIndex);
-}
-
-static py::array_t<double>
-c_matmul(const py::array_t<double>& A, const py::array_t<double>& B)
-{
-    // check dimension and shape
-
-    errors::assertMsgCritical(A.ndim() == 2, "c_matmul: Invalid shape of matrix A");
-
-    errors::assertMsgCritical(B.ndim() == 2, "c_matmul: Invalid shape of matrix B");
-
-    auto nrow_A = A.shape(0);
-
-    auto ncol_A = A.shape(1);
-
-    auto nrow_B = B.shape(0);
-
-    auto ncol_B = B.shape(1);
-
-    errors::assertMsgCritical(ncol_A == nrow_B, "c_matmul: Inconsistent sizes");
-
-    // check layout
-
-    auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
-
-    auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
-
-    errors::assertMsgCritical(c_style_A | f_style_A, "c_matmul: Matrix A is noncontiguous");
-
-    auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
-
-    auto f_style_B = py::detail::check_flags(B.ptr(), py::array::f_style);
-
-    errors::assertMsgCritical(c_style_B | f_style_B, "c_matmul: Matrix B is noncontiguous");
-
-    // check transpose
-
-    auto trans_A = CblasNoTrans;
-
-    auto lda_A = ncol_A;
-
-    if (f_style_A)
-    {
-        trans_A = CblasTrans;
-
-        lda_A = nrow_A;
-    }
-
-    auto trans_B = CblasNoTrans;
-
-    auto lda_B = ncol_B;
-
-    if (f_style_B)
-    {
-        trans_B = CblasTrans;
-
-        lda_B = nrow_B;
-    }
-
-    // compute matrix-matrix multiplication
-
-    py::array_t<double> C({nrow_A, ncol_B});
-
-    auto lda_C = ncol_B;
-
-    cblas_dgemm(CblasRowMajor, trans_A, trans_B, nrow_A, ncol_B, ncol_A, 1.0, A.data(), lda_A, B.data(), lda_B, 0.0, C.mutable_data(), lda_C);
-
-    return C;
-}
-
-static void
-c_dgemm(const std::string          layout_str,
-        const std::string          trans_A_str,
-        const std::string          trans_B_str,
-        const int32_t              m,
-        const int32_t              n,
-        const int32_t              k,
-        const double               alpha,
-        const py::array_t<double>& A,
-        const int32_t              lda_A,
-        const py::array_t<double>& B,
-        const int32_t              lda_B,
-        const double               beta,
-        py::array_t<double>&       C,
-        const int32_t              lda_C)
-{
-    auto layout = CblasRowMajor;
-
-    if (fstr::upcase(layout_str) == std::string("COL-MAJOR")) layout = CblasColMajor;
-
-    auto trans_A = CblasNoTrans;
-
-    if (fstr::upcase(trans_A_str) == std::string("T")) trans_A = CblasTrans;
-
-    auto trans_B = CblasNoTrans;
-
-    if (fstr::upcase(trans_B_str) == std::string("T")) trans_B = CblasTrans;
-
-    cblas_dgemm(layout, trans_A, trans_B, m, n, k, alpha, A.data(), lda_A, B.data(), lda_B, beta, C.mutable_data(), lda_C);
-}
-
-static py::array_t<double>
-c_multi_dot(const std::vector<py::array_t<double>>& matrices)
-{
-    py::array_t<double> prod(matrices[0]);
-
-    for (size_t i = 1; i < matrices.size(); i++)
-    {
-        auto prod_new = c_matmul(prod, matrices[i]);
-
-        prod = py::array_t<double>(prod_new);
-    }
-
-    return prod;
-}
-
-static py::array_t<double>
-c_outer(const py::array_t<double>& A, const py::array_t<double>& B)
-{
-    // check dimension and shape
-
-    errors::assertMsgCritical(A.ndim() == 1, "c_outer: Invalid shape of vector A");
-
-    errors::assertMsgCritical(B.ndim() == 1, "c_outer: Invalid shape of vector B");
-
-    auto m = A.shape(0);
-
-    auto n = B.shape(0);
-
-    // check layout
-
-    auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
-
-    auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
-
-    errors::assertMsgCritical(c_style_A & f_style_A, "c_outer: Vector A is noncontiguous");
-
-    auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
-
-    auto f_style_B = py::detail::check_flags(B.ptr(), py::array::f_style);
-
-    errors::assertMsgCritical(c_style_B & f_style_B, "c_outer: Vector B is noncontiguous");
-
-    // compute outer
-
-    py::array_t<double> C({m, n});
-
-    std::memset(C.mutable_data(), 0, sizeof(double) * C.size());
-
-    auto lda = n;
-
-    cblas_dger(CblasRowMajor, m, n, 1.0, A.data(), 1, B.data(), 1, C.mutable_data(), lda);
-
-    return C;
-}
-
-static py::list
-c_eigh(const py::array_t<double>& A)
-{
-    // check dimension and shape
-
-    errors::assertMsgCritical(A.ndim() == 2, "c_eigh: Invalid shape of matrix A");
-
-    auto nrow_A = A.shape(0);
-
-    auto ncol_A = A.shape(1);
-
-    errors::assertMsgCritical(ncol_A == nrow_A, "c_eigh: Matrix A is not symmetric");
-
-    // check layout
-
-    auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
-
-    auto f_style_A = py::detail::check_flags(A.ptr(), py::array::f_style);
-
-    errors::assertMsgCritical(c_style_A | f_style_A, "c_eigh: Matrix A is noncontiguous");
-
-    auto layout_A = LAPACK_ROW_MAJOR;
-
-    if (f_style_A) layout_A = LAPACK_COL_MAJOR;
-
-    // copy matrix into temporary storage
-
-    auto dim = nrow_A;
-
-    py::array_t<double> tmp_A({dim, dim});
-
-    std::memcpy(tmp_A.mutable_data(), A.data(), A.size() * sizeof(double));
-
-    // initialize eigenvalues and eigenvectors
-
-    py::array_t<double> eigenValues(dim);
-
-    py::array_t<double> eigenVectors({dim, dim});
-
-    // set up pointers to matrices and vectors
-
-    auto mat = tmp_A.mutable_data();
-
-    auto evecs = eigenVectors.mutable_data();
-
-    auto evals = eigenValues.mutable_data();
-
-    // temporary array for pivot data
-
-    CMemBlock<int32_t> idx(2 * dim);
-
-    // initialize number of eigenvalues
-
-    int32_t nval = 0;
-
-    // diagonalize matrix
-
-    auto st = LAPACKE_dsyevr(layout_A, 'V', 'A', 'U', dim, mat, dim, 0.0, 0.0, 0, 0, 1.0e-13, &nval, evals, evecs, dim, idx.data());
-
-    errors::assertMsgCritical(st == 0, "c_eigh: Diagonalization failed");
-
-    py::list result;
-
-    result.append(eigenValues);
-
-    result.append(eigenVectors);
-
-    return result;
-}
-
-// Exports classes/functions in src/math to python
-
-void
-export_math(py::module& m)
-{
     // CDenseMatrix class
-
     PyClass<CDenseMatrix>(m, "DenseMatrix")
         .def(py::init<>())
-        .def(py::init<const int32_t>())
-        .def(py::init<const int32_t, const int32_t>())
+        .def(py::init<const int, const int>())
         .def(py::init<const CDenseMatrix&>())
         .def(py::init(&CDenseMatrix_from_numpy))
-        .def("__str__", &CDenseMatrix::getString)
         .def("number_of_rows", &CDenseMatrix::getNumberOfRows, "Gets number of rows in dense matrix.")
         .def("number_of_columns", &CDenseMatrix::getNumberOfColumns, "Gets number of columns in dense matrix.")
         .def("symmetrize", &CDenseMatrix::symmetrize, "Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).")
-        .def("slice",
-             &CDenseMatrix::slice,
-             "Creates dense matrix object by slicing specified size submatrix at selected position from this dense matrix object.",
-             "iRow"_a,
-             "iColumn"_a,
-             "nRows"_a,
-             "nColumns"_a)
         .def(
             "to_numpy",
             [](const CDenseMatrix& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.values(), self.getNumberOfRows(), self.getNumberOfColumns());
+                return vlx_general::pointer_to_numpy(self.values(), {self.getNumberOfRows(), self.getNumberOfColumns()});
             },
             "Converts DenseMatrix to numpy array.")
         .def(py::self == py::self);
-
-    // exposing functions
-
-    m.def("mathconst_pi", &mathconst::getPiValue, "Gets value of PI constant.");
-
-    m.def("c_matmul", &c_matmul, "matmul for testing purposes.");
-    m.def("c_dgemm", &c_dgemm, "dgemm for testing purposes.");
-    m.def("c_multi_dot", &c_multi_dot, "multi_dot for testing purposes");
-    m.def("c_outer", &c_outer, "outer for testing purposes");
-    m.def("c_eigh", &c_eigh, "eigh for testing purposes");
 }
 
 }  // namespace vlx_math

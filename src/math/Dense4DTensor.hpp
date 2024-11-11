@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -26,49 +25,38 @@
 #ifndef Dense4DTensor_hpp
 #define Dense4DTensor_hpp
 
-#include <mpi.h>
-
-#include <cstdint>
-#include <ostream>
-#include <string>
 #include <vector>
-
-#include "MemBlock.hpp"
-#include "MpiFunc.hpp"
-#include "NumaPolicy.hpp"
 
 /**
  Class CDense4DTensor stores 4D tensor in coordinate format (zero-based
  indexing scheme).
-
- @author M. Delcey
  */
 class CDense4DTensor
 {
     /**
      The dimension of the first index.
      */
-    int32_t _iIndex;
+    int _iIndex;
 
     /**
      The dimension of the second index.
      */
-    int32_t _jIndex;
+    int _jIndex;
 
     /**
      The dimension of the third index.
      */
-    int32_t _kIndex;
+    int _kIndex;
 
     /**
      The dimension of the fourth index.
      */
-    int32_t _lIndex;
+    int _lIndex;
 
     /**
      The vector of tensor element values.
      */
-    CMemBlock<double> _values;
+    std::vector<double> _values;
 
    public:
     /**
@@ -85,7 +73,7 @@ class CDense4DTensor
      @param kIndex the dimension of the third index.
      @param lIndex the dimension of the fourth index.
      */
-    CDense4DTensor(const std::vector<double>& values, const int32_t iIndex, const int32_t jIndex, const int32_t kIndex, const int32_t lIndex);
+    CDense4DTensor(const std::vector<double>& values, const int iIndex, const int jIndex, const int kIndex, const int lIndex);
 
     /**
      Creates an empty tensor object with specific dimensions.
@@ -95,14 +83,14 @@ class CDense4DTensor
      @param kIndex the dimension of the third index.
      @param lIndex the dimension of the fourth index.
      */
-    CDense4DTensor(const int32_t iIndex, const int32_t jIndex, const int32_t kIndex, const int32_t lIndex);
+    CDense4DTensor(const int iIndex, const int jIndex, const int kIndex, const int lIndex);
 
     /**
      Creates an empty tensor object with all dimensions identical.
 
      @param nRows the number of rows in matrix.
      */
-    CDense4DTensor(const int32_t nRows);
+    CDense4DTensor(const int nRows);
 
     /**
      Creates a 4D tensor object by copying other 4D tensor object.
@@ -163,35 +151,35 @@ class CDense4DTensor
 
      @return the first index.
      */
-    int32_t getiIndex() const;
+    int getiIndex() const;
 
     /**
      Gets the dimension of the second index of the 4D tensor.
 
      @return the second index.
      */
-    int32_t getjIndex() const;
+    int getjIndex() const;
 
     /**
      Gets the dimension of the third index of the 4D tensor.
 
      @return the third index.
      */
-    int32_t getkIndex() const;
+    int getkIndex() const;
 
     /**
      Gets the dimension of the forth index of the 4D tensor.
 
      @return the fourth index.
      */
-    int32_t getlIndex() const;
+    int getlIndex() const;
 
     /**
      Gets number of elements in 4D tensor.
 
      @return the number of elements.
      */
-    int32_t getNumberOfElements() const;
+    int getNumberOfElements() const;
 
     /**
      Gets constant pointer to first element of 4D tensor.
@@ -206,30 +194,6 @@ class CDense4DTensor
      @return the pointer to first element of 4D tensor.
      */
     double* values();
-
-    /**
-     Gets string representation of 4D tensor object.
-
-     @return the string representation.
-     */
-    std::string getString() const;
-
-    /**
-     Broadcasts 4D tensor object within domain of MPI communicator.
-
-     @param rank the rank of MPI process.
-     @param comm the MPI communicator.
-     */
-    void broadcast(int32_t rank, MPI_Comm comm);
-
-    /**
-     Converts 4D tensor object to text output and insert it into output
-     text stream.
-
-     @param output the output text stream.
-     @param source the 4D tensor object.
-     */
-    friend std::ostream& operator<<(std::ostream& output, const CDense4DTensor& source);
 };
 
 #endif /* Dense4DTensor_hpp */

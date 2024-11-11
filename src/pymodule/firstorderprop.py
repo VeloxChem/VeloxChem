@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -27,10 +26,10 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import dipole_in_debye
 from .outputstream import OutputStream
+from .oneeints import compute_electric_dipole_integrals
 
 
 class FirstOrderProperties:
@@ -78,6 +77,7 @@ class FirstOrderProperties:
         :param scf_results:
             The dictionary containing SCF results.
         """
+
         if self.rank == mpi_master():
             total_density = scf_results['D_alpha'] + scf_results['D_beta']
         else:
@@ -99,39 +99,37 @@ class FirstOrderProperties:
 
         if molecule.get_charge() != 0:
             coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.elem_ids_to_numpy()
+            nuclear_charges = molecule.get_element_ids()
             origin = np.sum(coords.T * nuclear_charges,
                             axis=1) / np.sum(nuclear_charges)
         else:
             origin = np.zeros(3)
 
-        # dipole integrals
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_drv.origin = origin
-        dipole_mats = dipole_drv.compute(molecule, basis)
-
         dipole_moment = None
         if self.rank == mpi_master():
-            dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
-                           dipole_mats.z_to_numpy())
+            dipole_ints = compute_electric_dipole_integrals(
+                molecule, basis, origin)
 
             # electronic contribution
+
             # multiple states:
             if len(total_density.shape) > 2:
                 dof = total_density.shape[0]
                 electronic_dipole = np.zeros((dof, 3))
                 for i in range(dof):
-                    electronic_dipole[i] = -1.0 * np.array(
-                  [np.sum(dipole_ints[d] * total_density[i]) for d in range(3)])
+                    electronic_dipole[i] = np.array([
+                        np.sum(dipole_ints[d] * total_density[i])
+                        for d in range(3)
+                    ])
 
             # or single state:
             else:
-                electronic_dipole = -1.0 * np.array(
-                  [np.sum(dipole_ints[d] * total_density) for d in range(3)])
+                electronic_dipole = np.array(
+                    [np.sum(dipole_ints[d] * total_density) for d in range(3)])
 
             # nuclear contribution
             coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.elem_ids_to_numpy()
+            nuclear_charges = molecule.get_element_ids()
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 
@@ -195,8 +193,7 @@ class FirstOrderProperties:
                 valstr += '{:17.6f} Debye   '.format(dip_debye[i])
                 self.ostream.print_header(valstr)
         else:
-            index = 0
-            for s in states:
+            for index, s in enumerate(states):
                 self.ostream.print_blank()
                 state_text = 'Excited State %d' % s
                 self.ostream.print_header(state_text)
@@ -209,7 +206,6 @@ class FirstOrderProperties:
                     valstr += '{:17.6f} a.u.'.format(dip_au[i])
                     valstr += '{:17.6f} Debye   '.format(dip_debye[i])
                     self.ostream.print_header(valstr)
-                index += 1
 
         self.ostream.print_blank()
         self.ostream.flush()

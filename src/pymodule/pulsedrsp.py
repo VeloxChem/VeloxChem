@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -489,8 +488,8 @@ class PulsedResponse:
                 'Pulsed response module adjusts frequencies to intersect with 0'
             )
         zero_padded_frequencies = np.arange(0.0, frequencies[-1], dw)
-        truncated_frequencies = zero_padded_frequencies[
-            zero_padded_frequencies >= frequencies[0]]
+        truncated_frequencies = zero_padded_frequencies[zero_padded_frequencies
+                                                        >= frequencies[0]]
         return zero_padded_frequencies, truncated_frequencies
 
     def gauss_env_pulse_w(self, w, F0, t0, delta_t, w_carrier, cep):

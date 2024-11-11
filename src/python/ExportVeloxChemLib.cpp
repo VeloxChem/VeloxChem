@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -25,36 +24,36 @@
 
 #include <pybind11/pybind11.h>
 
-#include "ExportDFT.hpp"
+#include "ExportDft.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
-#include "ExportMolData.hpp"
-#include "ExportOneInts.hpp"
-#include "ExportOrbData.hpp"
-#include "ExportResponse.hpp"
-#include "ExportTwoInts.hpp"
+#include "ExportMoldata.hpp"
+#include "ExportOneElecInts.hpp"
+#include "ExportOrbdata.hpp"
 #include "ExportVisualization.hpp"
-#include "ExportXTB.hpp"
+#include "ExportXtb.hpp"
+#include "ExportT2CIntegrals.hpp"
+#include "ExportT4CIntegrals.hpp"
 
 PYBIND11_MODULE(veloxchemlib, m)
 {
     vlx_general::export_general(m);
 
+    vlx_math::export_math(m);
+
     vlx_moldata::export_moldata(m);
 
     vlx_orbdata::export_orbdata(m);
 
-    vlx_oneints::export_oneints(m);
+    vlx_dft::export_dft(m);
 
-    vlx_twoints::export_twoints(m);
-
-    vlx_math::export_math(m);
+    vlx_oneeints::export_oneeints(m);
 
     vlx_visualization::export_visualization(m);
 
-    vlx_response::export_response(m);
-
-    vlx_dft::export_dft(m);
-
     vlx_xtb::export_xtb(m);
+
+    vlx_t2cintegrals::export_t2cintegrals(m);
+
+    vlx_t4cintegrals::export_t4cintegrals(m);
 }

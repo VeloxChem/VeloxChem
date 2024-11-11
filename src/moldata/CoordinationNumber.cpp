@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -28,6 +27,8 @@
 
 #include "CoordinationNumber.hpp"
 
+#include <cmath>
+
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
 #include "MathConst.hpp"
@@ -35,8 +36,8 @@
 
 namespace coordnum {  // coordnum namespace
 
-std::vector<double>
-getCovalentRadius()
+auto
+getCovalentRadius() -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -76,16 +77,16 @@ getCovalentRadius()
     return cn;
 }
 
-std::vector<double>
-getCoordinationNumber(const CMolecule& molecule)
+auto
+getCoordinationNumber(const CMolecule& molecule) -> std::vector<double>
 {
     CDenseMatrix dcndr;
 
     return getCoordinationNumber(molecule, dcndr);
 }
 
-std::vector<double>
-getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
+auto
+getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -99,21 +100,17 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
 
     const double cnmax = 8.0;
 
-    const double sqrtpi = std::sqrt(mathconst::getPiValue());
+    const double sqrtpi = std::sqrt(mathconst::pi_value());
 
     auto covalent_radius = getCovalentRadius();
 
     // get molecular information
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
-    auto ids_elem = molecule.getIdsElemental();
+    auto ids_elem = molecule.identifiers();
 
-    auto xcoord = molecule.getCoordinatesX();
-
-    auto ycoord = molecule.getCoordinatesY();
-
-    auto zcoord = molecule.getCoordinatesZ();
+    auto xyzcoord = molecule.coordinates("bohr");
 
     // compute coordination numbers with error function
 
@@ -128,11 +125,15 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
         errors::assertMsgCritical(dcndr.getNumberOfColumns() == natoms, err_size);
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < i; j++)
+        const auto rixyz = xyzcoord[i].coordinates();
+
+        for (int j = 0; j < i; j++)
         {
-            std::vector<double> rij({xcoord[j] - xcoord[i], ycoord[j] - ycoord[i], zcoord[j] - zcoord[i]});
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rjxyz[0] - rixyz[0], rjxyz[1] - rixyz[1], rjxyz[2] - rixyz[2]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
@@ -154,11 +155,11 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
 
             if (dcndr.getNumberOfElements() > 0)
             {
-                for (int32_t d = 0; d < 3; d++)
+                for (int d = 0; d < 3; d++)
                 {
-                    int32_t di = d * natoms + i;
+                    auto di = d * natoms + i;
 
-                    int32_t dj = d * natoms + j;
+                    auto dj = d * natoms + j;
 
                     dcndr.values()[di * natoms + i] += dcn_val * rij[d] / r;
 
@@ -174,20 +175,20 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
 
     // apply cutoff function for large coordination numbers
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         double dcnpdcn = std::exp(cnmax) / (std::exp(cnmax) + std::exp(cn[i]));
 
         if (dcndr.getNumberOfElements() > 0)
         {
-            for (int32_t dj = 0; dj < 3 * natoms; dj++)
+            for (int dj = 0; dj < 3 * natoms; dj++)
             {
                 dcndr.values()[dj * natoms + i] *= dcnpdcn;
             }
         }
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
         cn[i] = std::log(1.0 + std::exp(cnmax)) - std::log(1.0 + std::exp(cnmax - cn[i]));
     }
@@ -195,8 +196,8 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
     return cn;
 }
 
-std::vector<double>
-getPaulingElectronegativity()
+auto
+getPaulingElectronegativity() -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -224,8 +225,8 @@ getPaulingElectronegativity()
     });
 }
 
-std::vector<double>
-getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
+auto
+getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -243,7 +244,7 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
 
     const double cn_thr = 1600.0;
 
-    const double sqrtpi = std::sqrt(mathconst::getPiValue());
+    const double sqrtpi = std::sqrt(mathconst::pi_value());
 
     auto covalent_radius = getCovalentRadius();
 
@@ -251,15 +252,11 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
 
     // get molecular information
 
-    auto natoms = molecule.getNumberOfAtoms();
+    auto natoms = molecule.number_of_atoms();
 
-    auto ids_elem = molecule.getIdsElemental();
+    auto ids_elem = molecule.identifiers();
 
-    auto xcoord = molecule.getCoordinatesX();
-
-    auto ycoord = molecule.getCoordinatesY();
-
-    auto zcoord = molecule.getCoordinatesZ();
+    auto xyzcoord = molecule.coordinates("bohr");
 
     // compute covalent coordination numbers
 
@@ -274,11 +271,15 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
         errors::assertMsgCritical(dcovcndr.getNumberOfColumns() == natoms, err_size);
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int i = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < i; j++)
+        const auto rixyz = xyzcoord[i].coordinates();
+
+        for (int j = 0; j < i; j++)
         {
-            std::vector<double> rij({xcoord[j] - xcoord[i], ycoord[j] - ycoord[i], zcoord[j] - zcoord[i]});
+            const auto rjxyz = xyzcoord[j].coordinates();
+
+            std::vector<double> rij({rjxyz[0] - rixyz[0], rjxyz[1] - rixyz[1], rjxyz[2] - rixyz[2]});
 
             double r2 = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
@@ -304,11 +305,11 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
 
             if (dcovcndr.getNumberOfElements() > 0)
             {
-                for (int32_t d = 0; d < 3; d++)
+                for (int d = 0; d < 3; d++)
                 {
-                    int32_t di = d * natoms + i;
+                    auto di = d * natoms + i;
 
-                    int32_t dj = d * natoms + j;
+                    auto dj = d * natoms + j;
 
                     dcovcndr.values()[di * natoms + i] -= dcovcn_val * rij[d] / r;
 

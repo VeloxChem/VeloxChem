@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -34,6 +33,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .molecule import Molecule
+from .profiler import Profiler
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -77,8 +77,13 @@ class OptimizationEngine(geometric.engine.Engine):
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
 
+        self._debug = False
+
     def lower(self):
-        """ Required in order to get MECI optimization working in geomeTRIC"""
+        """
+        Required in order to get MECI optimization working in geomeTRIC
+        """
+
         return 'custom engine'
 
     def calc_new(self, coords, dirname):
@@ -99,23 +104,34 @@ class OptimizationEngine(geometric.engine.Engine):
         labels = self.molecule.get_labels()
 
         if self.rank == mpi_master():
-            new_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au')
             new_mol.set_charge(self.molecule.get_charge())
             new_mol.set_multiplicity(self.molecule.get_multiplicity())
         else:
             new_mol = Molecule()
-        new_mol.broadcast(self.rank, self.comm)
+        new_mol = self.comm.bcast(new_mol, root=mpi_master())
 
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
-        self.grad_drv.ostream.mute()
+        if self._debug:
+            profiler = Profiler()
+            self.grad_drv.ostream.print_blank()
+            self.grad_drv.ostream.print_info(
+                '==DEBUG==   available memory before gradient: ' +
+                profiler.get_available_memory())
+            self.grad_drv.ostream.print_blank()
+            self.grad_drv.ostream.flush()
+
+        if not self._debug:
+            self.grad_drv.ostream.mute()
 
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
-        self.grad_drv.ostream.unmute()
+        if not self._debug:
+            self.grad_drv.ostream.unmute()
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())
@@ -132,6 +148,14 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.print_info(valstr)
             valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
             self.grad_drv.ostream.print_info(valstr)
+            self.grad_drv.ostream.print_blank()
+            self.grad_drv.ostream.flush()
+
+        if self._debug:
+            profiler = Profiler()
+            self.grad_drv.ostream.print_info(
+                '==DEBUG==   available memory after  gradient: ' +
+                profiler.get_available_memory())
             self.grad_drv.ostream.print_blank()
             self.grad_drv.ostream.flush()
 

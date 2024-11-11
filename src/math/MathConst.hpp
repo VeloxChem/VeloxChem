@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -28,13 +27,10 @@
 
 namespace mathconst {  // mathconst namespace
 
-/**
- Gets value of PI constant.
-
- @return the PI constant.
- */
-inline double
-getPiValue()
+/// @brief Gets standard value of pi constant.
+/// @return The value of pi constant.
+constexpr auto
+pi_value() -> double
 {
     return 3.14159265358979323846;
 }

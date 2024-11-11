@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -26,421 +25,93 @@
 
 def get_uff_parameters():
     """
-    Initialize UFF parameters.
+    Initialize UFF parameters. Reference: A. K. Rappé, C. J. Casewit, K. S.
+    Colwell, W. A. Goddard III, W. M. Skiff, J. Am. Chem. Soc. 1992, 114,
+    10024-10035.
 
     :return:
         A dictionary containing UFF parameters.
     """
 
-    uff_parameters = {
-        'hx': {
-            'sigma': 0.2886,
-            'epsilon': 0.1839
-        },
-        'cx': {
-            'sigma': 0.3851,
-            'epsilon': 0.4389
-        },
-        'nx': {
-            'sigma': 0.3662,
-            'epsilon': 0.3219
-        },
-        'ox': {
-            'sigma': 0.3405,
-            'epsilon': 0.4013
-        },
-        'px': {
-            'sigma': 0.415,
-            'epsilon': 0.1338
-        },
-        'sx': {
-            'sigma': 0.403,
-            'epsilon': 0.1437
-        },
-        'He': {
-            'sigma': 0.2104,
-            'epsilon': 0.2343
-        },
-        'Li': {
-            'sigma': 0.2184,
-            'epsilon': 0.1046
-        },
-        'Be': {
-            'sigma': 0.2446,
-            'epsilon': 0.3556
-        },
-        'B': {
-            'sigma': 0.3638,
-            'epsilon': 0.7531
-        },
-        'F': {
-            'sigma': 0.2997,
-            'epsilon': 0.2092
-        },
-        'Na': {
-            'sigma': 0.2658,
-            'epsilon': 0.1255
-        },
-        'Mg': {
-            'sigma': 0.2691,
-            'epsilon': 0.4644
-        },
-        'Al': {
-            'sigma': 0.4008,
-            'epsilon': 2.1128
-        },
-        'Si': {
-            'sigma': 0.3826,
-            'epsilon': 1.6819
-        },
-        'Cl': {
-            'sigma': 0.3516,
-            'epsilon': 0.9497
-        },
-        'Ar': {
-            'sigma': 0.3446,
-            'epsilon': 0.774
-        },
-        'K': {
-            'sigma': 0.3396,
-            'epsilon': 0.1464
-        },
-        'Ca': {
-            'sigma': 0.3028,
-            'epsilon': 0.9957
-        },
-        'Sc': {
-            'sigma': 0.2936,
-            'epsilon': 0.0795
-        },
-        'Ti': {
-            'sigma': 0.2829,
-            'epsilon': 0.0711
-        },
-        'V': {
-            'sigma': 0.2801,
-            'epsilon': 0.0669
-        },
-        'Cr': {
-            'sigma': 0.2693,
-            'epsilon': 0.0628
-        },
-        'Mn': {
-            'sigma': 0.2638,
-            'epsilon': 0.0544
-        },
-        'Fe': {
-            'sigma': 0.2594,
-            'epsilon': 0.0544
-        },
-        'Co': {
-            'sigma': 0.2559,
-            'epsilon': 0.0586
-        },
-        'Ni': {
-            'sigma': 0.2525,
-            'epsilon': 0.0628
-        },
-        'Cu': {
-            'sigma': 0.3114,
-            'epsilon': 0.0209
-        },
-        'Zn': {
-            'sigma': 0.2462,
-            'epsilon': 0.5188
-        },
-        'Ga': {
-            'sigma': 0.3905,
-            'epsilon': 1.7363
-        },
-        'Ge': {
-            'sigma': 0.3813,
-            'epsilon': 1.5856
-        },
-        'As': {
-            'sigma': 0.3769,
-            'epsilon': 1.2928
-        },
-        'Se': {
-            'sigma': 0.3746,
-            'epsilon': 1.2175
-        },
-        'Br': {
-            'sigma': 0.3732,
-            'epsilon': 1.0501
-        },
-        'Kr': {
-            'sigma': 0.3689,
-            'epsilon': 0.9204
-        },
-        'Rb': {
-            'sigma': 0.3665,
-            'epsilon': 0.1674
-        },
-        'Sr': {
-            'sigma': 0.3244,
-            'epsilon': 0.9832
-        },
-        'Y': {
-            'sigma': 0.298,
-            'epsilon': 0.3012
-        },
-        'Zr': {
-            'sigma': 0.2783,
-            'epsilon': 0.2887
-        },
-        'Nb': {
-            'sigma': 0.282,
-            'epsilon': 0.2468
-        },
-        'Mo': {
-            'sigma': 0.2719,
-            'epsilon': 0.2343
-        },
-        'Tc': {
-            'sigma': 0.2671,
-            'epsilon': 0.2008
-        },
-        'Ru': {
-            'sigma': 0.264,
-            'epsilon': 0.2343
-        },
-        'Rh': {
-            'sigma': 0.2609,
-            'epsilon': 0.2217
-        },
-        'Pd': {
-            'sigma': 0.2583,
-            'epsilon': 0.2008
-        },
-        'Ag': {
-            'sigma': 0.2805,
-            'epsilon': 0.1506
-        },
-        'Cd': {
-            'sigma': 0.2537,
-            'epsilon': 0.9539
-        },
-        'In': {
-            'sigma': 0.3976,
-            'epsilon': 2.5061
-        },
-        'Sn': {
-            'sigma': 0.3913,
-            'epsilon': 2.3722
-        },
-        'Sb': {
-            'sigma': 0.3938,
-            'epsilon': 1.8785
-        },
-        'Te': {
-            'sigma': 0.3982,
-            'epsilon': 1.6651
-        },
-        'I': {
-            'sigma': 0.4009,
-            'epsilon': 1.4183
-        },
-        'Xe': {
-            'sigma': 0.3924,
-            'epsilon': 1.389
-        },
-        'Cs': {
-            'sigma': 0.4024,
-            'epsilon': 0.1883
-        },
-        'Ba': {
-            'sigma': 0.3299,
-            'epsilon': 1.5229
-        },
-        'La': {
-            'sigma': 0.3138,
-            'epsilon': 0.0711
-        },
-        'Ce': {
-            'sigma': 0.3168,
-            'epsilon': 0.0544
-        },
-        'Pr': {
-            'sigma': 0.3213,
-            'epsilon': 0.0418
-        },
-        'Nd': {
-            'sigma': 0.3185,
-            'epsilon': 0.0418
-        },
-        'Pm': {
-            'sigma': 0.316,
-            'epsilon': 0.0377
-        },
-        'Sm': {
-            'sigma': 0.3136,
-            'epsilon': 0.0335
-        },
-        'Eu': {
-            'sigma': 0.3112,
-            'epsilon': 0.0335
-        },
-        'Gd': {
-            'sigma': 0.3001,
-            'epsilon': 0.0377
-        },
-        'Tb': {
-            'sigma': 0.3074,
-            'epsilon': 0.0293
-        },
-        'Dy': {
-            'sigma': 0.3054,
-            'epsilon': 0.0293
-        },
-        'Ho': {
-            'sigma': 0.3037,
-            'epsilon': 0.0293
-        },
-        'Er': {
-            'sigma': 0.3021,
-            'epsilon': 0.0293
-        },
-        'Tm': {
-            'sigma': 0.3006,
-            'epsilon': 0.0251
-        },
-        'Yb': {
-            'sigma': 0.2989,
-            'epsilon': 0.9539
-        },
-        'Lu': {
-            'sigma': 0.3243,
-            'epsilon': 0.1715
-        },
-        'Hf': {
-            'sigma': 0.2798,
-            'epsilon': 0.3012
-        },
-        'Ta': {
-            'sigma': 0.2824,
-            'epsilon': 0.3389
-        },
-        'W': {
-            'sigma': 0.2734,
-            'epsilon': 0.2803
-        },
-        'Re': {
-            'sigma': 0.2632,
-            'epsilon': 0.2761
-        },
-        'Os': {
-            'sigma': 0.278,
-            'epsilon': 0.1548
-        },
-        'Ir': {
-            'sigma': 0.253,
-            'epsilon': 0.3054
-        },
-        'Pt': {
-            'sigma': 0.2454,
-            'epsilon': 0.3347
-        },
-        'Au': {
-            'sigma': 0.2934,
-            'epsilon': 0.1632
-        },
-        'Hg': {
-            'sigma': 0.241,
-            'epsilon': 1.6108
-        },
-        'Tl': {
-            'sigma': 0.3873,
-            'epsilon': 2.845
-        },
-        'Pb': {
-            'sigma': 0.3828,
-            'epsilon': 2.7738
-        },
-        'Bi': {
-            'sigma': 0.3893,
-            'epsilon': 2.1672
-        },
-        'Po': {
-            'sigma': 0.4195,
-            'epsilon': 1.3597
-        },
-        'At': {
-            'sigma': 0.4232,
-            'epsilon': 1.1882
-        },
-        'Rn': {
-            'sigma': 0.4245,
-            'epsilon': 1.0376
-        },
-        'Fr': {
-            'sigma': 0.4365,
-            'epsilon': 0.2092
-        },
-        'Ra': {
-            'sigma': 0.3276,
-            'epsilon': 1.6902
-        },
-        'Ac': {
-            'sigma': 0.3099,
-            'epsilon': 0.1381
-        },
-        'Th': {
-            'sigma': 0.3025,
-            'epsilon': 0.1088
-        },
-        'Pa': {
-            'sigma': 0.305,
-            'epsilon': 0.092
-        },
-        'U': {
-            'sigma': 0.3025,
-            'epsilon': 0.092
-        },
-        'Np': {
-            'sigma': 0.305,
-            'epsilon': 0.0795
-        },
-        'Pu': {
-            'sigma': 0.305,
-            'epsilon': 0.0669
-        },
-        'Am': {
-            'sigma': 0.3012,
-            'epsilon': 0.0586
-        },
-        'Cm': {
-            'sigma': 0.2963,
-            'epsilon': 0.0544
-        },
-        'Bk': {
-            'sigma': 0.2975,
-            'epsilon': 0.0544
-        },
-        'Cf': {
-            'sigma': 0.2952,
-            'epsilon': 0.0544
-        },
-        'Es': {
-            'sigma': 0.2939,
-            'epsilon': 0.0502
-        },
-        'Fm': {
-            'sigma': 0.2927,
-            'epsilon': 0.0502
-        },
-        'Md': {
-            'sigma': 0.2917,
-            'epsilon': 0.046
-        },
-        'No': {
-            'sigma': 0.2894,
-            'epsilon': 0.046
-        },
-        'Lw': {
-            'sigma': 0.2883,
-            'epsilon': 0.046
-        },
-    }
+    periodic_table = [
+        'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al',
+        'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn',
+        'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb',
+        'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In',
+        'Sn', 'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm',
+        'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', 'Hf', 'Ta',
+        'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At',
+        'Rn', 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
+        'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt',
+        'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
+    ]
+
+    # H-Zn
+    uff_x_values = [
+        2.886, 2.362, 2.451, 2.745, 4.083, 3.851, 3.660, 3.500, 3.364, 3.243,
+        2.983, 3.021, 4.499, 4.295, 4.147, 4.035, 3.947, 3.868, 3.812, 3.399,
+        3.295, 3.175, 3.144, 3.023, 2.961, 2.912, 2.872, 2.834, 3.495, 2.763
+    ]
+
+    # Ga-Nd
+    uff_x_values += [
+        4.383, 4.280, 4.230, 4.205, 4.189, 4.141, 4.114, 3.641, 3.345, 3.124,
+        3.165, 3.052, 2.998, 2.963, 2.929, 2.899, 3.148, 2.848, 4.463, 4.392,
+        4.420, 4.470, 4.500, 4.404, 4.517, 3.703, 3.522, 3.556, 3.606, 3.575
+    ]
+
+    # Pm-Th
+    uff_x_values += [
+        3.547, 3.520, 3.493, 3.368, 3.451, 3.428, 3.409, 3.391, 3.374, 3.355,
+        3.640, 3.141, 3.170, 3.069, 2.954, 3.120, 2.840, 2.754, 3.293, 2.705,
+        4.347, 4.297, 4.370, 4.709, 4.750, 4.765, 4.900, 3.677, 3.478, 3.396
+    ]
+
+    # Pa-No
+    uff_x_values += [
+        3.424, 3.395, 3.424, 3.424, 3.381, 3.326, 3.339, 3.313, 3.299, 3.286,
+        3.274, 3.248
+    ]
+
+    # H-Zn
+    uff_D_values = [
+        0.044, 0.056, 0.025, 0.085, 0.180, 0.105, 0.069, 0.060, 0.050, 0.042,
+        0.030, 0.111, 0.505, 0.402, 0.305, 0.274, 0.227, 0.185, 0.035, 0.238,
+        0.019, 0.017, 0.016, 0.015, 0.013, 0.013, 0.014, 0.015, 0.005, 0.124
+    ]
+
+    # Ga-Nd
+    uff_D_values += [
+        0.415, 0.379, 0.309, 0.291, 0.251, 0.220, 0.040, 0.235, 0.072, 0.069,
+        0.059, 0.056, 0.048, 0.056, 0.053, 0.048, 0.036, 0.228, 0.599, 0.567,
+        0.449, 0.398, 0.339, 0.332, 0.045, 0.364, 0.017, 0.013, 0.010, 0.010
+    ]
+
+    # Pm-Th
+    uff_D_values += [
+        0.009, 0.008, 0.008, 0.009, 0.007, 0.007, 0.007, 0.007, 0.006, 0.228,
+        0.041, 0.072, 0.081, 0.067, 0.066, 0.037, 0.073, 0.080, 0.039, 0.385,
+        0.680, 0.663, 0.518, 0.325, 0.284, 0.248, 0.050, 0.404, 0.033, 0.026
+    ]
+
+    # Pa-No
+    uff_D_values += [
+        0.022, 0.022, 0.019, 0.016, 0.014, 0.013, 0.013, 0.013, 0.012, 0.012,
+        0.011, 0.011
+    ]
+
+    uff_parameters = {}
+
+    for idx, (x, D) in enumerate(zip(uff_x_values, uff_D_values)):
+        key = periodic_table[idx]
+
+        # rename C to cx, H to hx, etc.
+        if key in ['C', 'H', 'O', 'N', 'S', 'P']:
+            key = key.lower() + 'x'
+
+        sigma = 0.1 * x / 2.0**(1.0 / 6.0)
+        epsilon = D * 4.184
+
+        uff_parameters[key] = {'sigma': sigma, 'epsilon': epsilon}
 
     return uff_parameters

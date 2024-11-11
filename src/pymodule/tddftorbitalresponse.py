@@ -1,11 +1,33 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
 from .veloxchemlib import XCIntegrator
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
@@ -194,7 +216,7 @@ class TddftOrbitalResponse(CphfSolver):
 
             # 1) Calculate unrelaxed one-particle and transition density matrix
             ovlp = scf_tensors['S']
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
 
             nocc = molecule.number_of_alpha_electrons()
             mo_occ = mo[:, :nocc].copy()
@@ -276,7 +298,6 @@ class TddftOrbitalResponse(CphfSolver):
                          + list(x_minus_y_ao) )
   
             # 2) Construct the right-hand side
-            dm_ao_rhs = AODensityMatrix(dm_ao_list, denmat.rest)
 
             if self._dft:
                 # 3) Construct density matrices for E[3] term:
@@ -299,94 +320,67 @@ class TddftOrbitalResponse(CphfSolver):
                     zero_dm_ao_list.extend([0 * x_minus_y_ao[s],
                                             0 * x_minus_y_ao[s]])
 
-                perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
-                                                  denmat.rest)
-
-                # corresponds to rho^{omega_b,omega_c} in quadratic response,
-                # which is zero for TDDFT orbital response
-                zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
         else:
             dof = None
-            dm_ao_rhs = AODensityMatrix()
+            dm_ao_list = None
+
             if self._dft:
-                perturbed_dm_ao = AODensityMatrix()
-                zero_dm_ao =  AODensityMatrix()
+                perturbed_dm_ao_list = None
+                zero_dm_ao_list =  None
 
         dof = self.comm.bcast(dof, root=mpi_master())
-        dm_ao_rhs.broadcast(self.rank, self.comm)
+
+        if self._dft:
+            # TODO: bcast array by array
+            perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list, root=mpi_master())
+            # TODO: bcast array by array
+            dm_ao_list = self.comm.bcast(dm_ao_list, root=mpi_master())
+            # TODO: bcast array by array
+            # TODO: consider only bcast size of zero dm
+            zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
+
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        # Fock matrices with corresponding type
-        fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
-
-        # Set the vector-related components to general Fock matrix
-        # (not 1PDM part)
-        for ifock in range(dof, 3*dof):
-            fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
+        fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis,
+                          eri_dict, dft_dict, pe_dict, self.profiler)
 
         if self._dft:
-            perturbed_dm_ao.broadcast(self.rank, self.comm)
-            zero_dm_ao.broadcast(self.rank, self.comm)
             # Fock matrix for computing gxc
-            fock_gxc_ao = AOFockMatrix(zero_dm_ao)
-            if self.xcfun.is_hybrid():
-                fact_xc = self.xcfun.get_frac_exact_exchange()
-                for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
-                    fock_ao_rhs.set_scale_factor(fact_xc, ifock)
-                    fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
-                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                    fock_gxc_ao.set_scale_factor(fact_xc, ifock)
-                    fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
-                for ifock in range(dof):
-                    fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
-                for ifock in range(dof, 3*dof):
-                    fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
-            else:
-                for ifock in range(dof):
-                    fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
-                for ifock in range(dof, 3*dof):
-                    fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
-                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                    fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
+            fock_gxc_ao = []
+            for i_mat in range(len(zero_dm_ao_list)):
+                fock_gxc_ao.append(zero_dm_ao_list[i_mat].copy())
         else:
             fock_gxc_ao = None
 
         if self._dft:
-            if not self.xcfun.is_hybrid():
-                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                    fock_gxc_ao.scale(2.0, ifock)
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv = XCIntegrator()
-            molgrid.partition_grid_points()
-            molgrid.distribute_counts_and_displacements(self.rank,
-                                                self.nodes, self.comm)
+            #molgrid.partition_grid_points()
+            #molgrid.distribute_counts_and_displacements(self.rank,
+            #                                    self.nodes, self.comm)
             xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis, 
-                                      perturbed_dm_ao, zero_dm_ao,
+                                      perturbed_dm_ao_list, zero_dm_ao_list,
                                       gs_density, molgrid,
                                       self.xcfun.get_func_label(), "qrf")
 
-            fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
-
-        self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis,
-                          eri_dict, dft_dict, pe_dict, self.profiler)
+            for idx in range(len(fock_gxc_ao)):
+                fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx], root=mpi_master())
 
         # Calculate the RHS and transform it to the MO basis
         if self.rank == mpi_master():
             # Extract the 1PDM contributions
             fock_ao_rhs_1pdm = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_rhs_1pdm[ifock] = fock_ao_rhs.alpha_to_numpy(ifock)
+                fock_ao_rhs_1pdm[ifock] = fock_ao_rhs[ifock]
 
             # Extract the excitation vector contributions
             fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
             fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs.alpha_to_numpy(dof
-                                                                         + ifock)
-                fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs.alpha_to_numpy(2 * dof
-                                                                        + ifock)
+                fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs[dof + ifock]
+                fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs[2 * dof + ifock]
 
             # Transform to MO basis:
             rhs_mo = np.zeros((dof, nocc, nvir))
@@ -423,7 +417,7 @@ class TddftOrbitalResponse(CphfSolver):
                 gxc_ao = np.zeros((dof, nao, nao))
                 gxc_mo = np.zeros((dof, nocc, nvir))
                 for ifock in range(dof):
-                    gxc_ao[ifock] = fock_gxc_ao.alpha_to_numpy(2*ifock)
+                    gxc_ao[ifock] = fock_gxc_ao[2*ifock]
                     gxc_mo[ifock] = np.linalg.multi_dot([mo_occ.T, gxc_ao[ifock],
                                                          mo_vir])
                 rhs_mo += 0.25 * gxc_mo
@@ -471,14 +465,14 @@ class TddftOrbitalResponse(CphfSolver):
             # Get overlap, MO coefficients from scf_tensors
             ovlp = scf_tensors['S']
             nocc = molecule.number_of_alpha_electrons()
-            mo = scf_tensors['C']
+            mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nocc = mo_occ.shape[1]
             nvir = mo_vir.shape[1]
             nao = mo_occ.shape[0]
 
-            mo_energies = scf_tensors['E']
+            mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             evir = mo_energies[nocc:]
             eo_diag = np.diag(eocc)
@@ -503,10 +497,8 @@ class TddftOrbitalResponse(CphfSolver):
             fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
             fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_rhs_x_plus_y[ifock] = (
-                        fock_ao_rhs.alpha_to_numpy(ifock+dof) )
-                fock_ao_rhs_x_minus_y[ifock] = (
-                        fock_ao_rhs.alpha_to_numpy(ifock+2*dof) )
+                fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs[ifock+dof]
+                fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs[ifock+2*dof]
 
             Fp1_vv = np.zeros((dof, nao, nao))
             Fm1_vv = np.zeros((dof, nao, nao))
@@ -550,14 +542,12 @@ class TddftOrbitalResponse(CphfSolver):
                 for x in range(dof)
             ])
             lambda_ao_list = list([lambda_ao[s] for s in range(dof)])
-            ao_density_lambda = AODensityMatrix(lambda_ao_list, denmat.rest)
         else:
-            ao_density_lambda = AODensityMatrix()
+            lambda_ao_list = None
 
-        ao_density_lambda.broadcast(self.rank, self.comm)
-        fock_lambda = AOFockMatrix(ao_density_lambda)
+        lambda_ao_list = self.comm.bcast(lambda_ao_list, root=mpi_master())
 
-        self._comp_lr_fock(fock_lambda, ao_density_lambda, molecule, basis,
+        fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
                            eri_dict, dft_dict, pe_dict, self.profiler)
 
         if self.rank == mpi_master():
@@ -566,8 +556,8 @@ class TddftOrbitalResponse(CphfSolver):
             fock_ao_lambda_np = np.zeros((dof, nao, nao))
             fock_ao_rhs_1pdm = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_lambda_np[ifock] = fock_lambda.alpha_to_numpy(ifock)
-                fock_ao_rhs_1pdm[ifock] = fock_ao_rhs.alpha_to_numpy(ifock)
+                fock_ao_lambda_np[ifock] = fock_lambda[ifock]
+                fock_ao_rhs_1pdm[ifock] = fock_ao_rhs[ifock]
 
             fmat = (fock_ao_lambda_np + fock_ao_lambda_np.transpose(0,2,1)
                     + 0.5 * fock_ao_rhs_1pdm)
@@ -627,7 +617,7 @@ class TddftOrbitalResponse(CphfSolver):
             if fock_gxc_ao is not None:
                 factor = -0.25
                 for ifock in range(dof):
-                    fock_gxc_ao_np = fock_gxc_ao.alpha_to_numpy(2*ifock)
+                    fock_gxc_ao_np = fock_gxc_ao[2*ifock]
                     omega[ifock] += factor * np.linalg.multi_dot([
                         D_occ, fock_gxc_ao_np, D_occ
                         ])

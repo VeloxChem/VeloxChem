@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -31,7 +30,7 @@ namespace units {  // units namespace
 // https://physics.nist.gov/cuu/Constants/Table/allascii.txt
 
 double
-getBohrValueInAngstroms()
+bohr_in_angstrom()
 {
     // Bohr radius: 0.5291 772 109 03 e-10 [m]
 
@@ -39,7 +38,7 @@ getBohrValueInAngstroms()
 }
 
 double
-getHartreeValueInElectronVolts()
+hartree_in_ev()
 {
     // hartree-electron volt relationship: 27.211 386 245 988
 

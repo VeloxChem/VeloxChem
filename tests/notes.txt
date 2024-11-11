@@ -1,0 +1,9 @@
+Test cases with numerical issues: 
+
+- Nuclear Potential Geom 010 for oxygen at def2-QZVP (5.448375545578334e-13 diff.)
+- Kinetic Energy Geom 100 for carbon at def2-QZVP (1.2729817200352045e-12) 
+- Kinetic Energy Geom 200 for oxygen at def2-QZVP (1.3768985951401191e-12)
+- Kinetic Energy Geom 200 for carbon at def2-QZVP (1.3914425167627087e-12)
+- Kinetic Energy Geom 101 for carbon, oxygen at def2-QZVP (4.1795122918131256e-11)
+- Kinetic Energy Geom 101 for oxygen, carbon at def2-QZVP (1.7009380015586828e-12)
+

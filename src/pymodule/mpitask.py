@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -189,9 +188,12 @@ class MpiTask:
         if ('molecule' in self.input_dict and
             ('xyz' in self.input_dict['molecule'] or
              'xyzfile' in self.input_dict['molecule'])):
-            self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
-            self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
-            self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
+            self.molecule = self.mpi_comm.bcast(self.molecule,
+                                                root=mpi_master())
+            self.ao_basis = self.mpi_comm.bcast(self.ao_basis,
+                                                root=mpi_master())
+            self.min_basis = self.mpi_comm.bcast(self.min_basis,
+                                                 root=mpi_master())
 
     def finish(self):
         """

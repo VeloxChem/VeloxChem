@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -31,14 +30,13 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import (ElectricDipoleIntegralsDriver,
-                           LinearMomentumIntegralsDriver,
-                           AngularMomentumIntegralsDriver)
+from .oneeints import compute_electric_dipole_integrals
+from .veloxchemlib import (compute_linear_momentum_integrals,
+                           compute_angular_momentum_integrals)
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
-from .veloxchemlib import denmat, fockmat
+from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
-from .aofockmatrix import AOFockMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .linearsolver import LinearSolver
@@ -107,7 +105,7 @@ class TdaEigenSolver(LinearSolver):
         # NTO and detachment/attachment density
         self.nto = False
         self.nto_pairs = None
-        self.nto_cubes = True
+        self.nto_cubes = False
         self.detach_attach = False
         self.cube_origin = None
         self.cube_stepsize = None
@@ -276,16 +274,15 @@ class TdaEigenSolver(LinearSolver):
 
         for i in range(self.max_iter):
 
-            profiler.set_timing_key(f'Iteration {i+1}')
+            profiler.set_timing_key(f'Iteration {i + 1}')
 
             # perform linear transformation of trial vectors
 
             if i >= n_restart_iterations:
-                fock, tdens, gsdens = self._get_densities(
-                    trial_mat, scf_tensors, molecule)
-
-                self._comp_lr_fock(fock, tdens, molecule, basis, eri_dict,
-                                   dft_dict, pe_dict, profiler)
+                tdens = self._get_trans_densities(trial_mat, scf_tensors,
+                                                  molecule)
+                fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
+                                          dft_dict, pe_dict, profiler)
 
             profiler.start_timer('ReducedSpace')
 
@@ -312,7 +309,7 @@ class TdaEigenSolver(LinearSolver):
 
             profiler.stop_timer('ReducedSpace')
 
-            profiler.check_memory_usage(f'Iteration {i+1}')
+            profiler.check_memory_usage(f'Iteration {i + 1}')
 
             profiler.print_memory_tracing(self.ostream)
 
@@ -419,12 +416,12 @@ class TdaEigenSolver(LinearSolver):
                     lam_end = lam_start + min(mo_occ.shape[1], mo_vir.shape[1])
                     nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                    nto_h5_fname = f'{base_fname}_S{s+1}_NTO.h5'
+                    nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
                     nto_mo.write_hdf5(nto_h5_fname)
                     nto_h5_files.append(nto_h5_fname)
                 else:
                     nto_mo = MolecularOrbitals()
-                nto_mo.broadcast(self.rank, self.comm)
+                nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
 
                 if self.nto_cubes:
                     lam_diag, nto_cube_fnames = self.write_nto_cubes(
@@ -445,7 +442,7 @@ class TdaEigenSolver(LinearSolver):
                     dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
                 else:
                     dens_DA = AODensityMatrix()
-                dens_DA.broadcast(self.rank, self.comm)
+                dens_DA = dens_DA.broadcast(self.comm, root=mpi_master())
 
                 dens_cube_fnames = self.write_detach_attach_cubes(
                     cubic_grid, molecule, basis, s, dens_DA)
@@ -554,10 +551,9 @@ class TdaEigenSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
 
-    def _get_densities(self, trial_mat, tensors, molecule):
+    def _get_trans_densities(self, trial_mat, tensors, molecule):
         """
-        Computes the ground-state and transition densities, and initializes the
-        Fock matrix.
+        Computes the transition densities.
 
         :param trial_mat:
             The matrix containing the Z vectors as columns.
@@ -567,8 +563,7 @@ class TdaEigenSolver(LinearSolver):
             The molecule.
 
         :return:
-            The initialized Fock matrix, the transition density matrix, and the
-            ground-state density matrix.
+            The transition density matrix.
         """
 
         # form transition densities
@@ -584,49 +579,18 @@ class TdaEigenSolver(LinearSolver):
                 mo_occ = tensors['C_alpha'][:, :nocc].copy()
             mo_vir = tensors['C_alpha'][:, nocc:].copy()
 
-            ao_mats = []
+            tdens = []
             for k in range(trial_mat.shape[1]):
                 if self.core_excitation:
                     mat = trial_mat[:, k].reshape(self.num_core_orbitals, nvir)
                 else:
                     mat = trial_mat[:, k].reshape(nocc, nvir)
                 mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
-                ao_mats.append(mat)
-            tdens = AODensityMatrix(ao_mats, denmat.rest)
+                tdens.append(mat)
         else:
-            tdens = AODensityMatrix()
-        tdens.broadcast(self.rank, self.comm)
+            tdens = None
 
-        # initialize Fock matrices
-
-        fock = AOFockMatrix(tdens)
-
-        if self._dft:
-            if self.xcfun.is_hybrid():
-                fock_flag = fockmat.rgenjkx
-                fact_xc = self.xcfun.get_frac_exact_exchange()
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_scale_factor(fact_xc, i)
-            else:
-                fock_flag = fockmat.rgenj
-        else:
-            fock_flag = fockmat.rgenjk
-
-        for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fock_flag, i)
-
-        # broadcast ground state density
-
-        if self._dft:
-            if self.rank == mpi_master():
-                gsdens = AODensityMatrix([tensors['D_alpha']], denmat.rest)
-            else:
-                gsdens = AODensityMatrix()
-            gsdens.broadcast(self.rank, self.comm)
-        else:
-            gsdens = None
-
-        return fock, tdens, gsdens
+        return tdens
 
     def _get_sigmas(self, fock, tensors, molecule, trial_mat):
         """
@@ -657,9 +621,9 @@ class TdaEigenSolver(LinearSolver):
         orb_ene = tensors['E_alpha']
 
         sigma_vecs = []
-        for fockind in range(fock.number_of_fock_matrices()):
+        for fockind in range(len(fock)):
             # 2e contribution
-            mat = fock.to_numpy(fockind)
+            mat = fock[fockind].copy()
             mat = np.matmul(mo_occ.T, np.matmul(mat, mo_vir))
             # 1e contribution
             if self.core_excitation:
@@ -693,33 +657,38 @@ class TdaEigenSolver(LinearSolver):
             The one-electron integrals.
         """
 
-        dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-        dipole_mats = dipole_drv.compute(molecule, basis)
-
-        linmom_drv = LinearMomentumIntegralsDriver(self.comm)
-        linmom_mats = linmom_drv.compute(molecule, basis)
-
-        angmom_drv = AngularMomentumIntegralsDriver(self.comm)
-        angmom_mats = angmom_drv.compute(molecule, basis)
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis,
+                                                        [0.0, 0.0, 0.0])
+        linmom_mats = compute_linear_momentum_integrals(molecule, basis)
+        angmom_mats = compute_angular_momentum_integrals(
+            molecule, basis, [0.0, 0.0, 0.0])
 
         integrals = {}
 
         if self.rank == mpi_master():
-            integrals['electric_dipole'] = (dipole_mats.x_to_numpy(),
-                                            dipole_mats.y_to_numpy(),
-                                            dipole_mats.z_to_numpy())
+            integrals['electric_dipole'] = (
+                dipole_mats[0],
+                dipole_mats[1],
+                dipole_mats[2],
+            )
 
-            integrals['linear_momentum'] = (-1.0 * linmom_mats.x_to_numpy(),
-                                            -1.0 * linmom_mats.y_to_numpy(),
-                                            -1.0 * linmom_mats.z_to_numpy())
+            integrals['linear_momentum'] = (
+                -1.0 * linmom_mats[0],
+                -1.0 * linmom_mats[1],
+                -1.0 * linmom_mats[2],
+            )
 
-            integrals['angular_momentum'] = (-1.0 * angmom_mats.x_to_numpy(),
-                                             -1.0 * angmom_mats.y_to_numpy(),
-                                             -1.0 * angmom_mats.z_to_numpy())
+            integrals['angular_momentum'] = (
+                -1.0 * angmom_mats[0],
+                -1.0 * angmom_mats[1],
+                -1.0 * angmom_mats[2],
+            )
 
-            integrals['magnetic_dipole'] = (0.5 * angmom_mats.x_to_numpy(),
-                                            0.5 * angmom_mats.y_to_numpy(),
-                                            0.5 * angmom_mats.z_to_numpy())
+            integrals['magnetic_dipole'] = (
+                0.5 * angmom_mats[0],
+                0.5 * angmom_mats[1],
+                0.5 * angmom_mats[2],
+            )
 
         return integrals
 
@@ -756,17 +725,17 @@ class TdaEigenSolver(LinearSolver):
                 [mo_occ, exc_vec, mo_vir.T])
 
             transition_dipoles['electric'][s, :] = np.array([
-                np.vdot(trans_dens, integrals['electric_dipole'][d])
+                np.vdot(trans_dens, integrals['electric_dipole'][d].T)
                 for d in range(3)
-            ]) * (-1.0)
+            ])
 
             transition_dipoles['velocity'][s, :] = np.array([
-                np.vdot(trans_dens, integrals['linear_momentum'][d])
+                np.vdot(trans_dens, integrals['linear_momentum'][d].T)
                 for d in range(3)
-            ]) / eigvals[s]
+            ]) / (-eigvals[s])
 
             transition_dipoles['magnetic'][s, :] = np.array([
-                np.vdot(trans_dens, integrals['magnetic_dipole'][d])
+                np.vdot(trans_dens, integrals['magnetic_dipole'][d].T)
                 for d in range(3)
             ])
 

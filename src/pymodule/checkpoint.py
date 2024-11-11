@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -56,7 +55,7 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.create_dataset('nuclear_repulsion',
                           data=np.array([molecule.nuclear_repulsion_energy()]))
 
-        hf.create_dataset('nuclear_charges', data=molecule.elem_ids_to_numpy())
+        hf.create_dataset('nuclear_charges', data=molecule.get_element_ids())
 
         hf.create_dataset('atom_coordinates',
                           data=molecule.get_coordinates_in_bohr())
@@ -76,11 +75,11 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.create_dataset('spin_multiplicity',
                           data=np.array([molecule.get_multiplicity()]))
 
-        hf.create_dataset('basis_set', data=np.string_([basis.get_label()]))
+        hf.create_dataset('basis_set', data=np.bytes_([basis.get_label()]))
 
-        hf.create_dataset('dft_func_label', data=np.string_([dft_func_label]))
+        hf.create_dataset('dft_func_label', data=np.bytes_([dft_func_label]))
 
-        hf.create_dataset('potfile_text', data=np.string_([potfile_text]))
+        hf.create_dataset('potfile_text', data=np.bytes_([potfile_text]))
 
         hf.close()
 
@@ -110,15 +109,15 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
             for y in ['alpha', 'beta']
         ]
         for key in keys:
-            hf.create_dataset(key, data=scf_results[key])
+            # TODO: remove this if statement since all keys should be available
+            if key in scf_results:
+                hf.create_dataset(key, data=scf_results[key])
 
-        # write SCF energy and dipole moment
+        # write SCF energy
         hf.create_dataset('scf_type',
-                          data=np.string_([scf_results['scf_type']]))
+                          data=np.bytes_([scf_results['scf_type']]))
         hf.create_dataset('scf_energy',
                           data=np.array([scf_results['scf_energy']]))
-        hf.create_dataset('dipole_moment',
-                          data=np.array(scf_results['dipole_moment']))
 
         # write SCF history
         keys = list(scf_history[0].keys())
@@ -230,7 +229,7 @@ def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
     :param fname:
         Name of the checkpoint file.
     :param labels:
-        The list of labels for trial vecotrs and transformed vectors.
+        The list of labels for trial vectors and transformed vectors.
     :param molecule:
         The molecule.
     :param basis:
@@ -280,7 +279,7 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
     :param fname:
         Name of the checkpoint file.
     :param labels:
-        The list of labels for trial vecotrs and transformed vectors.
+        The list of labels for trial vectors and transformed vectors.
     :param molecule:
         The molecule.
     :param basis:
@@ -301,7 +300,7 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
         return False
 
     e_nuc = molecule.nuclear_repulsion_energy()
-    nuclear_charges = molecule.elem_ids_to_numpy()
+    nuclear_charges = molecule.get_element_ids()
     basis_set = basis.get_label()
 
     dft_func_label = dft_dict['dft_func_label']
@@ -382,7 +381,7 @@ def write_distributed_focks(fname, dist_focks, key_freq_pairs, comm, ostream):
     if comm.Get_rank() == mpi_master():
         hf = h5py.File(fname, 'w')
         str_key_freq_pairs = [str((key, w)) for key, w in key_freq_pairs]
-        hf.create_dataset('key_freq_pairs', data=np.string_(str_key_freq_pairs))
+        hf.create_dataset('key_freq_pairs', data=np.bytes_(str_key_freq_pairs))
         hf.close()
     comm.barrier()
 

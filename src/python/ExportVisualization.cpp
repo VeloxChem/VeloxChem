@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -25,7 +24,6 @@
 
 #include "ExportVisualization.hpp"
 
-#include <mpi.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -33,8 +31,9 @@
 #include <array>
 #include <vector>
 
-#include "Buffer.hpp"
+#include "AtomicRadii.hpp"
 #include "CubicGrid.hpp"
+#include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "VisualizationDriver.hpp"
 
@@ -42,6 +41,36 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_visualization {  // vlx_visualization namespace
+
+static auto
+CVisualizationDriver_compute_local_grid(CVisualizationDriver&      self,
+                             CCubicGrid&                grid,
+                             const CMolecule&           molecule,
+                             const CMolecularBasis&     basis,
+                             const py::array_t<double>& mocoefs,
+                             const int                  moidx,
+                             const std::string&         mospin) -> void
+{
+    auto nao = mocoefs.shape(0);
+    auto nmo = mocoefs.shape(1);
+
+    self.compute_local_grid(grid, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
+}
+
+static auto
+CVisualizationDriver_get_mo(CVisualizationDriver&                   self,
+                            const std::vector<std::vector<double>>& coords,
+                            const CMolecule&                        molecule,
+                            const CMolecularBasis&                  basis,
+                            const py::array_t<double>&              mocoefs,
+                            const int                               moidx,
+                            const std::string&                      mospin) -> std::vector<double>
+{
+    auto nao = mocoefs.shape(0);
+    auto nmo = mocoefs.shape(1);
+
+    return self.getMO(coords, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
+}
 
 // Exports classes/functions in src/visualization to python
 
@@ -52,21 +81,25 @@ export_visualization(py::module& m)
 
     PyClass<CCubicGrid>(m, "CubicGrid")
         .def(py::init<>())
-        .def(py::init<const std::array<double, 3>&, const std::array<double, 3>&, const std::array<int32_t, 3>>())
+        .def(py::init<const std::array<double, 3>&, const std::array<double, 3>&, const std::array<int, 3>>())
         .def("get_origin", &CCubicGrid::getOrigin, "Gets coordinate of the origin.")
         .def("get_step_size", &CCubicGrid::getStepSize, "Gets step size in X, Y and Z direction.")
         .def("get_num_points", &CCubicGrid::getNumPoints, "Gets number of points in X, Y and Z direction.")
         .def("set_values", &CCubicGrid::setValues, "Sets the cubic grid values.", "vals"_a)
         .def(
             "values_to_numpy",
-            [](const CCubicGrid& self) -> py::array_t<double> { return vlx_general::pointer_to_numpy(self.values(), self.getNumPoints()); },
+            [](const CCubicGrid& self) -> py::array_t<double> {
+              auto num_points = self.getNumPoints();
+              return vlx_general::pointer_to_numpy(self.values(), {num_points[0], num_points[1], num_points[2]});
+            },
             "Convertis cubic grid values to 3D numpy array.");
 
     // CVisualizationDriver class
+    // Note: VisualizationDriver is prefixed by an underscore and will be used in visualizationdriver.py
 
-    PyClass<CVisualizationDriver>(m, "VisualizationDriver")
-        .def(py::init(&vlx_general::create<CVisualizationDriver>), "comm"_a = py::none())
-        .def("get_rank", &CVisualizationDriver::getRank, "Gets rank of the MPI process.")
+    PyClass<CVisualizationDriver>(m, "_VisualizationDriver")
+        .def(py::init<>())
+        .def("_create_local_cubic_grid", &CVisualizationDriver::create_local_cubic_grid, "Creates MPI-local cubic grid.")
         .def("get_atomic_orbital_info",
              &CVisualizationDriver::getAtomicOrbitalInformation,
              "Gets atomic orbital information.",
@@ -79,50 +112,32 @@ export_visualization(py::module& m)
              "grid"_a,
              "basis"_a,
              "aoinfo"_a)
-        .def("compute",
-             py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CMolecularOrbitals&, const int32_t, const std::string&>(
-                 &CVisualizationDriver::compute, py::const_),
-             "Computes molecular orbital values at cubic grid points.",
+        .def("_compute_local_grid",
+             &CVisualizationDriver_compute_local_grid,
+             "Computes molecular orbital values at MPI-local cubic grid points.",
              "grid"_a,
              "molecule"_a,
              "basis"_a,
-             "molorb"_a,
+             "mocoefs"_a,
              "moidx"_a,
              "mospin"_a)
-        .def("compute",
-             py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int32_t, const std::string&>(
-                 &CVisualizationDriver::compute, py::const_),
-             "Computes density values at cubic grid points.",
+        .def("_compute_local_grid",
+             py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int, const std::string&>(
+                 &CVisualizationDriver::compute_local_grid, py::const_),
+             "Computes density values at MPI-local cubic grid points.",
              "grid"_a,
              "molecule"_a,
              "basis"_a,
              "density"_a,
              "denidx"_a,
              "denspin"_a)
-        .def(
-            "compute",
-            [](const CVisualizationDriver& self,
-               CCubicGrid&                 grid,
-               const CMolecule&            molecule,
-               const CMolecularBasis&      basis,
-               const py::array_t<double>&  coeffs,
-               const std::vector<int32_t>& idxs) -> void {
-                auto _coeffs = BufferHostXYd(coeffs.data(), coeffs.shape(0), coeffs.shape(1));
-                self.compute(grid, molecule, basis, _coeffs, idxs);
-            },
-            "Computes values of orbital-like quantities at cubic grid points.",
-            "grid"_a,
-            "molecule"_a,
-            "basis"_a,
-            "coeffs"_a,
-            "idxs"_a)
         .def("get_mo",
-             &CVisualizationDriver::getMO,
+             &CVisualizationDriver_get_mo,
              "Computes molecular orbital at given coordinates.",
              "coords"_a,
              "molecule"_a,
              "basis"_a,
-             "mo"_a,
+             "mocoefs"_a,
              "moidx"_a,
              "mospin"_a)
         .def("get_density",

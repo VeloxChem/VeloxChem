@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -25,7 +24,6 @@
 
 from mpi4py import MPI
 import numpy as np
-import time as tm
 import sys
 
 from .veloxchemlib import _XtbDriver
@@ -67,7 +65,7 @@ class XtbDriver:
 
         self.ostream = ostream
 
-        self._xtb_driver = _XtbDriver(self.comm)
+        self._xtb_driver = _XtbDriver()
         self._xtb_driver.mute()
         self.xtb_verbose = False
 
@@ -84,21 +82,24 @@ class XtbDriver:
         Sets maximum number of SCF iterations.
         """
 
-        self._xtb_driver.set_max_iter(max_iter)
+        if self.rank == mpi_master():
+            self._xtb_driver.set_max_iter(max_iter)
 
     def set_elec_temp(self, elec_temp):
         """
         Sets electronic temperature for electron smearing.
         """
 
-        self._xtb_driver.set_elec_temp(elec_temp)
+        if self.rank == mpi_master():
+            self._xtb_driver.set_elec_temp(elec_temp)
 
     def set_method(self, xtb_method):
         """
         Sets XTB method.
         """
 
-        self._xtb_driver.set_method(xtb_method.lower())
+        if self.rank == mpi_master():
+            self._xtb_driver.set_method(xtb_method.lower())
 
     def get_method(self):
         """
@@ -112,21 +113,30 @@ class XtbDriver:
         Gets XTB energy.
         """
 
-        return self._xtb_driver.get_energy()
+        if self.rank == mpi_master():
+            return self._xtb_driver.get_energy()
+        else:
+            return None
 
     def get_gradient(self):
         """
         Gets XTB gradient.
         """
 
-        return self._xtb_driver.get_gradient()
+        if self.rank == mpi_master():
+            return self._xtb_driver.get_gradient()
+        else:
+            return None
 
     def get_dipole(self):
         """
         Gets XTB dipole.
         """
 
-        return self._xtb_driver.get_dipole()
+        if self.rank == mpi_master():
+            return self._xtb_driver.get_dipole()
+        else:
+            return None
 
     def compute(self, molecule):
         """
@@ -147,25 +157,23 @@ class XtbDriver:
 
         assert_msg_critical(self.is_available(), errmsg)
 
-        # set verbosity
-
-        if self.ostream.is_muted or (not self.xtb_verbose):
-            self._xtb_driver.mute()
-        else:
-            self._xtb_driver.unmute()
-
-        # run XTB calculation
-
-        start_time = tm.time()
-
-        # TODO: disable this when doing optimization
-        self.print_title()
-
-        self._xtb_driver.compute(molecule)
-
-        # process results
-
         if self.rank == mpi_master():
+
+            # set verbosity
+
+            if self.ostream.is_muted or (not self.xtb_verbose):
+                self._xtb_driver.mute()
+            else:
+                self._xtb_driver.unmute()
+
+            # run XTB calculation
+
+            self.print_title()
+
+            self._xtb_driver.compute(molecule)
+
+            # process results
+
             energy = self._xtb_driver.get_energy()
             gradient = self._xtb_driver.get_gradient()
             dipole = self._xtb_driver.get_dipole()
@@ -177,10 +185,6 @@ class XtbDriver:
             grad2 = np.sum(gradient**2, axis=1)
             rms_grad = np.sqrt(np.mean(grad2))
             max_grad = np.max(np.sqrt(grad2))
-
-            # TODO: enable this when doing optimization
-            # self.print_energy_and_gradient_info(energy, rms_grad, max_grad,
-            #                                     start_time)
 
             xtb_results = {
                 'energy': energy,
@@ -211,25 +215,6 @@ class XtbDriver:
 
         self.ostream.print_reference('Reference:')
         self.ostream.print_reference(self.get_reference())
-        self.ostream.flush()
-
-    def print_energy_and_gradient_info(self, energy, rms_grad, max_grad,
-                                       start_time):
-        """
-        Prints energy and gradient info for XTB calculation.
-        """
-
-        valstr = '  Energy   : {:.10f} a.u.'.format(energy)
-        self.ostream.print_info(valstr)
-
-        valstr = '  Gradient : {:.6e} a.u. (RMS)'.format(rms_grad)
-        self.ostream.print_info(valstr)
-        valstr = '             {:.6e} a.u. (Max)'.format(max_grad)
-        self.ostream.print_info(valstr)
-
-        valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
-        self.ostream.print_info(valstr)
-        self.ostream.print_blank()
         self.ostream.flush()
 
     def get_reference(self):

@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -25,609 +24,462 @@
 
 #include "Molecule.hpp"
 
-#include <mpi.h>
-
+#include <algorithm>
 #include <cmath>
-#include <sstream>
+#include <iterator>
+#include <ranges>
 
+#include "AtomicRadii.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
-#include "MathFunc.hpp"
+#include "CustomViews.hpp"
 #include "StringFormat.hpp"
 
-CMolecule::CMolecule(const std::vector<double>&      atomCoordinates,
-                     const std::vector<double>&      atomCharges,
-                     const std::vector<double>&      atomMasses,
-                     const std::vector<std::string>& atomLabels,
-                     const std::vector<int32_t>&     idsElemental)
+CMolecule::CMolecule()
 
-    : _atomCoordinates(atomCoordinates, static_cast<int32_t>(idsElemental.size()), 3)
+    : _charge{0.0}
 
-    , _atomCharges{atomCharges}
+    , _multiplicity{1}
 
-    , _atomMasses{atomMasses}
+    , _coordinates{}
 
-    , _atomLabels{atomLabels}
+    , _identifiers{}
 
-    , _idsElemental{idsElemental}
+    , _atom_basis_labels{}
 {
 }
 
-CMolecule::CMolecule(const CMolecule& source)
+CMolecule::CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit)
 
-    : _charge(source._charge)
+    : _charge{0.0}
 
-    , _multiplicity(source._multiplicity)
+    , _multiplicity{1}
 
-    , _atomCoordinates(source._atomCoordinates)
+    , _coordinates(coordinates)
 
-    , _atomCharges(source._atomCharges)
+    , _identifiers(identifiers)
+{
+    for (std::vector<int>::size_type i = 0; i < _identifiers.size(); i++)
+    {
+        _atom_basis_labels.push_back(std::string(""));
+    }
 
-    , _atomMasses(source._atomMasses)
+    if (_is_angstrom(unit))
+    {
+        std::ranges::for_each(_coordinates, [=](TPoint<double> &pnt) { pnt.scale(1.0 / units::bohr_in_angstrom()); });
+    }
+}
 
-    , _atomLabels(source._atomLabels)
+CMolecule::CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit, const std::vector<std::string>& atom_basis_labels)
 
-    , _idsAtomic(source._idsAtomic)
+    : _charge{0.0}
 
-    , _idsElemental(source._idsElemental)
+    , _multiplicity{1}
+
+    , _coordinates(coordinates)
+
+    , _identifiers(identifiers)
+
+    , _atom_basis_labels(atom_basis_labels)
+{
+    if (_is_angstrom(unit))
+    {
+        std::ranges::for_each(_coordinates, [=](TPoint<double> &pnt) { pnt.scale(1.0 / units::bohr_in_angstrom()); });
+    }
+}
+
+CMolecule::CMolecule(const CMolecule &molecule_one, const CMolecule &molecule_two)
+{
+    _identifiers.reserve(molecule_one._identifiers.size() + molecule_two._identifiers.size());
+
+    std::ranges::copy(molecule_one._identifiers, std::back_inserter(_identifiers));
+
+    std::ranges::copy(molecule_two._identifiers, std::back_inserter(_identifiers));
+
+    _coordinates.reserve(molecule_one._coordinates.size() + molecule_two._coordinates.size());
+
+    std::ranges::copy(molecule_one._coordinates, std::back_inserter(_coordinates));
+
+    std::ranges::copy(molecule_two._coordinates, std::back_inserter(_coordinates));
+
+    _atom_basis_labels.reserve(molecule_one._atom_basis_labels.size() + molecule_two._atom_basis_labels.size());
+
+    std::ranges::copy(molecule_one._atom_basis_labels, std::back_inserter(_atom_basis_labels));
+
+    std::ranges::copy(molecule_two._atom_basis_labels, std::back_inserter(_atom_basis_labels));
+
+    _charge = molecule_one._charge + molecule_two._charge;
+
+    const auto spin_a = (molecule_one._multiplicity - 1) / 2;
+
+    const auto spin_b = (molecule_two._multiplicity - 1) / 2;
+
+    _multiplicity = 2 * (spin_a + spin_b) + 1;
+}
+
+CMolecule::CMolecule(const CMolecule &other)
+
+    : _charge(other._charge)
+
+    , _multiplicity(other._multiplicity)
+
+    , _coordinates(other._coordinates)
+
+    , _identifiers(other._identifiers)
+
+    , _atom_basis_labels(other._atom_basis_labels)
 {
 }
 
-CMolecule::CMolecule(CMolecule&& source) noexcept
+CMolecule::CMolecule(CMolecule &&other) noexcept
 
-    : _charge(std::move(source._charge))
+    : _charge(std::move(other._charge))
 
-    , _multiplicity(std::move(source._multiplicity))
+    , _multiplicity(std::move(other._multiplicity))
 
-    , _atomCoordinates(std::move(source._atomCoordinates))
+    , _coordinates(std::move(other._coordinates))
 
-    , _atomCharges(std::move(source._atomCharges))
+    , _identifiers(std::move(other._identifiers))
 
-    , _atomMasses(std::move(source._atomMasses))
-
-    , _atomLabels(std::move(source._atomLabels))
-
-    , _idsAtomic(std::move(source._idsAtomic))
-
-    , _idsElemental(std::move(source._idsElemental))
+    , _atom_basis_labels(std::move(other._atom_basis_labels))
 {
 }
 
-CMolecule::CMolecule(const CMolecule& mol_1, const CMolecule& mol_2)
+auto
+CMolecule::operator=(const CMolecule &other) -> CMolecule &
 {
-    std::vector<double>      atomCoordinates;
-    std::vector<double>      atomCharges;
-    std::vector<double>      atomMasses;
-    std::vector<std::string> atomLabels;
-    std::vector<int32_t>     idsElemental;
+    _charge = other._charge;
 
-    // x, y, and z coordinates
+    _multiplicity = other._multiplicity;
 
-    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
-    {
-        atomCoordinates.push_back(mol_1._atomCoordinates.data(0)[i]);
-    }
+    _coordinates = other._coordinates;
 
-    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
-    {
-        atomCoordinates.push_back(mol_2._atomCoordinates.data(0)[i]);
-    }
+    _identifiers = other._identifiers;
 
-    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
-    {
-        atomCoordinates.push_back(mol_1._atomCoordinates.data(1)[i]);
-    }
-
-    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
-    {
-        atomCoordinates.push_back(mol_2._atomCoordinates.data(1)[i]);
-    }
-
-    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
-    {
-        atomCoordinates.push_back(mol_1._atomCoordinates.data(2)[i]);
-    }
-
-    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
-    {
-        atomCoordinates.push_back(mol_2._atomCoordinates.data(2)[i]);
-    }
-
-    // charges, masses, labels, ids
-
-    for (int32_t i = 0; i < mol_1.getNumberOfAtoms(); i++)
-    {
-        atomCharges.push_back(mol_1._atomCharges.data()[i]);
-
-        atomMasses.push_back(mol_1._atomMasses.data()[i]);
-
-        atomLabels.push_back(mol_1._atomLabels.data()[i]);
-
-        idsElemental.push_back(mol_1._idsElemental.data()[i]);
-    }
-
-    for (int32_t i = 0; i < mol_2.getNumberOfAtoms(); i++)
-    {
-        atomCharges.push_back(mol_2._atomCharges.data()[i]);
-
-        atomMasses.push_back(mol_2._atomMasses.data()[i]);
-
-        atomLabels.push_back(mol_2._atomLabels.data()[i]);
-
-        idsElemental.push_back(mol_2._idsElemental.data()[i]);
-    }
-
-    // set up combined molecule
-
-    auto natoms = static_cast<int32_t>(idsElemental.size());
-
-    _atomCoordinates = CMemBlock2D<double>(atomCoordinates, natoms, 3);
-
-    _atomCharges = CMemBlock<double>(atomCharges);
-
-    _atomMasses = CMemBlock<double>(atomMasses);
-
-    _atomLabels = atomLabels;
-
-    _idsElemental = CMemBlock<int32_t>(idsElemental);
-
-    setCharge(mol_1._charge + mol_2._charge);
-
-    setMultiplicity(mol_1._multiplicity + mol_2._multiplicity - 1);
-}
-
-CMolecule
-CMolecule::getSubMolecule(int32_t startIndex, int32_t numAtoms)
-{
-    std::vector<double> atomCoordinates;
-
-    std::vector<double> atomCharges;
-
-    std::vector<double> atomMasses;
-
-    std::vector<std::string> atomLabels;
-
-    std::vector<int32_t> idsElemental;
-
-    // boundary check
-
-    auto total_natoms = getNumberOfAtoms();
-
-    if ((startIndex < 0) || (numAtoms <= 0) || (startIndex + numAtoms > total_natoms))
-    {
-        return CMolecule();
-    }
-
-    // x, y, and z coordinates
-
-    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
-    {
-        atomCoordinates.push_back(_atomCoordinates.data(0)[i]);
-    }
-
-    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
-    {
-        atomCoordinates.push_back(_atomCoordinates.data(1)[i]);
-    }
-
-    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
-    {
-        atomCoordinates.push_back(_atomCoordinates.data(2)[i]);
-    }
-
-    // charges, masses, labels, ids
-
-    for (int32_t i = startIndex; i < startIndex + numAtoms; i++)
-    {
-        atomCharges.push_back(_atomCharges.data()[i]);
-
-        atomMasses.push_back(_atomMasses.data()[i]);
-
-        atomLabels.push_back(_atomLabels.data()[i]);
-
-        idsElemental.push_back(_idsElemental.data()[i]);
-    }
-
-    // create sub-molecule
-
-    return CMolecule(atomCoordinates, atomCharges, atomMasses, atomLabels, idsElemental);
-}
-
-CMolecule&
-CMolecule::operator=(const CMolecule& source)
-{
-    if (this == &source) return *this;
-
-    _charge = source._charge;
-
-    _multiplicity = source._multiplicity;
-
-    _atomCoordinates = source._atomCoordinates;
-
-    _atomCharges = source._atomCharges;
-
-    _atomMasses = source._atomMasses;
-
-    _atomLabels = source._atomLabels;
-
-    _idsAtomic = source._idsAtomic;
-
-    _idsElemental = source._idsElemental;
+    _atom_basis_labels = other._atom_basis_labels;
 
     return *this;
 }
 
-CMolecule&
-CMolecule::operator=(CMolecule&& source) noexcept
+auto
+CMolecule::operator=(CMolecule &&other) noexcept -> CMolecule &
 {
-    if (this == &source) return *this;
+    if (this != &other)
+    {
+        _charge = std::move(other._charge);
 
-    _charge = std::move(source._charge);
+        _multiplicity = std::move(other._multiplicity);
 
-    _multiplicity = std::move(source._multiplicity);
+        _coordinates = std::move(other._coordinates);
 
-    _atomCoordinates = std::move(source._atomCoordinates);
+        _identifiers = std::move(other._identifiers);
 
-    _atomCharges = std::move(source._atomCharges);
-
-    _atomMasses = std::move(source._atomMasses);
-
-    _atomLabels = std::move(source._atomLabels);
-
-    _idsAtomic = std::move(source._idsAtomic);
-
-    _idsElemental = std::move(source._idsElemental);
+        _atom_basis_labels = std::move(other._atom_basis_labels);
+    }
 
     return *this;
 }
 
-bool
-CMolecule::operator==(const CMolecule& other) const
+auto
+CMolecule::operator==(const CMolecule &other) const -> bool
 {
-    if (std::fabs(_charge - other._charge) > 1.0e-13) return false;
-
-    if (_multiplicity != other._multiplicity) return false;
-
-    if (_atomCoordinates != other._atomCoordinates) return false;
-
-    if (_atomCharges != other._atomCharges) return false;
-
-    if (_atomMasses != other._atomMasses) return false;
-
-    if (_atomLabels.size() != other._atomLabels.size()) return false;
-
-    for (size_t i = 0; i < _atomLabels.size(); i++)
+    if (_multiplicity != other._multiplicity)
     {
-        if (_atomLabels[i] != other._atomLabels[i]) return false;
+        return false;
     }
-
-    if (_idsAtomic != other._idsAtomic) return false;
-
-    if (_idsElemental != other._idsElemental) return false;
-
-    return true;
-}
-
-bool
-CMolecule::operator!=(const CMolecule& other) const
-{
-    return !(*this == other);
-}
-
-void
-CMolecule::addAtom(const std::string& atomLabel, const double atomCoordinateX, const double atomCoordinateY, const double atomCoordinateZ)
-{
-    CChemicalElement elem;
-
-    if (elem.setAtomType(atomLabel))
+    else if (!mathfunc::equal(_charge, other._charge, 1.0e-12, 1.0e-12))
     {
-        std::vector<double> atomCoordinates;
-
-        std::vector<double> atomCharges;
-
-        std::vector<double> atomMasses;
-
-        std::vector<std::string> atomLabels;
-
-        std::vector<int32_t> idsElemental;
-
-        // set up pointers to atomic coordinates anf charges
-
-        const auto natoms = getNumberOfAtoms();
-
-        auto coordx = getCoordinatesX();
-
-        for (int32_t i = 0; i < natoms; i++)
-        {
-            atomCoordinates.push_back(coordx[i]);
-        }
-
-        atomCoordinates.push_back(atomCoordinateX);
-
-        auto coordy = getCoordinatesY();
-
-        for (int32_t i = 0; i < natoms; i++)
-        {
-            atomCoordinates.push_back(coordy[i]);
-        }
-
-        atomCoordinates.push_back(atomCoordinateY);
-
-        auto coordz = getCoordinatesZ();
-
-        for (int32_t i = 0; i < natoms; i++)
-        {
-            atomCoordinates.push_back(coordz[i]);
-        }
-
-        atomCoordinates.push_back(atomCoordinateZ);
-
-        for (int32_t i = 0; i < natoms; i++)
-        {
-            atomCharges.push_back(_atomCharges.at(i));
-
-            atomMasses.push_back(_atomMasses.at(i));
-
-            atomLabels.push_back(_atomLabels[i]);
-
-            idsElemental.push_back(_idsElemental.at(i));
-        }
-
-        atomCharges.push_back(elem.getAtomicCharge());
-
-        atomMasses.push_back(elem.getAtomicMass());
-
-        atomLabels.push_back(atomLabel);
-
-        idsElemental.push_back(elem.getIdentifier());
-
-        *this = CMolecule(atomCoordinates, atomCharges, atomMasses, atomLabels, idsElemental);
+        return false;
+    }
+    else if (_identifiers != other._identifiers)
+    {
+        return false;
+    }
+    else if (_atom_basis_labels != other._atom_basis_labels)
+    {
+        return false;
+    }
+    else
+    {
+        return _coordinates == other._coordinates;
     }
 }
 
-void
-CMolecule::setAtomicIndexes(const int32_t startIndex)
+auto
+CMolecule::add_atom(const int identifier, const TPoint<double>& coordinates, const std::string& unit) -> void
 {
-    for (int32_t i = 0; i < _idsAtomic.size(); i++)
+    add_atom(identifier, coordinates, unit, std::string(""));
+}
+
+auto
+CMolecule::add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit, const std::string& atom_basis_label) -> void
+{
+    _identifiers.push_back(identifier);
+
+    _atom_basis_labels.push_back(atom_basis_label);
+
+    _coordinates.push_back(coordinates);
+
+    if (_is_angstrom(unit))
     {
-        _idsAtomic.at(i) = startIndex + i;
+        _coordinates.back().scale(1.0 / units::bohr_in_angstrom());
     }
 }
 
-std::vector<double>
-CMolecule::getAtomCoordinates(const int32_t iAtom) const
+auto
+CMolecule::slice(const std::vector<int> &atoms) const -> CMolecule
 {
-    std::vector<double> coords;
+    // Note: the sliced molecule fragment will have default charge and multiplicity,
+    //       which could be wrong, but we will not make any guess here
 
-    coords.push_back(getCoordinatesX()[iAtom]);
+    CMolecule molfrag;
 
-    coords.push_back(getCoordinatesY()[iAtom]);
+    std::ranges::for_each(atoms, [&](const int i) { molfrag.add_atom(_identifiers.at(i), _coordinates.at(i), "au", _atom_basis_labels.at(i)); });
 
-    coords.push_back(getCoordinatesZ()[iAtom]);
-
-    return coords;
+    return molfrag;
 }
 
-void
-CMolecule::setAtomCoordinates(const int32_t iAtom, const std::vector<double>& xyz)
-{
-    _atomCoordinates.data(0)[iAtom] = xyz[0];
-
-    _atomCoordinates.data(1)[iAtom] = xyz[1];
-
-    _atomCoordinates.data(2)[iAtom] = xyz[2];
-}
-
-void
-CMolecule::setCharge(const double charge)
+auto
+CMolecule::set_charge(const double charge) -> void
 {
     _charge = charge;
 }
 
-void
-CMolecule::setMultiplicity(const int32_t multiplicity)
+auto
+CMolecule::set_multiplicity(const int multiplicity) -> void
 {
     _multiplicity = multiplicity;
 }
 
-double
-CMolecule::getCharge() const
+auto
+CMolecule::get_charge() const -> double
 {
     return _charge;
 }
 
-int32_t
-CMolecule::getMultiplicity() const
+auto
+CMolecule::get_multiplicity() const -> int
 {
     return _multiplicity;
 }
 
-int32_t
-CMolecule::getNumberOfAtoms() const
+auto
+CMolecule::number_of_atoms() const -> int
 {
-    return _idsElemental.size();
+    return static_cast<int>(_identifiers.size());
 }
 
-int32_t
-CMolecule::getNumberOfAtoms(const int32_t idElemental) const
+auto
+CMolecule::number_of_atoms(const int identifier) const -> int
 {
-    return getNumberOfAtoms(0, _idsElemental.size(), idElemental);
+    return static_cast<int>(std::ranges::count(_identifiers, identifier));
 }
 
-int32_t
-CMolecule::getNumberOfAtoms(const int32_t iAtom, const int32_t nAtoms, const int32_t idElemental) const
+auto
+CMolecule::number_of_atoms(const int iatom, const int natoms, const int identifier) const -> int
 {
-    int32_t natoms = 0;
+    int count = 0;
 
-    for (int32_t i = iAtom; i < (iAtom + nAtoms); i++)
+    std::ranges::for_each(std::views::iota(iatom, iatom + natoms), [&](const int i) {
+        if (identifier == _identifiers.at(i)) count++;
+    });
+
+    return count;
+}
+
+auto
+CMolecule::elemental_composition() const -> std::set<int>
+{
+    return std::set<int>(_identifiers.begin(), _identifiers.end());
+}
+
+auto
+CMolecule::number_of_electrons() const -> int
+{
+    return std::accumulate(_identifiers.begin(), _identifiers.end(), -static_cast<int>(_charge));
+}
+
+auto
+CMolecule::identifiers() const -> std::vector<int>
+{
+    return _identifiers;
+}
+
+auto
+CMolecule::atom_basis_labels() const -> std::vector<std::string>
+{
+    return _atom_basis_labels;
+}
+
+auto
+CMolecule::coordinates(const std::string &unit) const -> std::vector<TPoint<double>>
+{
+    if (_is_angstrom(unit))
     {
-        if (_idsElemental.at(i) == idElemental) natoms++;
+        std::vector<TPoint<double>> coords;
+
+        coords.reserve(_coordinates.size());
+
+        auto fact = units::bohr_in_angstrom();
+
+        std::ranges::transform(_coordinates, std::back_inserter(coords), [&](const TPoint<double> &pnt) {
+            TPoint<double> rpnt = pnt;
+            rpnt.scale(fact);
+            return rpnt;
+        });
+
+        return coords;
     }
-
-    return natoms;
-}
-
-std::set<int32_t>
-CMolecule::getElementalComposition() const
-{
-    std::set<int32_t> elemset;
-
-    for (int32_t i = 0; i < _idsElemental.size(); i++)
+    else
     {
-        elemset.insert(_idsElemental.at(i));
+        return _coordinates;
     }
-
-    return elemset;
 }
 
-int32_t
-CMolecule::getNumberOfElectrons() const
+auto
+CMolecule::charges() const -> std::vector<double>
 {
-    double nelectrons = -_charge;
+    std::vector<double> charges;
 
-    for (int32_t i = 0; i < _atomCharges.size(); i++)
+    charges.reserve(_identifiers.size());
+
+    std::ranges::transform(_identifiers, std::back_inserter(charges), [](const int i) { return static_cast<double>(i); });
+
+    return charges;
+}
+
+auto
+CMolecule::masses() const -> std::vector<double>
+{
+    std::vector<double> masses;
+
+    masses.reserve(_identifiers.size());
+
+    std::ranges::transform(_identifiers, std::back_inserter(masses), [](const int i) { return chem_elem::mass(i); });
+
+    return masses;
+}
+
+auto
+CMolecule::labels() const -> std::vector<std::string>
+{
+    std::vector<std::string> labels;
+
+    labels.reserve(_identifiers.size());
+
+    std::ranges::transform(_identifiers, std::back_inserter(labels), [](const int i) { return chem_elem::label(i); });
+
+    return labels;
+}
+
+auto
+CMolecule::label(const int iatom) const -> std::string
+{
+    return chem_elem::label(_identifiers.at(iatom));
+}
+
+auto
+CMolecule::atom_coordinates(const int iatom, const std::string &unit) const -> TPoint<double>
+{
+    if (_is_angstrom(unit))
     {
-        nelectrons += _atomCharges.at(i);
+        auto rpnt = _coordinates.at(iatom);
+
+        rpnt.scale(units::bohr_in_angstrom());
+
+        return rpnt;
     }
-
-    return static_cast<int32_t>(nelectrons);
-}
-
-const int32_t*
-CMolecule::getIdsElemental() const
-{
-    return _idsElemental.data();
-}
-
-const double*
-CMolecule::getCoordinatesX() const
-{
-    return _atomCoordinates.data(0);
-}
-
-const double*
-CMolecule::getCoordinatesY() const
-{
-    return _atomCoordinates.data(1);
-}
-
-const double*
-CMolecule::getCoordinatesZ() const
-{
-    return _atomCoordinates.data(2);
-}
-
-CMemBlock2D<double>
-CMolecule::getCoordinates() const
-{
-    return _atomCoordinates;
-}
-
-CMemBlock<double>
-CMolecule::getCharges() const
-{
-    return _atomCharges;
-}
-
-CMemBlock<double>
-CMolecule::getMasses() const
-{
-    return _atomMasses;
-}
-
-CMemBlock<double>
-CMolecule::getMinDistances() const
-{
-    // allocate and initialize distances
-
-    auto natoms = getNumberOfAtoms();
-
-    CMemBlock<double> mdists(natoms);
-
-    auto rmin = mdists.data();
-
-    mathfunc::set_to(rmin, 1.0e24, natoms);
-
-    // set pointers to coordinates
-
-    auto rx = getCoordinatesX();
-
-    auto ry = getCoordinatesY();
-
-    auto rz = getCoordinatesZ();
-
-    // determine distance to closest neighbouring atom
-
-    for (int32_t i = 0; i < natoms; i++)
+    else
     {
-        for (int32_t j = i + 1; j < natoms; j++)
-        {
-            auto rab = mathfunc::distance(rx[i], ry[i], rz[i], rx[j], ry[j], rz[j]);
-
-            if (rab < rmin[i]) rmin[i] = rab;
-
-            if (rab < rmin[j]) rmin[j] = rab;
-        }
+        return _coordinates.at(iatom);
     }
+}
+
+auto
+CMolecule::set_atom_coordinates(const int iatom, const std::vector<double>& xyz) -> void
+{
+    if (iatom < number_of_atoms())
+    {
+        _coordinates[iatom] = TPoint<double>({xyz[0], xyz[1], xyz[2]});
+    }
+}
+
+auto
+CMolecule::atom_indices(const std::string &label) const -> std::vector<int>
+{
+    std::vector<int> indices;
+
+    indices.reserve(_identifiers.size());
+
+    const auto identifier = chem_elem::identifier(format::upper_case(label));
+
+    std::ranges::for_each(std::views::iota(0, number_of_atoms()), [&](const int i) {
+        if (_identifiers[i] == identifier) indices.push_back(i);
+    });
+
+    return indices;
+}
+
+auto
+CMolecule::nuclear_repulsion_energy() const -> double
+{
+    double nenergy = 0.0;
+
+    std::ranges::for_each(views::upper_triangular(_identifiers.size()), [&](const auto &index) {
+        const auto [i, j] = index;
+        nenergy += _identifiers[i] * _identifiers[j] / _coordinates[i].distance(_coordinates[j]);
+    });
+
+    return nenergy;
+}
+
+auto
+CMolecule::check_proximity(const double distance) const -> bool
+{
+    const auto r2dist = distance * distance;
+
+    auto tru_ij = views::upper_triangular(_identifiers.size());
+
+    auto it = std::ranges::find_if(tru_ij, [&](const auto &index) {
+        const auto [i, j] = index;
+        return _coordinates[i].distance_square(_coordinates[j]) <= r2dist;
+    });
+
+    return it == tru_ij.end();
+}
+
+auto
+CMolecule::min_distances() const -> std::vector<double>
+{
+    std::vector<double> mdists(_identifiers.size(), std::numeric_limits<double>::max());
+
+    std::ranges::for_each(views::upper_triangular(_identifiers.size()), [&](const auto &index) {
+        const auto [i, j] = index;
+        const auto rab    = _coordinates[i].distance(_coordinates[j]);
+        if (rab < mdists[i]) mdists[i] = rab;
+        if (rab < mdists[j]) mdists[j] = rab;
+    });
 
     return mdists;
 }
 
-double
-CMolecule::getNuclearRepulsionEnergy() const
-{
-    // set up pointers to atomic coordinates anf charges
-
-    auto coordx = getCoordinatesX();
-
-    auto coordy = getCoordinatesY();
-
-    auto coordz = getCoordinatesZ();
-
-    // loop over atoms
-
-    double enuc = 0;
-
-    auto natoms = getNumberOfAtoms();
-
-    for (int32_t i = 0; i < natoms; i++)
-    {
-        auto rax = coordx[i];
-
-        auto ray = coordy[i];
-
-        auto raz = coordz[i];
-
-        auto zea = _atomCharges.at(i);
-
-        for (int32_t j = i + 1; j < natoms; j++)
-        {
-            auto rab = mathfunc::distance(rax, ray, raz, coordx[j], coordy[j], coordz[j]);
-
-            enuc += zea * _atomCharges.at(j) / rab;
-        }
-    }
-
-    return enuc;
-}
-
-std::vector<double>
-CMolecule::getVdwRadii() const
+auto
+CMolecule::get_vdw_radii() const -> std::vector<double>
 {
     std::vector<double> atomradii;
 
     auto radii = atomicradii::buildVdwRadii();
 
-    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    for (int i = 0; i < number_of_atoms(); i++)
     {
-        atomradii.push_back(radii[_idsElemental.data()[i]]);
+        atomradii.push_back(radii[_identifiers[i]]);
     }
 
     return atomradii;
 }
 
-std::vector<double>
-CMolecule::getMkRadii() const
+auto
+CMolecule::get_mk_radii() const -> std::vector<double>
 {
     std::vector<double> atomradii;
 
@@ -635,346 +487,69 @@ CMolecule::getMkRadii() const
 
     auto vdw_radii = atomicradii::buildVdwRadii();
 
-    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    for (int i = 0; i < number_of_atoms(); i++)
     {
-        if (_idsElemental.data()[i] < static_cast<int32_t>(mk_radii.size()))
+        if (_identifiers[i] < static_cast<int>(mk_radii.size()))
         {
-            atomradii.push_back(mk_radii[_idsElemental.data()[i]]);
+            atomradii.push_back(mk_radii[_identifiers[i]]);
         }
         else
         {
-            atomradii.push_back(vdw_radii[_idsElemental.data()[i]]);
+            atomradii.push_back(vdw_radii[_identifiers[i]]);
         }
     }
 
     return atomradii;
 }
 
-std::vector<double>
-CMolecule::getChelpgRadii() const
+auto
+CMolecule::get_chelpg_radii() const -> std::vector<double>
 {
     std::vector<double> atomradii;
 
     auto chelpg_radii = atomicradii::buildChelpgRadii();
 
-    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    for (int i = 0; i < number_of_atoms(); i++)
     {
-        if (_idsElemental.data()[i] < static_cast<int32_t>(chelpg_radii.size()))
+        if (_identifiers[i] < static_cast<int>(chelpg_radii.size()))
         {
-            atomradii.push_back(chelpg_radii[_idsElemental.data()[i]]);
+            atomradii.push_back(chelpg_radii[_identifiers[i]]);
         }
         else
         {
-            atomradii.push_back(2.0 / units::getBohrValueInAngstroms());
+            atomradii.push_back(2.0 / units::bohr_in_angstrom());
         }
     }
 
     return atomradii;
 }
 
-std::vector<double>
-CMolecule::getCovalentRadii() const
+auto
+CMolecule::get_covalent_radii() const -> std::vector<double>
 {
     std::vector<double> atomradii;
 
     auto radii = atomicradii::buildCovalentRadii();
 
-    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
+    for (int i = 0; i < number_of_atoms(); i++)
     {
-        atomradii.push_back(radii[_idsElemental.data()[i]]);
+        atomradii.push_back(radii[_identifiers[i]]);
     }
 
     return atomradii;
 }
 
-std::string
-CMolecule::getLabel(const int32_t iAtom) const
+auto
+CMolecule::_is_angstrom(const std::string &unit) const -> bool
 {
-    if (iAtom < getNumberOfAtoms())
+    if (unit.length() >= 3)
     {
-        return _atomLabels[iAtom];
+        const auto label = std::string("ANGSTROM").substr(0, unit.length());
+
+        return format::upper_case(unit) == label;
     }
-
-    return std::string();
-}
-
-std::vector<int32_t>
-CMolecule::getAtomIndexes(const std::string& atomLabel) const
-{
-    CChemicalElement elem;
-
-    if (elem.setAtomType(atomLabel))
+    else
     {
-        std::vector<int32_t> indexes;
-
-        const auto idatm = elem.getIdentifier();
-
-        for (int32_t i = 0; i < getNumberOfAtoms(); i++)
-        {
-            if (_idsElemental.at(i) == idatm)
-            {
-                indexes.push_back(i);
-            }
-        }
-
-        return indexes;
+        return false;
     }
-
-    return std::vector<int32_t>();
-}
-
-int32_t
-CMolecule::getIndexOfNearestAtom(const int32_t iAtom) const
-{
-    // set up pointers to coordinates
-
-    auto coordx = getCoordinatesX();
-
-    auto coordy = getCoordinatesY();
-
-    auto coordz = getCoordinatesZ();
-
-    // set up coordinates of reference atom
-
-    const auto rax = coordx[iAtom];
-
-    const auto ray = coordy[iAtom];
-
-    const auto raz = coordz[iAtom];
-
-    // determine position of nearest atom
-
-    int32_t idx = -1;
-
-    double rmin = 1.0e9;
-
-    for (int32_t i = 0; i < getNumberOfAtoms(); i++)
-    {
-        if (i != iAtom)
-        {
-            const double rab = mathfunc::distance(rax, ray, raz, coordx[i], coordy[i], coordz[i]);
-
-            if (rab < rmin)
-            {
-                rmin = rab;
-
-                idx = i;
-            }
-        }
-    }
-
-    return idx;
-}
-
-int32_t
-CMolecule::getCoordinationNummber(const int32_t iAtom, const double radius) const
-{
-    const auto natoms = getNumberOfAtoms();
-
-    if (natoms > 0)
-    {
-        // set up pointers to coordinates
-
-        auto coordx = getCoordinatesX();
-
-        auto coordy = getCoordinatesY();
-
-        auto coordz = getCoordinatesZ();
-
-        // set up atom coordinates
-
-        const auto rax = coordx[iAtom];
-
-        const auto ray = coordy[iAtom];
-
-        const auto raz = coordz[iAtom];
-
-        int32_t cnum = 0;
-
-        for (int32_t i = 0; i < natoms; i++)
-        {
-            if (i != iAtom)
-            {
-                const auto rab = mathfunc::distance(rax, ray, raz, coordx[i], coordy[i], coordz[i]);
-
-                if (rab < radius)
-                {
-                    cnum++;
-                }
-            }
-        }
-
-        return cnum;
-    }
-
-    return 0;
-}
-
-double
-CMolecule::getMinDistance(const double coordinateX, const double coordinateY, const double coordinateZ) const
-{
-    const auto natoms = getNumberOfAtoms();
-
-    if (natoms > 0)
-    {
-        // set up pointers to coordinates
-
-        auto coordx = getCoordinatesX();
-
-        auto coordy = getCoordinatesY();
-
-        auto coordz = getCoordinatesZ();
-
-        double rmin = mathfunc::distance(coordinateX, coordinateY, coordinateZ, coordx[0], coordy[0], coordz[0]);
-
-        for (int32_t i = 1; i < natoms; i++)
-        {
-            const auto rab = mathfunc::distance(coordinateX, coordinateY, coordinateZ, coordx[i], coordy[i], coordz[i]);
-
-            if (rmin > rab)
-            {
-                rmin = rab;
-            }
-        }
-
-        return rmin;
-    }
-
-    return -1.0;
-}
-
-std::string
-CMolecule::printGeometry() const
-{
-    std::stringstream ss;
-
-    ss << "Molecular Geometry (Angstroms)\n";
-
-    ss << std::string(32, '=') << "\n\n";
-
-    ss << "  Atom ";
-
-    ss << fstr::format(std::string("Coordinate X"), 20, fmt::right);
-
-    ss << "  ";
-
-    ss << fstr::format(std::string("Coordinate Y"), 20, fmt::right);
-
-    ss << "  ";
-
-    ss << fstr::format(std::string("Coordinate Z"), 20, fmt::right);
-
-    ss << "  \n\n";
-
-    auto factor = units::getBohrValueInAngstroms();
-
-    auto coordx = _atomCoordinates.data(0);
-
-    auto coordy = _atomCoordinates.data(1);
-
-    auto coordz = _atomCoordinates.data(2);
-
-    for (int32_t i = 0; i < _atomCoordinates.size(0); i++)
-    {
-        std::string label("  ");
-
-        label.append(_atomLabels.at(i));
-
-        ss << fstr::format(label, 6, fmt::left);
-
-        ss << fstr::to_string(factor * coordx[i], 12, 22, fmt::right);
-
-        ss << fstr::to_string(factor * coordy[i], 12, 22, fmt::right);
-
-        ss << fstr::to_string(factor * coordz[i], 12, 22, fmt::right);
-
-        ss << "\n";
-    }
-
-    ss << "\n";
-
-    return ss.str();
-}
-
-bool
-CMolecule::checkProximity(const double minDistance) const
-{
-    auto natoms = _atomCoordinates.size(0);
-
-    auto coordx = _atomCoordinates.data(0);
-
-    auto coordy = _atomCoordinates.data(1);
-
-    auto coordz = _atomCoordinates.data(2);
-
-    for (int32_t i = 0; i < natoms; i++)
-    {
-        for (int32_t j = i + 1; j < natoms; j++)
-        {
-            auto rab = mathfunc::distance(coordx[i], coordy[i], coordz[i], coordx[j], coordy[j], coordz[j]);
-
-            if (rab < minDistance)
-            {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-void
-CMolecule::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if constexpr (ENABLE_MPI)
-    {
-        mpi::bcast(_charge, comm);
-
-        mpi::bcast(_multiplicity, comm);
-
-        _atomCoordinates.broadcast(rank, comm);
-
-        _atomCharges.broadcast(rank, comm);
-
-        _atomMasses.broadcast(rank, comm);
-
-        mpi::bcast(_atomLabels, rank, comm);
-
-        _idsAtomic.broadcast(rank, comm);
-
-        _idsElemental.broadcast(rank, comm);
-    }
-}
-
-std::ostream&
-operator<<(std::ostream& output, const CMolecule& source)
-{
-    output << std::endl;
-
-    output << "[CMolecule (Object):" << &source << "]" << std::endl;
-
-    output << "_charge: " << source._charge << std::endl;
-
-    output << "_multiplicity: " << source._multiplicity << std::endl;
-
-    output << "_atomCoordinates: " << source._atomCoordinates << std::endl;
-
-    output << "_atomCharges: " << source._atomCharges << std::endl;
-
-    output << "_atomMasses: " << source._atomMasses << std::endl;
-
-    output << "_atomLabels: " << std::endl;
-
-    for (size_t i = 0; i < source._atomLabels.size(); i++)
-    {
-        output << "atomsLabels_[" << i << "]" << std::endl;
-
-        output << source._atomLabels[i] << std::endl;
-    }
-
-    output << "_idsAtomic: " << source._idsAtomic << std::endl;
-
-    output << "_idsElemental: " << source._idsElemental << std::endl;
-
-    return output;
 }

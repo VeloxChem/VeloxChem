@@ -17,7 +17,8 @@ monkey:cron_deploy:
     - ulimit -s unlimited
     - lscpu | egrep 'Thread|Core|Socket|^CPU\('
     - python -V
-    - mpiicpc -cxx=icpx --version
+    - mpicxx --version
+    - mpicxx -show
     - cmake --version
     - python -m venv --clear venv
     - source venv/bin/activate
@@ -32,7 +33,7 @@ monkey:cron_deploy:
         h5py
         psutil
         geometric
-    - CC=icx MPICC="mpiicc -cc=icx" python -m pip install
+    - CC=gcc MPICC=mpicc python -m pip install
         mpi4py --no-binary=mpi4py
     - CC=gcc CXX=g++ python -m pip install
         cppe
@@ -42,10 +43,9 @@ monkey:cron_deploy:
         -S.
         -Bbuild
         -GNinja
-        -DCMAKE_CXX_COMPILER=mpiicpc
-        -DCMAKE_CXX_FLAGS="-cxx=icpx"
+        -DCMAKE_CXX_COMPILER=mpicxx
         -DVLX_LA_VENDOR=MKL
-    - cmake --build build --parallel 6 -- -v -d stats
+    - cmake --build build --parallel 6 -- -d stats
     - ctest --test-dir build --output-on-failure
     # prepare tar.bz2 archive
     - git archive

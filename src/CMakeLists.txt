@@ -4,7 +4,6 @@ add_library(vlxobjs OBJECT)
 
 target_compile_definitions(vlxobjs
   PUBLIC
-    $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>>
     $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
   )
 
@@ -44,31 +43,37 @@ target_include_directories(vlxobjs
 target_link_libraries(vlxobjs
   PUBLIC
     OpenMP::OpenMP_CXX
-    MPI::MPI_CXX
     Math::LA
     Libxc::xc
   )
 
-add_subdirectory(device)
-add_subdirectory(dft)
-add_subdirectory(dftfuncs)
-add_subdirectory(eridrv)
+add_subdirectory(dft_func)
 add_subdirectory(general)
 add_subdirectory(math)
 add_subdirectory(moldata)
-add_subdirectory(oneints)
-add_subdirectory(oneints_amom)
-add_subdirectory(oneints_dip)
-add_subdirectory(oneints_ef)
-add_subdirectory(oneints_kin)
-add_subdirectory(oneints_lmom)
-add_subdirectory(oneints_npot)
-add_subdirectory(oneints_ovl)
+add_subdirectory(onee_ints)
 add_subdirectory(orbdata)
+add_subdirectory(pdft_func)
 add_subdirectory(pymodule)
 add_subdirectory(python)
-add_subdirectory(response)
-add_subdirectory(specfunc)
-add_subdirectory(twoints)
+add_subdirectory(t2c_electric_dipole_momentum)
+add_subdirectory(t2c_electric_dipole_momentum_geom_X00)
+add_subdirectory(t2c_func)
+add_subdirectory(t2c_geometrical_derivatives)
+add_subdirectory(t2c_kinetic_energy)
+add_subdirectory(t2c_kinetic_energy_geom_X00)
+add_subdirectory(t2c_kinetic_energy_geom_X0Y)
+add_subdirectory(t2c_nuclear_potential)
+add_subdirectory(t2c_nuclear_potential_geom_0X0)
+add_subdirectory(t2c_nuclear_potential_geom_X00)
+add_subdirectory(t2c_nuclear_potential_geom_X0Y)
+add_subdirectory(t2c_nuclear_potential_geom_XY0)
+add_subdirectory(t2c_overlap)
+add_subdirectory(t2c_overlap_geom_X00)
+add_subdirectory(t2c_overlap_geom_X0Y)
+add_subdirectory(t4c_electron_repulsion)
+add_subdirectory(t4c_electron_repulsion_geom_X000)
+add_subdirectory(t4c_func)
+add_subdirectory(t4c_geometrical_derivatives)
 add_subdirectory(visualization)
 add_subdirectory(xtb)

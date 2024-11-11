@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -25,10 +24,7 @@
 
 #include "Dense4DTensor.hpp"
 
-#include <mpi.h>
-
 #include <cmath>
-#include <sstream>
 #include <utility>
 
 #include "StringFormat.hpp"
@@ -45,11 +41,7 @@ CDense4DTensor::CDense4DTensor()
 {
 }
 
-CDense4DTensor::CDense4DTensor(const std::vector<double>& values,
-                               const int32_t              iIndex,
-                               const int32_t              jIndex,
-                               const int32_t              kIndex,
-                               const int32_t              lIndex)
+CDense4DTensor::CDense4DTensor(const std::vector<double>& values, const int iIndex, const int jIndex, const int kIndex, const int lIndex)
 
     : _iIndex(iIndex)
 
@@ -59,11 +51,11 @@ CDense4DTensor::CDense4DTensor(const std::vector<double>& values,
 
     , _lIndex(lIndex)
 
-    , _values(CMemBlock<double>(values))
+    , _values(values)
 {
 }
 
-CDense4DTensor::CDense4DTensor(const int32_t iIndex, const int32_t jIndex, const int32_t kIndex, const int32_t lIndex)
+CDense4DTensor::CDense4DTensor(const int iIndex, const int jIndex, const int kIndex, const int lIndex)
 
     : _iIndex(iIndex)
 
@@ -73,11 +65,11 @@ CDense4DTensor::CDense4DTensor(const int32_t iIndex, const int32_t jIndex, const
 
     , _lIndex(lIndex)
 
-    , _values(CMemBlock<double>(iIndex * jIndex * kIndex * lIndex))
+    , _values(std::vector<double>(iIndex * jIndex * kIndex * lIndex, 0.0))
 {
 }
 
-CDense4DTensor::CDense4DTensor(const int32_t nRows)
+CDense4DTensor::CDense4DTensor(const int nRows)
 
     : _iIndex(nRows)
 
@@ -87,7 +79,7 @@ CDense4DTensor::CDense4DTensor(const int32_t nRows)
 
     , _lIndex(nRows)
 
-    , _values(CMemBlock<double>(nRows * nRows * nRows * nRows))
+    , _values(std::vector<double>(nRows * nRows * nRows * nRows, 0.0))
 {
 }
 
@@ -184,34 +176,34 @@ CDense4DTensor::operator!=(const CDense4DTensor& other) const
 void
 CDense4DTensor::zero()
 {
-    mathfunc::zero(_values.data(), _iIndex * _jIndex * _kIndex * _lIndex);
+    std::fill(_values.begin(), _values.end(), 0.0);
 }
 
-int32_t
+int
 CDense4DTensor::getiIndex() const
 {
     return _iIndex;
 }
 
-int32_t
+int
 CDense4DTensor::getjIndex() const
 {
     return _jIndex;
 }
 
-int32_t
+int
 CDense4DTensor::getkIndex() const
 {
     return _kIndex;
 }
 
-int32_t
+int
 CDense4DTensor::getlIndex() const
 {
     return _lIndex;
 }
 
-int32_t
+int
 CDense4DTensor::getNumberOfElements() const
 {
     return _iIndex * _jIndex * _kIndex * _lIndex;
@@ -227,74 +219,4 @@ double*
 CDense4DTensor::values()
 {
     return _values.data();
-}
-
-std::string
-CDense4DTensor::getString() const
-{
-    std::stringstream sst("");
-
-    auto vals = _values.data();
-
-    sst << "[Dimension " << _iIndex << " x " << _jIndex << " x " << _kIndex << " x " << _lIndex << "]\n";
-
-    for (int32_t i = 0; i < _iIndex; i++)
-    {
-        for (int32_t j = 0; j < _jIndex; j++)
-        {
-            sst << i << " " << j << "\n";
-
-            int32_t ij = (i * _jIndex + j) * _kIndex * _lIndex;
-
-            for (int32_t k = 0; k < _kIndex; k++)
-            {
-                for (int32_t l = 0; l < _lIndex; l++)
-                {
-                    sst << fstr::to_string(vals[ij + k * _lIndex + l], 8, 15, fmt::right);
-                }
-                sst << "\n";
-            }
-            sst << "\n";
-        }
-        sst << "\n";
-    }
-
-    return sst.str();
-}
-
-void
-CDense4DTensor::broadcast(int32_t rank, MPI_Comm comm)
-{
-    if constexpr (ENABLE_MPI)
-    {
-        mpi::bcast(_iIndex, comm);
-
-        mpi::bcast(_jIndex, comm);
-
-        mpi::bcast(_kIndex, comm);
-
-        mpi::bcast(_lIndex, comm);
-
-        _values.broadcast(rank, comm);
-    }
-}
-
-std::ostream&
-operator<<(std::ostream& output, const CDense4DTensor& source)
-{
-    output << std::endl;
-
-    output << "[CDense4DTensor (Object):" << &source << "]" << std::endl;
-
-    output << "_iIndex: " << source._iIndex << std::endl;
-
-    output << "_jIndex: " << source._jIndex << std::endl;
-
-    output << "_kIndex: " << source._kIndex << std::endl;
-
-    output << "_lIndex: " << source._lIndex << std::endl;
-
-    output << "_values: " << source._values << std::endl;
-
-    return output;
 }

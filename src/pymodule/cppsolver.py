@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -36,7 +35,6 @@ from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
-from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
@@ -287,7 +285,7 @@ class ComplexResponse(LinearSolver):
 
         :return:
             A dictionary containing response functions, solutions and a
-            dictionarry containing solutions and kappa values when called from
+            dictionary containing solutions and kappa values when called from
             a non-linear response module.
         """
 
@@ -460,11 +458,6 @@ class ComplexResponse(LinearSolver):
         residuals = {}
         relative_residual_norm = {}
 
-        signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(self._graceful_exit, molecule,
-                                            basis, dft_dict, pe_dict,
-                                            rsp_vector_labels)
-
         iter_per_trial_in_hours = None
 
         # start iterations
@@ -472,7 +465,7 @@ class ComplexResponse(LinearSolver):
 
             iter_start_time = tm.time()
 
-            profiler.set_timing_key(f'Iteration {iteration+1}')
+            profiler.set_timing_key(f'Iteration {iteration + 1}')
 
             profiler.start_timer('ReducedSpace')
 
@@ -738,8 +731,6 @@ class ComplexResponse(LinearSolver):
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
-
-        signal_handler.remove_sigterm_function()
 
         self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
@@ -1018,13 +1009,9 @@ class ComplexResponse(LinearSolver):
             elif x_unit.lower() == 'nm':
                 spectrum['x_data'].append(auxnm / w)
 
-            Gxx = -rsp_funcs[('x', 'x', w)].imag
-            Gyy = -rsp_funcs[('y', 'y', w)].imag
-            Gzz = -rsp_funcs[('z', 'z', w)].imag
-
-            Gxx /= w
-            Gyy /= w
-            Gzz /= w
+            Gxx = -rsp_funcs[('x', 'x', w)].imag / (-w)
+            Gyy = -rsp_funcs[('y', 'y', w)].imag / (-w)
+            Gzz = -rsp_funcs[('z', 'z', w)].imag / (-w)
 
             beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
             Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()

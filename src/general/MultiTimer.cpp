@@ -1,10 +1,9 @@
 //
-//                           VELOXCHEM 1.0-RC2
+//                              VELOXCHEM
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
-//  Contact: https://veloxchem.org/contact
+//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -50,7 +49,7 @@ CMultiTimer::start(const std::string& label)
     {
         // found label
 
-        int32_t index = label_iter - _labels.begin();
+        auto index = label_iter - _labels.begin();
 
         _timers[index].start();
     }
@@ -75,7 +74,7 @@ CMultiTimer::stop(const std::string& label)
     {
         // found label
 
-        int32_t index = label_iter - _labels.begin();
+        auto index = label_iter - _labels.begin();
 
         _timers[index].stop();
     }
@@ -86,7 +85,7 @@ CMultiTimer::getSummary() const
 {
     std::stringstream ss;
 
-    for (int32_t timer_id = 0; timer_id < static_cast<int32_t>(_timers.size()); timer_id++)
+    for (size_t timer_id = 0; timer_id < _timers.size(); timer_id++)
     {
         const auto& label = _labels[timer_id];
 
