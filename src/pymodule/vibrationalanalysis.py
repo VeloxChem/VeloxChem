@@ -294,9 +294,7 @@ class VibrationalAnalysis:
                 self.do_resonance_raman = False
 
             # print the vibrational properties
-            #self.print_vibrational_analysis(molecule)
-            self.print_vibrational_analysis_ostream(molecule)
-            self.print_vibrational_analysis_file(molecule)
+            self.print_vibrational_analysis(molecule)
 
             # print resonance Raman grid at the end
             if self.do_resonance_raman:
@@ -561,153 +559,28 @@ class VibrationalAnalysis:
             The response driver (for excited state vibrational analysis).
         """
 
-        # number of atoms, elements, and coordinates
-        natm = molecule.number_of_atoms()
-        elem = molecule.get_labels()
         number_of_modes = len(self.vib_frequencies)
+        n_dom_modes = 5
 
-        # normalize the normal modes
-        self.normal_modes /= np.linalg.norm(self.normal_modes,
-                                            axis=1)[:, np.newaxis]
-        self.normed_normal_modes = self.normal_modes / np.linalg.norm(self.normal_modes,
-                                            axis=1)[:, np.newaxis]
+        if number_of_modes <= n_dom_modes:
+            normal_mode_idx_lst = range(number_of_modes)
+        elif (self.ir_intensities is not None):
+            normal_mode_idx_lst = self.get_dominant_modes(n_dom_modes)
+            warn_msg1 = f'The {n_dom_modes} dominant normal modes are printed below.'
+            self.ostream.print_warning(warn_msg1)
+        else:
+            normal_mode_idx_lst = range(n_dom_modes)
+            warn_msg1 = f'The {n_dom_modes} lowest normal modes are printed below.'
+            self.ostream.print_warning(warn_msg1)
+        warn_msg2 = f'All results are available in txt-format in {self.result_file}.'
 
-        # set name of output file
-        #if self.result_file is None:
-        #    self.result_file = f'vib-results.out'
-        # open output file
-        fout = open(self.result_file, 'w')
+        self.ostream.print_warning(warn_msg2)
 
-        title = 'Vibrational Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-        # result file
-        fout.write(title.center(52))
-        fout.write('\n')
-        fout.write(('=' * (len(title) + 2)).center(52))
-        fout.write('\n\n')
+        self.print_vibrational_analysis_ostream(molecule, normal_mode_idx_lst,
+                                                filename, rsp_drv)
+        self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
-        width = 52
-        for k in range(number_of_modes):
-
-            # print indices and vibrational frequencies:
-            index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
-            self.ostream.print_header(index_string.ljust(width))
-            self.ostream.print_header('-' * width)
-            # result file
-            fout.write(index_string.ljust(width))
-            fout.write('\n')
-            fout.write('-' * width)
-            fout.write('\n')
-
-            freq_string = '{:22s}{:20.2f}  {:8s}'.format(
-                'Harmonic frequency:', self.vib_frequencies[k], 'cm**-1')
-            self.ostream.print_header(freq_string.ljust(width))
-            # result file
-            fout.write(freq_string.ljust(width))
-            fout.write('\n')
-
-            mass_string = '{:22s}{:20.4f}  {:8s}'.format(
-                'Reduced mass:', self.reduced_masses[k], 'amu')
-            self.ostream.print_header(mass_string.ljust(width))
-            # result file
-            fout.write(mass_string.ljust(width))
-            fout.write('\n')
-
-            force_cnst_string = '{:22s}{:20.4f}  {:8s}'.format(
-                'Force constant:', self.force_constants[k], 'mdyne/A')
-            self.ostream.print_header(force_cnst_string.ljust(width))
-            # result file
-            fout.write(force_cnst_string.ljust(width))
-            fout.write('\n')
-
-            if self.ir_intensities is not None:
-                ir_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
-                    'IR intensity:', self.ir_intensities[k], 'km/mol')
-                self.ostream.print_header(ir_intens_string.ljust(width))
-                # result file
-                fout.write(ir_intens_string.ljust(width))
-                fout.write('\n')
-
-            if self.do_raman and (self.raman_intensities is not None):
-                freq_unit = ' a.u.'
-                freqs = list(self.raman_intensities.keys())
-                for freq in freqs:
-                    if freq == 0.0:
-                        this_freq = 'static'
-                    else:
-                        this_freq = str(round(freq,4)) + freq_unit
-                    raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
-                            'Raman activity:', this_freq, self.raman_intensities[freq][k],
-                            'A**4/amu')
-                    self.ostream.print_header(raman_intens_string.ljust(width))
-                    # result file
-                    fout.write(raman_intens_string.ljust(width))
-                    fout.write('\n')
-
-                if self.print_depolarization_ratio:
-                    raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Parallel Raman:', int_pol[k], 'A**4/amu')
-                    self.ostream.print_header(
-                        raman_parallel_str.ljust(width))
-                    # result file
-                    fout.write(raman_parallel_str.ljust(width))
-                    fout.write('\n')
-
-                    raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Perpendicular Raman:', int_depol[k], 'A**4/amu')
-                    self.ostream.print_header(
-                        raman_perpendicular_str.ljust(width))
-                    # result file
-                    fout.write(raman_perpendicular_str.ljust(width))
-                    fout.write('\n')
-
-                    depolarization_str = '{:22s}{:20.4f}'.format(
-                        'Depolarization ratio:', depol_ratio[k])
-                    self.ostream.print_header(
-                        depolarization_str.ljust(width))
-                    # result file
-                    fout.write(depolarization_str.ljust(width))
-                    fout.write('\n')
-
-            normal_mode_string = '{:22s}'.format('Normal mode:')
-            self.ostream.print_header(normal_mode_string.ljust(width))
-            # result file
-            fout.write(normal_mode_string.ljust(width))
-            fout.write('\n\n')
-
-            normal_mode_string = '{:16s}{:>12s}{:>12s}{:>12s}'.format(
-                '', 'X', 'Y', 'Z')
-            self.ostream.print_header(normal_mode_string.ljust(width))
-            # result file
-            fout.write(normal_mode_string.ljust(width))
-            fout.write('\n')
-
-            # print normal modes:
-            for atom_index in range(natm):
-                valstr = '{:<8d}'.format(atom_index + 1)
-                valstr += '{:<8s}'.format(elem[atom_index])
-                valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 0])
-                valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 1])
-                valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 2])
-                self.ostream.print_header(valstr.ljust(width))
-                # result file
-                fout.write(valstr.ljust(width))
-                fout.write('\n')
-
-            self.ostream.print_blank()
-            self.ostream.print_blank()
-            # result file
-            fout.write('\n\n')
-
-        self.ostream.flush()
-        fout.close()
-
-    def print_vibrational_analysis_ostream(self, molecule, filename=None, rsp_drv=None):
+    def print_vibrational_analysis_ostream(self, molecule, idx_lst, filename=None, rsp_drv=None):
         """
         Prints the results from the vibrational analysis to the ostream.
 
@@ -731,15 +604,17 @@ class VibrationalAnalysis:
                                             axis=1)[:, np.newaxis]
 
         # sort out dominant modes to print to ostream
-        n_dom_modes = 5
-        if number_of_modes <= n_dom_modes:
-            normal_mode_idx_lst = range(number_of_modes)
-        else:
-            normal_mode_idx_lst = self.get_dominant_modes(n_dom_modes)
-            warn_msg1 = f'The {n_dom_modes} dominant normal modes are printed below.'
-            warn_msg2 = f'All results are available in txt-format in {self.result_file}.'
-            self.ostream.print_warning(warn_msg1)
-            self.ostream.print_warning(warn_msg2)
+        #n_dom_modes = 5
+        #if number_of_modes <= n_dom_modes:
+        #    normal_mode_idx_lst = range(number_of_modes)
+        #elif (self.ir_intensities is not None):
+        #    normal_mode_idx_lst = self.get_dominant_modes(n_dom_modes)
+        #    warn_msg1 = f'The {n_dom_modes} dominant normal modes are printed below.'
+        #    warn_msg2 = f'All results are available in txt-format in {self.result_file}.'
+        #    self.ostream.print_warning(warn_msg1)
+        #    self.ostream.print_warning(warn_msg2)
+        #else:
+        #    normal_mode_idx_lst = range(n_dom_modes)
 
         title = 'Vibrational Analysis'
         self.ostream.print_header(title)
@@ -747,8 +622,7 @@ class VibrationalAnalysis:
         self.ostream.print_blank()
 
         width = 52
-        #for k in range(number_of_modes):
-        for k in normal_mode_idx_lst:
+        for k in idx_lst:
 
             # print indices and vibrational frequencies:
             index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
@@ -1002,10 +876,7 @@ class VibrationalAnalysis:
             A list containing the indices of the dominant normal modes.
         """
 
-        if self.ir_intensities is not None:
-            lst = self.ir_intensities.tolist()
-        else:
-            lst = self.force_constants.tolist()
+        lst = self.ir_intensities.tolist()
 
         tmp = list(lst)
         tmp.sort()
