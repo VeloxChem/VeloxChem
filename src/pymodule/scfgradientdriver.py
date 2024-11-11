@@ -284,10 +284,12 @@ class ScfGradientDriver(GradientDriver):
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(D)
 
+        den_mat_for_fock2 = make_matrix(basis, mat_t.general)
+        den_mat_for_fock2.set_values(D)
+
         fock_timing = {
             'Screening': 0.0,
             'FockGrad': 0.0,
-            'LinAlg': 0.0,
         }
 
         self._print_debug_info('before fock_grad')
@@ -316,7 +318,8 @@ class ScfGradientDriver(GradientDriver):
             t0 = time.time()
 
             gmats = fock_grad_drv.compute(basis, screener_atom, screener,
-                                          den_mat_for_fock, iatom, fock_type,
+                                          den_mat_for_fock, den_mat_for_fock2,
+                                          iatom, fock_type,
                                           exchange_scaling_factor, 0.0,
                                           thresh_int)
 
@@ -324,15 +327,7 @@ class ScfGradientDriver(GradientDriver):
 
             factor = 2.0 if fock_type == 'j' else 1.0
 
-            t0 = time.time()
-
-            for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix_to_numpy(label)
-                self.gradient[iatom, i] += np.sum(gmat * D) * factor
-
-            gmats = Matrices()
-
-            fock_timing['LinAlg'] += time.time() - t0
+            self.gradient[iatom, :] += np.array(gmats) * factor
 
         self._print_debug_info('after  fock_grad')
 
