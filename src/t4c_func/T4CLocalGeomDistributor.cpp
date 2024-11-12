@@ -1413,11 +1413,17 @@ local_distribute_jk_geom_ket_gen(CMatrices&                       focks,
 
                         // Coulomb contribution (F_pq)
 
-                        submat_pq->at({loc_p, loc_q}) += 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
-                        submat_qp->at({loc_q, loc_p}) += 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
+                        const auto f2rs = 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
 
-                        submat_rs->at({loc_r, loc_s}) += 2.0 * fval * (denmat_pq->operator[]({p, q})+denmat_qp->operator[]({q, p}));
-                        submat_sr->at({loc_s, loc_r}) += 2.0 * fval * (denmat_pq->operator[]({p, q})+denmat_qp->operator[]({q, p}));
+                        submat_pq->at({loc_p, loc_q}) += f2rs;
+                        submat_qp->at({loc_q, loc_p}) += f2rs;
+
+                        // Coulomb contribution (F_rs)
+
+                        const auto f2pq = 2.0 * fval * (denmat_pq->operator[]({p, q}) + denmat_qp->operator[]({q, p}));
+
+                        submat_rs->at({loc_r, loc_s}) += f2pq;
+                        submat_sr->at({loc_s, loc_r}) += f2pq;
 
                         // Exchange contribution (F_pr)
 
@@ -1644,11 +1650,17 @@ local_distribute_jkx_geom_ket_gen(CMatrices&                       focks,
 
                         // Coulomb contribution (F_pq)
 
-                        submat_pq->at({loc_p, loc_q}) += 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
-                        submat_qp->at({loc_q, loc_p}) += 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
+                        const auto f2rs = 2.0 * fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
 
-                        submat_rs->at({loc_r, loc_s}) += 2.0 * fval * (denmat_pq->operator[]({p, q})+denmat_qp->operator[]({q, p}));
-                        submat_sr->at({loc_s, loc_r}) += 2.0 * fval * (denmat_pq->operator[]({p, q})+denmat_qp->operator[]({q, p}));
+                        submat_pq->at({loc_p, loc_q}) += f2rs;
+                        submat_qp->at({loc_q, loc_p}) += f2rs;
+
+                        // Coulomb contribution (F_rs)
+
+                        const auto f2pq = 2.0 * fval * (denmat_pq->operator[]({p, q}) + denmat_qp->operator[]({q, p}));
+
+                        submat_rs->at({loc_r, loc_s}) += f2pq;
+                        submat_sr->at({loc_s, loc_r}) += f2pq;
 
                         // Exchange contribution
 
@@ -1830,11 +1842,17 @@ local_distribute_j_geom_ket_gen(CMatrices&                       focks,
 
                         // Coulomb contribution (F_pq)
 
-                        submat_pq->at({loc_p, loc_q}) += fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
-                        submat_qp->at({loc_q, loc_p}) += fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
+                        const auto f_rs = fval * (denmat_rs->operator[]({r, s}) + denmat_sr->operator[]({s, r}));
 
-                        submat_rs->at({loc_r, loc_s}) += fval * (denmat_pq->operator[]({p, q})+denmat_qp->operator[]({q, p}));
-                        submat_sr->at({loc_s, loc_r}) += fval * (denmat_pq->operator[]({p, q})+denmat_qp->operator[]({q, p}));
+                        submat_pq->at({loc_p, loc_q}) += f_rs;
+                        submat_qp->at({loc_q, loc_p}) += f_rs;
+
+                        // Coulomb contribution (F_rs)
+
+                        const auto f_pq = fval * (denmat_pq->operator[]({p, q}) + denmat_qp->operator[]({q, p}));
+
+                        submat_rs->at({loc_r, loc_s}) += f_pq;
+                        submat_sr->at({loc_s, loc_r}) += f_pq;
                     }
                 }
             }
