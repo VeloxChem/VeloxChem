@@ -1109,6 +1109,28 @@ local_distribute_geom_ket_symm(CMatrices&                       focks,
                                                                 bra_igto,
                                                                 ket_range);
         }
+        else if (density->get_type() == mat_t::general)
+        {
+            t4cfunc::local_distribute_jk_geom_ket_gen(focks,
+                                                      suffix,
+                                                      density,
+                                                      buffer,
+                                                      offset,
+                                                      a_indices,
+                                                      b_indices,
+                                                      c_indices,
+                                                      d_indices,
+                                                      a_loc_indices,
+                                                      b_loc_indices,
+                                                      c_loc_indices,
+                                                      d_loc_indices,
+                                                      a_angmom,
+                                                      b_angmom,
+                                                      c_angmom,
+                                                      d_angmom,
+                                                      bra_igto,
+                                                      ket_range);
+        }
     }
 
     if (label == "2jkx")
@@ -1136,6 +1158,29 @@ local_distribute_geom_ket_symm(CMatrices&                       focks,
                                                                  bra_igto,
                                                                  ket_range);
         }
+        else if (density->get_type() == mat_t::general)
+        {
+            t4cfunc::local_distribute_jkx_geom_ket_gen(focks,
+                                                       suffix,
+                                                       density,
+                                                       buffer,
+                                                       offset,
+                                                       exchange_factor,
+                                                       a_indices,
+                                                       b_indices,
+                                                       c_indices,
+                                                       d_indices,
+                                                       a_loc_indices,
+                                                       b_loc_indices,
+                                                       c_loc_indices,
+                                                       d_loc_indices,
+                                                       a_angmom,
+                                                       b_angmom,
+                                                       c_angmom,
+                                                       d_angmom,
+                                                       bra_igto,
+                                                       ket_range);
+        }
     }
 
     if ((label == "j") || (label == "j_rs"))
@@ -1161,6 +1206,28 @@ local_distribute_geom_ket_symm(CMatrices&                       focks,
                                                                d_angmom,
                                                                bra_igto,
                                                                ket_range);
+        }
+        else if (density->get_type() == mat_t::general)
+        {
+            t4cfunc::local_distribute_j_geom_ket_gen(focks,
+                                                     suffix,
+                                                     density,
+                                                     buffer,
+                                                     offset,
+                                                     a_indices,
+                                                     b_indices,
+                                                     c_indices,
+                                                     d_indices,
+                                                     a_loc_indices,
+                                                     b_loc_indices,
+                                                     c_loc_indices,
+                                                     d_loc_indices,
+                                                     a_angmom,
+                                                     b_angmom,
+                                                     c_angmom,
+                                                     d_angmom,
+                                                     bra_igto,
+                                                     ket_range);
         }
     }
 
