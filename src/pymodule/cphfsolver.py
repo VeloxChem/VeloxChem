@@ -209,7 +209,7 @@ class CphfSolver(LinearSolver):
 
         if self.rank == mpi_master():
             # get rhs, find out how many degrees of freedom, and reshape
-            cphf_rhs = cphf_rhs_dict['cphf_rhs'] #.reshape(3*natm, nocc*nvir)
+            cphf_rhs = cphf_rhs_dict['cphf_rhs']
             dof = cphf_rhs.shape[0]
             cphf_rhs = cphf_rhs.reshape(dof, nocc * nvir)
         else:
@@ -637,7 +637,7 @@ class CphfSolver(LinearSolver):
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, *args)
 
         if self.rank == mpi_master():
-            cphf_rhs = cphf_rhs_dict['cphf_rhs'] #.reshape(3*natm, nocc*nvir)
+            cphf_rhs = cphf_rhs_dict['cphf_rhs']
             dof = cphf_rhs.shape[0]
         else:
             cphf_rhs = None
