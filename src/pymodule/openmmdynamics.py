@@ -738,7 +738,9 @@ class OpenMMDynamics:
         :param qm_minimization:
             QM driver object for energy minimization. Default is None.
         :param basis:
-            Basis set for the SCF driver if qm_driver is not None.    
+            Basis set for the SCF driver if qm_driver is not None.
+        :param constraints:
+            Constraints for the system. Default is None.
         :param minimize:
             If True, the energy of the conformations will be minimized. Default is True.
 
@@ -829,6 +831,7 @@ class OpenMMDynamics:
             self.ostream.flush()
 
             # Filter out the conformations with RMSD < 0.1 and keep the lowest energy one.
+
             for i, coord in enumerate(opt_coordinates):
                 molecule = Molecule.from_xyz_string(coord)
                 molecule_coords = molecule.get_coordinates_in_angstrom()
@@ -837,7 +840,7 @@ class OpenMMDynamics:
                     if i != j:
                         molecule2 = Molecule.from_xyz_string(coord2)
                         molecule2_coords = molecule2.get_coordinates_in_angstrom()
-                        rmsd = np.sqrt(np.mean((molecule_coords - molecule2_coords) ** 2))
+                        rmsd = self._calculate_rmsd(molecule_coords, molecule2_coords)
                         if rmsd < 0.1:
                             if energies[j] < energy:
                                 energies[i] = energies[j]
@@ -2177,6 +2180,72 @@ class OpenMMDynamics:
             potential_energy = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
 
         return potential_energy
+    
+    def _calculate_rmsd(self, coord1, coord2):
+        """
+        Calculate the root mean square deviation (RMSD) between two sets of atomic coordinates
+        after optimal alignment using the Kabsch algorithm. This method accounts for rotational
+        and translational differences between the molecular conformations.
+
+        :param coord1: 
+            The coordinates of the first molecule.
+        :param coord2:
+            The coordinates of the second molecule.
+
+
+        :return:
+        - rmsd_value: float
+            The RMSD between the two aligned molecules.
+        """
+
+        # Center the coordinates to eliminate translational differences
+        centroid1 = np.mean(coord1, axis=0)  
+        centroid2 = np.mean(coord2, axis=0) 
+        coord1_centered = coord1 - centroid1
+        coord2_centered = coord2 - centroid2
+
+        # The covariance matrix captures how the centered coordinates of the two molecules relate
+        covariance_matrix = np.dot(coord1_centered.T, coord2_centered)
+        
+        # Perform Singular Value Decomposition (SVD) on the covariance matrix
+        V, S, Wt = np.linalg.svd(covariance_matrix)
+
+        # Correct for improper rotation (reflection)
+        # Calculate the determinant of the rotation matrix to check for reflection
+        # A determinant of -1 indicates a reflection, which we need to correct
+        d = np.sign(np.linalg.det(np.dot(V, Wt)))
+
+        # If the determinant is negative, adjust the matrices to ensure a proper rotation
+        if d < 0:
+            # Reflect the last column of V and invert the last singular value
+            V[:, -1] *= -1
+            S[-1] *= -1
+
+        # Compute the optimal rotation matrix
+        # Multiply V and Wt to get the rotation matrix that best aligns coord1 to coord2
+        rotation_matrix = np.dot(V, Wt)
+
+        # Apply the rotation to the centered coordinates of the first molecule
+        # Rotate coord1_centered using the rotation matrix
+        coord1_rotated = np.dot(coord1_centered, rotation_matrix)
+
+        #Calculate the RMSD between the rotated coordinates and the centered coordinates of the second molecule
+        diff = coord1_rotated - coord2_centered
+
+        # Square the differences
+        diff_squared = diff ** 2
+
+        # Sum the squared differences over all atoms and coordinate axes (x, y, z)
+        sum_diff_squared = np.sum(diff_squared)
+
+        # Calculate the mean squared deviation
+        mean_diff_squared = sum_diff_squared / len(coord1)
+
+        # Take the square root of the mean squared deviation to obtain the RMSD
+        rmsd_value = np.sqrt(mean_diff_squared)
+
+        return rmsd_value
+
     
 
 
