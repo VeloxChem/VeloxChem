@@ -2260,6 +2260,7 @@ class PolOrbitalResponse(CphfSolver):
             for idx, map_idx in map_dof:
                 for x, y in [tnsr_idx for tnsr_idx in map_idx]:
                     cphf_ov[f, x, y] = cphf_sol[idx]
+        cphf_ov = cphf_ov.reshape(n_freq, dof**2, nocc, nvir)
 
         return cphf_ov
 
