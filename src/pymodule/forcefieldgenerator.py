@@ -296,7 +296,7 @@ class ForceFieldGenerator:
         for i, dih in enumerate(self.target_dihedrals):
             self.validate_force_field(i)
 
-        # save output files
+        # ave output files
 
         if self.rank == mpi_master() and self.keep_files:
             out_dir = Path(self.molecule_name + '_files')
@@ -316,6 +316,66 @@ class ForceFieldGenerator:
             except (NotADirectoryError, PermissionError):
                 pass
             self.workdir = None
+    
+    def refine_dihedrals(self, dihedrals, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19):
+        """
+        Refines the dihedral angles using QM calculations.
+
+        :param dihedrals:
+            The list of lists of dihedral indices to be refined. (1-indexed)
+        :param scf_drv:
+            The SCF driver.
+        :param basis:
+            The AO basis set.
+        :param range:
+            List with the range of dihedral angles. Default is [0, 360].
+        :param n_points:
+            The number of points to be calculated. Default is 19. Minimum is 6.
+        """
+        # Check if basis is provided unless XTBDriver is used
+        if not isinstance(scf_drv, XtbDriver) and basis is None:
+            error_msg = 'Basis is required for the SCF driver.'
+            assert_msg_critical(False, error_msg)
+
+        # Check if the number of points is valid
+        if n_points < 6:
+            error_msg = 'The number of points must be at least 6 to fit the dihedral potential.'
+            assert_msg_critical(False, error_msg)
+
+        # Perform a SCF calculation
+        if scf_result is None:
+            self.ostream.print_info('Performing SCF calculation...')
+            self.ostream.flush()
+            scf_result = scf_drv.compute(self.molecule, basis)
+
+        scan_xyz_files = []
+
+        for i, dih in enumerate(dihedrals):
+            scf_drv.ostream.mute()
+            opt_drv = OptimizationDriver(scf_drv)
+            opt_drv.ostream.mute()
+            constraint = f"scan dihedral {dih[0]} {dih[1]} {dih[2]} {dih[3]} {scan_range[0]} {scan_range[1]} {n_points}"
+            opt_drv.constraints = [constraint]
+
+            self.ostream.print_info(f'Scanning dihedral {dih}...')
+            self.ostream.flush()
+            opt_drv.compute(self.molecule, basis, scf_result)
+
+            # Change the default file name to the dihedral indices
+            file = Path("scan-final.xyz")
+            file.rename(f"{dih[0]}-{dih[1]}-{dih[2]}-{dih[3]}.xyz")
+            scan_xyz_files.append(f"{dih[0]}-{dih[1]}-{dih[2]}-{dih[3]}.xyz")
+
+        # Refine the dihedral angles
+        self.read_qm_scan_xyz_files(scan_xyz_files)
+        
+        for i in range(len(dihedrals)):
+            self.dihedral_correction(i)
+            mm_phi_fitted = self.validate_force_field(i)
+
+        self.ostream.print_info('Dihedral MM parameters have been refined and updated in the topology.')
+        self.ostream.flush()
+
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
@@ -2176,26 +2236,26 @@ class ForceFieldGenerator:
         self.set_dihedral_parameters(dih, coef_list)
 
         # write itp and gro files
+        # This is not needed anymore since the writting methods are centralized in write_gromacs_files and write_openmm_files!
+        # mol_name = Path(self.molecule_name).stem
 
-        mol_name = Path(self.molecule_name).stem
+        # workdir = Path('.') if self.workdir is None else self.workdir
 
-        workdir = Path('.') if self.workdir is None else self.workdir
+        # self.ffversion += 1
+        # new_itp_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.itp')
+        # new_top_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.top')
 
-        self.ffversion += 1
-        new_itp_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.itp')
-        new_top_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.top')
+        # if self.rank == mpi_master():
+        #     self.write_itp(new_itp_fname, mol_name)
+        #     self.write_top(new_top_fname, new_itp_fname, mol_name)
+        # self.comm.barrier()
 
-        if self.rank == mpi_master():
-            self.write_itp(new_itp_fname, mol_name)
-            self.write_top(new_top_fname, new_itp_fname, mol_name)
-        self.comm.barrier()
-
-        self.ostream.print_info('...done.')
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            f'Generated new topology file: {Path(new_top_fname).name}')
-        self.ostream.print_blank()
-        self.ostream.flush()
+        # self.ostream.print_info('...done.')
+        # self.ostream.print_blank()
+        # self.ostream.print_info(
+        #     f'Generated new topology file: {Path(new_top_fname).name}')
+        # self.ostream.print_blank()
+        # self.ostream.flush()
 
     def validate_force_field(self, i):
         """

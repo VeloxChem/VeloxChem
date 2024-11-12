@@ -1,4 +1,4 @@
-name: vlxenv
+name: vlxenv-md
 channels:
   - conda-forge
 dependencies:
@@ -30,3 +30,5 @@ dependencies:
   - yapf
   - toml
   - flake8
+  - openmm
+  - pymbar
