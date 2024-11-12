@@ -221,11 +221,11 @@ comp_electron_repulsion_geom2000_ssss(T& distributor,
 
                 t2cfunc::reduce(cbuffer, 0, pbuffer, 0, 1, ket_width, ket_npgtos);
 
-                pbuffer.scale(4.0 * a_exp, {0, 1});
+                pbuffer.scale(2.0 * a_exp, {0, 1});
 
-                pbuffer.scale(4.0 * a_exp, {3, 6});
+                pbuffer.scale(4.0 * a_exp * a_exp, {3, 6});
 
-                pbuffer.scale(4.0 * a_exp, {9, 15});
+                pbuffer.scale(4.0 * a_exp * a_exp, {9, 15});
 
                 t2cfunc::reduce(cbuffer, 1, pbuffer, 0, 1, ket_width, ket_npgtos);
 
