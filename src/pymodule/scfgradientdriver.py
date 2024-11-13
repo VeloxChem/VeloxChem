@@ -317,17 +317,17 @@ class ScfGradientDriver(GradientDriver):
 
             t0 = time.time()
 
-            gmats = fock_grad_drv.compute(basis, screener_atom, screener,
-                                          den_mat_for_fock, den_mat_for_fock2,
-                                          iatom, fock_type,
-                                          exchange_scaling_factor, 0.0,
-                                          thresh_int)
+            atomgrad = fock_grad_drv.compute(basis, screener_atom, screener,
+                                             den_mat_for_fock,
+                                             den_mat_for_fock2, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
 
             fock_timing['FockGrad'] += time.time() - t0
 
             factor = 2.0 if fock_type == 'j' else 1.0
 
-            self.gradient[iatom, :] += np.array(gmats) * factor
+            self.gradient[iatom, :] += np.array(atomgrad) * factor
 
         self._print_debug_info('after  fock_grad')
 
@@ -520,6 +520,15 @@ class ScfGradientDriver(GradientDriver):
         Dab_for_fock = make_matrix(basis, mat_t.symmetric)
         Dab_for_fock.set_values(Da + Db)
 
+        Da_for_fock_2 = make_matrix(basis, mat_t.general)
+        Da_for_fock_2.set_values(Da)
+
+        Db_for_fock_2 = make_matrix(basis, mat_t.general)
+        Db_for_fock_2.set_values(Db)
+
+        Dab_for_fock_2 = make_matrix(basis, mat_t.general)
+        Dab_for_fock_2.set_values(Da + Db)
+
         fock_grad_drv = FockGeom1000Driver()
 
         extra_factor = self._get_extra_block_size_factor(
@@ -537,35 +546,27 @@ class ScfGradientDriver(GradientDriver):
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
-            gmats_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
-                                              Dab_for_fock, iatom, 'j', 0.0,
-                                              0.0, thresh_int)
-
-            if fock_type != 'j':
-                gmats_Ka = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                 Da_for_fock, iatom, 'kx',
-                                                 exchange_scaling_factor, 0.0,
-                                                 thresh_int)
-                gmats_Kb = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                 Db_for_fock, iatom, 'kx',
-                                                 exchange_scaling_factor, 0.0,
+            atomgrad_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                 Dab_for_fock, Dab_for_fock_2,
+                                                 iatom, 'j', 0.0, 0.0,
                                                  thresh_int)
 
-            for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat_jab = gmats_Jab.matrix_to_numpy(label)
-                self.gradient[iatom, i] += 0.5 * np.sum(gmat_jab * (Da + Db))
-
-                if fock_type != 'j':
-                    gmat_ka = gmats_Ka.matrix_to_numpy(label)
-                    gmat_kb = gmats_Kb.matrix_to_numpy(label)
-                    self.gradient[iatom, i] -= 0.5 * np.sum(gmat_ka * Da)
-                    self.gradient[iatom, i] -= 0.5 * np.sum(gmat_kb * Db)
-
-            gmats_Jab = Matrices()
+            self.gradient[iatom, :] += 0.5 * np.array(atomgrad_Jab)
 
             if fock_type != 'j':
-                gmats_Ka = Matrices()
-                gmats_Kb = Matrices()
+                atomgrad_Ka = fock_grad_drv.compute(basis, screener_atom,
+                                                    screener, Da_for_fock,
+                                                    Da_for_fock_2, iatom, 'kx',
+                                                    exchange_scaling_factor,
+                                                    0.0, thresh_int)
+                atomgrad_Kb = fock_grad_drv.compute(basis, screener_atom,
+                                                    screener, Db_for_fock,
+                                                    Db_for_fock_2, iatom, 'kx',
+                                                    exchange_scaling_factor,
+                                                    0.0, thresh_int)
+
+                self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
+                self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
 
         # TODO: unrestricted DFT gradient
         # XC contribution to gradient

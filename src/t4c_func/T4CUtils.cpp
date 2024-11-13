@@ -1436,6 +1436,61 @@ local_distribute_geom(std::vector<double>&             values,
         }
         // TODO: mat_t::general
     }
+    else if ((label == "k") || (label == "k_rs"))
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_k_geom_sym(values,
+                                                 cart_ind,
+                                                 density,
+                                                 density_2,
+                                                 buffer,
+                                                 offset,
+                                                 a_indices,
+                                                 b_indices,
+                                                 c_indices,
+                                                 d_indices,
+                                                 a_loc_indices,
+                                                 b_loc_indices,
+                                                 c_loc_indices,
+                                                 d_loc_indices,
+                                                 a_angmom,
+                                                 b_angmom,
+                                                 c_angmom,
+                                                 d_angmom,
+                                                 bra_igto,
+                                                 ket_range);
+        }
+        // TODO: mat_t::general
+    }
+    else if ((label == "kx") || (label == "kx_rs"))
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_kx_geom_sym(values,
+                                                  cart_ind,
+                                                  density,
+                                                  density_2,
+                                                  buffer,
+                                                  offset,
+                                                  exchange_factor,
+                                                  a_indices,
+                                                  b_indices,
+                                                  c_indices,
+                                                  d_indices,
+                                                  a_loc_indices,
+                                                  b_loc_indices,
+                                                  c_loc_indices,
+                                                  d_loc_indices,
+                                                  a_angmom,
+                                                  b_angmom,
+                                                  c_angmom,
+                                                  d_angmom,
+                                                  bra_igto,
+                                                  ket_range);
+        }
+        // TODO: mat_t::general
+    }
 }
 
 }  // namespace t4cfunc
