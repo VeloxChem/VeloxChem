@@ -17,7 +17,52 @@ CT4CGeomX0MatricesDistributor::CT4CGeomX0MatricesDistributor(CMatrices*         
 
     : _focks(focks)
 
+    , _values(std::vector<double>(3, 0.0))
+
     , _density(density)
+
+    , _density_2(nullptr)
+
+    , _label(format::lower_case(label))
+
+    , _exchange_factor(exchange_factor)
+
+    , _omega(omega)
+
+    , _matrices(CMatrices())
+
+    , _a_loc_indices(std::vector<size_t>())
+
+    , _b_loc_indices(std::vector<size_t>())
+
+    , _c_loc_indices(std::vector<size_t>())
+
+    , _d_loc_indices(std::vector<size_t>())
+
+    , _a_glob_indices(std::vector<size_t>())
+
+    , _b_glob_indices(std::vector<size_t>())
+
+    , _c_glob_indices(std::vector<size_t>())
+
+    , _d_glob_indices(std::vector<size_t>())
+{
+}
+
+CT4CGeomX0MatricesDistributor::CT4CGeomX0MatricesDistributor(CMatrices*         focks,
+                                                             const CMatrix*     density,
+                                                             const CMatrix*     density_2,
+                                                             const std::string& label,
+                                                             const double       exchange_factor,
+                                                             const double       omega)
+
+    : _focks(focks)
+
+    , _values(std::vector<double>(3, 0.0))
+
+    , _density(density)
+
+    , _density_2(density_2)
 
     , _label(format::lower_case(label))
 
@@ -55,6 +100,12 @@ auto
 CT4CGeomX0MatricesDistributor::need_omega() const -> bool
 {
     return (_label == "j_rs") || (_label == "k_rs") || (_label == "kx_rs");
+}
+
+auto
+CT4CGeomX0MatricesDistributor::get_values() const -> std::vector<double>
+{
+    return _values;
 }
 
 auto
@@ -124,7 +175,9 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
 {
     auto keys = _focks->keys();
 
-    if (const auto nkeys = keys.size(); nkeys > 0)
+    const auto nkeys = keys.size();
+
+    if ((nkeys > 0) && (_density_2 == nullptr))
     {
         const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
 
@@ -150,6 +203,35 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                                     d_angmom,
                                                     ibra_gto,
                                                     ket_range);
+        });
+    }
+    else if ((nkeys > 0) && (_density_2 != nullptr))
+    {
+        const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
+
+        std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
+            t4cfunc::local_distribute_geom(_values,
+                                           i,
+                                           _density,
+                                           _density_2,
+                                           _label,
+                                           _exchange_factor,
+                                           buffer,
+                                           offset + i * ncomps,
+                                           a_indices,
+                                           b_indices,
+                                           c_indices,
+                                           d_indices,
+                                           _a_loc_indices,
+                                           _b_loc_indices,
+                                           _c_loc_indices,
+                                           _d_loc_indices,
+                                           a_angmom,
+                                           b_angmom,
+                                           c_angmom,
+                                           d_angmom,
+                                           ibra_gto,
+                                           ket_range);
         });
     }
 }

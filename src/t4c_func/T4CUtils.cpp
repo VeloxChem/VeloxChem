@@ -1330,4 +1330,81 @@ local_distribute_geom_ket_symm(CMatrices&                       focks,
     }
 }
 
+auto
+local_distribute_geom(std::vector<double>&             values,
+                      const int                        cart_ind,
+                      const CMatrix*                   density,
+                      const CMatrix*                   density_2,
+                      const std::string&               label,
+                      const double                     exchange_factor,
+                      const CSimdArray<double>&        buffer,
+                      const size_t                     offset,
+                      const std::vector<size_t>&       a_indices,
+                      const std::vector<size_t>&       b_indices,
+                      const std::vector<size_t>&       c_indices,
+                      const std::vector<size_t>&       d_indices,
+                      const std::vector<size_t>&       a_loc_indices,
+                      const std::vector<size_t>&       b_loc_indices,
+                      const std::vector<size_t>&       c_loc_indices,
+                      const std::vector<size_t>&       d_loc_indices,
+                      const int                        a_angmom,
+                      const int                        b_angmom,
+                      const int                        c_angmom,
+                      const int                        d_angmom,
+                      const size_t                     bra_igto,
+                      const std::pair<size_t, size_t>& ket_range) -> void
+{
+    if (label == "2jk")
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_jk_geom_sym(values,
+                                                  cart_ind,
+                                                  density,
+                                                  density_2,
+                                                  buffer,
+                                                  offset,
+                                                  a_indices,
+                                                  b_indices,
+                                                  c_indices,
+                                                  d_indices,
+                                                  a_loc_indices,
+                                                  b_loc_indices,
+                                                  c_loc_indices,
+                                                  d_loc_indices,
+                                                  a_angmom,
+                                                  b_angmom,
+                                                  c_angmom,
+                                                  d_angmom,
+                                                  bra_igto,
+                                                  ket_range);
+        }
+        /*
+        else if (density->get_type() == mat_t::general)
+        {
+            t4cfunc::local_distribute_jk_geom_gen(values,
+                                                  cart_ind,
+                                                  density,
+                                                  density_2,
+                                                  buffer,
+                                                  offset,
+                                                  a_indices,
+                                                  b_indices,
+                                                  c_indices,
+                                                  d_indices,
+                                                  a_loc_indices,
+                                                  b_loc_indices,
+                                                  c_loc_indices,
+                                                  d_loc_indices,
+                                                  a_angmom,
+                                                  b_angmom,
+                                                  c_angmom,
+                                                  d_angmom,
+                                                  bra_igto,
+                                                  ket_range);
+        }
+        */
+    }
+}
+
 }  // namespace t4cfunc
