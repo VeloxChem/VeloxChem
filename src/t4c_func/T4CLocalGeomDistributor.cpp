@@ -2268,10 +2268,6 @@ local_distribute_jk_geom_sym(std::vector<double>&             values,
                              const std::vector<size_t>&       b_indices,
                              const std::vector<size_t>&       c_indices,
                              const std::vector<size_t>&       d_indices,
-                             const std::vector<size_t>&       a_loc_indices,
-                             const std::vector<size_t>&       b_loc_indices,
-                             const std::vector<size_t>&       c_loc_indices,
-                             const std::vector<size_t>&       d_loc_indices,
                              const int                        a_angmom,
                              const int                        b_angmom,
                              const int                        c_angmom,
@@ -2363,12 +2359,6 @@ local_distribute_jk_geom_sym(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -2378,16 +2368,6 @@ local_distribute_jk_geom_sym(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -2403,13 +2383,9 @@ local_distribute_jk_geom_sym(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -2425,12 +2401,6 @@ local_distribute_jk_geom_sym(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -2442,11 +2412,7 @@ local_distribute_jk_geom_sym(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -2560,10 +2526,6 @@ local_distribute_jkx_geom_sym(std::vector<double>&             values,
                               const std::vector<size_t>&       b_indices,
                               const std::vector<size_t>&       c_indices,
                               const std::vector<size_t>&       d_indices,
-                              const std::vector<size_t>&       a_loc_indices,
-                              const std::vector<size_t>&       b_loc_indices,
-                              const std::vector<size_t>&       c_loc_indices,
-                              const std::vector<size_t>&       d_loc_indices,
                               const int                        a_angmom,
                               const int                        b_angmom,
                               const int                        c_angmom,
@@ -2655,12 +2617,6 @@ local_distribute_jkx_geom_sym(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -2670,16 +2626,6 @@ local_distribute_jkx_geom_sym(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -2695,13 +2641,9 @@ local_distribute_jkx_geom_sym(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -2717,12 +2659,6 @@ local_distribute_jkx_geom_sym(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -2734,11 +2670,7 @@ local_distribute_jkx_geom_sym(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -2855,10 +2787,6 @@ local_distribute_j_geom_sym(std::vector<double>&             values,
                             const std::vector<size_t>&       b_indices,
                             const std::vector<size_t>&       c_indices,
                             const std::vector<size_t>&       d_indices,
-                            const std::vector<size_t>&       a_loc_indices,
-                            const std::vector<size_t>&       b_loc_indices,
-                            const std::vector<size_t>&       c_loc_indices,
-                            const std::vector<size_t>&       d_loc_indices,
                             const int                        a_angmom,
                             const int                        b_angmom,
                             const int                        c_angmom,
@@ -2902,12 +2830,6 @@ local_distribute_j_geom_sym(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -2917,16 +2839,6 @@ local_distribute_j_geom_sym(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -2942,13 +2854,9 @@ local_distribute_j_geom_sym(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -2964,12 +2872,6 @@ local_distribute_j_geom_sym(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -2981,11 +2883,7 @@ local_distribute_j_geom_sym(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -3038,10 +2936,6 @@ local_distribute_k_geom_sym(std::vector<double>&             values,
                             const std::vector<size_t>&       b_indices,
                             const std::vector<size_t>&       c_indices,
                             const std::vector<size_t>&       d_indices,
-                            const std::vector<size_t>&       a_loc_indices,
-                            const std::vector<size_t>&       b_loc_indices,
-                            const std::vector<size_t>&       c_loc_indices,
-                            const std::vector<size_t>&       d_loc_indices,
                             const int                        a_angmom,
                             const int                        b_angmom,
                             const int                        c_angmom,
@@ -3109,12 +3003,6 @@ local_distribute_k_geom_sym(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -3124,16 +3012,6 @@ local_distribute_k_geom_sym(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -3149,13 +3027,9 @@ local_distribute_k_geom_sym(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -3171,12 +3045,6 @@ local_distribute_k_geom_sym(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -3188,11 +3056,7 @@ local_distribute_k_geom_sym(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -3278,10 +3142,6 @@ local_distribute_kx_geom_sym(std::vector<double>&             values,
                              const std::vector<size_t>&       b_indices,
                              const std::vector<size_t>&       c_indices,
                              const std::vector<size_t>&       d_indices,
-                             const std::vector<size_t>&       a_loc_indices,
-                             const std::vector<size_t>&       b_loc_indices,
-                             const std::vector<size_t>&       c_loc_indices,
-                             const std::vector<size_t>&       d_loc_indices,
                              const int                        a_angmom,
                              const int                        b_angmom,
                              const int                        c_angmom,
@@ -3349,12 +3209,6 @@ local_distribute_kx_geom_sym(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -3364,16 +3218,6 @@ local_distribute_kx_geom_sym(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -3389,13 +3233,9 @@ local_distribute_kx_geom_sym(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -3411,12 +3251,6 @@ local_distribute_kx_geom_sym(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -3428,11 +3262,7 @@ local_distribute_kx_geom_sym(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -3517,10 +3347,6 @@ local_distribute_jk_geom_gen(std::vector<double>&             values,
                              const std::vector<size_t>&       b_indices,
                              const std::vector<size_t>&       c_indices,
                              const std::vector<size_t>&       d_indices,
-                             const std::vector<size_t>&       a_loc_indices,
-                             const std::vector<size_t>&       b_loc_indices,
-                             const std::vector<size_t>&       c_loc_indices,
-                             const std::vector<size_t>&       d_loc_indices,
                              const int                        a_angmom,
                              const int                        b_angmom,
                              const int                        c_angmom,
@@ -3610,12 +3436,6 @@ local_distribute_jk_geom_gen(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -3625,16 +3445,6 @@ local_distribute_jk_geom_gen(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -3650,13 +3460,9 @@ local_distribute_jk_geom_gen(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -3672,12 +3478,6 @@ local_distribute_jk_geom_gen(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -3689,11 +3489,7 @@ local_distribute_jk_geom_gen(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -3753,10 +3549,6 @@ local_distribute_jkx_geom_gen(std::vector<double>&             values,
                               const std::vector<size_t>&       b_indices,
                               const std::vector<size_t>&       c_indices,
                               const std::vector<size_t>&       d_indices,
-                              const std::vector<size_t>&       a_loc_indices,
-                              const std::vector<size_t>&       b_loc_indices,
-                              const std::vector<size_t>&       c_loc_indices,
-                              const std::vector<size_t>&       d_loc_indices,
                               const int                        a_angmom,
                               const int                        b_angmom,
                               const int                        c_angmom,
@@ -3846,12 +3638,6 @@ local_distribute_jkx_geom_gen(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -3861,16 +3647,6 @@ local_distribute_jkx_geom_gen(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -3886,13 +3662,9 @@ local_distribute_jkx_geom_gen(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -3908,12 +3680,6 @@ local_distribute_jkx_geom_gen(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -3925,11 +3691,7 @@ local_distribute_jkx_geom_gen(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -3992,10 +3754,6 @@ local_distribute_j_geom_gen(std::vector<double>&             values,
                             const std::vector<size_t>&       b_indices,
                             const std::vector<size_t>&       c_indices,
                             const std::vector<size_t>&       d_indices,
-                            const std::vector<size_t>&       a_loc_indices,
-                            const std::vector<size_t>&       b_loc_indices,
-                            const std::vector<size_t>&       c_loc_indices,
-                            const std::vector<size_t>&       d_loc_indices,
                             const int                        a_angmom,
                             const int                        b_angmom,
                             const int                        c_angmom,
@@ -4037,12 +3795,6 @@ local_distribute_j_geom_gen(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -4052,16 +3804,6 @@ local_distribute_j_geom_gen(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -4077,13 +3819,9 @@ local_distribute_j_geom_gen(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -4099,12 +3837,6 @@ local_distribute_j_geom_gen(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -4116,11 +3848,7 @@ local_distribute_j_geom_gen(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -4159,10 +3887,6 @@ local_distribute_k_geom_gen(std::vector<double>&             values,
                             const std::vector<size_t>&       b_indices,
                             const std::vector<size_t>&       c_indices,
                             const std::vector<size_t>&       d_indices,
-                            const std::vector<size_t>&       a_loc_indices,
-                            const std::vector<size_t>&       b_loc_indices,
-                            const std::vector<size_t>&       c_loc_indices,
-                            const std::vector<size_t>&       d_loc_indices,
                             const int                        a_angmom,
                             const int                        b_angmom,
                             const int                        c_angmom,
@@ -4228,12 +3952,6 @@ local_distribute_k_geom_gen(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -4243,16 +3961,6 @@ local_distribute_k_geom_gen(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -4268,13 +3976,9 @@ local_distribute_k_geom_gen(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -4290,12 +3994,6 @@ local_distribute_k_geom_gen(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -4307,11 +4005,7 @@ local_distribute_k_geom_gen(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
@@ -4357,10 +4051,6 @@ local_distribute_kx_geom_gen(std::vector<double>&             values,
                              const std::vector<size_t>&       b_indices,
                              const std::vector<size_t>&       c_indices,
                              const std::vector<size_t>&       d_indices,
-                             const std::vector<size_t>&       a_loc_indices,
-                             const std::vector<size_t>&       b_loc_indices,
-                             const std::vector<size_t>&       c_loc_indices,
-                             const std::vector<size_t>&       d_loc_indices,
                              const int                        a_angmom,
                              const int                        b_angmom,
                              const int                        c_angmom,
@@ -4426,12 +4116,6 @@ local_distribute_kx_geom_gen(std::vector<double>&             values,
 
     const auto refq = b_indices[bra_igto + 1];
 
-    // reference local indexes on bra side
-
-    const auto loc_refp = a_loc_indices[bra_igto + 1];
-
-    const auto loc_refq = b_loc_indices[bra_igto + 1];
-
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices[0];
@@ -4441,16 +4125,6 @@ local_distribute_kx_geom_gen(std::vector<double>&             values,
     const auto cdim = c_indices[0];
 
     const auto ddim = d_indices[0];
-
-    // dimensions of local bra and ket orbital indexes
-
-    const auto alocdim = a_loc_indices[0];
-
-    const auto blocdim = b_loc_indices[0];
-
-    const auto clocdim = c_loc_indices[0];
-
-    const auto dlocdim = d_loc_indices[0];
 
     // set up angular components
 
@@ -4466,13 +4140,9 @@ local_distribute_kx_geom_gen(std::vector<double>&             values,
     {
         const auto p = i * adim + refp;
 
-        const auto loc_p = i * alocdim + loc_refp;
-
         for (int j = 0; j < bcomps; j++)
         {
             const auto q = j * bdim + refq;
-
-            const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
             {
@@ -4488,12 +4158,6 @@ local_distribute_kx_geom_gen(std::vector<double>&             values,
 
                         const auto refs = d_indices[m + 1];
 
-                        // reference local indexes on ket side
-
-                        const auto loc_refr = c_loc_indices[m + 1];
-
-                        const auto loc_refs = d_loc_indices[m + 1];
-
                         // impose angular symmetry on ket side
 
                         if (refr == refs)
@@ -4505,11 +4169,7 @@ local_distribute_kx_geom_gen(std::vector<double>&             values,
 
                         const auto r = k * cdim + refr;
 
-                        const auto loc_r = k * clocdim + loc_refr;
-
                         const auto s = l * ddim + refs;
-
-                        const auto loc_s = l * dlocdim + loc_refs;
 
                         // prescale integral for accumulation to Fock matrix
 
