@@ -1479,7 +1479,29 @@ local_distribute_geom(std::vector<double>&             values,
                                                  bra_igto,
                                                  ket_range);
         }
-        // TODO: mat_t::general
+        else if (density->get_type() == mat_t::general)
+        {
+            t4cfunc::local_distribute_j_geom_gen(values,
+                                                 cart_ind,
+                                                 density,
+                                                 density_2,
+                                                 buffer,
+                                                 offset,
+                                                 a_indices,
+                                                 b_indices,
+                                                 c_indices,
+                                                 d_indices,
+                                                 a_loc_indices,
+                                                 b_loc_indices,
+                                                 c_loc_indices,
+                                                 d_loc_indices,
+                                                 a_angmom,
+                                                 b_angmom,
+                                                 c_angmom,
+                                                 d_angmom,
+                                                 bra_igto,
+                                                 ket_range);
+        }
     }
     else if ((label == "k") || (label == "k_rs"))
     {
@@ -1506,7 +1528,29 @@ local_distribute_geom(std::vector<double>&             values,
                                                  bra_igto,
                                                  ket_range);
         }
-        // TODO: mat_t::general
+        else if (density->get_type() == mat_t::general)
+        {
+            t4cfunc::local_distribute_k_geom_gen(values,
+                                                 cart_ind,
+                                                 density,
+                                                 density_2,
+                                                 buffer,
+                                                 offset,
+                                                 a_indices,
+                                                 b_indices,
+                                                 c_indices,
+                                                 d_indices,
+                                                 a_loc_indices,
+                                                 b_loc_indices,
+                                                 c_loc_indices,
+                                                 d_loc_indices,
+                                                 a_angmom,
+                                                 b_angmom,
+                                                 c_angmom,
+                                                 d_angmom,
+                                                 bra_igto,
+                                                 ket_range);
+        }
     }
     else if ((label == "kx") || (label == "kx_rs"))
     {
@@ -1534,7 +1578,30 @@ local_distribute_geom(std::vector<double>&             values,
                                                   bra_igto,
                                                   ket_range);
         }
-        // TODO: mat_t::general
+        else if (density->get_type() == mat_t::general)
+        {
+            t4cfunc::local_distribute_kx_geom_gen(values,
+                                                  cart_ind,
+                                                  density,
+                                                  density_2,
+                                                  buffer,
+                                                  offset,
+                                                  exchange_factor,
+                                                  a_indices,
+                                                  b_indices,
+                                                  c_indices,
+                                                  d_indices,
+                                                  a_loc_indices,
+                                                  b_loc_indices,
+                                                  c_loc_indices,
+                                                  d_loc_indices,
+                                                  a_angmom,
+                                                  b_angmom,
+                                                  c_angmom,
+                                                  d_angmom,
+                                                  bra_igto,
+                                                  ket_range);
+        }
     }
 }
 
