@@ -128,6 +128,7 @@ export_t4cintegrals(py::module& m)
     // CFockGeom1000Driver class
     PyClass<CFockGeomX000Driver<1>>(m, "FockGeom1000Driver")
         .def(py::init<>())
+        .def("_set_block_size_factor", &CFockGeomX000Driver<1>::set_block_size_factor, "Sets block size factor.")
         .def(
             "compute",
             [](const CFockGeomX000Driver<1>& self,
@@ -154,6 +155,22 @@ export_t4cintegrals(py::module& m)
                const double                  omega,
                const int                     ithreshold) -> CMatrices {
                 return self.compute(basis, screener_atom, screener, density, iatom, label, exchange_factor, omega, ithreshold);
+            },
+            "Computes gradient of Fock matrix of requested type for given molecule and basis.")
+        .def(
+            "compute",
+            [](const CFockGeomX000Driver<1>& self,
+               const CMolecularBasis&        basis,
+               const CT4CScreener&           screener_atom,
+               const CT4CScreener&           screener,
+               const CMatrix&                density,
+               const CMatrix&                density2,
+               const int                     iatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega,
+               const int                     ithreshold) -> std::vector<double> {
+                return self.compute(basis, screener_atom, screener, density, density2, iatom, label, exchange_factor, omega, ithreshold);
             },
             "Computes gradient of Fock matrix of requested type for given molecule and basis.");
 }

@@ -210,6 +210,17 @@ auto accumulate(CSubMatrix*                glob_matrix,
                 const int                  ket_comps,
                 const bool                 ang_order) -> void;
 
+auto accumulate_value(double*                    value_ptr,
+                      const CSubMatrix*          density_matrix,
+                      const CSubMatrix*          loc_matrix,
+                      const std::vector<size_t>& bra_loc_indices,
+                      const std::vector<size_t>& ket_loc_indices,
+                      const std::vector<size_t>& bra_glob_indices,
+                      const std::vector<size_t>& ket_glob_indices,
+                      const int                  bra_comps,
+                      const int                  ket_comps,
+                      const bool                 ang_order) -> void;
+
 /// @brief Adds batch of  local matrices to matrices container.
 /// @param matrices The matrices container to be added to.
 /// @param label The identifier of Fock matrix type.

@@ -104,6 +104,8 @@ class CT4CGeomX0MatricesDistributor
     /// @param ket_gto_pair_block The basis function pairs block on ket side.
     auto accumulate(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void;
 
+    auto accumulate_values(double* values, const CMatrix* density, const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void;
+
    private:
     /// @brief The Fock matrices associated with distributor.
     CMatrices* _focks;

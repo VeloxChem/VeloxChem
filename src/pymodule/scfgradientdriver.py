@@ -24,6 +24,7 @@
 
 from mpi4py import MPI
 from copy import deepcopy
+from os import environ
 import numpy as np
 import time
 import math
@@ -70,8 +71,10 @@ class ScfGradientDriver(GradientDriver):
         self.flag = 'SCF Gradient Driver'
 
         self.eri_thresh = scf_drv.eri_thresh
-        self._debug = scf_drv._debug
         self.timing = scf_drv.timing
+
+        self._debug = scf_drv._debug
+        self._block_size_factor = scf_drv._block_size_factor
 
         self.numerical = False
         self.delta_h = 0.001
@@ -92,6 +95,24 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
                                     profiler.get_available_memory())
             self.ostream.flush()
+
+    def _get_extra_block_size_factor(self, naos):
+
+        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
+
+        if total_cores >= 2048:
+            if naos >= 4500:
+                extra_factor = 4
+            else:
+                extra_factor = 2
+
+        elif total_cores >= 1024:
+            extra_factor = 2
+
+        else:
+            extra_factor = 1
+
+        return extra_factor
 
     def compute(self, molecule, basis, scf_results):
         """
@@ -263,15 +284,22 @@ class ScfGradientDriver(GradientDriver):
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(D)
 
+        den_mat_for_fock2 = make_matrix(basis, mat_t.general)
+        den_mat_for_fock2.set_values(D)
+
         fock_timing = {
             'Screening': 0.0,
             'FockGrad': 0.0,
-            'LinAlg': 0.0,
         }
 
         self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
+
+        extra_factor = self._get_extra_block_size_factor(
+            basis.get_dimensions_of_basis())
+        fock_grad_drv._set_block_size_factor(self._block_size_factor *
+                                             extra_factor)
 
         t0 = time.time()
 
@@ -290,7 +318,8 @@ class ScfGradientDriver(GradientDriver):
             t0 = time.time()
 
             gmats = fock_grad_drv.compute(basis, screener_atom, screener,
-                                          den_mat_for_fock, iatom, fock_type,
+                                          den_mat_for_fock, den_mat_for_fock2,
+                                          iatom, fock_type,
                                           exchange_scaling_factor, 0.0,
                                           thresh_int)
 
@@ -298,15 +327,7 @@ class ScfGradientDriver(GradientDriver):
 
             factor = 2.0 if fock_type == 'j' else 1.0
 
-            t0 = time.time()
-
-            for i, label in enumerate(['X', 'Y', 'Z']):
-                gmat = gmats.matrix_to_numpy(label)
-                self.gradient[iatom, i] += np.sum(gmat * D) * factor
-
-            gmats = Matrices()
-
-            fock_timing['LinAlg'] += time.time() - t0
+            self.gradient[iatom, :] += np.array(gmats) * factor
 
         self._print_debug_info('after  fock_grad')
 
@@ -500,6 +521,11 @@ class ScfGradientDriver(GradientDriver):
         Dab_for_fock.set_values(Da + Db)
 
         fock_grad_drv = FockGeom1000Driver()
+
+        extra_factor = self._get_extra_block_size_factor(
+            basis.get_dimensions_of_basis())
+        fock_grad_drv._set_block_size_factor(self._block_size_factor *
+                                             extra_factor)
 
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
