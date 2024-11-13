@@ -30,6 +30,7 @@ import sys
 import re
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+from collections import defaultdict
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .atomtypeidentifier import AtomTypeIdentifier
@@ -316,7 +317,200 @@ class ForceFieldGenerator:
             except (NotADirectoryError, PermissionError):
                 pass
             self.workdir = None
-    
+
+    def reparametrize_dihedrals(self, rotatable_bond, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19):
+        """
+        Changes the dihedral constants for a specific rotatable bond in order to
+        fit the QM scan.
+
+        :param rotatable_bond:
+            The list of indices of the rotatable bond. (1-indexed)
+        :param scf_drv:
+            The SCF driver.
+        :param basis:
+            The AO basis set.
+        :param scan_range:
+            List with the range of dihedral angles. Default is [0, 360].
+        :param n_points:
+            The number of points to be calculated. Default is 19. Minimum is 6.
+        """
+
+        try:
+            from scipy.optimize import least_squares
+        except ImportError:
+            error_msg = 'Scipy is required for fitting dihedral potentials.'
+            assert_msg_critical(False, error_msg)
+
+        central_atom_1 = rotatable_bond[0] - 1
+        central_atom_2 = rotatable_bond[1] - 1
+
+        # Identify the dihedral indices for the rotatable bond
+        dihedral_indices = []
+        dihedral_types = []
+        for (i,j,k,l), dihedral in self.dihedrals.items():
+            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
+                dihedral_indices.append([i,j,k,l])
+                dihedral_types.append(dihedral['comment'])
+
+        # Print some information
+        self.ostream.print_info(f'Rotatable bond: {rotatable_bond}')
+        self.ostream.print_info(f'Dihedral indices: {dihedral_indices}')
+        self.ostream.print_info(f'Dihedral types: {dihedral_types}')
+        self.ostream.flush()
+
+        # Perform a SCF calculation
+        if scf_result is None:
+            self.ostream.print_info('Performing SCF calculation...')
+            self.ostream.flush()
+            scf_result = scf_drv.compute(self.molecule, basis)
+
+        # Take one of the dihedrals to perform the scan
+        reference_dih = dihedral_indices[0]
+        scf_drv.ostream.mute()
+        opt_drv = OptimizationDriver(scf_drv)
+        opt_drv.ostream.mute()
+        constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
+        opt_drv.constraints = [constraint]
+
+        # Scan the dihedral
+        self.ostream.print_info(f'Scanning dihedral {reference_dih}...')
+        self.ostream.flush()
+        opt_drv.compute(self.molecule, basis, scf_result)
+        self.ostream.print_info('Scan completed.')
+        self.ostream.flush()
+
+        # Change the default file name to the dihedral indices
+        file = Path("scan-final.xyz")
+        file.rename(f"{reference_dih[0]+1}-{reference_dih[1]+1}-{reference_dih[2]+1}-{reference_dih[3]+1}.xyz")
+
+        # Read the QM scan
+        self.read_qm_scan_xyz_files([f"{reference_dih[0]+1}-{reference_dih[1]+1}-{reference_dih[2]+1}-{reference_dih[3]+1}.xyz"])
+
+        # Group dihedrals by their types
+
+        dihedral_groups = defaultdict(list)
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            dihedral_type = dihedral['comment']
+            dihedral_groups[dihedral_type].append((i, j, k, l))
+
+        # Extract initial parameters for each dihedral instance
+        barriers = []
+        phases = []
+        periodicities = []
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            if not dihedral['multiple']:
+                barrier = dihedral['barrier']
+                phase = dihedral['phase']
+                periodicity = dihedral['periodicity']
+                barriers.append(barrier)
+                phases.append(phase)
+                periodicities.append(periodicity)
+            else:
+                raise ValueError('RB dihedrals are not supported for reparametrization. Use refine_dihedrals instead.')
+
+        # Convert to NumPy arrays
+        barriers = np.array(barriers, dtype=float)
+        phases_array = np.array(phases, dtype=float)
+        periodicities_array = np.array(periodicities, dtype=float)
+        phases_array_rad = np.deg2rad(phases_array)
+        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
+
+        # Print initial barriers
+        self.ostream.print_info(f"Initial barriers: {barriers}")
+        self.ostream.flush()
+
+        # Store the original barriers
+        original_barriers = barriers.copy()
+
+        # Set the dihedral barriers to zero for the scan
+        for i, j, k, l in dihedral_indices:
+            self.dihedrals[(i, j, k, l)]['barrier'] = 0
+
+        # Validate the dihedral MM parameters
+        initial_data = self.validate_force_field(0)
+        self.visualize(initial_data)
+
+        # Prepare data for fitting
+        qm_energies = np.array(initial_data['qm_scan_kJpermol'])
+        mm_baseline = np.min(initial_data['mm_scan_kJpermol'])
+
+        # Define the dihedral potential function
+        def dihedral_potential(phi, barriers, phases_rad, periodicities):
+            total_potential = np.zeros_like(phi)
+            for barrier, phase_rad, periodicity in zip(barriers, phases_rad, periodicities):
+                total_potential += barrier * (1 + np.cos(periodicity * phi - phase_rad))
+            return total_potential
+
+
+        # Define the objective function
+        def objective_function(barriers_to_fit):
+            # Update the dihedral parameters in the force field
+            # Compute dihedral energy contributions analytically
+            dihedral_energies = dihedral_potential(
+                dihedral_angles_rad,
+                barriers_to_fit,
+                phases_array_rad,
+                periodicities_array
+            )
+            mm_energies_fit = dihedral_energies + mm_baseline
+
+            # Compute relative energies
+            mm_energies_fit_rel = mm_energies_fit - np.min(mm_energies_fit)
+            qm_energies_rel = qm_energies - np.min(qm_energies)
+
+            # Compute residuals between relative energies
+            residuals = mm_energies_fit_rel - qm_energies_rel
+
+            return residuals
+
+        self.ostream.print_info('Fitting dihedral parameters...')
+        self.ostream.flush()
+
+        # Adjust bounds and initial parameters
+        bounds = [(0, np.inf) for _ in barriers]
+        lower_bounds = [b[0] for b in bounds]
+        upper_bounds = [b[1] for b in bounds]
+
+        # Use the original barriers as the initial guess
+        initial_guess = original_barriers.copy()
+
+        result = least_squares(
+            objective_function,
+            initial_guess,
+            method='trf',
+            bounds=(lower_bounds, upper_bounds),
+            verbose=2,
+            xtol=1e-6,
+            ftol=1e-6,
+            gtol=1e-6,
+            max_nfev=20,
+        )
+
+        # Update the force field parameters with the optimized barriers
+        fitted_barriers = result.x
+        for idx, dihedral_type in enumerate(dihedral_types):
+            barrier = fitted_barriers[idx]
+            for i, j, k, l in dihedral_groups[dihedral_type]:
+                self.dihedrals[(i, j, k, l)]['barrier'] = barrier
+
+        # Print how the barriers have changed
+        self.ostream.print_info('Fitted dihedral barriers:')
+        for idx, dihedral_type in enumerate(dihedral_types):
+            self.ostream.print_info(f'  {dihedral_type}: {barriers[idx]:.3f} -> {fitted_barriers[idx]:.3f}')
+        self.ostream.flush()
+
+        # Validate the fitted parameters
+        self.ostream.print_info('Validating fitted parameters...')
+        self.ostream.flush()
+
+        fit = self.validate_force_field(0)
+        self.visualize(fit)
+
+        self.ostream.print_info('Dihedral MM parameters have been refined and updated in the topology.')
+
+
     def refine_dihedrals(self, dihedrals, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19):
         """
         Refines the dihedral angles using QM calculations.
@@ -327,7 +521,7 @@ class ForceFieldGenerator:
             The SCF driver.
         :param basis:
             The AO basis set.
-        :param range:
+        :param scan_range:
             List with the range of dihedral angles. Default is [0, 360].
         :param n_points:
             The number of points to be calculated. Default is 19. Minimum is 6.
@@ -2316,7 +2510,7 @@ class ForceFieldGenerator:
         :param dihedral:
             The dihedral (list of four atom ids).
         :param geometries:
-            The scanned geometris for this dihedral.
+            The scanned geometries for this dihedral.
         :param angles:
             The scanned angles for this dihedral.
         """
