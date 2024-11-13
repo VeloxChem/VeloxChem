@@ -59,34 +59,34 @@ class TestNumericalGradient:
         exchange_scaling_factor = 0.2
         thresh_int = 12
 
-        for density, fock_type in zip([tmat, tmat2],
-                                      ['2jk', '2jkx', 'j', 'k', 'kx']):
+        density_list = [tmat, tmat2]
+        density_list_2 = [tmat2, tmat]
+        fock_type_list = ['2jk', '2jkx', 'j', 'k', 'kx']
+
+        for density, density2, fock_type in zip(density_list, density_list_2,
+                                                fock_type_list):
 
             den_mat = make_matrix(bas, mat_t.general)
             den_mat.set_values(density)
 
-            local_anagrad = {}
+            den_mat_2 = make_matrix(bas, mat_t.general)
+            den_mat_2.set_values(density2)
+
+            anagrad = np.zeros((natoms, 3))
 
             for iatom in local_atoms:
                 atom_screening = T4CScreener()
                 atom_screening.partition_atom(bas, mol, 'eri', iatom)
 
-                gmats = fock_grad_drv.compute(bas, atom_screening, screening,
-                                              den_mat, iatom, fock_type,
-                                              exchange_scaling_factor, 0.0,
-                                              thresh_int)
+                atomgrad = fock_grad_drv.compute(bas, atom_screening, screening,
+                                                 den_mat, den_mat_2, iatom,
+                                                 fock_type,
+                                                 exchange_scaling_factor, 0.0,
+                                                 thresh_int)
 
-                for c, label in enumerate(['X', 'Y', 'Z']):
-                    gmat = gmats.matrix(label).to_numpy()
-                    local_anagrad[(iatom, label.lower())] = gmat
+                anagrad[iatom, :] += np.array(atomgrad)
 
-            local_anagrads = scf_drv.comm.gather(local_anagrad,
-                                                 root=mpi_master())
-
-            if scf_drv.rank == mpi_master():
-                anagrad = {}
-                for local_anagrad in local_anagrads:
-                    anagrad.update(local_anagrad)
+            anagrad = scf_drv.comm.reduce(anagrad, root=mpi_master())
 
             labels = mol.get_labels()
             coords = mol.get_coordinates_in_bohr()
@@ -94,6 +94,8 @@ class TestNumericalGradient:
             multiplicity = mol.get_multiplicity()
 
             delta_h = 0.0005
+
+            numgrad = np.zeros((natoms, 3))
 
             for i in range(mol.number_of_atoms()):
                 for d in range(3):
@@ -134,11 +136,12 @@ class TestNumericalGradient:
                     coords[i, d] += delta_h
 
                     if scf_drv.rank == mpi_master():
-                        anagrad_i_d = anagrad[(i, 'xyz'[d])]
-                        numgrad_i_d = (f_plus - f_minus) / (2.0 * delta_h)
+                        e_plus = np.sum(f_plus * density2)
+                        e_minus = np.sum(f_minus * density2)
+                        numgrad[i, d] = (e_plus - e_minus) / (2.0 * delta_h)
 
-                        assert np.max(np.abs(anagrad_i_d -
-                                             numgrad_i_d)) < 1.0e-7
+            if scf_drv.rank == mpi_master():
+                assert np.max(np.abs(anagrad - numgrad)) < 1.0e-7
 
     def test_nh3_svp(self):
 
