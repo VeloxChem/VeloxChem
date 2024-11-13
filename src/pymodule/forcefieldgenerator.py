@@ -318,7 +318,7 @@ class ForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparametrize_dihedrals(self, rotatable_bond, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19):
+    def reparametrize_dihedrals(self, rotatable_bond, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, visualize=False):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -332,7 +332,9 @@ class ForceFieldGenerator:
         :param scan_range:
             List with the range of dihedral angles. Default is [0, 360].
         :param n_points:
-            The number of points to be calculated. Default is 19. Minimum is 6.
+            The number of points to be calculated. Default is 19.
+        :param visualize:
+            If the dihedral scans should be visualized.
         """
 
         try:
@@ -351,11 +353,19 @@ class ForceFieldGenerator:
             if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
                 dihedral_indices.append([i,j,k,l])
                 dihedral_types.append(dihedral['comment'])
-
+        # Transform the dihedral indices to 1-indexed for printing
+        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        # Print a header
+        header = 'VeloxChem Dihedral Reparametrization'
+        self.ostream.print_header(header)
+        self.ostream.print_header('=' * len(header))
+        self.ostream.print_blank()
+        self.ostream.flush()
         # Print some information
-        self.ostream.print_info(f'Rotatable bond: {rotatable_bond}')
-        self.ostream.print_info(f'Dihedral indices: {dihedral_indices}')
-        self.ostream.print_info(f'Dihedral types: {dihedral_types}')
+        self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
+        # Print the dihedral indices *in 1 index* and types
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
+        self.ostream.print_info(f'Dihedral types:{dihedral_types}')
         self.ostream.flush()
 
         # Perform a SCF calculation
@@ -373,7 +383,10 @@ class ForceFieldGenerator:
         opt_drv.constraints = [constraint]
 
         # Scan the dihedral
-        self.ostream.print_info(f'Scanning dihedral {reference_dih}...')
+        self.ostream.print_info(f'Dihedral: {reference_dih[0] +1}-{reference_dih[1] +1}-{reference_dih[2] +1}-{reference_dih[3] +1} taken for scan...')
+        self.ostream.print_info(f'Angle range: {scan_range[0]}-{scan_range[1]}')
+        self.ostream.print_info(f'Number of points: {n_points}')
+        self.ostream.print_info(f'Scanning dihedral {reference_dih[0] +1}-{reference_dih[1] +1}-{reference_dih[2] +1}-{reference_dih[3] +1}...')
         self.ostream.flush()
         opt_drv.compute(self.molecule, basis, scf_result)
         self.ostream.print_info('Scan completed.')
@@ -387,7 +400,6 @@ class ForceFieldGenerator:
         self.read_qm_scan_xyz_files([f"{reference_dih[0]+1}-{reference_dih[1]+1}-{reference_dih[2]+1}-{reference_dih[3]+1}.xyz"])
 
         # Group dihedrals by their types
-
         dihedral_groups = defaultdict(list)
         for i, j, k, l in dihedral_indices:
             dihedral = self.dihedrals[(i, j, k, l)]
@@ -400,15 +412,15 @@ class ForceFieldGenerator:
         periodicities = []
         for i, j, k, l in dihedral_indices:
             dihedral = self.dihedrals[(i, j, k, l)]
-            if not dihedral['multiple']:
+            if dihedral['multiple'] == True:
+                raise ValueError('RB dihedrals are not supported for reparametrization. Use refine_dihedrals instead.')
+            else:
                 barrier = dihedral['barrier']
                 phase = dihedral['phase']
                 periodicity = dihedral['periodicity']
                 barriers.append(barrier)
                 phases.append(phase)
                 periodicities.append(periodicity)
-            else:
-                raise ValueError('RB dihedrals are not supported for reparametrization. Use refine_dihedrals instead.')
 
         # Convert to NumPy arrays
         barriers = np.array(barriers, dtype=float)
@@ -418,7 +430,7 @@ class ForceFieldGenerator:
         dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
 
         # Print initial barriers
-        self.ostream.print_info(f"Initial barriers: {barriers}")
+        self.ostream.print_info(f"GAFF barriers: {barriers} will be used as initial guess.")
         self.ostream.flush()
 
         # Store the original barriers
@@ -430,7 +442,8 @@ class ForceFieldGenerator:
 
         # Validate the dihedral MM parameters
         initial_data = self.validate_force_field(0)
-        self.visualize(initial_data)
+        if visualize:
+            self.visualize(initial_data)
 
         # Prepare data for fitting
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
@@ -465,7 +478,7 @@ class ForceFieldGenerator:
 
             return residuals
 
-        self.ostream.print_info('Fitting dihedral parameters...')
+        self.ostream.print_info('Fitting the dihedral parameters...')
         self.ostream.flush()
 
         # Adjust bounds and initial parameters
@@ -477,28 +490,30 @@ class ForceFieldGenerator:
         initial_guess = original_barriers.copy()
 
         result = least_squares(
-            objective_function,
-            initial_guess,
-            method='trf',
+            fun = objective_function,
+            x0 = initial_guess,
+            jac = '3-point',
+            method='dogbox',
             bounds=(lower_bounds, upper_bounds),
-            verbose=2,
+            verbose=0,
             xtol=1e-6,
             ftol=1e-6,
             gtol=1e-6,
-            max_nfev=20,
+            max_nfev=50,
         )
 
         # Update the force field parameters with the optimized barriers
         fitted_barriers = result.x
-        for idx, dihedral_type in enumerate(dihedral_types):
-            barrier = fitted_barriers[idx]
-            for i, j, k, l in dihedral_groups[dihedral_type]:
-                self.dihedrals[(i, j, k, l)]['barrier'] = barrier
+
+        # Assign the fitted barriers to the dihedrals
+        for idx, (i, j, k, l) in enumerate(dihedral_indices):
+            self.dihedrals[(i, j, k, l)]['barrier'] = fitted_barriers[idx]
+            self.dihedrals[(i, j, k, l)]['comment'] = f'{dihedral_types[idx]} reparametrized'   
 
         # Print how the barriers have changed
         self.ostream.print_info('Fitted dihedral barriers:')
-        for idx, dihedral_type in enumerate(dihedral_types):
-            self.ostream.print_info(f'  {dihedral_type}: {barriers[idx]:.3f} -> {fitted_barriers[idx]:.3f}')
+        for idx, dihedral_idx in enumerate(dihedral_indices_print):
+            self.ostream.print_info(f'Dihedral {dihedral_idx} type {dihedral_types[idx]}: {barriers[idx]:.3f} -> {fitted_barriers[idx]:.3f}')
         self.ostream.flush()
 
         # Validate the fitted parameters
@@ -506,10 +521,11 @@ class ForceFieldGenerator:
         self.ostream.flush()
 
         fit = self.validate_force_field(0)
-        self.visualize(fit)
+        if visualize:
+            self.visualize(fit)
 
-        self.ostream.print_info('Dihedral MM parameters have been refined and updated in the topology.')
-
+        self.ostream.print_info('Dihedral MM parameters have been reparametrized and updated in the topology.')
+        self.ostream.flush()
 
     def refine_dihedrals(self, dihedrals, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19):
         """
