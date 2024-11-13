@@ -265,17 +265,6 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
 {
     auto bsfac = _determine_block_size_factor(_get_nao(density));
 
-    // set up Fock matrices
-
-    auto fock_mats = matfunc::make_matrices(
-        std::array<int, 1>{
-            1,
-        },
-        basis,
-        mat_t::general);
-
-    fock_mats.zero();
-
     // prepare pointers for OMP parallel region
 
     auto ptr_screener = &screener;
@@ -285,8 +274,6 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
     auto ptr_density = &density;
 
     auto ptr_density_2 = &density2;
-
-    auto ptr_focks = &fock_mats;
 
     auto nthreads = omp_get_max_threads();
 
@@ -298,7 +285,7 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
 
     // execute OMP tasks with static scheduling
 
-#pragma omp parallel shared(ptr_omp_values, ptr_screener, ptr_screener_atom, ptr_density, ptr_density_2, ptr_focks, label, exchange_factor, omega, ithreshold)
+#pragma omp parallel shared(ptr_omp_values, ptr_screener, ptr_screener_atom, ptr_density, ptr_density_2, label, exchange_factor, omega, ithreshold)
     {
 #pragma omp single nowait
         {
@@ -315,8 +302,7 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
                 const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
 #pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range)
                 {
-                    //CT4CGeomX0MatricesDistributor distributor(ptr_focks, ptr_density, label, exchange_factor, omega);
-                    CT4CGeomX0MatricesDistributor distributor(ptr_focks, ptr_density, ptr_density_2, label, exchange_factor, omega);
+                    CT4CGeomX0MatricesDistributor distributor(ptr_density, ptr_density_2, label, exchange_factor, omega);
                     distributor.set_indices(bra_gpairs, ket_gpairs);
                     erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
                     auto values = distributor.get_values();
@@ -324,7 +310,6 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
                     ptr_omp_values->row(thread_id)[0] += values[0];
                     ptr_omp_values->row(thread_id)[1] += values[1];
                     ptr_omp_values->row(thread_id)[2] += values[2];
-                    //distributor.accumulate_values(ptr_omp_values->row(thread_id), ptr_density2, bra_gpairs, ket_gpairs);
                 }
             });
         }

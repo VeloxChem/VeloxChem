@@ -49,14 +49,13 @@ CT4CGeomX0MatricesDistributor::CT4CGeomX0MatricesDistributor(CMatrices*         
 {
 }
 
-CT4CGeomX0MatricesDistributor::CT4CGeomX0MatricesDistributor(CMatrices*         focks,
-                                                             const CMatrix*     density,
+CT4CGeomX0MatricesDistributor::CT4CGeomX0MatricesDistributor(const CMatrix*     density,
                                                              const CMatrix*     density_2,
                                                              const std::string& label,
                                                              const double       exchange_factor,
                                                              const double       omega)
 
-    : _focks(focks)
+    : _focks(nullptr)
 
     , _values(std::vector<double>(3, 0.0))
 
@@ -147,16 +146,19 @@ CT4CGeomX0MatricesDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_blo
 
     // adds submatrices storage
 
-    auto keys = _focks->keys();
-
-    if (const auto nkeys = keys.size(); nkeys > 0)
+    if (_focks != nullptr)
     {
-        std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
-            t4cfunc::add_local_matrices(_matrices, _label, mat_t::general, std::to_string(i), a_dims, b_dims, c_dims, d_dims);
-        });
-    }
+        auto keys = _focks->keys();
 
-    _matrices.zero();
+        if (const auto nkeys = keys.size(); nkeys > 0)
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
+                t4cfunc::add_local_matrices(_matrices, _label, mat_t::general, std::to_string(i), a_dims, b_dims, c_dims, d_dims);
+            });
+        }
+
+        _matrices.zero();
+    }
 }
 
 auto
@@ -173,12 +175,12 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                           const size_t                     ibra_gto,
                                           const std::pair<size_t, size_t>& ket_range) -> void
 {
-    auto keys = _focks->keys();
-
-    const auto nkeys = keys.size();
-
-    if ((nkeys > 0) && (_density_2 == nullptr))
+    if (_focks != nullptr)
     {
+        auto keys = _focks->keys();
+
+        const auto nkeys = keys.size();
+
         const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
 
         std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
@@ -205,11 +207,12 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                                     ket_range);
         });
     }
-    else if ((nkeys > 0) && (_density_2 != nullptr))
+    else
     {
         const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
 
-        std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
+        for (int i = 0; i < 3; i++)
+        {
             t4cfunc::local_distribute_geom(_values,
                                            i,
                                            _density,
@@ -232,7 +235,7 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                            d_angmom,
                                            ibra_gto,
                                            ket_range);
-        });
+        };
     }
 }
 

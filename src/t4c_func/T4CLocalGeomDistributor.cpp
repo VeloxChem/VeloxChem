@@ -2486,60 +2486,60 @@ local_distribute_jk_geom_sym(std::vector<double>&             values,
 
                         if (angord_qs)
                         {
-                            values[cart_ind] += denmat_2_pr->operator[]({p, r}) * (-1.0) * fval * denmat_qs->operator[]({q, s});
+                            values[cart_ind] -= denmat_2_pr->operator[]({p, r}) * fval * denmat_qs->operator[]({q, s});
 
-                            values[cart_ind] += denmat_2_rp->operator[]({r, p}) * (-1.0) * fval * denmat_qs->operator[]({q, s});
+                            values[cart_ind] -= denmat_2_rp->operator[]({r, p}) * fval * denmat_qs->operator[]({q, s});
                         }
                         else
                         {
-                            values[cart_ind] += denmat_2_pr->operator[]({p, r}) * (-1.0) * fval * denmat_qs->operator[]({s, q});
+                            values[cart_ind] -= denmat_2_pr->operator[]({p, r}) * fval * denmat_qs->operator[]({s, q});
 
-                            values[cart_ind] += denmat_2_rp->operator[]({r, p}) * (-1.0) * fval * denmat_qs->operator[]({s, q});
+                            values[cart_ind] -= denmat_2_rp->operator[]({r, p}) * fval * denmat_qs->operator[]({s, q});
                         }
 
                         // Exchange contribution (F_ps)
 
                         if (angord_qr)
                         {
-                            values[cart_ind] += denmat_2_ps->operator[]({p, s}) * (-1.0) * fval * denmat_qr->operator[]({q, r});
+                            values[cart_ind] -= denmat_2_ps->operator[]({p, s}) * fval * denmat_qr->operator[]({q, r});
 
-                            values[cart_ind] += denmat_2_sp->operator[]({s, p}) * (-1.0) * fval * denmat_qr->operator[]({q, r});
+                            values[cart_ind] -= denmat_2_sp->operator[]({s, p}) * fval * denmat_qr->operator[]({q, r});
                         }
                         else
                         {
-                            values[cart_ind] += denmat_2_ps->operator[]({p, s}) * (-1.0) * fval * denmat_qr->operator[]({r, q});
+                            values[cart_ind] -= denmat_2_ps->operator[]({p, s}) * fval * denmat_qr->operator[]({r, q});
 
-                            values[cart_ind] += denmat_2_sp->operator[]({s, p}) * (-1.0) * fval * denmat_qr->operator[]({r, q});
+                            values[cart_ind] -= denmat_2_sp->operator[]({s, p}) * fval * denmat_qr->operator[]({r, q});
                         }
 
                         // Exchange contribution (F_qr)
 
                         if (angord_ps)
                         {
-                            values[cart_ind] += denmat_2_qr->operator[]({q, r}) * (-1.0) * fval * denmat_ps->operator[]({p, s});
+                            values[cart_ind] -= denmat_2_qr->operator[]({q, r}) * fval * denmat_ps->operator[]({p, s});
 
-                            values[cart_ind] += denmat_2_rq->operator[]({r, q}) * (-1.0) * fval * denmat_ps->operator[]({p, s});
+                            values[cart_ind] -= denmat_2_rq->operator[]({r, q}) * fval * denmat_ps->operator[]({p, s});
                         }
                         else
                         {
-                            values[cart_ind] += denmat_2_qr->operator[]({q, r}) * (-1.0) * fval * denmat_ps->operator[]({s, p});
+                            values[cart_ind] -= denmat_2_qr->operator[]({q, r}) * fval * denmat_ps->operator[]({s, p});
 
-                            values[cart_ind] += denmat_2_rq->operator[]({r, q}) * (-1.0) * fval * denmat_ps->operator[]({s, p});
+                            values[cart_ind] -= denmat_2_rq->operator[]({r, q}) * fval * denmat_ps->operator[]({s, p});
                         }
 
                         // Exchange contribution (F_qs)
 
                         if (angord_pr)
                         {
-                            values[cart_ind] += denmat_2_qs->operator[]({q, s}) * (-1.0) * fval * denmat_pr->operator[]({p, r});
+                            values[cart_ind] -= denmat_2_qs->operator[]({q, s}) * fval * denmat_pr->operator[]({p, r});
 
-                            values[cart_ind] += denmat_2_sq->operator[]({s, q}) * (-1.0) * fval * denmat_pr->operator[]({p, r});
+                            values[cart_ind] -= denmat_2_sq->operator[]({s, q}) * fval * denmat_pr->operator[]({p, r});
                         }
                         else
                         {
-                            values[cart_ind] += denmat_2_qs->operator[]({q, s}) * (-1.0) * fval * denmat_pr->operator[]({r, p});
+                            values[cart_ind] -= denmat_2_qs->operator[]({q, s}) * fval * denmat_pr->operator[]({r, p});
 
-                            values[cart_ind] += denmat_2_sq->operator[]({s, q}) * (-1.0) * fval * denmat_pr->operator[]({r, p});
+                            values[cart_ind] -= denmat_2_sq->operator[]({s, q}) * fval * denmat_pr->operator[]({r, p});
                         }
                     }
                 }

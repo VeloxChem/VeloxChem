@@ -30,8 +30,7 @@ class CT4CGeomX0MatricesDistributor
                                   const double       exchange_factor,
                                   const double       omega);
 
-    CT4CGeomX0MatricesDistributor(CMatrices*         focks,
-                                  const CMatrix*     density,
+    CT4CGeomX0MatricesDistributor(const CMatrix*     density,
                                   const CMatrix*     density_2,
                                   const std::string& label,
                                   const double       exchange_factor,
