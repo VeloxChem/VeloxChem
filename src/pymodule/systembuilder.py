@@ -1238,7 +1238,7 @@ class SystemBuilder:
             f.write("TITLE     Solvated system\n")
             # Write the box size to the PDB file
             # Box size is in nm, convert to Angstrom
-            f.write(f"CRYST1{self.box[0]*10:9.3f}{self.box[1]*10:9.3f}{self.box[2]*10:9.3f}  90.00  90.00  90.00 P 1           1\n")
+            f.write(f"CRYST1{self.box[0]:9.3f}{self.box[1]:9.3f}{self.box[2]:9.3f}  90.00  90.00  90.00 P 1           1\n")
             
             atom_counter = 1
             residue_counter = 1

@@ -127,7 +127,7 @@ class OMMExplicitSolvation:
         self.lambdas_stage3 = [1.0, 0.5, 0.2, 0.1, 0.0]
 
         # Storage for potential energies across stages
-        self.u_kln = []
+        self.u_kln_matrices = []
         self.stage = 1
 
         # Final energies
@@ -348,12 +348,13 @@ class OMMExplicitSolvation:
 
         u_kln = self._recalculate_energies(trajectories, forcefields, topology)
 
+        self.u_kln_matrices.append(u_kln)
+
         recalculation_end = time.time()
         recalculation_time = recalculation_end - recalculation_start
 
         self.ostream.print_info(f"Energy recalculation for stage {stage} took {recalculation_time:.2f} seconds.")
         self.ostream.flush()
-        self.u_kln.append(u_kln)
 
         self.ostream.print_info(f"Calculating the free energy with MBAR for stage {stage}...")
         self.ostream.flush()
