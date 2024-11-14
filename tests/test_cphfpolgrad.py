@@ -124,8 +124,10 @@ class TestCphfPolgrad:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_real")
-        self.run_cphfpolgrad_complex(molecule, basis, None, "cphfpolgrad_coefficients_complex")
+        #self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_real")
+        self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real")
+        #self.run_cphfpolgrad_complex(molecule, basis, None, "cphfpolgrad_coefficients_complex")
+        self.run_cphfpolgrad_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex")
 
     @pytest.mark.skipif('pyscf' not in sys.modules,
                         reason='pyscf for integral derivatives not available')
@@ -141,5 +143,7 @@ class TestCphfPolgrad:
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
 
-        self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_real")
-        self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_complex")
+        #self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_real")
+        self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real")
+        #self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_complex")
+        self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex")
