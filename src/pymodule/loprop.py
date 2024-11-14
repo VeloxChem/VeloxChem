@@ -94,12 +94,8 @@ class LoPropDriver:
             n_mo = C.shape[1]
 
             # re-arrange AOs
-            re_arranged_indices = get_basis_function_indices_of_atoms(molecule, basis)
-
-            print()
-            print('re_arranged_indices')
-            print(re_arranged_indices)
-            print()
+            re_arranged_indices = get_basis_function_indices_of_atoms(
+                molecule, basis)
 
             # obtain occupied & virtual orbital lists
             ao_per_atom, ao_occ, ao_vir = self.get_ao_indices(molecule, basis)
@@ -198,6 +194,11 @@ class LoPropDriver:
             Ny *= inv_sqrt_2
             Nz *= inv_sqrt_2
 
+            # Note: loprop uses r instead of mu for dipole operator
+            Nx *= -1.0
+            Ny *= -1.0
+            Nz *= -1.0
+
             # unpact response vectors to matrix form
             nocc = molecule.number_of_alpha_electrons()
             norb = n_mo
@@ -218,14 +219,15 @@ class LoPropDriver:
             Dk_loprop = np.concatenate(([Dx_loprop], [Dy_loprop], [Dz_loprop]))
 
         # dipole
-        dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0,0.0,0.0])
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis,
+                                                        [0.0, 0.0, 0.0])
 
         if self.rank == mpi_master():
 
             # Note: loprop uses r instead of mu for dipole operator
-            x_ao = -1.0*dipole_mats[0]
-            y_ao = -1.0*dipole_mats[1]
-            z_ao = -1.0*dipole_mats[2]
+            x_ao = -1.0 * dipole_mats[0]
+            y_ao = -1.0 * dipole_mats[1]
+            z_ao = -1.0 * dipole_mats[2]
 
             # convert to loprop basis
             x_ao_loprop = np.linalg.multi_dot([T.T, x_ao, T])
