@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import FockGeom1000Driver, T4CScreener
-from veloxchem.veloxchemlib import partition_atoms, make_matrix
+from veloxchem.veloxchemlib import make_matrix
 from veloxchem.veloxchemlib import mpi_master, mat_t
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -47,7 +47,8 @@ class TestNumericalGradient:
         tmat2 = scf_drv.comm.bcast(tmat2, root=mpi_master())
 
         natoms = mol.number_of_atoms()
-        local_atoms = partition_atoms(natoms, scf_drv.rank, scf_drv.nodes)
+
+        local_atoms = list(range(natoms))[scf_drv.rank::scf_drv.nodes]
 
         fock_grad_drv = FockGeom1000Driver()
 
