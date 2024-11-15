@@ -17,7 +17,51 @@ CT4CGeomX0MatricesDistributor::CT4CGeomX0MatricesDistributor(CMatrices*         
 
     : _focks(focks)
 
+    , _values(std::vector<double>(3, 0.0))
+
     , _density(density)
+
+    , _density_2(nullptr)
+
+    , _label(format::lower_case(label))
+
+    , _exchange_factor(exchange_factor)
+
+    , _omega(omega)
+
+    , _matrices(CMatrices())
+
+    , _a_loc_indices(std::vector<size_t>())
+
+    , _b_loc_indices(std::vector<size_t>())
+
+    , _c_loc_indices(std::vector<size_t>())
+
+    , _d_loc_indices(std::vector<size_t>())
+
+    , _a_glob_indices(std::vector<size_t>())
+
+    , _b_glob_indices(std::vector<size_t>())
+
+    , _c_glob_indices(std::vector<size_t>())
+
+    , _d_glob_indices(std::vector<size_t>())
+{
+}
+
+CT4CGeomX0MatricesDistributor::CT4CGeomX0MatricesDistributor(const CMatrix*     density,
+                                                             const CMatrix*     density_2,
+                                                             const std::string& label,
+                                                             const double       exchange_factor,
+                                                             const double       omega)
+
+    : _focks(nullptr)
+
+    , _values(std::vector<double>(3, 0.0))
+
+    , _density(density)
+
+    , _density_2(density_2)
 
     , _label(format::lower_case(label))
 
@@ -55,6 +99,12 @@ auto
 CT4CGeomX0MatricesDistributor::need_omega() const -> bool
 {
     return (_label == "j_rs") || (_label == "k_rs") || (_label == "kx_rs");
+}
+
+auto
+CT4CGeomX0MatricesDistributor::get_values() const -> std::vector<double>
+{
+    return _values;
 }
 
 auto
@@ -96,16 +146,19 @@ CT4CGeomX0MatricesDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_blo
 
     // adds submatrices storage
 
-    auto keys = _focks->keys();
-
-    if (const auto nkeys = keys.size(); nkeys > 0)
+    if (_focks != nullptr)
     {
-        std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
-            t4cfunc::add_local_matrices(_matrices, _label, mat_t::general, std::to_string(i), a_dims, b_dims, c_dims, d_dims);
-        });
-    }
+        auto keys = _focks->keys();
 
-    _matrices.zero();
+        if (const auto nkeys = keys.size(); nkeys > 0)
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
+                t4cfunc::add_local_matrices(_matrices, _label, mat_t::general, std::to_string(i), a_dims, b_dims, c_dims, d_dims);
+            });
+        }
+
+        _matrices.zero();
+    }
 }
 
 auto
@@ -122,10 +175,12 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                           const size_t                     ibra_gto,
                                           const std::pair<size_t, size_t>& ket_range) -> void
 {
-    auto keys = _focks->keys();
-
-    if (const auto nkeys = keys.size(); nkeys > 0)
+    if (_focks != nullptr)
     {
+        auto keys = _focks->keys();
+
+        const auto nkeys = keys.size();
+
         const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
 
         std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
@@ -151,6 +206,32 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                                     ibra_gto,
                                                     ket_range);
         });
+    }
+    else
+    {
+        const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
+
+        for (int i = 0; i < 3; i++)
+        {
+            t4cfunc::local_distribute_geom(_values,
+                                           i,
+                                           _density,
+                                           _density_2,
+                                           _label,
+                                           _exchange_factor,
+                                           buffer,
+                                           offset + i * ncomps,
+                                           a_indices,
+                                           b_indices,
+                                           c_indices,
+                                           d_indices,
+                                           a_angmom,
+                                           b_angmom,
+                                           c_angmom,
+                                           d_angmom,
+                                           ibra_gto,
+                                           ket_range);
+        };
     }
 }
 
@@ -334,6 +415,206 @@ CT4CGeomX0MatricesDistributor::accumulate(const CGtoPairBlock& bra_gto_pair_bloc
                                         b_comps,
                                         true);
                 }
+            }
+        }
+    }
+}
+
+auto
+CT4CGeomX0MatricesDistributor::accumulate_values(double* values, const CMatrix* density, const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
+{
+    {
+        const auto bra_ang_moms = bra_gto_pair_block.angular_momentums();
+
+        const auto ket_ang_moms = ket_gto_pair_block.angular_momentums();
+
+        const auto a_comps = tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.first});
+
+        const auto b_comps = tensor::number_of_spherical_components(std::array<int, 1>{bra_ang_moms.second});
+
+        const auto c_comps = tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.first});
+
+        const auto d_comps = tensor::number_of_spherical_components(std::array<int, 1>{ket_ang_moms.second});
+
+        auto keys = _focks->keys();
+
+        if (const auto nkeys = keys.size(); nkeys > 0)
+        {
+            for (size_t i = 0; i < nkeys; i++)
+            {
+                const auto suffix = std::to_string(i);
+
+                auto fock = _focks->matrix(keys[i]);
+
+                double local_value = 0.0;
+
+                if ((_label == "2jk") || (_label == "2jkx") || (_label == "j") || (_label == "j_rs"))
+                {
+                    const auto qp_pair = std::pair<int, int>({bra_ang_moms.second, bra_ang_moms.first});
+
+                    const auto sr_pair = std::pair<int, int>({ket_ang_moms.second, ket_ang_moms.first});
+
+                    // acummulate contributions to Fock matrix
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(bra_ang_moms),
+                                        _matrices.matrix("PQ_" + suffix)->sub_matrix({0, 0}),
+                                        _a_loc_indices,
+                                        _b_loc_indices,
+                                        _a_glob_indices,
+                                        _b_glob_indices,
+                                        a_comps,
+                                        b_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(ket_ang_moms),
+                                        _matrices.matrix("RS_" + suffix)->sub_matrix({0, 0}),
+                                        _c_loc_indices,
+                                        _d_loc_indices,
+                                        _c_glob_indices,
+                                        _d_glob_indices,
+                                        c_comps,
+                                        d_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(qp_pair),
+                                        _matrices.matrix("QP_" + suffix)->sub_matrix({0, 0}),
+                                        _b_loc_indices,
+                                        _a_loc_indices,
+                                        _b_glob_indices,
+                                        _a_glob_indices,
+                                        b_comps,
+                                        a_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(sr_pair),
+                                        _matrices.matrix("SR_" + suffix)->sub_matrix({0, 0}),
+                                        _d_loc_indices,
+                                        _c_loc_indices,
+                                        _d_glob_indices,
+                                        _c_glob_indices,
+                                        d_comps,
+                                        c_comps,
+                                        true);
+                }
+
+                if ((_label == "2jk") || (_label == "2jkx") || (_label == "k") || (_label == "kx") || (_label == "k_rs") || (_label == "kx_rs"))
+                {
+                    // set up angular pairs
+
+                    const auto pr_pair = std::pair<int, int>({bra_ang_moms.first, ket_ang_moms.first});
+
+                    const auto ps_pair = std::pair<int, int>({bra_ang_moms.first, ket_ang_moms.second});
+
+                    const auto qr_pair = std::pair<int, int>({bra_ang_moms.second, ket_ang_moms.first});
+
+                    const auto qs_pair = std::pair<int, int>({bra_ang_moms.second, ket_ang_moms.second});
+
+                    const auto rp_pair = std::pair<int, int>({ket_ang_moms.first, bra_ang_moms.first});
+
+                    const auto sp_pair = std::pair<int, int>({ket_ang_moms.second, bra_ang_moms.first});
+
+                    const auto rq_pair = std::pair<int, int>({ket_ang_moms.first, bra_ang_moms.second});
+
+                    const auto sq_pair = std::pair<int, int>({ket_ang_moms.second, bra_ang_moms.second});
+
+                    // acummulate contributions to Fock matrix
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(pr_pair),
+                                        _matrices.matrix("PR_" + suffix)->sub_matrix({0, 0}),
+                                        _a_loc_indices,
+                                        _c_loc_indices,
+                                        _a_glob_indices,
+                                        _c_glob_indices,
+                                        a_comps,
+                                        c_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(ps_pair),
+                                        _matrices.matrix("PS_" + suffix)->sub_matrix({0, 0}),
+                                        _a_loc_indices,
+                                        _d_loc_indices,
+                                        _a_glob_indices,
+                                        _d_glob_indices,
+                                        a_comps,
+                                        d_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(qr_pair),
+                                        _matrices.matrix("QR_" + suffix)->sub_matrix({0, 0}),
+                                        _b_loc_indices,
+                                        _c_loc_indices,
+                                        _b_glob_indices,
+                                        _c_glob_indices,
+                                        b_comps,
+                                        c_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(qs_pair),
+                                        _matrices.matrix("QS_" + suffix)->sub_matrix({0, 0}),
+                                        _b_loc_indices,
+                                        _d_loc_indices,
+                                        _b_glob_indices,
+                                        _d_glob_indices,
+                                        b_comps,
+                                        d_comps,
+                                        true);
+
+                    // acummulate contributions to Fock matrix
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(rp_pair),
+                                        _matrices.matrix("RP_" + suffix)->sub_matrix({0, 0}),
+                                        _c_loc_indices,
+                                        _a_loc_indices,
+                                        _c_glob_indices,
+                                        _a_glob_indices,
+                                        c_comps,
+                                        a_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(sp_pair),
+                                        _matrices.matrix("SP_" + suffix)->sub_matrix({0, 0}),
+                                        _d_loc_indices,
+                                        _a_loc_indices,
+                                        _d_glob_indices,
+                                        _a_glob_indices,
+                                        d_comps,
+                                        a_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(rq_pair),
+                                        _matrices.matrix("RQ_" + suffix)->sub_matrix({0, 0}),
+                                        _c_loc_indices,
+                                        _b_loc_indices,
+                                        _c_glob_indices,
+                                        _b_glob_indices,
+                                        c_comps,
+                                        b_comps,
+                                        true);
+
+                    t4cfunc::accumulate_value(&local_value,
+                                        density->sub_matrix(sq_pair),
+                                        _matrices.matrix("SQ_" + suffix)->sub_matrix({0, 0}),
+                                        _d_loc_indices,
+                                        _b_loc_indices,
+                                        _d_glob_indices,
+                                        _b_glob_indices,
+                                        d_comps,
+                                        b_comps,
+                                        true);
+                }
+
+                values[i] += local_value;
             }
         }
     }

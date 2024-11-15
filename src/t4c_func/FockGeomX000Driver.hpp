@@ -2,8 +2,10 @@
 #define FockGeomX000Driver_hpp
 
 #include <string>
+#include <vector>
 
 #include "ElectronRepulsionGeom1000Func.hpp"
+#include "DenseMatrix.hpp"
 #include "GtoFunc.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "Matrices.hpp"
@@ -80,6 +82,17 @@ class CFockGeomX000Driver
                  const double           exchange_factor,
                  const double           omega,
                  const int              ithreshold) const -> CMatrices;
+
+    auto compute(const CMolecularBasis& basis,
+                 const CT4CScreener&    screener_atom,
+                 const CT4CScreener&    screener,
+                 const CMatrix&         density,
+                 const CMatrix&         density2,
+                 const int              iatom,
+                 const std::string&     label,
+                 const double           exchange_factor,
+                 const double           omega,
+                 const int              ithreshold) const -> std::vector<double>;
 
     auto set_block_size_factor(const int factor) -> void;
 
@@ -235,6 +248,84 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
     }
 
     return fock_mats;
+}
+
+template <int N>
+auto
+CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
+                                const CT4CScreener&    screener_atom,
+                                const CT4CScreener&    screener,
+                                const CMatrix&         density,
+                                const CMatrix&         density2,
+                                const int              iatom,
+                                const std::string&     label,
+                                const double           exchange_factor,
+                                const double           omega,
+                                const int              ithreshold) const -> std::vector<double>
+{
+    auto bsfac = _determine_block_size_factor(_get_nao(density));
+
+    // prepare pointers for OMP parallel region
+
+    auto ptr_screener = &screener;
+
+    auto ptr_screener_atom = &screener_atom;
+
+    auto ptr_density = &density;
+
+    auto ptr_density_2 = &density2;
+
+    auto nthreads = omp_get_max_threads();
+
+    CDenseMatrix omp_values(nthreads, 3);
+
+    omp_values.zero();
+
+    auto ptr_omp_values = &omp_values;
+
+    // execute OMP tasks with static scheduling
+
+#pragma omp parallel shared(ptr_omp_values, ptr_screener, ptr_screener_atom, ptr_density, ptr_density_2, label, exchange_factor, omega, ithreshold)
+    {
+#pragma omp single nowait
+        {
+            auto bra_gto_pair_blocks = ptr_screener_atom->gto_pair_blocks();
+
+            auto ket_gto_pair_blocks = ptr_screener->gto_pair_blocks();
+
+            const auto work_tasks = omp::make_bra_ket_work_group(bra_gto_pair_blocks, ket_gto_pair_blocks, ithreshold, bsfac);
+
+            std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
+                const auto bra_gpairs = bra_gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
+                const auto ket_gpairs = ket_gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
+                const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
+                const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range)
+                {
+                    CT4CGeomX0MatricesDistributor distributor(ptr_density, ptr_density_2, label, exchange_factor, omega);
+                    distributor.set_indices(bra_gpairs, ket_gpairs);
+                    erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    auto values = distributor.get_values();
+                    auto thread_id = omp_get_thread_num();
+                    ptr_omp_values->row(thread_id)[0] += values[0];
+                    ptr_omp_values->row(thread_id)[1] += values[1];
+                    ptr_omp_values->row(thread_id)[2] += values[2];
+                }
+            });
+        }
+    }
+
+    std::vector<double> values(3, 0.0);
+
+    for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        for (int d = 0; d < 3; d++)
+        {
+            values[d] += omp_values.row(thread_id)[d];
+        }
+    }
+
+    return values;
 }
 
 template <int N>
