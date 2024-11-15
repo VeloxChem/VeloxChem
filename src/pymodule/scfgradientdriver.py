@@ -100,17 +100,13 @@ class ScfGradientDriver(GradientDriver):
 
         total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
 
-        if total_cores >= 2048:
-            if naos >= 4500:
-                extra_factor = 4
-            else:
-                extra_factor = 2
-
-        elif total_cores >= 1024:
-            extra_factor = 2
-
-        else:
+        if total_cores < 4096:
             extra_factor = 1
+        else:
+            if naos < 3000:
+                extra_factor = 2
+            else:
+                extra_factor = 1
 
         return extra_factor
 

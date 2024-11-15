@@ -350,11 +350,15 @@ CFockGeomX000Driver<N>::_determine_block_size_factor(const int nao) const -> int
     {
         return 32 * _block_size_factor;
     }
-    else if (nao < 1000)
+    else if (nao < 1500)
     {
         return 16 * _block_size_factor;
     }
-    else if (nao < 3000)
+    else if (nao < 4500)
+    {
+        return 8 * _block_size_factor;
+    }
+    else if (nao < 6000)
     {
         return 4 * _block_size_factor;
     }
