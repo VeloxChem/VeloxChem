@@ -232,7 +232,7 @@ class ScfDriver:
         self.filename = None
 
         self._debug = False
-        self._block_size_factor = 16
+        self._block_size_factor = 4
 
         # input keywords
         self._input_keywords = {

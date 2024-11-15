@@ -332,19 +332,19 @@ CFockDriver::_get_nao(const CMatrices& mats) const -> int
 auto
 CFockDriver::_determine_block_size_factor(const int nao) const -> int
 {
-    if (nao < 450)
+    if (nao < 300)
+    {
+        return 32 * _block_size_factor;
+    }
+    else if (nao < 1000)
     {
         return 16 * _block_size_factor;
     }
-    else if (nao < 900)
-    {
-        return 8 * _block_size_factor;
-    }
-    else if (nao < 1800)
+    else if (nao < 3000)
     {
         return 4 * _block_size_factor;
     }
-    else if (nao < 3600)
+    else if (nao < 10000)
     {
         return 2 * _block_size_factor;
     }
