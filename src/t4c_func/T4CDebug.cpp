@@ -1,11 +1,13 @@
 #include "T4CDebug.hpp"
 
 #include <iostream>
+#include <iomanip>
 
 namespace t4cfunc {  // t4cfunc namespace
 
 auto
 dump_buffer(const CSimdArray<double>&        buffer,
+            const size_t                     position,
             const CGtoPairBlock&             bra_gto_pair_block,
             const CGtoPairBlock&             ket_gto_pair_block,
             const std::pair<size_t, size_t>& ket_indices,
@@ -32,6 +34,8 @@ dump_buffer(const CSimdArray<double>&        buffer,
 
     const auto d_indices = ket_gto_pair_block.ket_orbital_indices();
     
+    std::cout << " * Angular Momentum: " << bramom.first << "," << bramom.second << "," << ketmom.first << "," << ketmom.second << std::endl; 
+    
     for (int i = 0; i < acomps; i++)
     {
         for (int j = 0; j < bcomps; j++)
@@ -44,7 +48,7 @@ dump_buffer(const CSimdArray<double>&        buffer,
                     
                     for (size_t m = 0; m < components; m++)
                     {
-                        auto tints = buffer.data(m * acomps * bcomps * ccomps * dcomps + bkoff);
+                        auto tints = buffer.data(position + m * acomps * bcomps * ccomps * dcomps + bkoff);
                      
                         for (auto n = ket_indices.first; n < ket_indices.second; n++)
                         {
@@ -58,12 +62,40 @@ dump_buffer(const CSimdArray<double>&        buffer,
                             
                             std::cout << d_indices[0] * l + d_indices[n + 1] << " ";
                             
+                            std::cout << std::setprecision(15);
+                            
                             std::cout << tints[n - ket_indices.first] << std::endl;
                         }
                     }
                 }
             }
         }
+    }
+}
+
+auto
+dump_buffer(const CSimdArray<double>& buffer,
+            const size_t              position,
+            const std::string&        label,
+            const size_t              elements,
+            const size_t              components) -> void
+{
+    std::cout << " *** BUFFER : " << label << std::endl;
+    
+    for (size_t i = 0; i < components; i++)
+    {
+        std::cout << " * " << i << " : ";
+        
+        const auto tints = buffer.data(position + i);
+        
+        for (size_t j = 0; j < elements; j++)
+        {
+            std::cout << std::setprecision(15);
+            
+            std::cout << tints[j] << " ";
+        }
+        
+        std::cout << std::endl;
     }
 }
 
