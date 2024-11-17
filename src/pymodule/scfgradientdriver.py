@@ -72,9 +72,9 @@ class ScfGradientDriver(GradientDriver):
 
         self.eri_thresh = scf_drv.eri_thresh
         self.timing = scf_drv.timing
-
         self._debug = scf_drv._debug
-        self._block_size_factor = scf_drv._block_size_factor
+
+        self._block_size_factor = 4
 
         self.numerical = False
         self.delta_h = 0.001
