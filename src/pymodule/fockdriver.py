@@ -92,7 +92,7 @@ class FockDriver:
 
         return self._fock_drv._compute_fock_omp(*args)
 
-    def _set_block_size_factor(self, factor, naos):
+    def _set_block_size_factor(self, factor):
 
         assert_msg_critical(
             factor in [1, 2, 4, 8, 16, 32, 64, 128],

@@ -96,19 +96,6 @@ class ScfGradientDriver(GradientDriver):
                                     profiler.get_available_memory())
             self.ostream.flush()
 
-    def _get_extra_block_size_factor(self, naos):
-
-        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
-
-        if total_cores < 1024:
-            extra_factor = 1
-        elif total_cores < 4096:
-            extra_factor = 2
-        else:
-            extra_factor = 4
-
-        return extra_factor
-
     def partition_atoms(self, molecule):
         """
         Partition atoms for parallel computation of gradient.
@@ -329,11 +316,7 @@ class ScfGradientDriver(GradientDriver):
         self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
-
-        extra_factor = self._get_extra_block_size_factor(
-            basis.get_dimensions_of_basis())
-        fock_grad_drv._set_block_size_factor(self._block_size_factor *
-                                             extra_factor)
+        fock_grad_drv._set_block_size_factor(self._block_size_factor)
 
         t0 = time.time()
 
@@ -564,11 +547,7 @@ class ScfGradientDriver(GradientDriver):
         Dab_for_fock_2.set_values(Da + Db)
 
         fock_grad_drv = FockGeom1000Driver()
-
-        extra_factor = self._get_extra_block_size_factor(
-            basis.get_dimensions_of_basis())
-        fock_grad_drv._set_block_size_factor(self._block_size_factor *
-                                             extra_factor)
+        fock_grad_drv._set_block_size_factor(self._block_size_factor)
 
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
