@@ -97,7 +97,7 @@ class CFockGeomX000Driver
     auto set_block_size_factor(const int factor) -> void;
 
    private:
-    int _block_size_factor = 4;
+    int _block_size_factor = 8;
 
     auto _get_nao(const CMatrix& mat) const -> int;
 

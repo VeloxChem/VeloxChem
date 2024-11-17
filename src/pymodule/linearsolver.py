@@ -179,7 +179,7 @@ class LinearSolver:
         self._dist_fock_ung = None
 
         self._debug = False
-        self._block_size_factor = 4
+        self._block_size_factor = 8
 
         # input keywords
         self._input_keywords = {
