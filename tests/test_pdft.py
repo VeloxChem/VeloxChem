@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 from pathlib import Path
 
-from veloxchem.veloxchemlib import XCIntegrator, XCPairDensityFunctional, XCMolecularGradient
+from veloxchem.veloxchemlib import (XCIntegrator, XCPairDensityFunctional,
+                                    XCMolecularGradient)
 from veloxchem.veloxchemlib import available_pdft_functionals
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -333,9 +334,9 @@ class TestPDFT:
     def test_grad_tlda(self):
         H2O_xyz = """3
 
-O   0.0   0.0   0.0
-H   0.0   1.4   1.1
-H   0.0  -1.4   1.1
+        O   0.0   0.0   0.0
+        H   0.0   1.4   1.1
+        H   0.0  -1.4   1.1
         """
         molecule = Molecule.from_xyz_string(H2O_xyz)
         basis = MolecularBasis.read(molecule, "cc-pvdz")
@@ -347,23 +348,32 @@ H   0.0  -1.4   1.1
         func_comp = {"TSLATER": 1.0, 'TVWN_RPA': 1.0}
 
         # densities and orbitals from a converged cas(4,4) MC-tBLYP calculation
-        here = Path(__file__).parent
-        dmat_ao = np.load(str(here)+"/data/h2o.ccpvdz.cas44.dao.npy")
-        ns_d2 = np.load(str(here)+"/data/h2o.ccpvdz.cas44.d2.npy")
-        act_mos = np.load(str(here)+"/data/h2o.ccpvdz.cas44.actorbs.npy")
+        data_dir = Path(__file__).parent / "data"
+        dmat_ao = np.load(str(data_dir / "h2o.ccpvdz.cas44.dao.npy"))
+        ns_d2 = np.load(str(data_dir / "h2o.ccpvdz.cas44.d2.npy"))
+        act_mos = np.load(str(data_dir / "h2o.ccpvdz.cas44.actorbs.npy"))
         xc_drv = XCMolecularGradient()
-        dft_gradients = xc_drv.integrate_vxc_pdft_gradient(molecule, basis, dmat_ao, ns_d2,
-                                             act_mos, molgrid, func, func_comp, 0.0)
+        dft_gradients = xc_drv.integrate_vxc_pdft_gradient(
+            molecule, basis, dmat_ao, ns_d2, act_mos, molgrid, func, func_comp,
+            0.0)
 
-        ref_grad = np.array([[0, 0, -0.128566279], [0, 0.0894509471, 0.0642872016], [0, -0.0894509471, 0.0642872016]])
-        assert np.allclose(dft_gradients, ref_grad)
+        comm = MPI.COMM_WORLD
+        dft_gradients = comm.reduce(dft_gradients,
+                                    op=MPI.SUM,
+                                    root=mpi_master())
+
+        if comm.Get_rank() == mpi_master():
+            ref_grad = np.array([[0, 0, -0.128566279],
+                                 [0, 0.0894509471, 0.0642872016],
+                                 [0, -0.0894509471, 0.0642872016]])
+            assert np.allclose(dft_gradients, ref_grad)
 
     def test_grad_tblyp(self):
         H2O_xyz = """3
 
-O   0.0   0.0   0.0
-H   0.0   1.4   1.1
-H   0.0  -1.4   1.1
+        O   0.0   0.0   0.0
+        H   0.0   1.4   1.1
+        H   0.0  -1.4   1.1
         """
         molecule = Molecule.from_xyz_string(H2O_xyz)
         basis = MolecularBasis.read(molecule, "cc-pvdz")
@@ -375,13 +385,22 @@ H   0.0  -1.4   1.1
         func_comp = {"TSLATER": 1.0, 'TB88': 1.0, 'TLYP': 1.0}
 
         # densities and orbitals from a converged cas(4,4) MC-tBLYP calculation
-        here = Path(__file__).parent
-        dmat_ao = np.load(str(here)+"/data/h2o.ccpvdz.cas44.dao.npy")
-        ns_d2 = np.load(str(here)+"/data/h2o.ccpvdz.cas44.d2.npy")
-        act_mos = np.load(str(here)+"/data/h2o.ccpvdz.cas44.actorbs.npy")
+        data_dir = Path(__file__).parent / "data"
+        dmat_ao = np.load(str(data_dir / "h2o.ccpvdz.cas44.dao.npy"))
+        ns_d2 = np.load(str(data_dir / "h2o.ccpvdz.cas44.d2.npy"))
+        act_mos = np.load(str(data_dir / "h2o.ccpvdz.cas44.actorbs.npy"))
         xc_drv = XCMolecularGradient()
-        dft_gradients = xc_drv.integrate_vxc_pdft_gradient(molecule, basis, dmat_ao, ns_d2,
-                                             act_mos, molgrid, func, func_comp, 0.0)
+        dft_gradients = xc_drv.integrate_vxc_pdft_gradient(
+            molecule, basis, dmat_ao, ns_d2, act_mos, molgrid, func, func_comp,
+            0.0)
 
-        ref_grad = np.array([[0, 0, -0.116818315], [0, 0.0808942190, 0.0584138119], [0, -0.0808942190, 0.0584138119]])
-        assert np.allclose(dft_gradients, ref_grad)
+        comm = MPI.COMM_WORLD
+        dft_gradients = comm.reduce(dft_gradients,
+                                    op=MPI.SUM,
+                                    root=mpi_master())
+
+        if comm.Get_rank() == mpi_master():
+            ref_grad = np.array([[0, 0, -0.116818315],
+                                 [0, 0.0808942190, 0.0584138119],
+                                 [0, -0.0808942190, 0.0584138119]])
+            assert np.allclose(dft_gradients, ref_grad)

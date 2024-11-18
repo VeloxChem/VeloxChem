@@ -44,6 +44,7 @@
 #include "GtoValues.hpp"
 #include "Prescreener.hpp"
 #include "XCFunctional.hpp"
+#include "XCMolecularGradientForPDFT.hpp"
 
 CXCMolecularGradient::CXCMolecularGradient()
 

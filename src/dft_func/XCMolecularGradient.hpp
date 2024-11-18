@@ -38,7 +38,7 @@
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
 #include "XCFunctional.hpp"
-#include "XCMolecularGradientForPDFT.hpp"
+#include "XCPairDensityFunctional.hpp"
 
 /**
  Class CXCMolecularGradient implements XC molecular gradient.

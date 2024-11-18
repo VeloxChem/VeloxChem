@@ -31,7 +31,9 @@
 #include "DftSubMatrix.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
+#include "MultiTimer.hpp"
 #include "PairDensityGridGenerator.hpp"
+#include "Prescreener.hpp"
 
 namespace xcgradpdft {  // xcgradpdft namespace
 
@@ -274,20 +276,20 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t t = 0; t < n_active; t++)
+            for (int t = 0; t < n_active; t++)
             {
                 auto MOt = mos_on_grid.row(t);
 
                 auto t_offset = t * n_active * npoints;
 
-                for (int32_t u = 0; u < n_active; u++)
+                for (int u = 0; u < n_active; u++)
                 {
                     auto MOu = mos_on_grid.row(u);
 
                     auto tu_offset = t_offset + u * npoints;
 
-                    #pragma omp simd aligned(mo_pair_val, MOt, MOu: VLX_ALIGN)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    #pragma omp simd 
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         mo_pair_val[tu_offset + g] += MOt[g] * MOu[g];
                     }
@@ -319,18 +321,18 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t v = 0; v < n_active; v++)
+            for (int v = 0; v < n_active; v++)
             {
                 auto v_offset = v * npoints;
 
-                for (int32_t w = 0; w < n_active; w++)
+                for (int w = 0; w < n_active; w++)
                 {
                     auto vw_offset = (v*n_active + w) * npoints;
 
                     auto MOw = mos_on_grid.row(w);
 
-                    #pragma omp simd aligned(g_val, d_val, MOw : VLX_ALIGN)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    #pragma omp simd 
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         g_val[v_offset + g] += d_val[vw_offset + g] * MOw[g];
                     }
@@ -378,7 +380,7 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < aocount; nu++)
+            for (int nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -386,8 +388,8 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
                 auto nu_offset = nu * npoints;
 
-                #pragma omp simd aligned(gdenx, gdeny, gdenz, gdenpi_x, gdenpi_y, gdenpi_z, F_val, k_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                #pragma omp simd 
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -427,14 +429,14 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
             
             auto gatm = molgrad_threads.row(thread_id);
             
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            for (int iatom = 0; iatom < natoms; iatom++)
             {   
                 auto atom_offset = iatom * npoints;
                 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
                 
-                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(local_weights, vrho, gdenx, gdeny, gdenz, gdenpi_x, gdenpi_y, gdenpi_z : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) 
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {   
                     auto atom_g = atom_offset + g;
                     
@@ -463,9 +465,9 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
     CDenseMatrix molgrad(natoms, 3);
 
-    for (int32_t iatom = 0; iatom < natoms; iatom++)
+    for (int iatom = 0; iatom < natoms; iatom++)
     {
-        for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+        for (int thread_id = 0; thread_id < nthreads; thread_id++)
         {
             molgrad.row(iatom)[0] += molgrad_threads.row(thread_id)[iatom * 3 + 0];
             molgrad.row(iatom)[1] += molgrad_threads.row(thread_id)[iatom * 3 + 1];
@@ -776,20 +778,20 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t t = 0; t < n_active; t++)
+            for (int t = 0; t < n_active; t++)
             {
                 auto MOt = mos_on_grid.row(t);
 
                 auto t_offset = t * n_active * npoints;
 
-                for (int32_t u = 0; u < n_active; u++)
+                for (int u = 0; u < n_active; u++)
                 {
                     auto MOu = mos_on_grid.row(u);
 
                     auto tu_offset = t_offset + u * npoints;
 
-                    #pragma omp simd aligned(mo_pair_val, MOt, MOu: VLX_ALIGN)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    #pragma omp simd 
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         mo_pair_val[tu_offset + g] += MOt[g] * MOu[g];
                     }
@@ -827,11 +829,11 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t v = 0; v < n_active; v++)
+            for (int v = 0; v < n_active; v++)
             {
                 auto v_offset = v * npoints;
 
-                for (int32_t w = 0; w < n_active; w++)
+                for (int w = 0; w < n_active; w++)
                 {
                     auto vw_offset = (v*n_active + w) * npoints;
 
@@ -840,8 +842,8 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
                     //auto MOw_y = mos_y_on_grid.row(w);
                     //auto MOw_z = mos_z_on_grid.row(w);
 
-                    #pragma omp simd aligned(g_val, d_val, MOw : VLX_ALIGN)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    #pragma omp simd 
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         g_val[v_offset + g] += d_val[vw_offset + g] * MOw[g];
                         //g_x_val[v_offset + g] += d_val[vw_offset + g] * MOw_x[g];
@@ -927,7 +929,7 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < aocount; nu++)
+            for (int nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -935,8 +937,8 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
                 auto nu_offset = nu * npoints;
 
-                #pragma omp simd aligned(gdenx, gdeny, gdenz, gdenpi_x, gdenpi_y, gdenpi_z, F_val, k_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                #pragma omp simd 
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -1002,14 +1004,14 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
             auto gatm = molgrad_threads.row(thread_id);
 
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            for (int iatom = 0; iatom < natoms; iatom++)
             {
                 auto atom_offset = iatom * npoints;
 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
-                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(local_weights, vrho, gdenx, gdeny, gdenz, gdenpi_x, gdenpi_y, gdenpi_z : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) 
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
