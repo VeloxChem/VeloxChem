@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import numpy as np
 import pytest
+from pathlib import Path
 
 from veloxchem.veloxchemlib import XCIntegrator, XCPairDensityFunctional, XCMolecularGradient
 from veloxchem.veloxchemlib import available_pdft_functionals
@@ -346,9 +347,10 @@ H   0.0  -1.4   1.1
         func_comp = {"TSLATER": 1.0, 'TVWN_RPA': 1.0}
 
         # densities and orbitals from a converged cas(4,4) MC-tBLYP calculation
-        dmat_ao = np.load("data/h2o.ccpvdz.cas44.dao.npy")
-        ns_d2 = np.load("data/h2o.ccpvdz.cas44.d2.npy")
-        act_mos = np.load("data/h2o.ccpvdz.cas44.actorbs.npy")
+        here = Path(__file__).parent
+        dmat_ao = np.load(str(here)+"/data/h2o.ccpvdz.cas44.dao.npy")
+        ns_d2 = np.load(str(here)+"/data/h2o.ccpvdz.cas44.d2.npy")
+        act_mos = np.load(str(here)+"/data/h2o.ccpvdz.cas44.actorbs.npy")
         xc_drv = XCMolecularGradient()
         dft_gradients = xc_drv.integrate_vxc_pdft_gradient(molecule, basis, dmat_ao, ns_d2,
                                              act_mos, molgrid, func, func_comp, 0.0)
@@ -373,9 +375,10 @@ H   0.0  -1.4   1.1
         func_comp = {"TSLATER": 1.0, 'TB88': 1.0, 'TLYP': 1.0}
 
         # densities and orbitals from a converged cas(4,4) MC-tBLYP calculation
-        dmat_ao = np.load("data/h2o.ccpvdz.cas44.dao.npy")
-        ns_d2 = np.load("data/h2o.ccpvdz.cas44.d2.npy")
-        act_mos = np.load("data/h2o.ccpvdz.cas44.actorbs.npy")
+        here = Path(__file__).parent
+        dmat_ao = np.load(str(here)+"/data/h2o.ccpvdz.cas44.dao.npy")
+        ns_d2 = np.load(str(here)+"/data/h2o.ccpvdz.cas44.d2.npy")
+        act_mos = np.load(str(here)+"/data/h2o.ccpvdz.cas44.actorbs.npy")
         xc_drv = XCMolecularGradient()
         dft_gradients = xc_drv.integrate_vxc_pdft_gradient(molecule, basis, dmat_ao, ns_d2,
                                              act_mos, molgrid, func, func_comp, 0.0)
