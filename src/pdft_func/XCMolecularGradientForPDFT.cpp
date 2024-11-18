@@ -25,6 +25,7 @@
 #include "XCMolecularGradientForPDFT.hpp"
 
 #include <omp.h>
+#include <cstring>
 
 #include "DenseLinearAlgebra.hpp"
 #include "DftSubMatrix.hpp"
