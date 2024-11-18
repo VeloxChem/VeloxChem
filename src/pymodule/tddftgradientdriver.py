@@ -24,10 +24,15 @@
 import numpy as np
 import time as tm
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver,
+                           NuclearPotentialGeom010Driver, FockGeom1000Driver)
+from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import partition_atoms, make_matrix
+from .matrices import Matrices
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .molecule import Molecule
 from .lrsolver import LinearResponseSolver
@@ -63,12 +68,17 @@ class TddftGradientDriver(GradientDriver):
         - do_four_point: Flag for four-point finite difference.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    # TODO: add response driver here? Save scf_drv as an instance variable?
+    def __init__(self, scf_drv):
         """
         Initializes gradient driver.
+
+        :param scf_drv:
+            The Scf driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv.comm, scf_drv.ostream)
+        self._debug = scf_drv._debug
 
         self.flag = 'RPA Gradient Driver'
 
@@ -193,6 +203,146 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
+    def compute_analytical_vlx(self, molecule, basis, scf_drv, rsp_results):
+        """
+        Performs calculation of analytical gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The SCF tensors.
+        :param rsp_results:
+            The results of the RPA or TDA calculation.
+        """
+
+        scf_tensors = scf_drv.scf_tensors
+
+        # compute orbital response
+        orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
+        orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        orbrsp_drv.compute(molecule, basis, scf_tensors,
+                           rsp_results)
+
+        orbrsp_results = orbrsp_drv.cphf_results
+        omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
+
+        if self.rank == mpi_master():
+            # only alpha part
+            gs_dm = scf_tensors['D_alpha']
+            nocc = molecule.number_of_alpha_electrons()
+            natm = molecule.number_of_atoms()
+            mo = scf_tensors['C_alpha']
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            nocc = mo_occ.shape[1]
+            nvir = mo_vir.shape[1]
+            nao = mo_occ.shape[0]
+
+            # TODO: check variable names and make sure they are consistent
+            # with cphfsolver.
+            # spin summation already included
+            x_plus_y_ao = orbrsp_results['x_plus_y_ao']
+            x_minus_y_ao = orbrsp_results['x_minus_y_ao']
+
+            # CPHF/CPKS coefficients (lambda Lagrange multipliers)
+            cphf_ov = orbrsp_results['cphf_ov']
+            unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao']
+            dof = x_plus_y_ao.shape[0]
+            cphf_ao = np.array([
+                np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
+                for x in range(dof)
+            ])
+            relaxed_density_ao = ( unrelaxed_density_ao + 2.0 * cphf_ao
+                        + 2.0 * cphf_ao.transpose(0,2,1) )
+        else:
+            dof = None
+            relaxed_density_ao = None
+
+        dof = self.comm.bcast(dof, root=mpi_master())
+        relaxed_density_ao = self.comm.bcast(relaxed_density_ao,
+                                             root=mpi_master())
+
+        # ground state gradient
+        t1 = tm.time()
+        gs_grad_drv = ScfGradientDriver(scf_drv)
+        gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
+
+        gs_grad_drv.ostream.mute()
+        gs_grad_drv.compute(molecule, basis, scf_tensors)
+        gs_grad_drv.ostream.unmute()
+        t2 = tm.time()
+
+        if self.rank == mpi_master():
+            if gs_grad_drv.numerical:
+                gs_gradient_type = "Numerical GS gradient"
+            else:
+                gs_gradient_type = "Analytical GS gradient"
+            self.ostream.print_info(gs_gradient_type
+                                    + ' computed in'
+                                    + ' {:.2f} sec.'.format(t2 - t1))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            gs_gradient = gs_grad_drv.get_gradient()
+
+        self.gradient = np.zeros((dof, natm, 3))
+
+        local_atoms = partition_atoms(natm, self.rank, self.nodes)
+
+        # kinetic energy contribution to gradient
+
+        kin_grad_drv = KineticEnergyGeom100Driver()
+
+        self._print_debug_info('before kin_grad')
+
+        for iatom in local_atoms:
+            gmats = kin_grad_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                for s in range(dof):
+                    # Sum of alpha + beta already in relaxed_density_ao
+                    self.gradient[s, iatom, i] += np.sum((gmat + gmat.T) 
+                                                 * relaxed_density_ao[s])
+
+            gmats = Matrices()
+
+        self._print_debug_info('after  kin_grad')
+
+        # nuclear potential contribution to gradient
+
+        self._print_debug_info('before npot_grad')
+
+        npot_grad_100_drv = NuclearPotentialGeom100Driver()
+        npot_grad_010_drv = NuclearPotentialGeom010Driver()
+
+        for iatom in local_atoms:
+            gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
+            gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                gmat_010 = gmats_010.matrix_to_numpy(label)
+
+                # TODO: move minus sign into function call (such as in oneints)
+                for s in range(dof):
+                    # summation of alpha and beta already included
+                    # in relaxed_density_ao
+                    self.gradient[s, iatom, i] -=  np.sum(
+                        (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
+                    self.gradient[s, iatom, i] -=  np.sum(gmat_010 
+                                                * relaxed_density_ao[s])
+
+            gmats_100 = Matrices()
+            gmats_010 = Matrices()
+
+        self._print_debug_info('after  npot_grad')
+
+
+    # TODO: remove this routine once compute_analytical_vlx
+    # confirmed to be correct.
     def compute_analytical(self, molecule, basis, scf_drv, rsp_results):
         """
         Performs calculation of analytical gradient.
@@ -276,6 +426,9 @@ class TddftGradientDriver(GradientDriver):
             self.gradient = np.zeros((dof, natm, 3))
             self.gradient += gs_grad_drv.get_gradient()
 
+
+            self.hcore_contrib = np.zeros((dof, natm, 3))
+
             # loop over atoms and contract integral derivatives
             # with density matrices
             # add the corresponding contribution to the gradient
@@ -300,6 +453,11 @@ class TddftGradientDriver(GradientDriver):
                             relaxed_density_ao[s].reshape(nao**2),
                             (d_hcore[x].T).reshape(nao**2)
                         ])
+                        self.hcore_contrib[s,i,x] += np.linalg.multi_dot([
+                            relaxed_density_ao[s].reshape(nao**2),
+                            (d_hcore[x].T).reshape(nao**2)
+                        ])
+
                         self.gradient[s,i,x] += np.linalg.multi_dot([
                             2.0 * omega_ao[s].reshape(nao**2),
                             (d_ovlp[x].T).reshape(nao**2)
@@ -461,3 +619,18 @@ class TddftGradientDriver(GradientDriver):
         scf_drv.ostream.unmute()
 
         return dipole_moment
+
+    def _print_debug_info(self, label):
+        """
+        Prints debug information.
+
+        :param label:
+            The label of debug information.
+        """
+
+        if self._debug:
+            profiler = Profiler()
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
+                                    profiler.get_available_memory())
+            self.ostream.flush()
+
