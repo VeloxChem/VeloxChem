@@ -81,9 +81,6 @@ namespace xcgradpdft {  // xcgradpdft namespace
                                              const CXCPairDensityFunctional& xcFunctional,
                                              const double                    rs_omega);
 
-// Duplicate for now
-void _computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis);
-
 }   // namespace xcgradpdft
 
 #endif /* XCMolecularGradientForPDFT_hpp */

@@ -40,9 +40,18 @@ namespace aoindices {  // aoindices namespace
  @return a vector of vector containing the AO indices of the two molecules.
  */
 std::vector<std::vector<int>> getDimerAOIndices(const CMolecule&       mol_1,
-                                                    const CMolecule&       mol_2,
-                                                    const CMolecularBasis& basis_1,
-                                                    const CMolecularBasis& basis_2);
+                                                const CMolecule&       mol_2,
+                                                const CMolecularBasis& basis_1,
+                                                const CMolecularBasis& basis_2);
+
+/**
+ Computes AO-to-atom mapping.
+
+ @param ao_to_atom_ids the vector for storing the mapping.
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ */
+void computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis);
 
 }  // namespace aoindices
 

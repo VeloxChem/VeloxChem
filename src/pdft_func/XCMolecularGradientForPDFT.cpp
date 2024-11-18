@@ -27,6 +27,7 @@
 #include <omp.h>
 #include <cstring>
 
+#include "AOIndices.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DftSubMatrix.hpp"
 #include "GtoFunc.hpp"
@@ -68,7 +69,7 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
     std::vector<int> ao_to_atom_ids(naos);
 
-    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+    aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
 
     // molecular gradient
 
@@ -510,7 +511,7 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
     std::vector<int> ao_to_atom_ids(naos);
 
-    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+    aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
 
     // molecular gradient
 
@@ -1066,40 +1067,6 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
     }
 
     return molgrad;
-}
-
-void
-_computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis)
-{
-    auto natoms = molecule.number_of_atoms();
-
-    auto max_angl = basis.max_angular_momentum();
-
-    // azimuthal quantum number: s,p,d,f,...
-
-    for (int angl = 0, aoidx = 0; angl <= max_angl; angl++)
-    {
-        auto nsph = angl * 2 + 1;
-
-        // magnetic quantum number: s,p-1,p0,p+1,d-2,d-1,d0,d+1,d+2,...
-
-        for (int isph = 0; isph < nsph; isph++)
-        {
-            // atoms
-
-            for (int atomidx = 0; atomidx < natoms; atomidx++)
-            {
-                auto nao = basis.number_of_basis_functions(std::vector<int>({atomidx}), angl);
-
-                // atomic orbitals
-
-                for (int iao = 0; iao < nao; iao++, aoidx++)
-                {
-                    ao_to_atom_ids[aoidx] = atomidx;
-                }
-            }
-        }
-    }
 }
 
 }   // namespace xcgradpdft

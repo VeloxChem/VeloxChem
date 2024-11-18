@@ -104,15 +104,6 @@ class CXCMolecularGradient
                                               const CMolecularGrid&   molecularGrid,
                                               const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
 
-    /**
-     Computes AO-to-atom mapping.
-
-     @param ao_to_atom_ids the vector for storing the mapping.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     */
-    void _computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) const;
-
    public:
     /**
      Creates an XC integrator object.
