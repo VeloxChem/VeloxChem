@@ -39,6 +39,7 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
+from .veloxchemlib import XCMolecularGradient
 
 # C++ functions
 from .veloxchemlib import is_chemical_element
@@ -61,6 +62,7 @@ from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
+from .veloxchemlib import partition_atoms
 
 # C++ enums
 from .veloxchemlib import mat_t
@@ -118,6 +120,7 @@ from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
+from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver

@@ -38,7 +38,7 @@ namespace pdftlyp {  // pdftlyp namespace
  @param exc the functional value.
  @param vrho the 1st-order functional derivative wrt density.
  */
-void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
+void compute_exc_vxc(const int np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
 
 }  // namespace pdftlyp
 

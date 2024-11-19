@@ -83,6 +83,7 @@ class GradientDriver:
 
         self.numerical = False
         self.do_four_point = False
+        self.delta_h = 0.001
 
         self.dft = False
         self.grid_level = None

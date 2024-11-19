@@ -39,7 +39,7 @@ namespace pdftslater {  // pdftslater namespace
  @param vrho the 1st-order functional derivative wrt density.
  @param v2rho the 2nd-order functional derivative wrt density
  */
-void compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho);
+void compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho);
 }  // namespace pdftslater
 
 #endif /* PairDensitySlater_hpp */

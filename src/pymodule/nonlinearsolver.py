@@ -134,7 +134,7 @@ class NonlinearSolver:
         self.filename = None
 
         self._debug = False
-        self._block_size_factor = 16
+        self._block_size_factor = 8
 
         # input keywords
         self._input_keywords = {
@@ -445,9 +445,7 @@ class NonlinearSolver:
             profiler.set_timing_key('Nonlinear Fock')
 
         fock_drv = FockDriver(self.comm)
-
-        fock_drv._set_block_size_factor(self._block_size_factor,
-                                        ao_basis.get_dimensions_of_basis())
+        fock_drv._set_block_size_factor(self._block_size_factor)
 
         # TODO: take screening from eri_dict
         if self.rank == mpi_master():
