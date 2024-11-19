@@ -18,6 +18,7 @@ target_sources(vlxobjs
     PairDensityVWN.cpp
     XCIntegratorForPDFT.cpp
     XCPairDensityFunctional.cpp
+    XCMolecularGradientForPDFT.cpp
   )
 
 target_include_directories(vlxobjs

@@ -36,7 +36,7 @@ from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
-from .veloxchemlib import partition_atoms, make_matrix
+from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
 from .matrices import Matrices
 from .profiler import Profiler
@@ -72,9 +72,9 @@ class ScfGradientDriver(GradientDriver):
 
         self.eri_thresh = scf_drv.eri_thresh
         self.timing = scf_drv.timing
-
         self._debug = scf_drv._debug
-        self._block_size_factor = scf_drv._block_size_factor
+
+        self._block_size_factor = 4
 
         self.numerical = False
         self.delta_h = 0.001
@@ -96,23 +96,44 @@ class ScfGradientDriver(GradientDriver):
                                     profiler.get_available_memory())
             self.ostream.flush()
 
-    def _get_extra_block_size_factor(self, naos):
+    def partition_atoms(self, molecule):
+        """
+        Partition atoms for parallel computation of gradient.
 
-        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
+        :param molecule:
+            The molecule.
 
-        if total_cores >= 2048:
-            if naos >= 4500:
-                extra_factor = 4
-            else:
-                extra_factor = 2
+        :return:
+            The list of atom indices for the current MPI rank.
+        """
 
-        elif total_cores >= 1024:
-            extra_factor = 2
+        if self.rank == mpi_master():
+            elem_ids = molecule.get_identifiers()
+            coords = molecule.get_coordinates_in_bohr()
+            mol_com = molecule.center_of_mass_in_bohr()
+
+            r2_array = np.sum((coords - mol_com)**2, axis=1)
+            sorted_r2_list = sorted([
+                (r2, nchg, i)
+                for i, (r2, nchg) in enumerate(zip(r2_array, elem_ids))
+            ])
+
+            dict_atoms = {}
+            for r2, nchg, i in sorted_r2_list:
+                if nchg not in dict_atoms:
+                    dict_atoms[nchg] = []
+                dict_atoms[nchg].append(i)
+
+            list_atoms = []
+            for nchg in sorted(dict_atoms.keys(), reverse=True):
+                list_atoms += dict_atoms[nchg]
 
         else:
-            extra_factor = 1
+            list_atoms = None
 
-        return extra_factor
+        list_atoms = self.comm.bcast(list_atoms, root=mpi_master())
+
+        return list_atoms[self.rank::self.nodes]
 
     def compute(self, molecule, basis, scf_results):
         """
@@ -185,7 +206,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = np.zeros((natoms, 3))
 
-        local_atoms = partition_atoms(natoms, self.rank, self.nodes)
+        local_atoms = self.partition_atoms(molecule)
 
         # kinetic energy contribution to gradient
 
@@ -295,11 +316,7 @@ class ScfGradientDriver(GradientDriver):
         self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
-
-        extra_factor = self._get_extra_block_size_factor(
-            basis.get_dimensions_of_basis())
-        fock_grad_drv._set_block_size_factor(self._block_size_factor *
-                                             extra_factor)
+        fock_grad_drv._set_block_size_factor(self._block_size_factor)
 
         t0 = time.time()
 
@@ -427,7 +444,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = np.zeros((natoms, 3))
 
-        local_atoms = partition_atoms(natoms, self.rank, self.nodes)
+        local_atoms = self.partition_atoms(molecule)
 
         # kinetic energy contribution to gradient
 
@@ -530,11 +547,7 @@ class ScfGradientDriver(GradientDriver):
         Dab_for_fock_2.set_values(Da + Db)
 
         fock_grad_drv = FockGeom1000Driver()
-
-        extra_factor = self._get_extra_block_size_factor(
-            basis.get_dimensions_of_basis())
-        fock_grad_drv._set_block_size_factor(self._block_size_factor *
-                                             extra_factor)
+        fock_grad_drv._set_block_size_factor(self._block_size_factor)
 
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import FockGeom1000Driver, T4CScreener
-from veloxchem.veloxchemlib import partition_atoms, make_matrix
+from veloxchem.veloxchemlib import make_matrix
 from veloxchem.veloxchemlib import mpi_master, mat_t
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -39,7 +39,8 @@ class TestGradientDriver:
         screener.partition(basis, molecule, 'eri')
 
         natoms = molecule.number_of_atoms()
-        local_atoms = partition_atoms(natoms, scf_drv.rank, scf_drv.nodes)
+
+        local_atoms = list(range(natoms))[scf_drv.rank::scf_drv.nodes]
 
         for iatom in local_atoms:
 
