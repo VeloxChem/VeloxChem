@@ -40,6 +40,7 @@ from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
+from .scfrestdriver import ScfRestrictedDriver
 from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input, get_random_string_parallel
 from .errorhandler import assert_msg_critical, safe_arccos
@@ -318,7 +319,7 @@ class ForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparametrize_dihedrals(self, rotatable_bond, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, visualize=False):
+    def reparametrize_dihedrals(self, rotatable_bond, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, visualize=False):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -326,9 +327,9 @@ class ForceFieldGenerator:
         :param rotatable_bond:
             The list of indices of the rotatable bond. (1-indexed)
         :param scf_drv:
-            The SCF driver.
+            The SCF driver. If None is provided it will use HF.
         :param basis:
-            The AO basis set.
+            The AO basis set. If None is provided it will use 6-31G*.
         :param scan_range:
             List with the range of dihedral angles. Default is [0, 360].
         :param n_points:
@@ -349,12 +350,15 @@ class ForceFieldGenerator:
         # Identify the dihedral indices for the rotatable bond
         dihedral_indices = []
         dihedral_types = []
+
         for (i,j,k,l), dihedral in self.dihedrals.items():
             if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
                 dihedral_indices.append([i,j,k,l])
                 dihedral_types.append(dihedral['comment'])
+        
         # Transform the dihedral indices to 1-indexed for printing
         dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        
         # Print a header
         header = 'VeloxChem Dihedral Reparametrization'
         self.ostream.print_header(header)
@@ -367,13 +371,20 @@ class ForceFieldGenerator:
         self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
         self.ostream.print_info(f'Dihedral types:{dihedral_types}')
         self.ostream.flush()
+        
+        if scf_drv is None:
+            scf_drv = ScfRestrictedDriver()
+            scf_drv.ostream.mute()
+        
+        if basis is None:
+            basis = MolecularBasis.read(self.molecule,'6-31G*')
 
         # Perform a SCF calculation
         if scf_result is None:
             self.ostream.print_info('Performing SCF calculation...')
             self.ostream.flush()
             scf_result = scf_drv.compute(self.molecule, basis)
-
+        
         # Take one of the dihedrals to perform the scan
         reference_dih = dihedral_indices[0]
         scf_drv.ostream.mute()
@@ -527,16 +538,16 @@ class ForceFieldGenerator:
         self.ostream.print_info('Dihedral MM parameters have been reparametrized and updated in the topology.')
         self.ostream.flush()
 
-    def refine_dihedrals(self, dihedrals, scf_drv, basis=None, scf_result=None, scan_range=[0, 360], n_points=19):
+    def refine_dihedrals(self, dihedrals, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19):
         """
         Refines the dihedral angles using QM calculations.
 
         :param dihedrals:
             The list of lists of dihedral indices to be refined. (1-indexed)
         :param scf_drv:
-            The SCF driver.
+            The SCF driver. If None is provided it will use HF.
         :param basis:
-            The AO basis set.
+            The AO basis set. If None is provided it will use 6-31G*.
         :param scan_range:
             List with the range of dihedral angles. Default is [0, 360].
         :param n_points:
@@ -551,6 +562,13 @@ class ForceFieldGenerator:
         if n_points < 6:
             error_msg = 'The number of points must be at least 6 to fit the dihedral potential.'
             assert_msg_critical(False, error_msg)
+
+        if scf_drv is None:
+            scf_drv = ScfRestrictedDriver()
+            scf_drv.ostream.mute()
+
+        if basis is None:
+            basis = MolecularBasis.read(self.molecule,'6-31G*')
 
         # Perform a SCF calculation
         if scf_result is None:
