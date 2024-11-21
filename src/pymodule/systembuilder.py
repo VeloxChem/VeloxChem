@@ -84,7 +84,7 @@ class SystemBuilder:
         self.ostream = ostream
 
         # Packing configuration
-        self.threshold = 1.6
+        self.threshold = 1.8
         self.number_of_attempts = 100
 
         # Molecules
@@ -838,6 +838,11 @@ class SystemBuilder:
             translated_solvent = [
                 (molecule_id, label, coord) for label, coord in zip(new_molecule_labels, translated_solvent_coords)
             ]
+            # If number of attempts approaches the total attempts print a warning
+            if attempt_num == int(0.9 * total_attempts):
+                self.ostream.print_info(f"Warning: {attempt_num} attempts have been made to insert the solvent molecule")
+                self.ostream.print_info("Consider reducing the target density")
+                self.ostream.flush()
 
             return translated_solvent  
 
