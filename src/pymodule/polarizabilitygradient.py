@@ -500,11 +500,8 @@ class PolarizabilityGradient():
 
         gradient_start_time = tm.time()
 
-        # WIP upper triangular
-
         # construct the analytic polarizability gradient
         for x in range(dof):
-            #for y in range(dof):
             for y in range(x, dof):
                 for a in range(3): # nuclear cartesian coordinate components
                     scf_polgrad[x, y, a] += (
@@ -679,10 +676,7 @@ class PolarizabilityGradient():
         dof = len(self.vector_components)
         xc_pol_gradient = np.zeros((dof, dof, natm, 3))
 
-        #WIP upper triangular
-
         for m in range(dof):
-            #for n in range(dof):
             for n in range(m, dof):
                 if self.rank == mpi_master():
                     rhow_dm = 1.0 * rel_dm_ao[m, n]
@@ -744,10 +738,7 @@ class PolarizabilityGradient():
         dof = len(self.vector_components)
         xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
 
-        # WIP upper triangular
-
         for m in range(dof):
-            #for n in range(dof):
             for n in range(m, dof):
                 if self.rank == mpi_master():
                     rhow_dm = 1.0 * rel_dm_ao[m, n]
