@@ -24,10 +24,8 @@
 
 from mpi4py import MPI
 import numpy as np
-import math
 import sys
 
-from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master
 from .fockdriver import FockDriver
 from .outputstream import OutputStream
@@ -110,8 +108,6 @@ class MOIntegralsDriver:
         mo_a = mol_orbs.alpha_to_numpy()
         mo_b = mol_orbs.beta_to_numpy()
 
-        naos = mo_a.shape[0]
-
         nocc_a = molecule.number_of_alpha_electrons()
         nocc_b = molecule.number_of_beta_electrons()
 
@@ -160,13 +156,8 @@ class MOIntegralsDriver:
 
         # AO integrals
 
-        t4c_drv = T4CScreener()
-        t4c_drv.partition(basis, molecule, 'eri')
-
-        thresh_int = int(-math.log10(self.eri_thresh))
-
         fock_drv = FockDriver()
-        pqrs = fock_drv.compute_eri(t4c_drv, naos, thresh_int)
+        pqrs = fock_drv.compute_eri(molecule, basis, self.eri_thresh)
 
         # AO-to-MO integral transformation
 
