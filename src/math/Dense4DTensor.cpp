@@ -220,3 +220,29 @@ CDense4DTensor::values()
 {
     return _values.data();
 }
+
+const double*
+CDense4DTensor::row(const int i, const int j, const int k) const
+{
+    if ((i < _iIndex) && (j < _jIndex) && (k < _kIndex))
+    {
+        return _values.data() + i * _jIndex * _kIndex * _lIndex + j * _kIndex * _lIndex + k * _lIndex;
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
+double*
+CDense4DTensor::row(const int i, const int j, const int k)
+{
+    if ((i < _iIndex) && (j < _jIndex) && (k < _kIndex))
+    {
+        return _values.data() + i * _jIndex * _kIndex * _lIndex + j * _kIndex * _lIndex + k * _lIndex;
+    }
+    else
+    {
+        return nullptr;
+    }
+}
