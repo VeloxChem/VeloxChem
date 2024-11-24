@@ -29,6 +29,7 @@ import numpy as np
 import time as tm
 import math
 import sys
+import re
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
@@ -672,6 +673,48 @@ class ScfDriver:
         """
 
         sad_drv = SadGuessDriver()
+
+        if self.scf_type == 'restricted':
+            density_type = 'restricted'
+        else:
+            density_type = 'unrestricted'
+
+        natoms = molecule.number_of_atoms()
+        unpaired_electrons_on_atoms = [0 for a in range(natoms)]
+
+        if (self.guess_unpaired_electrons and density_type == 'restricted'):
+            warn_msg = 'Ignoring "guess_unpaired_electrons" in '
+            warn_msg += 'spin-restricted SCF calculation.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+
+        if (self.guess_unpaired_electrons and density_type == 'unrestricted'):
+            for entry in self.guess_unpaired_electrons.split(','):
+                m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                assert_msg_critical(
+                    m is not None,
+                    'Initial Guess: Invalid input for unpaired electrons')
+                atom_index = int(m.group(1).strip()) - 1
+                num_unpaired_elec = float(m.group(2).strip())
+                unpaired_electrons_on_atoms[atom_index] = num_unpaired_elec
+
+            sad_drv.set_number_of_unpaired_electrons_on_atoms(
+                unpaired_electrons_on_atoms)
+
+            guess_msg = 'Generating initial guess with '
+            guess_msg += 'user-provided information...'
+            self.ostream.print_info(guess_msg)
+
+            labels = molecule.get_labels()
+            for a, (num_unpaired_elec, atom_name) in enumerate(
+                    zip(unpaired_electrons_on_atoms, labels)):
+                if num_unpaired_elec != 0:
+                    spin = 'alpha' if num_unpaired_elec > 0 else 'beta '
+                    abs_num_unpaired_elec = abs(num_unpaired_elec)
+                    self.ostream.print_info(
+                        f'  {abs_num_unpaired_elec} unpaired {spin} ' +
+                        f'electrons on atom {a + 1} ({atom_name})')
+            self.ostream.print_blank()
 
         return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type)
 
