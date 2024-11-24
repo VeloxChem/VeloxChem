@@ -31,9 +31,10 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .matrix import Matrix
-from .fockdriver import FockDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
+from .fockdriver import FockDriver
+from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
 from .sanitychecks import molecule_sanity_check
 from .errorhandler import assert_msg_critical
@@ -58,6 +59,8 @@ class Mp2Driver:
         - eri_thresh: The electron repulsion integrals screening threshold.
         - comm_size: The size of each subcommunicator.
         - ostream: The output stream.
+        - conventional: The flag for using conventional (in-memory) AO-to-MO
+          integral transformation.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -91,6 +94,9 @@ class Mp2Driver:
         # output stream
         self.ostream = ostream
 
+        # use conventional (in-memory) AO-to-MO integral transformation?
+        self.conventional = False
+
     def update_settings(self, mp2_dict, method_dict=None):
         """
         Updates settings in MP2 driver.
@@ -107,6 +113,7 @@ class Mp2Driver:
         mp2_keywords = {
             'eri_thresh': 'float',
             'comm_size': 'int',
+            'conventional': 'bool',
         }
 
         parse_input(self, mp2_keywords, mp2_dict)
@@ -196,7 +203,124 @@ class Mp2Driver:
 
         # run MP2
 
-        return self.compute_distributed(molecule, basis, mol_orbs)
+        if self.conventional:
+            return self.compute_conventional(molecule, basis, mol_orbs)
+        else:
+            return self.compute_distributed(molecule, basis, mol_orbs)
+
+    def compute_conventional(self, molecule, basis, mol_orbs):
+        """
+        Performs conventional MP2 calculation.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param mol_orbs:
+            The molecular orbitals.
+        """
+
+        # synchronize mol_orbs
+
+        if self.rank != mpi_master():
+            mol_orbs = MolecularOrbitals()
+        mol_orbs = mol_orbs.broadcast(self.comm, root=mpi_master())
+
+        # sanity check
+
+        molecule_sanity_check(molecule)
+
+        assert_msg_critical(
+            basis.get_dimensions_of_basis() == mol_orbs.number_of_aos(),
+            'Mp2Driver.compute: Inconsistent number of AOs in basis set ' +
+            'and molecular orbitals')
+
+        assert_msg_critical(
+            mol_orbs.get_orbitals_type() != molorb.restopen,
+            'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
+
+        # compute MP2 in memory
+
+        moints_drv = MOIntegralsDriver(self.comm, self.ostream)
+
+        if self.rank == mpi_master():
+
+            self.e_mp2 = 0.0
+
+            # restricted
+
+            if mol_orbs.get_orbitals_type() == molorb.rest:
+
+                orb_ene = mol_orbs.ea_to_numpy()
+                nocc = molecule.number_of_alpha_electrons()
+                eocc = orb_ene[:nocc]
+                evir = orb_ene[nocc:]
+                e_vv = evir.reshape(-1, 1) + evir
+
+                phys_oovv = moints_drv.compute_in_memory(
+                    molecule, basis, mol_orbs, 'phys_oovv')
+                for i in range(phys_oovv.shape[0]):
+                    for j in range(phys_oovv.shape[1]):
+                        ab = phys_oovv[i, j, :, :]
+                        denom = e_vv - eocc[i] - eocc[j]
+                        self.e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
+
+                mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
+                self.ostream.print_header(mp2_str.ljust(92))
+                self.ostream.print_blank()
+
+            # unrestricted
+
+            elif mol_orbs.get_orbitals_type() == molorb.unrest:
+
+                orb_ene_a = mol_orbs.ea_to_numpy()
+                orb_ene_b = mol_orbs.eb_to_numpy()
+
+                nocc_a = molecule.number_of_alpha_electrons()
+                nocc_b = molecule.number_of_beta_electrons()
+
+                eocc_a = orb_ene_a[:nocc_a]
+                evir_a = orb_ene_a[nocc_a:]
+
+                eocc_b = orb_ene_b[:nocc_b]
+                evir_b = orb_ene_b[nocc_b:]
+
+                e_vv_aa = evir_a.reshape(-1, 1) + evir_a
+                e_vv_bb = evir_b.reshape(-1, 1) + evir_b
+                e_vv_ab = evir_a.reshape(-1, 1) + evir_b
+
+                phys_oovv_aaaa = moints_drv.compute_in_memory(
+                    molecule, basis, mol_orbs, 'phys_oovv', 'aaaa')
+                phys_oovv_bbbb = moints_drv.compute_in_memory(
+                    molecule, basis, mol_orbs, 'phys_oovv', 'bbbb')
+                phys_oovv_abab = moints_drv.compute_in_memory(
+                    molecule, basis, mol_orbs, 'phys_oovv', 'abab')
+
+                for i in range(phys_oovv_aaaa.shape[0]):
+                    for j in range(phys_oovv_aaaa.shape[1]):
+                        vv = phys_oovv_aaaa[i, j, :, :]
+                        denom = e_vv_aa - eocc_a[i] - eocc_a[j]
+                        self.e_mp2 -= 0.5 * np.sum(vv * (vv - vv.T) / denom)
+
+                for i in range(phys_oovv_bbbb.shape[0]):
+                    for j in range(phys_oovv_bbbb.shape[1]):
+                        vv = phys_oovv_bbbb[i, j, :, :]
+                        denom = e_vv_bb - eocc_b[i] - eocc_b[j]
+                        self.e_mp2 -= 0.5 * np.sum(vv * (vv - vv.T) / denom)
+
+                for i in range(phys_oovv_abab.shape[0]):
+                    for j in range(phys_oovv_abab.shape[1]):
+                        vv = phys_oovv_abab[i, j, :, :]
+                        denom = e_vv_ab - eocc_a[i] - eocc_b[j]
+                        self.e_mp2 -= np.sum(vv * vv / denom)
+
+                mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
+                self.ostream.print_header(mp2_str.ljust(92))
+                self.ostream.print_blank()
+
+            return {'mp2_energy': self.e_mp2}
+        else:
+            return None
 
     def compute_distributed(self, molecule, basis, mol_orbs):
         """
