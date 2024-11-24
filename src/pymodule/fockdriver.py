@@ -88,6 +88,10 @@ class FockDriver:
 
         return all((rank in range(self.nodes)) for rank in translated_ranks)
 
+    def compute_eri(self, screener, naos, ithresh):
+
+        return self._fock_drv.compute_eri(screener, naos, ithresh)
+
     def _compute_fock_omp(self, *args):
 
         return self._fock_drv._compute_fock_omp(*args)
