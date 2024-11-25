@@ -198,10 +198,6 @@ class ScfDriver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-        self._V_es = None
-        self._pe_summary = ''
-
-        # PyFraME embedding
         self.embedding_options = None
         self._embedding_drv = None
 
@@ -265,8 +261,6 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
-                'embedding_options':
-                    ('dict', 'dictionary to set the embedding options'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 # 'use_split_comm': ('bool', 'use split communicators'),
             },
@@ -439,7 +433,6 @@ class ScfDriver:
             from .sanitychecks import embedding_options_sanity_check
             embedding_options_sanity_check(self, method_dict)
 
-        # TODO add embedding
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
@@ -470,17 +463,31 @@ class ScfDriver:
         if self.potfile:
             self.pe_options['potfile'] = self.potfile
 
-        self._pe = ('potfile' in self.pe_options)
+        self._pe = (('potfile' in self.pe_options) or
+                    (self.embedding_options is not None))
 
         if self._pe:
-            potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-            potfile = self.comm.bcast(potfile, root=mpi_master())
-            self.pe_options['potfile'] = potfile
+            if self.embedding_options is None:
+                potfile = None
+                if self.rank == mpi_master():
+                    potfile = self.pe_options['potfile']
+                    if not Path(potfile).is_file():
+                        potfile = str(
+                            Path(self.filename).parent / Path(potfile).name)
+                potfile = self.comm.bcast(potfile, root=mpi_master())
+                self.pe_options['potfile'] = potfile
+                # TODO: include more options from pe_options
+                self.embedding_options = {
+                    'settings': {
+                        'embedding_method': 'PE',
+                    },
+                    'inputs': {
+                        'json_file': potfile,
+                    },
+                }
+            else:
+                potfile = self.embedding_options['inputs']['json_file']
+                self.pe_options['potfile'] = potfile
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -581,7 +588,6 @@ class ScfDriver:
 
         # set up polarizable embedding
         if self._pe:
-            # TODO: add PE info
             pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
@@ -1131,7 +1137,6 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
-        # TODO add emb info
         if self.use_split_comm:
             self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
 
@@ -1784,32 +1789,20 @@ class ScfDriver:
         if self.timing and self._dft:
             profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
         pe_t0 = tm.time()
-        emb_t0 = tm.time()
 
         if self._pe and not self._first_step:
-            # TODO: add PE contribution and update pe_summary
-            pass
-        else:
-            e_emb, V_emb = 0.0, None
-
-        # pyframe contributions
-        if self.embedding_options is not None and not self._first_step:
             if self.scf_type == 'restricted':
-                density_matrix = 2 * den_mat[0]
+                density_matrix = 2.0 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
             from .embedding import PolarizableEmbeddingSCF
-            if isinstance(self._embedding_drv, PolarizableEmbeddingSCF):
-                e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
-                    density_matrix=density_matrix)
-            else:
-                e_emb, V_emb = 0.0, np.zeros_like(fock_mat[0])
+            assert_msg_critical(
+                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
+                'ScfDriver: Inconsistent embedding driver for SCF')
+            e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
+                density_matrix=density_matrix)
         else:
-            e_emb, V_emb = 0.0, np.zeros_like(fock_mat[0])
-
-        # TODO add emb
-        if self.timing and self.embedding_options is not None:
-            profiler.add_timing_info('FockEmb', tm.time() - emb_t0)
+            e_emb, V_emb = 0.0, None
 
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
@@ -1897,8 +1890,6 @@ class ScfDriver:
                 e_ee += xc_ene
             if self._pe and not self._first_step:
                 e_ee += e_emb
-            if self.embedding_options is not None and not self._first_step:
-                e_ee += e_emb
             e_sum = e_ee + e_kin + e_en
         else:
             e_sum = 0.0
@@ -1944,12 +1935,7 @@ class ScfDriver:
                 if self.scf_type != 'restricted':
                     fock_mat[1] += np_xcmat_b
 
-            # TODO: add PE contribution to Fock
             if self._pe and not self._first_step:
-                pass
-
-            # TODO add emb treat fock matrix contributions separately?
-            if self.embedding_options is not None and not self._first_step:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
@@ -2253,12 +2239,6 @@ class ScfDriver:
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
         self._print_energy_components()
 
-        if self._pe:
-            self.ostream.print_blank()
-            for line in self._pe_summary.splitlines():
-                self.ostream.print_header(line.ljust(92))
-            self.ostream.flush()
-
         if self.embedding_options is not None:
             self.ostream.print_blank()
             for line in self._embedding_drv.get_pe_summary():
@@ -2526,9 +2506,8 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        if self.scf_type == 'restricted':
-            valstr = 'Multiplicity (2S+1)           :{:5.1f}'.format(mult)
-            self.ostream.print_header(valstr.ljust(92))
+        valstr = 'Multiplicity (2S+1)           :{:3.0f}'.format(mult)
+        self.ostream.print_header(valstr.ljust(92))
 
         sz = 0.5 * (mult - 1.0)
         valstr = 'Magnetic Quantum Number (M_S) :{:5.1f}'.format(sz)
@@ -2617,8 +2596,6 @@ class ScfDriver:
                 potfile_text = '\n'.join(f_pot.readlines())
         else:
             potfile_text = ''
-
-        # TODO add emb?
 
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
         write_scf_results_to_hdf5(final_h5_fname, self.scf_tensors,

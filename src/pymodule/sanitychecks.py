@@ -151,7 +151,6 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
 
 
 def embedding_options_sanity_check(obj, options=None):
-    from pyframe.embedding import subsystem
     """
     Checks the validity of the given options dictionary.
 
@@ -161,67 +160,100 @@ def embedding_options_sanity_check(obj, options=None):
             - vdw: dictionary with keys: method and combination_rule.
                 - method: string
                 - combination_rule: string
-            - induced_dipoles: dictionary with keys: threshold, max_iterations, and solver.
+            - induced_dipoles: dictionary with keys: threshold, max_iterations,
+                               and solver.
                 - solver: string
                 - threshold: float
                 - max_iterations: integer
-            - environment_energy: bool which decides if the environment energy will be calculated.
+            - environment_energy: bool which decides if the environment energy
+                                  will be calculated.
         inputs:
-            - json_file: string that is the path to the json file that contains the embedding potentials.
+            - json_file: string that is the path to the json file that contains
+                         the embedding potentials.
             - objects:
                 - quantum_subsystem: PyFraME class subsystem.QuantumSubsystem.
                 - classical_subsystem: PyFraME class subsystem.ClassicalSubsystem.
     """
+
+    from pyframe.embedding import subsystem
+
     if not isinstance(options, dict):
         raise TypeError("The options parameter must be a dictionary.")
     if 'settings' not in options:
         raise KeyError("Missing 'settings' key in options dictionary.")
+
     settings = options['settings']
-    if 'embedding_method' not in settings or not isinstance(settings['embedding_method'], str):
+
+    if 'embedding_method' not in settings or not isinstance(
+            settings['embedding_method'], str):
         raise KeyError("Missing or invalid 'embedding_method' in settings.")
+
     if 'vdw' in settings:
         if not isinstance(settings['vdw'], dict):
             raise TypeError("'vdw' must be a dictionary.")
+
         vdw = settings['vdw']
+
         if 'method' not in vdw or not isinstance(vdw['method'], str):
             raise KeyError("Missing or invalid 'method' in 'vdw'.")
-        if 'combination_rule' not in vdw or not isinstance(vdw['combination_rule'], str):
+        if 'combination_rule' not in vdw or not isinstance(
+                vdw['combination_rule'], str):
             raise KeyError("Missing or invalid 'combination_rule' in 'vdw'.")
+
     if 'induced_dipoles' in settings:
         if not isinstance(settings['induced_dipoles'], dict):
             raise TypeError("'induced_dipoles' must be a dictionary.")
+
         dipoles = settings['induced_dipoles']
+
         if 'solver' in dipoles and not isinstance(dipoles['solver'], str):
             raise KeyError("'solver' must be a string.")
-        if 'threshold' in dipoles and not isinstance(dipoles['threshold'], (int, float)):
+        if 'threshold' in dipoles and not isinstance(dipoles['threshold'],
+                                                     (int, float)):
             raise KeyError("'threshold' must be an integer or float.")
-        if 'max_iterations' in dipoles and not isinstance(dipoles['max_iterations'], int):
+        if 'max_iterations' in dipoles and not isinstance(
+                dipoles['max_iterations'], int):
             raise KeyError("'max_iterations' must be an integer.")
         if 'max_iterations' in dipoles and dipoles['max_iterations'] <= 0:
             raise ValueError("'max_iterations' must be a positive integer.")
+
     if 'environment_energy' in settings:
         if not isinstance(settings['environment_energy'], bool):
             raise TypeError("'environment_energy' must be a boolean.")
+
     if 'inputs' not in options:
         raise KeyError("Missing 'inputs' key in options dictionary.")
+
     inputs = options['inputs']
+
     if 'json_file' in inputs and not isinstance(inputs['json_file'], str):
         raise TypeError("'json_file' must be a string.")
+
     if 'objects' in inputs:
         if not isinstance(inputs['objects'], dict):
             raise TypeError("'objects' must be a dictionary.")
+
         objects = inputs['objects']
+
         if 'quantum_subsystem' not in objects:
             raise KeyError("Missing 'quantum_subsystem' in 'objects'.")
         if 'classical_subsystem' not in objects:
             raise KeyError("Missing 'classical_subsystem' in 'objects'.")
-        if not isinstance(objects['quantum_subsystem'], subsystem.QuantumSubsystem):
+        if not isinstance(objects['quantum_subsystem'],
+                          subsystem.QuantumSubsystem):
             raise TypeError(
-                "'quantum_subsystem' must be an instance of PyFraME class subsystem.QuantumSubsystem.")
-        if not isinstance(objects['classical_subsystem'], subsystem.ClassicalSubsystem):
+                "'quantum_subsystem' must be an instance of PyFraME class " +
+                "subsystem.QuantumSubsystem.")
+        if not isinstance(objects['classical_subsystem'],
+                          subsystem.ClassicalSubsystem):
             raise TypeError(
-                "'classical_subsystem' must be an instance of PyFraME class subsystem.ClassicalSubsystem.")
+                "'classical_subsystem' must be an instance of PyFraME class " +
+                "subsystem.ClassicalSubsystem.")
+
     if 'json_file' not in inputs and 'objects' not in inputs:
-        raise KeyError("At least one of 'json_file' or 'objects' must be provided in 'inputs'.")
+        raise KeyError(
+            "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
+        )
+
     # Sets embedding options
     obj.embedding_options = options

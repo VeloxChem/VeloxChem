@@ -249,19 +249,17 @@ class ScfRestrictedDriver(ScfDriver):
         :return:
             The string for spin restricted closed shell SCF calculation.
         """
-        scf_type = ""
-        if self._dft:
-            scf_type += "Spin-Restricted Kohn-Sham"
-        else:
-            scf_type += "Spin-Restricted Hartree-Fock"
-
-        if self._pe:
-            scf_type += " with PE"
 
         if self.embedding_options is not None:
-            scf_type += " with " + self.embedding_options['settings']['embedding_method']
+            emb_type = ' with ' + self.embedding_options['settings'][
+                'embedding_method']
+        else:
+            emb_type = ''
 
-        return scf_type
+        if self._dft:
+            return "Spin-Restricted Kohn-Sham" + emb_type
+
+        return "Spin-Restricted Hartree-Fock" + emb_type
 
     def __deepcopy__(self, memo):
         """
