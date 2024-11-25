@@ -321,7 +321,6 @@ class LinearSolver:
             assert_msg_critical(
                 len(self.electric_field) == 3,
                 'LinearSolver: Expecting 3 values in \'electric field\' input')
-            # TODO what to do here?
             assert_msg_critical(
                 not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
@@ -348,20 +347,31 @@ class LinearSolver:
         if self.potfile:
             self.pe_options['potfile'] = self.potfile
 
-        self._pe = ('potfile' in self.pe_options)
+        self._pe = (('potfile' in self.pe_options) or
+                    (self.embedding_options is not None))
 
         if self._pe:
-            from .polembed import PolEmbed
-
-            cppe_potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file() and self.filename is not None:
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
-            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
-            self.pe_options['potfile'] = cppe_potfile
+            if self.embedding_options is None:
+                potfile = None
+                if self.rank == mpi_master():
+                    potfile = self.pe_options['potfile']
+                    if not Path(potfile).is_file():
+                        potfile = str(
+                            Path(self.filename).parent / Path(potfile).name)
+                potfile = self.comm.bcast(potfile, root=mpi_master())
+                self.pe_options['potfile'] = potfile
+                # TODO: include more options from pe_options
+                self.embedding_options = {
+                    'settings': {
+                        'embedding_method': 'PE',
+                    },
+                    'inputs': {
+                        'json_file': potfile,
+                    },
+                }
+            else:
+                potfile = self.embedding_options['inputs']['json_file']
+                self.pe_options['potfile'] = potfile
 
     def _init_eri(self, molecule, basis):
         """
@@ -464,16 +474,17 @@ class LinearSolver:
         """
 
         if self._pe:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
-            V_es = pe_drv.compute_multipole_potential_integrals()
+            if self.embedding_options['settings']['embedding_method'] == 'PE':
+                from .embedding import PolarizableEmbeddingLRS
+                self._embedding_drv = PolarizableEmbeddingLRS(
+                    molecule=molecule,
+                    ao_basis=basis,
+                    options=self.embedding_options,
+                    comm=self.comm)
+            else:
+                raise NotImplementedError
 
-            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
-                pe_drv.get_cppe_version())
-            self.ostream.print_info(cppe_info)
-            self.ostream.print_blank()
-
-            pot_info = "Reading polarizable embedding potential: {}".format(
+            pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
@@ -481,13 +492,9 @@ class LinearSolver:
             with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
         else:
-            pe_drv = None
-            V_es = None
             potfile_text = ''
 
         return {
-            'pe_drv': pe_drv,
-            'V_es': V_es,
             'potfile_text': potfile_text,
         }
 
@@ -645,18 +652,6 @@ class LinearSolver:
         :return:
             The gerade and ungerade E2 b matrix vector product in half-size.
         """
-
-        # init PyFraME embedding
-        if self.embedding_options is not None:
-            if self.embedding_options['settings']['embedding_method'] == 'PE':
-                from .embedding import PolarizableEmbeddingLRS
-                self._embedding_drv = PolarizableEmbeddingLRS(
-                    molecule=molecule,
-                    ao_basis=basis,
-                    options=self.embedding_options,
-                    comm=self.comm)
-            else:
-                raise NotImplementedError
 
         n_ger = vecs_ger.shape(1)
         n_ung = vecs_ung.shape(1)
@@ -944,9 +939,6 @@ class LinearSolver:
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        # V_es = pe_dict['V_es']
-        # pe_drv = pe_dict['pe_drv']
-
         if self.rank == mpi_master():
             num_densities = len(dens)
         else:
@@ -1033,20 +1025,16 @@ class LinearSolver:
 
         if self._pe:
             t0 = tm.time()
-            # TODO: add PE contribution
-            if profiler is not None:
-                profiler.add_timing_info('FockPE', tm.time() - t0)
-
-        if self.embedding_options is not None:
-            t0 = tm.time()
             for idx in range(num_densities):
-                dm = dens[idx] * 2.0  # FIXME only closed shell right now
-                fock_mat_emb = self._embedding_drv.compute_pe_contributions(
+                # Note: only closed shell density for now
+                dm = dens[idx] * 2.0
+                V_emb = self._embedding_drv.compute_pe_contributions(
                     density_matrix=dm)
                 if self.rank == mpi_master():
-                    fock_arrays[idx] += fock_mat_emb
+                    fock_arrays[idx] += V_emb
+
             if profiler is not None:
-                profiler.add_timing_info('FockEmb', tm.time() - t0)
+                profiler.add_timing_info('FockPE', tm.time() - t0)
 
         # TODO: look into split communicator
 
