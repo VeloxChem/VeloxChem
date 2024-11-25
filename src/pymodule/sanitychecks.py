@@ -22,6 +22,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from pathlib import Path
+
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import mpi_master
 from .dftutils import get_default_grid_level
@@ -150,7 +152,53 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
                             err_msg_scan)
 
 
-def embedding_options_sanity_check(obj, options=None):
+def pe_sanity_check(obj, method_dict=None):
+    """
+    Checks PE settings and updates relevant attributes.
+
+    :param method_dict:
+        The dicitonary of method settings.
+    """
+
+    if method_dict:
+        if 'pe_options' in method_dict:
+            obj.pe_options = dict(method_dict['pe_options'])
+        else:
+            obj.pe_options = {}
+
+    if obj.potfile:
+        obj.pe_options['potfile'] = obj.potfile
+
+    obj._pe = (('potfile' in obj.pe_options) or
+               (obj.embedding_options is not None))
+
+    if obj._pe:
+        if obj.embedding_options is None:
+            potfile = None
+            if obj.rank == mpi_master():
+                potfile = obj.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(obj.filename).parent / Path(potfile).name)
+            potfile = obj.comm.bcast(potfile, root=mpi_master())
+            obj.pe_options['potfile'] = potfile
+            # TODO: include more options from pe_options
+            obj.embedding_options = {
+                'settings': {
+                    'embedding_method': 'PE',
+                },
+                'inputs': {
+                    'json_file': potfile,
+                },
+            }
+        else:
+            potfile = obj.embedding_options['inputs']['json_file']
+            obj.pe_options['potfile'] = potfile
+
+        embedding_options_sanity_check(obj.embedding_options)
+
+
+def embedding_options_sanity_check(options):
     """
     Checks the validity of the given options dictionary.
 
@@ -254,6 +302,3 @@ def embedding_options_sanity_check(obj, options=None):
         raise KeyError(
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
-
-    # Sets embedding options
-    obj.embedding_options = options

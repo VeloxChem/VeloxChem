@@ -52,7 +52,7 @@ from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_libxc_reference
-from .sanitychecks import molecule_sanity_check, dft_sanity_check
+from .sanitychecks import molecule_sanity_check, dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
@@ -427,11 +427,7 @@ class ScfDriver:
 
         dft_sanity_check(self, 'update_settings')
 
-        self._pe_sanity_check(method_dict)
-
-        if self.embedding_options is not None:
-            from .sanitychecks import embedding_options_sanity_check
-            embedding_options_sanity_check(self, method_dict)
+        pe_sanity_check(self, method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -445,49 +441,6 @@ class ScfDriver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
-
-    def _pe_sanity_check(self, method_dict=None):
-        """
-        Checks PE settings and updates relevant attributes.
-
-        :param method_dict:
-            The dicitonary of method settings.
-        """
-
-        if method_dict:
-            if 'pe_options' in method_dict:
-                self.pe_options = dict(method_dict['pe_options'])
-            else:
-                self.pe_options = {}
-
-        if self.potfile:
-            self.pe_options['potfile'] = self.potfile
-
-        self._pe = (('potfile' in self.pe_options) or
-                    (self.embedding_options is not None))
-
-        if self._pe:
-            if self.embedding_options is None:
-                potfile = None
-                if self.rank == mpi_master():
-                    potfile = self.pe_options['potfile']
-                    if not Path(potfile).is_file():
-                        potfile = str(
-                            Path(self.filename).parent / Path(potfile).name)
-                potfile = self.comm.bcast(potfile, root=mpi_master())
-                self.pe_options['potfile'] = potfile
-                # TODO: include more options from pe_options
-                self.embedding_options = {
-                    'settings': {
-                        'embedding_method': 'PE',
-                    },
-                    'inputs': {
-                        'json_file': potfile,
-                    },
-                }
-            else:
-                potfile = self.embedding_options['inputs']['json_file']
-                self.pe_options['potfile'] = potfile
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -520,12 +473,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        self._pe_sanity_check()
-
-        # check embedding setup
-        if self.embedding_options is not None:
-            from .sanitychecks import embedding_options_sanity_check
-            embedding_options_sanity_check(self, self.embedding_options)
+        pe_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -1348,13 +1296,10 @@ class ScfDriver:
                         self._scf_tensors['grid_level'] = self.grid_level
 
                 if self._pe:
-                    # pe info
+                    # pe info, energy and potential matrix
                     self._scf_tensors['potfile'] = self.potfile
-
-                if self.embedding_options is not None:
-                    # pe energy and fock matrices
-                    self._scf_tensors['F_emb'] = V_emb
                     self._scf_tensors['E_emb'] = e_emb
+                    self._scf_tensors['F_emb'] = V_emb
 
             else:
                 self._scf_tensors = None
@@ -2239,7 +2184,7 @@ class ScfDriver:
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
         self._print_energy_components()
 
-        if self.embedding_options is not None:
+        if self._pe:
             self.ostream.print_blank()
             for line in self._embedding_drv.get_pe_summary():
                 self.ostream.print_header(line.ljust(92))

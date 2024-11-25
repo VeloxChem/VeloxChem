@@ -43,7 +43,7 @@ from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .profiler import Profiler
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
@@ -121,8 +121,6 @@ class LinearSolver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-
-        # PyFraME embedding
         self.embedding_options = None
         self._embedding_drv = None
 
@@ -315,7 +313,7 @@ class LinearSolver:
 
         dft_sanity_check(self, 'update_settings')
 
-        self._pe_sanity_check(method_dict)
+        pe_sanity_check(self, method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -329,49 +327,6 @@ class LinearSolver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
-
-    def _pe_sanity_check(self, method_dict=None):
-        """
-        Checks PE settings and updates relevant attributes.
-
-        :param method_dict:
-            The dicitonary of method settings.
-        """
-
-        if method_dict:
-            if 'pe_options' in method_dict:
-                self.pe_options = dict(method_dict['pe_options'])
-            else:
-                self.pe_options = {}
-
-        if self.potfile:
-            self.pe_options['potfile'] = self.potfile
-
-        self._pe = (('potfile' in self.pe_options) or
-                    (self.embedding_options is not None))
-
-        if self._pe:
-            if self.embedding_options is None:
-                potfile = None
-                if self.rank == mpi_master():
-                    potfile = self.pe_options['potfile']
-                    if not Path(potfile).is_file():
-                        potfile = str(
-                            Path(self.filename).parent / Path(potfile).name)
-                potfile = self.comm.bcast(potfile, root=mpi_master())
-                self.pe_options['potfile'] = potfile
-                # TODO: include more options from pe_options
-                self.embedding_options = {
-                    'settings': {
-                        'embedding_method': 'PE',
-                    },
-                    'inputs': {
-                        'json_file': potfile,
-                    },
-                }
-            else:
-                potfile = self.embedding_options['inputs']['json_file']
-                self.pe_options['potfile'] = potfile
 
     def _init_eri(self, molecule, basis):
         """

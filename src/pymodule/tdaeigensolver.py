@@ -45,7 +45,7 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import get_random_string_parallel
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
@@ -182,7 +182,7 @@ class TdaEigenSolver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        self._pe_sanity_check()
+        pe_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
