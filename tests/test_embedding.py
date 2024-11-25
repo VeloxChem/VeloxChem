@@ -1,8 +1,10 @@
+from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import pytest
 import sys
 
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -89,14 +91,16 @@ class TestPolarizableEmbedding:
 
         scf_results = self.run_scf_with_pe(name='acrolein')
 
-        assert scf_results['scf_energy'] == pytest.approx(-188.314434428374,
-                                                          rel=1e-10)
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert scf_results['scf_energy'] == pytest.approx(-188.314434428374,
+                                                              rel=1e-10)
 
     @pytest.mark.skipif('pyframe' not in sys.modules,
                         reason='pyframe not available')
     def test_lrs_with_pe(self):
 
         scf_results = self.run_scf_with_pe(name='acrolein')
+
         ref_freqs = [0.0, 0.04]
         lrs_results = self.run_lrs_with_pe(name='acrolein',
                                            scf_results=scf_results,
@@ -112,11 +116,12 @@ class TestPolarizableEmbedding:
             """
         ref_prop = np.array([float(x) for x in reference_data.split()])
 
-        prop = np.array([
-            -lrs_results['response_functions'][(a, b, w)]
-            for w in ref_freqs
-            for a in 'xyz'
-            for b in 'xyz'
-        ])
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            prop = np.array([
+                -1.0 * lrs_results['response_functions'][(a, b, w)]
+                for w in ref_freqs
+                for a in 'xyz'
+                for b in 'xyz'
+            ])
 
-        assert np.max(np.abs((prop - ref_prop) / prop)) < 5.0e-6
+            assert np.max(np.abs((prop - ref_prop) / prop)) < 5.0e-6
