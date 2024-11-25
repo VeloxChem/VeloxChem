@@ -2261,7 +2261,7 @@ class ScfDriver:
 
         if self.embedding_options is not None:
             self.ostream.print_blank()
-            for line in self._embedding_drv.log_manager.get_logs().splitlines():
+            for line in self._embedding_drv.get_pe_summary():
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 

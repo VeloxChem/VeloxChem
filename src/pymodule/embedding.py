@@ -11,7 +11,6 @@ try:
                                    induction_interactions,
                                    repulsion_interactions,
                                    dispersion_interactions)
-    from pyframe.embedding.logging_util import log_manager
 except ImportError:
     raise ImportError('Unable to import PyFraME. Please install PyFraME.')
 
@@ -58,6 +57,7 @@ class EmbeddingIntegralDriver:
         idx = np.where(multipole_orders >= 0)[0]
         charge_coordinates = multipole_coordinates[idx]
         charges = np.array([multipoles[i][0] for i in idx])
+
         op += compute_nuclear_potential_integrals(
             molecule=self.molecule,
             basis=self.basis,
@@ -69,6 +69,7 @@ class EmbeddingIntegralDriver:
             idx = np.where(multipole_orders >= 1)[0]
             dipole_coordinates = multipole_coordinates[idx]
             dipoles = np.array([multipoles[i][1:4] for i in idx])
+
             op += compute_electric_field_integrals(self.molecule, self.basis,
                                                    dipole_coordinates, dipoles)
 
@@ -76,6 +77,7 @@ class EmbeddingIntegralDriver:
 
     def electronic_fields(self, coordinates: np.ndarray,
                           density_matrix: np.ndarray) -> np.ndarray:
+        # TODO: double check electronic fields...
         """Calculate the electronic fields on coordinates.
 
         Args:
@@ -163,9 +165,6 @@ class PolarizableEmbedding:
 
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
 
-        self.log_manager = log_manager
-        self.log_manager.set_level(log_level)
-
         self.options = options
         if self.options['settings']['embedding_method'] != 'PE':
             raise NotImplementedError(
@@ -215,13 +214,13 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
         - vdw_combination_rule: The VDW combination rule to be used.
         - _f_elec_es: Electrostatic Fock matrix.
         - _e_nuc_es: Electrostatic nuclear energy.
-        - _e_rep: VDW repulsion energy.
-        - _e_disp: VDW dispersion energy.
+        - _e_vdw: VDW energy.
         - _environment_energy: Interaction energy between multipoles in the
                                classical_subsystem.
     """
 
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+
         super().__init__(molecule, ao_basis, options, comm, log_level)
 
         self._f_elec_es = electrostatic_interactions.es_fock_matrix_contributions(
@@ -232,35 +231,34 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem=self.classical_subsystem)
 
-        self._e_es = None
-        self.e = None
-        self.v = None
-
         vdw_options = self.options['settings'].get('vdw', {})
         self.vdw_method = vdw_options.get('method', 'LJ')
         self.vdw_combination_rule = vdw_options.get('combination_rule',
                                                     'Lorentz-Berthelot')
+        if 'vdw' in self.options['settings']:
+            self._e_vdw = repulsion_interactions.compute_repulsion_interactions(
+                quantum_subsystem=self.quantum_subsystem,
+                classical_subsystem=self.classical_subsystem,
+                method=self.vdw_method,
+                combination_rule=self.vdw_combination_rule)
 
-        self._e_rep = repulsion_interactions.compute_repulsion_interactions(
-            quantum_subsystem=self.quantum_subsystem,
-            classical_subsystem=self.classical_subsystem,
-            method=self.vdw_method,
-            combination_rule=self.vdw_combination_rule
-        ) if 'vdw' in self.options['settings'] else 0.0
+            self._e_vdw += dispersion_interactions.compute_dispersion_interactions(
+                quantum_subsystem=self.quantum_subsystem,
+                classical_subsystem=self.classical_subsystem,
+                method=self.vdw_method,
+                combination_rule=self.vdw_combination_rule)
 
-        self._e_disp = dispersion_interactions.compute_dispersion_interactions(
-            quantum_subsystem=self.quantum_subsystem,
-            classical_subsystem=self.classical_subsystem,
-            method=self.vdw_method,
-            combination_rule=self.vdw_combination_rule
-        ) if 'vdw' in self.options['settings'] else 0.0
+        else:
+            self._e_vdw = 0.0
 
+        # TODO: double check default environment_energy option
         self._environment_energy = (self.classical_subsystem.environment_energy
                                     if self.options['settings'].get(
                                         'environment_energy', True) else 0.0)
 
+        self.pe_summary = None
+
     def compute_pe_contributions(self, density_matrix):
-        self.log_manager.reset()
 
         if self._e_nuc_es is None:
             self._e_nuc_es = electrostatic_interactions.compute_electrostatic_nuclear_energy(
@@ -298,42 +296,36 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver)
 
-        self._e_es = self._e_nuc_es + e_elec_es
-        self.e = self._e_induction + self._e_es + self._e_disp + self._e_rep
-        self.v = self._f_elec_es - f_elec_induction
+        e_emb = self._e_induction + self._e_nuc_es + e_elec_es + self._e_vdw
+        V_emb = self._f_elec_es - f_elec_induction
 
-        # TODO: why log_manager instead of ostream?
-        self.log_manager.logger.info(
-            'Polarizable Embedding (PE) Energy Contributions'.ljust(92))
-        self.log_manager.logger.info(
-            '------------------------------------'.ljust(92))
-        self.log_manager.logger.info(
-            f'Electrostatic Contributions (E_es) :{self._e_es:20.10f} a.u.')
-        self.log_manager.logger.info(
-            f'Induced Contributions (E_ind)      :{self._e_induction:20.10f} a.u.'
-        )
+        self.pe_summary = []
+
+        self.pe_summary.append(
+            'Polarizable Embedding (PE) Energy Contributions')
+        self.pe_summary.append('------------------------------------')
+
+        self.pe_summary.append('Electrostatic Contribution         :' +
+                               f'{self._e_nuc_es + e_elec_es:20.10f} a.u.')
+
+        self.pe_summary.append('Induced Contribution               :' +
+                               f'{self._e_induction:20.10f} a.u.')
+
+        if self._e_vdw != 0.0:
+            self.pe_summary.append('Van der Waals Contribution         :' +
+                                   f'{self._e_vdw:20.10f} a.u.')
 
         if self._environment_energy != 0.0:
-            self.log_manager.logger.info(
-                'Environment Contributions (E_mul)  :' +
-                f'{self._environment_energy:20.10f} a.u.')
+            self.pe_summary.append('Environment Contribution           :' +
+                                   f'{self._environment_energy:20.10f} a.u.')
 
-        # TODO: We should print a single "VDW" contribution so that it is not
-        #       confused with DFT-D dispersion correction
-        if self._e_disp != 0.0:
-            self.log_manager.logger.info(
-                f'Dispersion Contributions (E_disp)   :{self._e_disp:20.10f} a.u.'
-            )
+        self.pe_summary.append('------------------------------------')
 
-        if self._e_rep != 0.0:
-            self.log_manager.logger.info(
-                f'Repulsion Contributions (E_disp)   :{self._e_rep:20.10f} a.u.'
-            )
+        return e_emb, V_emb
 
-        self.log_manager.logger.info(
-            '------------------------------------'.ljust(92))
+    def get_pe_summary(self):
 
-        return self.e, self.v
+        return self.pe_summary
 
 
 class PolarizableEmbeddingLRS(PolarizableEmbedding):
@@ -363,4 +355,4 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver)
 
-        return -f_elec_induction
+        return -1.0 * f_elec_induction
