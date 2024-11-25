@@ -302,6 +302,7 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
         self.e = self._e_induction + self._e_es + self._e_disp + self._e_rep
         self.v = self._f_elec_es - f_elec_induction
 
+        # TODO: why log_manager instead of ostream?
         self.log_manager.logger.info(
             'Polarizable Embedding (PE) Energy Contributions'.ljust(92))
         self.log_manager.logger.info(
@@ -314,9 +315,11 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
 
         if self._environment_energy != 0.0:
             self.log_manager.logger.info(
-                'Environment Contributions (E_mul)   :' +
+                'Environment Contributions (E_mul)  :' +
                 f'{self._environment_energy:20.10f} a.u.')
 
+        # TODO: We should print a single "VDW" contribution so that it is not
+        #       confused with DFT-D dispersion correction
         if self._e_disp != 0.0:
             self.log_manager.logger.info(
                 f'Dispersion Contributions (E_disp)   :{self._e_disp:20.10f} a.u.'
