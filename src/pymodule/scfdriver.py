@@ -52,7 +52,7 @@ from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_libxc_reference
-from .sanitychecks import molecule_sanity_check, dft_sanity_check, embedding_options_sanity_check
+from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
@@ -265,7 +265,8 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
-                'embedding_options': ('dict', 'dictionary to set the embedding options'),
+                'embedding_options':
+                    ('dict', 'dictionary to set the embedding options'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 # 'use_split_comm': ('bool', 'use split communicators'),
             },
@@ -435,6 +436,7 @@ class ScfDriver:
         self._pe_sanity_check(method_dict)
 
         if self.embedding_options is not None:
+            from .sanitychecks import embedding_options_sanity_check
             embedding_options_sanity_check(self, method_dict)
 
         # TODO add embedding
@@ -515,6 +517,7 @@ class ScfDriver:
 
         # check embedding setup
         if self.embedding_options is not None:
+            from .sanitychecks import embedding_options_sanity_check
             embedding_options_sanity_check(self, self.embedding_options)
 
         # check print level (verbosity of output)
@@ -588,10 +591,11 @@ class ScfDriver:
             settings = self.embedding_options['settings']
             if self.embedding_options['settings']['embedding_method'] == 'PE':
                 from .embedding import PolarizableEmbeddingSCF
-                self._embedding_drv = PolarizableEmbeddingSCF(molecule=molecule,
-                                                              ao_basis=ao_basis,
-                                                              options=self.embedding_options,
-                                                              comm=self.comm)
+                self._embedding_drv = PolarizableEmbeddingSCF(
+                    molecule=molecule,
+                    ao_basis=ao_basis,
+                    options=self.embedding_options,
+                    comm=self.comm)
             else:
                 raise NotImplementedError
 
@@ -604,25 +608,38 @@ class ScfDriver:
                         break
                 return d
 
-            settings_str = (
-                "embedding_method: {}\n"
-                "vdw:\n"
-                "    - method: {}\n"
-                "    - combination_rule: {}\n"
-                "induced_dipoles:\n"
-                "    - solver: {}\n"
-                "    - threshold: {}\n"
-                "    - max_iterations: {}\n"
-                "environment_energy: {}"
-            ).format(
-                settings.get('embedding_method', 'PE'),
-                get_setting(settings, 'vdw', 'method', default='LJ'),
-                get_setting(settings, 'vdw', 'combination_rule', default='Lorentz-Berthelot'),
-                get_setting(settings, 'induced_dipoles', 'solver', default='jacobi'),
-                get_setting(settings, 'induced_dipoles', 'threshold', default='1e-8'),
-                get_setting(settings, 'induced_dipoles', 'max_iterations', default='100'),
-                settings.get('environment_energy', 'True')
-            )
+            # TODO: cleanup
+            settings_str = ("embedding_method: {}\n"
+                            "vdw:\n"
+                            "    - method: {}\n"
+                            "    - combination_rule: {}\n"
+                            "induced_dipoles:\n"
+                            "    - solver: {}\n"
+                            "    - threshold: {}\n"
+                            "    - max_iterations: {}\n"
+                            "environment_energy: {}").format(
+                                settings.get('embedding_method', 'PE'),
+                                get_setting(settings,
+                                            'vdw',
+                                            'method',
+                                            default='LJ'),
+                                get_setting(settings,
+                                            'vdw',
+                                            'combination_rule',
+                                            default='Lorentz-Berthelot'),
+                                get_setting(settings,
+                                            'induced_dipoles',
+                                            'solver',
+                                            default='jacobi'),
+                                get_setting(settings,
+                                            'induced_dipoles',
+                                            'threshold',
+                                            default='1e-8'),
+                                get_setting(settings,
+                                            'induced_dipoles',
+                                            'max_iterations',
+                                            default='100'),
+                                settings.get('environment_energy', 'True'))
             emb_info = 'Reading embedding settings:\n{}'.format(settings_str)
             self.ostream.print_info(emb_info)
             self.ostream.print_blank()
@@ -1158,15 +1175,15 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_emb, fock_mat_emb = self._comp_2e_fock(
+            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
 
-            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat, npot_mat,
-                                     den_mat)
+            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat,
+                                     npot_mat, den_mat)
 
-            self._comp_full_fock(fock_mat, vxc_mat, fock_mat_emb, kin_mat, npot_mat)
+            self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1331,7 +1348,7 @@ class ScfDriver:
 
                 if self.embedding_options is not None:
                     # pe energy and fock matrices
-                    self._scf_tensors['F_emb'] = fock_mat_emb
+                    self._scf_tensors['F_emb'] = V_emb
                     self._scf_tensors['E_emb'] = e_emb
 
             else:
@@ -1545,14 +1562,14 @@ class ScfDriver:
         """
 
         if self.use_split_comm and not self._first_step:
-            fock_mat, vxc_mat, e_emb, fock_mat_emb = self._comp_2e_fock_split_comm(
+            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_split_comm(
                 den_mat, molecule, basis, screener, e_grad, profiler)
 
         else:
-            fock_mat, vxc_mat, e_emb, fock_mat_emb = self._comp_2e_fock_single_comm(
+            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
                 den_mat, molecule, basis, screener, e_grad, profiler)
 
-        return fock_mat, vxc_mat, e_emb, fock_mat_emb
+        return fock_mat, vxc_mat, e_emb, V_emb
 
     def _comp_2e_fock_single_comm(self,
                                   den_mat,
@@ -1773,7 +1790,7 @@ class ScfDriver:
             # TODO: add PE contribution and update pe_summary
             pass
         else:
-            e_emb, fock_mat_emb = 0.0, None
+            e_emb, V_emb = 0.0, None
 
         # pyframe contributions
         if self.embedding_options is not None and not self._first_step:
@@ -1781,12 +1798,14 @@ class ScfDriver:
                 density_matrix = 2 * den_mat[0]
             else:
                 density_matrix = den_mat[0] + den_mat[1]
-            if self._embedding_drv.__class__.__name__ == 'PolarizableEmbeddingSCF':
-                e_emb, fock_mat_emb = self._embedding_drv.compute_pe_contributions(density_matrix=density_matrix)
+            from .embedding import PolarizableEmbeddingSCF
+            if isinstance(self._embedding_drv, PolarizableEmbeddingSCF):
+                e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
+                    density_matrix=density_matrix)
             else:
-                e_emb, fock_mat_emb = 0.0, np.zeros(fock_mat[0].shape, dtype=fock_mat[0].dtype)
+                e_emb, V_emb = 0.0, np.zeros_like(fock_mat[0])
         else:
-            e_emb, fock_mat_emb = 0.0, np.zeros(fock_mat[0].shape, dtype=fock_mat[0].dtype)
+            e_emb, V_emb = 0.0, np.zeros_like(fock_mat[0])
 
         # TODO add emb
         if self.timing and self.embedding_options is not None:
@@ -1795,7 +1814,7 @@ class ScfDriver:
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
-        return fock_mat, vxc_mat, e_emb, fock_mat_emb
+        return fock_mat, vxc_mat, e_emb, V_emb
 
     def _comp_2e_fock_split_comm(self,
                                  fock_mat,
@@ -1832,7 +1851,8 @@ class ScfDriver:
 
         return None
 
-    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat, den_mat):
+    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat,
+                     den_mat):
         """
         Computes the sum of SCF energy components: electronic energy, kinetic
         energy, and nuclear potential energy.
@@ -1886,7 +1906,7 @@ class ScfDriver:
 
         return e_sum
 
-    def _comp_full_fock(self, fock_mat, vxc_mat, fock_mat_emb, kin_mat, npot_mat):
+    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, kin_mat, npot_mat):
         """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
         Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
@@ -1896,7 +1916,7 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (2e-part).
         :param vxc_mat:
             The Vxc matrix.
-        :param fock_mat_emb:
+        :param V_emb:
             The embedding Fock matrix contributions.
         :param kin_mat:
             The kinetic energy matrix.
@@ -1930,7 +1950,9 @@ class ScfDriver:
 
             # TODO add emb treat fock matrix contributions separately?
             if self.embedding_options is not None and not self._first_step:
-                fock_mat[0] += fock_mat_emb
+                fock_mat[0] += V_emb
+                if self.scf_type != 'restricted':
+                    fock_mat[1] += V_emb
 
     def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
