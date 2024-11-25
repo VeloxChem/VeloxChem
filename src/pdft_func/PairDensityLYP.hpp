@@ -1,9 +1,10 @@
 //
-//                              VELOXCHEM
+//                           VELOXCHEM 1.0-RC2
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -30,7 +31,7 @@
 namespace pdftlyp {  // pdftlyp namespace
 
 /**
- Computes Exc and Vxc Fock for pair-density LYP exchange.
+ Computes Exc and Vxc Fock for pair-density LYP correlation.
 
  @param np the number of grid points.
  @param rho the density.

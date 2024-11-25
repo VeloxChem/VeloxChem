@@ -67,6 +67,15 @@ auto make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> 
 /// @return The vector of work tasks.
 auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int ithreshold, const int block_size_factor) -> std::vector<std::array<size_t, 8>>;
 
+/// @brief Generates work groups for OMP tasks manager.
+/// @param bra_gto_pair_blocks The vector of bra basis functions pair blocks.
+/// @param ket_gto_pair_blocks The vector of ket basis functions pair blocks.
+/// @return The vector of work tasks.
+auto make_bra_ket_work_group(const std::vector<CBlockedGtoPairBlock>& bra_gto_pair_blocks,
+                             const std::vector<CBlockedGtoPairBlock>& ket_gto_pair_blocks,
+                             const int                                ithreshold,
+                             const int                                block_size_factor) -> std::vector<std::array<size_t, 8>>;
+
 /// @brief Gets angular momentum scaling factor for SIMD width.
 /// @param ang_pair The angular momentum pair.
 /// @return The scaling factor for SIMD width

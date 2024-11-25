@@ -107,6 +107,7 @@ export_general(py::module &m) -> void
 
     // exposing functions from Codata.hpp
     m.def("bohr_in_angstrom", &units::bohr_in_angstrom, "Gets Bohr value in Angstroms.");
+    m.def("bohr_in_angstroms", &units::bohr_in_angstrom, "Gets Bohr value in Angstroms.");
     m.def("hartree_in_ev", &units::hartree_in_ev, "Gets Hartree value in electronvolts.");
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole, "Gets Hartree value in kcal/mol.");
     m.def("hartree_in_inverse_nm", &units::getHartreeValueInInverseNanometer, "Gets Hartree value in inverse nanometer.");
@@ -189,6 +190,7 @@ export_general(py::module &m) -> void
           "Gets work tasks for given two vectors of basis function blocks.");
     m.def("make_diag_work_tasks", &omp::make_diag_work_group, "Gets work tasks for diagonal integrals.");
     m.def("make_work_group", &omp::make_work_group, "Gets work group for ERIs.");
+    m.def("make_bra_ket_work_group", &omp::make_bra_ket_work_group, "Gets work group for ERIs.");
     m.def("partition_atoms", &omp::partition_atoms, "Get atomic indices of partitioned atoms list.");
 
     // exposing functions from SphericalMomentum.hpp

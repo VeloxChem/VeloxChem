@@ -32,10 +32,11 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import (compute_linear_momentum_integrals,
                            compute_angular_momentum_integrals)
 from .veloxchemlib import T4CScreener
-from .veloxchemlib import Matrices, make_matrix, mat_t
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import make_matrix, mat_t
+from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
@@ -179,7 +180,7 @@ class LinearSolver:
         self._dist_fock_ung = None
 
         self._debug = False
-        self._block_size_factor = 1
+        self._block_size_factor = 8
 
         # input keywords
         self._input_keywords = {
@@ -354,12 +355,15 @@ class LinearSolver:
                 'Using sub-communicators for {}.'.format(valstr))
             self.ostream.print_blank()
         else:
+            self._print_mem_debug_info('before screener')
             if self.rank == mpi_master():
                 screening = T4CScreener()
                 screening.partition(basis, molecule, 'eri')
             else:
                 screening = None
+            self._print_mem_debug_info('after  screener')
             screening = self.comm.bcast(screening, root=mpi_master())
+            self._print_mem_debug_info('after  bcast screener')
 
         return {
             'screening': screening,
@@ -556,6 +560,20 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
+    def _print_mem_debug_info(self, label):
+        """
+        Prints memory debug information.
+
+        :param label:
+            The label of memory debug information.
+        """
+
+        if self._debug:
+            profiler = Profiler()
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
+                                    profiler.get_available_memory())
+            self.ostream.flush()
+
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the linear equations.
@@ -747,23 +765,12 @@ class LinearSolver:
 
             # form Fock matrices
 
-            if self._debug:
-                if profiler is None:
-                    profiler = Profiler()
-                self.ostream.print_info(
-                    '==DEBUG==   available memory before Fock build: ' +
-                    profiler.get_available_memory())
-                self.ostream.flush()
+            self._print_mem_debug_info('before Fock build')
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
 
-            if self._debug:
-                self.ostream.print_info(
-                    '==DEBUG==   available memory after  Fock build: ' +
-                    profiler.get_available_memory())
-                self.ostream.print_blank()
-                self.ostream.flush()
+            self._print_mem_debug_info('after  Fock build')
 
             if self.rank == mpi_master():
                 raw_fock_ger = []
@@ -910,19 +917,11 @@ class LinearSolver:
         for idx in range(num_densities):
             dens[idx] = self.comm.bcast(dens[idx], root=mpi_master())
 
-        den_mat_for_fock = Matrices()
-
-        for idx in range(num_densities):
-            den_mat = make_matrix(basis, mat_t.general)
-            den_mat.set_values(dens[idx])
-            den_mat_for_fock.add(den_mat, str(idx))
-
         thresh_int = int(-math.log10(self.eri_thresh))
 
         t0 = tm.time()
 
         fock_drv = FockDriver(self.comm)
-
         fock_drv._set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
@@ -946,29 +945,37 @@ class LinearSolver:
         else:
             erf_k_coef, omega = None, None
 
-        fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                    [fock_type for x in range(len(dens))],
-                                    exchange_scaling_factor, 0.0, thresh_int)
-
         fock_arrays = []
+
         for idx in range(num_densities):
-            fock_np = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
+            den_mat_for_fock = make_matrix(basis, mat_t.general)
+            den_mat_for_fock.set_values(dens[idx])
+
+            self._print_mem_debug_info('before restgen Fock build')
+            fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+            self._print_mem_debug_info('after  restgen Fock build')
+
+            fock_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
+
+            if fock_type == 'j':
+                # for pure functional
+                fock_np *= 2.0
+
+            if need_omega:
+                # for range-separated functional
+                self._print_mem_debug_info('before restgen erf Fock build')
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            'kx_rs', erf_k_coef, omega,
+                                            thresh_int)
+                self._print_mem_debug_info('after  restgen erf Fock build')
+
+                fock_np -= fock_mat.to_numpy()
+                fock_mat = Matrix()
+
             fock_arrays.append(fock_np)
-
-        if fock_type == 'j':
-            # for pure functional
-            for idx in range(num_densities):
-                fock_arrays[idx] *= 2.0
-
-        if need_omega:
-            # for range-separated functional
-            fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                        ['kx_rs' for x in range(len(dens))],
-                                        erf_k_coef, omega, thresh_int)
-
-            for idx in range(num_densities):
-                fock_erf_k = fock_mat.matrix(str(idx)).full_matrix().to_numpy()
-                fock_arrays[idx] -= fock_erf_k
 
         if profiler is not None:
             profiler.add_timing_info('FockERI', tm.time() - t0)
@@ -1190,10 +1197,6 @@ class LinearSolver:
         cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
             self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-        if self.batch_size is not None:
-            cur_str = 'Batch Size of Fock Matrices     : {:d}'.format(
-                self.batch_size)
-            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

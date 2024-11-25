@@ -36,7 +36,7 @@ CDensityGridQuad::CDensityGridQuad()
 
     , _nDensityMatrices(0)
 
-    , _densityValues(CMemBlock2D<double>())
+    , _densityValues(CDensityGridData2D())
 {
 }
 
@@ -57,7 +57,7 @@ CDensityGridQuad::CDensityGridQuad(const int nGridPoints, const int nDensityMatr
         if (xcFuncType == xcfun::mgga) ncomp = 24;
     }
 
-    _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
+    _densityValues = CDensityGridData2D(nGridPoints, _nDensityMatrices * ncomp);
 }
 
 CDensityGridQuad::CDensityGridQuad(const CDensityGridQuad& source)
@@ -558,20 +558,37 @@ CDensityGridQuad::sl_gamZ(const int iDensityMatrix)
 void
 CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                               const xcfun         xcFuncType,
-                              const int       numdens,
+                              const int           numdens,
                               const std::string&  quadMode)
 
 {
-    if (_gridType != dengrid::ab) return;
-
-    // set grid points data
-
-    auto npoints = getNumberOfGridPoints();
-
-    // set up pointers to destination density
-
     if (xcFuncType == xcfun::lda)
     {
+        DensityProdForLDA(rwDensityGrid, numdens, quadMode);
+    }
+    else if (xcFuncType == xcfun::gga)
+    {
+        DensityProdForGGA(rwDensityGrid, numdens, quadMode);
+    }
+    else if (xcFuncType == xcfun::mgga)
+    {
+        DensityProdForMGGA(rwDensityGrid, numdens, quadMode);
+    }
+    else
+    {
+        errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + std::string("Invalid functional type"));
+    }
+}
+
+void
+CDensityGridQuad::DensityProdForLDA(const CDensityGrid& rwDensityGrid,
+                                    const int           numdens,
+                                    const std::string&  quadMode)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         if (format::upper_case(quadMode) == "SHG")
         {
             for (int j = 0; j < numdens / 12; j++)
@@ -1124,9 +1141,17 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
             errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + format::upper_case(quadMode) +
                                       std::string(" not implemented for LDA"));
         }
-    }
-    else if (xcFuncType == xcfun::gga)
-    {
+}
+
+void
+CDensityGridQuad::DensityProdForGGA(const CDensityGrid& rwDensityGrid,
+                                    const int           numdens,
+                                    const std::string&  quadMode)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         if (format::upper_case(quadMode) == "REDTPA_I")
         {
             for (int j = 0; j < numdens / 6; j++)
@@ -8460,9 +8485,17 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
             errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + format::upper_case(quadMode) +
                                       std::string(" not implemented for GGA"));
         }
-    }
-    else if (xcFuncType == xcfun::mgga)
-    {
+}
+
+void
+CDensityGridQuad::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
+                                     const int           numdens,
+                                     const std::string&  quadMode)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         if (format::upper_case(quadMode) == "QRF")
         {
             for (int j = 0; j < numdens / 2; j++)
@@ -15209,9 +15242,4 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
             errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + format::upper_case(quadMode) +
                                       std::string(" not implemented for meta-GGA"));
         }
-    }
-    else
-    {
-        errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + std::string("Invalid functional type"));
-    }
 }

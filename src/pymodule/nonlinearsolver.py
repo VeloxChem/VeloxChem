@@ -29,8 +29,9 @@ import math
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t
-from .veloxchemlib import mpi_master, denmat
+from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
 from .fockdriver import FockDriver
@@ -133,7 +134,7 @@ class NonlinearSolver:
         self.filename = None
 
         self._debug = False
-        self._block_size_factor = 1
+        self._block_size_factor = 8
 
         # input keywords
         self._input_keywords = {
@@ -444,7 +445,6 @@ class NonlinearSolver:
             profiler.set_timing_key('Nonlinear Fock')
 
         fock_drv = FockDriver(self.comm)
-
         fock_drv._set_block_size_factor(self._block_size_factor)
 
         # TODO: take screening from eri_dict
@@ -657,11 +657,6 @@ class NonlinearSolver:
                     if self.rank == mpi_master():
                         dts1.append(v.reshape(n_ao, n_ao))
 
-                if self.rank == mpi_master():
-                    dens1 = AODensityMatrix(dts1, denmat.rest)
-                else:
-                    dens1 = AODensityMatrix()
-
                 if mode_is_quadratic:
 
                     # If computing two-time perturbed Fock matrices (DFT) then
@@ -676,13 +671,6 @@ class NonlinearSolver:
                         v2 = dist_den_2_batch.get_full_vector(i)
                         if self.rank == mpi_master():
                             dts2.append(v2.reshape(n_ao, n_ao))
-
-                    if self.rank == mpi_master():
-                        dens2 = AODensityMatrix(dts2, denmat.rest)
-                        dens_for_fock = AODensityMatrix(dens2)
-                    else:
-                        dens2 = AODensityMatrix()
-                        dens_for_fock = AODensityMatrix()
 
                 elif mode_is_cubic:
 
@@ -712,28 +700,10 @@ class NonlinearSolver:
                         if self.rank == mpi_master():
                             dts2.append(v2.reshape(n_ao, n_ao))
 
-                    if self.rank == mpi_master():
-                        dens2 = AODensityMatrix(dts2, denmat.rest)
-                    else:
-                        dens2 = AODensityMatrix()
-
                     for i in range(dist_den_3_batch.shape(1)):
                         v3 = dist_den_3_batch.get_full_vector(i)
                         if self.rank == mpi_master():
                             dts3.append(v3.reshape(n_ao, n_ao))
-
-                    if self.rank == mpi_master():
-                        dens3 = AODensityMatrix(dts3, denmat.rest)
-                    else:
-                        dens3 = AODensityMatrix()
-
-                    # TODO separate dens2 and dens3 from dens_for_fock
-
-                    if self.rank == mpi_master():
-                        dens_for_fock = AODensityMatrix(dts2 + dts3,
-                                                        denmat.rest)
-                    else:
-                        dens_for_fock = AODensityMatrix()
 
             else:
 
@@ -754,13 +724,6 @@ class NonlinearSolver:
                         if self.rank == mpi_master():
                             dts2.append(v2.reshape(n_ao, n_ao))
 
-                    if self.rank == mpi_master():
-                        dens2 = AODensityMatrix(dts2, denmat.rest)
-                        dens_for_fock = AODensityMatrix(dens2)
-                    else:
-                        dens2 = AODensityMatrix()
-                        dens_for_fock = AODensityMatrix()
-
                 elif mode_is_cubic:
 
                     # If computing three-time perturbed Fock matrices at HF
@@ -776,23 +739,38 @@ class NonlinearSolver:
                         if self.rank == mpi_master():
                             dts3.append(v3.reshape(n_ao, n_ao))
 
-                    if self.rank == mpi_master():
-                        dens3 = AODensityMatrix(dts3, denmat.rest)
-                        dens_for_fock = AODensityMatrix(dens3)
-                    else:
-                        dens3 = AODensityMatrix()
-                        dens_for_fock = AODensityMatrix()
-
             # broadcast densities
 
-            dens_for_fock = dens_for_fock.broadcast(self.comm,
-                                                    root=mpi_master())
+            if self.rank == mpi_master():
+                num_dts1, num_dts2, num_dts3 = len(dts1), len(dts2), len(dts3)
+            else:
+                num_dts1, num_dts2, num_dts3 = None, None, None
+
+            num_dts1, num_dts2, num_dts3 = self.comm.bcast(
+                (num_dts1, num_dts2, num_dts3), root=mpi_master())
+
+            if self.rank != mpi_master():
+                dts1 = [None for x in range(num_dts1)]
+                dts2 = [None for x in range(num_dts2)]
+                dts3 = [None for x in range(num_dts3)]
+
+            for idx in range(num_dts1):
+                dts1[idx] = self.comm.bcast(dts1[idx], root=mpi_master())
+            for idx in range(num_dts2):
+                dts2[idx] = self.comm.bcast(dts2[idx], root=mpi_master())
+            for idx in range(num_dts3):
+                dts3[idx] = self.comm.bcast(dts3[idx], root=mpi_master())
 
             if self._dft:
-                dens1 = dens1.broadcast(self.comm, root=mpi_master())
-                dens2 = dens2.broadcast(self.comm, root=mpi_master())
-                if mode_is_cubic:
-                    dens3 = dens3.broadcast(self.comm, root=mpi_master())
+                if mode_is_quadratic:
+                    dts_for_fock = dts2
+                elif mode_is_cubic:
+                    dts_for_fock = dts2 + dts3
+            else:
+                if mode_is_quadratic:
+                    dts_for_fock = dts2
+                elif mode_is_cubic:
+                    dts_for_fock = dts3
 
             thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -824,12 +802,15 @@ class NonlinearSolver:
 
             fock_arrays = []
 
-            for idx in range(dens_for_fock.number_of_density_matrices()):
+            for idx in range(len(dts_for_fock)):
                 den_mat = make_matrix(ao_basis, mat_t.general)
-                den_mat.set_values(dens_for_fock.alpha_to_numpy(idx))
+                den_mat.set_values(dts_for_fock[idx])
+
                 fock_mat = fock_drv.compute(screening, den_mat, fock_type,
                                             fock_k_factor, 0.0, thresh_int)
-                fock_np = fock_mat.full_matrix().to_numpy()
+
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 if fock_type == 'j':
                     # for pure functional
@@ -837,9 +818,11 @@ class NonlinearSolver:
 
                 if need_omega:
                     # for range-separated functional
-                    erf_k_mat = fock_drv.compute(screening, den_mat, 'kx_rs',
-                                                 erf_k_coef, omega, thresh_int)
-                    fock_np -= erf_k_mat.full_matrix().to_numpy()
+                    fock_mat = fock_drv.compute(screening, den_mat, 'kx_rs',
+                                                erf_k_coef, omega, thresh_int)
+
+                    fock_np -= fock_mat.to_numpy()
+                    fock_mat = Matrix()
 
                 fock_arrays.append(fock_np)
 
@@ -853,18 +836,16 @@ class NonlinearSolver:
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
-                gs_den_mat = AODensityMatrix(gs_density, denmat.rest)
-
                 if mode_is_quadratic:
                     # Compute XC contribution to two-time transformed Fock matrics
                     xc_drv.integrate_kxc_fock(fock_arrays, molecule, ao_basis,
-                                              dens1, dens2, gs_den_mat, molgrid,
+                                              dts1, dts2, gs_density, molgrid,
                                               self.xcfun.get_func_label(), mode)
                 elif mode_is_cubic:
                     # Compute XC contribution to three-time transformed Fock matrics
                     xc_drv.integrate_kxclxc_fock(fock_arrays, molecule,
-                                                 ao_basis, dens1, dens2, dens3,
-                                                 gs_den_mat, molgrid,
+                                                 ao_basis, dts1, dts2, dts3,
+                                                 gs_density, molgrid,
                                                  self.xcfun.get_func_label(),
                                                  mode)
 

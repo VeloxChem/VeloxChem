@@ -58,6 +58,8 @@ class CT4CScreener
     /// @param label  The label of four center integral.
     auto partition(const CMolecularBasis &basis, const CMolecule &molecule, const std::string &label) -> void;
 
+    auto partition_atom(const CMolecularBasis& basis, const CMolecule& molecule, const std::string& label, const int iatom) -> void;
+
     /// @brief Gets vector of blocked basis function pair blocks.
     /// @return The vector of  blocked basis function pair blocks.
     auto gto_pair_blocks() const -> std::vector<CBlockedGtoPairBlock>;

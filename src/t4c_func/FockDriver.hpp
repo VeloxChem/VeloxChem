@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "Dense4DTensor.hpp"
 #include "Matrices.hpp"
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
@@ -62,6 +63,10 @@ class CFockDriver
                  const std::string     &label,
                  const double           exchange_factor,
                  const double           omega) const -> CMatrix;
+
+    auto compute_eri(const CT4CScreener& screener,
+                     const int           nao,
+                     const int           ithreshold) const -> CDense4DTensor;
 
     /// @brief Computes Fock matrix for given density..
     /// @param screener The screener with basis function pairs data.
@@ -130,7 +135,7 @@ class CFockDriver
     auto set_block_size_factor(const int factor) -> void;
 
    private:
-    int _block_size_factor = 1;
+    int _block_size_factor = 8;
 
     auto _determine_block_size_factor(const int nao) const -> int;
 

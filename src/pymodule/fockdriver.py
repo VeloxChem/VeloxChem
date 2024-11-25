@@ -24,10 +24,12 @@
 
 from mpi4py import MPI
 from os import environ
+import math
 import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import _FockDriver
+from .veloxchemlib import T4CScreener
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -84,16 +86,32 @@ class FockDriver:
         Checks that subcomm is a sub-communicator of self.comm.
         """
 
-        ranks = list(range(self.nodes))
-        group = self.comm.Get_group()
+        translated_ranks = subcomm.allgather(self.comm.Get_rank())
 
-        subranks = list(range(subcomm.Get_size()))
-        subgroup = subcomm.Get_group()
+        return all((rank in range(self.nodes)) for rank in translated_ranks)
 
-        translated_ranks = subgroup.Translate_ranks(subranks, group)
+    def compute_eri(self, molecule, basis, eri_thresh=1.0e-12):
+        """
+        Computes ERI as a 4D array.
 
-        return all((rank != MPI.UNDEFINED and rank in ranks)
-                   for rank in translated_ranks)
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param eri_thresh:
+            The ERI screening threshold.
+
+        :return:
+            ERI as a 4D array.
+        """
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(basis, molecule, 'eri')
+
+        naos = basis.get_dimensions_of_basis()
+        thresh_int = int(-math.log10(eri_thresh))
+
+        return self._fock_drv.compute_eri(t4c_drv, naos, thresh_int)
 
     def _compute_fock_omp(self, *args):
 
@@ -107,15 +125,11 @@ class FockDriver:
 
         total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
 
-        # TODO: double check extra_factor for total_cores >= 4096
-
-        if total_cores >= 4096:
-            extra_factor = 8
-        elif total_cores >= 2048:
-            extra_factor = 4
-        elif total_cores >= 1024:
+        if total_cores < 1024:
+            extra_factor = 1
+        elif total_cores < 4096:
             extra_factor = 2
         else:
-            extra_factor = 1
+            extra_factor = 4
 
         self._fock_drv._set_block_size_factor(factor * extra_factor)

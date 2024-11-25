@@ -1,9 +1,10 @@
 //
-//                              VELOXCHEM
+//                           VELOXCHEM 1.0-RC2
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -36,9 +37,9 @@ namespace pdftslater {  // pdftslater namespace
  @param rho the density.
  @param exc the functional value.
  @param vrho the 1st-order functional derivative wrt density.
+ @param v2rho the 2nd-order functional derivative wrt density
  */
 void compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho);
-
 }  // namespace pdftslater
 
 #endif /* PairDensitySlater_hpp */

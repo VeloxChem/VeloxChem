@@ -38,6 +38,7 @@
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
 #include "XCFunctional.hpp"
+#include "XCPairDensityFunctional.hpp"
 
 /**
  Class CXCMolecularGradient implements XC molecular gradient.
@@ -63,12 +64,19 @@ class CXCMolecularGradient
      @param xcFunctional the exchange-correlation functional.
      @return the molecular gradient.
      */
-    CDenseMatrix _integrateVxcGradientForLDA(const CMolecule&        molecule,
-                                             const CMolecularBasis&  basis,
-                                             const double*           rwDensityPointer,
-                                             const double*           gsDensityPointer,
-                                             const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+    auto _integrateVxcGradientForLDA(const CMolecule&        molecule,
+                                     const CMolecularBasis&  basis,
+                                     const std::vector<const double*>& rwDensityPointers,
+                                     const std::vector<const double*>& gsDensityPointers,
+                                     const CMolecularGrid&   molecularGrid,
+                                     const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
+
+    auto _integrateVxcGradientForLDAOpenShell(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const std::vector<const double*>& rwDensityPointers,
+                                              const std::vector<const double*>& gsDensityPointers,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
 
     /**
      Integrates first-order GGA exchnage-correlation functional contribution to
@@ -82,21 +90,19 @@ class CXCMolecularGradient
      @param xcFunctional the exchange-correlation functional.
      @return the molecular gradient.
      */
-    CDenseMatrix _integrateVxcGradientForGGA(const CMolecule&        molecule,
-                                             const CMolecularBasis&  basis,
-                                             const double*           rwDensityPointer,
-                                             const double*           gsDensityPointer,
-                                             const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+    auto _integrateVxcGradientForGGA(const CMolecule&        molecule,
+                                     const CMolecularBasis&  basis,
+                                     const std::vector<const double*>& rwDensityPointers,
+                                     const std::vector<const double*>& gsDensityPointers,
+                                     const CMolecularGrid&   molecularGrid,
+                                     const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
 
-    /**
-     Computes AO-to-atom mapping.
-
-     @param ao_to_atom_ids the vector for storing the mapping.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     */
-    void _computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) const;
+    auto _integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const std::vector<const double*>& rwDensityPointers,
+                                              const std::vector<const double*>& gsDensityPointers,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const CXCFunctional&    xcFunctional) const -> CDenseMatrix;
 
    public:
     /**
@@ -110,14 +116,14 @@ class CXCMolecularGradient
 
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param gsDensityMatrix the ground state AO density matrix.
+     @param gsDensityPointers the pointers to ground state AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
     CDenseMatrix integrateVxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
-                                      const double*           gsDensityPointer,
+                                      const std::vector<const double*>& gsDensityPointers,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
@@ -127,19 +133,43 @@ class CXCMolecularGradient
 
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param rwDensityMatrix the perturbed AO density matrix (to be contracted
-            with GTO gradient).
-     @param gsDensityMatrix the ground state AO density matrix.
+     @param rwDensityPointers the pointers to perturbed AO density matrix (to
+            be contracted with GTO gradient).
+     @param gsDensityPointers the pointers to ground state AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular gradient.
      */
     CDenseMatrix integrateVxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
-                                      const double*           rwDensityPointer,
-                                      const double*           gsDensityPointer,
+                                      const std::vector<const double*>& rwDensityPointers,
+                                      const std::vector<const double*>& gsDensityPointers,
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
+
+    /**
+     Integrates first-order exchange-correlation functional contribution to
+     PDFT molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix object.
+     @param twoBodyDensityMatrix the MO two-body active density matrix.
+     @param activeMOs the active molecular orbitals.
+     @param molecularGrid the molecular grid.
+     @param fvxc exchange-correlation functional.
+     @param rs_omega range-separation parameter.
+     @return the molecular gradient.
+     */
+    CDenseMatrix integrateVxcPDFTGradient(const CMolecule&                    molecule,
+                                          const CMolecularBasis&              basis,
+                                          const double*                       densityMatrixPointer,
+                                          const CDenseMatrix&                 twoBodyDensityMatrix,
+                                          const CDenseMatrix&                 activeMOs,
+                                          const CMolecularGrid&               molecularGrid,
+                                          const CXCPairDensityFunctional&     fvxc,
+                                          const double                        rs_omega) const;
+
 };
 
 #endif /* XCMolecularGradient_hpp */

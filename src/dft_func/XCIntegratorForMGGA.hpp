@@ -205,9 +205,9 @@ auto integratePartialFxcFockForMGGA(const CXCFunctional& xcFunctional,
  @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
  @param basis the molecular basis.
- @param rwDensityMatrix the perturbed one-time transformed densities.
- @param rw2DensityMatrix the two-time transformed densities.
- @param gsDensityMatrix the ground state density matrix.
+ @param rwDensityPointers the pointers to perturbed one-time transformed densities.
+ @param rw2DensityPointers the pointers to two-time transformed densities.
+ @param gsDensityPointers the pointers to ground state density matrix.
  @param molecularGrid the molecular grid.
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
@@ -216,9 +216,9 @@ auto integratePartialFxcFockForMGGA(const CXCFunctional& xcFunctional,
 auto integrateKxcFockForMGGA(const std::vector<double*>& aoFockPointers,
                              const CMolecule&            molecule,
                              const CMolecularBasis&      basis,
-                             const CAODensityMatrix&     rwDensityMatrix,
-                             const CAODensityMatrix&     rw2DensityMatrix,
-                             const CAODensityMatrix&     gsDensityMatrix,
+                             const std::vector<const double*>& rwDensityPointers,
+                             const std::vector<const double*>& rw2DensityPointers,
+                             const std::vector<const double*>& gsDensityPointers,
                              const CMolecularGrid&       molecularGrid,
                              const double                screeningThresholdForGTOValues,
                              const CXCFunctional&        xcFunctional,
@@ -266,7 +266,7 @@ auto integrateKxcFockForMGGA(const std::vector<double*>& aoFockPointers,
  @param v3lapltau2 ,
  @param v3tau3 ,
  @param rwDensityGridQuad the products of one-time transformed densities on grid points.
- @param rw2DensityMatrix the two-time transformed densities on grid points.
+ @param rw2DensityGrid the two-time transformed densities on grid points.
  @param iFock the index of the AO Fock matrix.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
@@ -321,10 +321,10 @@ auto integratePartialKxcFockForMGGA(const CXCFunctional&    xcFunctional,
  @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
  @param basis the molecular basis.
- @param rwDensityMatrix the perturbed one-time transformed densities.
- @param rw2DensityMatrix the two-time transformed densities.
- @param rw3DensityMatrix the three-time transformed densities.
- @param gsDensityMatrix the ground state density matrix.
+ @param rwDensityPointers the pointers to perturbed one-time transformed densities.
+ @param rw2DensityPointers the pointers to two-time transformed densities.
+ @param rw3DensityPointers the pointers to three-time transformed densities.
+ @param gsDensityPointers the pointers to ground state density matrix.
  @param molecularGrid the molecular grid.
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
@@ -333,10 +333,10 @@ auto integratePartialKxcFockForMGGA(const CXCFunctional&    xcFunctional,
 auto integrateKxcLxcFockForMGGA(const std::vector<double*>& aoFockPointers,
                                 const CMolecule&            molecule,
                                 const CMolecularBasis&      basis,
-                                const CAODensityMatrix&     rwDensityMatrix,
-                                const CAODensityMatrix&     rw2DensityMatrix,
-                                const CAODensityMatrix&     rw3DensityMatrix,
-                                const CAODensityMatrix&     gsDensityMatrix,
+                                const std::vector<const double*>& rwDensityPointers,
+                                const std::vector<const double*>& rw2DensityPointers,
+                                const std::vector<const double*>& rw3DensityPointers,
+                                const std::vector<const double*>& gsDensityPointers,
                                 const CMolecularGrid&       molecularGrid,
                                 const double                screeningThresholdForGTOValues,
                                 const CXCFunctional&        xcFunctional,
@@ -384,7 +384,7 @@ auto integrateKxcLxcFockForMGGA(const std::vector<double*>& aoFockPointers,
  @param v3lapltau2 ,
  @param v3tau3 ,
  @param rwDensityGridQuad the products of one-time transformed densities on grid points.
- @param rw2DensityMatrix the two-time transformed densities on grid points.
+ @param rw2DensityGrid the two-time transformed densities on grid points.
  @param iFock the index of the AO Fock matrix.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
@@ -509,7 +509,7 @@ auto integratePartialKxcFockForMGGA2(const CXCFunctional&     xcFunctional,
  @param v4lapltau3 ,
  @param v4tau4 ,
  @param rwDensityGridQuad the products of one-time transformed densities on grid points.
- @param rw3DensityMatrix the three-time transformed densities on grid points.
+ @param rw3DensityGrid the three-time transformed densities on grid points.
  @param iFock the index of the AO Fock matrix.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.

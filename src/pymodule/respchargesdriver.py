@@ -364,8 +364,8 @@ class RespChargesDriver:
                     bas = MolecularBasis()
 
                 # broadcast molecule and basis set
-                mol.broadcast(self.rank, self.comm)
-                bas.broadcast(self.rank, self.comm)
+                mol = self.comm.bcast(mol, root=mpi_master())
+                bas = self.comm.bcast(bas, root=mpi_master())
 
                 molecules.append(mol)
                 basis_sets.append(bas)
@@ -422,7 +422,7 @@ class RespChargesDriver:
                 self.ostream.print_block(mol.get_string())
                 self.ostream.print_block(mol.more_info())
                 self.ostream.print_blank()
-                self.ostream.print_block(bas.get_string('Atomic Basis', mol))
+                self.ostream.print_block(bas.get_string('Atomic Basis'))
                 self.ostream.flush()
 
             nalpha = mol.number_of_alpha_electrons()

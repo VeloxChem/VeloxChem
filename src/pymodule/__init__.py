@@ -38,6 +38,8 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
+from .veloxchemlib import DispersionModel
+from .veloxchemlib import XCMolecularGradient
 
 # C++ functions
 from .veloxchemlib import is_chemical_element
@@ -46,6 +48,8 @@ from .veloxchemlib import chemical_element_label
 from .veloxchemlib import chemical_element_identifier
 from .veloxchemlib import chemical_element_mass
 from .veloxchemlib import chemical_element_max_angular_momentum
+from .veloxchemlib import available_functionals
+from .veloxchemlib import available_pdft_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
@@ -58,6 +62,7 @@ from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
+from .veloxchemlib import partition_atoms
 
 # C++ enums
 from .veloxchemlib import mat_t
@@ -78,11 +83,14 @@ from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
 from .fockdriver import FockDriver
+from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mp2driver import Mp2Driver
 from .cubicgrid import CubicGrid
@@ -94,6 +102,12 @@ from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
+from .quadraticresponsedriver import QuadraticResponseDriver
+from .cubicresponsedriver import CubicResponseDriver
+from .shgdriver import ShgDriver
+from .tpatransitiondriver import TpaTransitionDriver
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -101,8 +115,12 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
+from .rspshg import SHG
+from .rsptpa import TPA
+#from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
+from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver

@@ -1,9 +1,10 @@
 //
-//                              VELOXCHEM
+//                           VELOXCHEM 1.0-RC2
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later
 //
@@ -27,7 +28,7 @@
 
 #include <cstdint>
 
-namespace pdftvwn {  // pdftvwn namespace
+namespace pdftvwn_rpa {  // pdftvwn_rpa namespace
 
 /**
  Computes Exc and Vxc Fock for pair-density LDA.
@@ -39,6 +40,22 @@ namespace pdftvwn {  // pdftvwn namespace
  */
 void compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho);
 
-}  // namespace pdftvwn
+}  // namespace pdftvwn_rpa
+
+/****************************************************************/
+
+namespace pdftvwn5 {  // pdftvwn5 namespace
+
+/**
+ Computes Exc and Vxc Fock for pair-density LDA.
+
+ @param np the number of grid points.
+ @param rho the density.
+ @param exc the functional value.
+ @param vrho the 1st-order functional derivative wrt density.
+ */
+void compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho);
+
+}  // namespace pdftvwn5
 
 #endif /* PairDensityVWN_hpp */

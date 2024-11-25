@@ -45,21 +45,14 @@ CAtomBasis::CAtomBasis(const CAtomBasis &other)
 
 CAtomBasis::CAtomBasis(CAtomBasis &&other) noexcept
 
-    : _functions{}
+    : _functions(std::move(other._functions))
 
-    , _name{}
+    , _name(std::move(other._name))
 
-    , _ecp_label{}
+    , _ecp_label(std::move(other._ecp_label))
 
-    , _identifier{-1}
+    , _identifier(std::move(other._identifier))
 {
-    std::swap(_functions, other._functions);
-
-    std::swap(_name, other._name);
-
-    std::swap(_ecp_label, other._ecp_label);
-
-    std::swap(_identifier, other._identifier);
 }
 
 auto
@@ -79,13 +72,16 @@ CAtomBasis::operator=(const CAtomBasis &other) -> CAtomBasis &
 auto
 CAtomBasis::operator=(CAtomBasis &&other) noexcept -> CAtomBasis &
 {
-    std::swap(_functions, other._functions);
+    if (this != &other)
+    {
+        _functions = std::move(other._functions);
 
-    std::swap(_name, other._name);
+        _name = std::move(other._name);
 
-    std::swap(_ecp_label, other._ecp_label);
+        _ecp_label = std::move(other._ecp_label);
 
-    std::swap(_identifier, other._identifier);
+        _identifier = std::move(other._identifier);
+    }
 
     return *this;
 }

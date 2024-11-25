@@ -10,7 +10,7 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 
 
-@pytest.mark.finitediff
+@pytest.mark.timeconsuming
 class TestCrfFD:
 
     def run_crf_fd(self, xcfun_label, basis_set_label, components, freqs):

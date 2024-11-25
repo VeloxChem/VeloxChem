@@ -3,6 +3,7 @@ target_sources(vlxobjs
     AOKohnShamMatrix.cpp
     DensityGrid.cpp
     DensityGridCubic.cpp
+    DensityGridData2D.cpp
     DensityGridGenerator.cpp
     DensityGridQuad.cpp
     DftFunc.cpp

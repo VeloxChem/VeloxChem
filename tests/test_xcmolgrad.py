@@ -31,7 +31,7 @@ class TestXCMolGrad:
 
         grad_drv = XCMolecularGradient()
         mol_grad = grad_drv.integrate_vxc_gradient(molecule, basis,
-                                                   density.alpha_to_numpy(0),
+                                                   [density.alpha_to_numpy(0)],
                                                    mol_grid, xcfun)
         mol_grad = scf_drv.comm.reduce(mol_grad, root=mpi_master())
 

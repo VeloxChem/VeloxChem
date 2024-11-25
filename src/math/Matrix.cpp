@@ -71,13 +71,10 @@ CMatrix::CMatrix(const CMatrix &other)
 
 CMatrix::CMatrix(CMatrix &&other) noexcept
 
-    : _sub_matrices(std::map<std::pair<int, int>, CSubMatrix *>())
+    : _sub_matrices(std::move(other._sub_matrices))
 
-    , _mat_type(mat_t::general)
+    , _mat_type(std::move(other._mat_type))
 {
-    std::swap(_sub_matrices, other._sub_matrices);
-
-    std::swap(_mat_type, other._mat_type);
 }
 
 CMatrix::~CMatrix()
@@ -100,9 +97,15 @@ CMatrix::operator=(const CMatrix &other) -> CMatrix &
 auto
 CMatrix::operator=(CMatrix &&other) noexcept -> CMatrix &
 {
-    std::swap(_sub_matrices, other._sub_matrices);
+    if (this != &other)
+    {
+        // release existing resources
+        _deallocate();
 
-    std::swap(_mat_type, other._mat_type);
+        _sub_matrices = std::move(other._sub_matrices);
+
+        _mat_type = std::move(other._mat_type);
+    }
 
     return *this;
 }

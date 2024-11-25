@@ -5,5 +5,5 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "finitediff: tests for response finite difference",
+        "timeconsuming: time-consuming tests that are not included in CI",
     )

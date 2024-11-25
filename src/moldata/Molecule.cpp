@@ -133,25 +133,16 @@ CMolecule::CMolecule(const CMolecule &other)
 
 CMolecule::CMolecule(CMolecule &&other) noexcept
 
-    : _charge{0.0}
+    : _charge(std::move(other._charge))
 
-    , _multiplicity{1}
+    , _multiplicity(std::move(other._multiplicity))
 
-    , _coordinates{}
+    , _coordinates(std::move(other._coordinates))
 
-    , _identifiers{}
+    , _identifiers(std::move(other._identifiers))
 
-    , _atom_basis_labels{}
+    , _atom_basis_labels(std::move(other._atom_basis_labels))
 {
-    std::swap(_charge, other._charge);
-
-    std::swap(_multiplicity, other._multiplicity);
-
-    std::swap(_coordinates, other._coordinates);
-
-    std::swap(_identifiers, other._identifiers);
-
-    std::swap(_atom_basis_labels, other._atom_basis_labels);
 }
 
 auto
@@ -173,15 +164,18 @@ CMolecule::operator=(const CMolecule &other) -> CMolecule &
 auto
 CMolecule::operator=(CMolecule &&other) noexcept -> CMolecule &
 {
-    std::swap(_charge, other._charge);
+    if (this != &other)
+    {
+        _charge = std::move(other._charge);
 
-    std::swap(_multiplicity, other._multiplicity);
+        _multiplicity = std::move(other._multiplicity);
 
-    std::swap(_coordinates, other._coordinates);
+        _coordinates = std::move(other._coordinates);
 
-    std::swap(_identifiers, other._identifiers);
+        _identifiers = std::move(other._identifiers);
 
-    std::swap(_atom_basis_labels, other._atom_basis_labels);
+        _atom_basis_labels = std::move(other._atom_basis_labels);
+    }
 
     return *this;
 }

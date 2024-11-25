@@ -835,8 +835,8 @@ class SadGuessDriver:
         S12mat = ovl_drv.compute(molecule, basis_1, basis_2)
         S22mat = ovl_drv.compute(molecule, basis_2)
 
-        S12 = S12mat.full_matrix().to_numpy()
-        S22 = S22mat.full_matrix().to_numpy()
+        S12 = S12mat.to_numpy()
+        S22 = S22mat.to_numpy()
 
         nao_1 = S12.shape[0]
         nao_2 = S12.shape[1]

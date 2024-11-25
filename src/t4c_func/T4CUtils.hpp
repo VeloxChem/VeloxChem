@@ -210,6 +210,17 @@ auto accumulate(CSubMatrix*                glob_matrix,
                 const int                  ket_comps,
                 const bool                 ang_order) -> void;
 
+auto accumulate_value(double*                    value_ptr,
+                      const CSubMatrix*          density_matrix,
+                      const CSubMatrix*          loc_matrix,
+                      const std::vector<size_t>& bra_loc_indices,
+                      const std::vector<size_t>& ket_loc_indices,
+                      const std::vector<size_t>& bra_glob_indices,
+                      const std::vector<size_t>& ket_glob_indices,
+                      const int                  bra_comps,
+                      const int                  ket_comps,
+                      const bool                 ang_order) -> void;
+
 /// @brief Adds batch of  local matrices to matrices container.
 /// @param matrices The matrices container to be added to.
 /// @param label The identifier of Fock matrix type.
@@ -309,6 +320,25 @@ auto local_distribute_geom_ket_symm(CMatrices&                       focks,
                                     const int                        d_angmom,
                                     const size_t                     bra_igto,
                                     const std::pair<size_t, size_t>& ket_range) -> void;
+
+auto local_distribute_geom(std::vector<double>&             values,
+                           const int                        cart_ind,
+                           const CMatrix*                   density,
+                           const CMatrix*                   density_2,
+                           const std::string&               label,
+                           const double                     exchange_factor,
+                           const CSimdArray<double>&        buffer,
+                           const size_t                     offset,
+                           const std::vector<size_t>&       a_indices,
+                           const std::vector<size_t>&       b_indices,
+                           const std::vector<size_t>&       c_indices,
+                           const std::vector<size_t>&       d_indices,
+                           const int                        a_angmom,
+                           const int                        b_angmom,
+                           const int                        c_angmom,
+                           const int                        d_angmom,
+                           const size_t                     bra_igto,
+                           const std::pair<size_t, size_t>& ket_range) -> void;
 
 /// Transforms Cartesian integrals buffer to half-transformed integrals buffer.
 /// - Parameter sbuffer: the spherical  integrals array.

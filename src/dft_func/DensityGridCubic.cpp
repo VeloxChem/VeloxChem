@@ -35,11 +35,11 @@ CDensityGridCubic::CDensityGridCubic()
 
     , _nDensityMatrices(0)
 
-    , _densityValues(CMemBlock2D<double>())
+    , _densityValues(CDensityGridData2D())
 {
 }
 
-CDensityGridCubic::CDensityGridCubic(const CMemBlock2D<double>& densityValues, const dengrid gridType)
+CDensityGridCubic::CDensityGridCubic(const CDensityGridData2D& densityValues, const dengrid gridType)
 
     : _gridType(gridType)
 
@@ -66,7 +66,7 @@ CDensityGridCubic::CDensityGridCubic(const int nGridPoints, const int nDensityMa
         if (xcFuncType == xcfun::mgga) ncomp = 130;
     }
 
-    _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
+    _densityValues = CDensityGridData2D(nGridPoints, _nDensityMatrices * ncomp);
 }
 
 CDensityGridCubic::CDensityGridCubic(const CDensityGridCubic& source)
@@ -2297,21 +2297,40 @@ const double*
 
 void
 CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
-                              const CDensityGrid& rw2DensityGrid,
-                              const xcfun         xcFuncType,
-                              const int             numdens,
-                              const std::string&  CubeMode) 
-
+                               const CDensityGrid& rw2DensityGrid,
+                               const xcfun         xcFuncType,
+                               const int           numdens,
+                               const std::string&  cubeMode) 
 {
-    if (_gridType != dengrid::ab) return;
-
-    // set grid points data
-
-    auto npoints = getNumberOfGridPoints();
-
     if (xcFuncType == xcfun::lda)
     {
-        if (format::upper_case(CubeMode) == "TPA")
+        DensityProdForLDA(rwDensityGrid, rw2DensityGrid, numdens, cubeMode);
+    }
+    else if (xcFuncType == xcfun::gga)
+    {   
+        DensityProdForGGA(rwDensityGrid, rw2DensityGrid, numdens, cubeMode);
+    }
+    else if (xcFuncType == xcfun::mgga)
+    {
+        DensityProdForMGGA(rwDensityGrid, rw2DensityGrid, numdens, cubeMode);
+    }
+    else
+    {
+        errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + std::string("Invalid functional type"));
+    }
+}
+
+void
+CDensityGridCubic::DensityProdForLDA(const CDensityGrid& rwDensityGrid,
+                                     const CDensityGrid& rw2DensityGrid,
+                                     const int           numdens,
+                                     const std::string&  cubeMode) 
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
+        if (format::upper_case(cubeMode) == "TPA")
         {
             for (int j = 0; j < numdens / 30; j++)
             {
@@ -2526,7 +2545,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(CubeMode) == "CRF")
+        else if (format::upper_case(cubeMode) == "CRF")
         {
             for (int j = 0; j < numdens / 8; j++)
             {
@@ -2614,13 +2633,23 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         }
         else
         {
-            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(CubeMode) +
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
                                       std::string(" not implemented for LDA"));
         }
-    }
-    else if (xcFuncType == xcfun::gga)
-    {   
-        if (format::upper_case(CubeMode) == "TPA")
+    
+}
+
+void
+CDensityGridCubic::DensityProdForGGA(const CDensityGrid& rwDensityGrid,
+                                     const CDensityGrid& rw2DensityGrid,
+                                     const int           numdens,
+                                     const std::string&  cubeMode) 
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
+        if (format::upper_case(cubeMode) == "TPA")
         {
             for (int j = 0; j < numdens / 30; j++)
             {
@@ -7113,7 +7142,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(CubeMode) == "CRF")
+        else if (format::upper_case(cubeMode) == "CRF")
         {
             for (int j = 0; j < numdens / 8; j++)
             {
@@ -8103,13 +8132,22 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         }
         else
         {
-            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(CubeMode) +
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
                                       std::string(" not implemented for GGA"));
         }
-    }
-    else if (xcFuncType == xcfun::mgga)
-    {
-        if (format::upper_case(CubeMode) == "CRF")
+}
+
+void
+CDensityGridCubic::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
+                                      const CDensityGrid& rw2DensityGrid,
+                                      const int           numdens,
+                                      const std::string&  cubeMode) 
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
+        if (format::upper_case(cubeMode) == "CRF")
         {
             for (int j = 0; j < numdens / 8; j++)
             {
@@ -9883,7 +9921,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(CubeMode) == "TPA")
+        else if (format::upper_case(cubeMode) == "TPA")
         {
             for (int j = 0; j < numdens / 30; j++)
             {
@@ -18875,12 +18913,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         }
         else
         {
-            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(CubeMode) +
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
                                       std::string(" not implemented for meta-GGA"));
         }
-    }
-    else
-    {
-        errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + std::string("Invalid functional type"));
-    }
 }

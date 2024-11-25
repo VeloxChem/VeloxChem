@@ -163,44 +163,44 @@ auto
 CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
-                                const CAODensityMatrix& rwDensityMatrix,
-                                const CAODensityMatrix& rw2DensityMatrix,
-                                const CAODensityMatrix& gsDensityMatrix,
+                                const std::vector<const double*>& rwDensityPointers,
+                                const std::vector<const double*>& rw2DensityPointers,
+                                const std::vector<const double*>& gsDensityPointers,
                                 const CMolecularGrid&   molecularGrid,
                                 const std::string&      xcFuncLabel,
                                 const std::string&      quadMode) const -> void
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    return integrateKxcFock(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+    return integrateKxcFock(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, fvxc, quadMode);
 }
 
 auto
 CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
-                                const CAODensityMatrix& rwDensityMatrix,
-                                const CAODensityMatrix& rw2DensityMatrix,
-                                const CAODensityMatrix& gsDensityMatrix,
+                                const std::vector<const double*>& rwDensityPointers,
+                                const std::vector<const double*>& rw2DensityPointers,
+                                const std::vector<const double*>& gsDensityPointers,
                                 const CMolecularGrid&   molecularGrid,
                                 const CXCFunctional&    fvxc,
                                 const std::string&      quadMode) const -> void
 {
     auto xcfuntype = fvxc.getFunctionalType();
 
-    if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
+    if (gsDensityPointers.size() == 1)
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateKxcFockForLDA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintlda::integrateKxcFockForLDA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            xcintgga::integrateKxcFockForGGA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintgga::integrateKxcFockForGGA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateKxcFockForMGGA(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintmgga::integrateKxcFockForMGGA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else
         {
@@ -221,49 +221,49 @@ auto
 CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
                                    const CMolecule&        molecule,
                                    const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& rwDensityMatrix,
-                                   const CAODensityMatrix& rw2DensityMatrix,
-                                   const CAODensityMatrix& rw3DensityMatrix,
-                                   const CAODensityMatrix& gsDensityMatrix,
+                                   const std::vector<const double*>& rwDensityPointers,
+                                   const std::vector<const double*>& rw2DensityPointers,
+                                   const std::vector<const double*>& rw3DensityPointers,
+                                   const std::vector<const double*>& gsDensityPointers,
                                    const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel,
                                    const std::string&      cubeMode) const -> void
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    return integrateKxcLxcFock(aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, cubeMode);
+    return integrateKxcLxcFock(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, fvxc, cubeMode);
 }
 
 auto
 CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
                                    const CMolecule&        molecule,
                                    const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& rwDensityMatrix,
-                                   const CAODensityMatrix& rw2DensityMatrix,
-                                   const CAODensityMatrix& rw3DensityMatrix,
-                                   const CAODensityMatrix& gsDensityMatrix,
+                                   const std::vector<const double*>& rwDensityPointers,
+                                   const std::vector<const double*>& rw2DensityPointers,
+                                   const std::vector<const double*>& rw3DensityPointers,
+                                   const std::vector<const double*>& gsDensityPointers,
                                    const CMolecularGrid&   molecularGrid,
                                    const CXCFunctional&    fvxc,
                                    const std::string&      cubeMode) const -> void
 {
     auto xcfuntype = fvxc.getFunctionalType();
 
-    if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && rw3DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
+    if (gsDensityPointers.size() == 1)
     {
         if (xcfuntype == xcfun::lda)
         {
             xcintlda::integrateKxcLxcFockForLDA(
-                aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
+                aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
             xcintgga::integrateKxcLxcFockForGGA(
-                aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
+                aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::mgga)
         {
             xcintmgga::integrateKxcLxcFockForMGGA(
-                aoFockPointers, molecule, basis, rwDensityMatrix, rw2DensityMatrix, rw3DensityMatrix, gsDensityMatrix, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
+                aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else
         {
@@ -281,18 +281,17 @@ CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
 }
 
 auto
-CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
-                                CDense4DTensor&        tensorWxc,
-                                const CMolecule&       molecule,
-                                const CMolecularBasis& basis,
-                                const double*          densityMatrixPointer,
-                                const CDenseMatrix&    twoBodyDensityMatrix,
-                                const CDenseMatrix&    activeMOs,
-                                const CMolecularGrid&  molecularGrid,
-                                const std::string&     xcFuncLabel) const -> void
+CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&                  aoFockMatrix,
+                                CDense4DTensor&                     tensorWxc,
+                                const CMolecule&                    molecule,
+                                const CMolecularBasis&              basis,
+                                const double*                       densityMatrixPointer,
+                                const CDenseMatrix&                 twoBodyDensityMatrix,
+                                const CDenseMatrix&                 activeMOs,
+                                const CMolecularGrid&               molecularGrid,
+                                const CXCPairDensityFunctional&     fvxc,
+                                const double                        rs_omega) const -> void
 {
-    auto fvxc = vxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
-
     auto xcfuntype = fvxc.getFunctionalType();
 
     if (xcfuntype == "PLDA")
@@ -306,7 +305,7 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
                                           activeMOs,
                                           molecularGrid,
                                           _screeningThresholdForGTOValues,
-                                          fvxc);
+                                          fvxc, rs_omega);
     }
     else if (xcfuntype == "PGGA")
     {
@@ -319,7 +318,7 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&     aoFockMatrix,
                                           activeMOs,
                                           molecularGrid,
                                           _screeningThresholdForGTOValues,
-                                          fvxc);
+                                          fvxc, rs_omega);
     }
     else
     {

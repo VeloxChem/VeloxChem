@@ -50,7 +50,7 @@ def compute_nuclear_potential_integrals(molecule,
         npot_mat = npot_drv.compute(molecule, basis, charges, coordinates)
 
     # Note: factor -1.0 for electron charge
-    return -1.0 * npot_mat.full_matrix().to_numpy()
+    return -1.0 * npot_mat.to_numpy()
 
 
 def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):
@@ -71,7 +71,7 @@ def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):
 
     # Note: factor -1.0 for electron charge
     return tuple([
-        -1.0 * dip_mats.matrix('X').full_matrix().to_numpy(),
-        -1.0 * dip_mats.matrix('Y').full_matrix().to_numpy(),
-        -1.0 * dip_mats.matrix('Z').full_matrix().to_numpy(),
+        -1.0 * dip_mats.matrix_to_numpy('X'),
+        -1.0 * dip_mats.matrix_to_numpy('Y'),
+        -1.0 * dip_mats.matrix_to_numpy('Z'),
     ])

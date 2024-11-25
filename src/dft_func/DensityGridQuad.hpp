@@ -29,7 +29,7 @@
 #include <vector>
 
 #include "DensityGrid.hpp"
-#include "MemBlock2D.hpp"
+#include "DensityGridData2D.hpp"
 #include "XCFunctionalType.hpp"
 
 /**
@@ -50,7 +50,7 @@ class CDensityGridQuad
     /**
      The density variables values at grid points.
      */
-    CMemBlock2D<double> _densityValues;
+    CDensityGridData2D _densityValues;
 
    public:
     /**
@@ -221,6 +221,9 @@ class CDensityGridQuad
      */
     void DensityProd(const CDensityGrid& rwDensityGrid, const xcfun xcFuncType, const int numDens, const std::string& quadMode);
 
+    void DensityProdForLDA(const CDensityGrid& rwDensityGrid, const int numDens, const std::string& quadMode);
+    void DensityProdForGGA(const CDensityGrid& rwDensityGrid, const int numDens, const std::string& quadMode);
+    void DensityProdForMGGA(const CDensityGrid& rwDensityGrid, const int numDens, const std::string& quadMode);
 };
 
 #endif /* DensityGridQuad_hpp */

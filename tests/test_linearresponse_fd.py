@@ -10,7 +10,7 @@ from veloxchem.rsppolarizability import Polarizability
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
-@pytest.mark.finitediff
+@pytest.mark.timeconsuming
 class TestLrfFD:
 
     def run_lrf_fd(self, xcfun_label):
