@@ -89,7 +89,9 @@ CFockDriver::compute_eri(const CT4CScreener& screener,
 
     auto bsfac = _determine_block_size_factor(nao);
 
+#pragma omp parallel shared(ptr_screener, ptr_eri_tensor)
     {
+#pragma omp single nowait
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
@@ -101,6 +103,7 @@ CFockDriver::compute_eri(const CT4CScreener& screener,
                 const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
                 const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
                 const bool diagonal   = (task[0] == task[1]) && (task[2] == task[3]) && (bra_range == ket_range);
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal)
                 {
                     CT4CEriTensorDistributor distributor(ptr_eri_tensor);
                     distributor.set_indices(bra_gpairs, ket_gpairs);
