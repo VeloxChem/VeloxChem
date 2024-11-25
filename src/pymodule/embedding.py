@@ -1,4 +1,7 @@
+from contextlib import redirect_stdout
+from io import StringIO
 import numpy as np
+
 from .veloxchemlib import compute_electric_field_integrals, compute_electric_field_values, compute_quadrupole_integrals
 from .oneeints import compute_nuclear_potential_integrals
 
@@ -158,10 +161,11 @@ class PolarizableEmbedding:
 
     def _create_pyframe_objects(self):
         if "json_file" in self.options['inputs']:
-            self.quantum_subsystem, self.classical_subsystem = read_input.reader(
-                input_data=self.options['inputs']['json_file'],
-                comm=self.comm
-            )
+            with redirect_stdout(StringIO()) as fg_out:
+                self.quantum_subsystem, self.classical_subsystem = read_input.reader(
+                    input_data=self.options['inputs']['json_file'],
+                    comm=self.comm
+                )
         elif "objects" in self.options['inputs']:
             self.quantum_subsystem, self.classical_subsystem = (
                 self.options['inputs']['objects']['quantum_subsystem'],
