@@ -1,7 +1,6 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import T4CScreener
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.fockdriver import FockDriver
@@ -31,13 +30,7 @@ class TestFockERI:
         npyfile = str(here / 'data' / 'h2o.sto3g.eri.npy')
         ref_eri = np.load(npyfile)
 
-        naos = ref_eri.shape[0]
-        ithresh = 12
-
-        t4c_drv = T4CScreener()
-        t4c_drv.partition(bas, mol, "eri")
-
         fock_drv = FockDriver()
-        eri = fock_drv.compute_eri(t4c_drv, naos, ithresh)
+        eri = fock_drv.compute_eri(mol, bas)
 
         assert np.max(np.abs(eri - ref_eri)) < 1e-12
