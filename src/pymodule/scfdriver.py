@@ -536,66 +536,49 @@ class ScfDriver:
 
         # set up polarizable embedding
         if self._pe:
+
+            # TODO: print PyFraME info
+
             pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
         if self.embedding_options is not None:
+            assert_msg_critical(
+                self.embedding_options['settings']['embedding_method'] == 'PE',
+                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
+            )
+
             settings = self.embedding_options['settings']
-            if self.embedding_options['settings']['embedding_method'] == 'PE':
-                from .embedding import PolarizableEmbeddingSCF
-                self._embedding_drv = PolarizableEmbeddingSCF(
-                    molecule=molecule,
-                    ao_basis=ao_basis,
-                    options=self.embedding_options,
-                    comm=self.comm)
-            else:
-                raise NotImplementedError
 
-            def get_setting(setting_dict, *keys, default=None):
-                """Safely get a nested setting from a dictionary with a default."""
-                d = setting_dict
-                for key in keys:
-                    d = d.get(key, default)
-                    if d is default:
-                        break
-                return d
+            from .embedding import PolarizableEmbeddingSCF
 
-            # TODO: cleanup
-            settings_str = ("embedding_method: {}\n"
-                            "vdw:\n"
-                            "    - method: {}\n"
-                            "    - combination_rule: {}\n"
-                            "induced_dipoles:\n"
-                            "    - solver: {}\n"
-                            "    - threshold: {}\n"
-                            "    - max_iterations: {}\n"
-                            "environment_energy: {}").format(
-                                settings.get('embedding_method', 'PE'),
-                                get_setting(settings,
-                                            'vdw',
-                                            'method',
-                                            default='LJ'),
-                                get_setting(settings,
-                                            'vdw',
-                                            'combination_rule',
-                                            default='Lorentz-Berthelot'),
-                                get_setting(settings,
-                                            'induced_dipoles',
-                                            'solver',
-                                            default='jacobi'),
-                                get_setting(settings,
-                                            'induced_dipoles',
-                                            'threshold',
-                                            default='1e-8'),
-                                get_setting(settings,
-                                            'induced_dipoles',
-                                            'max_iterations',
-                                            default='100'),
-                                settings.get('environment_energy', 'True'))
-            emb_info = 'Reading embedding settings:\n{}'.format(settings_str)
+            self._embedding_drv = PolarizableEmbeddingSCF(
+                molecule=molecule,
+                ao_basis=ao_basis,
+                options=self.embedding_options,
+                comm=self.comm)
+
+            emb_info = 'Embedding settings:'
             self.ostream.print_info(emb_info)
+
+            for key in ['embedding_method', 'environment_energy']:
+                if key in settings:
+                    self.ostream.print_info(f'- {key:<15s} : {settings[key]}')
+
+            if 'vdw' in settings:
+                self.ostream.print_info('{- "vdw":<15s}')
+                for key in ['method', 'combination_rule']:
+                    self.ostream.print_info(
+                        f'  - {key:<15s} : {settings["vdw"][key]}')
+
+            if 'induced_dipoles' in settings:
+                self.ostream.print_info('{- "induced_dipoles":<15s}')
+                for key in ['solver', 'threshold', 'max_iterations']:
+                    self.ostream.print_info(
+                        f'  - {key:<15s} : {settings["induced_dipoles"][key]}')
+
             self.ostream.print_blank()
 
         # C2-DIIS method

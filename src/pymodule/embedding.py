@@ -5,6 +5,7 @@ import numpy as np
 from .veloxchemlib import (compute_electric_field_integrals,
                            compute_electric_field_values)
 from .oneeints import compute_nuclear_potential_integrals
+from .errorhandler import assert_msg_critical
 
 try:
     from pyframe.embedding import (read_input, electrostatic_interactions,
@@ -166,9 +167,11 @@ class PolarizableEmbedding:
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
 
         self.options = options
-        if self.options['settings']['embedding_method'] != 'PE':
-            raise NotImplementedError(
-                "Method set is not Polarizable Embedding.")
+
+        assert_msg_critical(
+            self.options['settings']['embedding_method'] == 'PE',
+            'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
+        )
 
         self.comm = comm
         self.molecule = molecule
@@ -235,6 +238,7 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
         self.vdw_method = vdw_options.get('method', 'LJ')
         self.vdw_combination_rule = vdw_options.get('combination_rule',
                                                     'Lorentz-Berthelot')
+
         if 'vdw' in self.options['settings']:
             self._e_vdw = repulsion_interactions.compute_repulsion_interactions(
                 quantum_subsystem=self.quantum_subsystem,

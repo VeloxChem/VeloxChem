@@ -22,7 +22,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -429,15 +428,20 @@ class LinearSolver:
         """
 
         if self._pe:
-            if self.embedding_options['settings']['embedding_method'] == 'PE':
-                from .embedding import PolarizableEmbeddingLRS
-                self._embedding_drv = PolarizableEmbeddingLRS(
-                    molecule=molecule,
-                    ao_basis=basis,
-                    options=self.embedding_options,
-                    comm=self.comm)
-            else:
-                raise NotImplementedError
+            assert_msg_critical(
+                self.embedding_options['settings']['embedding_method'] == 'PE',
+                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
+            )
+
+            from .embedding import PolarizableEmbeddingLRS
+
+            self._embedding_drv = PolarizableEmbeddingLRS(
+                molecule=molecule,
+                ao_basis=basis,
+                options=self.embedding_options,
+                comm=self.comm)
+
+            # TODO: print PyFraME info
 
             pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
