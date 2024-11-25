@@ -112,7 +112,6 @@ from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
-from .embedding import PolarizableEmbedding
 
 # Python functions
 from .errorhandler import assert_msg_critical
