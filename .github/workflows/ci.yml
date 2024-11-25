@@ -51,7 +51,7 @@ jobs:
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
           CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
-          CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
+          CC=gcc CXX=g++ python -m pip install MDAnalysis
           echo "=== VeloxChem build ==="
           export XTBHOME=/usr/local
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
