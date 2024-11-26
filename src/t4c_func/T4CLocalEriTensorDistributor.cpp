@@ -135,6 +135,9 @@ local_distribute_eri_tensor(CDense4DTensor*                  eri_tensor,
 
                         auto fval = curr_buffer[m - ket_range.first];
 
+                        // Note: updating 8-fold pqrs integrals without omp critical
+                        // since only unique pqrs combinations are computed
+
                         eri_tensor->row(p, q, r)[s] = fval;
                         eri_tensor->row(p, q, s)[r] = fval;
 
