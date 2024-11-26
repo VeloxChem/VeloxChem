@@ -285,9 +285,12 @@ class NonlinearSolver:
             The dictionary of ERI information.
         """
 
-        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                    self.eri_thresh, molecule, basis)
+        if self.rank == mpi_master():
+            screening = T4CScreener()
+            screening.partition(basis, molecule, 'eri')
+        else:
+            screening = None
+        screening = self.comm.bcast(screening, root=mpi_master())
 
         return {
             'screening': screening,
@@ -355,6 +358,7 @@ class NonlinearSolver:
                        molecule,
                        ao_basis,
                        fock_flag,
+                       eri_dict,
                        dft_dict,
                        first_order_dens,
                        second_order_dens,
@@ -374,6 +378,8 @@ class NonlinearSolver:
             The AO basis set
         :param fock_flag:
             The type of Fock matrices
+        :param eri_dict:
+            The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
         :param first_order_dens:
@@ -389,9 +395,10 @@ class NonlinearSolver:
             A list of Fock matrices
         """
 
-        f_total = self._comp_two_el_int(mo, molecule, ao_basis, dft_dict,
-                                        first_order_dens, second_order_dens,
-                                        third_oder_dens, mode, profiler)
+        f_total = self._comp_two_el_int(mo, molecule, ao_basis, eri_dict,
+                                        dft_dict, first_order_dens,
+                                        second_order_dens, third_oder_dens,
+                                        mode, profiler)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype='complex128')
@@ -409,6 +416,7 @@ class NonlinearSolver:
                          mo,
                          molecule,
                          ao_basis,
+                         eri_dict,
                          dft_dict,
                          first_order_dens,
                          second_order_dens,
@@ -425,6 +433,8 @@ class NonlinearSolver:
             The molecule
         :param ao_basis:
             The AO basis set
+        :param eri_dict:
+            The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
         :param first_order_dens:
@@ -449,13 +459,7 @@ class NonlinearSolver:
         fock_drv = FockDriver(self.comm)
         fock_drv._set_block_size_factor(self._block_size_factor)
 
-        # TODO: take screening from eri_dict
-        if self.rank == mpi_master():
-            screening = T4CScreener()
-            screening.partition(ao_basis, molecule, 'eri')
-        else:
-            screening = None
-        screening = self.comm.bcast(screening, root=mpi_master())
+        screening = eri_dict['screening']
 
         # sanity check
 
