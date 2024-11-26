@@ -181,6 +181,7 @@ class LinearSolver:
 
         self._debug = False
         self._block_size_factor = 8
+        self._xcfun_ldstaging = 1024
 
         # input keywords
         self._input_keywords = {
@@ -204,6 +205,7 @@ class LinearSolver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
+                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -391,7 +393,7 @@ class LinearSolver:
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
+            molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.

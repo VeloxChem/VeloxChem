@@ -126,6 +126,8 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
         assert_msg_critical(not obj.xcfun.is_undefined(),
                             f'{type(obj).__name__}: Undefined XC functional')
         obj._dft = True
+        # update leading dimension (max batch size for DFT grid)
+        obj.xcfun._set_leading_dimension(obj._xcfun_ldstaging)
 
     # check grid level
     if obj._dft and obj.grid_level is not None:

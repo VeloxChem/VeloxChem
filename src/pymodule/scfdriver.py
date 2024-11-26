@@ -234,6 +234,7 @@ class ScfDriver:
 
         self._debug = False
         self._block_size_factor = 8
+        self._xcfun_ldstaging = 1024
 
         # input keywords
         self._input_keywords = {
@@ -255,6 +256,7 @@ class ScfDriver:
                     ('str', 'unpaired electrons for initila guess'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
+                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
@@ -526,7 +528,7 @@ class ScfDriver:
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
-            self._mol_grid = grid_drv.generate(molecule)
+            self._mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = self._mol_grid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
