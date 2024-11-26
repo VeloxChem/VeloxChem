@@ -581,7 +581,6 @@ class ScfGradientDriver(GradientDriver):
                 self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
                 self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
 
-        # TODO: unrestricted DFT gradient
         # XC contribution to gradient
 
         if use_dft:

@@ -216,8 +216,6 @@ class GradientDriver:
             The energy.
         """
 
-        # TODO: remove compute_energy and use grad_drv.get_energy()
-
         return
 
     def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density,

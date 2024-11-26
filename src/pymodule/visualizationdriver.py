@@ -183,7 +183,10 @@ class VisualizationDriver:
 
     def compute(self, cubic_grid, *args):
         """
-        TODO
+        Computes values on cubic grid.
+
+        :param cubic_grid:
+            The cubic grid.
         """
 
         local_cubic_grid = self._vis_drv._create_local_cubic_grid(
