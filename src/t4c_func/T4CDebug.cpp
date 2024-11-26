@@ -34,7 +34,7 @@ dump_buffer(const CSimdArray<double>&        buffer,
 
     const auto d_indices = ket_gto_pair_block.ket_orbital_indices();
     
-    std::cout << " * Angular Momentum: " << bramom.first << "," << bramom.second << "," << ketmom.first << "," << ketmom.second << std::endl; 
+    //std::cout << " * Angular Momentum: " << bramom.first << "," << bramom.second << "," << ketmom.first << "," << ketmom.second << std::endl;
     
     for (int i = 0; i < acomps; i++)
     {
