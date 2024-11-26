@@ -1166,4 +1166,160 @@ local_distribute_geom_ket_symm(CMatrices&                       focks,
     }
 }
 
+auto
+local_distribute_geom_ket_no_symm(CMatrices&                       focks,
+                                  const std::string&               suffix,
+                                  const CMatrix*                   density,
+                                  const std::string&               label,
+                                  const double                     exchange_factor,
+                                  const CSimdArray<double>&        buffer,
+                                  const size_t                     offset,
+                                  const std::vector<size_t>&       a_indices,
+                                  const std::vector<size_t>&       b_indices,
+                                  const std::vector<size_t>&       c_indices,
+                                  const std::vector<size_t>&       d_indices,
+                                  const std::vector<size_t>&       a_loc_indices,
+                                  const std::vector<size_t>&       b_loc_indices,
+                                  const std::vector<size_t>&       c_loc_indices,
+                                  const std::vector<size_t>&       d_loc_indices,
+                                  const int                        a_angmom,
+                                  const int                        b_angmom,
+                                  const int                        c_angmom,
+                                  const int                        d_angmom,
+                                  const size_t                     bra_igto,
+                                  const std::pair<size_t, size_t>& ket_range) -> void
+{
+    if (label == "2jk")
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_jk_geom_ket_no_symm_den_symm(focks,
+                                                                   suffix,
+                                                                   density,
+                                                                   buffer,
+                                                                   offset,
+                                                                   a_indices,
+                                                                   b_indices,
+                                                                   c_indices,
+                                                                   d_indices,
+                                                                   a_loc_indices,
+                                                                   b_loc_indices,
+                                                                   c_loc_indices,
+                                                                   d_loc_indices,
+                                                                   a_angmom,
+                                                                   b_angmom,
+                                                                   c_angmom,
+                                                                   d_angmom,
+                                                                   bra_igto,
+                                                                   ket_range);
+        }
+    }
+
+    if (label == "2jkx")
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_jkx_geom_ket_no_symm_den_symm(focks,
+                                                                    suffix,
+                                                                    density,
+                                                                    buffer,
+                                                                    offset,
+                                                                    exchange_factor,
+                                                                    a_indices,
+                                                                    b_indices,
+                                                                    c_indices,
+                                                                    d_indices,
+                                                                    a_loc_indices,
+                                                                    b_loc_indices,
+                                                                    c_loc_indices,
+                                                                    d_loc_indices,
+                                                                    a_angmom,
+                                                                    b_angmom,
+                                                                    c_angmom,
+                                                                    d_angmom,
+                                                                    bra_igto,
+                                                                    ket_range);
+        }
+    }
+
+    if ((label == "j") || (label == "j_rs"))
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_j_geom_ket_no_symm_den_symm(focks,
+                                                                  suffix,
+                                                                  density,
+                                                                  buffer,
+                                                                  offset,
+                                                                  a_indices,
+                                                                  b_indices,
+                                                                  c_indices,
+                                                                  d_indices,
+                                                                  a_loc_indices,
+                                                                  b_loc_indices,
+                                                                  c_loc_indices,
+                                                                  d_loc_indices,
+                                                                  a_angmom,
+                                                                  b_angmom,
+                                                                  c_angmom,
+                                                                  d_angmom,
+                                                                  bra_igto,
+                                                                  ket_range);
+        }
+    }
+
+    if ((label == "k") || (label == "k_rs"))
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_k_geom_ket_no_symm_den_symm(focks,
+                                                                  suffix,
+                                                                  density,
+                                                                  buffer,
+                                                                  offset,
+                                                                  a_indices,
+                                                                  b_indices,
+                                                                  c_indices,
+                                                                  d_indices,
+                                                                  a_loc_indices,
+                                                                  b_loc_indices,
+                                                                  c_loc_indices,
+                                                                  d_loc_indices,
+                                                                  a_angmom,
+                                                                  b_angmom,
+                                                                  c_angmom,
+                                                                  d_angmom,
+                                                                  bra_igto,
+                                                                  ket_range);
+        }
+    }
+
+    if ((label == "kx") || (label == "kx_rs"))
+    {
+        if (density->get_type() == mat_t::symmetric)
+        {
+            t4cfunc::local_distribute_kx_geom_ket_no_symm_den_symm(focks,
+                                                                   suffix,
+                                                                   density,
+                                                                   buffer,
+                                                                   offset,
+                                                                   exchange_factor,
+                                                                   a_indices,
+                                                                   b_indices,
+                                                                   c_indices,
+                                                                   d_indices,
+                                                                   a_loc_indices,
+                                                                   b_loc_indices,
+                                                                   c_loc_indices,
+                                                                   d_loc_indices,
+                                                                   a_angmom,
+                                                                   b_angmom,
+                                                                   c_angmom,
+                                                                   d_angmom,
+                                                                   bra_igto,
+                                                                   ket_range);
+        }
+    }
+}
+
 }  // namespace t4cfunc
