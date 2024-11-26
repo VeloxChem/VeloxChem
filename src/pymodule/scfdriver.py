@@ -106,8 +106,6 @@ class ScfDriver:
         - V_es: The polarizable embedding matrix.
         - pe_options: The dictionary with options for polarizable embedding.
         - pe_summary: The summary string for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - split_comm_ratio: The list of ratios for split communicators.
         - dispersion: The flag for calculating D4 dispersion correction.
         - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
@@ -202,10 +200,6 @@ class ScfDriver:
         self.embedding_options = None
         self._embedding_drv = None
 
-        # split communicators
-        self.use_split_comm = False
-        self._split_comm_ratio = None
-
         # static electric field
         self.electric_field = None
         self._ef_nuc_energy = 0.0
@@ -264,7 +258,6 @@ class ScfDriver:
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
-                # 'use_split_comm': ('bool', 'use split communicators'),
             },
         }
 
@@ -1112,33 +1105,17 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
-        if self.use_split_comm:
-            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
-
-        if self.use_split_comm and not self._first_step:
-            screener = None
-            if not self._first_step:
-                valstr = 'ERI'
-                if self._dft:
-                    valstr += '/DFT'
-                if self._pe:
-                    valstr += '/PE'
-                self.ostream.print_info(
-                    'Using sub-communicators for {}.'.format(valstr))
+        self._print_debug_info('before screener')
+        if self.rank == mpi_master():
+            screener = T4CScreener()
+            screener.partition(ao_basis, molecule, 'eri')
         else:
-            self._print_debug_info('before screener')
-            if self.rank == mpi_master():
-                screener = T4CScreener()
-                screener.partition(ao_basis, molecule, 'eri')
-            else:
-                screener = None
-            self._print_debug_info('after  screener')
-            screener = self.comm.bcast(screener, root=mpi_master())
-            self._print_debug_info('after  bcast screener')
+            screener = None
+        self._print_debug_info('after  screener')
+        screener = self.comm.bcast(screener, root=mpi_master())
+        self._print_debug_info('after  bcast screener')
 
         profiler.check_memory_usage('Initial guess')
-
-        self._split_comm_ratio = None
 
         e_grad = None
 
@@ -1555,13 +1532,8 @@ class ScfDriver:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
-        if self.use_split_comm and not self._first_step:
-            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_split_comm(
-                den_mat, molecule, basis, screener, e_grad, profiler)
-
-        else:
-            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
-                den_mat, molecule, basis, screener, e_grad, profiler)
+        fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
+            den_mat, molecule, basis, screener, e_grad, profiler)
 
         return fock_mat, vxc_mat, e_emb, V_emb
 
@@ -1814,41 +1786,6 @@ class ScfDriver:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
         return fock_mat, vxc_mat, e_emb, V_emb
-
-    def _comp_2e_fock_split_comm(self,
-                                 fock_mat,
-                                 den_mat,
-                                 molecule,
-                                 basis,
-                                 screening,
-                                 e_grad=None,
-                                 profiler=None):
-        """
-        Computes Fock/Kohn-Sham matrix on split communicators.
-
-        :param fock_mat:
-            The AO Fock matrix (only 2e-part).
-        :param den_mat:
-            The AO density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param screening:
-            The screening container object.
-        :param e_grad:
-            The electronic gradient.
-        :param profiler:
-            The profiler.
-
-        :return:
-            The AO Kohn-Sham (Vxc) matrix.
-        """
-
-        assert_msg_critical(
-            False, 'SCF driver: SCF with split communicator not implemented')
-
-        return None
 
     def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat,
                      den_mat):

@@ -70,8 +70,6 @@ class LinearSolver:
         - xcfun: The XC functional.
         - pe: The flag for running polarizable embedding calculation.
         - pe_options: The dictionary with options for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - split_comm_ratio: The list of ratios for split communicators.
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
@@ -123,10 +121,6 @@ class LinearSolver:
         self._pe = False
         self.embedding_options = None
         self._embedding_drv = None
-
-        # split communicators
-        self.use_split_comm = False
-        self._split_comm_ratio = None
 
         # static electric field
         self.electric_field = None
@@ -214,7 +208,6 @@ class LinearSolver:
                 'embedding_options':
                     ('dict', 'dictionary to set the embedding options'),
                 'electric_field': ('seq_fixed', 'static electric field'),
-                # 'use_split_comm': ('bool', 'use split communicators'),
             },
         }
 
@@ -343,29 +336,15 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        if self.use_split_comm:
-            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
-
-        if self.use_split_comm:
-            screening = None
-            valstr = 'ERI'
-            if self._dft:
-                valstr += '/DFT'
-            if self._pe:
-                valstr += '/PE'
-            self.ostream.print_info(
-                'Using sub-communicators for {}.'.format(valstr))
-            self.ostream.print_blank()
+        self._print_mem_debug_info('before screener')
+        if self.rank == mpi_master():
+            screening = T4CScreener()
+            screening.partition(basis, molecule, 'eri')
         else:
-            self._print_mem_debug_info('before screener')
-            if self.rank == mpi_master():
-                screening = T4CScreener()
-                screening.partition(basis, molecule, 'eri')
-            else:
-                screening = None
-            self._print_mem_debug_info('after  screener')
-            screening = self.comm.bcast(screening, root=mpi_master())
-            self._print_mem_debug_info('after  bcast screener')
+            screening = None
+        self._print_mem_debug_info('after  screener')
+        screening = self.comm.bcast(screening, root=mpi_master())
+        self._print_mem_debug_info('after  bcast screener')
 
         return {
             'screening': screening,
@@ -1004,8 +983,6 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
 
-        # TODO: look into split communicator
-
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = self.comm.reduce(fock_arrays[idx],
                                                 root=mpi_master())
@@ -1014,41 +991,6 @@ class LinearSolver:
             return fock_arrays
         else:
             return None
-
-    def _comp_lr_fock_split_comm(self,
-                                 fock,
-                                 dens,
-                                 molecule,
-                                 basis,
-                                 eri_dict,
-                                 dft_dict,
-                                 pe_dict,
-                                 profiler=None):
-        """
-        Computes linear response Fock/Fxc matrix on split communicators.
-
-        :param fock:
-            The Fock matrix (2e part).
-        :param dens:
-            The density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param eri_dict:
-            The dictionary containing ERI information.
-        :param dft_dict:
-            The dictionary containing DFT information.
-        :param pe_dict:
-            The dictionary containing PE information.
-        :param profiler:
-            The profiler.
-        """
-
-        assert_msg_critical(
-            False,
-            'LinearSolver: Linear response with split communicator not implemented'
-        )
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
