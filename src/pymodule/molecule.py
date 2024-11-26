@@ -285,12 +285,22 @@ def _Molecule_read_molecule_string(mol_str, units='angstrom'):
     for line in mol_str.strip().splitlines():
         if line:
             content = line.split()
-            labels.append(content[0].upper())
+
+            elem_name = content[0].upper()
+            basis_elem_name = elem_name
+
+            if elem_name.startswith('BQ_'):
+                elem_name, basis_elem_name = elem_name.split('_')
+            elif elem_name.endswith('_BQ'):
+                basis_elem_name, elem_name = elem_name.split('_')
+
+            labels.append(elem_name)
             coords.append([float(x) for x in content[1:4]])
+
             if len(content) > 4:
-                basis_set_labels.append(content[4].upper())
+                basis_set_labels.append([content[4].upper(), basis_elem_name])
             else:
-                basis_set_labels.append('')
+                basis_set_labels.append(['', basis_elem_name])
 
     coords = np.array(coords)
 
