@@ -135,6 +135,7 @@ class NonlinearSolver:
 
         self._debug = False
         self._block_size_factor = 8
+        self._xcfun_ldstaging = 1024
 
         # input keywords
         self._input_keywords = {
@@ -154,6 +155,7 @@ class NonlinearSolver:
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
+                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -310,7 +312,7 @@ class NonlinearSolver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
-            molgrid = grid_drv.generate(molecule)
+            molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple

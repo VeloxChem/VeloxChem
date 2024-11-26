@@ -557,7 +557,7 @@ class ScfDriver:
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
-            self._mol_grid = grid_drv.generate(molecule)
+            self._mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = self._mol_grid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
