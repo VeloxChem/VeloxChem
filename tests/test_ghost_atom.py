@@ -50,34 +50,22 @@ class TestGhostAtom:
         ch4_bq_str = ch4_str.replace('C', 'C_Bq').replace('H', 'H_Bq')
 
         ref_energies = {
-            'monomer_1': -56.14844212,
-            'monomer_2': -40.16809185,
-            'm1_in_dimer': -56.14873979,
-            'm2_in_dimer': -40.16810402,
-            'dimer': -96.31683373,
+            'nh3_in_dimer': -56.1487397917,
+            'ch4_in_dimer': -40.1681040195,
         }
 
         molstr_units = 'bohr'
         basis_label = 'def2-svp'
-        tol = 1.0e-7
+        tol = 1.0e-8
 
-        e_monomer_1 = self.run_scf(nh3_str, molstr_units, basis_label)
-        e_monomer_2 = self.run_scf(ch4_str, molstr_units, basis_label)
-
-        e_m1_in_dimer = self.run_scf(nh3_str + '\n' + ch4_bq_str, molstr_units,
-                                     basis_label)
-        e_m2_in_dimer = self.run_scf(nh3_bq_str + '\n' + ch4_str, molstr_units,
-                                     basis_label)
-
-        e_dimer = self.run_scf(nh3_str + '\n' + ch4_str, molstr_units,
-                               basis_label)
+        e_nh3_in_dimer = self.run_scf(nh3_str + '\n' + ch4_bq_str, molstr_units,
+                                      basis_label)
+        e_ch4_in_dimer = self.run_scf(nh3_bq_str + '\n' + ch4_str, molstr_units,
+                                      basis_label)
 
         calc_energies = {
-            'monomer_1': e_monomer_1,
-            'monomer_2': e_monomer_2,
-            'm1_in_dimer': e_m1_in_dimer,
-            'm2_in_dimer': e_m2_in_dimer,
-            'dimer': e_dimer,
+            'nh3_in_dimer': e_nh3_in_dimer,
+            'ch4_in_dimer': e_ch4_in_dimer,
         }
 
         for key in calc_energies:
@@ -107,34 +95,22 @@ class TestGhostAtom:
         ch4_bq_str = ch4_str.replace('C', 'C_Bq').replace('H', 'H_Bq')
 
         ref_energies = {
-            'monomer_1': -56.12920930,
-            'monomer_2': -40.14769857,
-            'm1_in_dimer': -56.12930872,
-            'm2_in_dimer': -40.14773564,
-            'dimer': -96.27701050,
+            'nh3_in_dimer': -56.1293087216,
+            'ch4_in_dimer': -40.1477356376,
         }
 
         molstr_units = 'bohr'
         basis_label = 'sto-3g'
-        tol = 1.0e-7
+        tol = 1.0e-8
 
-        e_monomer_1 = self.run_scf(nh3_str, molstr_units, basis_label)
-        e_monomer_2 = self.run_scf(ch4_str, molstr_units, basis_label)
-
-        e_m1_in_dimer = self.run_scf(nh3_str + '\n' + ch4_bq_str, molstr_units,
-                                     basis_label)
-        e_m2_in_dimer = self.run_scf(nh3_bq_str + '\n' + ch4_str, molstr_units,
-                                     basis_label)
-
-        e_dimer = self.run_scf(nh3_str + '\n' + ch4_str, molstr_units,
-                               basis_label)
+        e_nh3_in_dimer = self.run_scf(nh3_str + '\n' + ch4_bq_str, molstr_units,
+                                      basis_label)
+        e_ch4_in_dimer = self.run_scf(nh3_bq_str + '\n' + ch4_str, molstr_units,
+                                      basis_label)
 
         calc_energies = {
-            'monomer_1': e_monomer_1,
-            'monomer_2': e_monomer_2,
-            'm1_in_dimer': e_m1_in_dimer,
-            'm2_in_dimer': e_m2_in_dimer,
-            'dimer': e_dimer,
+            'nh3_in_dimer': e_nh3_in_dimer,
+            'ch4_in_dimer': e_ch4_in_dimer,
         }
 
         for key in calc_energies:
