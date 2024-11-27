@@ -202,7 +202,7 @@ class ScfDriver:
 
         # point charges (in case we want a simple MM environment without PE)
         self._point_charges = None
-        self._nuc_mm_energy = None
+        self._nuc_mm_energy = 0.0
         self._V_es = None
 
         # static electric field
@@ -592,7 +592,7 @@ class ScfDriver:
             self.ostream.print_blank()
 
         # set up point charges without PE
-        if self._point_charges is not None:
+        elif self._point_charges is not None:
             pot_info = 'Reading point charges: {}'.format(self._point_charges)
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
@@ -625,9 +625,9 @@ class ScfDriver:
             self._point_charges = self.comm.bcast(self._point_charges,
                                                   root=mpi_master())
 
-        # nuclei - point charges interaction
-        self._nuc_mm_energy = 0.0
-        if self._point_charges is not None:
+            # nuclei - point charges interaction
+            self._nuc_mm_energy = 0.0
+
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
@@ -1868,10 +1868,7 @@ class ScfDriver:
                 'ScfDriver: Inconsistent embedding driver for SCF')
             e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
                 density_matrix=density_matrix)
-        else:
-            e_emb, V_emb = 0.0, None
-
-        if self._point_charges is not None and not self._first_step:
+        elif self._point_charges is not None and not self._first_step:
             if self.scf_type == 'restricted':
                 density_matrix = 2.0 * den_mat[0]
             else:
@@ -1928,12 +1925,15 @@ class ScfDriver:
                 e_ee = 0.5 * (np.sum(D[0] * F[0]) + np.sum(D[1] * F[1]))
                 e_kin = np.sum((D[0] + D[1]) * T)
                 e_en = np.sum((D[0] + D[1]) * V)
+
             if self._dft and not self._first_step:
                 e_ee += xc_ene
+
             if self._pe and not self._first_step:
                 e_ee += e_emb
-            if self._point_charges is not None and not self._first_step:
+            elif self._point_charges is not None and not self._first_step:
                 e_ee += e_emb
+
             e_sum = e_ee + e_kin + e_en
         else:
             e_sum = 0.0
@@ -1983,8 +1983,7 @@ class ScfDriver:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
-
-            if self._point_charges is not None and not self._first_step:
+            elif self._point_charges is not None and not self._first_step:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
