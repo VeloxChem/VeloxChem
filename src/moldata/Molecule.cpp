@@ -61,7 +61,9 @@ CMolecule::CMolecule(const std::vector<int> &identifiers, const std::vector<TPoi
 {
     for (std::vector<int>::size_type i = 0; i < _identifiers.size(); i++)
     {
-        _atom_basis_labels.push_back(std::make_pair(std::string(""), std::string("")));
+        const auto label = chem_elem::label(_identifiers[i]);
+
+        _atom_basis_labels.push_back(std::make_pair(std::string(""), format::upper_case(label)));
     }
 
     if (_is_angstrom(unit))
@@ -208,7 +210,9 @@ CMolecule::operator==(const CMolecule &other) const -> bool
 auto
 CMolecule::add_atom(const int identifier, const TPoint<double>& coordinates, const std::string& unit) -> void
 {
-    add_atom(identifier, coordinates, unit, std::make_pair(std::string(""), std::string("")));
+    const auto label = chem_elem::label(identifier);
+
+    add_atom(identifier, coordinates, unit, std::make_pair(std::string(""), format::upper_case(label)));
 }
 
 auto
