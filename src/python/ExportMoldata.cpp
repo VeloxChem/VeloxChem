@@ -121,7 +121,12 @@ CMolecule_from_labels_and_array_2(const std::vector<std::string>& labels,
 {
     const auto natoms = static_cast<int>(labels.size());
 
-    std::vector<std::pair<std::string, std::string>> atom_basis_labels(natoms, std::make_pair(std::string(""), std::string("")));
+    std::vector<std::pair<std::string, std::string>> atom_basis_labels;
+
+    for (int a = 0; a < natoms; a++)
+    {
+        atom_basis_labels.push_back(std::make_pair(std::string(""), format::upper_case(labels[a])));
+    }
 
     return CMolecule_from_labels_and_array(labels, py_coords, units, atom_basis_labels);
 }
@@ -149,7 +154,12 @@ CMolecule_from_elemids_and_array_2(const std::vector<int>& elem_ids, const py::a
 {
     const auto natoms = static_cast<int>(elem_ids.size());
 
-    std::vector<std::pair<std::string, std::string>> atom_basis_labels(natoms, std::make_pair(std::string(""), std::string("")));
+    std::vector<std::pair<std::string, std::string>> atom_basis_labels;
+
+    for (int a = 0; a < natoms; a++)
+    {
+        atom_basis_labels.push_back(std::make_pair(std::string(""), chem_elem::label(elem_ids[a])));
+    }
 
     return CMolecule_from_elemids_and_array(elem_ids, py_coords, units, atom_basis_labels);
 }

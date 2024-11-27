@@ -91,6 +91,8 @@ class TestNumericalGradient:
 
             labels = mol.get_labels()
             coords = mol.get_coordinates_in_bohr()
+            atom_basis_labels = mol.get_atom_basis_labels()
+
             charge = mol.get_charge()
             multiplicity = mol.get_multiplicity()
 
@@ -101,7 +103,7 @@ class TestNumericalGradient:
             for i in range(mol.number_of_atoms()):
                 for d in range(3):
                     coords[i, d] += delta_h
-                    new_mol = Molecule(labels, coords, 'au')
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
 
@@ -118,7 +120,7 @@ class TestNumericalGradient:
                     f_plus = scf_drv.comm.reduce(f_plus, root=mpi_master())
 
                     coords[i, d] -= 2.0 * delta_h
-                    new_mol = Molecule(labels, coords, 'au')
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
 

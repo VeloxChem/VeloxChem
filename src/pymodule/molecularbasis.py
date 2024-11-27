@@ -343,17 +343,21 @@ def _MolecularBasis_read_dict(molecule,
 
     mol_basis = MolecularBasis()
 
+    atom_basis_elements = []
+    for bas_label, bas_elem in molecule.get_atom_basis_labels():
+        atom_basis_elements.append(bas_elem)
+
     for index, elem_id in enumerate(molecule.get_identifiers()):
         idxstr = str(index + 1)
         if idxstr in basis_dict:
             lbasis_name = basis_dict[idxstr]
             lbasis_dict = _read_basis_file(lbasis_name, basis_path, ostream)
-            basis_key = _gen_basis_key(elem_id, lbasis_dict)
+            basis_key = _gen_basis_key(atom_basis_elements[index], lbasis_dict)
             atom_basis = _read_atom_basis(lbasis_dict[basis_key], elem_id,
                                           lbasis_name)
             mol_basis.add(atom_basis)
         else:
-            basis_key = _gen_basis_key(elem_id, mbasis_dict)
+            basis_key = _gen_basis_key(atom_basis_elements[index], mbasis_dict)
             atom_basis = _read_atom_basis(mbasis_dict[basis_key], elem_id,
                                           basis_name)
             mol_basis.add(atom_basis)
