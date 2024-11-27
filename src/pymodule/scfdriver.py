@@ -38,6 +38,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import mpi_master
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import xcfun
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
@@ -103,7 +104,6 @@ class ScfDriver:
         - xcfun: The XC functional.
         - molgrid: The molecular grid.
         - pe: The flag for running polarizable embedding calculation.
-        - V_es: The polarizable embedding matrix.
         - pe_options: The dictionary with options for polarizable embedding.
         - pe_summary: The summary string for polarizable embedding.
         - dispersion: The flag for calculating D4 dispersion correction.
@@ -200,6 +200,11 @@ class ScfDriver:
         self.embedding_options = None
         self._embedding_drv = None
 
+        # point charges (in case we want a simple MM environment without PE)
+        self._point_charges = None
+        self._nuc_mm_energy = None
+        self._V_es = None
+
         # static electric field
         self.electric_field = None
         self._ef_nuc_energy = 0.0
@@ -248,6 +253,7 @@ class ScfDriver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initila guess'),
+                '_point_charges': ('str', 'potential file for point charges'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
@@ -437,6 +443,16 @@ class ScfDriver:
             # field
             self.restart = False
 
+        if self._point_charges is not None:
+            assert_msg_critical(
+                not self._pe,
+                'SCF driver: The \'_point_charges\' option is incompatible ' +
+                'with polarizable embedding')
+            # disable restart of calculation with point charges since
+            # checkpoint file does not contain information about the point
+            # charges
+            self.restart = False
+
     def compute(self, molecule, ao_basis, min_basis=None):
         """
         Performs SCF calculation using molecular data.
@@ -539,7 +555,6 @@ class ScfDriver:
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
-        if self.embedding_options is not None:
             assert_msg_critical(
                 self.embedding_options['settings']['embedding_method'] == 'PE',
                 'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
@@ -575,6 +590,56 @@ class ScfDriver:
                         f'  - {key:<15s} : {settings["induced_dipoles"][key]}')
 
             self.ostream.print_blank()
+
+        # set up point charges without PE
+        if self._point_charges is not None:
+            pot_info = 'Reading point charges: {}'.format(self._point_charges)
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
+            potfile = self._point_charges
+
+            if self.rank == mpi_master():
+                with Path(potfile).open('r') as fh:
+                    lines = fh.read().strip().splitlines()
+                    try:
+                        npoints = int(lines[0].strip())
+                    except (ValueError, TypeError):
+                        assert_msg_critical(
+                            False, 'potfile: Invalid number of points')
+                    assert_msg_critical(
+                        npoints == len(lines[2:]),
+                        'potfile: Inconsistent number of points')
+                    self._point_charges = np.zeros((4, npoints))
+                    for idx, line in enumerate(lines[2:]):
+                        label, x, y, z, q = line.split()
+                        self._point_charges[0, idx] = (float(x) /
+                                                       bohr_in_angstrom())
+                        self._point_charges[1, idx] = (float(y) /
+                                                       bohr_in_angstrom())
+                        self._point_charges[2, idx] = (float(z) /
+                                                       bohr_in_angstrom())
+                        self._point_charges[3, idx] = float(q)
+            else:
+                self._point_charges = None
+            self._point_charges = self.comm.bcast(self._point_charges,
+                                                  root=mpi_master())
+
+        # nuclei - point charges interaction
+        self._nuc_mm_energy = 0.0
+        if self._point_charges is not None:
+            natoms = molecule.number_of_atoms()
+            coords = molecule.get_coordinates_in_bohr()
+            nuclear_charges = molecule.get_element_ids()
+            npoints = self._point_charges.shape[1]
+            for a in range(natoms):
+                xyz_a = coords[a]
+                chg_a = nuclear_charges[a]
+                for p in range(npoints):
+                    xyz_p = self._point_charges[:3, p]
+                    chg_p = self._point_charges[3, p]
+                    r_ap = np.linalg.norm(xyz_a - xyz_p)
+                    self._nuc_mm_energy += chg_a * chg_p / r_ap
 
         # C2-DIIS method
         if self.acc_type.upper() == 'DIIS':
@@ -1057,6 +1122,30 @@ class ScfDriver:
         if self.rank == mpi_master() and self.electric_field is not None:
             dipole_ints = dipole_mats
 
+        if self._point_charges is not None and not self._first_step:
+            t0_point_charges = tm.time()
+
+            ave, res = divmod(self._point_charges.shape[1], self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+
+            charges = self._point_charges[3, :].copy()[start:end]
+            coords = self._point_charges[:3, :].T.copy()[start:end, :]
+
+            V_es = compute_nuclear_potential_integrals(molecule, ao_basis,
+                                                       charges, coords)
+
+            self._V_es = self.comm.reduce(V_es, root=mpi_master())
+            if self.rank != mpi_master():
+                self._V_es = np.zeros(V_es.shape)
+
+            self.ostream.print_info(
+                'Point charges one-electron integral computed in' +
+                ' {:.2f} sec.'.format(tm.time() - t0_point_charges))
+            self.ostream.print_blank()
+
         linear_dependency = False
 
         if self.rank == mpi_master():
@@ -1175,8 +1264,8 @@ class ScfDriver:
 
             diff_den = self._comp_density_change(den_mat, self._density)
 
-            e_scf = (e_el + self._nuc_energy + self._d4_energy +
-                     self._ef_nuc_energy)
+            e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
+                     self._d4_energy + self._ef_nuc_energy)
 
             diff_e_scf = e_scf - self.scf_energy
 
@@ -1782,6 +1871,16 @@ class ScfDriver:
         else:
             e_emb, V_emb = 0.0, None
 
+        if self._point_charges is not None and not self._first_step:
+            if self.scf_type == 'restricted':
+                density_matrix = 2.0 * den_mat[0]
+            else:
+                density_matrix = den_mat[0] + den_mat[1]
+            e_emb = np.sum(density_matrix * self._V_es)
+            V_emb = self._V_es
+        else:
+            e_emb, V_emb = 0.0, None
+
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
@@ -1833,6 +1932,8 @@ class ScfDriver:
                 e_ee += xc_ene
             if self._pe and not self._first_step:
                 e_ee += e_emb
+            if self._point_charges is not None and not self._first_step:
+                e_ee += e_emb
             e_sum = e_ee + e_kin + e_en
         else:
             e_sum = 0.0
@@ -1879,6 +1980,11 @@ class ScfDriver:
                     fock_mat[1] += np_xcmat_b
 
             if self._pe and not self._first_step:
+                fock_mat[0] += V_emb
+                if self.scf_type != 'restricted':
+                    fock_mat[1] += V_emb
+
+            if self._point_charges is not None and not self._first_step:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
@@ -2469,13 +2575,17 @@ class ScfDriver:
 
         enuc = self._nuc_energy
 
+        # TODO: extract nuclei-MM energy also for polarizable embedding
+
+        enuc_mm = self._nuc_mm_energy
+
         e_d4 = self._d4_energy
 
         e_ef_nuc = self._ef_nuc_energy
 
         etot = self._iter_data['energy']
 
-        e_el = etot - enuc - e_d4 - e_ef_nuc
+        e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -2485,6 +2595,10 @@ class ScfDriver:
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
+
+        if self._point_charges is not None:
+            valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
 
         if self.dispersion:
             valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} a.u.'
