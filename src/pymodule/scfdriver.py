@@ -593,37 +593,39 @@ class ScfDriver:
 
         # set up point charges without PE
         elif self._point_charges is not None:
-            pot_info = 'Reading point charges: {}'.format(self._point_charges)
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
 
-            potfile = self._point_charges
+            if isinstance(self._point_charges, str):
+                potfile = self._point_charges
 
-            if self.rank == mpi_master():
-                with Path(potfile).open('r') as fh:
-                    lines = fh.read().strip().splitlines()
-                    try:
-                        npoints = int(lines[0].strip())
-                    except (ValueError, TypeError):
+                pot_info = 'Reading point charges: {}'.format(potfile)
+                self.ostream.print_info(pot_info)
+                self.ostream.print_blank()
+
+                if self.rank == mpi_master():
+                    with Path(potfile).open('r') as fh:
+                        lines = fh.read().strip().splitlines()
+                        try:
+                            npoints = int(lines[0].strip())
+                        except (ValueError, TypeError):
+                            assert_msg_critical(
+                                False, 'potfile: Invalid number of points')
                         assert_msg_critical(
-                            False, 'potfile: Invalid number of points')
-                    assert_msg_critical(
-                        npoints == len(lines[2:]),
-                        'potfile: Inconsistent number of points')
-                    self._point_charges = np.zeros((4, npoints))
-                    for idx, line in enumerate(lines[2:]):
-                        label, x, y, z, q = line.split()
-                        self._point_charges[0, idx] = (float(x) /
-                                                       bohr_in_angstrom())
-                        self._point_charges[1, idx] = (float(y) /
-                                                       bohr_in_angstrom())
-                        self._point_charges[2, idx] = (float(z) /
-                                                       bohr_in_angstrom())
-                        self._point_charges[3, idx] = float(q)
-            else:
-                self._point_charges = None
-            self._point_charges = self.comm.bcast(self._point_charges,
-                                                  root=mpi_master())
+                            npoints == len(lines[2:]),
+                            'potfile: Inconsistent number of points')
+                        self._point_charges = np.zeros((4, npoints))
+                        for idx, line in enumerate(lines[2:]):
+                            label, x, y, z, q = line.split()
+                            self._point_charges[0, idx] = (float(x) /
+                                                           bohr_in_angstrom())
+                            self._point_charges[1, idx] = (float(y) /
+                                                           bohr_in_angstrom())
+                            self._point_charges[2, idx] = (float(z) /
+                                                           bohr_in_angstrom())
+                            self._point_charges[3, idx] = float(q)
+                else:
+                    self._point_charges = None
+                self._point_charges = self.comm.bcast(self._point_charges,
+                                                      root=mpi_master())
 
             # nuclei - point charges interaction
             self._nuc_mm_energy = 0.0

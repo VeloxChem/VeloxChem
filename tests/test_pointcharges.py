@@ -1,9 +1,11 @@
 from pathlib import Path
+import numpy as np
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
 class TestPointCharges:
@@ -38,3 +40,15 @@ class TestPointCharges:
 
         if scf_drv.rank == mpi_master():
             assert abs(scf_results['scf_energy'] - (-75.9798409316)) < 1e-9
+
+        grad_drv = ScfGradientDriver(scf_drv)
+        grad_drv.compute(mol, bas, scf_results)
+        grad = grad_drv.get_gradient()
+
+        ref_grad = np.array([
+            [0.000750546761, 0.003575640378, -0.011559368772],
+            [-0.000285312950, -0.000437290211, 0.001172097782],
+            [0.010343001179, 0.003694676067, 0.009357019181],
+        ])
+
+        assert np.max(np.abs(grad - ref_grad)) < 1e-6

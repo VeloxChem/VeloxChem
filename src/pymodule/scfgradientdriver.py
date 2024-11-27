@@ -24,7 +24,6 @@
 
 from mpi4py import MPI
 from copy import deepcopy
-from os import environ
 import numpy as np
 import time
 import math
@@ -75,9 +74,6 @@ class ScfGradientDriver(GradientDriver):
         self._debug = scf_drv._debug
 
         self._block_size_factor = 4
-
-        self.numerical = False
-        self.delta_h = 0.001
 
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
@@ -136,6 +132,23 @@ class ScfGradientDriver(GradientDriver):
         return list_atoms[self.rank::self.nodes]
 
     def compute(self, molecule, basis, scf_results):
+        """
+        Performs calculation of gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary containing converged SCF results.
+        """
+
+        if self.numerical:
+            self.compute_numerical_gradient(molecule, basis, scf_results)
+        else:
+            self.compute_analytical_gradient(molecule, basis, scf_results)
+
+    def compute_analytical_gradient(self, molecule, basis, scf_results):
         """
         Performs calculation of gradient.
 
@@ -249,6 +262,31 @@ class ScfGradientDriver(GradientDriver):
             gmats_010 = Matrices()
 
         self._print_debug_info('after  npot_grad')
+
+        # point charges contribution
+        if self.scf_driver._point_charges is not None:
+            npoints = self.scf_driver._point_charges.shape[1]
+
+            mm_coords = []
+            mm_charges = []
+            for p in range(npoints):
+                xyz_p = self.scf_driver._point_charges[:3, p]
+                chg_p = self.scf_driver._point_charges[3, p]
+                mm_coords.append(xyz_p.copy())
+                mm_charges.append(chg_p)
+
+            for iatom in local_atoms:
+                gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                                      mm_coords, mm_charges)
+
+                for i, label in enumerate(['X', 'Y', 'Z']):
+                    gmat_100 = gmats_100.matrix_to_numpy(label)
+
+                    # TODO: move minus sign into function call (such as in oneints)
+                    self.gradient[iatom, i] -= 2.0 * np.sum(
+                        (gmat_100 + gmat_100.T) * D)
+
+                gmats_100 = Matrices()
 
         # orbital contribution to gradient
 
@@ -387,6 +425,23 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
+            if self.scf_driver._point_charges is not None:
+                natm = molecule.number_of_atoms()
+                nuc_mm_contrib = np.zeros((natm, 3))
+                coords = molecule.get_coordinates_in_bohr()
+                nuclear_charges = molecule.get_element_ids()
+                npoints = self.scf_driver._point_charges.shape[1]
+                for i in range(natm):
+                    z_a = nuclear_charges[i]
+                    r_a = coords[i]
+                    for p in range(npoints):
+                        r_p = self.scf_driver._point_charges[:3, p]
+                        q_p = self.scf_driver._point_charges[3, p]
+                        r = np.linalg.norm(r_a - r_p)
+                        f_ij = z_a * q_p * (r_p - r_a) / r**3
+                        nuc_mm_contrib[i] += f_ij
+                self.gradient += nuc_mm_contrib
+
             if self.dispersion:
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
@@ -479,6 +534,31 @@ class ScfGradientDriver(GradientDriver):
 
             gmats_100 = Matrices()
             gmats_010 = Matrices()
+
+        # point charges contribution
+        if self.scf_driver._point_charges is not None:
+            npoints = self.scf_driver._point_charges.shape[1]
+
+            mm_coords = []
+            mm_charges = []
+            for p in range(npoints):
+                xyz_p = self.scf_driver._point_charges[:3, p]
+                chg_p = self.scf_driver._point_charges[3, p]
+                mm_coords.append(xyz_p.copy())
+                mm_charges.append(chg_p)
+
+            for iatom in local_atoms:
+                gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                                      mm_coords, mm_charges)
+
+                for i, label in enumerate(['X', 'Y', 'Z']):
+                    gmat_100 = gmats_100.matrix_to_numpy(label)
+
+                    # TODO: move minus sign into function call (such as in oneints)
+                    self.gradient[iatom, i] -= np.sum(
+                        (gmat_100 + gmat_100.T) * (Da + Db))
+
+                gmats_100 = Matrices()
 
         # orbital contribution to gradient
 
@@ -615,6 +695,23 @@ class ScfGradientDriver(GradientDriver):
 
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
+
+            if self.scf_driver._point_charges is not None:
+                natm = molecule.number_of_atoms()
+                nuc_mm_contrib = np.zeros((natm, 3))
+                coords = molecule.get_coordinates_in_bohr()
+                nuclear_charges = molecule.get_element_ids()
+                npoints = self.scf_driver._point_charges.shape[1]
+                for i in range(natm):
+                    z_a = nuclear_charges[i]
+                    r_a = coords[i]
+                    for p in range(npoints):
+                        r_p = self.scf_driver._point_charges[:3, p]
+                        q_p = self.scf_driver._point_charges[3, p]
+                        r = np.linalg.norm(r_a - r_p)
+                        f_ij = z_a * q_p * (r_p - r_a) / r**3
+                        nuc_mm_contrib[i] += f_ij
+                self.gradient += nuc_mm_contrib
 
             if self.dispersion:
                 disp = DispersionModel()
