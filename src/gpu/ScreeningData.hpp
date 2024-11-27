@@ -196,6 +196,34 @@ class CScreeningData
     std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_dd;
     std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_dd;
 
+    struct GpuData
+    {
+	double* d_boys_func_table = nullptr;
+	double* d_boys_func_ft = nullptr;
+	double* d_s_prim_info = nullptr;
+	double* d_p_prim_info = nullptr;
+	double* d_d_prim_info = nullptr;
+	double* d_mat_Q = nullptr;
+	double* d_mat_S = nullptr;
+	double* d_mat_T = nullptr;
+	                                                          
+	uint32_t *d_ss_first_inds_local = nullptr;
+	uint32_t *d_sp_first_inds_local = nullptr;
+	uint32_t *d_sd_first_inds_local = nullptr;
+	uint32_t *d_pp_first_inds_local = nullptr;
+	uint32_t *d_pd_first_inds_local = nullptr;
+	uint32_t *d_dd_first_inds_local = nullptr;
+
+	uint32_t  *d_ss_second_inds_local = nullptr;
+	uint32_t  *d_sp_second_inds_local = nullptr;
+	uint32_t  *d_sd_second_inds_local = nullptr;
+	uint32_t  *d_pp_second_inds_local = nullptr;
+	uint32_t  *d_pd_second_inds_local = nullptr;
+	uint32_t  *d_dd_second_inds_local = nullptr;
+    };
+    std::vector<GpuData> _gpuData;
+
+
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
     auto _sortQ(const int64_t s_prim_count,
@@ -207,6 +235,8 @@ class CScreeningData
 
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold);
+
+    ~CScreeningData();
 
     auto getNumGpusPerNode() const -> const int64_t;
 
@@ -409,6 +439,12 @@ class CScreeningData
                                  const std::vector<double>&   d_prim_info) -> void;
 
     auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const int64_t d_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
+
+    auto allocateGpuBoysFunctionData() -> void;
+
+    auto accessGpuData(size_t gpuId) const -> const GpuData&;
+
+    auto freeGpuData() -> void;
 };
 
 #endif /* ScreeningData_hpp */

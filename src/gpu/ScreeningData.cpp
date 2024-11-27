@@ -95,6 +95,12 @@ CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis&
     form_Q_and_D_inds_for_K(s_prim_count, p_prim_count, d_prim_count,
                             s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
                             s_prim_info, p_prim_info, d_prim_info);
+    allocateGpuBoysFunctionData();
+}
+
+CScreeningData::~CScreeningData()
+{
+     freeGpuData();
 }
 
 auto
