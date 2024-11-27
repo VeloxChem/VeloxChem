@@ -37,6 +37,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
 from .matrices import Matrices
 from .profiler import Profiler
 from .griddriver import GridDriver
@@ -442,6 +443,45 @@ class ScfGradientDriver(GradientDriver):
                         nuc_mm_contrib[i] += f_ij
                 self.gradient += nuc_mm_contrib
 
+                vdw_grad = np.zeros((natm, 3))
+
+                for a in range(natoms):
+                    xyz_i = coords[a]
+                    sigma_i = self.scf_driver._qm_vdw_params[a, 0]
+                    epsilon_i = self.scf_driver._qm_vdw_params[a, 1]
+
+                    print(sigma_i, epsilon_i)
+                    print()
+
+                    for p in range(npoints):
+                        xyz_j = self.scf_driver._point_charges[:3, p]
+                        sigma_j = self.scf_driver._point_charges[4, p]
+                        epsilon_j = self.scf_driver._point_charges[5, p]
+
+                        r_ij = xyz_j - xyz_i
+                        distance_ij = np.linalg.norm(r_ij)
+                        n_ij = r_ij / distance_ij
+
+                        # bohr to nm
+                        distance_ij *= bohr_in_angstrom() * 0.1
+
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
+
+                        sigma_r_6 = (sigma_ij / distance_ij)**6
+                        sigma_r_12 = sigma_r_6**2
+
+                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij
+                                                  - sigma_r_6 / distance_ij)
+
+                        vdw_grad[a] += -g * n_ij
+
+                # convert gradient to atomic unit
+                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
+                             bohr_in_angstrom())
+
+                self.gradient += vdw_grad
+
             if self.dispersion:
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
@@ -712,6 +752,42 @@ class ScfGradientDriver(GradientDriver):
                         f_ij = z_a * q_p * (r_p - r_a) / r**3
                         nuc_mm_contrib[i] += f_ij
                 self.gradient += nuc_mm_contrib
+
+                vdw_grad = np.zeros((natm, 3))
+
+                for a in range(natoms):
+                    xyz_i = coords[a]
+                    sigma_i = self.scf_driver._qm_vdw_params[a, 0]
+                    epsilon_i = self.scf_driver._qm_vdw_params[a, 1]
+
+                    for p in range(npoints):
+                        xyz_j = self.scf_driver._point_charges[:3, p]
+                        sigma_j = self.scf_driver._point_charges[4, p]
+                        epsilon_j = self.scf_driver._point_charges[5, p]
+
+                        r_ij = xyz_j - xyz_i
+                        distance_ij = np.linalg.norm(r_ij)
+                        n_ij = r_ij / distance_ij
+
+                        # bohr to nm
+                        distance_ij *= bohr_in_angstrom() * 0.1
+
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
+
+                        sigma_r_6 = (sigma_ij / distance_ij)**6
+                        sigma_r_12 = sigma_r_6**2
+
+                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij
+                                                  - sigma_r_6 / distance_ij)
+
+                        vdw_grad[a] += -g * n_ij
+
+                # convert gradient to atomic unit
+                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
+                             bohr_in_angstrom())
+
+                self.gradient += vdw_grad
 
             if self.dispersion:
                 disp = DispersionModel()

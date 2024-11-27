@@ -38,7 +38,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstrom
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
 from .veloxchemlib import xcfun
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
@@ -202,6 +202,7 @@ class ScfDriver:
 
         # point charges (in case we want a simple MM environment without PE)
         self._point_charges = None
+        self._qm_vdw_params = None
         self._nuc_mm_energy = 0.0
         self._V_es = None
 
@@ -254,6 +255,7 @@ class ScfDriver:
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initila guess'),
                 '_point_charges': ('str', 'potential file for point charges'),
+                '_qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
@@ -612,9 +614,9 @@ class ScfDriver:
                         assert_msg_critical(
                             npoints == len(lines[2:]),
                             'potfile: Inconsistent number of points')
-                        self._point_charges = np.zeros((4, npoints))
+                        self._point_charges = np.zeros((6, npoints))
                         for idx, line in enumerate(lines[2:]):
-                            label, x, y, z, q = line.split()
+                            label, x, y, z, q, sigma, epsilon = line.split()
                             self._point_charges[0, idx] = (float(x) /
                                                            bohr_in_angstrom())
                             self._point_charges[1, idx] = (float(y) /
@@ -622,9 +624,32 @@ class ScfDriver:
                             self._point_charges[2, idx] = (float(z) /
                                                            bohr_in_angstrom())
                             self._point_charges[3, idx] = float(q)
+                            self._point_charges[4, idx] = float(sigma)
+                            self._point_charges[5, idx] = float(epsilon)
                 else:
                     self._point_charges = None
                 self._point_charges = self.comm.bcast(self._point_charges,
+                                                      root=mpi_master())
+
+            if isinstance(self._qm_vdw_params, str):
+                vdw_param_file = self._qm_vdw_params
+
+                vdw_info = 'Reading vdw parameters for QM atoms: {}'.format(
+                    vdw_param_file)
+                self.ostream.print_info(vdw_info)
+                self.ostream.print_blank()
+
+                if self.rank == mpi_master():
+                    natoms = molecule.number_of_atoms()
+                    self._qm_vdw_params = np.zeros((natoms, 2))
+                    with Path(vdw_param_file).open('r') as fh:
+                        for a in range(natoms):
+                            sigma, epsilon = fh.readline().split()
+                            self._qm_vdw_params[a, 0] = float(sigma)
+                            self._qm_vdw_params[a, 1] = float(epsilon)
+                else:
+                    self._qm_vdw_params = None
+                self._qm_vdw_params = self.comm.bcast(self._qm_vdw_params,
                                                       root=mpi_master())
 
             # nuclei - point charges interaction
@@ -642,6 +667,35 @@ class ScfDriver:
                     chg_p = self._point_charges[3, p]
                     r_ap = np.linalg.norm(xyz_a - xyz_p)
                     self._nuc_mm_energy += chg_a * chg_p / r_ap
+
+            vdw_ene = 0.0
+
+            for a in range(natoms):
+                xyz_i = coords[a]
+                sigma_i = self._qm_vdw_params[a, 0]
+                epsilon_i = self._qm_vdw_params[a, 1]
+
+                for p in range(npoints):
+                    xyz_j = self._point_charges[:3, p]
+                    sigma_j = self._point_charges[4, p]
+                    epsilon_j = self._point_charges[5, p]
+
+                    distance_ij = np.linalg.norm(xyz_i - xyz_j)
+                    # bohr to nm
+                    distance_ij *= bohr_in_angstrom() * 0.1
+
+                    epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                    sigma_ij = 0.5 * (sigma_i + sigma_j)
+
+                    sigma_r_6 = (sigma_ij / distance_ij)**6
+                    sigma_r_12 = sigma_r_6**2
+
+                    vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
+
+            # kJ/mol to Hartree
+            vdw_ene /= (4.184 * hartree_in_kcalpermol())
+
+            self._nuc_mm_energy += vdw_ene
 
         # C2-DIIS method
         if self.acc_type.upper() == 'DIIS':
