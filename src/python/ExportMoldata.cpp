@@ -158,7 +158,9 @@ CMolecule_from_elemids_and_array_2(const std::vector<int>& elem_ids, const py::a
 
     for (int a = 0; a < natoms; a++)
     {
-        atom_basis_labels.push_back(std::make_pair(std::string(""), chem_elem::label(elem_ids[a])));
+        const auto label = chem_elem::label(elem_ids[a]);
+
+        atom_basis_labels.push_back(std::make_pair(std::string(""), format::upper_case(label)));
     }
 
     return CMolecule_from_elemids_and_array(elem_ids, py_coords, units, atom_basis_labels);

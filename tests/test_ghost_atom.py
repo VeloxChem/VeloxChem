@@ -36,7 +36,7 @@ class TestGhostAtom:
         """
         nh3_str = nh3_str.strip()
 
-        nh3_bq_str = nh3_str.replace('N', 'N_Bq').replace('H', 'H_Bq')
+        nh3_bq_str = nh3_str.replace('N', 'Bq_N').replace('H', 'Bq_H')
 
         ch4_str = """
         C   -1.621   -5.080    0.444
@@ -47,7 +47,7 @@ class TestGhostAtom:
         """
         ch4_str = ch4_str.strip()
 
-        ch4_bq_str = ch4_str.replace('C', 'C_Bq').replace('H', 'H_Bq')
+        ch4_bq_str = ch4_str.replace('C', 'Bq_C').replace('H', 'Bq_H')
 
         ref_energies = {
             'nh3_in_dimer': -56.1487397917,
