@@ -5,6 +5,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
@@ -33,24 +34,25 @@ class TestPointCharges:
         potfile = str(here / 'data' / 'pe_water.pot')
         vdwfile = str(here / 'data' / 'pe_water.qm_vdw_params.txt')
 
-        scf_drv = ScfRestrictedDriver()
-        scf_drv._point_charges = potfile
-        scf_drv._qm_vdw_params = vdwfile
-        scf_drv.ostream.mute()
+        for scf_drv in [ScfRestrictedDriver(), ScfUnrestrictedDriver()]:
 
-        scf_results = scf_drv.compute(mol, bas)
+            scf_drv._point_charges = potfile
+            scf_drv._qm_vdw_params = vdwfile
+            scf_drv.ostream.mute()
 
-        if scf_drv.rank == mpi_master():
-            assert abs(scf_results['scf_energy'] - (-75.9747807664)) < 1e-9
+            scf_results = scf_drv.compute(mol, bas)
 
-        grad_drv = ScfGradientDriver(scf_drv)
-        grad_drv.compute(mol, bas, scf_results)
-        grad = grad_drv.get_gradient()
+            if scf_drv.rank == mpi_master():
+                assert abs(scf_results['scf_energy'] - (-75.9732334209)) < 1e-9
 
-        ref_grad = np.array([
-            [-0.010251323886, -0.005576710592, -0.011298928229],
-            [-0.000285313121, -0.000437290097, 0.001172097669],
-            [0.010343001378, 0.003694676053, 0.009357019053],
-        ])
+            grad_drv = ScfGradientDriver(scf_drv)
+            grad_drv.compute(mol, bas, scf_results)
+            grad = grad_drv.get_gradient()
 
-        assert np.max(np.abs(grad - ref_grad)) < 1e-6
+            ref_grad = np.array([
+                [-0.012426949439, -0.009449823622, -0.013955922853],
+                [-0.003881905016, -0.002485992070, 0.002890530027],
+                [0.010380233206, 0.003716170298, 0.009359249589],
+            ])
+
+            assert np.max(np.abs(grad - ref_grad)) < 1e-6

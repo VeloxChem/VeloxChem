@@ -659,18 +659,21 @@ class ScfDriver:
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
             npoints = self._point_charges.shape[1]
-            for a in range(natoms):
+
+            for a in range(self.rank, natoms, self.nodes):
                 xyz_a = coords[a]
                 chg_a = nuclear_charges[a]
+
                 for p in range(npoints):
                     xyz_p = self._point_charges[:3, p]
                     chg_p = self._point_charges[3, p]
                     r_ap = np.linalg.norm(xyz_a - xyz_p)
+
                     self._nuc_mm_energy += chg_a * chg_p / r_ap
 
             vdw_ene = 0.0
 
-            for a in range(natoms):
+            for a in range(self.rank, natoms, self.nodes):
                 xyz_i = coords[a]
                 sigma_i = self._qm_vdw_params[a, 0]
                 epsilon_i = self._qm_vdw_params[a, 1]
@@ -696,6 +699,8 @@ class ScfDriver:
             vdw_ene /= (4.184 * hartree_in_kcalpermol())
 
             self._nuc_mm_energy += vdw_ene
+
+            self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
         # C2-DIIS method
         if self.acc_type.upper() == 'DIIS':
@@ -1322,6 +1327,8 @@ class ScfDriver:
 
             e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
                      self._d4_energy + self._ef_nuc_energy)
+
+            e_scf = self.comm.bcast(e_scf, root=mpi_master())
 
             diff_e_scf = e_scf - self.scf_energy
 
