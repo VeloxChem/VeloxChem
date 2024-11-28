@@ -203,6 +203,17 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
+        grad_timing = {
+            'Screening': 0.0,
+            'Overlap_grad': 0.0,
+            'Kinetic_energy_grad': 0.0,
+            'Nuclear_potential_grad': 0.0,
+            'Point_charges_grad': 0.0,
+            'Fock_grad': 0.0,
+            'XC_grad': 0.0,
+            'classical': 0.0,
+        }
+
         if self.rank == mpi_master():
             D = scf_results['D_alpha']
             nocc = molecule.number_of_alpha_electrons()
@@ -224,6 +235,8 @@ class ScfGradientDriver(GradientDriver):
 
         # kinetic energy contribution to gradient
 
+        t0 = time.time()
+
         kin_grad_drv = KineticEnergyGeom100Driver()
 
         self._print_debug_info('before kin_grad')
@@ -239,7 +252,11 @@ class ScfGradientDriver(GradientDriver):
 
         self._print_debug_info('after  kin_grad')
 
+        grad_timing['Kinetic_energy_grad'] += time.time() - t0
+
         # nuclear potential contribution to gradient
+
+        t0 = time.time()
 
         self._print_debug_info('before npot_grad')
 
@@ -263,6 +280,10 @@ class ScfGradientDriver(GradientDriver):
             gmats_010 = Matrices()
 
         self._print_debug_info('after  npot_grad')
+
+        grad_timing['Nuclear_potential_grad'] += time.time() - t0
+
+        t0 = time.time()
 
         # point charges contribution
         if self.scf_driver._point_charges is not None:
@@ -289,7 +310,11 @@ class ScfGradientDriver(GradientDriver):
 
                 gmats_100 = Matrices()
 
+        grad_timing['Point_charges_grad'] += time.time() - t0
+
         # orbital contribution to gradient
+
+        t0 = time.time()
 
         self._print_debug_info('before ovl_grad')
 
@@ -306,6 +331,8 @@ class ScfGradientDriver(GradientDriver):
             gmats = Matrices()
 
         self._print_debug_info('after  ovl_grad')
+
+        grad_timing['Overlap_grad'] += time.time() - t0
 
         # ERI contribution to gradient
 
@@ -347,11 +374,6 @@ class ScfGradientDriver(GradientDriver):
         den_mat_for_fock2 = make_matrix(basis, mat_t.general)
         den_mat_for_fock2.set_values(D)
 
-        fock_timing = {
-            'Screening': 0.0,
-            'FockGrad': 0.0,
-        }
-
         self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
@@ -362,14 +384,18 @@ class ScfGradientDriver(GradientDriver):
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
 
-        fock_timing['Screening'] += time.time() - t0
+        grad_timing['Screening'] += time.time() - t0
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
         for iatom in local_atoms:
 
+            t0 = time.time()
+
             screener_atom = T4CScreener()
             screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+            grad_timing['Screening'] += time.time() - t0
 
             t0 = time.time()
 
@@ -379,7 +405,7 @@ class ScfGradientDriver(GradientDriver):
                                              fock_type, exchange_scaling_factor,
                                              0.0, thresh_int)
 
-            fock_timing['FockGrad'] += time.time() - t0
+            grad_timing['Fock_grad'] += time.time() - t0
 
             factor = 2.0 if fock_type == 'j' else 1.0
 
@@ -388,6 +414,8 @@ class ScfGradientDriver(GradientDriver):
         self._print_debug_info('after  fock_grad')
 
         # XC contribution to gradient
+
+        t0 = time.time()
 
         self._print_debug_info('before xc_grad')
 
@@ -419,9 +447,13 @@ class ScfGradientDriver(GradientDriver):
 
         self._print_debug_info('after  xc_grad')
 
+        grad_timing['XC_grad'] += time.time() - t0
+
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
         # (only added on master rank)
+
+        t0 = time.time()
 
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
@@ -486,14 +518,16 @@ class ScfGradientDriver(GradientDriver):
 
             self.gradient += vdw_grad
 
+        grad_timing['classical'] += time.time() - t0
+
         # collect gradient
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
         if self.timing and self.rank == mpi_master():
-            self.ostream.print_info('Fock timing decomposition')
-            for key, val in fock_timing.items():
-                self.ostream.print_info(f'    {key:<10s}:  {val:.2f} sec')
+            self.ostream.print_info('Gradient timing decomposition')
+            for key, val in grad_timing.items():
+                self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_unrestricted(self, molecule, basis, scf_results):
