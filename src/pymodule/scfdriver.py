@@ -1363,11 +1363,15 @@ class ScfDriver:
 
             # compute new Fock matrix, molecular orbitals and density
 
-            profiler.start_timer('FockDiag')
+            profiler.start_timer('EffFock')
 
             self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
+
+            profiler.stop_timer('EffFock')
+
+            profiler.start_timer('NewMO')
 
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
@@ -1377,13 +1381,17 @@ class ScfDriver:
 
             self._update_mol_orbs_phase()
 
+            profiler.stop_timer('NewMO')
+
+            profiler.start_timer('NewDens')
+
             if self.rank == mpi_master():
                 den_mat = self.molecular_orbitals.get_density(molecule)
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
 
-            profiler.stop_timer('FockDiag')
+            profiler.stop_timer('NewDens')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self._num_iter))
