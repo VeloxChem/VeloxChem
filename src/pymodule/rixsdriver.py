@@ -127,67 +127,6 @@ class RixsDriver:
             # field
             self.restart = False
         """
- 
-    def sts_tdm(self, molecule, scf_results, tda_res_val, tda_res_core):
-        """
-        The state-to-state transition-density-matrix
-
-        :param molecule    : molecule object (could be removed w/ small modifications)
-        :param ao_basis    : atomic orbital basis (could be removed)
-        :param scf_results : results of the SCF calculation
-        :tda_res_val       : linear-response results for the valence calculation
-        :tda_res_core      : linear-response results for the core calculation
-
-        returns the state-to-state transition-density-matrix in ao-basis
-        """
-        norb = scf_results['C_alpha'].shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-        nvir = norb - nocc
-
-        X_val_mo = tda_res_val['eigenvectors'].reshape(nocc,nvir,self.nr_ve)
-        X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
-        X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
-
-        # Electron- and hole density matrices
-        gamma_ab = np.einsum('ipJ, iqI -> pqIJ', X_cor_mo, X_val_mo, optimize=True)
-        gamma_ij = np.einsum('qaJ, paI -> pqIJ', X_cor_mo, X_val_mo, optimize=True)
-
-        # Transform
-        C_ab = scf_results['C'][:,nocc:]
-        C_ij = scf_results['C'][:,:nocc]
-        
-        gamma_ab_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ab, gamma_ab, C_ab, optimize=True)
-        gamma_ij_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ij, gamma_ij, C_ij, optimize=True)
-
-        gamma_ao = gamma_ab_ao - gamma_ij_ao
-        return gamma_ao
-
-    def gts_tdm(self, molecule, scf_results, tda_res_core):
-        """
-        The GS-to-state transition-density-matrix (GS to core) --
-        essentially transformed and reshaped eigenvector
-
-        :param molecule    : molecule object (could be removed w/ small modifications)
-        :param ao_basis    : atomic orbital basis (could be removed)
-        :param scf_results : results of the SCF calculation (could be removed w/ small modifications)
-        :tda_res_val       : linear-response results for the valence calculation
-        :tda_res_core      : linear-response results for the core calculation
-
-        returns the GS-to-state transition-density-matrix in ao-basis
-        """
-        norb = scf_results['C_alpha'].shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-        nvir = norb - nocc
-
-        X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
-        X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
-
-        # Transform
-        C_ab = scf_results['C_alpha'][:,nocc:]
-        C_ij = scf_results['C_alpha'][:,:nocc]
-        gamma_ng_ao = np.einsum('vp, pqJ, wq -> vwJ', C_ij, X_cor_mo, C_ab, optimize=True)
-
-        return gamma_ng_ao
     
     def sts_tdm(self, molecule, scf_results, tda_res_val, tda_res_core):
         """
@@ -223,7 +162,7 @@ class RixsDriver:
         gamma_ao = gamma_ab_ao - gamma_ij_ao
         return gamma_ao
 
-    def gts_tdm(self, molecule, scf_results, tda_res_val, tda_res_core):
+    def gts_tdm(self, molecule, scf_results, tda_res_core):
         """
         The GS-to-state transition-density-matrix (GS to core) --
         essentially transformed and reshaped eigenvector
@@ -322,7 +261,7 @@ class RixsDriver:
         self.nvir = self.norb - self.nocc
             
         gamma = self.sts_tdm(molecule, scf_results, tda_res_val, tda_res_core)
-        gamma_gs = self.gts_tdm(molecule, scf_results, tda_res_val, tda_res_core)
+        gamma_gs = self.gts_tdm(molecule, scf_results,tda_res_core)
 
         dip_mats = compute_electric_dipole_integrals(molecule, ao_basis)
         dipole_ints = -1.0 * np.array([dip_mats[0],
