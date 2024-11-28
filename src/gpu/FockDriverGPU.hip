@@ -2025,22 +2025,12 @@ computeFockOnGPU(const              CMolecule& molecule,
     timer.start("Boys func. prep.");
 
     // Boys function (tabulated for order 0-28)
+    
+    const auto& gpuData = screening.accessGpuData(gpu_id);
 
-    const auto boys_func_table = boysfunc::getFullBoysFuncTable();
+    double* d_boys_func_table = gpuData.d_boys_func_table;
 
-    double* d_boys_func_table;
-
-    hipSafe(hipMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
-
-    hipSafe(hipMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
-
-    const auto boys_func_ft = boysfunc::getBoysFuncFactors();
-
-    double* d_boys_func_ft;
-
-    hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
-
-    hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+    double* d_boys_func_ft = gpuData.d_boys_func_ft;
 
     timer.stop("Boys func. prep.");
 
@@ -8096,9 +8086,6 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto exchange_elapsed_time = exchange_timer.getElapsedTime();
 
     screening.setExchangeTime(gpu_id, exchange_elapsed_time);
-
-    hipSafe(hipFree(d_boys_func_table));
-    hipSafe(hipFree(d_boys_func_ft));
 
     hipSafe(hipFree(d_s_prim_info));
     hipSafe(hipFree(d_s_prim_aoinds));
