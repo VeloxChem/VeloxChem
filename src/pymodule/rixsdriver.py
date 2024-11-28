@@ -30,7 +30,7 @@ import sys
 
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import hartree_in_ev, bohr_in_angstroms
-from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .oneeints import compute_electric_dipole_integrals
 from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
@@ -48,7 +48,8 @@ class RixsDriver:
         The output stream.
 
     Instance variables:
-        - grid_per_sphere: Number of Lebedev grid points per sphere.
+        - theta: Angle.
+        - gamma_n: Broadening term.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -86,7 +87,7 @@ class RixsDriver:
         self.input_keywords = {
             'rixs': {
                 'angle': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
-                'gamma': ('float', 'broadening factor'),
+                'gamma': ('float', 'broadening term'),
             },
         }
 
@@ -126,27 +127,7 @@ class RixsDriver:
             # field
             self.restart = False
         """
-    
-    def dipole_integrals(self, molecule, basis):
-        if molecule.get_charge() != 0:
-            coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.elem_ids_to_numpy()
-            origin = np.sum(coords.T * nuclear_charges,
-                            axis=1) / np.sum(nuclear_charges)
-        else:
-            origin = np.zeros(3)
-
-        # dipole integrals
-        dipole_drv = ElectricDipoleIntegralsDriver()
-        dipole_drv.origin = origin
-        dipole_mats = dipole_drv.compute(molecule, basis)
-        
-        dipole_ints = np.array([dipole_mats.x_to_numpy(),
-                                dipole_mats.y_to_numpy(),
-                                dipole_mats.z_to_numpy()])
-        return dipole_ints
-
-    
+ 
     def sts_tdm(self, molecule, scf_results, tda_res_val, tda_res_core):
         """
         The state-to-state transition-density-matrix
@@ -202,8 +183,8 @@ class RixsDriver:
         X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
 
         # Transform
-        C_ab = scf_results['C'][:,nocc:]
-        C_ij = scf_results['C'][:,:nocc]
+        C_ab = scf_results['C_alpha'][:,nocc:]
+        C_ij = scf_results['C_alpha'][:,:nocc]
         gamma_ng_ao = np.einsum('vp, pqJ, wq -> vwJ', C_ij, X_cor_mo, C_ab, optimize=True)
 
         return gamma_ng_ao
@@ -233,8 +214,8 @@ class RixsDriver:
         gamma_ij = np.einsum('qaJ, paI -> pqIJ', X_cor_mo, X_val_mo, optimize=True)
 
         # Transform
-        C_ab = scf_results['C'][:,nocc:]
-        C_ij = scf_results['C'][:,:nocc]
+        C_ab = scf_results['C_alpha'][:,nocc:]
+        C_ij = scf_results['C_alpha'][:,:nocc]
         
         gamma_ab_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ab, gamma_ab, C_ab, optimize=True)
         gamma_ij_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ij, gamma_ij, C_ij, optimize=True)
@@ -263,8 +244,8 @@ class RixsDriver:
         X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
 
         # Transform
-        C_ab = scf_results['C'][:,nocc:]
-        C_ij = scf_results['C'][:,:nocc]
+        C_ab = scf_results['C_alpha'][:,nocc:]
+        C_ij = scf_results['C_alpha'][:,:nocc]
         gamma_ng_ao = np.einsum('vp, pqJ, wq -> vwJ', C_ij, X_cor_mo, C_ab, optimize=True)
 
         return gamma_ng_ao
@@ -343,7 +324,10 @@ class RixsDriver:
         gamma = self.sts_tdm(molecule, scf_results, tda_res_val, tda_res_core)
         gamma_gs = self.gts_tdm(molecule, scf_results, tda_res_val, tda_res_core)
 
-        dipole_ints = self.dipole_integrals(molecule, ao_basis)
+        dip_mats = compute_electric_dipole_integrals(molecule, ao_basis)
+        dipole_ints = -1.0 * np.array([dip_mats[0],
+                                       dip_mats[1],
+                                       dip_mats[2]])
 
         omega_f = tda_res_val['eigenvalues']
         omega_n = tda_res_core['eigenvalues']
