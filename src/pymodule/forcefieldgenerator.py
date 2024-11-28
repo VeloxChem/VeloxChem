@@ -1705,9 +1705,15 @@ class ForceFieldGenerator:
             value: tuple of atom types
         """
 
-        # Non-rotatable atom types
-        unique_non_rotatable_atom_types = ['cd', 'c', 'ne']
-        redundant_non_rotatable_atom_types = ['cc', 'ss', 'hc', 'ha', 'h4', 'hn', 'ho', 'nc', 'n2', 'c2', 'o', 'n', 'nf']
+        unique_non_rotatable_atom_types = ['c', 'n']
+
+        redundant_non_rotatable_atom_types = [
+            'ce', 'cf', 'cg', 'ch',  # Aromatic and conjugated carbons
+            'c1',  # Sp carbons
+            'nb', 'nc', 'nd', 'ne', 'nf',  # Aromatic and conjugated nitrogens
+            'ss',  # Sulfur in thio-ester and thio-ether
+            'o', 'oh'  # Oxygen in carbonyl and hydroxyl groups
+            ]
 
         # Make all possible combinations of non-rotatable bonds
         non_rotatable_bonds = []
@@ -1725,10 +1731,10 @@ class ForceFieldGenerator:
                 non_rotatable_bonds.append((j, i))
         
         # Combinations within unique_non_rotatable_atom_types
-        for i in unique_non_rotatable_atom_types:
-            for j in unique_non_rotatable_atom_types:
-                non_rotatable_bonds.append((i, j))
-                non_rotatable_bonds.append((j, i))
+        # for i in unique_non_rotatable_atom_types:
+        #     for j in unique_non_rotatable_atom_types:
+        #         non_rotatable_bonds.append((i, j))
+        #         non_rotatable_bonds.append((j, i))
 
         # Collect keys to delete
         bonds_to_delete = []
