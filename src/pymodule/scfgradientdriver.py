@@ -40,10 +40,8 @@ from .veloxchemlib import parse_xc_func
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
 from .matrices import Matrices
 from .profiler import Profiler
-from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
-from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 
@@ -422,25 +420,13 @@ class ScfGradientDriver(GradientDriver):
         if use_dft:
             if self.rank == mpi_master():
                 xcfun_label = scf_results['xcfun']
-                grid_level = scf_results.get('grid_level', None)
             else:
                 xcfun_label = None
-                grid_level = None
-
-            xcfun_label, grid_level = self.comm.bcast((xcfun_label, grid_level),
-                                                      root=mpi_master())
-
-            grid_level = (get_default_grid_level(xcfun_label)
-                          if grid_level is None else grid_level)
-
-            # TODO: take molecular grid from scf
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            xcfun_label = self.comm.bcast(xcfun_label, root=mpi_master())
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(
-                molecule, basis, [D], mol_grid, xcfun_label)
+                molecule, basis, [D], self.scf_driver._mol_grid, xcfun_label)
 
         else:
             xcfun_label = 'hf'
@@ -739,25 +725,14 @@ class ScfGradientDriver(GradientDriver):
         if use_dft:
             if self.rank == mpi_master():
                 xcfun_label = scf_results['xcfun']
-                grid_level = scf_results.get('grid_level', None)
             else:
                 xcfun_label = None
-                grid_level = None
-
-            xcfun_label, grid_level = self.comm.bcast((xcfun_label, grid_level),
-                                                      root=mpi_master())
-
-            grid_level = (get_default_grid_level(xcfun_label)
-                          if grid_level is None else grid_level)
-
-            # TODO: take molecular grid from scf
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            xcfun_label = self.comm.bcast(xcfun_label, root=mpi_master())
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(
-                molecule, basis, [Da, Db], mol_grid, xcfun_label)
+                molecule, basis, [Da, Db], self.scf_driver._mol_grid,
+                xcfun_label)
 
         else:
             xcfun_label = 'hf'
@@ -881,7 +856,6 @@ class ScfGradientDriver(GradientDriver):
         if not self._debug:
             self.ostream.mute()
 
-        self.scf_driver.restart = False
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
