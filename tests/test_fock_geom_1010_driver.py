@@ -69,6 +69,7 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[0,0][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
+                print(i, " ", j, " xx", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 assert cmat == rmat
 
         # check full Fock matrix

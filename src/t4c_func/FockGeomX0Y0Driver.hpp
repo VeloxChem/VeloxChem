@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "ElectronRepulsionGeom1100Func.hpp"
+#include "ElectronRepulsionGeom1010Func.hpp"
 #include "GtoFunc.hpp"
 #include "GtoPairBlockFunc.hpp"
 #include "Matrices.hpp"
@@ -152,7 +152,7 @@ CFockGeomX0Y0Driver<N, M>::compute(const CMolecularBasis &basis,
                     auto ket_range = std::pair<size_t, size_t>(0, ket_gpairs.number_of_contracted_pairs());
                     if constexpr ((N == 1) && (M == 1))
                     {
-                        //erifunc::compute_geom_1010<CT4CGeomXYMatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                        erifunc::compute_geom_1010<CT4CGeomXYMatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
                     }
                     distributor.accumulate(bra_gpairs, ket_gpairs);
                 }
