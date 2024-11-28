@@ -109,6 +109,7 @@ class ForceFieldGenerator:
         self.molecule_name = 'vlx_' + get_random_string_parallel(self.comm)
         self.scan_xyz_files = None
         self.atom_types = None
+        self.rotatable_bonds = []
 
         # topology settings
         self.eq_param = True
@@ -841,6 +842,8 @@ class ForceFieldGenerator:
 
         self.connectivity_matrix = np.copy(
             atomtypeidentifier.connectivity_matrix)
+        
+        self.atom_info_dict = atomtypeidentifier.atom_info_dict
 
         if not resp:
             # skip RESP charges calculation
@@ -1395,6 +1398,20 @@ class ForceFieldGenerator:
                     'comment': dih['comment'][0] + ' RB',
                 }
 
+        # Fetch the rotatable bonds from the molecule and the atom types involved
+        rotatable_bonds_types = {}
+        for i, j, k, l in self.dihedrals:
+            # Ensure consistent ordering of bond indices
+            bond_indices = (min(j, k), max(j, k))
+            bond_types = (self.atom_types[bond_indices[0]], self.atom_types[bond_indices[1]])
+            rotatable_bonds_types[bond_indices] = bond_types
+
+        # Check if the rotatable bonds are indeed rotatable or not
+        updated_rotatable_bonds = self.check_rotatable_bonds(rotatable_bonds_types)
+
+        # Create a 1-indexed list of rotatable bonds without duplicates
+        self.rotatable_bonds = [[bond[0] + 1, bond[1] + 1] for bond in updated_rotatable_bonds.keys()]
+
         # Impropers
 
         self.impropers = {}
@@ -1677,6 +1694,93 @@ class ForceFieldGenerator:
             'equilibrium': equilibrium,
             'comment': 'User-defined'
         }
+
+    def check_rotatable_bonds(self, rotatable_bonds_types):
+        """
+        Checks the rotatable bonds in the molecule and the atom types involved.
+
+        :param rotatable_bonds_types:
+            The dictionary of possible rotatable bonds and the atom types involved.
+            key: tuple of atom indices
+            value: tuple of atom types
+        """
+
+        # Non-rotatable atom types
+        unique_non_rotatable_atom_types = ['cd', 'c', 'ne']
+        redundant_non_rotatable_atom_types = ['cc', 'ss', 'hc', 'ha', 'h4', 'hn', 'ho', 'nc', 'n2', 'c2', 'o', 'n', 'nf']
+
+        # Make all possible combinations of non-rotatable bonds
+        non_rotatable_bonds = []
+
+        # Combinations between unique_non_rotatable_atom_types and red_non_rotatable_atom_types
+        for i in unique_non_rotatable_atom_types:
+            for j in redundant_non_rotatable_atom_types:
+                non_rotatable_bonds.append((i, j))
+                non_rotatable_bonds.append((j, i))
+
+        # Combinations within redundant_non_rotatable_atom_types
+        for i in redundant_non_rotatable_atom_types:
+            for j in redundant_non_rotatable_atom_types:
+                non_rotatable_bonds.append((i, j))
+                non_rotatable_bonds.append((j, i))
+        
+        # Combinations within unique_non_rotatable_atom_types
+        for i in unique_non_rotatable_atom_types:
+            for j in unique_non_rotatable_atom_types:
+                non_rotatable_bonds.append((i, j))
+                non_rotatable_bonds.append((j, i))
+
+        # Collect keys to delete
+        bonds_to_delete = []
+        for (i, j), bond in rotatable_bonds_types.items():
+            # Check if bond is non-rotatable due to atom types
+            if bond in non_rotatable_bonds:
+                bonds_to_delete.append((i, j))
+                continue
+            # Check if bond is part of a ring
+            if self.is_bond_in_ring(i, j):
+                bonds_to_delete.append((i, j))
+                continue
+
+        for key in bonds_to_delete:
+            rotatable_bonds_types.pop(key)
+
+        # Exclude bonds involving terminal atoms
+        bonds_to_delete = []
+        for (i, j), bond in rotatable_bonds_types.items():
+            atom_i_connections = np.where(self.connectivity_matrix[i] == 1)[0]
+            atom_j_connections = np.where(self.connectivity_matrix[j] == 1)[0]
+
+            if len(atom_i_connections) == 1 or len(atom_j_connections) == 1:
+                bonds_to_delete.append((i, j))
+
+        for key in bonds_to_delete:
+            rotatable_bonds_types.pop(key)
+
+        return rotatable_bonds_types
+
+    def is_bond_in_ring(self, atom_i, atom_j):
+        """
+        Determines if the bond between atom_i and atom_j is part of a ring.
+
+        :param atom_i: 
+            Index of the first atom in the bond.
+        :param atom_j: 
+            Index of the second atom in the bond.
+        :return: 
+            True if the bond is part of a ring, False otherwise.
+        """
+
+        atom_i_info = self.atom_info_dict[atom_i + 1]  # +1 because atom_info_dict keys start from 1
+        atom_j_info = self.atom_info_dict[atom_j + 1]
+
+        # Check if both atoms are in cycles
+        if atom_i_info["CyclicStructure"] == "cycle" and atom_j_info["CyclicStructure"] == "cycle":
+            # Find common cycles
+            common_cycles = set(atom_i_info["CycleNumber"]).intersection(atom_j_info["CycleNumber"])
+            if common_cycles:
+                return True
+        return False
 
     def reparameterize(self,
                        hessian=None,
