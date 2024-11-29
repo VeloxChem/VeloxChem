@@ -269,15 +269,15 @@ comp_electron_repulsion_geom1010_sssp(T& distributor,
 
             t4cfunc::ket_transform<0, 1>(skbuffer, 27, ckbuffer, 0, 0, 0);
 
-            t4cfunc::ket_transform<0, 1>(skbuffer, 28, ckbuffer, 1, 0, 0);
+            t4cfunc::ket_transform<0, 1>(skbuffer, 30, ckbuffer, 3, 0, 0);
 
-            t4cfunc::ket_transform<0, 1>(skbuffer, 29, ckbuffer, 2, 0, 0);
+            t4cfunc::ket_transform<0, 1>(skbuffer, 33, ckbuffer, 6, 0, 0);
 
             t4cfunc::ket_transform<0, 1>(skbuffer, 36, ckbuffer, 9, 0, 1);
 
-            t4cfunc::ket_transform<0, 1>(skbuffer, 39, ckbuffer, 12, 0, 1);
+            t4cfunc::ket_transform<0, 1>(skbuffer, 45, ckbuffer, 18, 0, 1);
 
-            t4cfunc::ket_transform<0, 1>(skbuffer, 42, ckbuffer, 15, 0, 1);
+            t4cfunc::ket_transform<0, 1>(skbuffer, 54, ckbuffer, 27, 0, 1);
 
             erirec::comp_bra_geom1010_hrr_electron_repulsion_ssxx(skbuffer, 0, 27, 36, r_ab, 0, 1);
 

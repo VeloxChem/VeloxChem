@@ -280,9 +280,9 @@ comp_electron_repulsion_geom1010_spss(T& distributor,
 
             t4cfunc::ket_transform<0, 0>(skbuffer, 36, ckbuffer, 9, 0, 2);
 
-            t4cfunc::ket_transform<0, 0>(skbuffer, 41, ckbuffer, 15, 0, 2);
+            t4cfunc::ket_transform<0, 0>(skbuffer, 42, ckbuffer, 15, 0, 2);
 
-            t4cfunc::ket_transform<0, 0>(skbuffer, 46, ckbuffer, 21, 0, 2);
+            t4cfunc::ket_transform<0, 0>(skbuffer, 48, ckbuffer, 21, 0, 2);
 
             erirec::comp_bra_geom1010_hrr_electron_repulsion_spxx(skbuffer, 0, 27, 36, r_ab, 0, 0);
 
