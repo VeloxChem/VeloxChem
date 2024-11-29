@@ -76,7 +76,7 @@ class RixsDriver:
 
         # method settings
         self.nr_ve = None # nr_ce
-        self.emission_format = False
+
         # CVS
         self.nr_ce = None # nr_ce
         self.nr_CO = None # nr_ce
@@ -101,8 +101,8 @@ class RixsDriver:
             The dictionary of rixs input.
         """
 
-        #if method_dict is None:
-        #    method_dict = {}
+        if method_dict is None:
+            method_dict = {}
 
         rixs_keywords = {
             key: val[0] for key, val in self._input_keywords['rixs'].items()
@@ -236,7 +236,7 @@ class RixsDriver:
         else:
             w_prime = w_p
             
-        F = self.F_xy(w,f, gamma_ao,
+        F = self.F_xy(w, f, gamma_ao,
          gamma_ng_ao, tda_res_core,
          dipole_ints)
         
@@ -245,7 +245,6 @@ class RixsDriver:
                                                    + np.trace(np.abs(F)**2)))
         return sigma
 
-    #def rixs_map():
     def transition_dipole_mom(self, gamma_ao, dipole_integrals):
         T_fn = np.einsum('ijfn,xij->fnx', gamma_ao, -dipole_integrals)
         return T_fn
@@ -269,7 +268,6 @@ class RixsDriver:
         self.nocc = int(sum(scf_results['occ_alpha'])) #molecule.number_of_alpha_electrons()
         self.nvir = self.norb - self.nocc
 
-        # TODO: set these automatically
         self.nr_ve = len(tda_res_val['excitation_details'])
         self.nr_ce = len(tda_res_core['excitation_details'])
         self.nr_CO = self.find_nr_CO(tda_res_core['excitation_details'])
@@ -277,41 +275,40 @@ class RixsDriver:
         tdm_fn = self.sts_tdm(scf_results, tda_res_val, tda_res_core)
         tdm_ng = self.gts_tdm(scf_results, tda_res_core)
 
-        dip_mats = compute_electric_dipole_integrals(molecule, ao_basis)
-        dipole_ints = -1.0 * np.array([dip_mats[0],
-                                       dip_mats[1],
-                                       dip_mats[2]])
+        dip_tuple   = compute_electric_dipole_integrals(molecule, ao_basis)
+        dipole_ints = -1.0 * np.array([dip_tuple[0],
+                                       dip_tuple[1],
+                                       dip_tuple[2]])
 
         omega_f = tda_res_val['eigenvalues']
         omega_n = tda_res_core['eigenvalues']
         if self.photon_energy is None:
             self.photon_energy = omega_n # resonant
         
-        emission_ene = self.omega_p(tda_res_core, tda_res_val)
-        self.emission_energy = emission_ene
+        ene_loss     = np.zeros((self.nr_ve, len(self.photon_energy)))
+        emiss        = np.zeros((self.nr_ve, len(self.photon_energy)))
+        crossections = np.zeros((self.nr_ve, len(self.photon_energy)))
 
-        # Calculate all elements of the full RIXS map, 
-        # .real() is taken to handle eventual numerical inconsistencies
-        rixs_map, emiss = [], []
-        for en_n in self.photon_energy:
-            for val_state in range(self.nr_ve):
-                emiss.append(en_n - omega_f[val_state])
-                rixs_map.append(np.array([omega_f[val_state], en_n, 
-                                        self.rixs_xsection(en_n, val_state, tdm_fn, 
+        for vs_i in range(self.nr_ve):
+            for k, w_n in enumerate(self.photon_energy):
+                emiss[vs_i, k]        = w_n - omega_f[vs_i]
+                ene_loss[vs_i, k]     = w_n - (w_n - omega_f[vs_i])
+                crossections[vs_i, k] = self.rixs_xsection(w_n, vs_i, tdm_fn, 
                                                             tdm_ng, tda_res_core, tda_res_val, 
-                                                            dipole_ints, self.theta).real]))
+                                                            dipole_ints, self.theta).real
 
-        rixs_map = np.array(rixs_map)
-        self.rixs_map = rixs_map
-        self.crossection = rixs_map[:, -1]
-        self.ene_loss_rmap = rixs_map[:, 0] #
-        self.emission_map = np.array(emiss)
+        self.emission     = emiss
+        self.ene_loss     = ene_loss
+        self.crossections = crossections
         
+        emission_ene             = self.omega_p(tda_res_core, tda_res_val)
+        self.emission_energy_map = emission_ene
+        self.ene_loss_map        = np.array([ce - emission_ene[i] for i, ce in enumerate(tda_res_core['eigenvalues'])])
+
         T_fn = self.transition_dipole_mom(tdm_fn, dipole_ints)
-        f_f = self.osc_str(T_fn, emission_ene) 
+        f_f  = self.osc_str(T_fn, emission_ene) 
         self.oscillator_strength = f_f
 
-        self.ene_loss_map = self.ene_loss_map = np.array([self.photon_energy[i] - self.emission_energy[i] for i, w_n in enumerate(f_f)])
 
     
 
