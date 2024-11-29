@@ -25,8 +25,7 @@
 #ifndef OldOneElecIntsDrivers_hpp
 #define OldOneElecIntsDrivers_hpp
 
-#include "AngularMomentumIntegrals.hpp"
-#include "LinearMomentumIntegrals.hpp"
+#include "DenseMatrix.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 
@@ -37,11 +36,17 @@ class COldOneElecIntsMatrix
     std::vector<CDenseMatrix> _matrices;
 
    public:
-    COldOneElecIntsMatrix(const std::vector<CDenseMatrix> matrices);
+    COldOneElecIntsMatrix(const std::vector<CDenseMatrix>& matrices);
 
-    CDenseMatrix get_matrix(const int idx);
+    COldOneElecIntsMatrix(const COldOneElecIntsMatrix& source);
+    COldOneElecIntsMatrix(COldOneElecIntsMatrix&& source) noexcept;
 
     ~COldOneElecIntsMatrix();
+
+    COldOneElecIntsMatrix& operator=(const COldOneElecIntsMatrix& source);
+    COldOneElecIntsMatrix& operator=(COldOneElecIntsMatrix&& source) noexcept;
+
+    CDenseMatrix get_matrix(const int idx) const;
 };
 
 class COldElectricDipoleIntegralsDriver

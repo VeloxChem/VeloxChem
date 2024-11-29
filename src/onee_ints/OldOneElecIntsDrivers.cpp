@@ -24,7 +24,61 @@
 
 #include "OldOneElecIntsDrivers.hpp"
 
+#include "AngularMomentumIntegrals.hpp"
+#include "ElectricDipoleMomentumDriver.hpp"
+#include "LinearMomentumIntegrals.hpp"
+
 namespace oldonee {  // oldonee namespace
+
+COldOneElecIntsMatrix::COldOneElecIntsMatrix(const std::vector<CDenseMatrix>& matrices)
+
+    : _matrices(matrices)
+{
+}
+
+COldOneElecIntsMatrix::COldOneElecIntsMatrix(const COldOneElecIntsMatrix& source)
+
+    : _matrices(source._matrices)
+{
+}
+
+COldOneElecIntsMatrix::COldOneElecIntsMatrix(COldOneElecIntsMatrix&& source) noexcept
+
+    : _matrices(std::move(source._matrices))
+{
+}
+
+COldOneElecIntsMatrix::~COldOneElecIntsMatrix()
+{
+}
+
+COldOneElecIntsMatrix&
+COldOneElecIntsMatrix::operator=(const COldOneElecIntsMatrix& source)
+{
+    if (this == &source) return *this;
+
+    _matrices = source._matrices;
+
+    return *this;
+}
+
+COldOneElecIntsMatrix&
+COldOneElecIntsMatrix::operator=(COldOneElecIntsMatrix&& source) noexcept
+{
+    if (this == &source) return *this;
+
+    _matrices = std::move(source._matrices);
+
+    return *this;
+}
+
+CDenseMatrix
+COldOneElecIntsMatrix::get_matrix(const int idx) const
+{
+    if ((0 <= idx) && (idx < 3)) return _matrices[idx];
+
+    return CDenseMatrix();
+}
 
 COldElectricDipoleIntegralsDriver::COldElectricDipoleIntegralsDriver()
 {
