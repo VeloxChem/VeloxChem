@@ -24,11 +24,12 @@
 
 #include "OldOneElecIntsDrivers.hpp"
 
+#include <cstring>
+
 #include "AngularMomentumIntegrals.hpp"
 #include "ElectricDipoleMomentumDriver.hpp"
 #include "LinearMomentumIntegrals.hpp"
-
-namespace oldonee {  // oldonee namespace
+#include "Point.hpp"
 
 COldOneElecIntsMatrix::COldOneElecIntsMatrix(const std::vector<CDenseMatrix>& matrices)
 
@@ -91,6 +92,33 @@ COldElectricDipoleIntegralsDriver::~COldElectricDipoleIntegralsDriver()
 COldOneElecIntsMatrix
 COldElectricDipoleIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) const
 {
+    CElectricDipoleMomentumDriver dip_drv;
+
+    TPoint<double> origin({0.0, 0.0, 0.0});
+
+    auto dip_mats = dip_drv.compute(basis, molecule, origin);
+
+    std::vector<std::string> keys({"X", "Y", "Z"});
+
+    std::vector<CDenseMatrix> new_dip_mats;
+
+    for (const auto& key : keys)
+    {
+        const auto matptr = dip_mats.matrix(key);
+
+        const auto mat = matptr->full_matrix();
+
+        const auto nrows = mat.number_of_rows();
+        const auto ncols = mat.number_of_columns();
+
+        CDenseMatrix new_mat(nrows, ncols);
+
+        std::memcpy(new_mat.values(), mat.data(), nrows * ncols * sizeof(double));
+
+        new_dip_mats.push_back(new_mat);
+    }
+
+    return COldOneElecIntsMatrix(new_dip_mats);
 }
 
 COldLinearMomentumIntegralsDriver::COldLinearMomentumIntegralsDriver()
@@ -104,6 +132,9 @@ COldLinearMomentumIntegralsDriver::~COldLinearMomentumIntegralsDriver()
 COldOneElecIntsMatrix
 COldLinearMomentumIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) const
 {
+    const auto lmom_mats = onee::computeLinearMomentumIntegrals(molecule, basis);
+
+    return COldOneElecIntsMatrix(lmom_mats);
 }
 
 COldAngularMomentumIntegralsDriver::COldAngularMomentumIntegralsDriver()
@@ -117,6 +148,14 @@ COldAngularMomentumIntegralsDriver::~COldAngularMomentumIntegralsDriver()
 COldOneElecIntsMatrix
 COldAngularMomentumIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) const
 {
-}
+    std::vector<double> origin({0.0, 0.0, 0.0});
 
-}  // namespace oldonee
+    auto amom_mats = onee::computeAngularMomentumIntegrals(molecule, basis, origin);
+
+    for (int i = 0; i < 3; i++)
+    {
+        amom_mats[i].scale(-1.0);
+    }
+
+    return COldOneElecIntsMatrix(amom_mats);
+}

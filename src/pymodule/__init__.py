@@ -41,6 +41,9 @@ from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import XCMolecularGradient
 
+# for backward compatibility only
+from .veloxchemlib import ElectricDipoleIntegralsDriver
+
 # C++ functions
 from .veloxchemlib import is_chemical_element
 from .veloxchemlib import chemical_element_name
@@ -92,6 +95,7 @@ from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
+from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver

@@ -37,17 +37,82 @@
 #include "LinearMomentumIntegrals.hpp"
 #include "NuclearPotentialValues.hpp"
 #include "QuadrupoleIntegrals.hpp"
+#include "OldOneElecIntsDrivers.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_oneeints {
 
+// COldElectricDipoleIntegralsDriver constructor (for backward compatibility only)
+static std::shared_ptr<COldElectricDipoleIntegralsDriver>
+COldElectricDipoleIntegralsDriver_from_obj(py::object py_comm)
+{
+    return std::make_shared<COldElectricDipoleIntegralsDriver>();
+}
+
+// COldLinearMomentumIntegralsDriver constructor (for backward compatibility only)
+static std::shared_ptr<COldLinearMomentumIntegralsDriver>
+COldLinearMomentumIntegralsDriver_from_obj(py::object py_comm)
+{
+    return std::make_shared<COldLinearMomentumIntegralsDriver>();
+}
+
+// COldAngularMomentumIntegralsDriver constructor (for backward compatibility only)
+static std::shared_ptr<COldAngularMomentumIntegralsDriver>
+COldAngularMomentumIntegralsDriver_from_obj(py::object py_comm)
+{
+    return std::make_shared<COldAngularMomentumIntegralsDriver>();
+}
+
 // Exports classes/functions in src/onee_ints to python
 
 void
 export_oneeints(py::module& m)
 {
+    // COldOneElecIntsMatrix class (for backward compatibility only)
+    PyClass<COldOneElecIntsMatrix>(m, "OldOneElecIntsMatrix")
+        .def(py::init<const std::vector<CDenseMatrix>&>())
+        .def(
+            "x_to_numpy",
+            [](const COldOneElecIntsMatrix& self) -> py::array_t<double> {
+                const auto mat = self.get_matrix(0);
+                return vlx_general::pointer_to_numpy(mat.values(), {mat.getNumberOfRows(), mat.getNumberOfColumns()});
+            },
+            "Gets x matrix as numpy array.")
+        .def(
+            "y_to_numpy",
+            [](const COldOneElecIntsMatrix& self) -> py::array_t<double> {
+                const auto mat = self.get_matrix(1);
+                return vlx_general::pointer_to_numpy(mat.values(), {mat.getNumberOfRows(), mat.getNumberOfColumns()});
+            },
+            "Gets y matrix as numpy array.")
+        .def(
+            "z_to_numpy",
+            [](const COldOneElecIntsMatrix& self) -> py::array_t<double> {
+                const auto mat = self.get_matrix(2);
+                return vlx_general::pointer_to_numpy(mat.values(), {mat.getNumberOfRows(), mat.getNumberOfColumns()});
+            },
+            "Gets z matrix as numpy array.");
+
+    // COldElectricDipoleIntegralsDriver class (for backward compatibility only)
+    PyClass<COldElectricDipoleIntegralsDriver>(m, "ElectricDipoleIntegralsDriver")
+        .def(py::init<>())
+        .def(py::init(&COldElectricDipoleIntegralsDriver_from_obj), "comm"_a)
+        .def("compute", &COldElectricDipoleIntegralsDriver::compute, "Computes electric dipole integrals.");
+
+    // COldLinearMomentumIntegralsDriver class (for backward compatibility only)
+    PyClass<COldLinearMomentumIntegralsDriver>(m, "LinearMomentumIntegralsDriver")
+        .def(py::init<>())
+        .def(py::init(&COldLinearMomentumIntegralsDriver_from_obj), "comm"_a)
+        .def("compute", &COldLinearMomentumIntegralsDriver::compute, "Computes electric dipole integrals.");
+
+    // COldAngularMomentumIntegralsDriver class (for backward compatibility only)
+    PyClass<COldAngularMomentumIntegralsDriver>(m, "AngularMomentumIntegralsDriver")
+        .def(py::init<>())
+        .def(py::init(&COldAngularMomentumIntegralsDriver_from_obj), "comm"_a)
+        .def("compute", &COldAngularMomentumIntegralsDriver::compute, "Computes electric dipole integrals.");
+
     m.def("compute_linear_momentum_integrals",
             [](const CMolecule&           molecule,
                const CMolecularBasis&     basis) -> py::list {

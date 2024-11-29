@@ -1453,6 +1453,9 @@ class ScfDriver:
                     'F_beta': F_beta,
                 }
 
+                # for backward compatibility only
+                self._scf_tensors['F'] = (F_alpha, F_beta)
+
                 if self._dft:
                     # dft info
                     self._scf_tensors['xcfun'] = self.xcfun.get_func_label()

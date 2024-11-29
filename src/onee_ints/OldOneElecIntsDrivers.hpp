@@ -29,8 +29,6 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 
-namespace oldonee {  // oldonee namespace
-
 class COldOneElecIntsMatrix
 {
     std::vector<CDenseMatrix> _matrices;
@@ -78,7 +76,5 @@ class COldAngularMomentumIntegralsDriver
 
     COldOneElecIntsMatrix compute(const CMolecule& molecule, const CMolecularBasis& basis) const;
 };
-
-}  // namespace oldonee
 
 #endif /* OldOneElecIntsDrivers_hpp */
