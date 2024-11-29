@@ -134,6 +134,7 @@ from .symmetryanalyzer import SymmetryAnalyzer
 from .systembuilder import SystemBuilder
 from .openmmexplicitsolvation import OMMExplicitSolvation
 from .openmmdynamics import OpenMMDynamics
+from .evbdriver import EvbDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
