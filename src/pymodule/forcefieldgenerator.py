@@ -47,7 +47,7 @@ from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
-#from .xtbhessiandriver import XtbHessianDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
 
 
@@ -1824,6 +1824,10 @@ class ForceFieldGenerator:
             xtb_drv = XtbDriver(self.comm, self.ostream)
             xtb_grad_drv = XtbGradientDriver(xtb_drv)
             xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
+            # Mute all drivers
+            xtb_drv.ostream.mute()
+            xtb_grad_drv.ostream.mute()
+            xtb_opt_drv.ostream.mute()
             xtb_opt_drv.filename = self.molecule_name
             xtb_opt_results = xtb_opt_drv.compute(self.molecule)
             self.molecule = Molecule.read_xyz_string(
