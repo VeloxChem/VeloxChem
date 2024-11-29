@@ -553,6 +553,16 @@ CXCFunctional::operator!=(const CXCFunctional& other) const
     return !(*this == other);
 }
 
+void
+CXCFunctional::setLeadingDimension(const int ldStaging)
+{
+    _ldStaging = ldStaging;
+
+    _freeStagingBuffer();
+
+    _allocateStagingBuffer();
+}
+
 std::string
 CXCFunctional::getFunctionalLabel() const
 {

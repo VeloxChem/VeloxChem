@@ -3,8 +3,10 @@ target_sources(vlxobjs
     FockDriver.cpp
     T4CDiagonalDistributor.cpp
     T4CGeomX0MatricesDistributor.cpp
+    T4CEriTensorDistributor.cpp
     T4CLocalDistributor.cpp
     T4CLocalGeomDistributor.cpp
+    T4CLocalEriTensorDistributor.cpp
     T4CMatricesDistributor.cpp
     T4CMatrixDistributor.cpp
     T4CScreener.cpp

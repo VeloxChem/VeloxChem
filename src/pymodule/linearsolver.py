@@ -22,7 +22,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -44,7 +43,7 @@ from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .profiler import Profiler
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
@@ -71,8 +70,6 @@ class LinearSolver:
         - xcfun: The XC functional.
         - pe: The flag for running polarizable embedding calculation.
         - pe_options: The dictionary with options for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - split_comm_ratio: The list of ratios for split communicators.
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
@@ -122,10 +119,8 @@ class LinearSolver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-
-        # split communicators
-        self.use_split_comm = False
-        self._split_comm_ratio = None
+        self.embedding_options = None
+        self._embedding_drv = None
 
         # static electric field
         self.electric_field = None
@@ -180,6 +175,7 @@ class LinearSolver:
 
         self._debug = False
         self._block_size_factor = 8
+        self._xcfun_ldstaging = 1024
 
         # input keywords
         self._input_keywords = {
@@ -203,13 +199,15 @@ class LinearSolver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
+                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'embedding_options':
+                    ('dict', 'dictionary to set the embedding options'),
                 'electric_field': ('seq_fixed', 'static electric field'),
-                # 'use_split_comm': ('bool', 'use split communicators'),
             },
         }
 
@@ -310,7 +308,7 @@ class LinearSolver:
 
         dft_sanity_check(self, 'update_settings')
 
-        self._pe_sanity_check(method_dict)
+        pe_sanity_check(self, method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -325,38 +323,6 @@ class LinearSolver:
             # field
             self.restart = False
 
-    def _pe_sanity_check(self, method_dict=None):
-        """
-        Checks PE settings and updates relevant attributes.
-
-        :param method_dict:
-            The dicitonary of method settings.
-        """
-
-        if method_dict:
-            if 'pe_options' in method_dict:
-                self.pe_options = dict(method_dict['pe_options'])
-            else:
-                self.pe_options = {}
-
-        if self.potfile:
-            self.pe_options['potfile'] = self.potfile
-
-        self._pe = ('potfile' in self.pe_options)
-
-        if self._pe:
-            from .polembed import PolEmbed
-
-            cppe_potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file() and self.filename is not None:
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
-            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
-            self.pe_options['potfile'] = cppe_potfile
-
     def _init_eri(self, molecule, basis):
         """
         Initializes ERI.
@@ -370,29 +336,15 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        if self.use_split_comm:
-            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
-
-        if self.use_split_comm:
-            screening = None
-            valstr = 'ERI'
-            if self._dft:
-                valstr += '/DFT'
-            if self._pe:
-                valstr += '/PE'
-            self.ostream.print_info(
-                'Using sub-communicators for {}.'.format(valstr))
-            self.ostream.print_blank()
+        self._print_mem_debug_info('before screener')
+        if self.rank == mpi_master():
+            screening = T4CScreener()
+            screening.partition(basis, molecule, 'eri')
         else:
-            self._print_mem_debug_info('before screener')
-            if self.rank == mpi_master():
-                screening = T4CScreener()
-                screening.partition(basis, molecule, 'eri')
-            else:
-                screening = None
-            self._print_mem_debug_info('after  screener')
-            screening = self.comm.bcast(screening, root=mpi_master())
-            self._print_mem_debug_info('after  bcast screener')
+            screening = None
+        self._print_mem_debug_info('after  screener')
+        screening = self.comm.bcast(screening, root=mpi_master())
+        self._print_mem_debug_info('after  bcast screener')
 
         return {
             'screening': screening,
@@ -420,7 +372,7 @@ class LinearSolver:
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
+            molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
@@ -461,16 +413,22 @@ class LinearSolver:
         """
 
         if self._pe:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
-            V_es = pe_drv.compute_multipole_potential_integrals()
+            assert_msg_critical(
+                self.embedding_options['settings']['embedding_method'] == 'PE',
+                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
+            )
 
-            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
-                pe_drv.get_cppe_version())
-            self.ostream.print_info(cppe_info)
-            self.ostream.print_blank()
+            from .embedding import PolarizableEmbeddingLRS
 
-            pot_info = "Reading polarizable embedding potential: {}".format(
+            self._embedding_drv = PolarizableEmbeddingLRS(
+                molecule=molecule,
+                ao_basis=basis,
+                options=self.embedding_options,
+                comm=self.comm)
+
+            # TODO: print PyFraME info
+
+            pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
@@ -478,13 +436,9 @@ class LinearSolver:
             with open(str(self.pe_options['potfile']), 'r') as f_pot:
                 potfile_text = '\n'.join(f_pot.readlines())
         else:
-            pe_drv = None
-            V_es = None
             potfile_text = ''
 
         return {
-            'pe_drv': pe_drv,
-            'V_es': V_es,
             'potfile_text': potfile_text,
         }
 
@@ -932,9 +886,6 @@ class LinearSolver:
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        #V_es = pe_dict['V_es']
-        #pe_drv = pe_dict['pe_drv']
-
         if self.rank == mpi_master():
             num_densities = len(dens)
         else:
@@ -1021,11 +972,16 @@ class LinearSolver:
 
         if self._pe:
             t0 = tm.time()
-            # TODO: add PE contribution
+            for idx in range(num_densities):
+                # Note: only closed shell density for now
+                dm = dens[idx] * 2.0
+                V_emb = self._embedding_drv.compute_pe_contributions(
+                    density_matrix=dm)
+                if self.rank == mpi_master():
+                    fock_arrays[idx] += V_emb
+
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
-
-        # TODO: look into split communicator
 
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = self.comm.reduce(fock_arrays[idx],
@@ -1035,41 +991,6 @@ class LinearSolver:
             return fock_arrays
         else:
             return None
-
-    def _comp_lr_fock_split_comm(self,
-                                 fock,
-                                 dens,
-                                 molecule,
-                                 basis,
-                                 eri_dict,
-                                 dft_dict,
-                                 pe_dict,
-                                 profiler=None):
-        """
-        Computes linear response Fock/Fxc matrix on split communicators.
-
-        :param fock:
-            The Fock matrix (2e part).
-        :param dens:
-            The density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param eri_dict:
-            The dictionary containing ERI information.
-        :param dft_dict:
-            The dictionary containing DFT information.
-        :param pe_dict:
-            The dictionary containing PE information.
-        :param profiler:
-            The profiler.
-        """
-
-        assert_msg_critical(
-            False,
-            'LinearSolver: Linear response with split communicator not implemented'
-        )
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """

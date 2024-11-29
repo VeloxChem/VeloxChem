@@ -44,7 +44,7 @@ static std::shared_ptr<CMolecule>
 CMolecule_from_labels_and_array(const std::vector<std::string>& labels,
                                 const py::array_t<double>&      py_coords,
                                 const std::string&              units,
-                                const std::vector<std::string>& atom_basis_labels)
+                                const std::vector<std::pair<std::string, std::string>>& atom_basis_labels)
 {
     // sanity check
 
@@ -121,7 +121,12 @@ CMolecule_from_labels_and_array_2(const std::vector<std::string>& labels,
 {
     const auto natoms = static_cast<int>(labels.size());
 
-    std::vector<std::string> atom_basis_labels(natoms, std::string(""));
+    std::vector<std::pair<std::string, std::string>> atom_basis_labels;
+
+    for (int a = 0; a < natoms; a++)
+    {
+        atom_basis_labels.push_back(std::make_pair(std::string(""), format::upper_case(labels[a])));
+    }
 
     return CMolecule_from_labels_and_array(labels, py_coords, units, atom_basis_labels);
 }
@@ -130,7 +135,7 @@ static std::shared_ptr<CMolecule>
 CMolecule_from_elemids_and_array(const std::vector<int>& elem_ids,
                                  const py::array_t<double>& py_coords,
                                  const std::string& units,
-                                 const std::vector<std::string>& atom_basis_labels)
+                                 const std::vector<std::pair<std::string, std::string>>& atom_basis_labels)
 {
     std::vector<std::string> labels;
 
@@ -149,7 +154,14 @@ CMolecule_from_elemids_and_array_2(const std::vector<int>& elem_ids, const py::a
 {
     const auto natoms = static_cast<int>(elem_ids.size());
 
-    std::vector<std::string> atom_basis_labels(natoms, std::string(""));
+    std::vector<std::pair<std::string, std::string>> atom_basis_labels;
+
+    for (int a = 0; a < natoms; a++)
+    {
+        const auto label = chem_elem::label(elem_ids[a]);
+
+        atom_basis_labels.push_back(std::make_pair(std::string(""), format::upper_case(label)));
+    }
 
     return CMolecule_from_elemids_and_array(elem_ids, py_coords, units, atom_basis_labels);
 }
@@ -172,7 +184,7 @@ export_moldata(py::module &m)
     PyClass<CMolecule>(m, "Molecule")
         .def(py::init<>())
         .def(py::init<const std::vector<int> &, const std::vector<TPoint<double>> &, const std::string &>())
-        .def(py::init<const std::vector<int>&, const std::vector<TPoint<double>>&, const std::string&, const std::vector<std::string>&>())
+        .def(py::init<const std::vector<int>&, const std::vector<TPoint<double>>&, const std::string&, const std::vector<std::pair<std::string, std::string>>&>())
         .def(py::init<const CMolecule &>())
         .def(py::init<const CMolecule &, const CMolecule &>())
         .def(py::init(&CMolecule_from_labels_and_array), "symbols"_a, "coordinates"_a, "units"_a, "atom_basis_labels"_a)
@@ -182,14 +194,14 @@ export_moldata(py::module &m)
         .def(py::pickle(
             [](const CMolecule &mol) { return py::make_tuple(mol.identifiers(), mol.coordinates("au"), mol.atom_basis_labels(), mol.get_charge(), mol.get_multiplicity()); },
             [](py::tuple t) {
-                auto mol = CMolecule(t[0].cast<std::vector<int>>(), t[1].cast<std::vector<TPoint<double>>>(), std::string("au"), t[2].cast<std::vector<std::string>>());
+                auto mol = CMolecule(t[0].cast<std::vector<int>>(), t[1].cast<std::vector<TPoint<double>>>(), std::string("au"), t[2].cast<std::vector<std::pair<std::string, std::string>>>());
                 mol.set_charge(t[3].cast<double>());
                 mol.set_multiplicity(t[4].cast<int>());
                 return mol;
             }))
         .def("add_atom", py::overload_cast<const int, const TPoint<double>&, const std::string&>(&CMolecule::add_atom),
           "Adds atom to molecule.")
-        .def("add_atom", py::overload_cast<const int, const TPoint<double>&, const std::string&, const std::string&>(&CMolecule::add_atom),
+        .def("add_atom", py::overload_cast<const int, const TPoint<double>&, const std::string&, const std::pair<std::string, std::string>&>(&CMolecule::add_atom),
           "Adds atom to molecule.")
         .def("slice", &CMolecule::slice, "Creates a new molecule by slicing selected atoms from molecule.")
         .def("set_charge", &CMolecule::set_charge, "Sets charge of molecule.")

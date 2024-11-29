@@ -194,6 +194,10 @@ class CDense4DTensor
      @return the pointer to first element of 4D tensor.
      */
     double* values();
+
+    const double* row(const int i, const int j, const int k) const;
+
+    double* row(const int i, const int j, const int k);
 };
 
 #endif /* Dense4DTensor_hpp */

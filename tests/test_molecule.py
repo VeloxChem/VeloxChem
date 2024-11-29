@@ -80,6 +80,13 @@ class TestMolecule:
 
         return Molecule(self.nh3_elements(), self.nh3_coords(), "au")
 
+    def nh3_molecule_with_ghost_atom(self):
+
+        nh3_str = self.nh3_xyzstr()
+        nh3_str = nh3_str.replace('N', 'Bq_N')
+
+        return Molecule.read_molecule_string(nh3_str, 'au')
+
     def test_constructors(self):
 
         tol = 1.0e-12
@@ -287,14 +294,8 @@ class TestMolecule:
 
         mol = self.nh3_molecule()
         assert mol.atom_indices('B') == []
-        assert mol.atom_indices('N') == [
-            0,
-        ]
-        assert mol.atom_indices('H') == [
-            1,
-            2,
-            3,
-        ]
+        assert mol.atom_indices('N') == [0]
+        assert mol.atom_indices('H') == [1, 2, 3]
 
     def test_nuclear_repulsion_energy(self):
 
@@ -686,35 +687,38 @@ class TestMolecule:
             fpath = here / 'data' / f'vlx_molecule_{random_string}.xyz'
             fname = str(fpath)
 
-            mol = self.nh3_molecule()
-            mol.write_xyz(fname)
+            for mol in [
+                    self.nh3_molecule(),
+                    self.nh3_molecule_with_ghost_atom(),
+            ]:
+                mol.write_xyz(fname)
 
-            ref_labels = mol.get_labels()
-            ref_coords_au = mol.get_coordinates_in_bohr()
-            ref_coords_ang = mol.get_coordinates_in_angstrom()
+                ref_labels = mol.get_labels()
+                ref_coords_au = mol.get_coordinates_in_bohr()
+                ref_coords_ang = mol.get_coordinates_in_angstrom()
 
-            mol_2 = Molecule.read_xyz_file(fname)
-            assert ref_labels == mol_2.get_labels()
-            assert np.max(
-                np.abs(ref_coords_au -
-                       mol_2.get_coordinates_in_bohr())) < 1.0e-10
-            assert np.max(
-                np.abs(ref_coords_ang -
-                       mol_2.get_coordinates_in_angstrom())) < 1.0e-10
-
-            with open(fname, 'r') as f_xyz:
-                lines = f_xyz.readlines()
-                mol_3 = Molecule.read_xyz_string(''.join(lines))
-                assert ref_labels == mol_3.get_labels()
+                mol_2 = Molecule.read_xyz_file(fname)
+                assert ref_labels == mol_2.get_labels()
                 assert np.max(
                     np.abs(ref_coords_au -
-                           mol_3.get_coordinates_in_bohr())) < 1.0e-10
+                           mol_2.get_coordinates_in_bohr())) < 1.0e-10
                 assert np.max(
                     np.abs(ref_coords_ang -
-                           mol_3.get_coordinates_in_angstrom())) < 1.0e-10
+                           mol_2.get_coordinates_in_angstrom())) < 1.0e-10
 
-            if fpath.is_file():
-                fpath.unlink()
+                with open(fname, 'r') as f_xyz:
+                    lines = f_xyz.readlines()
+                    mol_3 = Molecule.read_xyz_string(''.join(lines))
+                    assert ref_labels == mol_3.get_labels()
+                    assert np.max(
+                        np.abs(ref_coords_au -
+                               mol_3.get_coordinates_in_bohr())) < 1.0e-10
+                    assert np.max(
+                        np.abs(ref_coords_ang -
+                               mol_3.get_coordinates_in_angstrom())) < 1.0e-10
+
+                if fpath.is_file():
+                    fpath.unlink()
 
     def test_dihedral(self):
 
