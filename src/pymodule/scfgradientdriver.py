@@ -824,7 +824,6 @@ class ScfGradientDriver(GradientDriver):
         self.print_header()
 
         self.ostream.mute()
-        # Currently, only numerical gradients activated
         self.compute_numerical(molecule, ao_basis, scf_results)
         self.ostream.unmute()
 
@@ -854,7 +853,8 @@ class ScfGradientDriver(GradientDriver):
         """
 
         if not self._debug:
-            self.ostream.mute()
+            #self.ostream.mute()
+            pass
 
         if self.numerical:
             self.scf_driver.restart = False
@@ -863,7 +863,8 @@ class ScfGradientDriver(GradientDriver):
                             'ScfGradientDriver: SCF did not converge')
 
         if not self._debug:
-            self.ostream.unmute()
+            #self.ostream.unmute()
+            pass
 
         if self.rank == mpi_master():
             scf_results.update(new_scf_results)
