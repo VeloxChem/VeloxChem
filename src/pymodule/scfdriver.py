@@ -450,10 +450,7 @@ class ScfDriver:
                 not self._pe,
                 'SCF driver: The \'_point_charges\' option is incompatible ' +
                 'with polarizable embedding')
-            # disable restart of calculation with point charges since
-            # checkpoint file does not contain information about the point
-            # charges
-            self.restart = False
+            # Note: we allow restarting SCF with point charges
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
