@@ -32,7 +32,7 @@
 namespace pdftslater {  // pdftslater namespace
 
 void
-compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
+compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho)
 {
     double onethird = 1.0 / 3.0;
 
@@ -50,7 +50,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
     double fre = frg * 0.75 / std::pow(2.0, fourthird);
 
-    for (int32_t g = 0; g < np; g++)
+    for (int g = 0; g < np; g++)
     {
         double density = rho[2 * g + 0];
 

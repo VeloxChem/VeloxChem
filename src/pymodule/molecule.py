@@ -285,12 +285,22 @@ def _Molecule_read_molecule_string(mol_str, units='angstrom'):
     for line in mol_str.strip().splitlines():
         if line:
             content = line.split()
-            labels.append(content[0].upper())
+
+            elem_name = content[0].upper()
+            basis_elem_name = elem_name
+
+            if elem_name.startswith('BQ_'):
+                elem_name, basis_elem_name = elem_name.split('_')
+            elif elem_name.endswith('_BQ'):
+                basis_elem_name, elem_name = elem_name.split('_')
+
+            labels.append(elem_name)
             coords.append([float(x) for x in content[1:4]])
+
             if len(content) > 4:
-                basis_set_labels.append(content[4].upper())
+                basis_set_labels.append([content[4].upper(), basis_elem_name])
             else:
-                basis_set_labels.append('')
+                basis_set_labels.append(['', basis_elem_name])
 
     coords = np.array(coords)
 
@@ -702,16 +712,34 @@ def _Molecule_get_string(self):
         A string with representation of molecule.
     """
 
-    labels = self.get_labels()
-    coords_in_angstrom = self.get_coordinates_in_angstrom()
-
     mol_str = 'Molecular Geometry (Angstroms)\n'
     mol_str += '================================\n\n'
-    mol_str += '  Atom         Coordinate X'
-    mol_str += '          Coordinate Y          Coordinate Z  \n\n'
-    for label, coords in zip(labels, coords_in_angstrom):
-        mol_str += f'  {label:<4s}{coords[0]:>22.12f}'
-        mol_str += f'{coords[1]:>22.12f}{coords[2]:>22.12f}\n'
+    mol_str += '  Atom'
+    mol_str += '         Coordinate X '
+    mol_str += '         Coordinate Y '
+    mol_str += '         Coordinate Z  \n\n'
+
+    xyz_lines = self.get_xyz_string().splitlines()
+
+    for line in xyz_lines[2:]:
+        content = line.split()
+
+        elem_name = content[0]
+        if elem_name.startswith('Bq_') or elem_name.endswith('_Bq'):
+            elem_name = ' ' + elem_name
+        else:
+            elem_name = '  ' + elem_name
+
+        x_coord = float(content[1])
+        y_coord = float(content[2])
+        z_coord = float(content[3])
+
+        mol_str += f'{elem_name:<6s}'
+        mol_str += f'{x_coord:>22.12f}'
+        mol_str += f'{y_coord:>22.12f}'
+        mol_str += f'{z_coord:>22.12f}'
+        mol_str += '\n'
+
     mol_str += '\n'
 
     return mol_str
@@ -809,12 +837,21 @@ def _Molecule_get_xyz_string(self, precision=12):
     labels = self.get_labels()
     coords_in_angstrom = self.get_coordinates_in_angstrom()
 
+    elem_ids = self.get_identifiers()
+    atom_basis_labels = self.get_atom_basis_labels()
+
     natoms = len(labels)
     xyz = f'{natoms}\n\n'
 
     for a in range(natoms):
         xa, ya, za = coords_in_angstrom[a]
-        xyz += f'{labels[a]:<6s}'
+
+        if elem_ids[a] == 0 and atom_basis_labels[a][1]:
+            elem_name = 'Bq_' + atom_basis_labels[a][1].capitalize()
+        else:
+            elem_name = labels[a]
+
+        xyz += f'{elem_name:<6s}'
         xyz += f' {xa:{precision + 10}.{precision}f}'
         xyz += f' {ya:{precision + 10}.{precision}f}'
         xyz += f' {za:{precision + 10}.{precision}f}\n'

@@ -29,6 +29,7 @@ import numpy as np
 import time as tm
 import math
 import sys
+import re
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
@@ -37,6 +38,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import mpi_master
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
 from .veloxchemlib import xcfun
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
@@ -52,7 +54,7 @@ from .firstorderprop import FirstOrderProperties
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_libxc_reference
-from .sanitychecks import molecule_sanity_check, dft_sanity_check
+from .sanitychecks import molecule_sanity_check, dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
@@ -102,11 +104,8 @@ class ScfDriver:
         - xcfun: The XC functional.
         - molgrid: The molecular grid.
         - pe: The flag for running polarizable embedding calculation.
-        - V_es: The polarizable embedding matrix.
         - pe_options: The dictionary with options for polarizable embedding.
         - pe_summary: The summary string for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - split_comm_ratio: The list of ratios for split communicators.
         - dispersion: The flag for calculating D4 dispersion correction.
         - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
@@ -198,12 +197,14 @@ class ScfDriver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-        self._V_es = None
-        self._pe_summary = ''
+        self.embedding_options = None
+        self._embedding_drv = None
 
-        # split communicators
-        self.use_split_comm = False
-        self._split_comm_ratio = None
+        # point charges (in case we want a simple MM environment without PE)
+        self._point_charges = None
+        self._qm_vdw_params = None
+        self._nuc_mm_energy = 0.0
+        self._V_es = None
 
         # static electric field
         self.electric_field = None
@@ -232,7 +233,8 @@ class ScfDriver:
         self.filename = None
 
         self._debug = False
-        self._block_size_factor = 16
+        self._block_size_factor = 8
+        self._xcfun_ldstaging = 1024
 
         # input keywords
         self._input_keywords = {
@@ -252,8 +254,11 @@ class ScfDriver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initila guess'),
+                '_point_charges': ('str', 'potential file for point charges'),
+                '_qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
+                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
@@ -261,7 +266,6 @@ class ScfDriver:
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
-                # 'use_split_comm': ('bool', 'use split communicators'),
             },
         }
 
@@ -426,7 +430,7 @@ class ScfDriver:
 
         dft_sanity_check(self, 'update_settings')
 
-        self._pe_sanity_check(method_dict)
+        pe_sanity_check(self, method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -441,34 +445,15 @@ class ScfDriver:
             # field
             self.restart = False
 
-    def _pe_sanity_check(self, method_dict=None):
-        """
-        Checks PE settings and updates relevant attributes.
-
-        :param method_dict:
-            The dicitonary of method settings.
-        """
-
-        if method_dict:
-            if 'pe_options' in method_dict:
-                self.pe_options = dict(method_dict['pe_options'])
-            else:
-                self.pe_options = {}
-
-        if self.potfile:
-            self.pe_options['potfile'] = self.potfile
-
-        self._pe = ('potfile' in self.pe_options)
-
-        if self._pe:
-            potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-            potfile = self.comm.bcast(potfile, root=mpi_master())
-            self.pe_options['potfile'] = potfile
+        if self._point_charges is not None:
+            assert_msg_critical(
+                not self._pe,
+                'SCF driver: The \'_point_charges\' option is incompatible ' +
+                'with polarizable embedding')
+            # disable restart of calculation with point charges since
+            # checkpoint file does not contain information about the point
+            # charges
+            self.restart = False
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -501,7 +486,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        self._pe_sanity_check()
+        pe_sanity_check(self)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -554,7 +539,7 @@ class ScfDriver:
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
-            self._mol_grid = grid_drv.generate(molecule)
+            self._mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = self._mol_grid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
@@ -564,11 +549,158 @@ class ScfDriver:
 
         # set up polarizable embedding
         if self._pe:
-            # TODO: add PE info
+
+            # TODO: print PyFraME info
+
             pot_info = 'Reading polarizable embedding potential: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
+
+            assert_msg_critical(
+                self.embedding_options['settings']['embedding_method'] == 'PE',
+                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
+            )
+
+            settings = self.embedding_options['settings']
+
+            from .embedding import PolarizableEmbeddingSCF
+
+            self._embedding_drv = PolarizableEmbeddingSCF(
+                molecule=molecule,
+                ao_basis=ao_basis,
+                options=self.embedding_options,
+                comm=self.comm)
+
+            emb_info = 'Embedding settings:'
+            self.ostream.print_info(emb_info)
+
+            for key in ['embedding_method', 'environment_energy']:
+                if key in settings:
+                    self.ostream.print_info(f'- {key:<15s} : {settings[key]}')
+
+            if 'vdw' in settings:
+                self.ostream.print_info('{- "vdw":<15s}')
+                for key in ['method', 'combination_rule']:
+                    self.ostream.print_info(
+                        f'  - {key:<15s} : {settings["vdw"][key]}')
+
+            if 'induced_dipoles' in settings:
+                self.ostream.print_info('{- "induced_dipoles":<15s}')
+                for key in ['solver', 'threshold', 'max_iterations']:
+                    self.ostream.print_info(
+                        f'  - {key:<15s} : {settings["induced_dipoles"][key]}')
+
+            self.ostream.print_blank()
+
+        # set up point charges without PE
+        elif self._point_charges is not None:
+
+            if isinstance(self._point_charges, str):
+                potfile = self._point_charges
+
+                pot_info = 'Reading point charges: {}'.format(potfile)
+                self.ostream.print_info(pot_info)
+                self.ostream.print_blank()
+
+                if self.rank == mpi_master():
+                    with Path(potfile).open('r') as fh:
+                        lines = fh.read().strip().splitlines()
+                        try:
+                            npoints = int(lines[0].strip())
+                        except (ValueError, TypeError):
+                            assert_msg_critical(
+                                False, 'potfile: Invalid number of points')
+                        assert_msg_critical(
+                            npoints == len(lines[2:]),
+                            'potfile: Inconsistent number of points')
+                        self._point_charges = np.zeros((6, npoints))
+                        for idx, line in enumerate(lines[2:]):
+                            label, x, y, z, q, sigma, epsilon = line.split()
+                            self._point_charges[0, idx] = (float(x) /
+                                                           bohr_in_angstrom())
+                            self._point_charges[1, idx] = (float(y) /
+                                                           bohr_in_angstrom())
+                            self._point_charges[2, idx] = (float(z) /
+                                                           bohr_in_angstrom())
+                            self._point_charges[3, idx] = float(q)
+                            self._point_charges[4, idx] = float(sigma)
+                            self._point_charges[5, idx] = float(epsilon)
+                else:
+                    self._point_charges = None
+                self._point_charges = self.comm.bcast(self._point_charges,
+                                                      root=mpi_master())
+
+            if isinstance(self._qm_vdw_params, str):
+                vdw_param_file = self._qm_vdw_params
+
+                vdw_info = 'Reading vdw parameters for QM atoms: {}'.format(
+                    vdw_param_file)
+                self.ostream.print_info(vdw_info)
+                self.ostream.print_blank()
+
+                if self.rank == mpi_master():
+                    natoms = molecule.number_of_atoms()
+                    self._qm_vdw_params = np.zeros((natoms, 2))
+                    with Path(vdw_param_file).open('r') as fh:
+                        for a in range(natoms):
+                            sigma, epsilon = fh.readline().split()
+                            self._qm_vdw_params[a, 0] = float(sigma)
+                            self._qm_vdw_params[a, 1] = float(epsilon)
+                else:
+                    self._qm_vdw_params = None
+                self._qm_vdw_params = self.comm.bcast(self._qm_vdw_params,
+                                                      root=mpi_master())
+
+            # nuclei - point charges interaction
+            self._nuc_mm_energy = 0.0
+
+            natoms = molecule.number_of_atoms()
+            coords = molecule.get_coordinates_in_bohr()
+            nuclear_charges = molecule.get_element_ids()
+            npoints = self._point_charges.shape[1]
+
+            for a in range(self.rank, natoms, self.nodes):
+                xyz_a = coords[a]
+                chg_a = nuclear_charges[a]
+
+                for p in range(npoints):
+                    xyz_p = self._point_charges[:3, p]
+                    chg_p = self._point_charges[3, p]
+                    r_ap = np.linalg.norm(xyz_a - xyz_p)
+
+                    self._nuc_mm_energy += chg_a * chg_p / r_ap
+
+            vdw_ene = 0.0
+
+            for a in range(self.rank, natoms, self.nodes):
+                xyz_i = coords[a]
+                sigma_i = self._qm_vdw_params[a, 0]
+                epsilon_i = self._qm_vdw_params[a, 1]
+
+                for p in range(npoints):
+                    xyz_j = self._point_charges[:3, p]
+                    sigma_j = self._point_charges[4, p]
+                    epsilon_j = self._point_charges[5, p]
+
+                    distance_ij = np.linalg.norm(xyz_i - xyz_j)
+                    # bohr to nm
+                    distance_ij *= bohr_in_angstrom() * 0.1
+
+                    epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                    sigma_ij = 0.5 * (sigma_i + sigma_j)
+
+                    sigma_r_6 = (sigma_ij / distance_ij)**6
+                    sigma_r_12 = sigma_r_6**2
+
+                    vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
+
+            # kJ/mol to Hartree
+            vdw_ene /= (4.184 * hartree_in_kcalpermol())
+
+            self._nuc_mm_energy += vdw_ene
+
+            self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
         # C2-DIIS method
         if self.acc_type.upper() == 'DIIS':
@@ -672,6 +804,48 @@ class ScfDriver:
         """
 
         sad_drv = SadGuessDriver()
+
+        if self.scf_type == 'restricted':
+            density_type = 'restricted'
+        else:
+            density_type = 'unrestricted'
+
+        natoms = molecule.number_of_atoms()
+        unpaired_electrons_on_atoms = [0 for a in range(natoms)]
+
+        if (self.guess_unpaired_electrons and density_type == 'restricted'):
+            warn_msg = 'Ignoring "guess_unpaired_electrons" in '
+            warn_msg += 'spin-restricted SCF calculation.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+
+        if (self.guess_unpaired_electrons and density_type == 'unrestricted'):
+            for entry in self.guess_unpaired_electrons.split(','):
+                m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                assert_msg_critical(
+                    m is not None,
+                    'Initial Guess: Invalid input for unpaired electrons')
+                atom_index = int(m.group(1).strip()) - 1
+                num_unpaired_elec = float(m.group(2).strip())
+                unpaired_electrons_on_atoms[atom_index] = num_unpaired_elec
+
+            sad_drv.set_number_of_unpaired_electrons_on_atoms(
+                unpaired_electrons_on_atoms)
+
+            guess_msg = 'Generating initial guess with '
+            guess_msg += 'user-provided information...'
+            self.ostream.print_info(guess_msg)
+
+            labels = molecule.get_labels()
+            for a, (num_unpaired_elec, atom_name) in enumerate(
+                    zip(unpaired_electrons_on_atoms, labels)):
+                if num_unpaired_elec != 0:
+                    spin = 'alpha' if num_unpaired_elec > 0 else 'beta '
+                    abs_num_unpaired_elec = abs(num_unpaired_elec)
+                    self.ostream.print_info(
+                        f'  {abs_num_unpaired_elec} unpaired {spin} ' +
+                        f'electrons on atom {a + 1} ({atom_name})')
+            self.ostream.print_blank()
 
         return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type)
 
@@ -1009,6 +1183,30 @@ class ScfDriver:
         if self.rank == mpi_master() and self.electric_field is not None:
             dipole_ints = dipole_mats
 
+        if self._point_charges is not None and not self._first_step:
+            t0_point_charges = tm.time()
+
+            ave, res = divmod(self._point_charges.shape[1], self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+
+            charges = self._point_charges[3, :].copy()[start:end]
+            coords = self._point_charges[:3, :].T.copy()[start:end, :]
+
+            V_es = compute_nuclear_potential_integrals(molecule, ao_basis,
+                                                       charges, coords)
+
+            self._V_es = self.comm.reduce(V_es, root=mpi_master())
+            if self.rank != mpi_master():
+                self._V_es = np.zeros(V_es.shape)
+
+            self.ostream.print_info(
+                'Point charges one-electron integral computed in' +
+                ' {:.2f} sec.'.format(tm.time() - t0_point_charges))
+            self.ostream.print_blank()
+
         linear_dependency = False
 
         if self.rank == mpi_master():
@@ -1057,33 +1255,17 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
-        if self.use_split_comm:
-            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
-
-        if self.use_split_comm and not self._first_step:
-            screener = None
-            if not self._first_step:
-                valstr = 'ERI'
-                if self._dft:
-                    valstr += '/DFT'
-                if self._pe:
-                    valstr += '/PE'
-                self.ostream.print_info(
-                    'Using sub-communicators for {}.'.format(valstr))
+        self._print_debug_info('before screener')
+        if self.rank == mpi_master():
+            screener = T4CScreener()
+            screener.partition(ao_basis, molecule, 'eri')
         else:
-            self._print_debug_info('before screener')
-            if self.rank == mpi_master():
-                screener = T4CScreener()
-                screener.partition(ao_basis, molecule, 'eri')
-            else:
-                screener = None
-            self._print_debug_info('after  screener')
-            screener = self.comm.bcast(screener, root=mpi_master())
-            self._print_debug_info('after  bcast screener')
+            screener = None
+        self._print_debug_info('after  screener')
+        screener = self.comm.bcast(screener, root=mpi_master())
+        self._print_debug_info('after  bcast screener')
 
         profiler.check_memory_usage('Initial guess')
-
-        self._split_comm_ratio = None
 
         e_grad = None
 
@@ -1103,15 +1285,15 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock(
+            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
 
-            e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
-                                     den_mat)
+            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat,
+                                     npot_mat, den_mat)
 
-            self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
+            self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1143,8 +1325,10 @@ class ScfDriver:
 
             diff_den = self._comp_density_change(den_mat, self._density)
 
-            e_scf = (e_el + self._nuc_energy + self._d4_energy +
-                     self._ef_nuc_energy)
+            e_scf = (e_el + self._nuc_energy + self._nuc_mm_energy +
+                     self._d4_energy + self._ef_nuc_energy)
+
+            e_scf = self.comm.bcast(e_scf, root=mpi_master())
 
             diff_e_scf = e_scf - self.scf_energy
 
@@ -1271,8 +1455,10 @@ class ScfDriver:
                         self._scf_tensors['grid_level'] = self.grid_level
 
                 if self._pe:
-                    # pe info
+                    # pe info, energy and potential matrix
                     self._scf_tensors['potfile'] = self.potfile
+                    self._scf_tensors['E_emb'] = e_emb
+                    self._scf_tensors['F_emb'] = V_emb
 
             else:
                 self._scf_tensors = None
@@ -1498,15 +1684,10 @@ class ScfDriver:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
-        if self.use_split_comm and not self._first_step:
-            fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock_split_comm(
-                den_mat, molecule, basis, screener, e_grad, profiler)
+        fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
+            den_mat, molecule, basis, screener, e_grad, profiler)
 
-        else:
-            fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock_single_comm(
-                den_mat, molecule, basis, screener, e_grad, profiler)
-
-        return fock_mat, vxc_mat, e_pe, V_pe
+        return fock_mat, vxc_mat, e_emb, V_emb
 
     def _comp_2e_fock_single_comm(self,
                                   den_mat,
@@ -1574,9 +1755,7 @@ class ScfDriver:
         eri_t0 = tm.time()
 
         fock_drv = FockDriver(self.comm)
-
-        fock_drv._set_block_size_factor(self._block_size_factor,
-                                        basis.get_dimensions_of_basis())
+        fock_drv._set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
         fock_type = '2jk'
@@ -1742,52 +1921,33 @@ class ScfDriver:
         pe_t0 = tm.time()
 
         if self._pe and not self._first_step:
-            # TODO: add PE contribution and update pe_summary
-            pass
+            if self.scf_type == 'restricted':
+                density_matrix = 2.0 * den_mat[0]
+            else:
+                density_matrix = den_mat[0] + den_mat[1]
+            from .embedding import PolarizableEmbeddingSCF
+            assert_msg_critical(
+                isinstance(self._embedding_drv, PolarizableEmbeddingSCF),
+                'ScfDriver: Inconsistent embedding driver for SCF')
+            e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
+                density_matrix=density_matrix)
+        elif self._point_charges is not None and not self._first_step:
+            if self.scf_type == 'restricted':
+                density_matrix = 2.0 * den_mat[0]
+            else:
+                density_matrix = den_mat[0] + den_mat[1]
+            e_emb = np.sum(density_matrix * self._V_es)
+            V_emb = self._V_es
         else:
-            e_pe, V_pe = 0.0, None
+            e_emb, V_emb = 0.0, None
 
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
-        return fock_mat, vxc_mat, e_pe, V_pe
+        return fock_mat, vxc_mat, e_emb, V_emb
 
-    def _comp_2e_fock_split_comm(self,
-                                 fock_mat,
-                                 den_mat,
-                                 molecule,
-                                 basis,
-                                 screening,
-                                 e_grad=None,
-                                 profiler=None):
-        """
-        Computes Fock/Kohn-Sham matrix on split communicators.
-
-        :param fock_mat:
-            The AO Fock matrix (only 2e-part).
-        :param den_mat:
-            The AO density matrix.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param screening:
-            The screening container object.
-        :param e_grad:
-            The electronic gradient.
-        :param profiler:
-            The profiler.
-
-        :return:
-            The AO Kohn-Sham (Vxc) matrix.
-        """
-
-        assert_msg_critical(
-            False, 'SCF driver: SCF with split communicator not implemented')
-
-        return None
-
-    def _comp_energy(self, fock_mat, vxc_mat, e_pe, kin_mat, npot_mat, den_mat):
+    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat,
+                     den_mat):
         """
         Computes the sum of SCF energy components: electronic energy, kinetic
         energy, and nuclear potential energy.
@@ -1796,8 +1956,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (only 2e-part).
         :param vxc_mat:
             The Vxc matrix.
-        :param e_pe:
-            The polarizable embedding energy.
+        :param e_emb:
+            The embedding energy.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -1828,10 +1988,15 @@ class ScfDriver:
                 e_ee = 0.5 * (np.sum(D[0] * F[0]) + np.sum(D[1] * F[1]))
                 e_kin = np.sum((D[0] + D[1]) * T)
                 e_en = np.sum((D[0] + D[1]) * V)
+
             if self._dft and not self._first_step:
                 e_ee += xc_ene
+
             if self._pe and not self._first_step:
-                e_ee += e_pe
+                e_ee += e_emb
+            elif self._point_charges is not None and not self._first_step:
+                e_ee += e_emb
+
             e_sum = e_ee + e_kin + e_en
         else:
             e_sum = 0.0
@@ -1839,7 +2004,7 @@ class ScfDriver:
 
         return e_sum
 
-    def _comp_full_fock(self, fock_mat, vxc_mat, pe_mat, kin_mat, npot_mat):
+    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, kin_mat, npot_mat):
         """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
         Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
@@ -1849,8 +2014,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (2e-part).
         :param vxc_mat:
             The Vxc matrix.
-        :param pe_mat:
-            The polarizable embedding matrix.
+        :param V_emb:
+            The embedding Fock matrix contributions.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -1877,9 +2042,14 @@ class ScfDriver:
                 if self.scf_type != 'restricted':
                     fock_mat[1] += np_xcmat_b
 
-            # TODO: add PE contribution to Fock
             if self._pe and not self._first_step:
-                pass
+                fock_mat[0] += V_emb
+                if self.scf_type != 'restricted':
+                    fock_mat[1] += V_emb
+            elif self._point_charges is not None and not self._first_step:
+                fock_mat[0] += V_emb
+                if self.scf_type != 'restricted':
+                    fock_mat[1] += V_emb
 
     def _comp_gradient(self, fock_mat, ovl_mat, den_mat, oao_mat):
         """
@@ -2182,7 +2352,7 @@ class ScfDriver:
 
         if self._pe:
             self.ostream.print_blank()
-            for line in self._pe_summary.splitlines():
+            for line in self._embedding_drv.get_pe_summary():
                 self.ostream.print_header(line.ljust(92))
             self.ostream.flush()
 
@@ -2447,9 +2617,8 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         mult = molecule.get_multiplicity()
-        if self.scf_type == 'restricted':
-            valstr = 'Multiplicity (2S+1)           :{:5.1f}'.format(mult)
-            self.ostream.print_header(valstr.ljust(92))
+        valstr = 'Multiplicity (2S+1)           :{:3.0f}'.format(mult)
+        self.ostream.print_header(valstr.ljust(92))
 
         sz = 0.5 * (mult - 1.0)
         valstr = 'Magnetic Quantum Number (M_S) :{:5.1f}'.format(sz)
@@ -2468,13 +2637,17 @@ class ScfDriver:
 
         enuc = self._nuc_energy
 
+        # TODO: extract nuclei-MM energy also for polarizable embedding
+
+        enuc_mm = self._nuc_mm_energy
+
         e_d4 = self._d4_energy
 
         e_ef_nuc = self._ef_nuc_energy
 
         etot = self._iter_data['energy']
 
-        e_el = etot - enuc - e_d4 - e_ef_nuc
+        e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -2484,6 +2657,10 @@ class ScfDriver:
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
+
+        if self._point_charges is not None:
+            valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
 
         if self.dispersion:
             valstr = f'D4 Dispersion Correction           :{e_d4:20.10f} a.u.'

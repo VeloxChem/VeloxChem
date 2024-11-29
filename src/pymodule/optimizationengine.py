@@ -95,9 +95,11 @@ class OptimizationEngine(geometric.engine.Engine):
         start_time = tm.time()
 
         labels = self.molecule.get_labels()
+        atom_basis_labels = self.molecule.get_atom_basis_labels()
 
         if self.rank == mpi_master():
-            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au')
+            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
+                               atom_basis_labels)
             new_mol.set_charge(self.molecule.get_charge())
             new_mol.set_multiplicity(self.molecule.get_multiplicity())
         else:

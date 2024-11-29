@@ -138,6 +138,8 @@ class TpaDriver(NonlinearSolver):
 
         start_time = time.time()
 
+        eri_dict = self._init_eri(molecule, ao_basis)
+
         dft_dict = self._init_dft(molecule, scf_tensors)
 
         # sanity check
@@ -260,7 +262,7 @@ class TpaDriver(NonlinearSolver):
         tpa_dict = self.compute_tpa_components(Focks, self.frequencies, X,
                                                d_a_mo, Nx, self.comp,
                                                scf_tensors, molecule, ao_basis,
-                                               profiler, dft_dict)
+                                               profiler, eri_dict, dft_dict)
 
         valstr = '*** Time spent in TPA calculation: {:.2f} sec ***'.format(
             time.time() - start_time)
@@ -274,7 +276,7 @@ class TpaDriver(NonlinearSolver):
 
     def compute_tpa_components(self, Focks, w, X, d_a_mo, Nx, track,
                                scf_tensors, molecule, ao_basis, profiler,
-                               dft_dict):
+                               eri_dict, dft_dict):
         """
         Computes all the relevent terms to third-order isotropic gradient
 
@@ -295,8 +297,10 @@ class TpaDriver(NonlinearSolver):
             The molecule.
         :param basis:
             The AO basis.
-        :param profiler:
-            The profiler.
+        :param eri_dict:
+            The dictionary containing ERI information
+        :param dft_dict:
+            The dictionary containing DFT information
 
         :return:
             A dictionary containing all the relevent terms to third-order
@@ -332,7 +336,8 @@ class TpaDriver(NonlinearSolver):
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(w, density_list1, density_list2,
                                        density_list3, F0, mo, molecule,
-                                       ao_basis, dft_dict, fock_profiler)
+                                       ao_basis, eri_dict, dft_dict,
+                                       fock_profiler)
 
         fock_profiler.end(self.ostream)
 
@@ -369,7 +374,7 @@ class TpaDriver(NonlinearSolver):
         # second-order densities
         fock_dict_two = self.get_fock_dict_II(w, density_list_two1,
                                               density_list_two2, mo, molecule,
-                                              ao_basis, dft_dict,
+                                              ao_basis, eri_dict, dft_dict,
                                               fock_profiler_two)
 
         fock_profiler_two.end(self.ostream)
@@ -456,7 +461,7 @@ class TpaDriver(NonlinearSolver):
         return None
 
     def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis,
-                      dft_dict, profiler):
+                      eri_dict, dft_dict, profiler):
         """
         Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -473,6 +478,10 @@ class TpaDriver(NonlinearSolver):
             The molecule
         :param ao_basis:
             The AO basis set
+        :param eri_dict:
+            The dictionary containing ERI information
+        :param dft_dict:
+            The dictionary containing DFT information
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -565,7 +574,7 @@ class TpaDriver(NonlinearSolver):
         return None
 
     def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis,
-                         dft_dict, profiler):
+                         eri_dict, dft_dict, profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -580,6 +589,10 @@ class TpaDriver(NonlinearSolver):
             The molecule
         :param ao_basis:
             The AO basis set
+        :param eri_dict:
+            The dictionary containing ERI information
+        :param dft_dict:
+            The dictionary containing DFT information
 
         :return:
             A dictonary of compounded second-order Fock-matrices

@@ -140,6 +140,13 @@ class CXCFunctional
     bool operator!=(const CXCFunctional& other) const;
 
     /**
+     Sets the leading dimension.
+
+     @param ldStaging the leading dimension.
+     */
+    void setLeadingDimension(const int ldStaging);
+
+    /**
      Gets XC functional name.
      */
     std::string getFunctionalLabel() const;

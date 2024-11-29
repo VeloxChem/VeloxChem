@@ -34,6 +34,7 @@
 #include <sstream>
 
 #include "AODensityMatrix.hpp"
+#include "AOIndices.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
@@ -44,6 +45,7 @@
 #include "GtoValues.hpp"
 #include "Prescreener.hpp"
 #include "XCFunctional.hpp"
+#include "XCMolecularGradientForPDFT.hpp"
 
 CXCMolecularGradient::CXCMolecularGradient()
 
@@ -139,7 +141,7 @@ CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecu
 
     std::vector<int> ao_to_atom_ids(naos);
 
-    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+    aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
 
     // molecular gradient
 
@@ -467,7 +469,7 @@ CXCMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&     
 
     std::vector<int> ao_to_atom_ids(naos);
 
-    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+    aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
 
     // molecular gradient
 
@@ -812,7 +814,7 @@ CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecu
 
     std::vector<int> ao_to_atom_ids(naos);
 
-    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+    aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
 
     // molecular gradient
 
@@ -1236,7 +1238,7 @@ CXCMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&     
 
     std::vector<int> ao_to_atom_ids(naos);
 
-    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+    aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
 
     // molecular gradient
 
@@ -1705,36 +1707,45 @@ CXCMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&     
     return molgrad;
 }
 
-void
-CXCMolecularGradient::_computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) const
+auto
+CXCMolecularGradient::integrateVxcPDFTGradient(const CMolecule&                    molecule,
+                                        const CMolecularBasis&              basis,
+                                        const double*                       densityMatrixPointer,
+                                        const CDenseMatrix&                 twoBodyDensityMatrix,
+                                        const CDenseMatrix&                 activeMOs,
+                                        const CMolecularGrid&               molecularGrid,
+                                        const CXCPairDensityFunctional&     fvxc,
+                                        const double                        rs_omega) const -> CDenseMatrix
 {
-    auto natoms = molecule.number_of_atoms();
+    auto xcfuntype = fvxc.getFunctionalType();
 
-    auto max_angl = basis.max_angular_momentum();
-
-    // azimuthal quantum number: s,p,d,f,...
-
-    for (int angl = 0, aoidx = 0; angl <= max_angl; angl++)
+    if (xcfuntype == "PLDA")
     {
-        auto nsph = angl * 2 + 1;
-
-        // magnetic quantum number: s,p-1,p0,p+1,d-2,d-1,d0,d+1,d+2,...
-
-        for (int isph = 0; isph < nsph; isph++)
-        {
-            // atoms
-
-            for (int atomidx = 0; atomidx < natoms; atomidx++)
-            {
-                auto nao = basis.number_of_basis_functions(std::vector<int>({atomidx}), angl);
-
-                // atomic orbitals
-
-                for (int iao = 0; iao < nao; iao++, aoidx++)
-                {
-                    ao_to_atom_ids[aoidx] = atomidx;
-                }
-            }
-        }
+        return xcgradpdft::integrateVxcPDFTGradientForLDA(molecule,
+                                                  basis,
+                                                  densityMatrixPointer,
+                                                  twoBodyDensityMatrix,
+                                                  activeMOs,
+                                                  molecularGrid,
+                                                 _screeningThresholdForGTOValues,
+                                                  fvxc, rs_omega);
     }
+    else if (xcfuntype == "PGGA")
+    {
+        return xcgradpdft::integrateVxcPDFTGradientForGGA(molecule,
+                                                  basis,
+                                                  densityMatrixPointer,
+                                                  twoBodyDensityMatrix,
+                                                  activeMOs,
+                                                  molecularGrid,
+                                                  _screeningThresholdForGTOValues,
+                                                  fvxc, rs_omega);
+    }
+    else
+    {
+        std::string errxcfuntype("XCMolecularGradient.integrateVxcPDFTGradient: Only implemented for PLDA/PGGA");
+
+        errors::assertMsgCritical(false, errxcfuntype);
+    }
+    return CDenseMatrix();
 }

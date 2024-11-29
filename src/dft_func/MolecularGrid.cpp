@@ -44,6 +44,16 @@ CMolecularGrid::CMolecularGrid()
 {
 }
 
+CMolecularGrid::CMolecularGrid(const int maxNumberOfGridPointsPerBox)
+
+    : _isDistributed(false)
+
+    , _isPartitioned(false)
+
+    , _maxNumberOfGridPointsPerBox(maxNumberOfGridPointsPerBox)
+{
+}
+
 CMolecularGrid::CMolecularGrid(const CDenseMatrix& gridPoints)
 
     : _isDistributed(false)
@@ -53,6 +63,18 @@ CMolecularGrid::CMolecularGrid(const CDenseMatrix& gridPoints)
     , _isPartitioned(false)
 
     , _maxNumberOfGridPointsPerBox(1024)
+{
+}
+
+CMolecularGrid::CMolecularGrid(const CDenseMatrix& gridPoints, const int maxNumberOfGridPointsPerBox)
+
+    : _isDistributed(false)
+
+    , _gridPoints(gridPoints)
+
+    , _isPartitioned(false)
+
+    , _maxNumberOfGridPointsPerBox(maxNumberOfGridPointsPerBox)
 {
 }
 
