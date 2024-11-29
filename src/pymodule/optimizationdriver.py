@@ -29,7 +29,7 @@ import numpy as np
 import time as tm
 import tempfile
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -120,7 +120,7 @@ class OptimizationDriver:
 
         self.keep_files = False
 
-        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
         self.grad_drv = grad_drv
 
         self._debug = False
@@ -205,6 +205,51 @@ class OptimizationDriver:
         self.ostream.print_blank()
         self.ostream.flush()
 
+        # check existing _optim.xyz file
+
+        labels = molecule.get_labels()
+
+        if self.filename is not None:
+            optim_xyz_file = f'{self.filename}_optim.xyz'
+
+            if Path(optim_xyz_file).is_file():
+                valid_optim_xyz = True
+
+                with Path(optim_xyz_file).open('r') as fh:
+                    optim_xyz_lines = fh.readlines()
+
+                try:
+                    natoms = int(optim_xyz_lines[0].strip())
+                except (ValueError, TypeError):
+                    valid_optim_xyz = False
+
+                if valid_optim_xyz:
+                    n_xyzs = len(optim_xyz_lines) // (natoms + 2)
+                    xyz_end = n_xyzs * (natoms + 2)
+                    xyz_lines = optim_xyz_lines[xyz_end - natoms:xyz_end]
+
+                    if len(xyz_lines) == natoms:
+                        for a in range(len(xyz_lines)):
+                            content = xyz_lines[a].split()
+                            if labels[a].upper() != content[0].upper():
+                                valid_optim_xyz = False
+                                break
+
+                        if valid_optim_xyz:
+                            for a in range(len(xyz_lines)):
+                                content = xyz_lines[a].split()
+                                xyz_au = np.array([
+                                    float(content[1]),
+                                    float(content[2]),
+                                    float(content[3]),
+                                ]) / bohr_in_angstrom()
+                                molecule.set_atom_coordinates(a, xyz_au)
+
+                            restart_text = 'Restarting from xyz file: '
+                            restart_text += optim_xyz_file
+                            self.ostream.print_info(restart_text)
+                            self.ostream.print_blank()
+
         start_time = tm.time()
 
         opt_engine = OptimizationEngine(self.grad_drv, molecule, *args)
@@ -223,7 +268,7 @@ class OptimizationDriver:
             temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(temp_dir.name)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.filename is not None:
             self.clean_up_file(Path(self.filename + '.log'))
             self.clean_up_file(
                 Path(self.filename + '.tmp', 'hessian', 'hessian.txt'))
@@ -232,10 +277,16 @@ class OptimizationDriver:
 
         # filename is used by geomeTRIC to create .log and other files
 
-        if self.rank == mpi_master() and self.keep_files:
-            filename = self.filename
+        if self.filename is not None:
+            base_fname = self.filename
         else:
-            filename = Path(self.filename).name
+            name_string = get_random_string_parallel(self.comm)
+            base_fname = 'vlx_' + name_string
+
+        if self.rank == mpi_master() and self.keep_files:
+            filename = base_fname
+        else:
+            filename = Path(base_fname).name
             filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
