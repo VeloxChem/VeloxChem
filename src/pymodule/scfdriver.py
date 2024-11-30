@@ -1071,7 +1071,7 @@ class ScfDriver:
             err_mo = 'ScfDriver.set_start_orbitals: inconsistent number of MOs'
             err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
 
-            n_ao = basis.get_dimension_of_basis(molecule)
+            n_ao = basis.get_dimensions_of_basis()
 
             assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
             assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
@@ -1115,7 +1115,8 @@ class ScfDriver:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
             self.checkpoint_file = f'{base_fname}.scf.h5'
-        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
+
         self.comm.barrier()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
@@ -1523,7 +1524,7 @@ class ScfDriver:
         self.ostream.print_info('Preparing for a graceful termination...')
         self.ostream.flush()
 
-        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
 
         self.ostream.print_blank()
         self.ostream.print_info('...done.')
@@ -1586,7 +1587,7 @@ class ScfDriver:
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
                 coords = molecule.get_coordinates_in_bohr()
-                nuclear_charges = molecule.elem_ids_to_numpy()
+                nuclear_charges = molecule.get_element_ids()
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)
             else:
