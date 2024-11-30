@@ -60,7 +60,10 @@ find_package(Python 3.9 REQUIRED COMPONENTS Interpreter Development NumPy)
 # pybind11
 find_package(pybind11 2.6 CONFIG REQUIRED)
 # Libxc
-find_package(Libxc 6.0.0 CONFIG REQUIRED COMPONENTS C)
+find_package(Libxc CONFIG REQUIRED COMPONENTS C)
+if(Libxc_VERSION VERSION_LESS "6")
+  message(FATAL_ERROR "Libxc version must be 6 or higher!")
+endif()
 get_property(_loc TARGET Libxc::xc PROPERTY LOCATION)
 message(STATUS "Found Libxc: ${_loc} (found version \"${Libxc_VERSION}\")") 
 
