@@ -138,6 +138,12 @@ from .symmetryanalyzer import SymmetryAnalyzer
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
+from .oneeints import compute_overlap_integrals
+from .oneeints import compute_kinetic_energy_integrals
+from .oneeints import compute_nuclear_potential_integrals
+from .oneeints import compute_electric_dipole_integrals
+from .oneeints import compute_linear_momentum_integrals
+from .oneeints import compute_angular_momentum_integrals
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
