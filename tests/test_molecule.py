@@ -275,20 +275,20 @@ class TestMolecule:
 
         # check nitrogen atom coordinates in au
         coords = mol.get_atom_coordinates(0, 'au')
-        assert coords == Point([-3.710, 3.019, -0.037])
+        assert coords == [-3.710, 3.019, -0.037]
 
         # check last hydrogen atom coordinates in au
         coords = mol.get_atom_coordinates(3, 'au')
-        assert coords == Point([-4.780, 2.569, -1.573])
+        assert coords == [-4.780, 2.569, -1.573]
 
         # check nitrogen atom coordinates in angstrom
         f = bohr_in_angstrom()
         coords = mol.get_atom_coordinates(0, 'angstrom')
-        assert coords == Point([-3.710 * f, 3.019 * f, -0.037 * f])
+        assert coords == [-3.710 * f, 3.019 * f, -0.037 * f]
 
         # check last hydrogen atom coordinates in au
         coords = mol.get_atom_coordinates(3, 'angstrom')
-        assert coords == Point([-4.780 * f, 2.569 * f, -1.573 * f])
+        assert coords == [-4.780 * f, 2.569 * f, -1.573 * f]
 
     def test_atom_indices(self):
 

@@ -1156,6 +1156,7 @@ Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
 Molecule.set_dihedral_in_degrees = _Molecule_set_dihedral_in_degrees
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
 Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
+Molecule.get_string = _Molecule_get_string
 Molecule.more_info = _Molecule_more_info
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
@@ -1171,7 +1172,6 @@ Molecule.print_keywords = _Molecule_print_keywords
 Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
-Molecule.get_string = _Molecule_get_string
 
 # aliases for backward compatibility
 Molecule.read_xyz = _Molecule_read_xyz_file
