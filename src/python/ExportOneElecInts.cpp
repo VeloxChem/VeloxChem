@@ -123,7 +123,9 @@ export_oneeints(py::module& m)
                 ret.append(vlx_general::pointer_to_numpy(linmom[2].values(), {linmom[2].getNumberOfRows(), linmom[2].getNumberOfColumns()}));
                 return ret;
             },
-            "Computes linear momentum integrals.");
+            "Computes linear momentum integrals.",
+             "molecule"_a,
+             "basis"_a);
 
     m.def("compute_angular_momentum_integrals",
             [](const CMolecule&           molecule,
@@ -136,7 +138,10 @@ export_oneeints(py::module& m)
                 ret.append(vlx_general::pointer_to_numpy(angmom[2].values(), {angmom[2].getNumberOfRows(), angmom[2].getNumberOfColumns()}));
                 return ret;
             },
-            "Computes angular momentum integrals.");
+            "Computes angular momentum integrals.",
+             "molecule"_a,
+             "basis"_a,
+             "origin"_a = std::vector<double>({0.0, 0.0, 0.0}));
 
     m.def("compute_electric_field_integrals",
             [](const CMolecule&           molecule,
@@ -157,7 +162,11 @@ export_oneeints(py::module& m)
                 auto efield = onee::computeElectricFieldIntegrals(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles);
                 return vlx_general::pointer_to_numpy(efield.values(), {efield.getNumberOfRows(), efield.getNumberOfColumns()});
             },
-            "Computes electric field integrals.");
+            "Computes electric field integrals.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "dipole_moments"_a);
 
     m.def("compute_electric_field_values",
             [](const CMolecule&           molecule,
@@ -176,7 +185,11 @@ export_oneeints(py::module& m)
                 auto ef_vals = onee::computeElectricFieldValues(molecule, basis, dipole_coords.data(), ndipoles, D.data(), naos);
                 return vlx_general::pointer_to_numpy(ef_vals.values(), {ef_vals.getNumberOfRows(), ef_vals.getNumberOfColumns()});
             },
-            "Computes electric field values.");
+            "Computes electric field values.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "D"_a);
 
     m.def("compute_nuclear_potential_values",
             [](const CMolecule&           molecule,
@@ -193,7 +206,11 @@ export_oneeints(py::module& m)
                 auto npot_vals = onee::computeNuclearPotentialValues(molecule, basis, point_coords.data(), npoints, D.data(), naos);
                 return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
             },
-            "Computes nuclear potential values.");
+            "Computes nuclear potential values.",
+             "molecule"_a,
+             "basis"_a,
+             "point_coords"_a,
+             "D"_a);
 
     m.def("compute_quadrupole_integrals",
             [](const CMolecule&           molecule,
@@ -209,7 +226,10 @@ export_oneeints(py::module& m)
                 ret.append(vlx_general::pointer_to_numpy(mu[5].values(), {mu[5].getNumberOfRows(), mu[5].getNumberOfColumns()}));
                 return ret;
             },
-            "Computes quadrupole integrals.");
+            "Computes quadrupole integrals.",
+             "molecule"_a,
+             "basis"_a,
+             "origin"_a = std::vector<double>({0.0, 0.0, 0.0}));
 }
 
 }  // namespace vlx_oneeints
