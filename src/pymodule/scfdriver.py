@@ -201,8 +201,8 @@ class ScfDriver:
         self._embedding_drv = None
 
         # point charges (in case we want a simple MM environment without PE)
-        self._point_charges = None
-        self._qm_vdw_params = None
+        self.point_charges = None
+        self.qm_vdw_params = None
         self._nuc_mm_energy = 0.0
         self._V_es = None
 
@@ -254,8 +254,8 @@ class ScfDriver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initila guess'),
-                '_point_charges': ('str', 'potential file for point charges'),
-                '_qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
+                'point_charges': ('str', 'potential file for point charges'),
+                'qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
@@ -445,10 +445,10 @@ class ScfDriver:
             # field
             self.restart = False
 
-        if self._point_charges is not None:
+        if self.point_charges is not None:
             assert_msg_critical(
                 not self._pe,
-                'SCF driver: The \'_point_charges\' option is incompatible ' +
+                'SCF driver: The \'point_charges\' option is incompatible ' +
                 'with polarizable embedding')
             # Note: we allow restarting SCF with point charges
 
@@ -591,10 +591,10 @@ class ScfDriver:
             self.ostream.print_blank()
 
         # set up point charges without PE
-        elif self._point_charges is not None:
+        elif self.point_charges is not None:
 
-            if isinstance(self._point_charges, str):
-                potfile = self._point_charges
+            if isinstance(self.point_charges, str):
+                potfile = self.point_charges
 
                 pot_info = 'Reading point charges: {}'.format(potfile)
                 self.ostream.print_info(pot_info)
@@ -611,25 +611,30 @@ class ScfDriver:
                         assert_msg_critical(
                             npoints == len(lines[2:]),
                             'potfile: Inconsistent number of points')
-                        self._point_charges = np.zeros((6, npoints))
+                        self.point_charges = np.zeros((6, npoints))
                         for idx, line in enumerate(lines[2:]):
-                            label, x, y, z, q, sigma, epsilon = line.split()
-                            self._point_charges[0, idx] = (float(x) /
-                                                           bohr_in_angstrom())
-                            self._point_charges[1, idx] = (float(y) /
-                                                           bohr_in_angstrom())
-                            self._point_charges[2, idx] = (float(z) /
-                                                           bohr_in_angstrom())
-                            self._point_charges[3, idx] = float(q)
-                            self._point_charges[4, idx] = float(sigma)
-                            self._point_charges[5, idx] = float(epsilon)
+                            content = line.split()
+                            label, x, y, z, q = content[:5]
+                            self.point_charges[0, idx] = (float(x) /
+                                                          bohr_in_angstrom())
+                            self.point_charges[1, idx] = (float(y) /
+                                                          bohr_in_angstrom())
+                            self.point_charges[2, idx] = (float(z) /
+                                                          bohr_in_angstrom())
+                            self.point_charges[3, idx] = float(q)
+                            if self.qm_vdw_params is not None:
+                                # Note: read MM vdw parameters only when QM vdw
+                                # parameters are present
+                                sigma, epsilon = content[5:7]
+                                self.point_charges[4, idx] = float(sigma)
+                                self.point_charges[5, idx] = float(epsilon)
                 else:
-                    self._point_charges = None
-                self._point_charges = self.comm.bcast(self._point_charges,
-                                                      root=mpi_master())
+                    self.point_charges = None
+                self.point_charges = self.comm.bcast(self.point_charges,
+                                                     root=mpi_master())
 
-            if isinstance(self._qm_vdw_params, str):
-                vdw_param_file = self._qm_vdw_params
+            if isinstance(self.qm_vdw_params, str):
+                vdw_param_file = self.qm_vdw_params
 
                 vdw_info = 'Reading vdw parameters for QM atoms: {}'.format(
                     vdw_param_file)
@@ -638,16 +643,16 @@ class ScfDriver:
 
                 if self.rank == mpi_master():
                     natoms = molecule.number_of_atoms()
-                    self._qm_vdw_params = np.zeros((natoms, 2))
+                    self.qm_vdw_params = np.zeros((natoms, 2))
                     with Path(vdw_param_file).open('r') as fh:
                         for a in range(natoms):
                             sigma, epsilon = fh.readline().split()
-                            self._qm_vdw_params[a, 0] = float(sigma)
-                            self._qm_vdw_params[a, 1] = float(epsilon)
+                            self.qm_vdw_params[a, 0] = float(sigma)
+                            self.qm_vdw_params[a, 1] = float(epsilon)
                 else:
-                    self._qm_vdw_params = None
-                self._qm_vdw_params = self.comm.bcast(self._qm_vdw_params,
-                                                      root=mpi_master())
+                    self.qm_vdw_params = None
+                self.qm_vdw_params = self.comm.bcast(self.qm_vdw_params,
+                                                     root=mpi_master())
 
             # nuclei - point charges interaction
             self._nuc_mm_energy = 0.0
@@ -655,47 +660,48 @@ class ScfDriver:
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
-            npoints = self._point_charges.shape[1]
+            npoints = self.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
                 xyz_a = coords[a]
                 chg_a = nuclear_charges[a]
 
                 for p in range(npoints):
-                    xyz_p = self._point_charges[:3, p]
-                    chg_p = self._point_charges[3, p]
+                    xyz_p = self.point_charges[:3, p]
+                    chg_p = self.point_charges[3, p]
                     r_ap = np.linalg.norm(xyz_a - xyz_p)
 
                     self._nuc_mm_energy += chg_a * chg_p / r_ap
 
-            vdw_ene = 0.0
+            if self.qm_vdw_params is not None:
+                vdw_ene = 0.0
 
-            for a in range(self.rank, natoms, self.nodes):
-                xyz_i = coords[a]
-                sigma_i = self._qm_vdw_params[a, 0]
-                epsilon_i = self._qm_vdw_params[a, 1]
+                for a in range(self.rank, natoms, self.nodes):
+                    xyz_i = coords[a]
+                    sigma_i = self.qm_vdw_params[a, 0]
+                    epsilon_i = self.qm_vdw_params[a, 1]
 
-                for p in range(npoints):
-                    xyz_j = self._point_charges[:3, p]
-                    sigma_j = self._point_charges[4, p]
-                    epsilon_j = self._point_charges[5, p]
+                    for p in range(npoints):
+                        xyz_j = self.point_charges[:3, p]
+                        sigma_j = self.point_charges[4, p]
+                        epsilon_j = self.point_charges[5, p]
 
-                    distance_ij = np.linalg.norm(xyz_i - xyz_j)
-                    # bohr to nm
-                    distance_ij *= bohr_in_angstrom() * 0.1
+                        distance_ij = np.linalg.norm(xyz_i - xyz_j)
+                        # bohr to nm
+                        distance_ij *= bohr_in_angstrom() * 0.1
 
-                    epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
-                    sigma_ij = 0.5 * (sigma_i + sigma_j)
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
 
-                    sigma_r_6 = (sigma_ij / distance_ij)**6
-                    sigma_r_12 = sigma_r_6**2
+                        sigma_r_6 = (sigma_ij / distance_ij)**6
+                        sigma_r_12 = sigma_r_6**2
 
-                    vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
+                        vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
 
-            # kJ/mol to Hartree
-            vdw_ene /= (4.184 * hartree_in_kcalpermol())
+                # kJ/mol to Hartree
+                vdw_ene /= (4.184 * hartree_in_kcalpermol())
 
-            self._nuc_mm_energy += vdw_ene
+                self._nuc_mm_energy += vdw_ene
 
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
@@ -1181,17 +1187,17 @@ class ScfDriver:
         if self.rank == mpi_master() and self.electric_field is not None:
             dipole_ints = dipole_mats
 
-        if self._point_charges is not None and not self._first_step:
-            t0_point_charges = tm.time()
+        if self.point_charges is not None and not self._first_step:
+            t0point_charges = tm.time()
 
-            ave, res = divmod(self._point_charges.shape[1], self.nodes)
+            ave, res = divmod(self.point_charges.shape[1], self.nodes)
             counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
 
             start = sum(counts[:self.rank])
             end = sum(counts[:self.rank + 1])
 
-            charges = self._point_charges[3, :].copy()[start:end]
-            coords = self._point_charges[:3, :].T.copy()[start:end, :]
+            charges = self.point_charges[3, :].copy()[start:end]
+            coords = self.point_charges[:3, :].T.copy()[start:end, :]
 
             V_es = compute_nuclear_potential_integrals(molecule, ao_basis,
                                                        charges, coords)
@@ -1202,7 +1208,7 @@ class ScfDriver:
 
             self.ostream.print_info(
                 'Point charges one-electron integral computed in' +
-                ' {:.2f} sec.'.format(tm.time() - t0_point_charges))
+                ' {:.2f} sec.'.format(tm.time() - t0point_charges))
             self.ostream.print_blank()
 
         linear_dependency = False
@@ -1940,7 +1946,7 @@ class ScfDriver:
                 'ScfDriver: Inconsistent embedding driver for SCF')
             e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
                 density_matrix=density_matrix)
-        elif self._point_charges is not None and not self._first_step:
+        elif self.point_charges is not None and not self._first_step:
             if self.scf_type == 'restricted':
                 density_matrix = 2.0 * den_mat[0]
             else:
@@ -2003,7 +2009,7 @@ class ScfDriver:
 
             if self._pe and not self._first_step:
                 e_ee += e_emb
-            elif self._point_charges is not None and not self._first_step:
+            elif self.point_charges is not None and not self._first_step:
                 e_ee += e_emb
 
             e_sum = e_ee + e_kin + e_en
@@ -2055,7 +2061,7 @@ class ScfDriver:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
-            elif self._point_charges is not None and not self._first_step:
+            elif self.point_charges is not None and not self._first_step:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
@@ -2667,7 +2673,7 @@ class ScfDriver:
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        if self._point_charges is not None:
+        if self.point_charges is not None:
             valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
