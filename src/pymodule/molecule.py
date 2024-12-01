@@ -783,7 +783,7 @@ def _Molecule_get_coordinates_in_bohr(self):
     """
 
     coords = []
-    for r in self.get_coordinates():
+    for r in self._get_coordinates():
         coords.append(r.coordinates())
 
     return np.array(coords)
@@ -798,7 +798,7 @@ def _Molecule_get_coordinates_in_angstrom(self):
     """
 
     coords = []
-    for r in self.get_coordinates('angstrom'):
+    for r in self._get_coordinates('angstrom'):
         coords.append(r.coordinates())
 
     return np.array(coords)

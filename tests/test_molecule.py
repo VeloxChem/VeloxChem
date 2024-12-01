@@ -222,18 +222,18 @@ class TestMolecule:
 
         coords = self.nh3_coords()
 
-        coords_a = mol.get_coordinates()
+        coords_a = mol._get_coordinates()
         for r_a, r_b in zip(coords, coords_a):
             assert r_a == r_b
 
-        coords_a = mol.get_coordinates('au')
+        coords_a = mol._get_coordinates('au')
         for r_a, r_b in zip(coords, coords_a):
             assert r_a == r_b
 
         f = bohr_in_angstrom()
         for r in coords:
             r.scale(f)
-        coords_a = mol.get_coordinates('angstrom')
+        coords_a = mol._get_coordinates('angstrom')
         for r_a, r_b in zip(coords, coords_a):
             assert r_a == r_b
 

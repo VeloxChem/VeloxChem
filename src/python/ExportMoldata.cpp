@@ -221,7 +221,7 @@ export_moldata(py::module &m)
         .def("number_of_electrons", &CMolecule::number_of_electrons, "Gets a number of electrons in molecule.")
         .def("get_identifiers", &CMolecule::identifiers, "Gets a vector of elemental identidiers in molecule.")
         .def("get_atom_basis_labels", &CMolecule::atom_basis_labels, "Gets a vector of atom basis set labels.")
-        .def("get_coordinates", &CMolecule::coordinates, py::arg("units") = "au", "Gets coordinates of atoms in molecules")
+        .def("_get_coordinates", &CMolecule::coordinates, py::arg("units") = "au", "(Internal method) Gets coordinates of atoms in molecules.")
         .def("get_charges", &CMolecule::charges, "Gets a vector of atomic charges in molecule.")
         .def(
             "get_element_ids",
