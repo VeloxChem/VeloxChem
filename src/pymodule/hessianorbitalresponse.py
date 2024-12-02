@@ -49,6 +49,11 @@ from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import vxc_deriv
 from .import_from_pyscf import eri_deriv
 
+# import veloxchem integrals
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+NuclearPotentialGeom100Driver,
+NuclearPotentialGeom010Driver, FockGeom1000Driver)
+
 class HessianOrbitalResponse(CphfSolver):
     """
     Implements solver for the coupled-perturbed Hartree-Fock (CPHF) equations
