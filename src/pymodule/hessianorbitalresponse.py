@@ -183,12 +183,13 @@ class HessianOrbitalResponse(CphfSolver):
                     tmp_ovlp_deriv_ao[i, x] = gmat + gmat.T
                 tmp_fock_deriv_ao[i] = self._compute_fmat_deriv(molecule,
                                                                 basis,
-                                                                density, i)
+                                                                density,
+                                                                scf_drv, i)
                 # OG code
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                #fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
-                #                                i, scf_drv)
-                fock_deriv_ao[i] = hcore_deriv(molecule, basis, i)
+                fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
+                                                i, scf_drv)
+                #fock_deriv_ao[i] = hcore_deriv(molecule, basis, i)
 
                 # DEBUG
                 #print(i, np.max(np.abs(ovlp_deriv_ao[i] - tmp_ovlp_deriv_ao[i])))
@@ -287,7 +288,7 @@ class HessianOrbitalResponse(CphfSolver):
         else:
             return {}
 
-    def _compute_fmat_deriv(self, molecule, basis, density, i):
+    def _compute_fmat_deriv(self, molecule, basis, density, scf_drv, i):
         """
         Computes the derivative of the Fock matrix with respect
         to the coordinates of atom i.
@@ -298,6 +299,8 @@ class HessianOrbitalResponse(CphfSolver):
             The basis set.
         :param density:
             The density matrix in AO basis.
+        :param scf_drv:
+            The Scf Driver.
         :param i:
             The atom index.
         """
@@ -314,16 +317,43 @@ class HessianOrbitalResponse(CphfSolver):
         gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, i)
         gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, i)
 
+        exchange_scaling_factor = 1.0
+        fock_type = "2jk"
+        if scf_drv._dft:
+            # TODO: range-separated Fock
+            if scf_drv.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = scf_drv.xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+        
+        den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
+        den_mat_for_fock.set_values(density)
+        fock_grad_drv = FockGeom1000Driver()
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+        thresh_int = int(-math.log10(scf_drv.eri_thresh))
+        screener_atom = T4CScreener()
+        screener_atom.partition_atom(basis, molecule, 'eri', i)
+        gmats_eri = fock_grad_drv.compute(basis, screener_atom, screener,
+                                      den_mat_for_fock, i, fock_type,
+                                      exchange_scaling_factor, 0.0,
+                                      thresh_int)
+
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_kin = gmats_kin.matrix_to_numpy(label)
             gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
             gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
+            gmat_eri = gmats_eri.matrix_to_numpy(label)
             fmat_deriv[x] += gmat_kin + gmat_kin.T
             fmat_deriv[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
+            fmat_deriv[x] += gmat_eri
 
         gmats_kin = Matrices()
         gmats_npot_100 = Matrices()
         gmats_npot_010 = Matrices()
+        gmats_eri = Matrices()
 
         return fmat_deriv
 
