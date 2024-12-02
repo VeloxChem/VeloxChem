@@ -26,12 +26,14 @@ from mpi4py import MPI
 import numpy as np
 import time as tm
 import sys
+import math
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import AODensityMatrix
 #from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import make_matrix, mat_t, T4CScreener
 from .outputstream import OutputStream
 from .matrices import Matrices
 from .profiler import Profiler
@@ -306,7 +308,7 @@ class HessianOrbitalResponse(CphfSolver):
         """
 
         nao = basis.get_dimensions_of_basis()
-        print("NAO from dimension of basis: ", nao)
+        #print("NAO from dimension of basis: ", nao)
         fmat_deriv = np.zeros((3, nao, nao))
 
         kin_grad_drv = KineticEnergyGeom100Driver()
@@ -340,6 +342,7 @@ class HessianOrbitalResponse(CphfSolver):
                                       den_mat_for_fock, i, fock_type,
                                       exchange_scaling_factor, 0.0,
                                       thresh_int)
+        factor = 2.0 if fock_type == 'j' else 1.0
 
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_kin = gmats_kin.matrix_to_numpy(label)
@@ -348,7 +351,7 @@ class HessianOrbitalResponse(CphfSolver):
             gmat_eri = gmats_eri.matrix_to_numpy(label)
             fmat_deriv[x] += gmat_kin + gmat_kin.T
             fmat_deriv[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
-            fmat_deriv[x] += gmat_eri
+            fmat_deriv[x] += gmat_eri * factor
 
         gmats_kin = Matrices()
         gmats_npot_100 = Matrices()
