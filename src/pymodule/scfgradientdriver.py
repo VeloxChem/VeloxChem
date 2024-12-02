@@ -858,7 +858,11 @@ class ScfGradientDriver(GradientDriver):
         #     self.ostream.mute()
 
         if self.numerical:
+            # disable restarting scf for numerical gradient
             self.scf_driver.restart = False
+        else:
+            # always try restarting scf for analytical gradient
+            self.scf_driver.restart = True
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
