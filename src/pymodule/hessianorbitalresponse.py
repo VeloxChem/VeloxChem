@@ -147,6 +147,7 @@ class HessianOrbitalResponse(CphfSolver):
             ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
             tmp_ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
             fock_deriv_ao = np.zeros((natm, 3, nao, nao))
+            tmp_fock_deriv_ao = np.zeros((natm, 3, nao, nao))
         else:
             density = None
 
@@ -178,6 +179,9 @@ class HessianOrbitalResponse(CphfSolver):
                 for x, label in enumerate(['X', 'Y', 'Z']):
                     gmat = gmats.matrix_to_numpy(label)
                     tmp_ovlp_deriv_ao[i, x] = gmat + gmat.T
+                tmp_fock_deriv_ao[i] = self._compute_fmat_deriv(molecule,
+                                                                basis,
+                                                                density, i)
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
                                                 i, scf_drv)
@@ -274,6 +278,46 @@ class HessianOrbitalResponse(CphfSolver):
             }
         else:
             return {}
+
+    def _compute_fmat_deriv(self, molecule, basis, density, i):
+        """
+        Computes the derivative of the Fock matrix with respect
+        to the coordinates of atom i.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param density:
+            The density matrix in AO basis.
+        :param i:
+            The atom index.
+        """
+
+        nao = basis.get_dimensions_of_basis()
+        print("NAO from dimension of basis: ", nao)
+        fmat_deriv = np.zeros((3, nao, nao))
+
+        kin_grad_drv = KineticEnergyGeom100Driver()
+        gmats_kin = kin_grad_drv.compute(molecule, basis, i)
+
+        npot_grad_100_drv = NuclearPotentialGeom100Driver()
+        npot_grad_010_drv = NuclearPotentialGeom010Driver()
+        gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, i)
+        gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, i)
+
+        for x, label in enumerate(['X', 'Y', 'Z']):
+            gmat_kin = gmats_kin.matrix_to_numpy(label)
+            gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
+            gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
+            fmat_deriv[x] += gmat_kin + gmat_kin.T
+            fmat_deriv[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
+
+        gmats_kin = Matrices()
+        gmats_npot_100 = Matrices()
+        gmats_npot_010 = Matrices()
+
+        return fmat_deriv
 
     def print_cphf_header(self, title):
         """
