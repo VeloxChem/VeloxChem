@@ -879,8 +879,9 @@ class PolOrbitalResponse(CphfSolver):
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
 
+        # TODO remove
         # number of AOs
-        nao = mo.shape[0]
+        #nao = mo.shape[0]
 
         # determine data type of RHS
         if self.is_complex:

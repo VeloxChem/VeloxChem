@@ -165,40 +165,41 @@ class HessianOrbitalResponse(CphfSolver):
 
         t0 = tm.time()
 
-        # overlap gradient driver:
-        ovl_grad_drv = OverlapGeom100Driver()
-
-        # TODO: test if XCMolecularHessian obejct outside 
+        # TODO: test if XCMolecularHessian object outside 
         # for-loop gives the correct Hessian
         if scf_drv._dft: 
             xc_mol_hess = XCMolecularHessian()
+
+        # overlap gradient driver:
+        ovl_grad_drv = OverlapGeom100Driver()
+
         for i in range(natm):
+
             if scf_drv._dft:
                 vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
                                     molecule, basis, gs_density, mol_grid,
                                     scf_drv.xcfun.get_func_label(), i)
                 vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
+
             if self.rank == mpi_master():
+                # compute overlap gradient integrals matrices
                 gmats = ovl_grad_drv.compute(molecule, basis, i)
+
                 for x, label in enumerate(['X', 'Y', 'Z']):
                     gmat = gmats.matrix_to_numpy(label)
-                    tmp_ovlp_deriv_ao[i, x] = gmat + gmat.T
-                tmp_fock_deriv_ao[i] = self._compute_fmat_deriv(molecule,
-                                                                basis,
-                                                                density,
-                                                                scf_drv, i)
-                # OG code
-                ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
-                                                i, scf_drv)
-                #fock_deriv_ao[i] = hcore_deriv(molecule, basis, i)
+                    ovlp_deriv_ao[i, x] = gmat + gmat.T
 
-                # DEBUG
-                #print(i, np.max(np.abs(ovlp_deriv_ao[i] - tmp_ovlp_deriv_ao[i])))
-                print(i, np.max(np.abs(fock_deriv_ao[i] - tmp_fock_deriv_ao[i])))
+                # compute full Fock integrals  matrix
+                fock_deriv_ao[i] = self._compute_fmat_deriv(molecule, basis,
+                                                            scf_drv, density, i)
+                # old code using pyscf
+                #ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
+                #fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
+                #                                i, scf_drv)
 
                 if scf_drv._dft:
                     fock_deriv_ao[i] += vxc_deriv_i
+
         t1 = tm.time()
 
         if self.rank == mpi_master():
@@ -290,7 +291,7 @@ class HessianOrbitalResponse(CphfSolver):
         else:
             return {}
 
-    def _compute_fmat_deriv(self, molecule, basis, density, scf_drv, i):
+    def _compute_fmat_deriv(self, molecule, basis, scf_drv, density, i):
         """
         Computes the derivative of the Fock matrix with respect
         to the coordinates of atom i.
@@ -302,25 +303,34 @@ class HessianOrbitalResponse(CphfSolver):
         :param density:
             The density matrix in AO basis.
         :param scf_drv:
-            The Scf Driver.
+            The SCF Driver.
         :param i:
             The atom index.
+
+        :return fmat_deriv:
+            The derivative of the Fock matrix wrt. atom i.
         """
 
+        # number of atomic orbitals
         nao = basis.get_dimensions_of_basis()
-        #print("NAO from dimension of basis: ", nao)
+
+        # initialize fmat variable
         fmat_deriv = np.zeros((3, nao, nao))
 
+        # kinetic integral gadient
         kin_grad_drv = KineticEnergyGeom100Driver()
         gmats_kin = kin_grad_drv.compute(molecule, basis, i)
 
+        # nuclear potential integral gradients
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
         gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, i)
         gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, i)
 
+        # for Fock matrix gradient
         exchange_scaling_factor = 1.0
         fock_type = "2jk"
+
         if scf_drv._dft:
             # TODO: range-separated Fock
             if scf_drv.xcfun.is_hybrid():
@@ -332,23 +342,33 @@ class HessianOrbitalResponse(CphfSolver):
         
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
-        fock_grad_drv = FockGeom1000Driver()
+
+        # ERI threshold
+        thresh_int = int(-math.log10(scf_drv.eri_thresh))
+
+        # screening
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
-        thresh_int = int(-math.log10(scf_drv.eri_thresh))
         screener_atom = T4CScreener()
         screener_atom.partition_atom(basis, molecule, 'eri', i)
+
+        # Fock gradient
+        fock_grad_drv = FockGeom1000Driver()
         gmats_eri = fock_grad_drv.compute(basis, screener_atom, screener,
                                       den_mat_for_fock, i, fock_type,
                                       exchange_scaling_factor, 0.0,
                                       thresh_int)
+
+        # scaling of ERI gradient for non-hybrid functionals
         factor = 2.0 if fock_type == 'j' else 1.0
 
+        # calculate gradient contributions
         for x, label in enumerate(['X', 'Y', 'Z']):
             gmat_kin = gmats_kin.matrix_to_numpy(label)
             gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
             gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
             gmat_eri = gmats_eri.matrix_to_numpy(label)
+
             fmat_deriv[x] += gmat_kin + gmat_kin.T
             fmat_deriv[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
             fmat_deriv[x] += gmat_eri * factor
