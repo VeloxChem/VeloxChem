@@ -33,6 +33,7 @@ from .veloxchemlib import AODensityMatrix
 #from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import XCMolecularHessian
 from .outputstream import OutputStream
+from .matrices import Matrices
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
@@ -48,6 +49,7 @@ from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import vxc_deriv
 from .import_from_pyscf import eri_deriv
+from .import_from_pyscf import hcore_deriv
 
 # import veloxchem integrals
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
@@ -182,10 +184,16 @@ class HessianOrbitalResponse(CphfSolver):
                 tmp_fock_deriv_ao[i] = self._compute_fmat_deriv(molecule,
                                                                 basis,
                                                                 density, i)
+                # OG code
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
-                                                i, scf_drv)
-                print(i, np.max(np.abs(ovlp_deriv_ao[i] - tmp_ovlp_deriv_ao[i])))
+                #fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
+                #                                i, scf_drv)
+                fock_deriv_ao[i] = hcore_deriv(molecule, basis, i)
+
+                # DEBUG
+                #print(i, np.max(np.abs(ovlp_deriv_ao[i] - tmp_ovlp_deriv_ao[i])))
+                print(i, np.max(np.abs(fock_deriv_ao[i] - tmp_fock_deriv_ao[i])))
+
                 if scf_drv._dft:
                     fock_deriv_ao[i] += vxc_deriv_i
         t1 = tm.time()
