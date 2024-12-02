@@ -142,10 +142,6 @@ class HessianOrbitalResponse(CphfSolver):
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             eocc = mo_energies[:nocc]
-            eoo = eocc.reshape(-1, 1) + eocc # ei + ej
-            omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
-            evir = mo_energies[nocc:]
-            eov = eocc.reshape(-1, 1) - evir
 
             # preparing the CPHF RHS
             ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
@@ -192,10 +188,6 @@ class HessianOrbitalResponse(CphfSolver):
                 # compute full Fock integrals  matrix
                 fock_deriv_ao[i] = self._compute_fmat_deriv(molecule, basis,
                                                             scf_drv, density, i)
-                # old code using pyscf
-                #ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                #fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
-                #                                i, scf_drv)
 
                 if scf_drv._dft:
                     fock_deriv_ao[i] += vxc_deriv_i
