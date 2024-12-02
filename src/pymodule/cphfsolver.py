@@ -41,12 +41,6 @@ from .batchsize import get_number_of_batches
 from .dftutils import get_default_grid_level
 from scipy.sparse import linalg
 
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import vxc_deriv
-from .import_from_pyscf import eri_deriv
-
 class CphfSolver(LinearSolver):
     """
     Implements solver for the coupled-perturbed Hartree-Fock (CPHF) equations.
