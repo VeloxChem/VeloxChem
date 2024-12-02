@@ -140,6 +140,7 @@ class HessianOrbitalResponse(CphfSolver):
 
             # preparing the CPHF RHS
             ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
+            tmp_ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
             fock_deriv_ao = np.zeros((natm, 3, nao, nao))
         else:
             density = None
@@ -153,6 +154,10 @@ class HessianOrbitalResponse(CphfSolver):
         self.profiler.start_timer('derivs')
 
         t0 = tm.time()
+
+        # overlap gradient driver:
+        ovl_grad_drv = OverlapGeom100Driver()
+
         # TODO: test if XCMolecularHessian obejct outside 
         # for-loop gives the correct Hessian
         if scf_drv._dft: 
@@ -164,9 +169,14 @@ class HessianOrbitalResponse(CphfSolver):
                                     scf_drv.xcfun.get_func_label(), i)
                 vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
             if self.rank == mpi_master():
+                gmats = ovl_grad_drv.compute(molecule, basis, i)
+                for x, label in enumerate(['X', 'Y', 'Z']):
+                    gmat = gmats.matrix_to_numpy(label)
+                    tmp_ovlp_deriv_ao[i, x] = gmat + gmat.T
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
                                                 i, scf_drv)
+                print(i, np.max(np.abs(ovlp_deriv_ao[i] - tmp_ovlp_deriv_ao[i])))
                 if scf_drv._dft:
                     fock_deriv_ao[i] += vxc_deriv_i
         t1 = tm.time()
