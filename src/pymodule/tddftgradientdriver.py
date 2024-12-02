@@ -21,18 +21,24 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
+from mpi4py import MPI
+from copy import deepcopy
+from os import environ
 import numpy as np
-import time as tm
+import time
+import math
 
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import mpi_master, mat_t
-from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import T4CScreener
 from .veloxchemlib import partition_atoms, make_matrix
 from .matrices import Matrices
+from .profiler import Profiler
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .molecule import Molecule
 from .lrsolver import LinearResponseSolver
@@ -79,6 +85,8 @@ class TddftGradientDriver(GradientDriver):
 
         super().__init__(scf_drv.comm, scf_drv.ostream)
         self._debug = scf_drv._debug
+        self._block_size_factor = scf_drv._block_size_factor
+        self._scf_drv = scf_drv
 
         self.flag = 'RPA Gradient Driver'
 
@@ -180,7 +188,7 @@ class TddftGradientDriver(GradientDriver):
             else:
                 self.print_header(self.state_deriv_index)
 
-        start_time = tm.time()
+        start_time = time.time()
 
         # NOTE: the numerical gradient is calculated for the first state only.
         if self.numerical:
@@ -198,12 +206,12 @@ class TddftGradientDriver(GradientDriver):
                 self.print_gradient(molecule, self.state_deriv_index)
 
             valstr = '*** Time spent in gradient calculation: '
-            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+            valstr += '{:.2f} sec ***'.format(time.time() - start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_analytical_vlx(self, molecule, basis, scf_drv, rsp_results):
+    def compute_analytical_vlx(self, molecule, basis, rsp_results):
         """
         Performs calculation of analytical gradient.
 
@@ -211,13 +219,11 @@ class TddftGradientDriver(GradientDriver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The SCF tensors.
         :param rsp_results:
             The results of the RPA or TDA calculation.
         """
 
-        scf_tensors = scf_drv.scf_tensors
+        scf_tensors = self._scf_drv.scf_tensors
 
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
@@ -265,14 +271,14 @@ class TddftGradientDriver(GradientDriver):
                                              root=mpi_master())
 
         # ground state gradient
-        t1 = tm.time()
-        gs_grad_drv = ScfGradientDriver(scf_drv)
+        t1 = time.time()
+        gs_grad_drv = ScfGradientDriver(self._scf_drv)
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
         gs_grad_drv.ostream.mute()
         gs_grad_drv.compute(molecule, basis, scf_tensors)
         gs_grad_drv.ostream.unmute()
-        t2 = tm.time()
+        t2 = time.time()
 
         if self.rank == mpi_master():
             if gs_grad_drv.numerical:
@@ -339,6 +345,93 @@ class TddftGradientDriver(GradientDriver):
             gmats_010 = Matrices()
 
         self._print_debug_info('after  npot_grad')
+        
+        # orbital contribution to gradient
+
+        self._print_debug_info('before ovl_grad')
+
+        ovl_grad_drv = OverlapGeom100Driver()
+
+        for iatom in local_atoms:
+            gmats = ovl_grad_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                for s in range(dof):
+                    self.gradient[s, iatom, i] += 2.0 * np.sum(
+                        (gmat + gmat.T) * omega_ao[s])
+            gmats = Matrices()
+
+        self._print_debug_info('after  ovl_grad')
+
+        # ERI contribution to gradient
+
+        # determine the Fock type and exchange scaling factor
+        if self._dft:
+            if self.xcfun.is_hybrid():
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+                fock_type = '2jkx'
+            else:
+                exchange_scaling_factor = 0.0
+                fock_type = 'j'
+        else:
+            exchange_scaling_factor = 1.0
+            fock_type = '2jk'
+
+        # TODO: range-separated Fock
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
+
+        fock_timing = {
+            'Screening': 0.0,
+            'FockGrad': 0.0,
+            }
+
+        self._print_debug_info('before fock_grad')
+        fock_grad_drv = FockGeom1000Driver()
+
+        extra_factor = self._get_extra_block_size_factor(
+            basis.get_dimensions_of_basis())
+        fock_grad_drv._set_block_size_factor(self._block_size_factor *
+                                             extra_factor)
+        t0 = time.time()
+
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+
+        fock_timing['Screening'] += time.time() - t0
+
+        thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
+
+        factor = 2.0 if fock_type == 'j' else 1.0
+
+        for iatom in local_atoms:
+
+            screener_atom = T4CScreener()
+            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+            t0 = time.time()
+
+            for idx in range(dof):
+                den_mat_for_fock_rel = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_fock_rel.set_values(relaxed_density_ao[idx])
+                den_mat_for_fock_rel2 = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_rel2.set_values(relaxed_density_ao[idx])
+
+                atomgrad = fock_grad_drv.compute(basis, screener_atom, screener,
+                                             den_mat_for_fock_rel,
+                                             den_mat_for_fock_rel2, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                
+                self.gradient[idx, iatom, :] += np.array(atomgrad) * factor
+
+        fock_timing['FockGrad'] += time.time() - t0
+
+        self._print_debug_info('after  fock_grad')
 
 
     # TODO: remove this routine once compute_analytical_vlx
@@ -403,14 +496,14 @@ class TddftGradientDriver(GradientDriver):
         dof = self.comm.bcast(dof, root=mpi_master())
 
         # ground state gradient
-        t1 = tm.time()
+        t1 = time.time()
         gs_grad_drv = ScfGradientDriver(scf_drv)
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
         gs_grad_drv.ostream.mute()
         gs_grad_drv.compute(molecule, basis, scf_drv.scf_tensors)
         gs_grad_drv.ostream.unmute()
-        t2 = tm.time()
+        t2 = time.time()
 
         if self.rank == mpi_master():
             if gs_grad_drv.numerical:
@@ -427,13 +520,13 @@ class TddftGradientDriver(GradientDriver):
             self.gradient += gs_grad_drv.get_gradient()
 
 
-            self.hcore_contrib = np.zeros((dof, natm, 3))
+            self.partial_contrib = np.zeros((dof, natm, 3))
 
             # loop over atoms and contract integral derivatives
             # with density matrices
             # add the corresponding contribution to the gradient
             for i in range(natm):
-                t0 = tm.time()
+                t0 = time.time()
                 # taking integral derivatives from pyscf
                 d_ovlp = overlap_deriv(molecule, basis, i)
                 d_hcore = hcore_deriv(molecule, basis, i)
@@ -453,7 +546,7 @@ class TddftGradientDriver(GradientDriver):
                             relaxed_density_ao[s].reshape(nao**2),
                             (d_hcore[x].T).reshape(nao**2)
                         ])
-                        self.hcore_contrib[s,i,x] += np.linalg.multi_dot([
+                        self.partial_contrib[s,i,x] += np.linalg.multi_dot([
                             relaxed_density_ao[s].reshape(nao**2),
                             (d_hcore[x].T).reshape(nao**2)
                         ])
@@ -462,12 +555,26 @@ class TddftGradientDriver(GradientDriver):
                             2.0 * omega_ao[s].reshape(nao**2),
                             (d_ovlp[x].T).reshape(nao**2)
                         ])
+                        self.partial_contrib[s,i,x] += np.linalg.multi_dot([
+                            2.0 * omega_ao[s].reshape(nao**2),
+                            (d_ovlp[x].T).reshape(nao**2)
+                        ])
                         self.gradient[s,i,x] += 2.0 * np.linalg.multi_dot([
                             gs_dm.reshape(nao**2),
                             d_eri[x].transpose(1,0,3,2).reshape(nao**2,nao**2),
                             relaxed_density_ao[s].reshape(nao**2)
                         ])
+                        self.partial_contrib[s,i,x] += 2.0 * np.linalg.multi_dot([
+                            gs_dm.reshape(nao**2),
+                            d_eri[x].transpose(1,0,3,2).reshape(nao**2,nao**2),
+                            relaxed_density_ao[s].reshape(nao**2)
+                        ])
                         self.gradient[s,i,x] += -1.0 * frac_K * np.linalg.multi_dot([
+                           gs_dm.reshape(nao**2),
+                           d_eri[x].transpose(3,0,2,1).reshape(nao**2,nao**2),
+                           relaxed_density_ao[s].reshape(nao**2)
+                        ])
+                        self.partial_contrib[s,i,x] += -1.0 * frac_K * np.linalg.multi_dot([
                            gs_dm.reshape(nao**2),
                            d_eri[x].transpose(3,0,2,1).reshape(nao**2,nao**2),
                            relaxed_density_ao[s].reshape(nao**2)
@@ -620,6 +727,8 @@ class TddftGradientDriver(GradientDriver):
 
         return dipole_moment
 
+    # TODO: this routine is used by both ScfGradientDriver and
+    # TddftGradientDriver. It can be moved to the parent class.
     def _print_debug_info(self, label):
         """
         Prints debug information.
@@ -634,3 +743,22 @@ class TddftGradientDriver(GradientDriver):
                                     profiler.get_available_memory())
             self.ostream.flush()
 
+    # TODO: this routine is used by both ScfGradientDriver and
+    # TddftGradientDriver. It can be moved to the parent class.
+    def _get_extra_block_size_factor(self, naos):
+
+        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
+
+        if total_cores >= 2048:
+            if naos >= 4500:
+                extra_factor = 4
+            else:
+                extra_factor = 2
+
+        elif total_cores >= 1024:
+            extra_factor = 2
+
+        else:
+            extra_factor = 1
+
+        return extra_factor

@@ -59,7 +59,7 @@ class TestGrad:
         rsp_solver.ostream.mute()
         rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_tensors)
 
-        tddft_grad = TddftGradientDriver()
+        tddft_grad = TddftGradientDriver(scf_drv)
 
         orbrsp_dict = {"conv_thresh": 1e-7}
         tddft_grad.update_settings({}, rsp_dict, orbrsp_dict, method_dict)
