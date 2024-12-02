@@ -78,12 +78,17 @@ class ScfHessianDriver(HessianDriver):
 
         self.perturbed_density = None
 
+        # TODO TEMPORARY FLAG
+        # Only run orbital response for performance testing
+        self.orbrsp_only = False
+
         # flag for printing the Hessian
         self.do_print_hessian = False
 
         self._input_keywords['hessian'].update({
                 'do_pople_hessian': ('bool', 'whether to compute Pople Hessian'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),
+                'orbrsp_only': ('bool', 'whether to only run CPHF orbital response'),
             })
 
     def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):
@@ -133,6 +138,14 @@ class ScfHessianDriver(HessianDriver):
 
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
+
+        # TODO TEMPORARY
+        if self.orbrsp_only:
+            self.ostream.print_header('*** WARNING only computing Hessian orbital response!')
+            self.compute_orbital_response(molecule, ao_basis)
+            self.ostream.print_header('*** Hessian orbital response only: DONE  ***')
+            self.ostream.flush()
+            return
 
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
@@ -1343,4 +1356,25 @@ class ScfHessianDriver(HessianDriver):
                                 )
 
         return dipole_integrals_gradient
+
+    def compute_orbital_response(self, molecule, ao_basis):
+        """
+        TEMPORARY FUNCTION FOR PERFORMACE TESTING
+        Computes the CPHF orbital response.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            Tha AO basis.
+        """
+
+        # get SCF tensors
+        scf_tensors = self.scf_driver.scf_tensors
+
+        # Set up a CPHF solver
+        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+
+        # Solve the CPHF equations
+        cphf_solver.compute(molecule, ao_basis, scf_tensors, self.scf_driver)
 
