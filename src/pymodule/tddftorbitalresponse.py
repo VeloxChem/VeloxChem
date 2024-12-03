@@ -110,7 +110,7 @@ class TddftOrbitalResponse(CphfSolver):
                 else:
                     method = 'RPA'
                 nocc = molecule.number_of_alpha_electrons()
-                mo = scf_tensors['C']
+                mo = scf_tensors['C_alpha']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
 
@@ -125,7 +125,7 @@ class TddftOrbitalResponse(CphfSolver):
                 rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
                                 + 2.0 * lambda_ao.transpose(0,2,1) )
 
-                unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                unrel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
                                  unrel_dm_ao)
             else:
                 unrel_density = None
@@ -138,7 +138,7 @@ class TddftOrbitalResponse(CphfSolver):
 
             # relaxed density and dipole moment
             if self.rank == mpi_master():
-                rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                rel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
                                rel_dm_ao)
             else:
                 rel_density = None

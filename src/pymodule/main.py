@@ -374,10 +374,11 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv = TddftGradientDriver(scf_drv)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                  rsp_prop.rsp_driver)
+                                  rsp_prop._rsp_driver,
+                                  rsp_prop._rsp_property)
 
     # Hessian
     # TODO reconsider keeping this after introducing vibrationalanalysis class
@@ -450,14 +451,15 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv = TddftGradientDriver(scf_drv)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True
             opt_drv.update_settings(opt_dict)
             opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                          rsp_prop.rsp_driver)
+                                          rsp_prop._rsp_driver,
+                                      	  rsp_prop._rsp_property)
 
     # Vibrational analysis
 
@@ -566,7 +568,7 @@ def main():
             # Excited state gradient
             if 'gradient' in task.input_dict:
                 grad_dict = task.input_dict['gradient']
-                tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+                tddftgrad_drv = TddftGradientDriver(scf_drv)
                 tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
                                               method_dict)
                 tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
@@ -588,7 +590,7 @@ def main():
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:
                 opt_dict = task.input_dict['optimize_excited_state']
-                tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+                tddftgrad_drv = TddftGradientDriver(scf_drv)
                 tddftgrad_drv.update_settings(opt_dict, rsp_dict, orbrsp_dict,
                                               method_dict)
                 opt_drv = OptimizationDriver(tddftgrad_drv)
