@@ -37,6 +37,7 @@ from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
 from .molecule import Molecule
 from .outputstream import OutputStream
+from .matrices import Matrices
 from .griddriver import GridDriver
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check, polgrad_sanity_check
@@ -299,6 +300,16 @@ class PolarizabilityGradient():
                     # import integrals
                     d_hcore, d_ovlp, d_eri, d_dipole = self.import_integrals(
                         molecule, basis, i)
+
+                    # DEBUG
+                    tmp_d_hcore, tmp_d_ovlp = self._compute_integrals_deriv(molecule, basis, i)
+                    print('after compute integrals')
+                    self.ostream.flush()
+                    print(np.max(np.abs(d_hcore - tmp_d_hcore)))
+                    print(np.max(np.abs(d_ovlp- tmp_d_ovlp)))
+                    #print(np.max(np.abs(d_dipole - tmp_d_dipole)))
+                    self.ostream.flush()
+
                     # construct polarizability gradient
                     pol_gradient[:,:,i,:] = self.construct_scf_polgrad(
                         gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
@@ -435,7 +446,7 @@ class PolarizabilityGradient():
         :param molecule:
             The molecule.
         :param basis:
-            The MO coefficients.
+            The basis set.
         :param idx:
             The atom index
 
@@ -466,6 +477,85 @@ class PolarizabilityGradient():
         self.ostream.flush()
 
         return d_hcore, d_ovlp, d_eri, d_dipole
+
+    def _compute_integrals_deriv(self, molecule, basis, idx):
+        """
+        Comted the integral derivatives with respect to the
+        coodinates of atom idx.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param idx:
+            The atom index.
+
+        :return d_hcore:
+            The derivative H_core integrals.
+        :return d_ovlp:
+            The derivative overlap integrals.
+        :return d_eri:
+            The derivative electron-repulsion integrals.
+        :return d_dipole:
+            The derivative dipole moment integrals.
+        """
+        # timings
+        integral_start_time = tm.time()
+
+        # number of atomic orbitals
+        nao = basis.get_dimensions_of_basis()
+
+        # initialize integral variables
+        d_hcore = np.zeros((3, nao, nao))
+        d_ovlp= np.zeros((3, nao, nao))
+        d_dipole = np.zeros((3, nao, nao))
+        d_eri = np.zeros((3, nao, nao, nao, nao))
+
+        # overlap gradient
+        ovlp_grad_drv = OverlapGeom100Driver()
+        gmats_ovlp = ovlp_grad_drv.compute(molecule, basis, idx)
+
+        # kinetic integral gradient
+        kin_grad_drv = KineticEnergyGeom100Driver()
+        gmats_kin = kin_grad_drv.compute(molecule, basis, idx)
+
+        # nuclear potential integral gradients
+        npot_grad_100_drv = NuclearPotentialGeom100Driver()
+        npot_grad_010_drv = NuclearPotentialGeom010Driver()
+        gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, idx)
+        gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, idx)
+
+        # dipole integral gradient
+        #dip_grad_drv = ElectricDipoleMomentGeom100Driver()
+        #gmats_dip = dip_grad_drv.compute(molecule, basis, [0.0, 0.0, 0.0], idx)
+        
+        # calculate gradient contributions
+        for x, label in enumerate(['X', 'Y', 'Z']):
+            gmat_ovlp = gmats_ovlp.matrix_to_numpy(label)
+            gmat_kin = gmats_kin.matrix_to_numpy(label)
+            gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
+            gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
+            #gmat_dip = gmats_dip.matrix_to_numpy(label)
+
+            d_ovlp[x] += gmat_ovlp + gmat_ovlp.T
+            d_hcore[x] += gmat_kin + gmat_kin.T
+            d_hcore[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
+            #d_dipole[x] += gmat_dip + gmat_dip.T
+
+        gmats_ovlp= Matrices()
+        gmats_kin = Matrices()
+        gmats_npot_100 = Matrices()
+        gmats_npot_010 = Matrices()
+        #gmat_dip = Matrices()
+
+        valstr = ' * Time spent importing integrals for atom #{}: '.format(
+            idx + 1)
+        valstr += '{:.6f} sec * '.format(tm.time() - integral_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return d_hcore, d_ovlp#, d_dipole#, d_eri
 
     def construct_scf_polgrad(self, gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
                               d_hcore, d_ovlp, d_eri, d_dipole, nao, idx):
