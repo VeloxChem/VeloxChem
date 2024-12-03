@@ -82,6 +82,7 @@ class TddftGradientDriver(GradientDriver):
         self._debug = scf_drv._debug
         self._block_size_factor = scf_drv._block_size_factor
         self._scf_drv = scf_drv
+        self.timing = scf_drv.timing
 
         self.flag = 'RPA Gradient Driver'
 
@@ -357,7 +358,7 @@ class TddftGradientDriver(GradientDriver):
 
         self._print_debug_info('after  npot_grad')
         
-        # orbital contribution to gradient
+        # orbital response contribution to gradient
 
         self._print_debug_info('before ovl_grad')
 
@@ -500,6 +501,14 @@ class TddftGradientDriver(GradientDriver):
 
         if self.rank == mpi_master():
             self.gradient += gs_grad_drv.get_gradient()
+
+        self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
+
+        if self.timing and self.rank == mpi_master():
+            self.ostream.print_info('Fock timing decomposition')
+            for key, val in fock_timing.items():
+                self.ostream.print_info(f'    {key:<10s}:  {val:.2f} sec')
+            self.ostream.print_blank()
 
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """
