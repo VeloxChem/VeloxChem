@@ -136,27 +136,10 @@ class HessianOrbitalResponse(CphfSolver):
             density = scf_tensors['D_alpha']
             mo = scf_tensors['C_alpha']
             mo_energies = scf_tensors['E_alpha']
-        #    nao = mo.shape[0]
-
-            # nmo is sometimes different than nao (because of linear
-            # dependencies which get removed during SCF)
-            nmo = mo_energies.shape[0]
-            #nocc = molecule.number_of_alpha_electrons()
-            #nvir = nmo - nocc
-            #mo_occ = mo[:, :nocc]
-            #mo_vir = mo[:, nocc:]
             eocc = mo_energies[:nocc]
             tmp_eocc = eocc.reshape(-1,1)
-
             # DFT
-            #mol_grid = dft_dict['molgrid'] 
             gs_density = dft_dict['gs_density']
-
-            # preparing the CPHF RHS
-            #ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
-            #tmp_ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
-            #fock_deriv_ao = np.zeros((natm, 3, nao, nao))
-            #tmp_fock_deriv_ao = np.zeros((natm, 3, nao, nao))
         else:
             density = None
             mol_grid = None
@@ -164,10 +147,10 @@ class HessianOrbitalResponse(CphfSolver):
             tmp_eocc = None
             mo = None
 
+        # DFT grid
         mol_grid = dft_dict['molgrid'] 
-        #gs_density = dft_dict['gs_density']
+
         density = self.comm.bcast(density, root=mpi_master())
-        #mol_grid = self.comm.bcast(mol_grid, root=mpi_master())
         gs_density = self.comm.bcast(gs_density, root=mpi_master())
         tmp_eocc = self.comm.bcast(tmp_eocc, root=mpi_master())
         mo = self.comm.bcast(mo, root=mpi_master())
@@ -184,9 +167,6 @@ class HessianOrbitalResponse(CphfSolver):
         ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
         fock_deriv_ao = np.zeros((natm, 3, nao, nao))
 
-        #mol_grid = dft_dict['molgrid'] 
-        #gs_density = dft_dict['gs_density']
-
         # import the integral derivatives
         self.profiler.set_timing_key('derivs')
         self.profiler.start_timer('derivs')
@@ -201,13 +181,6 @@ class HessianOrbitalResponse(CphfSolver):
 
         for iatom in local_atoms:
 
-            #if scf_drv._dft:
-            #    vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
-            #                        molecule, basis, gs_density, mol_grid,
-            #                        scf_drv.xcfun.get_func_label(), iatom)
-            #    vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
-
-            #if self.rank == mpi_master():
             # compute overlap gradient integrals matrices
             gmats = ovlp_grad_drv.compute(molecule, basis, iatom)
 
@@ -249,8 +222,6 @@ class HessianOrbitalResponse(CphfSolver):
         fock_deriv_ov = np.zeros((natm, 3, nocc, nvir))
         orben_ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
 
-        #tmp_eocc = eocc.reshape(-1,1)
-
         # transform integral derivatives to MO basis
         for iatom in local_atoms:
             for x in range(3):
@@ -271,25 +242,22 @@ class HessianOrbitalResponse(CphfSolver):
         # transforming the oo overlap derivative back to AO basis
         # (not equal to the initial one)
         uij_ao = np.zeros((natm, 3, nao, nao))
-        #for a in range(natm):
+        
         for iatom in local_atoms:
             for x in range(3):
                 uij_ao[iatom,x] = np.linalg.multi_dot([
                    mo_occ, -0.5 * ovlp_deriv_oo[iatom,x], mo_occ.T 
                 ])
+
         uij_ao = uij_ao.reshape(3*natm, nao, nao)
         uij_ao = self.comm.reduce(uij_ao, root=mpi_master())
                    
-        #else:
-        #    uij_ao_list = None
-
         if self.rank == mpi_master():
             num_uij = len(uij_ao)
         else:
             num_uij = None
         num_uij = self.comm.bcast(num_uij, root=mpi_master())
 
-        # TODO: bcast array by array
         if self.rank == mpi_master():
             uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
         else:
@@ -301,23 +269,18 @@ class HessianOrbitalResponse(CphfSolver):
         # create AODensity and Fock matrix objects, contract with ERI
         fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis,
                            eri_dict, dft_dict, pe_dict, self.profiler)
+
         # _comp_lr_fock only returns value to master
         fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
        
-        #t2 = tm.time() 
-        #if self.rank == mpi_master():
-        #    self.ostream.print_info('CPHF/CPKS RHS computed in' +
-        #                             ' {:.2f} sec.'.format(t2 - t1))
-        #    self.ostream.print_blank()
-        #    self.ostream.flush()
-            
         fock_uij_numpy = np.zeros((natm, 3, nao, nao))
         fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
-        #for i in range(natm):
+
         for iatom in local_atoms:
             for x in range(3):
                 #fock_uij_numpy[iatom,x] = fock_uij[3*iatom + x]
                 tmp_uij_ao = fock_uij[3*iatom + x]
+
                 # transform to MO basis
                 fock_uij_mo[iatom,x] = np.linalg.multi_dot([
                     mo_occ.T, tmp_uij_ao, mo_vir
@@ -328,12 +291,11 @@ class HessianOrbitalResponse(CphfSolver):
         cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov
                         + 2 * fock_uij_mo)
 
-        #fock_uij_numpy = self.comm.allreduce(fock_uij_numpy, op=MPI.SUM)
-        #cphf_rhs = self.comm.allreduce(cphf_rhs, op=MPI.SUM)
         fock_uij_numpy = self.comm.reduce(fock_uij_numpy, root=mpi_master())
         cphf_rhs = self.comm.reduce(cphf_rhs, root=mpi_master())
 
         t2 = tm.time() 
+
         if self.rank == mpi_master():
             self.ostream.print_info('CPHF/CPKS RHS computed in' +
                                      ' {:.2f} sec.'.format(t2 - t1))
