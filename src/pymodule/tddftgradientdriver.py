@@ -262,17 +262,24 @@ class TddftGradientDriver(GradientDriver):
                         + 2.0 * cphf_ao.transpose(0,2,1) )
         else:
             dof = None
+            natm = None
+            gs_dm = None
             relaxed_density_ao = None
             x_plus_y_ao = None
             x_minus_y_ao = None
 
         dof = self.comm.bcast(dof, root=mpi_master())
+        natm = self.comm.bcast(natm, root=mpi_master())
+        gs_dm = self.comm.bcast(gs_dm,
+                                root=mpi_master())
         relaxed_density_ao = self.comm.bcast(relaxed_density_ao,
                                              root=mpi_master())
         x_plus_y_ao = self.comm.bcast(x_plus_y_ao,
                                       root=mpi_master())
         x_minus_y_ao = self.comm.bcast(x_minus_y_ao,
                                        root=mpi_master())
+        omega_ao = self.comm.bcast(omega_ao,
+                                   root=mpi_master())
 
         # ground state gradient
         t1 = time.time()
