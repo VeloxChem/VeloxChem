@@ -12,11 +12,6 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.gradientdriver import GradientDriver
 from veloxchem.tddftgradientdriver import TddftGradientDriver
 
-try:
-    import pyscf
-except ImportError:
-    pass
-
 class TestGrad:
     def run_tddft_grad(self, xcfun_label, tamm_dancoff, ref_grad):
 
@@ -71,8 +66,6 @@ class TestGrad:
             grad = tddft_grad.get_gradient()[0]
             assert np.max(np.abs(grad - ref_grad)) < 1.0e-6
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
     def test_tda_slater(self):
         xcfun_label = 'slater'
         tamm_dancoff = True
@@ -83,8 +76,6 @@ class TestGrad:
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
     def test_tda_blyp(self):
         xcfun_label = 'blyp'
         tamm_dancoff = True
@@ -95,8 +86,6 @@ class TestGrad:
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
     def test_rpa_slater(self):
         xcfun_label = 'slater'
         tamm_dancoff = False
@@ -107,8 +96,6 @@ class TestGrad:
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
     def test_rpa_blyp(self):
         xcfun_label = 'blyp'
         tamm_dancoff = False
