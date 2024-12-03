@@ -42,6 +42,12 @@ from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check, polgrad_sanity_check
 from .dftutils import get_default_grid_level
 
+# VLX integrals
+from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver, NuclearPotentialGeom010Driver,
+                           FockGeom1000Driver, ElectricDipoleMomentGeom100Driver)
+
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import hcore_deriv
@@ -547,8 +553,7 @@ class PolarizabilityGradient():
                         ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
                             x_minus_y[x].reshape(nao**2),
                             d_dipole[y, a].reshape(nao**2)
-                        ]) #)
-                        #scf_polgrad[x, y, a] += (
+                        ])
                         + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
                             (x_plus_y[x] - x_plus_y[x].T
                             ).reshape(nao**2), d_eri[a].transpose(
@@ -576,36 +581,6 @@ class PolarizabilityGradient():
 
                     if (y != x):
                         scf_polgrad[y, x, a] += scf_polgrad[x, y, a]
-
-
-                    # Below is the original code, which computes both off-diagonal
-                    # blocks of the polgrad.
-                    #scf_polgrad[y, x, a] += (
-                    #    1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
-                    #        (x_plus_y[y] - x_plus_y[y].T
-                    #        ).reshape(nao**2), d_eri[a].transpose(
-                    #            1, 0, 2, 3).reshape(nao**2, nao**2),
-                    #        x_plus_y[x].reshape(nao**2)
-                    #    ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
-                    #        (x_plus_y[y] - x_plus_y[y].T
-                    #        ).reshape(nao**2), d_eri[a].transpose(
-                    #            3, 0, 2, 1).reshape(nao**2, nao**2),
-                    #        x_plus_y[x].reshape(nao**2)
-                    #    ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
-                    #        (x_minus_y[y] + x_minus_y[y].T
-                    #        ).reshape(nao**2), d_eri[a].transpose(
-                    #            1, 0, 2, 3).reshape(nao**2, nao**2),
-                    #        x_minus_y[x].reshape(nao**2)
-                    #    ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
-                    #        (x_minus_y[y] + x_minus_y[y].T
-                    #        ).reshape(nao**2), d_eri[a].transpose(
-                    #            3, 0, 2, 1).reshape(nao**2, nao**2),
-                    #        x_minus_y[x].reshape(nao**2)
-                    #    ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                    #        d_dipole[y, a].reshape(nao**2),
-                    #        x_minus_y[x].reshape(nao**2)
-                    #    ]))
-                    # TEST
 
         valstr = ' * Time spent constructing pol. gradient for '
         valstr += 'atom #{:d}: {:.6f} sec * '.format(
