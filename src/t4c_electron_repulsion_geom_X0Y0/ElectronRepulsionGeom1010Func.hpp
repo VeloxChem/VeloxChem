@@ -7,10 +7,14 @@
 
 #include "ElectronRepulsionGeom1010RecSSSS.hpp"
 #include "ElectronRepulsionGeom1010RecSSSP.hpp"
+#include "ElectronRepulsionGeom1010RecSSPS.hpp"
 #include "ElectronRepulsionGeom1010RecSSSD.hpp"
+#include "ElectronRepulsionGeom1010RecSSPP.hpp"
 #include "ElectronRepulsionGeom1010RecSPSS.hpp"
 #include "ElectronRepulsionGeom1010RecSPSP.hpp"
+#include "ElectronRepulsionGeom1010RecSPPS.hpp"
 #include "ElectronRepulsionGeom1010RecSPSD.hpp"
+#include "ElectronRepulsionGeom1010RecSPPP.hpp"
 #include "ElectronRepulsionGeom1010RecSDSS.hpp"
 #include "ElectronRepulsionGeom1010RecSDSP.hpp"
 #include "ElectronRepulsionGeom1010RecSDSD.hpp"
@@ -51,9 +55,21 @@ compute_geom_1010(T&                               distributor,
         return;
     }
     
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({1, 0})))
+    {
+        erirec::comp_electron_repulsion_geom1010_ssps(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
     if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({0, 2})))
     {
         erirec::comp_electron_repulsion_geom1010_sssd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 0})) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        erirec::comp_electron_repulsion_geom1010_sspp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
         return;
     }
    
@@ -74,6 +90,18 @@ compute_geom_1010(T&                               distributor,
     if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({0, 2})))
     {
         erirec::comp_electron_repulsion_geom1010_spsd(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({1, 0})))
+    {
+        erirec::comp_electron_repulsion_geom1010_spps(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
+        return;
+    }
+    
+    if ((bra_angmoms == std::pair<int, int>({0, 1})) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        erirec::comp_electron_repulsion_geom1010_sppp(distributor, bra_gto_pair_block, ket_gto_pair_block, bra_indices, ket_indices);
         return;
     }
     

@@ -24,6 +24,253 @@ class TestFockGeom1010Driver:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         return mol, bas
+        
+    def test_h2o_fock_2jk_hess_h3_o1_sto3g(self):
+
+        mol_h2o, bas_sto3g = self.get_data_h2o()
+
+        # load density matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
+        den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
+        den_mat.set_values(np.load(npyfile))
+
+        # compute Fock matrix
+        fock_drv = FockGeom1010Driver()
+        fock_mats = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, 2, 0, "2jk", 0.0, 0.0)
+        
+        # load reference Fock matrix
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.sto3g.2j-k.geom.1010.h3.o1.npy')
+        ref_mat = np.load(npyfile)
+        
+        # dimension of molecular basis
+        basdims = [0, 4, 7]
+        
+        # check individual submatrices of X_X matrix
+        fock_mat_xx = fock_mats.matrix("X_X")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_xx.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[0,0][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_xx.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[0,0]))
+        assert fmat == fref
+        
+        # check individual submatrices of X_Y matrix
+        fock_mat_xy = fock_mats.matrix("X_Y")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_xy.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[0,1][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_xy.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[0,1]))
+        assert fmat == fref
+        
+        # check individual submatrices of X_Z matrix
+        fock_mat_xz = fock_mats.matrix("X_Z")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_xz.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[0,2][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_xz.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[0,2]))
+        assert fmat == fref
+        
+        # check individual submatrices of Y_X matrix
+        fock_mat_yy = fock_mats.matrix("Y_X")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_yy.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[1,0][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_yy.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[1,0]))
+        assert fmat == fref
+        
+        # check individual submatrices of Y_Y matrix
+        fock_mat_yy = fock_mats.matrix("Y_Y")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_yy.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[1,1][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_yy.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[1,1]))
+        assert fmat == fref
+        
+        # check individual submatrices of Y_Z matrix
+        fock_mat_yz = fock_mats.matrix("Y_Z")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_yz.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[1,2][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_yz.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[1,2]))
+        assert fmat == fref
+        
+        # check individual submatrices of Z_X matrix
+        fock_mat_zz = fock_mats.matrix("Z_X")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_zz.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[2,0][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_zz.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[2,0]))
+        assert fmat == fref
+        
+        # check individual submatrices of Z_Y matrix
+        fock_mat_zz = fock_mats.matrix("Z_Y")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_zz.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[2,1][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_zz.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[2,1]))
+        assert fmat == fref
+        
+        # check individual submatrices of Z_Z matrix
+        fock_mat_zz = fock_mats.matrix("Z_Z")
+        for i in range(2):
+            for j in range(2):
+                # bra side
+                sbra = basdims[i]
+                ebra = basdims[i + 1]
+                # ket side
+                sket = basdims[j]
+                eket = basdims[j + 1]
+                # load computed submatrix
+                cmat = fock_mat_zz.submatrix((i, j))
+                # load reference submatrix
+                rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
+                rmat.set_values(np.ascontiguousarray(ref_mat[2,2][sbra:ebra,
+                                                                sket:eket]))
+                # compare submatrices
+                assert cmat == rmat
+
+        # check full Fock matrix
+        fmat = fock_mat_zz.full_matrix()
+        fref = SubMatrix([0, 0, 7, 7])
+        fref.set_values(np.ascontiguousarray(ref_mat[2,2]))
+        assert fmat == fref
 
     def test_h2o_fock_2jk_hess_h3_h3_sto3g(self):
 
