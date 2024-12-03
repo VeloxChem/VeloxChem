@@ -385,6 +385,9 @@ def main():
         hessian_dict = (task.input_dict['hessian']
                         if 'hessian' in task.input_dict else {})
 
+        orbrsp_dict = (task.input_dict['orbital_response']
+                       if 'orbital_response' in task.input_dict else {})
+
         if use_xtb:
             hessian_drv = XtbHessianDriver(xtb_drv)
             hessian_drv.update_settings(method_dict, hessian_dict)
@@ -392,7 +395,7 @@ def main():
 
         elif scf_drv.scf_type == 'restricted':
             hessian_drv = ScfHessianDriver(scf_drv)
-            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
 
     # Geometry optimization
