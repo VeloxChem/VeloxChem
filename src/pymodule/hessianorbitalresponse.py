@@ -216,7 +216,6 @@ class HessianOrbitalResponse(CphfSolver):
             
         self.profiler.stop_timer('derivs')
 
-        #if self.rank == mpi_master():
         ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
         ovlp_deriv_oo = np.zeros((natm, 3, nocc, nocc))
         fock_deriv_ov = np.zeros((natm, 3, nocc, nvir))
@@ -278,9 +277,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         for iatom in local_atoms:
             for x in range(3):
-                #fock_uij_numpy[iatom,x] = fock_uij[3*iatom + x]
                 tmp_uij_ao = fock_uij[3*iatom + x]
-
                 # transform to MO basis
                 fock_uij_mo[iatom,x] = np.linalg.multi_dot([
                     mo_occ.T, tmp_uij_ao, mo_vir
