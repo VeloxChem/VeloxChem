@@ -37,7 +37,6 @@ from .veloxchemlib import make_matrix, mat_t, partition_atoms
 from .veloxchemlib import T4CScreener
 from .outputstream import OutputStream
 from .matrices import Matrices
-from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
 from .errorhandler import assert_msg_critical
@@ -111,13 +110,6 @@ class HessianOrbitalResponse(CphfSolver):
             The RHS of the CPHF equations.
         """
 
-        self.profiler = Profiler({
-            'timing': self.timing,
-            'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
-            'memory_tracing': self.memory_tracing,
-        })
-
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
         # ERI information
@@ -168,7 +160,10 @@ class HessianOrbitalResponse(CphfSolver):
         fock_deriv_ao = np.zeros((natm, 3, nao, nao))
 
         # import the integral derivatives
-        self.profiler.set_timing_key('derivs')
+        # For some reason the commented-out line results in a
+        # profiler error which I don't understand. Not sure why.
+        # It works if it's commented out. TODO: remove?
+        #self.profiler.set_timing_key('derivs')
         self.profiler.start_timer('derivs')
 
         t0 = tm.time()
