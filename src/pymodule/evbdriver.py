@@ -360,6 +360,7 @@ class EvbDriver():
         target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
         dp = EvbDataProcessing()
         dp.compute(reference_folder, target_folders, barrier, free_energy)
+        dp.print_results()
 
     @staticmethod
     def show_snapshots(folder):

@@ -29,7 +29,7 @@ class EvbDataProcessing:
         self.kb: float = 1.987204259e-3  # kcal/molK
         self.joule_to_cal: float = 0.239001
         self.verbose: bool = True
-        self.coordinate_bins = np.linspace(-100, 100, 100)
+        self.coordinate_bins = np.linspace(-300, 150, 300)
 
         self.calculate_discrete = True
         self.calculate_analytical = True
@@ -353,8 +353,8 @@ class EvbDataProcessing:
 
                 (
                     dGevb_discrete,
-                    reaction_free_energy_discretised,
                     barrier_discretised,
+                    reaction_free_energy_discretised,
                 ) = self.calculate_free_energies_and_smooth(dGevb_discrete)
 
                 result.update({
@@ -372,8 +372,8 @@ class EvbDataProcessing:
 
                 (
                     dGevb_analytical,
-                    reaction_free_energy_analytical,
                     barrier_analytical,
+                    reaction_free_energy_analytical,
                 ) = self.calculate_free_energies_and_smooth(dGevb_analytical)
 
                 result.update({
