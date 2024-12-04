@@ -55,7 +55,7 @@ class EvbDriver():
 
     def build_and_run_default_water_EVB(self, reactant: str, product: str | list[str], barrier, free_energy):
         
-        Lambda = list(np.linspace(0, 1, 26))
+        Lambda = list(np.linspace(0, 1, 51))
         if self.debug:
             Lambda = [0, 0.5, 1]
         self.build_forcefields(reactant, product)
@@ -169,7 +169,7 @@ class EvbDriver():
                 NPT=conf.get("NPT", False),
                 pressure=conf.get("pressure", 1),
                 solvent=conf.get("solvent", None),
-                padding=conf.get("padding", 1.5),
+                padding=conf.get("padding", 1.2),
                 CNT=conf.get("CNT", False),
                 Graphene=conf.get("graphene", False),
                 M=conf.get("M", 5),

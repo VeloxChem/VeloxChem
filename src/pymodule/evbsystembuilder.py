@@ -10,7 +10,7 @@ import openmm.unit as mmunit
 
 from mpi4py import MPI
 
-from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, mathconst_pi
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .forcefieldgenerator import ForceFieldGenerator
@@ -65,7 +65,7 @@ class EvbSystemBuilder():
 
         self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom()
 
-        self.deg_to_rad: float = mathconst_pi() / 180
+        self.deg_to_rad: float = np.pi / 180
 
         self.data_folder: str | None = None
         self.run_folder: str | None = None
@@ -129,7 +129,7 @@ class EvbSystemBuilder():
 
             # system_mol.set_coordinates_in_angstrom(positions)
             # print(f"New positions: {positions}")
-            R = Y / (2 * mathconst_pi())
+            R = Y / (2 * np.pi)
             if Graphene:
                 print(f"Building graphene sheet with X: {X/10:.3f}nm, Y: {Y/10:.3f}nm")
             if CNT:
@@ -201,7 +201,7 @@ class EvbSystemBuilder():
                         x = coord[0] + m * x_disp + x_offset
                         y = coord[1] + n * y_disp + y_offset
                         z = coord[2] + 5 + z_offset
-                        phi = 2 * mathconst_pi() * y / Y
+                        phi = 2 * np.pi * y / Y
                         new_coord_graphene = np.array([x, y, z])  # A
                         new_coord_CNT = np.array(
                             [x, R * math.sin(phi) + X / 2, R * math.cos(phi) + X / 2]
@@ -316,7 +316,7 @@ class EvbSystemBuilder():
                     CC_atoms[key[0]].index,
                     CC_atoms[key[1]].index,
                     CC_atoms[key[2]].index,
-                    angle["equilibrium"] * mathconst_pi() / 180,
+                    angle["equilibrium"] * np.pi / 180,
                     angle["force_constant"],
                 )
 

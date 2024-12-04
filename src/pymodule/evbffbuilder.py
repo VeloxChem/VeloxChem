@@ -5,7 +5,8 @@ import shutil
 
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
-from .scfrestdriver import ScfRestrictedDriver
+
+from .scfunrestdriver import ScfUnrestrictedDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
@@ -142,15 +143,15 @@ class EvbForceFieldBuilder():
                 print("Creating topology")
                 forcefield.create_topology(molecule)
             else:
-                if np.max(molecule.masses_to_numpy()) > 84:
+                if max(molecule.get_masses()) > 84:
                     basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
                     print(
-                        f"Heavy ({np.max(molecule.masses_to_numpy())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
+                        f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
                     )
                 else:
                     basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
 
-                scf_drv = ScfRestrictedDriver()
+                scf_drv = ScfUnrestrictedDriver()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
                     scf_drv.conv_thresh = 1.0e-4

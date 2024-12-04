@@ -33,6 +33,8 @@ class EvbDataProcessing:
 
         self.calculate_discrete = True
         self.calculate_analytical = True
+        self.smooth_window_size = 10
+        self.smooth_polynomial_order = 3
         self.results = {}
 
     def beta(self, T) -> float:
@@ -221,6 +223,7 @@ class EvbDataProcessing:
         binned_data = [[] for _ in range(np.max(lam_i) + 1)]
         for i, li in enumerate(lam_i):
             binned_data[li].append(data[i])
+        
         binned_data = np.array(binned_data)
         return binned_data
 
@@ -293,7 +296,8 @@ class EvbDataProcessing:
         return dGevb, pns, dGcor
 
     def calculate_free_energies_and_smooth(self, dGevb):
-        dGevb_smooth = scipy.signal.savgol_filter(dGevb, 10, 3)
+
+        dGevb_smooth = scipy.signal.savgol_filter(dGevb, self.smooth_window_size, self.smooth_polynomial_order)
 
         min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
         max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
@@ -324,6 +328,10 @@ class EvbDataProcessing:
             Lambda_indices = result["Lambda_indices"]
             E1_ref = result["E1_ref"]
             E2_ref = result["E2_ref"]
+            print(np.shape(E1_ref))
+            print(np.shape(E2_ref))
+            print(np.shape(Lambda_frame))
+            print(result)
             _, V, dE, Eg = self.calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12, Lambda_frame)
             dGfep, _, _, _ = self.calculate_dGfep(dE, Temp, Lambda, Lambda_indices)  # todo use T array instead
 

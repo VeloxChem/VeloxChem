@@ -201,6 +201,9 @@ class FepDriver():
                 f"{self.run_folder}/traj{l:.3f}.pdb",
                 write_step,
             ))
+
+            #todo custom reporters, xtc trajectory, h5 data, recalculate during run?
+
             runsimulation.reporters.append(
                 mmapp.StateDataReporter(
                     f"{self.run_folder}/data_{l:.3f}.dat",
@@ -214,6 +217,8 @@ class FepDriver():
                 ))
 
             print(f"Running sampling with step size {runsimulation.integrator.getStepSize()}")
+            
+                
             runsimulation.step(total_sample_steps)
             state = runsimulation.context.getState(getPositions=True)
             positions = state.getPositions()
