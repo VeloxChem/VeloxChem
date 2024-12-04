@@ -343,9 +343,10 @@ class HessianOrbitalResponse(CphfSolver):
         gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, i)
 
         # for Fock matrix gradient
-        exchange_scaling_factor = 1.0
-        fock_type = "2jk"
+        #exchange_scaling_factor = 1.0
+        #fock_type = "2jk"
 
+        # for Fock matrix gradient
         if scf_drv._dft:
             # TODO: range-separated Fock
             if scf_drv.xcfun.is_hybrid():
@@ -354,6 +355,9 @@ class HessianOrbitalResponse(CphfSolver):
             else:
                 fock_type = 'j'
                 exchange_scaling_factor = 0.0
+        else:
+            exchange_scaling_factor = 1.0
+            fock_type = "2jk"
         
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
