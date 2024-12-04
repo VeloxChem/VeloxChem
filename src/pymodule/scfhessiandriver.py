@@ -38,6 +38,9 @@ from .veloxchemlib import XCMolecularHessian
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 
+# vlx integrals
+from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
@@ -1309,7 +1312,9 @@ class ScfHessianDriver(HessianDriver):
         # TODO: replace the full array of dipole integrals derivatives with
         # the derivative with respect to each atom and contract with 
         # the densities in the same way as done for the energy gradient.
-        dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
+        #dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
+        #                                                molecule, ao_basis)
+        dipole_integrals_deriv = self.compute_vlx_dipole_integral_derivatives(
                                                         molecule, ao_basis)
 
         # Add the electronic contributions
@@ -1342,9 +1347,10 @@ class ScfHessianDriver(HessianDriver):
         # number of atoms
         natm = molecule.number_of_atoms()
 
-        scf_tensors = self.scf_driver.scf_tensors
+        #scf_tensors = self.scf_driver.scf_tensors
         # number of atomic orbitals
-        nao = scf_tensors['D_alpha'].shape[0]
+        #nao = scf_tensors['D_alpha'].shape[0]
+        nao = ao_basis.get_dimensions_of_basis()
 
         # 3 dipole components x No. atoms x 3 atomic coordinates
         # x No. basis x No. basis
@@ -1354,6 +1360,50 @@ class ScfHessianDriver(HessianDriver):
             dipole_integrals_gradient[:,i,:,:,:] = (
                                 dipole_deriv(molecule, ao_basis, i)
                                 )
+
+        return dipole_integrals_gradient
+
+    def compute_vlx_dipole_integral_derivatives(self, molecule, ao_basis):
+        """
+        Imports the analytical derivatives of dipole integrals.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+
+        :return:
+            The dipole integral derivatives.
+        """
+
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # number of atomic orbitals
+        nao = ao_basis.get_dimensions_of_basis()
+        
+        dip_grad_drv = ElectricDipoleMomentGeom100Driver()
+        dipole_integrals_gradient = np.zeros((3, natm, 3, nao, nao))
+
+        for i in range(natm):
+            gmats_dip = dip_grad_drv.compute(molecule, basis, [0.0, 0.0, 0.0], iatom)
+
+            # the keys of the dipole gmat
+            gmats_dip_components = (['X_X', 'X_Y', 'X_Z', 'Y_X' ]
+                                  + [ 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'])
+
+            # dictionary to convert from string idx to integer idx
+            comp_to_idx = {'X': 0, 'Y': 1, 'Z': 2}
+
+            for i, label in enumerate(gmats_dip_components):
+                gmat_dip = gmats_dip.matrix_to_numpy(label)
+                gmat_dip += gmat_dip.T
+
+                icoord = comp_to_idx[label[0]] # atom coordinate component
+                icomp = comp_to_idx[label[-1]] # dipole operator component
+
+                # reorder indices to first is operator comp, second is coord
+                dipole_integrals_gradient[icomp, icoord] += gmat_dip
 
         return dipole_integrals_gradient
 
