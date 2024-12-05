@@ -1385,8 +1385,8 @@ class ScfHessianDriver(HessianDriver):
         dip_grad_drv = ElectricDipoleMomentGeom100Driver()
         dipole_integrals_gradient = np.zeros((3, natm, 3, nao, nao))
 
-        for i in range(natm):
-            gmats_dip = dip_grad_drv.compute(molecule, basis, [0.0, 0.0, 0.0], iatom)
+        for iatom in range(natm):
+            gmats_dip = dip_grad_drv.compute(molecule, ao_basis, [0.0, 0.0, 0.0], iatom)
 
             # the keys of the dipole gmat
             gmats_dip_components = (['X_X', 'X_Y', 'X_Z', 'Y_X' ]
@@ -1403,7 +1403,7 @@ class ScfHessianDriver(HessianDriver):
                 icomp = comp_to_idx[label[-1]] # dipole operator component
 
                 # reorder indices to first is operator comp, second is coord
-                dipole_integrals_gradient[icomp, icoord] += gmat_dip
+                dipole_integrals_gradient[icomp, iatom, icoord] += gmat_dip
 
         return dipole_integrals_gradient
 
