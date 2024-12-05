@@ -88,6 +88,11 @@ class ScfHessianDriver(HessianDriver):
         # flag for printing the Hessian
         self.do_print_hessian = False
 
+        # TODO: determine _block_size_factor for SCF Hessian driver
+        # self._block_size_factor = 4
+
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
         self._input_keywords['hessian'].update({
                 'do_pople_hessian': ('bool', 'whether to compute Pople Hessian'),
                 'numerical_grad': ('bool', 'whether the gradient is numerical'),

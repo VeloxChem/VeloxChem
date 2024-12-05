@@ -74,6 +74,8 @@ class ScfGradientDriver(GradientDriver):
 
         self._block_size_factor = 4
 
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 

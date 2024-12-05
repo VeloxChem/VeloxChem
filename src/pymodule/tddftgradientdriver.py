@@ -80,8 +80,13 @@ class TddftGradientDriver(GradientDriver):
 
         super().__init__(scf_drv.comm, scf_drv.ostream)
         self._debug = scf_drv._debug
-        self._block_size_factor = scf_drv._block_size_factor
         self._scf_drv = scf_drv
+
+        # TODO: double check _block_size_factor
+        self._block_size_factor = 4
+
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
         self.timing = scf_drv.timing
 
         self.flag = 'RPA Gradient Driver'
