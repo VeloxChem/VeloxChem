@@ -1314,7 +1314,7 @@ class ScfHessianDriver(HessianDriver):
         # the densities in the same way as done for the energy gradient.
         #dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
         #                                                molecule, ao_basis)
-        dipole_integrals_deriv = self.compute_vlx_dipole_integral_derivatives(
+        dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
                                                         molecule, ao_basis)
 
         # Add the electronic contributions
@@ -1331,8 +1331,10 @@ class ScfHessianDriver(HessianDriver):
 
         self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
 
-    def compute_dipole_integral_derivatives(self, molecule, ao_basis):
+    # TODO remove this function
+    def compute_pyscf_dipole_integral_derivatives(self, molecule, ao_basis):
         """
+        LEGACY FUNCTION:  REPLACED BY VLX INTEGRALS
         Imports the analytical derivatives of dipole integrals.
 
         :param molecule:
@@ -1363,7 +1365,7 @@ class ScfHessianDriver(HessianDriver):
 
         return dipole_integrals_gradient
 
-    def compute_vlx_dipole_integral_derivatives(self, molecule, ao_basis):
+    def compute_dipole_integral_derivatives(self, molecule, ao_basis):
         """
         Imports the analytical derivatives of dipole integrals.
 
