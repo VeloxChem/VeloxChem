@@ -29,7 +29,7 @@ import numpy as np
 import time as tm
 import tempfile
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -120,7 +120,7 @@ class OptimizationDriver:
 
         self.keep_files = False
 
-        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
         self.grad_drv = grad_drv
 
         self._debug = False
@@ -223,7 +223,7 @@ class OptimizationDriver:
             temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(temp_dir.name)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.filename is not None:
             self.clean_up_file(Path(self.filename + '.log'))
             self.clean_up_file(
                 Path(self.filename + '.tmp', 'hessian', 'hessian.txt'))
@@ -232,10 +232,16 @@ class OptimizationDriver:
 
         # filename is used by geomeTRIC to create .log and other files
 
-        if self.rank == mpi_master() and self.keep_files:
-            filename = self.filename
+        if self.filename is not None:
+            base_fname = self.filename
         else:
-            filename = Path(self.filename).name
+            name_string = get_random_string_parallel(self.comm)
+            base_fname = 'vlx_' + name_string
+
+        if self.rank == mpi_master() and self.keep_files:
+            filename = base_fname
+        else:
+            filename = Path(base_fname).name
             filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
@@ -290,9 +296,11 @@ class OptimizationDriver:
         else:
             coords = m.xyzs[-1] / geometric.nifty.bohr2ang
             labels = molecule.get_labels()
+            atom_basis_labels = molecule.get_atom_basis_labels()
 
             if self.rank == mpi_master():
-                final_mol = Molecule(labels, coords.reshape(-1, 3), 'au')
+                final_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
+                                     atom_basis_labels)
                 final_mol.set_charge(molecule.get_charge())
                 final_mol.set_multiplicity(molecule.get_multiplicity())
             else:
@@ -334,7 +342,8 @@ class OptimizationDriver:
                     opt_results['scan_geometries'] = []
                     labels = molecule.get_labels()
                     for opt_coords_au in all_coords_au:
-                        mol = Molecule(labels, opt_coords_au[-1], 'au')
+                        mol = Molecule(labels, opt_coords_au[-1], 'au',
+                                       atom_basis_labels)
                         opt_results['scan_geometries'].append(
                             mol.get_xyz_string())
 
@@ -347,7 +356,7 @@ class OptimizationDriver:
                     labels = molecule.get_labels()
                     for xyz in m.xyzs:
                         mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
-                                       'au')
+                                       'au', atom_basis_labels)
                         opt_results['opt_geometries'].append(
                             mol.get_xyz_string())
 

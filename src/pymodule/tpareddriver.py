@@ -197,7 +197,8 @@ class TpaReducedDriver(TpaDriver):
         return distributed_density_1, distributed_density_2, None
 
     def get_fock_dict(self, wi, density_list1, density_list2, density_list3,
-                      F0_a, mo, molecule, ao_basis, dft_dict, profiler):
+                      F0_a, mo, molecule, ao_basis, eri_dict, dft_dict,
+                      profiler):
         """
         Computes the compounded Fock matrices F^{σ}  used for the reduced
         isotropic cubic response function
@@ -214,6 +215,10 @@ class TpaReducedDriver(TpaDriver):
             The molecule
         :param ao_basis:
             The AO basis set
+        :param eri_dict:
+            The dictionary containing ERI information
+        :param dft_dict:
+            The dictionary containing DFT information
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -257,13 +262,14 @@ class TpaReducedDriver(TpaDriver):
 
             if self._dft:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
-                                                 dft_dict, density_list1,
-                                                 density_list2, None,
-                                                 'redtpa_i', profiler)
+                                                 eri_dict, dft_dict,
+                                                 density_list1, density_list2,
+                                                 None, 'redtpa_i', profiler)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
-                                                 None, None, density_list2,
-                                                 None, 'redtpa_i', profiler)
+                                                 eri_dict, None, None,
+                                                 density_list2, None,
+                                                 'redtpa_i', profiler)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -638,7 +644,7 @@ class TpaReducedDriver(TpaDriver):
         return distributed_density_1, distributed_density_2
 
     def get_fock_dict_II(self, wi, density_list1, density_list2, mo, molecule,
-                         ao_basis, dft_dict, profiler):
+                         ao_basis, eri_dict, dft_dict, profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -653,6 +659,10 @@ class TpaReducedDriver(TpaDriver):
             The molecule
         :param ao_basis:
             The AO basis set
+        :param eri_dict:
+            The dictionary containing ERI information
+        :param dft_dict:
+            The dictionary containing DFT information
 
         :return:
             A dictonary of compounded second-order Fock-matrices
@@ -693,14 +703,15 @@ class TpaReducedDriver(TpaDriver):
 
             if self._dft:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', dft_dict,
-                                                 density_list1, density_list2,
-                                                 None, 'redtpa_ii', profiler)
-            else:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', None, None,
+                                                 'real_and_imag', eri_dict,
+                                                 dft_dict, density_list1,
                                                  density_list2, None,
                                                  'redtpa_ii', profiler)
+            else:
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                                 'real_and_imag', eri_dict,
+                                                 None, None, density_list2,
+                                                 None, 'redtpa_ii', profiler)
 
             self._print_fock_time(time.time() - time_start_fock)
 

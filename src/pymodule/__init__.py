@@ -39,6 +39,10 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
+from .veloxchemlib import XCMolecularGradient
+
+# for backward compatibility only
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 
 # C++ functions
 from .veloxchemlib import is_chemical_element
@@ -61,6 +65,7 @@ from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
+from .veloxchemlib import partition_atoms
 
 # C++ enums
 from .veloxchemlib import mat_t
@@ -91,6 +96,7 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
+from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
@@ -119,6 +125,7 @@ from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
+from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
@@ -145,6 +152,12 @@ from .features import print_features
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
+from .oneeints import compute_overlap_integrals
+from .oneeints import compute_kinetic_energy_integrals
+from .oneeints import compute_nuclear_potential_integrals
+from .oneeints import compute_electric_dipole_integrals
+from .oneeints import compute_linear_momentum_integrals
+from .oneeints import compute_angular_momentum_integrals
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,

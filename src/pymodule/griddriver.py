@@ -76,7 +76,7 @@ class GridDriver:
 
         self._grid_drv.set_level(grid_level)
 
-    def generate(self, molecule):
+    def generate(self, molecule, max_points_per_box=None, verbose=False):
         """
         Generates molecular grid for molecule.
 
@@ -94,9 +94,20 @@ class GridDriver:
         grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]
 
         # Note: use hstack since local_grid is of shape (4,N)
-        mol_grid = MolecularGrid(DenseMatrix(np.hstack(grid_np_arrays)))
+        if max_points_per_box is None:
+            mol_grid = MolecularGrid(DenseMatrix(np.hstack(grid_np_arrays)))
+        else:
+            mol_grid = MolecularGrid(DenseMatrix(np.hstack(grid_np_arrays)),
+                                     max_points_per_box)
 
-        mol_grid.partition_grid_points()
+        grid_summary = mol_grid.partition_grid_points()
+
+        if (self.rank == mpi_master()) and verbose:
+            for line in grid_summary.splitlines():
+                self.ostream.print_info(line)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
         mol_grid.distribute_counts_and_displacements(self.rank, self.nodes)
 
         return mol_grid

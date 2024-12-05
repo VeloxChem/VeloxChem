@@ -423,6 +423,78 @@ CXCMolecularHessian_integrate_vxc_fock_gradient(CXCMolecularHessian&       self,
     return ret;
 }
 
+auto
+CXCIntegrator_integrate_vxc_pdft_gradient(CXCMolecularGradient&       self,
+                   const CMolecule&           molecule,
+                   const CMolecularBasis&     basis,
+                   const py::array_t<double>& densityMatrix,
+                   const py::array_t<double>& active2DM,
+                   const py::array_t<double>& activeMOs,
+                   const CMolecularGrid&      molecularGrid,
+                   const std::string&         xcFuncLabel,
+                   const py::dict             components,
+                   const double               rs_omega) -> py::array_t<double>
+{
+    // active2DM
+
+    // sanity checks
+    std::string errsrc("integrate_vxc_pdft, active2DM: Expecting a C-style contiguous numpy array");
+    auto        c_style = py::detail::check_flags(active2DM.ptr(), py::array::c_style);
+    errors::assertMsgCritical(c_style, errsrc);
+
+    std::string errsizes("integrate_vxc_pdft, active2DM: Expecting 4 identical dimensions");
+    bool        same_size = ((active2DM.ndim() == 4) && (active2DM.shape(0) == active2DM.shape(1)) && (active2DM.shape(0) == active2DM.shape(2)) &&
+                      (active2DM.shape(0) == active2DM.shape(3)));
+    errors::assertMsgCritical(same_size, errsizes);
+
+    auto n_active = static_cast<int>(active2DM.shape(0));
+
+    // Form 4D tensor
+    CDenseMatrix tensor2DM(n_active * n_active, n_active * n_active);
+    std::memcpy(tensor2DM.values(), active2DM.data(), active2DM.size() * sizeof(double));
+
+    // activeMOs
+
+    // sanity checks
+    errsrc  = "integrate_vxc_pdft, activeMOs: Expecting a C-style contiguous numpy array";
+    c_style = py::detail::check_flags(activeMOs.ptr(), py::array::c_style);
+    errors::assertMsgCritical(c_style, errsrc);
+
+    errsizes = "integrate_vxc_pdft, activeMOs: Expecting a 2D numpy array";
+    errors::assertMsgCritical(activeMOs.ndim() == 2, errsizes);
+
+    auto naos = static_cast<int>(activeMOs.shape(1));
+
+    CDenseMatrix denseActiveMO(n_active, naos);
+    std::memcpy(denseActiveMO.values(), activeMOs.data(), activeMOs.size() * sizeof(double));
+
+    // densityMatrix
+
+    // sanity checks
+    errsrc  = "integrate_vxc_pdft, densityMatrix: Expecting a C-style contiguous numpy array";
+    c_style = py::detail::check_flags(densityMatrix.ptr(), py::array::c_style);
+    errors::assertMsgCritical(c_style, errsrc);
+
+    errsizes  = "integrate_vxc_pdft, densityMatrix: Expecting 2 identical dimensions";
+    same_size = ((densityMatrix.ndim() == 2) && (densityMatrix.shape(0) == naos) && (densityMatrix.shape(1) == naos));
+    errors::assertMsgCritical(same_size, errsizes);
+
+    // Functional
+
+    std::vector<std::string> labels;
+    std::vector<double> coeffs;
+    for (auto item : components)
+    {
+        labels.push_back(item.first.cast<std::string>());
+        coeffs.push_back(item.second.cast<double>());
+    };
+    CXCPairDensityFunctional xcfun = CXCPairDensityFunctional(xcFuncLabel, labels, coeffs);
+
+    // Now compute gradients
+    auto molgrad = self.integrateVxcPDFTGradient(molecule, basis, densityMatrix.data(), tensor2DM, denseActiveMO, molecularGrid, xcfun, rs_omega);
+    return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
+}
+
 // Exports classes/functions in src/dft to python
 
 void
@@ -462,7 +534,9 @@ export_dft(py::module& m)
 
     PyClass<CMolecularGrid>(m, "MolecularGrid")
         .def(py::init<>())
+        .def(py::init<const int>())
         .def(py::init<const CDenseMatrix&>())
+        .def(py::init<const CDenseMatrix&, const int>())
         .def(py::init<const CMolecularGrid&>())
         .def("partition_grid_points", &CMolecularGrid::partitionGridPoints)
         .def("distribute_counts_and_displacements", &CMolecularGrid::distributeCountsAndDisplacements)
@@ -721,7 +795,8 @@ export_dft(py::module& m)
             "rwDensityArraysTwo"_a,
             "gsDensityArrays"_a,
             "molecularGrid"_a,
-            "xcFuncLabel"_a);
+            "xcFuncLabel"_a)
+        .def("integrate_vxc_pdft_gradient", &CXCIntegrator_integrate_vxc_pdft_gradient);
 
     // CXCMolecularHessian class
 
@@ -785,6 +860,7 @@ export_dft(py::module& m)
         .def("is_range_separated", &CXCFunctional::isRangeSeparated, "Determines whether the XC function is range-separated.")
         .def("is_hybrid", &CXCFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
         .def("is_undefined", &CXCFunctional::isUndefined, "Determines whether the XC function is undefined.")
+        .def("_set_leading_dimension", &CXCFunctional::setLeadingDimension, "Sets the leading dimension.")
         .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of XC functional.")
         .def("get_func_label", &CXCFunctional::getFunctionalLabel, "Gets name of XC functional.")
         .def("get_frac_exact_exchange", &CXCFunctional::getFractionOfExactExchange, "Gets fraction of exact Hartree-Fock exchange in XC functional.")

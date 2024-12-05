@@ -281,12 +281,16 @@ class ScfUnrestrictedDriver(ScfDriver):
             The string for spin unrestricted open shell SCF calculation.
         """
 
-        pe_type = " with PE" if self._pe else ""
+        if self.embedding_options is not None:
+            emb_type = ' with ' + self.embedding_options['settings'][
+                'embedding_method']
+        else:
+            emb_type = ''
 
         if self._dft:
-            return "Spin-Unrestricted Kohn-Sham" + pe_type
+            return "Spin-Unrestricted Kohn-Sham" + emb_type
 
-        return "Spin-Unrestricted Hartree-Fock" + pe_type
+        return "Spin-Unrestricted Hartree-Fock" + emb_type
 
     def natural_orbitals(self, scf_tensors=None):
         """

@@ -116,7 +116,8 @@ class InputParser:
                     continue
 
                 # skip first line if reading basis set
-                if (not self.is_basis_set) and (line[:10] == '@BASIS_SET'):
+                if (not self.is_basis_set) and (line.startswith('@BASIS_SET') or
+                                                line.startswith('@ECP_SET')):
                     self.is_basis_set = True
                     self.basis_set_name = line[10:].strip()
                     continue

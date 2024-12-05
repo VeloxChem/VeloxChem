@@ -886,6 +886,10 @@ class SadGuessDriver:
             naodim_1 = len(aoinds_1)
             naodim_2 = len(aoinds_2)
 
+            # skip ghost atom
+            if (not alpha_occ[atomidx]) and (not beta_occ[atomidx]):
+                continue
+
             err_ao_size = 'SadGuessDriver._comp_sad_guess: '
             err_ao_size += 'Mismatch between basis set and occupation number'
             assert_msg_critical(
