@@ -463,20 +463,18 @@ class PolarizabilityGradient():
                         tmp_d_hcore[icoord] += gmat_hcore
                         # loop over operator components
                         for x, y in xy_pairs:
-                #    for x in range(dof):
-                #        for y in range(x,dof):
-                #            for icoord in range(3):
-                            tmp_scf_gradient[x, y, iatom, icoord] = (
+                            tmp_scf_gradient[x, y, iatom, icoord] += (
                                     np.linalg.multi_dot([ # xymn,amn->xya
                                         2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                                        d_hcore[icoord].reshape(nao**2)])
+                                        #d_hcore[icoord].reshape(nao**2)])
+                                        gmat_hcore.reshape(nao**2)])
                                     )
                             # DEBUG
                             vlx_hcore_grad[x, y, iatom, icoord] += (
                                     np.linalg.multi_dot([ # xymn,amn->xya
                                         2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                                        #gmat_hcore.reshape(nao**2)])
-                                        tmp_d_hcore[icoord].reshape(nao**2)])
+                                        gmat_hcore.reshape(nao**2)])
+                                        #tmp_d_hcore[icoord].reshape(nao**2)])
                                     )
 
                     gmats_kin = Matrices()
@@ -486,7 +484,7 @@ class PolarizabilityGradient():
 
                     print('after hcore gradient')
                     print(np.max(np.abs(d_hcore - tmp_d_hcore)))
-                    print(np.max(np.abs(tmp_scf_gradient[:,:,iatom] - vlx_hcore_grad[:,:,iatom])))
+                    #print(np.max(np.abs(tmp_scf_gradient[:,:,iatom] - vlx_hcore_grad[:,:,iatom])))
                     self.ostream.flush()
 
                     # overlap contribution to gradient
@@ -503,10 +501,11 @@ class PolarizabilityGradient():
                         tmp_d_ovlp[icoord] += gmat_ovlp
                         # loop over operator components
                         for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] = (
+                            tmp_scf_gradient[x, y, iatom, icoord] += (
                                     1.0 * np.linalg.multi_dot([ # xymn,amn->xya
                                     2.0 * omega_ao[x, y].reshape(nao**2),
-                                          d_ovlp[icoord].reshape(nao**2)]))
+                                          #d_ovlp[icoord].reshape(nao**2)]))
+                                          gmat_ovlp.reshape(nao**2)]))
                             vlx_ovlp_grad[x, y, iatom, icoord] += (
                                     1.0 * np.linalg.multi_dot([ # xymn,amn->xya
                                     2.0 * omega_ao[x, y].reshape(nao**2),
@@ -516,7 +515,7 @@ class PolarizabilityGradient():
 
                     print('after ovlp gradient')
                     print(np.max(np.abs(d_ovlp - tmp_d_ovlp)))
-                    print(np.max(np.abs(tmp_scf_gradient[:,:,iatom] - vlx_ovlp_grad[:,:,iatom])))
+                    #print(np.max(np.abs(tmp_scf_gradient[:,:,iatom] - vlx_ovlp_grad[:,:,iatom])))
                     self.ostream.flush()
 
                     # dipole contribution to gradient
@@ -545,12 +544,14 @@ class PolarizabilityGradient():
                     for icoord in range(3):
                         # loop over operator components
                         for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] = (
+                            tmp_scf_gradient[x, y, iatom, icoord] += (
                                     - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
                                         x_minus_y[x].reshape(nao**2),
-                                        d_dipole[y, icoord].reshape(nao**2)
+                                        #d_dipole[y, icoord].reshape(nao**2)
+                                        tmp_d_dipole[y, icoord].reshape(nao**2)
                                     ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                                        d_dipole[x, icoord].reshape(nao**2),
+                                        #d_dipole[x, icoord].reshape(nao**2),
+                                        tmp_d_dipole[x, icoord].reshape(nao**2),
                                         x_minus_y[y].reshape(nao**2)
                                     ]))
                             vlx_dip_grad[x, y, iatom, icoord] += (
@@ -566,7 +567,7 @@ class PolarizabilityGradient():
 
                     print('after dipole gradient')
                     print(np.max(np.abs(d_dipole - tmp_d_dipole)))
-                    print(np.max(np.abs(tmp_scf_gradient[:,:,iatom] - vlx_dip_grad[:,:,iatom])))
+                    #print(np.max(np.abs(tmp_scf_gradient[:,:,iatom] - vlx_dip_grad[:,:,iatom])))
                     self.ostream.flush()
 
                 # for Fock matrix gradient
@@ -614,7 +615,7 @@ class PolarizabilityGradient():
                     for x, y in xy_pairs:
                         # relaxed DM
                         den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
-                        den_mat_for_fock_rel.set_values(rel_dm_ao[x,y])
+                        den_mat_for_fock_rel.set_values(2.0*rel_dm_ao[x,y])
                         # (X+Y)_x
                         den_mat_for_fock_xpy_x = make_matrix(basis, mat_t.general)
                         den_mat_for_fock_xpy_x.set_values(x_plus_y[x])
@@ -699,7 +700,7 @@ class PolarizabilityGradient():
                                 np.array(erigrad_xmy_yx) * factor)
 
                         if (y != x):
-                            tmp_scf_gradient[y, x, iatom] += tmp_scf_gradient[x, y, iatom, icoord] 
+                            tmp_scf_gradient[y, x, iatom] += tmp_scf_gradient[x, y, iatom]
 
                 # DEBUG
                 pyscf_hcore_grad = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
@@ -910,8 +911,12 @@ class PolarizabilityGradient():
                 for x,y in xy_pairs:
                     if y != x:
                         tot_grad[y,x] += tot_grad[x,y]
-                print('gradients from pyscf')
+                print()
+                print('polgrads with pyscf')
                 print(np.max(np.abs(scf_polgrad - tot_grad)))
+                print()
+                print('polgrad pyscf vs vlx')
+                print(np.max(np.abs(scf_polgrad - tmp_scf_gradient)))
                 return
             else:
                 gs_dm = None
