@@ -54,16 +54,14 @@ class TestFockGeom1010Driver:
         fock_drv = FockGeom1010Driver()
         fock_mats = fock_drv.compute(bas_svpd, mol_h2o_dimer, den_mat, 0, 3, "2jk", 0.0, 0.0)
         
-        assert False
-        
         # load reference Fock matrix
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.geom.1100.o1.o4.npy')
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.j.geom.1010.o1.o4.npy')
         ref_mat = 2.0 * np.load(npyfile)
         
         # load reference Fock matrix
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.geom.1100.o1.o4.npy')
+        npyfile = str(here / 'data' / 'h2o.dimer.svpd.k.geom.1010.o1.o4.npy')
         ref_mat = ref_mat - np.load(npyfile)
         
         # dimension of molecular basis
@@ -87,7 +85,7 @@ class TestFockGeom1010Driver:
                                                                 sket:eket]))
                 # compare submatrices
                 print(i, " ", j, " x_x", np.max(rmat.to_numpy() - cmat.to_numpy()))
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_xx.full_matrix()

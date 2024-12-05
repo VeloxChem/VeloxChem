@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <utility>
 
-#include "ElectronRepulsionGeom0010ContrRecPSXX.hpp"
 #include "ElectronRepulsionGeom0010ContrRecXXSS.hpp"
 #include "ElectronRepulsionGeom1010ContrRecDSXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecPPXX.hpp"

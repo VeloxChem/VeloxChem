@@ -25,7 +25,6 @@
 #include "ElectronRepulsionGeom1010RecSPDP.hpp"
 #include "ElectronRepulsionGeom1010RecSPDD.hpp"
 
-
 #include "ElectronRepulsionGeom1010RecPSSS.hpp"
 #include "ElectronRepulsionGeom1010RecPSSP.hpp"
 #include "ElectronRepulsionGeom1010RecPSPS.hpp"
@@ -45,6 +44,16 @@
 #include "ElectronRepulsionGeom1010RecSDPD.hpp"
 #include "ElectronRepulsionGeom1010RecSDDP.hpp"
 #include "ElectronRepulsionGeom1010RecSDDD.hpp"
+
+#include "ElectronRepulsionGeom1010RecDSSS.hpp"
+#include "ElectronRepulsionGeom1010RecDSSP.hpp"
+#include "ElectronRepulsionGeom1010RecDSPS.hpp"
+#include "ElectronRepulsionGeom1010RecDSSD.hpp"
+#include "ElectronRepulsionGeom1010RecDSDS.hpp"
+#include "ElectronRepulsionGeom1010RecDSPP.hpp"
+#include "ElectronRepulsionGeom1010RecDSPD.hpp"
+#include "ElectronRepulsionGeom1010RecDSDP.hpp"
+#include "ElectronRepulsionGeom1010RecDSDD.hpp"
 
 #include "ElectronRepulsionGeom1010RecPPSS.hpp"
 #include "ElectronRepulsionGeom1010RecPPSP.hpp"

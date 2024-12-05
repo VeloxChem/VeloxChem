@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "ElectronRepulsionContrRecXXPD.hpp"
-#include "ElectronRepulsionGeom0010ContrRecPSXX.hpp"
 #include "ElectronRepulsionGeom0010ContrRecXXDD.hpp"
 #include "ElectronRepulsionGeom1010ContrRecDSXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecPPXX.hpp"
