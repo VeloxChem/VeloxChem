@@ -758,16 +758,7 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_fxc_gradient",
-            [](CXCMolecularGradient&      self,
-               const CMolecule&           molecule,
-               const CMolecularBasis&     basis,
-               const std::vector<py::array_t<double>>& rwDensityArraysOne,
-               const std::vector<py::array_t<double>>& rwDensityArraysTwo,
-               const std::vector<py::array_t<double>>& gsDensityArrays,
-               const CMolecularGrid&      molecularGrid,
-               const std::string&         xcFuncLabel) -> py::array_t<double> {
-                return CXCMolecularGradient_integrate_fxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
-            },
+            &CXCMolecularGradient_integrate_fxc_gradient,
             "Integrates 2nd-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
             "basis"_a,
@@ -778,16 +769,7 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_kxc_gradient",
-            [](CXCMolecularGradient&      self,
-               const CMolecule&           molecule,
-               const CMolecularBasis&     basis,
-               const std::vector<py::array_t<double>>& rwDensityArraysOne,
-               const std::vector<py::array_t<double>>& rwDensityArraysTwo,
-               const std::vector<py::array_t<double>>& gsDensityArrays,
-               const CMolecularGrid&      molecularGrid,
-               const std::string&         xcFuncLabel) -> py::array_t<double> {
-                return CXCMolecularGradient_integrate_kxc_gradient(self, molecule, basis, rwDensityArraysOne, rwDensityArraysTwo, gsDensityArrays, molecularGrid, xcFuncLabel);
-            },
+            &CXCMolecularGradient_integrate_kxc_gradient,
             "Integrates 3rd-order exchange-correlation contribution to molecular gradient.",
             "molecule"_a,
             "basis"_a,
