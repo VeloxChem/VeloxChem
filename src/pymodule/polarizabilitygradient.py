@@ -576,10 +576,8 @@ class PolarizabilityGradient():
                 # TODO this is basically the "get_k_frac" function
                 if self._dft:
                     # TODO: range-separated Fock
-                    #if scf_drv.xcfun.is_hybrid():
                     if self.xcfun.is_hybrid():
                         fock_type = '2jkx'
-                        #exchange_scaling_factor = scf_drv.xcfun.get_frac_exact_exchange()
                         exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
                     else:
                         fock_type = 'j'
@@ -591,11 +589,8 @@ class PolarizabilityGradient():
                 # scaling of ERI gradient for non-hybrid functionals
                 factor = 2.0 if fock_type == 'j' else 1.0
 
-                # TODO figure out an elegant way -- possibly make
-                # scf driver a mandatory argument to the class
                 # ERI threshold
-                eri_thresh = 1.0e-12 # default from scfdriver
-                thresh_int = int(-math.log10(eri_thresh))
+                thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
                 # Fock gradient driver
                 fock_grad_drv = FockGeom1000Driver()
@@ -1061,12 +1056,8 @@ class PolarizabilityGradient():
                 # scaling of ERI gradient for non-hybrid functionals
                 factor = 2.0 if fock_type == 'j' else 1.0
 
-                # TODO figure out an elegant way -- possibly make
-                # scf driver a mandatory argument to the class
                 # ERI threshold
                 thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
-                #eri_thresh = 1.0e-12 # default from scfdriver
-                #thresh_int = int(-math.log10(eri_thresh))
 
                 # Fock gradient driver
                 fock_grad_drv = FockGeom1000Driver()
@@ -1447,6 +1438,152 @@ class PolarizabilityGradient():
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+
+    def compute_polgrad_eri_contrib_real(self, molecule, basis, gs_dm, rel_dm_ao,
+                                         x_plus_y, x_minus_y, local_atoms):
+        """
+        Computes the contribution from ERI derivative integrals
+        to the real polarizability gradient.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis.
+        :param gs_dm:
+            The ground state density.
+        :param rel_dm_ao:
+            The relaxed density matrix.
+        :param x_plus_y:
+            The X+Y response vectors.
+        :param x_minus_y:
+            The X-Y response vectors.
+        :param local_atoms:
+            The atom partition for the MPI node.
+
+        :return eri_deriv_contrib:
+            The ERI derivative integral contribution to the polarizability gradient.
+        """
+
+        if self._dft:
+            # TODO: range-separated Fock
+            if self.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+        else:
+            exchange_scaling_factor = 1.0
+            fock_type = "2jk"
+
+        # scaling of ERI gradient for non-hybrid functionals
+        factor = 2.0 if fock_type == 'j' else 1.0
+
+        # ERI threshold
+        thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
+
+        # Fock gradient driver
+        fock_grad_drv = FockGeom1000Driver()
+
+        # screening
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+
+        # contraction with ground state density
+        den_mat_for_fock_gs = make_matrix(basis, mat_t.symmetric)
+        den_mat_for_fock_gs.set_values(gs_dm)
+
+        # number of atomic orbitals
+        natm = molecule.number_of_atoms()
+
+        # atom partitioning for parallelization
+        #local_atoms = partition_atoms(natm, self.rank, self.nodes)
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # operator component combinations
+        xy_pairs = [(x,y) for x in range(dof) for y in range(x,dof)]
+
+        eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
+
+        # ERI gradient
+        for iatom in range(local_atoms):
+            # screening
+            screener_atom = T4CScreener()
+            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+            # contraction with density matrices
+            for x, y in xy_pairs:
+                # relaxed DM
+                den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_rel.set_values(2.0*rel_dm_ao[x,y])
+                # (X+Y)_x
+                den_mat_for_fock_xpy_x = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xpy_x.set_values(x_plus_y[x])
+                # (X+Y)_y
+                den_mat_for_fock_xpy_y = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xpy_y.set_values(x_plus_y[y])
+                # (X+Y)_x - (X+Y)_x
+                den_mat_for_fock_xpy_m_xpyT_x = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xpy_m_xpyT_x.set_values( x_plus_y[x]
+                                                        - x_plus_y[x].T)
+                # (X+Y)_y - (X+Y)_y
+                den_mat_for_fock_xpy_m_xpyT_y = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xpy_m_xpyT_y.set_values( x_plus_y[y]
+                                                        - x_plus_y[y].T)
+                # (X-Y)_x
+                den_mat_for_fock_xmy_x = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xmy_x.set_values(x_minus_y[x])
+                # (X-Y)_y
+                den_mat_for_fock_xmy_y = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xmy_y.set_values(x_minus_y[y])
+                # (X-Y)_x + (X-Y)_x
+                den_mat_for_fock_xmy_p_xmyT_x = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xmy_p_xmyT_x.set_values( x_minus_y[x]
+                                                        + x_minus_y[x].T)
+                # (X-Y)_y + (X-Y)_y
+                den_mat_for_fock_xmy_p_xmyT_y = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xmy_p_xmyT_y.set_values( x_minus_y[y]
+                                                        + x_minus_y[y].T)
+                # contraction of integrals and DMs
+                erigrad_rel = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_gs,
+                                             den_mat_for_fock_rel, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                erigrad_xpy_xy = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_xpy_x,
+                                             den_mat_for_fock_xpy_m_xpyT_y, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                erigrad_xpy_yx = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_xpy_m_xpyT_x,
+                                             den_mat_for_fock_xpy_y, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                erigrad_xmy_xy = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_xmy_x,
+                                             den_mat_for_fock_xmy_p_xmyT_y, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                erigrad_xmy_yx = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_xmy_p_xmyT_x,
+                                             den_mat_for_fock_xmy_y, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                eri_deriv_contrib[x, y, iatom] += np.array(erigrad_rel) * factor
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_xy) * factor
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_yx) * factor
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy) * factor
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx) * factor
+
+        return eri_deriv_contrib
 
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
@@ -2446,3 +2583,26 @@ class PolarizabilityGradient():
             error_text += 'One is complex, the other is not.'
             raise ValueError(error_text)
 
+    def _freq_sanity_check(self):
+        """
+       Checks if a zero frequency has been input together with resonance Raman.
+
+       This check is due to convergence/singularity issues in the cphf
+       subspace solver for some molecules.
+       """
+
+        if self.is_complex:
+            try:
+                idx0 = self.frequencies.index(0.0)
+                warn_msg = 'Zero in frequency list for resonance Raman!\n'
+                if len(self.frequencies) == 1:
+                    error_msg += 'No other frequencies requested.'
+                    erro_msg += 'Will continue with normal Raman.'
+                else:
+                    self.frequencies.pop(idx0)
+                    warn_msg += 'It has been removed from the list.'
+                    warn_msg += 'Complex pol. gradient will be calculated for:\n'
+                    warn_msg += str(obj.frequencies)
+                    self.ostream.print_warning(warn_msg)
+            except ValueError:
+                pass
