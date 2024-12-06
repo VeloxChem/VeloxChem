@@ -510,15 +510,14 @@ class VibrationalAnalysis:
         scf_tensors = self.scf_driver.scf_tensors
 
         # set up the polarizability gradient driver
-        polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
+        polgrad_drv = PolarizabilityGradient(self.scf_driver, self.comm, self.ostream)
         if 'frequencies' not in self.polgrad_dict:
             polgrad_drv.frequencies = self.frequencies
         if self.rr_damping is not None:
             polgrad_drv.damping = self.rr_damping
         polgrad_drv.update_settings(self.polgrad_dict,
                                     orbrsp_dict = self.cphf_dict,
-                                    method_dict = self.method_dict, 
-                                    scf_drv = self.scf_driver)
+                                    method_dict = self.method_dict)
 
         # transfer settings for vibrational task to polgrad driver
         polgrad_drv.numerical = self.numerical_raman

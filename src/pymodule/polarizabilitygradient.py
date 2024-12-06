@@ -75,10 +75,12 @@ class PolarizabilityGradient():
         - vector_components: Cartesian components of the tensor
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, scf_drv, comm=None, ostream=None):
         """
         Initializes polarizability gradient driver to default setup.
 
+        :param scf_drv:
+            The SCF driver
         :param comm:
             The MPI communicator.
         :param ostream:
@@ -96,6 +98,8 @@ class PolarizabilityGradient():
         self.nodes = self.comm.Get_size()
 
         self.ostream = ostream
+
+        self._scf_drv = scf_drv
 
         self.polgradient = None
         self.delta_h = 0.001
@@ -133,8 +137,7 @@ class PolarizabilityGradient():
             }
         }
 
-    def update_settings(self, grad_dict, orbrsp_dict=None, method_dict=None,
-                        scf_drv=None):
+    def update_settings(self, grad_dict, orbrsp_dict=None, method_dict=None):
         """
         Updates response and method settings in polarizability gradient
         computation driver.
@@ -145,8 +148,6 @@ class PolarizabilityGradient():
             The dictionary of orbital response (CPHF) input.
         :param method_dict:
             The dictionary of method settings.
-        :param scf_drv:
-            The SCF driver (only for numerical calculations)
         """
 
         if method_dict is None:
@@ -177,7 +178,6 @@ class PolarizabilityGradient():
 
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
-        self.scf_drv = scf_drv
 
     def compute(self, molecule, basis, scf_tensors, lr_results=None):
         """
@@ -207,13 +207,14 @@ class PolarizabilityGradient():
         start_time = tm.time()
 
         if self.numerical:
+            # TODO maybe move this check out of conditional statement
             # sanity checks SCF driver input
-            if (self.rank == mpi_master()) and (self.scf_drv is None):
+            if (self.rank == mpi_master()) and (self._scf_drv is None):
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
             # compute
-            self.compute_numerical(molecule, basis, self.scf_drv)
+            self.compute_numerical(molecule, basis, self._scf_drv)
         else:
             # sanity checks linear response input
             if (self.rank == mpi_master()) and (lr_results is None):
@@ -1045,10 +1046,10 @@ class PolarizabilityGradient():
                 # TODO this is basically the "get_k_frac" function
                 if self._dft:
                     # TODO: range-separated Fock
-                    #if scf_drv.xcfun.is_hybrid():
+                    #if _scf_drv.xcfun.is_hybrid():
                     if self.xcfun.is_hybrid():
                         fock_type = '2jkx'
-                        #exchange_scaling_factor = scf_drv.xcfun.get_frac_exact_exchange()
+                        #exchange_scaling_factor = _scf_drv.xcfun.get_frac_exact_exchange()
                         exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
                     else:
                         fock_type = 'j'
@@ -1063,8 +1064,9 @@ class PolarizabilityGradient():
                 # TODO figure out an elegant way -- possibly make
                 # scf driver a mandatory argument to the class
                 # ERI threshold
-                eri_thresh = 1.0e-12 # default from scfdriver
-                thresh_int = int(-math.log10(eri_thresh))
+                thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
+                #eri_thresh = 1.0e-12 # default from scfdriver
+                #thresh_int = int(-math.log10(eri_thresh))
 
                 # Fock gradient driver
                 fock_grad_drv = FockGeom1000Driver()
