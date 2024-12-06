@@ -12,6 +12,7 @@
 #include "ElectronRepulsionGeom1010ContrRecSDXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecSFXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecSPXX.hpp"
+#include "ElectronRepulsionContrRecPPXX.hpp"
 #include "ElectronRepulsionPrimRecSDSP.hpp"
 #include "ElectronRepulsionPrimRecSDSS.hpp"
 #include "ElectronRepulsionPrimRecSFSP.hpp"
@@ -369,11 +370,11 @@ comp_electron_repulsion_geom1010_dpss(T& distributor,
 
             t4cfunc::ket_transform<0, 0>(skbuffer, 48, ckbuffer, 21, 0, 2);
 
-            t4cfunc::ket_transform<0, 0>(skbuffer, 198, ckbuffer, 0, 1, 1);
+            //t4cfunc::ket_transform<0, 0>(skbuffer, 198, ckbuffer, 0, 1, 1);
 
-            t4cfunc::ket_transform<0, 0>(skbuffer, 207, ckbuffer, 9, 1, 1);
+            //t4cfunc::ket_transform<0, 0>(skbuffer, 207, ckbuffer, 9, 1, 1);
 
-            t4cfunc::ket_transform<0, 0>(skbuffer, 216, ckbuffer, 18, 1, 1);
+            //t4cfunc::ket_transform<0, 0>(skbuffer, 216, ckbuffer, 18, 1, 1);
 
             t4cfunc::ket_transform<0, 0>(skbuffer, 630, ckbuffer, 27, 0, 1);
 
@@ -398,6 +399,12 @@ comp_electron_repulsion_geom1010_dpss(T& distributor,
             t4cfunc::ket_transform<0, 0>(skbuffer, 702, ckbuffer, 99, 0, 4);
 
             t4cfunc::ket_transform<0, 0>(skbuffer, 717, ckbuffer, 114, 0, 4);
+            
+            erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 198, 0, 36, r_ab, 0, 0);
+            
+            erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 207, 3, 42, r_ab, 0, 0);
+            
+            erirec::comp_bra_hrr_electron_repulsion_ppxx(skbuffer, 216, 6, 48, r_ab, 0, 0);
 
             erirec::comp_bra_geom1010_hrr_electron_repulsion_spxx(skbuffer, 9, 630, 639, r_ab, 0, 0);
 

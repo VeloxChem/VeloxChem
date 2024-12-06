@@ -84,14 +84,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[0,0][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                print(i, " ", j, " x_x", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_xx.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[0,0]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of X_Y matrix
         fock_mat_xy = fock_mats.matrix("X_Y")
@@ -110,13 +109,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[0,1][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_xy.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[0,1]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of X_Z matrix
         fock_mat_xz = fock_mats.matrix("X_Z")
@@ -135,13 +134,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[0,2][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_xz.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[0,2]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of Y_X matrix
         fock_mat_yy = fock_mats.matrix("Y_X")
@@ -160,13 +159,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[1,0][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_yy.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[1,0]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of Y_Y matrix
         fock_mat_yy = fock_mats.matrix("Y_Y")
@@ -185,13 +184,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[1,1][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_yy.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[1,1]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of Y_Z matrix
         fock_mat_yz = fock_mats.matrix("Y_Z")
@@ -210,13 +209,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[1,2][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_yz.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[1,2]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of Z_X matrix
         fock_mat_zz = fock_mats.matrix("Z_X")
@@ -235,13 +234,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[2,0][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_zz.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[2,0]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of Z_Y matrix
         fock_mat_zz = fock_mats.matrix("Z_Y")
@@ -260,13 +259,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[2,1][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_zz.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[2,1]))
-        #assert fmat == fref
+        assert fmat == fref
         
         # check individual submatrices of Z_Z matrix
         fock_mat_zz = fock_mats.matrix("Z_Z")
@@ -285,13 +284,13 @@ class TestFockGeom1010Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[2,2][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_zz.full_matrix()
         fref = SubMatrix([0, 0, 78, 78])
         fref.set_values(np.ascontiguousarray(ref_mat[2,2]))
-        #assert fmat == fref
+        assert fmat == fref
         
     def test_h2o_fock_2jk_hess_h3_o1_sto3g(self):
 

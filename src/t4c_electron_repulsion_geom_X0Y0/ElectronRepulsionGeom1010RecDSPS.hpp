@@ -12,6 +12,7 @@
 #include "ElectronRepulsionGeom1010ContrRecSDXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecSPXX.hpp"
 #include "ElectronRepulsionGeom1010ContrRecSSXX.hpp"
+#include "ElectronRepulsionContrRecPSXX.hpp"
 #include "ElectronRepulsionPrimRecSDSD.hpp"
 #include "ElectronRepulsionPrimRecSDSP.hpp"
 #include "ElectronRepulsionPrimRecSDSS.hpp"
@@ -443,11 +444,11 @@ comp_electron_repulsion_geom1010_dsps(T& distributor,
 
             t4cfunc::ket_transform<1, 0>(skbuffer, 54, ckbuffer, 75, 0, 1);
 
-            t4cfunc::ket_transform<1, 0>(skbuffer, 306, ckbuffer, 0, 1, 0);
-
-            t4cfunc::ket_transform<1, 0>(skbuffer, 315, ckbuffer, 9, 1, 0);
-
-            t4cfunc::ket_transform<1, 0>(skbuffer, 324, ckbuffer, 18, 1, 0);
+//            t4cfunc::ket_transform<1, 0>(skbuffer, 306, ckbuffer, 0, 1, 0);
+//
+//            t4cfunc::ket_transform<1, 0>(skbuffer, 315, ckbuffer, 9, 1, 0);
+//
+//            t4cfunc::ket_transform<1, 0>(skbuffer, 324, ckbuffer, 18, 1, 0);
 
             t4cfunc::ket_transform<1, 0>(skbuffer, 819, ckbuffer, 96, 0, 0);
 
@@ -472,6 +473,12 @@ comp_electron_repulsion_geom1010_dsps(T& distributor,
             t4cfunc::ket_transform<1, 0>(skbuffer, 939, ckbuffer, 444, 0, 3);
 
             t4cfunc::ket_transform<1, 0>(skbuffer, 969, ckbuffer, 474, 0, 3);
+            
+            erirec::comp_bra_hrr_electron_repulsion_psxx(skbuffer, 306, 0, 36, r_ab, 1, 0);
+            
+            erirec::comp_bra_hrr_electron_repulsion_psxx(skbuffer, 315, 3, 45, r_ab, 1, 0);
+            
+            erirec::comp_bra_hrr_electron_repulsion_psxx(skbuffer, 324, 6, 54, r_ab, 1, 0);
 
             erirec::comp_bra_geom1010_hrr_electron_repulsion_ssxx(skbuffer, 9, 819, 828, r_ab, 1, 0);
 
@@ -504,6 +511,8 @@ comp_electron_repulsion_geom1010_dsps(T& distributor,
             t4cfunc::bra_transform<2, 0>(sbuffer, 120, skbuffer, 801, 1, 0);
 
             distributor.distribute(sbuffer, 0, a_indices, b_indices, c_indices, d_indices, 2, 0, 1, 0, j, ket_range);
+            
+            // t4cfunc::dump_buffer(sbuffer, 0, bra_gto_pair_block, ket_gto_pair_block, ket_range, j, 9);
         }
     }
 
