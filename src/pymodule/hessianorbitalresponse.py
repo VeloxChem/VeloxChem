@@ -28,13 +28,14 @@ import time as tm
 import sys
 import math
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
 from .veloxchemlib import AODensityMatrix
-#from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import XCMolecularHessian
-from .veloxchemlib import make_matrix, mat_t, partition_atoms
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import mpi_master, denmat
+from .veloxchemlib import make_matrix, mat_t, partition_atoms
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver,
+                           NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .outputstream import OutputStream
 from .matrices import Matrices
 from .distributedarray import DistributedArray
@@ -44,19 +45,7 @@ from .inputparser import parse_input
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .dftutils import get_default_grid_level
-from scipy.sparse import linalg
 
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import vxc_deriv
-from .import_from_pyscf import eri_deriv
-from .import_from_pyscf import hcore_deriv
-
-# import veloxchem integrals
-from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
-NuclearPotentialGeom100Driver,
-NuclearPotentialGeom010Driver, FockGeom1000Driver)
 
 class HessianOrbitalResponse(CphfSolver):
     """

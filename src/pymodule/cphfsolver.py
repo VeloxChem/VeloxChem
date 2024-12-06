@@ -28,8 +28,6 @@ import time as tm
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
-from .veloxchemlib import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -38,14 +36,6 @@ from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .dftutils import get_default_grid_level
-from scipy.sparse import linalg
-
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import vxc_deriv
-from .import_from_pyscf import eri_deriv
 
 class CphfSolver(LinearSolver):
     """
@@ -689,6 +679,12 @@ class CphfSolver(LinearSolver):
         :returns:
             The ov block of the CPHF coefficients.
         """
+
+        try:
+            from scipy.sparse import linalg
+        except ImportError:
+            raise ImportError('Unable to import scipy. Please install scipy ' +
+                              'via pip or conda.')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
