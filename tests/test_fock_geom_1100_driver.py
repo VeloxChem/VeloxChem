@@ -86,7 +86,7 @@ class TestFockGeom1100Driver:
                                                                 sket:eket]))
                 # compare submatrices
                 print(i, " ", j, " x_x", np.max(rmat.to_numpy() - cmat.to_numpy()))
-                #assert cmat == rmat
+                assert cmat == rmat
 
         # check full Fock matrix
         fmat = fock_mat_xx.full_matrix()
