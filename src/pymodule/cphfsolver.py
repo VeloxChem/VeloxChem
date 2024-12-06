@@ -32,6 +32,8 @@ from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .batchsize import get_batch_size
@@ -162,13 +164,29 @@ class CphfSolver(LinearSolver):
 
         self.start_time = tm.time()
 
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self)
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
+
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
+
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
         # Timing information
+        # TODO: use Profiler
         timing_dict = {}
 
         if self.rank == mpi_master():
@@ -190,12 +208,13 @@ class CphfSolver(LinearSolver):
         mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
         eov = self.comm.bcast(eov, root=mpi_master())
         nao = self.comm.bcast(nao, root=mpi_master())
+
         nmo = mo_energies.shape[0]
         nocc = molecule.number_of_alpha_electrons()
         natm =  molecule.number_of_atoms()
         nvir = nmo - nocc
 
-        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, *args)
+        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args)
 
         if self.rank == mpi_master():
             # get rhs, find out how many degrees of freedom, and reshape
@@ -213,7 +232,7 @@ class CphfSolver(LinearSolver):
         self.dist_sigmas = None
 
         # the preconditioner: 1 / (eocc - evir)
-        precond = (1 / eov).reshape(nocc * nvir)
+        precond = (1.0 / eov).reshape(nocc * nvir)
         dist_precond = DistributedArray(precond, self.comm)
 
         # create list of distributed arrays for RHS
@@ -587,6 +606,18 @@ class CphfSolver(LinearSolver):
         """
 
         self.start_time = tm.time()
+
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
