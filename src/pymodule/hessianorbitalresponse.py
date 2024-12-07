@@ -288,38 +288,35 @@ class HessianOrbitalResponse(CphfSolver):
             uij_ao_list = None
 
         # create AODensity and Fock matrix objects, contract with ERI
+        # TODO: compute Fock in batches
         fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
                                       dft_dict, pe_dict, self.profiler)
 
-        # _comp_lr_fock only returns value to master
-        # TODO: broadcast matrix by matrix
-        # TODO: think about parallel storage of fock_uij
-        fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
+        dist_fock_uij = None
 
-        fock_uij = np.array(fock_uij).reshape(natm, 3, nao, nao)
-
-        # sum up the terms of the RHS
-
-        cphf_rhs = np.zeros((natm, 3, nocc, nvir))
-
-        for iatom in local_atoms:
+        for iatom in range(natm):
             for x in range(3):
-                # transform to MO basis
-                fock_uij_mo = np.linalg.multi_dot([
-                    mo_occ.T, fock_uij[iatom, x], mo_vir
-                    ])
-                cphf_rhs[iatom,x] += 2.0 * fock_uij_mo
+                if self.rank == mpi_master():
+                    # transform to MO basis
+                    fock_uij_ov_2 = 2.0 * np.linalg.multi_dot([
+                        mo_occ.T, fock_uij[iatom * 3 + x], mo_vir])
+                    fock_uij_ov_2 = fock_uij_ov_2.reshape(nocc * nvir, 1)
+                else:
+                    fock_uij_ov_2 = None
 
-        cphf_rhs = self.comm.reduce(cphf_rhs, root=mpi_master())
+                dist_fock_uij_ov_2 = DistributedArray(fock_uij_ov_2, self.comm)
 
-        if self.rank == mpi_master():
-            cphf_rhs_2D_T = cphf_rhs.reshape(natm * 3, nocc * nvir).T
-        else:
-            cphf_rhs_2D_T = None
-        dist_cphf_rhs = DistributedArray(cphf_rhs_2D_T, self.comm)
+                if dist_fock_uij is None:
+                    dist_fock_uij = dist_fock_uij_ov_2
+                else:
+                    dist_fock_uij.append(dist_fock_uij_ov_2, axis=1)
 
-        dist_cphf_rhs.data += dist_fock_deriv_ov.data
-        dist_cphf_rhs.data -= dist_orben_ovlp_deriv_ov.data
+        dist_cphf_rhs = DistributedArray(dist_fock_uij.data,
+                                         self.comm,
+                                         distribute=False)
+
+        dist_cphf_rhs.data += (dist_fock_deriv_ov.data -
+                               dist_orben_ovlp_deriv_ov.data)
 
         t2 = tm.time() 
 
@@ -336,7 +333,7 @@ class HessianOrbitalResponse(CphfSolver):
                 'dist_cphf_rhs': dist_cphf_rhs,
                 'ovlp_deriv_oo': ovlp_deriv_oo,
                 'fock_deriv_ao': fock_deriv_ao,
-                'fock_uij': fock_uij,
+                # 'fock_uij': fock_uij,
             }
         else:
             return {
