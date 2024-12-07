@@ -365,9 +365,10 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         cphf_solver.compute(molecule, ao_basis, scf_tensors)
+
+        cphf_solution_dict = cphf_solver.cphf_results
         
         if self.rank == mpi_master():
-            cphf_solution_dict = cphf_solver.cphf_results
             cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
             ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
@@ -402,8 +403,6 @@ class ScfHessianDriver(HessianDriver):
                         orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
             else:
                 fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
-                cphf_rhs = cphf_solution_dict['cphf_rhs'].reshape(natm, 3,
-                                                                  nocc, nvir)
         else:
             ovlp_deriv_oo = None
             cphf_ov = None
@@ -416,12 +415,13 @@ class ScfHessianDriver(HessianDriver):
                 orben_ovlp_deriv_oo = None
             else:
                 fock_deriv_ao = None
-                cphf_rhs = None
 
         ovlp_deriv_oo = self.comm.bcast(ovlp_deriv_oo, root=mpi_master())
         cphf_ov = self.comm.bcast(cphf_ov, root=mpi_master())
         perturbed_density = self.comm.bcast(perturbed_density,
                                             root=mpi_master())
+
+        dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
         if self.do_pople_hessian:
             fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
@@ -435,11 +435,10 @@ class ScfHessianDriver(HessianDriver):
                                     orben_ovlp_deriv_oo,
                                     perturbed_density, profiler)
         else:
-            cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
             fock_deriv_ao = self.comm.bcast(fock_deriv_ao, root=mpi_master())
             # TODO: should we also take ovlp_deriv_ao from cphf_solution_dict?
             hessian_first_order_derivatives = self.compute_furche(molecule,
-                                    ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
+                                    ao_basis, dist_cphf_rhs, -0.5 * ovlp_deriv_oo,
                                     cphf_ov, fock_deriv_ao, profiler)
 
         # TODO: need to test LDA and pure GGA functional
@@ -760,7 +759,7 @@ class ScfHessianDriver(HessianDriver):
             return None
 
 
-    def compute_furche(self, molecule, ao_basis, cphf_rhs, cphf_oo, cphf_ov,
+    def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, cphf_oo, cphf_ov,
                        fock_deriv_ao, profiler):
         """
         Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
@@ -771,8 +770,8 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param cphf_rhs:
-            The RHS of the CPHF equations in MO basis.
+        :param dist_cphf_rhs:
+            The distributed RHS of the CPHF equations in MO basis.
         :param cphf_oo:
             The oo block of the CPHF coefficients.
         :param cphf_ov:
@@ -803,22 +802,27 @@ class ScfHessianDriver(HessianDriver):
 
         # TODO: the MPI is not done properly here,
         # fix once the new integral code is ready.
+
+        # RHS contracted with CPHF coefficients (ov)
         if self.rank == mpi_master():
-
-            # RHS contracted with CPHF coefficients (ov)
             hessian_cphf_coeff_rhs = np.zeros((natm, natm, 3, 3))
-            ijxy_list = [(i,j,x,y)
-                         for i in range(natm)
-                         for j in range(natm)
-                         for x in range(3)
-                         for y in range(3)]
-            for i,j,x,y in ijxy_list:
-                hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
-                    np.linalg.multi_dot([cphf_ov[i,x].reshape(nocc*nvir),
-                                         cphf_rhs[j,y].reshape(nocc*nvir)]))
 
-            # First integral derivatives: partial Fock and overlap
-            # matrix derivatives
+        ijxy_list = [(i,j,x,y)
+                     for i in range(natm)
+                     for j in range(natm)
+                     for x in range(3)
+                     for y in range(3)]
+
+        for i,j,x,y in ijxy_list:
+            cphf_rhs_j_y = dist_cphf_rhs.get_full_vector(col=j*3+y)
+
+            if self.rank == mpi_master():
+                hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
+                    np.dot(cphf_ov[i,x].reshape(nocc*nvir), cphf_rhs_j_y))
+
+        # First integral derivatives: partial Fock and overlap
+        # matrix derivatives
+        if self.rank == mpi_master():
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
         if self._dft: 

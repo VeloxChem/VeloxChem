@@ -216,16 +216,8 @@ class CphfSolver(LinearSolver):
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args)
 
-        if self.rank == mpi_master():
-            # get rhs, find out how many degrees of freedom, and reshape
-            cphf_rhs = cphf_rhs_dict['cphf_rhs']
-            dof = cphf_rhs.shape[0]
-            cphf_rhs = cphf_rhs.reshape(dof, nocc * nvir)
-        else:
-            cphf_rhs = None
-            dof = None
-
-        dof = self.comm.bcast(dof, root=mpi_master())
+        dist_cphf_rhs = cphf_rhs_dict['dist_cphf_rhs']
+        dof = dist_cphf_rhs.data.shape[1]
 
         # Initialize trial and sigma vectors
         self.dist_trials = None
@@ -237,13 +229,10 @@ class CphfSolver(LinearSolver):
 
         # create list of distributed arrays for RHS
         dist_rhs = []
-        # TODO: are these loops over all degrees of freedom really efficient?
         for k in range(dof):
-            if self.rank == mpi_master():
-                cphf_rhs_k = cphf_rhs[k]
-            else:
-                cphf_rhs_k = None
-            dist_rhs.append(DistributedArray(cphf_rhs_k, self.comm))
+            dist_rhs.append(DistributedArray(dist_cphf_rhs.data[:,k],   
+                                             self.comm,
+                                             distribute=False))
 
         # setup and precondition trial vectors
         dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
@@ -389,7 +378,8 @@ class CphfSolver(LinearSolver):
             return {**cphf_rhs_dict,
                 'cphf_ov': cphf_ov,
             }
-        return None
+        else:
+            return {**cphf_rhs_dict}
 
     # To avoid init_eri, init_dft at each iteration, we do it once and pass it on to
     # build_sigmas.
@@ -529,9 +519,7 @@ class CphfSolver(LinearSolver):
         # distributed array for all trial vectors
         trials = []
 
-        n = len(dist_rhs)
-
-        for k in range(n):
+        for k in range(len(dist_rhs)):
             v = DistributedArray(dist_precond.data * dist_rhs[k].data,
                                  self.comm, distribute=False)
             norm = np.sqrt(v.squared_norm())

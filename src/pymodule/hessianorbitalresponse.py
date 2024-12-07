@@ -259,6 +259,12 @@ class HessianOrbitalResponse(CphfSolver):
 
         cphf_rhs = self.comm.reduce(cphf_rhs, root=mpi_master())
 
+        if self.rank == mpi_master():
+            cphf_rhs_2D_T = cphf_rhs.reshape(natm * 3, nocc * nvir).T
+        else:
+            cphf_rhs_2D_T = None
+        dist_cphf_rhs = DistributedArray(cphf_rhs_2D_T, self.comm)
+
         t2 = tm.time() 
 
         if self.rank == mpi_master():
@@ -272,12 +278,15 @@ class HessianOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             return {
                 'cphf_rhs': cphf_rhs.reshape(natm * 3, nocc, nvir),
+                'dist_cphf_rhs': dist_cphf_rhs,
                 'ovlp_deriv_oo': ovlp_deriv_oo,
                 'fock_deriv_ao': fock_deriv_ao,
                 'fock_uij': fock_uij,
             }
         else:
-            return None
+            return {
+                'dist_cphf_rhs': dist_cphf_rhs,
+            }
 
     def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):
         """
