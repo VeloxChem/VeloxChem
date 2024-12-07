@@ -197,8 +197,14 @@ class HessianOrbitalResponse(CphfSolver):
 
         ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
         ovlp_deriv_oo = np.zeros((natm, 3, nocc, nocc))
-        fock_deriv_ov = np.zeros((natm, 3, nocc, nvir))
-        orben_ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
+
+        fock_deriv_ov_dict = {(iatom, x): None
+                              for iatom in range(natm)
+                              for x in range(3)}
+
+        orben_ovlp_deriv_ov_dict = {(iatom, x): None
+                                    for iatom in range(natm)
+                                    for x in range(3)}
 
         # transform integral derivatives to MO basis
         for iatom in local_atoms:
@@ -209,12 +215,59 @@ class HessianOrbitalResponse(CphfSolver):
                 ovlp_deriv_oo[iatom,x,:,:] = np.linalg.multi_dot([
                     mo_occ.T, ovlp_deriv_ao[iatom,x], mo_occ
                 ])
-                fock_deriv_ov[iatom,x,:,:] = np.linalg.multi_dot([
+
+                fock_deriv_ov_dict[(iatom,x)] = np.linalg.multi_dot([
                     mo_occ.T, fock_deriv_ao[iatom,x], mo_vir
                 ])
-                orben_ovlp_deriv_ov[iatom,x,:,:] = (
+
+                orben_ovlp_deriv_ov_dict[(iatom,x)] = (
                     eocc.reshape(-1, 1) * ovlp_deriv_ov[iatom,x]
                 ) 
+
+        atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
+        gathered_atom_idx_rank = self.comm.gather(atom_idx_rank)
+        if self.rank == mpi_master():
+            all_atom_idx_rank = []
+            for local_list in gathered_atom_idx_rank:
+                for elem in local_list:
+                    all_atom_idx_rank.append(elem)
+            all_atom_idx_rank = sorted(all_atom_idx_rank)
+        else:
+            all_atom_idx_rank = None
+        all_atom_idx_rank = self.comm.bcast(all_atom_idx_rank, root=mpi_master())
+
+        dist_fock_deriv_ov = None
+        dist_orben_ovlp_deriv_ov = None
+
+        for iatom, root_rank in all_atom_idx_rank:
+            for x in range(3):
+                if self.rank == root_rank:
+                    fock_deriv_ov_dict_ix = fock_deriv_ov_dict[
+                            (iatom,x)].reshape(nocc * nvir, 1)
+                    orben_ovlp_deriv_ov_ix = orben_ovlp_deriv_ov_dict[
+                            (iatom,x)].reshape(nocc * nvir, 1)
+                else:
+                    fock_deriv_ov_dict_ix = None
+                    orben_ovlp_deriv_ov_ix = None
+
+                dist_fock_deriv_ov_ix = DistributedArray(
+                        fock_deriv_ov_dict_ix,
+                        self.comm,
+                        root=root_rank)
+
+                dist_orben_ovlp_deriv_ov_ix = DistributedArray(
+                        orben_ovlp_deriv_ov_ix,
+                        self.comm,
+                        root=root_rank)
+
+                if dist_fock_deriv_ov is None:
+                    dist_fock_deriv_ov = dist_fock_deriv_ov_ix
+                    dist_orben_ovlp_deriv_ov = dist_orben_ovlp_deriv_ov_ix
+                else:
+                    dist_fock_deriv_ov.append(
+                            dist_fock_deriv_ov_ix, axis=1)
+                    dist_orben_ovlp_deriv_ov.append(
+                            dist_orben_ovlp_deriv_ov_ix, axis=1)
 
         # the oo part of the CPHF coefficients in AO basis,
         # transforming the oo overlap derivative back to AO basis
@@ -247,7 +300,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         # sum up the terms of the RHS
 
-        cphf_rhs = fock_deriv_ov - orben_ovlp_deriv_ov
+        cphf_rhs = np.zeros((natm, 3, nocc, nvir))
 
         for iatom in local_atoms:
             for x in range(3):
@@ -265,6 +318,9 @@ class HessianOrbitalResponse(CphfSolver):
             cphf_rhs_2D_T = None
         dist_cphf_rhs = DistributedArray(cphf_rhs_2D_T, self.comm)
 
+        dist_cphf_rhs.data += dist_fock_deriv_ov.data
+        dist_cphf_rhs.data -= dist_orben_ovlp_deriv_ov.data
+
         t2 = tm.time() 
 
         if self.rank == mpi_master():
@@ -277,7 +333,6 @@ class HessianOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             return {
-                'cphf_rhs': cphf_rhs.reshape(natm * 3, nocc, nvir),
                 'dist_cphf_rhs': dist_cphf_rhs,
                 'ovlp_deriv_oo': ovlp_deriv_oo,
                 'fock_deriv_ao': fock_deriv_ao,
