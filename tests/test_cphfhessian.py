@@ -1,7 +1,5 @@
 from pathlib import Path
 import numpy as np
-import pytest
-import sys
 import h5py
 
 from veloxchem.veloxchemlib import mpi_master
@@ -9,11 +7,6 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.hessianorbitalresponse import HessianOrbitalResponse
-
-try:
-    import pyscf
-except ImportError:
-    pass
 
 
 class TestCphfSolver:
@@ -50,8 +43,6 @@ class TestCphfSolver:
             assert np.max(np.abs(cphf_coefficients) -
                           np.abs(cphf_reference)) < 1.0e-6
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
     def test_cphf_coefficients(self):
         nh3_xyz = """4
 
@@ -67,8 +58,6 @@ class TestCphfSolver:
 
         self.run_cphfsolver(molecule, basis, "hf", "cphf_coefficients")
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
     def test_cpks_coefficients(self):
         nh3_xyz = """4
 
