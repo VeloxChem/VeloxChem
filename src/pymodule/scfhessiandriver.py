@@ -366,7 +366,7 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
-        cphf_solver.compute(molecule, ao_basis, scf_tensors, self.scf_driver)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors)
         
         if self.rank == mpi_master():
             hessian_first_order_derivatives = np.zeros((natm, natm, 3, 3))

@@ -203,16 +203,16 @@ class HessianOrbitalResponse(CphfSolver):
         # transform integral derivatives to MO basis
         for iatom in local_atoms:
             for x in range(3):
-                ovlp_deriv_ov[iatom,x] = np.linalg.multi_dot([
+                ovlp_deriv_ov[iatom,x,:,:] = np.linalg.multi_dot([
                     mo_occ.T, ovlp_deriv_ao[iatom,x], mo_vir
                 ])
-                ovlp_deriv_oo[iatom,x] = np.linalg.multi_dot([
+                ovlp_deriv_oo[iatom,x,:,:] = np.linalg.multi_dot([
                     mo_occ.T, ovlp_deriv_ao[iatom,x], mo_occ
                 ])
-                fock_deriv_ov[iatom,x] = np.linalg.multi_dot([
+                fock_deriv_ov[iatom,x,:,:] = np.linalg.multi_dot([
                     mo_occ.T, fock_deriv_ao[iatom,x], mo_vir
                 ])
-                orben_ovlp_deriv_ov[iatom,x] = (
+                orben_ovlp_deriv_ov[iatom,x,:,:] = (
                     eocc.reshape(-1, 1) * ovlp_deriv_ov[iatom,x]
                 ) 
 
@@ -223,51 +223,40 @@ class HessianOrbitalResponse(CphfSolver):
         
         for iatom in local_atoms:
             for x in range(3):
-                uij_ao[iatom,x] = np.linalg.multi_dot([
+                uij_ao[iatom,x,:,:] = np.linalg.multi_dot([
                    mo_occ, -0.5 * ovlp_deriv_oo[iatom,x], mo_occ.T 
                 ])
 
-        uij_ao = uij_ao.reshape(3*natm, nao, nao)
         uij_ao = self.comm.reduce(uij_ao, root=mpi_master())
                    
         if self.rank == mpi_master():
-            num_uij = len(uij_ao)
+            uij_ao_list = [uij_ao[iatom,x] for iatom in range(natm) for x in range(3)]
         else:
-            num_uij = None
-        num_uij = self.comm.bcast(num_uij, root=mpi_master())
-
-        if self.rank == mpi_master():
-            uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
-        else:
-            uij_ao_list = [None for idx in range(num_uij)]
-
-        for idx in range(num_uij):
-            uij_ao_list[idx] = self.comm.bcast(uij_ao_list[idx], root=mpi_master())
+            uij_ao_list = None
 
         # create AODensity and Fock matrix objects, contract with ERI
-        fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis,
-                           eri_dict, dft_dict, pe_dict, self.profiler)
+        fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict, self.profiler)
 
         # _comp_lr_fock only returns value to master
+        # TODO: broadcast matrix by matrix
+        # TODO: think about parallel storage of fock_uij
         fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
-       
-        fock_uij_numpy = np.zeros((natm, 3, nao, nao))
-        fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
+
+        fock_uij = np.array(fock_uij).reshape(natm, 3, nao, nao)
+
+        # sum up the terms of the RHS
+
+        cphf_rhs = fock_deriv_ov - orben_ovlp_deriv_ov
 
         for iatom in local_atoms:
             for x in range(3):
-                tmp_uij_ao = fock_uij[3*iatom + x]
                 # transform to MO basis
-                fock_uij_mo[iatom,x] = np.linalg.multi_dot([
-                    mo_occ.T, tmp_uij_ao, mo_vir
+                fock_uij_mo = np.linalg.multi_dot([
+                    mo_occ.T, fock_uij[iatom, x], mo_vir
                     ])
-                fock_uij_numpy[iatom,x] = tmp_uij_ao
-                
-        # sum up the terms of the RHS
-        cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov
-                        + 2 * fock_uij_mo)
+                cphf_rhs[iatom,x] += 2.0 * fock_uij_mo
 
-        fock_uij_numpy = self.comm.reduce(fock_uij_numpy, root=mpi_master())
         cphf_rhs = self.comm.reduce(cphf_rhs, root=mpi_master())
 
         t2 = tm.time() 
@@ -282,13 +271,13 @@ class HessianOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             return {
-                'cphf_rhs': cphf_rhs.reshape(natm*3, nocc, nvir),
+                'cphf_rhs': cphf_rhs.reshape(natm * 3, nocc, nvir),
                 'ovlp_deriv_oo': ovlp_deriv_oo,
                 'fock_deriv_ao': fock_deriv_ao,
-                'fock_uij': fock_uij_numpy,
+                'fock_uij': fock_uij,
             }
         else:
-            return {}
+            return None
 
     def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):
         """
