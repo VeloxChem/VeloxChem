@@ -367,8 +367,6 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.compute(molecule, ao_basis, scf_tensors)
         
         if self.rank == mpi_master():
-            hessian_first_order_derivatives = np.zeros((natm, natm, 3, 3))
-
             cphf_solution_dict = cphf_solver.cphf_results
             cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
             ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
@@ -443,6 +441,9 @@ class ScfHessianDriver(HessianDriver):
             hessian_first_order_derivatives = self.compute_furche(molecule,
                                     ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
                                     cphf_ov, fock_deriv_ao, profiler)
+
+        # TODO: need to test LDA and pure GGA functional
+
         # amount of exact exchange
         frac_K = 1.0
 
@@ -453,17 +454,10 @@ class ScfHessianDriver(HessianDriver):
             else:
                 frac_K = 0.0
 
-            grid_drv = GridDriver()
-            grid_level = (get_default_grid_level(self.xcfun)
-                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
-            grid_drv.set_level(grid_level)
-
             xc_mol_hess = XCMolecularHessian()
-            mol_grid = grid_drv.generate(molecule)
-
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule,
                                                 ao_basis,
-                                                [density], mol_grid,
+                                                [density], self.scf_driver._mol_grid,
                                                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
@@ -789,6 +783,7 @@ class ScfHessianDriver(HessianDriver):
 
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
+
         if self.rank == mpi_master():
             scf_tensors = self.scf_driver.scf_tensors
             mo = scf_tensors['C_alpha']
@@ -806,38 +801,24 @@ class ScfHessianDriver(HessianDriver):
 
         density = self.comm.bcast(density, root=mpi_master())
 
-        # We use comp_lr_fock from CphfSolver to compute the eri
-        # and xc contributions
-        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
-        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
-        # ERI information
-        eri_dict = cphf_solver._init_eri(molecule, ao_basis)
-        # DFT information
-        dft_dict = cphf_solver._init_dft(molecule, scf_tensors)
-        # PE information
-        pe_dict = cphf_solver._init_pe(molecule, ao_basis)
-
-        if self._dft:
-            mol_grid = dft_dict['molgrid']
-
         # TODO: the MPI is not done properly here,
         # fix once the new integral code is ready.
         if self.rank == mpi_master():
-            # RHS contracted with CPHF coefficients (ov)
 
+            # RHS contracted with CPHF coefficients (ov)
             hessian_cphf_coeff_rhs = np.zeros((natm, natm, 3, 3))
-            for i in range(natm):
-                for j in range(natm):
-                    for x in range(3):
-                        for y in range(3):
-                            hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
-                            np.linalg.multi_dot([cphf_ov[i,x].reshape(nocc*nvir),
-                                                 cphf_rhs[j,y].reshape(nocc*nvir)])
-                            )
+            ijxy_list = [(i,j,x,y)
+                         for i in range(natm)
+                         for j in range(natm)
+                         for x in range(3)
+                         for y in range(3)]
+            for i,j,x,y in ijxy_list:
+                hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
+                    np.linalg.multi_dot([cphf_ov[i,x].reshape(nocc*nvir),
+                                         cphf_rhs[j,y].reshape(nocc*nvir)]))
 
             # First integral derivatives: partial Fock and overlap
             # matrix derivatives
-            # TODO why is this initiated here?
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
         if self._dft: 
@@ -846,14 +827,7 @@ class ScfHessianDriver(HessianDriver):
         ovlp_grad_drv = OverlapGeom100Driver()
 
         for i in range(natm):
-            # First derivative of the Vxc matrix elements
-            if self._dft:
-                vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
-                                molecule, ao_basis, [density], mol_grid,
-                                self.scf_driver.xcfun.get_func_label(), i)
-                vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
 
-            # compute overlap gradient integrals matrices
             ovlp_deriv_i = []
             gmats = ovlp_grad_drv.compute(molecule, ao_basis, i)
             for label in ['X', 'Y', 'Z']:
@@ -861,18 +835,10 @@ class ScfHessianDriver(HessianDriver):
                 ovlp_deriv_i.append(gmat + gmat.T)
             gmats = Matrices()
 
-            if self.rank == mpi_master():
-                fock_deriv_i = fock_deriv_ao[i]
+            fock_deriv_i = fock_deriv_ao[i]
 
-            # upper triangular part
+            # Note: upper triangular part
             for j in range(i, natm):
-                # First derivative of the Vxc matrix elements
-                if self._dft:
-                    vxc_deriv_j = xc_mol_hess.integrate_vxc_fock_gradient(
-                                    molecule, ao_basis, [density], mol_grid,
-                                    self.scf_driver.xcfun.get_func_label(), j)
-                    vxc_deriv_j = self.comm.reduce(vxc_deriv_j,
-                                                    root=mpi_master())
 
                 ovlp_deriv_j = []
                 gmats = ovlp_grad_drv.compute(molecule, ao_basis, j)
@@ -887,29 +853,45 @@ class ScfHessianDriver(HessianDriver):
                     Fix_Sjy = np.zeros((3,3))
                     Fjy_Six = np.zeros((3,3))
                     Six_Sjy = np.zeros((3,3))
-                    for x in range(3):
-                        for y in range(3):
-                            Fix_Sjy[x,y] = np.trace(np.linalg.multi_dot([
-                                    density, fock_deriv_i[x], density,
-                                    ovlp_deriv_j[y]]))
-                            Fjy_Six[x,y] = np.trace(np.linalg.multi_dot([
-                                    density, fock_deriv_j[y],
-                                    density, ovlp_deriv_i[x]]))
-                            Six_Sjy[x,y] = ( 2*np.trace(np.linalg.multi_dot([
-                                    omega_ao, ovlp_deriv_i[x], density,
-                                    ovlp_deriv_j[y]])) )
-                    hessian_first_integral_derivatives[i,j] += -2 * (Fix_Sjy 
-                                                            + Fjy_Six + Six_Sjy)
+
+                    xy_list = [(x,y) for x in range(3) for y in range(3)]
+
+                    for x, y in xy_list:
+                        Fix_Sjy[x,y] = np.trace(np.linalg.multi_dot([
+                            density, fock_deriv_i[x], density,
+                            ovlp_deriv_j[y]]))
+                        Fjy_Six[x,y] = np.trace(np.linalg.multi_dot([
+                            density, fock_deriv_j[y],
+                            density, ovlp_deriv_i[x]]))
+                        Six_Sjy[x,y] = 2.0 * np.trace(np.linalg.multi_dot([
+                            omega_ao, ovlp_deriv_i[x], density,
+                            ovlp_deriv_j[y]]))
+
+                    hessian_first_integral_derivatives[i,j] += -2.0 * (
+                            Fix_Sjy + Fjy_Six + Six_Sjy)
    
             if self.rank == mpi_master(): 
-                # lower triangular part
+                # Note: lower triangular part
                 for j in range(i):
                     hessian_first_integral_derivatives[i,j] += (
-                            hessian_first_integral_derivatives[j,i].T )
+                            hessian_first_integral_derivatives[j,i].T)
 
         if self.rank == mpi_master():
             # Overlap derivative with ERIs
             hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
+
+        # We use comp_lr_fock from CphfSolver to compute the eri
+        # and xc contributions
+        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+
+        # ERI information
+        eri_dict = cphf_solver._init_eri(molecule, ao_basis)
+        # DFT information
+        dft_dict = cphf_solver._init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = cphf_solver._init_pe(molecule, ao_basis)
+
         for i in range(natm):
 
             ovlp_deriv_i = []
