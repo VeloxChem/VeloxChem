@@ -418,6 +418,9 @@ class CphfSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 vec_list = []
+            else:
+                vec_list = None
+
             # loop over columns / trial vectors
             for col in range(batch_start, batch_end):
                 vec = dist_trials.get_full_vector(col)
@@ -427,24 +430,19 @@ class CphfSolver(LinearSolver):
                     vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     vec_list.append(vec_ao)
 
-            if self.rank != mpi_master():
-                vec_list = None
-
-            # TODO: bcast array by array
-            vec_list = self.comm.bcast(vec_list, root=mpi_master())
-
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
-                              dft_dict, pe_dict, self.profiler)
+                                      dft_dict, pe_dict, self.profiler)
 
-            sigmas = None
-
+            # create sigma vectors
             if self.rank == mpi_master():
-                # create sigma vectors
-                sigmas = np.zeros((nocc * nvir, num_vecs))
+                sigmas = np.zeros((nocc * nvir, batch_end - batch_start))
+            else:
+                sigmas = None
 
-            for ifock in range(batch_start, batch_end):
-                vec = dist_trials.get_full_vector(ifock)
+            for col in range(batch_start, batch_end):
+                vec = dist_trials.get_full_vector(col)
+                ifock = col - batch_start
 
                 if self.rank == mpi_master():
                     fock_vec = fock[ifock]
@@ -452,7 +450,7 @@ class CphfSolver(LinearSolver):
                         - np.linalg.multi_dot([mo_occ.T, fock_vec, mo_vir])
                         - np.linalg.multi_dot([mo_vir.T, fock_vec, mo_occ]).T
                         + vec.reshape(nocc,nvir) * eov
-                      )
+                        )
                     sigmas[:, ifock] = cphf_mo.reshape(nocc*nvir)
 
             dist_sigmas = DistributedArray(sigmas, self.comm)
