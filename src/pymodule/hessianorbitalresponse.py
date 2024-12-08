@@ -250,13 +250,13 @@ class HessianOrbitalResponse(CphfSolver):
                     eocc.reshape(-1, 1) * ovlp_deriv_ov_ix
                 ) 
 
-        dist_fock_deriv_ao = None
+        dist_fock_deriv_ao = []
 
         for iatom, root_rank in all_atom_idx_rank:
             for x in range(3):
                 if self.rank == root_rank:
                     fock_deriv_ao_dict_ix = fock_deriv_ao_dict[
-                            (iatom,x)].reshape(nao * nao, 1)
+                            (iatom,x)].reshape(nao * nao)
                 else:
                     fock_deriv_ao_dict_ix = None
 
@@ -265,11 +265,7 @@ class HessianOrbitalResponse(CphfSolver):
                         self.comm,
                         root=root_rank)
 
-                if dist_fock_deriv_ao is None:
-                    dist_fock_deriv_ao = dist_fock_deriv_ao_ix
-                else:
-                    dist_fock_deriv_ao.append(
-                            dist_fock_deriv_ao_ix, axis=1)
+                dist_fock_deriv_ao.append(dist_fock_deriv_ao_ix)
 
         # the oo part of the CPHF coefficients in AO basis,
         # transforming the oo overlap derivative back to AO basis

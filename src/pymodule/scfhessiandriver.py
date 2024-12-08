@@ -368,6 +368,7 @@ class ScfHessianDriver(HessianDriver):
 
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
+        dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
         
         if self.rank == mpi_master():
             """
@@ -403,8 +404,7 @@ class ScfHessianDriver(HessianDriver):
                             mo_occ.T, fock_deriv_ao[x, y], mo_occ])
                         # ij,xyij->xyij (element-wise multiplication)
                         orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
-            else:
-                dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
+
         else:
             perturbed_density = None
 
@@ -413,8 +413,6 @@ class ScfHessianDriver(HessianDriver):
                 fock_deriv_ao = None
                 fock_deriv_oo = None
                 orben_ovlp_deriv_oo = None
-            else:
-                dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
 
         #perturbed_density = self.comm.bcast(perturbed_density,
         #                                    root=mpi_master())
@@ -836,9 +834,9 @@ class ScfHessianDriver(HessianDriver):
                 ovlp_deriv_i.append(gmat + gmat.T)
             gmats = Matrices()
 
-            fock_deriv_ix = dist_fock_deriv_ao.get_full_vector(col=i*3+0)
-            fock_deriv_iy = dist_fock_deriv_ao.get_full_vector(col=i*3+1)
-            fock_deriv_iz = dist_fock_deriv_ao.get_full_vector(col=i*3+2)
+            fock_deriv_ix = dist_fock_deriv_ao[i*3+0].get_full_vector(0)
+            fock_deriv_iy = dist_fock_deriv_ao[i*3+1].get_full_vector(0)
+            fock_deriv_iz = dist_fock_deriv_ao[i*3+2].get_full_vector(0)
 
             if self.rank == mpi_master():
                 fock_deriv_i = [fock_deriv_ix.reshape(nao, nao),
@@ -855,9 +853,9 @@ class ScfHessianDriver(HessianDriver):
                     ovlp_deriv_j.append(gmat + gmat.T)
                 gmats = Matrices()
 
-                fock_deriv_jx = dist_fock_deriv_ao.get_full_vector(col=j*3+0)
-                fock_deriv_jy = dist_fock_deriv_ao.get_full_vector(col=j*3+1)
-                fock_deriv_jz = dist_fock_deriv_ao.get_full_vector(col=j*3+2)
+                fock_deriv_jx = dist_fock_deriv_ao[j*3+0].get_full_vector(0)
+                fock_deriv_jy = dist_fock_deriv_ao[j*3+1].get_full_vector(0)
+                fock_deriv_jz = dist_fock_deriv_ao[j*3+2].get_full_vector(0)
 
                 if self.rank == mpi_master():
                     fock_deriv_j = [fock_deriv_jx.reshape(nao, nao),
