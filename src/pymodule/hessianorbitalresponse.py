@@ -328,6 +328,11 @@ class HessianOrbitalResponse(CphfSolver):
 
         dist_cphf_rhs = []
 
+        if self.rank == mpi_master():
+            hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
+        else:
+            hessian_eri_overlap = None
+
         for iatom, root_rank in all_atom_idx_rank:
 
             uij_ao_list = [uij_ao_dict[(iatom,x)] for x in range(3)]
@@ -338,6 +343,26 @@ class HessianOrbitalResponse(CphfSolver):
             # create AODensity and Fock matrix objects, contract with ERI
             fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, self.profiler)
+
+            for jatom, root_rank_j in all_atom_idx_rank:
+                if jatom < iatom:
+                    continue
+
+                hess_ij = np.zeros((3, 3))
+
+                for y in range(3):
+                    uij_ao_jy = self.comm.bcast(uij_ao_dict[(jatom,y)], root=root_rank_j)
+
+                    if self.rank == mpi_master():
+                        for x in range(3):
+                            # xmn,ymn->xy
+                            hess_ij[x, y] = 2.0 * (np.sum(
+                                fock_uij[x] * uij_ao_jy))
+
+                if self.rank == mpi_master():
+                    hessian_eri_overlap[iatom,jatom,:,:] += 4.0 * hess_ij
+                    if iatom != jatom:
+                        hessian_eri_overlap[jatom,iatom,:,:] += 4.0 * hess_ij.T
 
             for x in range(3):
 
@@ -405,6 +430,7 @@ class HessianOrbitalResponse(CphfSolver):
             'Fix_Sjy': Fix_Sjy,
             'Fjy_Six': Fjy_Six,
             'Six_Sjy': Six_Sjy,
+            'hessian_eri_overlap': hessian_eri_overlap,
         }
 
     def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):

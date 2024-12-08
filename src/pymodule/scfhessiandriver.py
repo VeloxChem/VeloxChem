@@ -374,6 +374,8 @@ class ScfHessianDriver(HessianDriver):
         Fix_Sjy = cphf_solution_dict['Fix_Sjy']
         Fjy_Six = cphf_solution_dict['Fjy_Six']
         Six_Sjy = cphf_solution_dict['Six_Sjy']
+
+        hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
         
         if self.rank == mpi_master():
             """
@@ -438,7 +440,8 @@ class ScfHessianDriver(HessianDriver):
             hessian_first_order_derivatives = self.compute_furche(molecule,
                                     ao_basis, dist_cphf_rhs, 
                                     dist_cphf_ov, dist_fock_deriv_ao,
-                                    Fix_Sjy, Fjy_Six, Six_Sjy, profiler)
+                                    Fix_Sjy, Fjy_Six, Six_Sjy,
+                                    hessian_eri_overlap, profiler)
 
         # TODO: need to test LDA and pure GGA functional
 
@@ -760,7 +763,7 @@ class ScfHessianDriver(HessianDriver):
 
     def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, dist_cphf_ov,
                        dist_fock_deriv_ao, Fix_Sjy, Fjy_Six, Six_Sjy,
-                       profiler):
+                       hessian_eri_overlap, profiler):
         """
         Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
         Chem. Phys. Lett. 362, 511–518 (2002).
@@ -788,18 +791,9 @@ class ScfHessianDriver(HessianDriver):
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
             nao = mo.shape[0]
-            density = scf_tensors['D_alpha']
             mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
-        else:
-            density = None
-            scf_tensors = None
-
-        density = self.comm.bcast(density, root=mpi_master())
-
-        # TODO: the MPI is not done properly here,
-        # fix once the new integral code is ready.
 
         # RHS contracted with CPHF coefficients (ov)
         if self.rank == mpi_master():
@@ -835,76 +829,9 @@ class ScfHessianDriver(HessianDriver):
                     if i != j:
                         hessian_first_integral_derivatives[j,i,:,:] += hess_ij.T
    
-        if self._dft: 
-            xc_mol_hess = XCMolecularHessian()
-
-        # We use comp_lr_fock from CphfSolver to compute the eri
-        # and xc contributions
-        cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
-        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
-
-        # ERI information
-        eri_dict = cphf_solver._init_eri(molecule, ao_basis)
-        # DFT information
-        dft_dict = cphf_solver._init_dft(molecule, scf_tensors)
-        # PE information
-        pe_dict = cphf_solver._init_pe(molecule, ao_basis)
-
-        if self.rank == mpi_master():
-            # Overlap derivative with ERIs
-            hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
-
-        ovlp_grad_drv = OverlapGeom100Driver()
-
-        for i in range(natm):
-
-            ovlp_deriv_i = []
-            gmats = ovlp_grad_drv.compute(molecule, ao_basis, i)
-            for label in ['X', 'Y', 'Z']:
-                gmat = gmats.matrix_to_numpy(label)
-                ovlp_deriv_i.append(gmat + gmat.T)
-            gmats = Matrices()
-
-            if self.rank == mpi_master():
-                P_P_Six_ao_list = []
-                for x in range(3):
-                    # mn,xnk,kl->xml
-                    P_P_Six_ao_list.append(np.linalg.multi_dot([
-                        density, ovlp_deriv_i[x], density]))
-            else:
-                P_P_Six_ao_list = None
-
-            P_P_Six_fock_ao = cphf_solver._comp_lr_fock(
-                    P_P_Six_ao_list, molecule, ao_basis, eri_dict,
-                    dft_dict, pe_dict, profiler)
-
-            # upper triangular part
-            for j in range(i, natm):
-
-                ovlp_deriv_j = []
-                gmats = ovlp_grad_drv.compute(molecule, ao_basis, j)
-                for label in ['X', 'Y', 'Z']:
-                    gmat = gmats.matrix_to_numpy(label)
-                    ovlp_deriv_j.append(gmat + gmat.T)
-                gmats = Matrices()
-
-                if self.rank == mpi_master():
-                    P_P_Sjy = []
-                    for y in range(3):
-                        # mn,xnk,kl->xml
-                        P_P_Sjy.append(np.linalg.multi_dot([
-                            density, ovlp_deriv_j[y], density]))
-
-                    hess_ij = np.zeros((3, 3))
-                    for x in range(3):
-                        for y in range(3):
-                            # xmn,ymn->xy
-                            hess_ij[x, y] = 2.0 * (np.sum(
-                                P_P_Six_fock_ao[x] * P_P_Sjy[y]))
-
-                    hessian_eri_overlap[i,j,:,:] += hess_ij
-                    if i != j:
-                        hessian_eri_overlap[j,i,:,:] += hess_ij.T
+        # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
+        # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
+        # response
 
         # return the sum of the three contributions
         if self.rank == mpi_master():
