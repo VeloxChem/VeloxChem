@@ -362,24 +362,11 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
-        # transform Distributed arrays into numpy arrays
-        # TODO: decide whether using Distributed arrays in
-        # ScfHessianDriver is more convenient/efficient etc.
-
-            cphf_ov = np.zeros((dof, nocc, nvir))
-
-        for i in range(dof):
-            sol = solutions[i].get_full_vector(0)
-            if self.rank == mpi_master():
-                cphf_ov[i] = sol.reshape(nocc, nvir)
-
         # merge the rhs dict with the solution
-        if self.rank == mpi_master():
-            return {**cphf_rhs_dict,
-                'cphf_ov': cphf_ov,
-            }
-        else:
-            return {**cphf_rhs_dict}
+        return {
+            **cphf_rhs_dict,
+            'dist_cphf_ov': solutions,
+        }
 
     # To avoid init_eri, init_dft at each iteration, we do it once and pass it on to
     # build_sigmas.

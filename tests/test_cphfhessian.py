@@ -29,6 +29,15 @@ class TestCphfSolver:
         # TODO: hess_orbrsp_drv should return cphf_results
         hess_orbrsp_drv.compute(molecule, basis, scf_tensors)
 
+        dist_cphf_coefficients = hess_orbrsp_drv.cphf_results['dist_cphf_ov']
+        dof = len(dist_cphf_coefficients)
+
+        cphf_coefficients = []
+        for x in range(dof):
+            solution_vec = dist_cphf_coefficients[x].get_full_vector(0)
+            if scf_drv.rank == mpi_master():
+                cphf_coefficients.append(solution_vec)
+
         if scf_drv.rank == mpi_master():
             here = Path(__file__).parent
             hf_file_name = str(here / 'data' / 'cphf_coefficients.h5')
@@ -36,7 +45,8 @@ class TestCphfSolver:
             cphf_reference = np.array(hf.get(label))
             hf.close()
 
-            cphf_coefficients = hess_orbrsp_drv.cphf_results['cphf_ov']
+            cphf_coefficients = np.array(cphf_coefficients)
+            cphf_coefficients = cphf_coefficients.reshape(cphf_reference.shape)
 
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
