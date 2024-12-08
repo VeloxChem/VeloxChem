@@ -402,7 +402,7 @@ class ScfHessianDriver(HessianDriver):
                         # ij,xyij->xyij (element-wise multiplication)
                         orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
             else:
-                fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
+                dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
         else:
             ovlp_deriv_oo = None
             cphf_ov = None
@@ -414,7 +414,7 @@ class ScfHessianDriver(HessianDriver):
                 fock_deriv_oo = None
                 orben_ovlp_deriv_oo = None
             else:
-                fock_deriv_ao = None
+                dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
 
         ovlp_deriv_oo = self.comm.bcast(ovlp_deriv_oo, root=mpi_master())
         cphf_ov = self.comm.bcast(cphf_ov, root=mpi_master())
@@ -435,11 +435,10 @@ class ScfHessianDriver(HessianDriver):
                                     orben_ovlp_deriv_oo,
                                     perturbed_density, profiler)
         else:
-            fock_deriv_ao = self.comm.bcast(fock_deriv_ao, root=mpi_master())
             # TODO: should we also take ovlp_deriv_ao from cphf_solution_dict?
             hessian_first_order_derivatives = self.compute_furche(molecule,
                                     ao_basis, dist_cphf_rhs, -0.5 * ovlp_deriv_oo,
-                                    cphf_ov, fock_deriv_ao, profiler)
+                                    cphf_ov, dist_fock_deriv_ao, profiler)
 
         # TODO: need to test LDA and pure GGA functional
 
@@ -760,7 +759,7 @@ class ScfHessianDriver(HessianDriver):
 
 
     def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, cphf_oo, cphf_ov,
-                       fock_deriv_ao, profiler):
+                       dist_fock_deriv_ao, profiler):
         """
         Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
         Chem. Phys. Lett. 362, 511–518 (2002).
@@ -839,7 +838,14 @@ class ScfHessianDriver(HessianDriver):
                 ovlp_deriv_i.append(gmat + gmat.T)
             gmats = Matrices()
 
-            fock_deriv_i = fock_deriv_ao[i]
+            fock_deriv_ix = dist_fock_deriv_ao.get_full_vector(col=i*3+0)
+            fock_deriv_iy = dist_fock_deriv_ao.get_full_vector(col=i*3+1)
+            fock_deriv_iz = dist_fock_deriv_ao.get_full_vector(col=i*3+2)
+
+            if self.rank == mpi_master():
+                fock_deriv_i = [fock_deriv_ix.reshape(nao, nao),
+                                fock_deriv_iy.reshape(nao, nao),
+                                fock_deriv_iz.reshape(nao, nao)]
 
             # Note: upper triangular part
             for j in range(i, natm):
@@ -851,9 +857,15 @@ class ScfHessianDriver(HessianDriver):
                     ovlp_deriv_j.append(gmat + gmat.T)
                 gmats = Matrices()
 
+                fock_deriv_jx = dist_fock_deriv_ao.get_full_vector(col=j*3+0)
+                fock_deriv_jy = dist_fock_deriv_ao.get_full_vector(col=j*3+1)
+                fock_deriv_jz = dist_fock_deriv_ao.get_full_vector(col=j*3+2)
+
                 if self.rank == mpi_master():
-                    fock_deriv_j = fock_deriv_ao[j]
-        
+                    fock_deriv_j = [fock_deriv_jx.reshape(nao, nao),
+                                    fock_deriv_jy.reshape(nao, nao),
+                                    fock_deriv_jz.reshape(nao, nao)]
+            
                     Fix_Sjy = np.zeros((3,3))
                     Fjy_Six = np.zeros((3,3))
                     Six_Sjy = np.zeros((3,3))
