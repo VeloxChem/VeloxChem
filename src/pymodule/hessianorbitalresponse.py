@@ -251,35 +251,17 @@ class HessianOrbitalResponse(CphfSolver):
                 ) 
 
         dist_fock_deriv_ao = None
-        dist_fock_deriv_ov = None
-        dist_orben_ovlp_deriv_ov = None
 
         for iatom, root_rank in all_atom_idx_rank:
             for x in range(3):
                 if self.rank == root_rank:
                     fock_deriv_ao_dict_ix = fock_deriv_ao_dict[
                             (iatom,x)].reshape(nao * nao, 1)
-                    fock_deriv_ov_dict_ix = fock_deriv_ov_dict[
-                            (iatom,x)].reshape(nocc * nvir, 1)
-                    orben_ovlp_deriv_ov_ix = orben_ovlp_deriv_ov_dict[
-                            (iatom,x)].reshape(nocc * nvir, 1)
                 else:
                     fock_deriv_ao_dict_ix = None
-                    fock_deriv_ov_dict_ix = None
-                    orben_ovlp_deriv_ov_ix = None
 
                 dist_fock_deriv_ao_ix = DistributedArray(
                         fock_deriv_ao_dict_ix,
-                        self.comm,
-                        root=root_rank)
-
-                dist_fock_deriv_ov_ix = DistributedArray(
-                        fock_deriv_ov_dict_ix,
-                        self.comm,
-                        root=root_rank)
-
-                dist_orben_ovlp_deriv_ov_ix = DistributedArray(
-                        orben_ovlp_deriv_ov_ix,
                         self.comm,
                         root=root_rank)
 
@@ -288,18 +270,6 @@ class HessianOrbitalResponse(CphfSolver):
                 else:
                     dist_fock_deriv_ao.append(
                             dist_fock_deriv_ao_ix, axis=1)
-
-                if dist_fock_deriv_ov is None:
-                    dist_fock_deriv_ov = dist_fock_deriv_ov_ix
-                else:
-                    dist_fock_deriv_ov.append(
-                            dist_fock_deriv_ov_ix, axis=1)
-
-                if dist_orben_ovlp_deriv_ov is None:
-                    dist_orben_ovlp_deriv_ov = dist_orben_ovlp_deriv_ov_ix
-                else:
-                    dist_orben_ovlp_deriv_ov.append(
-                            dist_orben_ovlp_deriv_ov_ix, axis=1)
 
         # the oo part of the CPHF coefficients in AO basis,
         # transforming the oo overlap derivative back to AO basis
@@ -315,7 +285,8 @@ class HessianOrbitalResponse(CphfSolver):
                    mo_occ, -0.5 * ovlp_deriv_oo_dict[(iatom,x)], mo_occ.T 
                 ])
 
-        dist_fock_uij = None
+        # TODO: consider making dist_cphf_rhs a list of distributed vectors
+        dist_cphf_rhs = None
 
         for iatom, root_rank in all_atom_idx_rank:
 
@@ -329,6 +300,9 @@ class HessianOrbitalResponse(CphfSolver):
                                           dft_dict, pe_dict, self.profiler)
 
             for x in range(3):
+
+                # form dist_fock_uij_ov_2 from mpi_master
+
                 if self.rank == mpi_master():
                     # transform to MO basis
                     fock_uij_ov_2 = 2.0 * np.linalg.multi_dot([
@@ -339,17 +313,41 @@ class HessianOrbitalResponse(CphfSolver):
 
                 dist_fock_uij_ov_2 = DistributedArray(fock_uij_ov_2, self.comm)
 
-                if dist_fock_uij is None:
-                    dist_fock_uij = dist_fock_uij_ov_2
+                # form dist_fock_deriv_ov_ix and dist_orben_ovlp_deriv_ov_ix
+                # from root_rank
+
+                if self.rank == root_rank:
+                    fock_deriv_ov_dict_ix = fock_deriv_ov_dict[
+                            (iatom,x)].reshape(nocc * nvir, 1)
+                    orben_ovlp_deriv_ov_ix = orben_ovlp_deriv_ov_dict[
+                            (iatom,x)].reshape(nocc * nvir, 1)
                 else:
-                    dist_fock_uij.append(dist_fock_uij_ov_2, axis=1)
+                    fock_deriv_ov_dict_ix = None
+                    orben_ovlp_deriv_ov_ix = None
 
-        dist_cphf_rhs = DistributedArray(dist_fock_uij.data,
-                                         self.comm,
-                                         distribute=False)
+                dist_fock_deriv_ov_ix = DistributedArray(
+                        fock_deriv_ov_dict_ix,
+                        self.comm,
+                        root=root_rank)
 
-        dist_cphf_rhs.data += (dist_fock_deriv_ov.data -
-                               dist_orben_ovlp_deriv_ov.data)
+                dist_orben_ovlp_deriv_ov_ix = DistributedArray(
+                        orben_ovlp_deriv_ov_ix,
+                        self.comm,
+                        root=root_rank)
+
+                dist_cphf_rhs_ix_data = (dist_fock_uij_ov_2.data +
+                                         dist_fock_deriv_ov_ix.data -
+                                         dist_orben_ovlp_deriv_ov_ix.data)
+
+                dist_cphf_rhs_ix = DistributedArray(
+                        dist_cphf_rhs_ix_data,
+                        self.comm,
+                        distribute=False)
+
+                if dist_cphf_rhs is None:
+                    dist_cphf_rhs = dist_cphf_rhs_ix
+                else:
+                    dist_cphf_rhs.append(dist_cphf_rhs_ix, axis=1)
 
         t2 = tm.time() 
 

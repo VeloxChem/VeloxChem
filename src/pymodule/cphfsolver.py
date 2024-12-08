@@ -242,9 +242,10 @@ class CphfSolver(LinearSolver):
                           dft_dict, pe_dict, timing_dict)
 
         # lists that will hold the solutions and residuals
-        solutions = list(np.zeros((dof)))
+        # TODO: double check residuals in setup_trials
+        solutions = [None for x in range(dof)]
         residuals = list(np.zeros((dof)))
-        relative_residual_norm = np.ones((dof))
+        relative_residual_norm = [None for x in range(dof)]
 
         # start iterations
         for iteration in range(self.max_iter):
