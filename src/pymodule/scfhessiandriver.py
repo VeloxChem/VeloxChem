@@ -368,7 +368,6 @@ class ScfHessianDriver(HessianDriver):
 
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
-        dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
         hessian_first_integral_derivatives = cphf_solution_dict['hessian_first_integral_derivatives']
@@ -778,18 +777,6 @@ class ScfHessianDriver(HessianDriver):
         """
 
         natm = molecule.number_of_atoms()
-        nocc = molecule.number_of_alpha_electrons()
-
-        if self.rank == mpi_master():
-            scf_tensors = self.scf_driver.scf_tensors
-            mo = scf_tensors['C_alpha']
-            mo_occ = mo[:, :nocc].copy()
-            mo_vir = mo[:, nocc:].copy()
-            nvir = mo_vir.shape[1]
-            nao = mo.shape[0]
-            mo_energies = scf_tensors['E_alpha']
-            eocc = mo_energies[:nocc]
-            omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
         # RHS contracted with CPHF coefficients (ov)
         if self.rank == mpi_master():
