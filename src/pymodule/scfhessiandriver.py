@@ -160,10 +160,6 @@ class ScfHessianDriver(HessianDriver):
         else:
             self.compute_analytical(molecule, ao_basis, profiler)
 
-        # Calculate the gradient of the dipole moment for IR intensities
-        if self.do_dipole_gradient and (self.perturbed_density is not None):
-            self.compute_dipole_gradient(molecule, ao_basis)
-
         if self.rank == mpi_master():
             # print Hessian
             if self.do_print_hessian:
@@ -360,6 +356,7 @@ class ScfHessianDriver(HessianDriver):
         else:
             density = None
         density = self.comm.bcast(density, root=mpi_master())
+        nao = density.shape[0]
 
         # Solve CPHF equations
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
@@ -374,21 +371,6 @@ class ScfHessianDriver(HessianDriver):
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
         
         if self.rank == mpi_master():
-            """
-            ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
-
-            perturbed_density = np.zeros((natm, 3, nao, nao))
-            for x in range(natm):
-                for y in range(3):
-                    perturbed_density[x, y] = (
-                            # mj,xyij,ni->xymn
-                            - np.linalg.multi_dot([mo_occ, ovlp_deriv_oo[x, y].T, mo_occ.T])
-                            # ma,xyia,ni->xymn
-                            + np.linalg.multi_dot([mo_vir, cphf_ov[x, y].T, mo_occ.T]) 
-                            # mi,xyia,na->xymn
-                            + np.linalg.multi_dot([mo_occ, cphf_ov[x, y], mo_vir.T]) 
-                            )
-            """
 
             t1 = tm.time()
         
@@ -409,16 +391,11 @@ class ScfHessianDriver(HessianDriver):
                         orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
 
         else:
-            #perturbed_density = None
-
             if self.do_pople_hessian:
                 fock_uij = None
                 fock_deriv_ao = None
                 fock_deriv_oo = None
                 orben_ovlp_deriv_oo = None
-
-        #perturbed_density = self.comm.bcast(perturbed_density,
-        #                                    root=mpi_master())
 
         if self.do_pople_hessian:
             fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
@@ -430,7 +407,7 @@ class ScfHessianDriver(HessianDriver):
                                     ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov,
                                     fock_uij, fock_deriv_oo,
                                     orben_ovlp_deriv_oo,
-                                    perturbed_density, profiler)
+                                    self.perturbed_density, profiler)
         else:
             # TODO: should we also take ovlp_deriv_ao from cphf_solution_dict?
             hessian_first_order_derivatives = self.compute_furche(molecule,
@@ -571,16 +548,16 @@ class ScfHessianDriver(HessianDriver):
             if self._dft:
                 self.hessian += hessian_dft_xc
 
-            # save perturbed density as instance variable: needed for dipole
-            # gradient
-            #self.perturbed_density = perturbed_density
-
             t3 = tm.time()
             self.ostream.print_info('Second order derivative contributions'
                                     + ' to the Hessian computed in' +
                                      ' {:.2f} sec.'.format(t3 - t2))
             self.ostream.print_blank()
             self.ostream.flush()
+
+        # Calculate the gradient of the dipole moment for IR intensities
+        if self.do_dipole_gradient:
+            self.compute_dipole_gradient(molecule, ao_basis, dist_cphf_ov)
 
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
                       fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density,
@@ -1115,7 +1092,7 @@ class ScfHessianDriver(HessianDriver):
         self.scf_driver.compute(molecule, ao_basis)
         self.ostream.unmute()
 
-    def compute_dipole_gradient(self, molecule, ao_basis):
+    def compute_dipole_gradient(self, molecule, ao_basis, dist_cphf_ov):
         """
         Computes the analytical gradient of the dipole moment.
 
@@ -1123,21 +1100,11 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
-        :param perturbed_density: #TODO remove this if setup approved
-            The perturbed density matrix.
         """
 
         # Number of atoms and atomic charges
         natm = molecule.number_of_atoms()
         nuclear_charges = molecule.get_element_ids()
-
-        scf_tensors = self.scf_driver.scf_tensors 
-        perturbed_density = self.perturbed_density
-
-        density = scf_tensors['D_alpha']
-        nao = perturbed_density.shape[-1] # need for reshaping
 
         # Dipole integrals
         dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis, [0.0, 0.0, 0.0])
@@ -1170,19 +1137,63 @@ class ScfHessianDriver(HessianDriver):
         dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
                                                         molecule, ao_basis)
 
-        # Add the electronic contributions
-        for a in range(natm):
-            for c in range(3):
-                for x in range(3):
-                    dipole_gradient[c,a,x] += -2.0 * (
-                            np.linalg.multi_dot([
-                                density.reshape(nao**2),
-                                dipole_integrals_deriv[c,a,x].reshape(nao**2)])
-                            + np.linalg.multi_dot([
-                                perturbed_density[a,x].reshape(nao**2),
-                                dipole_ints[c].reshape(nao**2)]))
 
-        self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
+
+        if self.rank == mpi_master():
+            scf_tensors = self.scf_driver.scf_tensors 
+            density = scf_tensors['D_alpha']
+            nao = density.shape[0]
+            mo = scf_tensors['C_alpha']
+            nocc = molecule.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            nvir = mo_vir.shape[1]
+
+        ovlp_grad_drv = OverlapGeom100Driver()
+
+        for a in range(natm):
+
+            gmats = ovlp_grad_drv.compute(molecule, ao_basis, a)
+
+            ovlp_deriv_ao_a = []
+            for x, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                ovlp_deriv_ao_a.append(gmat + gmat.T)
+
+            gmats = Matrices()
+
+            perturbed_density_a = []
+
+            for x in range(3):
+
+                cphf_ov_ax = dist_cphf_ov[a*3+x].get_full_vector(0)
+
+                if self.rank == mpi_master():
+
+                    cphf_ov_ax = cphf_ov_ax.reshape(nocc, nvir)
+
+                    perturbed_density_a.append(
+                        # mj,xyij,ni->xymn
+                        - np.linalg.multi_dot([density, ovlp_deriv_ao_a[x], density])
+                        # ma,xyia,ni->xymn
+                        + np.linalg.multi_dot([mo_vir, cphf_ov_ax.T, mo_occ.T]) 
+                        # mi,xyia,na->xymn
+                        + np.linalg.multi_dot([mo_occ, cphf_ov_ax, mo_vir.T]) 
+                        )
+
+            if self.rank == mpi_master():
+
+                cx_pairs = [(c,x) for c in range(3) for x in range(3)]
+
+                for c,x in cx_pairs:
+                    dipole_gradient[c,a,x] += -2.0 * (
+                            np.sum(density *
+                                   dipole_integrals_deriv[c,a,x]) +
+                            np.sum(perturbed_density_a[x] *
+                                   dipole_ints[c]))
+
+        if self.rank == mpi_master():
+            self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
 
     # TODO remove this function
     def compute_pyscf_dipole_integral_derivatives(self, molecule, ao_basis):
