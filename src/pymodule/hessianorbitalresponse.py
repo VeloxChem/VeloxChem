@@ -149,7 +149,10 @@ class HessianOrbitalResponse(CphfSolver):
 
         # preparing the CPHF RHS
         # TODO: consider using local_atoms instead of all atoms
-        ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
+
+        ovlp_deriv_ao_dict = {(iatom, x): None
+                              for iatom in range(natm)
+                              for x in range(3)}
 
         fock_deriv_ao_dict = {(iatom, x): None
                               for iatom in range(natm)
@@ -176,7 +179,7 @@ class HessianOrbitalResponse(CphfSolver):
 
             for x, label in enumerate(['X', 'Y', 'Z']):
                 gmat = gmats.matrix_to_numpy(label)
-                ovlp_deriv_ao[iatom, x] = gmat + gmat.T
+                ovlp_deriv_ao_dict[(iatom, x)] = gmat + gmat.T
 
             gmats = Matrices()
 
@@ -205,8 +208,6 @@ class HessianOrbitalResponse(CphfSolver):
                     if self.rank == root_rank:
                         fock_deriv_ao_dict[(iatom, x)] += vxc_deriv_ix
 
-        ovlp_deriv_ao = self.comm.allreduce(ovlp_deriv_ao, op=MPI.SUM)
-
         t1 = tm.time()
 
         if self.rank == mpi_master():
@@ -234,11 +235,11 @@ class HessianOrbitalResponse(CphfSolver):
         for iatom in local_atoms:
             for x in range(3):
                 ovlp_deriv_ov_ix = np.linalg.multi_dot([
-                    mo_occ.T, ovlp_deriv_ao[iatom,x], mo_vir
+                    mo_occ.T, ovlp_deriv_ao_dict[(iatom,x)], mo_vir
                 ])
 
                 ovlp_deriv_oo_dict[(iatom,x)] = np.linalg.multi_dot([
-                    mo_occ.T, ovlp_deriv_ao[iatom,x], mo_occ
+                    mo_occ.T, ovlp_deriv_ao_dict[(iatom,x)], mo_occ
                 ])
 
                 fock_deriv_ov_dict[(iatom,x)] = np.linalg.multi_dot([
@@ -303,34 +304,35 @@ class HessianOrbitalResponse(CphfSolver):
         # the oo part of the CPHF coefficients in AO basis,
         # transforming the oo overlap derivative back to AO basis
         # (not equal to the initial one)
-        uij_ao = np.zeros((natm, 3, nao, nao))
+
+        uij_ao_dict = {(iatom, x): None
+                       for iatom in range(natm)
+                       for x in range(3)}
         
         for iatom in local_atoms:
             for x in range(3):
-                uij_ao[iatom,x,:,:] = np.linalg.multi_dot([
+                uij_ao_dict[(iatom,x)] = np.linalg.multi_dot([
                    mo_occ, -0.5 * ovlp_deriv_oo_dict[(iatom,x)], mo_occ.T 
                 ])
 
-        uij_ao = self.comm.reduce(uij_ao, root=mpi_master())
-                   
-        if self.rank == mpi_master():
-            uij_ao_list = [uij_ao[iatom,x] for iatom in range(natm) for x in range(3)]
-        else:
-            uij_ao_list = None
-
-        # create AODensity and Fock matrix objects, contract with ERI
-        # TODO: compute Fock in batches
-        fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, self.profiler)
-
         dist_fock_uij = None
 
-        for iatom in range(natm):
+        for iatom, root_rank in all_atom_idx_rank:
+
+            uij_ao_list = [uij_ao_dict[(iatom,x)] for x in range(3)]
+
+            for x in range(3):
+                uij_ao_list[x] = self.comm.bcast(uij_ao_list[x], root=root_rank)
+
+            # create AODensity and Fock matrix objects, contract with ERI
+            fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
+                                          dft_dict, pe_dict, self.profiler)
+
             for x in range(3):
                 if self.rank == mpi_master():
                     # transform to MO basis
                     fock_uij_ov_2 = 2.0 * np.linalg.multi_dot([
-                        mo_occ.T, fock_uij[iatom * 3 + x], mo_vir])
+                        mo_occ.T, fock_uij[x], mo_vir])
                     fock_uij_ov_2 = fock_uij_ov_2.reshape(nocc * nvir, 1)
                 else:
                     fock_uij_ov_2 = None
