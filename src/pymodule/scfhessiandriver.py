@@ -370,6 +370,8 @@ class ScfHessianDriver(HessianDriver):
         
         if self.rank == mpi_master():
             cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
+
+            """
             ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
             perturbed_density = np.zeros((natm, 3, nao, nao))
@@ -383,6 +385,7 @@ class ScfHessianDriver(HessianDriver):
                             # mi,xyia,na->xymn
                             + np.linalg.multi_dot([mo_occ, cphf_ov[x, y], mo_vir.T]) 
                             )
+            """
 
             t1 = tm.time()
         
@@ -404,7 +407,7 @@ class ScfHessianDriver(HessianDriver):
             else:
                 dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
         else:
-            ovlp_deriv_oo = None
+            #ovlp_deriv_oo = None
             cphf_ov = None
             perturbed_density = None
 
@@ -416,10 +419,11 @@ class ScfHessianDriver(HessianDriver):
             else:
                 dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
 
-        ovlp_deriv_oo = self.comm.bcast(ovlp_deriv_oo, root=mpi_master())
+        #ovlp_deriv_oo = self.comm.bcast(ovlp_deriv_oo, root=mpi_master())
         cphf_ov = self.comm.bcast(cphf_ov, root=mpi_master())
-        perturbed_density = self.comm.bcast(perturbed_density,
-                                            root=mpi_master())
+
+        #perturbed_density = self.comm.bcast(perturbed_density,
+        #                                    root=mpi_master())
 
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
@@ -437,7 +441,7 @@ class ScfHessianDriver(HessianDriver):
         else:
             # TODO: should we also take ovlp_deriv_ao from cphf_solution_dict?
             hessian_first_order_derivatives = self.compute_furche(molecule,
-                                    ao_basis, dist_cphf_rhs, -0.5 * ovlp_deriv_oo,
+                                    ao_basis, dist_cphf_rhs, 
                                     cphf_ov, dist_fock_deriv_ao, profiler)
 
         # TODO: need to test LDA and pure GGA functional
@@ -575,7 +579,7 @@ class ScfHessianDriver(HessianDriver):
 
             # save perturbed density as instance variable: needed for dipole
             # gradient
-            self.perturbed_density = perturbed_density
+            #self.perturbed_density = perturbed_density
 
             t3 = tm.time()
             self.ostream.print_info('Second order derivative contributions'
@@ -758,7 +762,7 @@ class ScfHessianDriver(HessianDriver):
             return None
 
 
-    def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, cphf_oo, cphf_ov,
+    def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, cphf_ov,
                        dist_fock_deriv_ao, profiler):
         """
         Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
@@ -771,8 +775,6 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         :param dist_cphf_rhs:
             The distributed RHS of the CPHF equations in MO basis.
-        :param cphf_oo:
-            The oo block of the CPHF coefficients.
         :param cphf_ov:
             The ov block of the CPHF coefficients.
         :param profiler:

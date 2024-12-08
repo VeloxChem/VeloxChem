@@ -218,8 +218,9 @@ class HessianOrbitalResponse(CphfSolver):
             
         self.profiler.stop_timer('derivs')
 
-        ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
-        ovlp_deriv_oo = np.zeros((natm, 3, nocc, nocc))
+        ovlp_deriv_oo_dict = {(iatom, x): None
+                              for iatom in range(natm)
+                              for x in range(3)}
 
         fock_deriv_ov_dict = {(iatom, x): None
                               for iatom in range(natm)
@@ -232,10 +233,11 @@ class HessianOrbitalResponse(CphfSolver):
         # transform integral derivatives to MO basis
         for iatom in local_atoms:
             for x in range(3):
-                ovlp_deriv_ov[iatom,x,:,:] = np.linalg.multi_dot([
+                ovlp_deriv_ov_ix = np.linalg.multi_dot([
                     mo_occ.T, ovlp_deriv_ao[iatom,x], mo_vir
                 ])
-                ovlp_deriv_oo[iatom,x,:,:] = np.linalg.multi_dot([
+
+                ovlp_deriv_oo_dict[(iatom,x)] = np.linalg.multi_dot([
                     mo_occ.T, ovlp_deriv_ao[iatom,x], mo_occ
                 ])
 
@@ -244,7 +246,7 @@ class HessianOrbitalResponse(CphfSolver):
                 ])
 
                 orben_ovlp_deriv_ov_dict[(iatom,x)] = (
-                    eocc.reshape(-1, 1) * ovlp_deriv_ov[iatom,x]
+                    eocc.reshape(-1, 1) * ovlp_deriv_ov_ix
                 ) 
 
         dist_fock_deriv_ao = None
@@ -306,7 +308,7 @@ class HessianOrbitalResponse(CphfSolver):
         for iatom in local_atoms:
             for x in range(3):
                 uij_ao[iatom,x,:,:] = np.linalg.multi_dot([
-                   mo_occ, -0.5 * ovlp_deriv_oo[iatom,x], mo_occ.T 
+                   mo_occ, -0.5 * ovlp_deriv_oo_dict[(iatom,x)], mo_occ.T 
                 ])
 
         uij_ao = self.comm.reduce(uij_ao, root=mpi_master())
@@ -360,7 +362,7 @@ class HessianOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             return {
                 'dist_cphf_rhs': dist_cphf_rhs,
-                'ovlp_deriv_oo': ovlp_deriv_oo,
+                # 'ovlp_deriv_oo': ovlp_deriv_oo,
                 # 'fock_deriv_ao': fock_deriv_ao,
                 # 'fock_uij': fock_uij,
                 'dist_fock_deriv_ao': dist_fock_deriv_ao,
