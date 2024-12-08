@@ -270,13 +270,9 @@ class HessianOrbitalResponse(CphfSolver):
                 dist_fock_deriv_ao.append(dist_fock_deriv_ao_ix)
 
         if self.rank == mpi_master():
-            Fix_Sjy = np.zeros((natm, natm, 3, 3))
-            Fjy_Six = np.zeros((natm, natm, 3, 3))
-            Six_Sjy = np.zeros((natm, natm, 3, 3))
+            hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
         else:
-            Fix_Sjy = None
-            Fjy_Six = None
-            Six_Sjy = None
+            hessian_first_integral_derivatives = None
 
         for iatom, root_rank_i in all_atom_idx_rank:
             for x in range(3):
@@ -300,17 +296,22 @@ class HessianOrbitalResponse(CphfSolver):
 
                         if self.rank == mpi_master():
 
-                            Fix_Sjy[iatom,jatom,x,y] = np.sum(
+                            Fix_Sjy = np.sum(
                                 np.matmul(density, fock_deriv_ao_ix) *
                                 np.matmul(density, ovlp_deriv_ao_jy).T)
 
-                            Fjy_Six[iatom,jatom,x,y] = np.sum(
+                            Fjy_Six = np.sum(
                                 np.matmul(density, fock_deriv_ao_jy) *
                                 np.matmul(density, ovlp_deriv_ao_ix).T)
 
-                            Six_Sjy[iatom,jatom,x,y] = 2.0 * np.sum(
+                            Six_Sjy = 2.0 * np.sum(
                                 np.matmul(omega_ao, ovlp_deriv_ao_ix) *
                                 np.matmul(density, ovlp_deriv_ao_jy).T)
+
+                            hess_ijxy = -2.0 * (Fix_Sjy + Fjy_Six + Six_Sjy)
+                            hessian_first_integral_derivatives[iatom,jatom,x,y] += hess_ijxy
+                            if iatom != jatom:
+                                hessian_first_integral_derivatives[jatom,iatom,y,x] += hess_ijxy
 
         # the oo part of the CPHF coefficients in AO basis,
         # transforming the oo overlap derivative back to AO basis
@@ -343,6 +344,10 @@ class HessianOrbitalResponse(CphfSolver):
             # create AODensity and Fock matrix objects, contract with ERI
             fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, self.profiler)
+
+            # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
+            # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
+            # response
 
             for jatom, root_rank_j in all_atom_idx_rank:
                 if jatom < iatom:
@@ -427,9 +432,7 @@ class HessianOrbitalResponse(CphfSolver):
             # 'fock_deriv_ao': fock_deriv_ao,
             # 'fock_uij': fock_uij,
             'dist_fock_deriv_ao': dist_fock_deriv_ao,
-            'Fix_Sjy': Fix_Sjy,
-            'Fjy_Six': Fjy_Six,
-            'Six_Sjy': Six_Sjy,
+            'hessian_first_integral_derivatives': hessian_first_integral_derivatives,
             'hessian_eri_overlap': hessian_eri_overlap,
         }
 

@@ -371,10 +371,7 @@ class ScfHessianDriver(HessianDriver):
         dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
-        Fix_Sjy = cphf_solution_dict['Fix_Sjy']
-        Fjy_Six = cphf_solution_dict['Fjy_Six']
-        Six_Sjy = cphf_solution_dict['Six_Sjy']
-
+        hessian_first_integral_derivatives = cphf_solution_dict['hessian_first_integral_derivatives']
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
         
         if self.rank == mpi_master():
@@ -438,9 +435,8 @@ class ScfHessianDriver(HessianDriver):
         else:
             # TODO: should we also take ovlp_deriv_ao from cphf_solution_dict?
             hessian_first_order_derivatives = self.compute_furche(molecule,
-                                    ao_basis, dist_cphf_rhs, 
-                                    dist_cphf_ov, dist_fock_deriv_ao,
-                                    Fix_Sjy, Fjy_Six, Six_Sjy,
+                                    ao_basis, dist_cphf_rhs, dist_cphf_ov,
+                                    hessian_first_integral_derivatives,
                                     hessian_eri_overlap, profiler)
 
         # TODO: need to test LDA and pure GGA functional
@@ -762,7 +758,7 @@ class ScfHessianDriver(HessianDriver):
 
 
     def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, dist_cphf_ov,
-                       dist_fock_deriv_ao, Fix_Sjy, Fjy_Six, Six_Sjy,
+                       hessian_first_integral_derivatives,
                        hessian_eri_overlap, profiler):
         """
         Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
@@ -799,39 +795,19 @@ class ScfHessianDriver(HessianDriver):
         if self.rank == mpi_master():
             hessian_cphf_coeff_rhs = np.zeros((natm, natm, 3, 3))
 
-        ijxy_list = [(i,j,x,y)
-                     for i in range(natm)
-                     for j in range(natm)
-                     for x in range(3)
-                     for y in range(3)]
+        for i in range(natm):
+            for x in range(3):
+                cphf_ov_ix = dist_cphf_ov[i*3+x].get_full_vector(0)
 
-        for i,j,x,y in ijxy_list:
-            cphf_rhs_jy = dist_cphf_rhs[j*3+y].get_full_vector(0)
-
-            cphf_ov_ix = dist_cphf_ov[i*3+x].get_full_vector(0)
-
-            if self.rank == mpi_master():
-                # TODO: consider calculating hessian_cphf_coeff_rhs on the fly
-                # in hessian orbital response
-                hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
-                    np.dot(cphf_ov_ix, cphf_rhs_jy))
-
-        # First integral derivatives: partial Fock and overlap
-        # matrix derivatives
-
-        if self.rank == mpi_master():
-            hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
-
-            for i in range(natm):
                 for j in range(i, natm):
-                    hess_ij = -2.0 * (Fix_Sjy[i,j] + Fjy_Six[i,j] + Six_Sjy[i,j])
-                    hessian_first_integral_derivatives[i,j,:,:] += hess_ij
-                    if i != j:
-                        hessian_first_integral_derivatives[j,i,:,:] += hess_ij.T
-   
-        # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
-        # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
-        # response
+                    for y in range(3):
+                        cphf_rhs_jy = dist_cphf_rhs[j*3+y].get_full_vector(0)
+
+                        if self.rank == mpi_master():
+                            hess_ijxy = 4.0 * (np.dot(cphf_ov_ix, cphf_rhs_jy))
+                            hessian_cphf_coeff_rhs[i,j,x,y] += hess_ijxy
+                            if i != j:
+                                hessian_cphf_coeff_rhs[j,i,y,x] += hess_ijxy
 
         # return the sum of the three contributions
         if self.rank == mpi_master():
