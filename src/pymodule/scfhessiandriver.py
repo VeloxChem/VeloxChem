@@ -1107,7 +1107,8 @@ class ScfHessianDriver(HessianDriver):
         nuclear_charges = molecule.get_element_ids()
 
         # Dipole integrals
-        dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis, [0.0, 0.0, 0.0])
+        dipole_mats = compute_electric_dipole_integrals(molecule, ao_basis,
+                                                        [0.0, 0.0, 0.0])
         # Note: compute_dipole_gradient uses r instead of mu for dipole operator
         dipole_ints = (
             -1.0 * dipole_mats[0],
@@ -1115,31 +1116,22 @@ class ScfHessianDriver(HessianDriver):
             -1.0 * dipole_mats[2],
         )
 
-        # Initialize a local dipole gradient to zero
-        dipole_gradient = np.zeros((3, natm, 3))
-
-        # Put the nuclear contributions to the right place
-        natm_zeros = np.zeros((natm))
-        dipole_gradient[0] = np.vstack((nuclear_charges,
-                                        natm_zeros, natm_zeros)).T
-        dipole_gradient[1] = np.vstack((natm_zeros,
-                                        nuclear_charges, natm_zeros)).T
-        dipole_gradient[2] = np.vstack((natm_zeros,
-                                        natm_zeros, nuclear_charges)).T
-
-        # TODO: replace once veloxchem analytical integral derivatives 
-        # are available
-        # TODO: replace the full array of dipole integrals derivatives with
-        # the derivative with respect to each atom and contract with 
-        # the densities in the same way as done for the energy gradient.
-        #dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
-        #                                                molecule, ao_basis)
-        dipole_integrals_deriv = self.compute_dipole_integral_derivatives(
-                                                        molecule, ao_basis)
-
-
-
         if self.rank == mpi_master():
+            # Initialize a local dipole gradient to zero
+            dipole_gradient = np.zeros((3, natm, 3))
+
+            # Put the nuclear contributions to the right place
+            natm_zeros = np.zeros(natm)
+            dipole_gradient[0,:,:] = np.vstack((nuclear_charges,
+                                                natm_zeros,
+                                                natm_zeros)).T
+            dipole_gradient[1,:,:] = np.vstack((natm_zeros,
+                                                nuclear_charges,
+                                                natm_zeros)).T
+            dipole_gradient[2,:,:] = np.vstack((natm_zeros,
+                                                natm_zeros,
+                                                nuclear_charges)).T
+
             scf_tensors = self.scf_driver.scf_tensors 
             density = scf_tensors['D_alpha']
             nao = density.shape[0]
@@ -1150,8 +1142,11 @@ class ScfHessianDriver(HessianDriver):
             nvir = mo_vir.shape[1]
 
         ovlp_grad_drv = OverlapGeom100Driver()
+        dip_grad_drv = ElectricDipoleMomentGeom100Driver()
 
         for a in range(natm):
+
+            # overlap gradient
 
             gmats = ovlp_grad_drv.compute(molecule, ao_basis, a)
 
@@ -1161,6 +1156,8 @@ class ScfHessianDriver(HessianDriver):
                 ovlp_deriv_ao_a.append(gmat + gmat.T)
 
             gmats = Matrices()
+
+            # perturbed density
 
             perturbed_density_a = []
 
@@ -1181,16 +1178,28 @@ class ScfHessianDriver(HessianDriver):
                         + np.linalg.multi_dot([mo_occ, cphf_ov_ax, mo_vir.T]) 
                         )
 
-            if self.rank == mpi_master():
+            # dipole gradient
 
-                cx_pairs = [(c,x) for c in range(3) for x in range(3)]
+            gmats_dip = dip_grad_drv.compute(molecule, ao_basis, [0.0, 0.0, 0.0], a)
 
-                for c,x in cx_pairs:
+            gmats_dip_components = ['X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z',
+                                    'Z_X', 'Z_Y', 'Z_Z']
+
+            comp_to_idx = {'X': 0, 'Y': 1, 'Z': 2}
+
+            for i, label in enumerate(gmats_dip_components):
+                gmat_dip = gmats_dip.matrix_to_numpy(label)
+
+                icoord = comp_to_idx[label[0]] # atom coordinate component
+                icomp = comp_to_idx[label[-1]] # dipole operator component
+
+                if self.rank == mpi_master():
+
+                    c, x = icomp, icoord
+
                     dipole_gradient[c,a,x] += -2.0 * (
-                            np.sum(density *
-                                   dipole_integrals_deriv[c,a,x]) +
-                            np.sum(perturbed_density_a[x] *
-                                   dipole_ints[c]))
+                            np.sum(density * (gmat_dip + gmat_dip.T)) +
+                            np.sum(perturbed_density_a[x] * dipole_ints[c]))
 
         if self.rank == mpi_master():
             self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
