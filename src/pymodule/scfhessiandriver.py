@@ -809,13 +809,13 @@ class ScfHessianDriver(HessianDriver):
                      for y in range(3)]
 
         for i,j,x,y in ijxy_list:
-            cphf_rhs_j_y = dist_cphf_rhs.get_full_vector(col=j*3+y)
+            cphf_rhs_jy = dist_cphf_rhs[j*3+y].get_full_vector(0)
 
             cphf_ov_ix = dist_cphf_ov[i*3+x].get_full_vector(0)
 
             if self.rank == mpi_master():
                 hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
-                    np.dot(cphf_ov_ix, cphf_rhs_j_y))
+                    np.dot(cphf_ov_ix, cphf_rhs_jy))
 
         # First integral derivatives: partial Fock and overlap
         # matrix derivatives

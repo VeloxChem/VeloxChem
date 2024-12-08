@@ -216,8 +216,8 @@ class CphfSolver(LinearSolver):
 
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args)
 
-        dist_cphf_rhs = cphf_rhs_dict['dist_cphf_rhs']
-        dof = dist_cphf_rhs.data.shape[1]
+        dist_rhs = cphf_rhs_dict['dist_cphf_rhs']
+        dof = len(dist_rhs)
 
         # Initialize trial and sigma vectors
         self.dist_trials = None
@@ -226,13 +226,6 @@ class CphfSolver(LinearSolver):
         # the preconditioner: 1 / (eocc - evir)
         precond = (1.0 / eov).reshape(nocc * nvir)
         dist_precond = DistributedArray(precond, self.comm)
-
-        # create list of distributed arrays for RHS
-        dist_rhs = []
-        for k in range(dof):
-            dist_rhs.append(DistributedArray(dist_cphf_rhs.data[:,k],   
-                                             self.comm,
-                                             distribute=False))
 
         # setup and precondition trial vectors
         dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)

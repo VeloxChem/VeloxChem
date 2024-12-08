@@ -285,8 +285,7 @@ class HessianOrbitalResponse(CphfSolver):
                    mo_occ, -0.5 * ovlp_deriv_oo_dict[(iatom,x)], mo_occ.T 
                 ])
 
-        # TODO: consider making dist_cphf_rhs a list of distributed vectors
-        dist_cphf_rhs = None
+        dist_cphf_rhs = []
 
         for iatom, root_rank in all_atom_idx_rank:
 
@@ -307,7 +306,7 @@ class HessianOrbitalResponse(CphfSolver):
                     # transform to MO basis
                     fock_uij_ov_2 = 2.0 * np.linalg.multi_dot([
                         mo_occ.T, fock_uij[x], mo_vir])
-                    fock_uij_ov_2 = fock_uij_ov_2.reshape(nocc * nvir, 1)
+                    fock_uij_ov_2 = fock_uij_ov_2.reshape(nocc * nvir)
                 else:
                     fock_uij_ov_2 = None
 
@@ -318,9 +317,9 @@ class HessianOrbitalResponse(CphfSolver):
 
                 if self.rank == root_rank:
                     fock_deriv_ov_dict_ix = fock_deriv_ov_dict[
-                            (iatom,x)].reshape(nocc * nvir, 1)
+                            (iatom,x)].reshape(nocc * nvir)
                     orben_ovlp_deriv_ov_ix = orben_ovlp_deriv_ov_dict[
-                            (iatom,x)].reshape(nocc * nvir, 1)
+                            (iatom,x)].reshape(nocc * nvir)
                 else:
                     fock_deriv_ov_dict_ix = None
                     orben_ovlp_deriv_ov_ix = None
@@ -344,10 +343,7 @@ class HessianOrbitalResponse(CphfSolver):
                         self.comm,
                         distribute=False)
 
-                if dist_cphf_rhs is None:
-                    dist_cphf_rhs = dist_cphf_rhs_ix
-                else:
-                    dist_cphf_rhs.append(dist_cphf_rhs_ix, axis=1)
+                dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
         t2 = tm.time() 
 
@@ -359,19 +355,13 @@ class HessianOrbitalResponse(CphfSolver):
 
         self.profiler.stop_timer('RHS')
 
-        if self.rank == mpi_master():
-            return {
-                'dist_cphf_rhs': dist_cphf_rhs,
-                # 'ovlp_deriv_oo': ovlp_deriv_oo,
-                # 'fock_deriv_ao': fock_deriv_ao,
-                # 'fock_uij': fock_uij,
-                'dist_fock_deriv_ao': dist_fock_deriv_ao,
-            }
-        else:
-            return {
-                'dist_cphf_rhs': dist_cphf_rhs,
-                'dist_fock_deriv_ao': dist_fock_deriv_ao,
-            }
+        return {
+            'dist_cphf_rhs': dist_cphf_rhs,
+            # 'ovlp_deriv_oo': ovlp_deriv_oo,
+            # 'fock_deriv_ao': fock_deriv_ao,
+            # 'fock_uij': fock_uij,
+            'dist_fock_deriv_ao': dist_fock_deriv_ao,
+        }
 
     def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):
         """
