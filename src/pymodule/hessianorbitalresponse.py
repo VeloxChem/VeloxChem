@@ -111,7 +111,8 @@ class HessianOrbitalResponse(CphfSolver):
             mo = scf_tensors['C_alpha']
             mo_energies = scf_tensors['E_alpha']
             eocc = mo_energies[:nocc]
-            # DFT
+            mo_occ = mo[:, :nocc].copy()
+            omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
         else:
             density = None
             eocc = None
@@ -252,9 +253,10 @@ class HessianOrbitalResponse(CphfSolver):
 
         dist_fock_deriv_ao = []
 
-        for iatom, root_rank in all_atom_idx_rank:
+        for iatom, root_rank_i in all_atom_idx_rank:
             for x in range(3):
-                if self.rank == root_rank:
+
+                if self.rank == root_rank_i:
                     fock_deriv_ao_dict_ix = fock_deriv_ao_dict[
                             (iatom,x)].reshape(nao * nao)
                 else:
@@ -263,9 +265,52 @@ class HessianOrbitalResponse(CphfSolver):
                 dist_fock_deriv_ao_ix = DistributedArray(
                         fock_deriv_ao_dict_ix,
                         self.comm,
-                        root=root_rank)
+                        root=root_rank_i)
 
                 dist_fock_deriv_ao.append(dist_fock_deriv_ao_ix)
+
+        if self.rank == mpi_master():
+            Fix_Sjy = np.zeros((natm, natm, 3, 3))
+            Fjy_Six = np.zeros((natm, natm, 3, 3))
+            Six_Sjy = np.zeros((natm, natm, 3, 3))
+        else:
+            Fix_Sjy = None
+            Fjy_Six = None
+            Six_Sjy = None
+
+        for iatom, root_rank_i in all_atom_idx_rank:
+            for x in range(3):
+
+                ovlp_deriv_ao_ix = self.comm.bcast(
+                        ovlp_deriv_ao_dict[(iatom,x)], root=root_rank_i)
+
+                fock_deriv_ao_ix = self.comm.bcast(
+                        fock_deriv_ao_dict[(iatom,x)], root=root_rank_i)
+
+                for jatom, root_rank_j in all_atom_idx_rank:
+                    if jatom < iatom:
+                        continue
+                    for y in range(3):
+
+                        ovlp_deriv_ao_jy = self.comm.bcast(
+                                ovlp_deriv_ao_dict[(jatom,y)], root=root_rank_j)
+
+                        fock_deriv_ao_jy = self.comm.bcast(
+                                fock_deriv_ao_dict[(jatom,y)], root=root_rank_j)
+
+                        if self.rank == mpi_master():
+
+                            Fix_Sjy[iatom,jatom,x,y] = np.sum(
+                                np.matmul(density, fock_deriv_ao_ix) *
+                                np.matmul(density, ovlp_deriv_ao_jy).T)
+
+                            Fjy_Six[iatom,jatom,x,y] = np.sum(
+                                np.matmul(density, fock_deriv_ao_jy) *
+                                np.matmul(density, ovlp_deriv_ao_ix).T)
+
+                            Six_Sjy[iatom,jatom,x,y] = 2.0 * np.sum(
+                                np.matmul(omega_ao, ovlp_deriv_ao_ix) *
+                                np.matmul(density, ovlp_deriv_ao_jy).T)
 
         # the oo part of the CPHF coefficients in AO basis,
         # transforming the oo overlap derivative back to AO basis
@@ -357,6 +402,9 @@ class HessianOrbitalResponse(CphfSolver):
             # 'fock_deriv_ao': fock_deriv_ao,
             # 'fock_uij': fock_uij,
             'dist_fock_deriv_ao': dist_fock_deriv_ao,
+            'Fix_Sjy': Fix_Sjy,
+            'Fjy_Six': Fjy_Six,
+            'Six_Sjy': Six_Sjy,
         }
 
     def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):

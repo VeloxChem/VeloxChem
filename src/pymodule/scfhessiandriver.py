@@ -369,6 +369,11 @@ class ScfHessianDriver(HessianDriver):
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_fock_deriv_ao = cphf_solution_dict['dist_fock_deriv_ao']
+        dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
+
+        Fix_Sjy = cphf_solution_dict['Fix_Sjy']
+        Fjy_Six = cphf_solution_dict['Fjy_Six']
+        Six_Sjy = cphf_solution_dict['Six_Sjy']
         
         if self.rank == mpi_master():
             """
@@ -406,7 +411,7 @@ class ScfHessianDriver(HessianDriver):
                         orben_ovlp_deriv_oo[x, y] = np.multiply(eoo, ovlp_deriv_oo[x,y])
 
         else:
-            perturbed_density = None
+            #perturbed_density = None
 
             if self.do_pople_hessian:
                 fock_uij = None
@@ -416,8 +421,6 @@ class ScfHessianDriver(HessianDriver):
 
         #perturbed_density = self.comm.bcast(perturbed_density,
         #                                    root=mpi_master())
-
-        dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
         if self.do_pople_hessian:
             fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
@@ -434,7 +437,8 @@ class ScfHessianDriver(HessianDriver):
             # TODO: should we also take ovlp_deriv_ao from cphf_solution_dict?
             hessian_first_order_derivatives = self.compute_furche(molecule,
                                     ao_basis, dist_cphf_rhs, 
-                                    dist_cphf_ov, dist_fock_deriv_ao, profiler)
+                                    dist_cphf_ov, dist_fock_deriv_ao,
+                                    Fix_Sjy, Fjy_Six, Six_Sjy, profiler)
 
         # TODO: need to test LDA and pure GGA functional
 
@@ -755,7 +759,8 @@ class ScfHessianDriver(HessianDriver):
 
 
     def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, dist_cphf_ov,
-                       dist_fock_deriv_ao, profiler):
+                       dist_fock_deriv_ao, Fix_Sjy, Fjy_Six, Six_Sjy,
+                       profiler):
         """
         Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
         Chem. Phys. Lett. 362, 511–518 (2002).
@@ -812,81 +817,28 @@ class ScfHessianDriver(HessianDriver):
             cphf_ov_ix = dist_cphf_ov[i*3+x].get_full_vector(0)
 
             if self.rank == mpi_master():
+                # TODO: consider calculating hessian_cphf_coeff_rhs on the fly
+                # in hessian orbital response
                 hessian_cphf_coeff_rhs[i,j,x,y] = 4.0 * (
                     np.dot(cphf_ov_ix, cphf_rhs_jy))
 
         # First integral derivatives: partial Fock and overlap
         # matrix derivatives
+
         if self.rank == mpi_master():
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
+            for i in range(natm):
+                for j in range(i, natm):
+                    hess_ij = -2.0 * (Fix_Sjy[i,j] + Fjy_Six[i,j] + Six_Sjy[i,j])
+                    hessian_first_integral_derivatives[i,j,:,:] = hess_ij
+                    if i != j:
+                        hessian_first_integral_derivatives[j,i,:,:] += hess_ij.T
+   
         if self._dft: 
             xc_mol_hess = XCMolecularHessian()
 
         ovlp_grad_drv = OverlapGeom100Driver()
-
-        for i in range(natm):
-
-            ovlp_deriv_i = []
-            gmats = ovlp_grad_drv.compute(molecule, ao_basis, i)
-            for label in ['X', 'Y', 'Z']:
-                gmat = gmats.matrix_to_numpy(label)
-                ovlp_deriv_i.append(gmat + gmat.T)
-            gmats = Matrices()
-
-            fock_deriv_ix = dist_fock_deriv_ao[i*3+0].get_full_vector(0)
-            fock_deriv_iy = dist_fock_deriv_ao[i*3+1].get_full_vector(0)
-            fock_deriv_iz = dist_fock_deriv_ao[i*3+2].get_full_vector(0)
-
-            if self.rank == mpi_master():
-                fock_deriv_i = [fock_deriv_ix.reshape(nao, nao),
-                                fock_deriv_iy.reshape(nao, nao),
-                                fock_deriv_iz.reshape(nao, nao)]
-
-            # Note: upper triangular part
-            for j in range(i, natm):
-
-                ovlp_deriv_j = []
-                gmats = ovlp_grad_drv.compute(molecule, ao_basis, j)
-                for label in ['X', 'Y', 'Z']:
-                    gmat = gmats.matrix_to_numpy(label)
-                    ovlp_deriv_j.append(gmat + gmat.T)
-                gmats = Matrices()
-
-                fock_deriv_jx = dist_fock_deriv_ao[j*3+0].get_full_vector(0)
-                fock_deriv_jy = dist_fock_deriv_ao[j*3+1].get_full_vector(0)
-                fock_deriv_jz = dist_fock_deriv_ao[j*3+2].get_full_vector(0)
-
-                if self.rank == mpi_master():
-                    fock_deriv_j = [fock_deriv_jx.reshape(nao, nao),
-                                    fock_deriv_jy.reshape(nao, nao),
-                                    fock_deriv_jz.reshape(nao, nao)]
-            
-                    Fix_Sjy = np.zeros((3,3))
-                    Fjy_Six = np.zeros((3,3))
-                    Six_Sjy = np.zeros((3,3))
-
-                    xy_list = [(x,y) for x in range(3) for y in range(3)]
-
-                    for x, y in xy_list:
-                        Fix_Sjy[x,y] = np.trace(np.linalg.multi_dot([
-                            density, fock_deriv_i[x], density,
-                            ovlp_deriv_j[y]]))
-                        Fjy_Six[x,y] = np.trace(np.linalg.multi_dot([
-                            density, fock_deriv_j[y],
-                            density, ovlp_deriv_i[x]]))
-                        Six_Sjy[x,y] = 2.0 * np.trace(np.linalg.multi_dot([
-                            omega_ao, ovlp_deriv_i[x], density,
-                            ovlp_deriv_j[y]]))
-
-                    hessian_first_integral_derivatives[i,j] += -2.0 * (
-                            Fix_Sjy + Fjy_Six + Six_Sjy)
-   
-            if self.rank == mpi_master(): 
-                # Note: lower triangular part
-                for j in range(i):
-                    hessian_first_integral_derivatives[i,j] += (
-                            hessian_first_integral_derivatives[j,i].T)
 
         if self.rank == mpi_master():
             # Overlap derivative with ERIs
