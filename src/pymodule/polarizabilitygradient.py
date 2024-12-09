@@ -353,9 +353,6 @@ class PolarizabilityGradient():
         all_orbrsp_results = self.compute_orbital_response(
             molecule, basis, scf_tensors, lr_results)
 
-        # number of frequencies
-        n_freqs = len(self.frequencies)
-
         # dictionary for polarizability gradient
         polgrad_results = {}
 
@@ -491,16 +488,23 @@ class PolarizabilityGradient():
                                     ]))
 
                             # symmetric
-                            if (y != x):
-                                tmp_scf_gradient[y, x, iatom, icoord] += tmp_scf_gradient[x, y, iatom, icoord]
+                            #if (y != x):
+                            #    tmp_scf_gradient[y, x, iatom, icoord] += tmp_scf_gradient[x, y, iatom, icoord]
 
                     gmats_dip = Matrices()
 
+                tmp_scf_gradient = self.comm.reduce(tmp_scf_gradient, root=mpi_master())
                 # ERI contribution
                 eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                         rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
 
-                pol_gradient = tmp_scf_gradient + eri_contrib
+                if self.rank == mpi_master():
+                    pol_gradient = tmp_scf_gradient + eri_contrib
+                    for x in range(dof):
+                        for y in range(x + 1, dof):
+                            pol_gradient[y, x] += pol_gradient[x, y]
+
+                #pol_gradient = tmp_scf_gradient + eri_contrib
             else:
                 gs_dm = None
                 rel_dm_ao = None
@@ -525,625 +529,7 @@ class PolarizabilityGradient():
         if self.rank == mpi_master():
             self.polgradient = dict(polgrad_results)
 
-            valstr = '** Time spent on constructing the analytical gradient for '
-            valstr += '{:d} frequencies: {:.6f} sec **'.format(
-                n_freqs, tm.time() - loop_start_time)
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-    def compute_analytical_vlx_integrals_complex(self, molecule, basis, scf_tensors, lr_results):
-        """
-        Performs calculation of the complex analytical
-        polarizability gradient.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
-        :param lr_results:
-            The results of the linear response calculation.
-        """
-
-        # get orbital response results
-        all_orbrsp_results = self.compute_orbital_response(
-            molecule, basis, scf_tensors, lr_results)
-
-        # number of frequencies
-        n_freqs = len(self.frequencies)
-
-        # dictionary for polarizability gradient
-        polgrad_results = {}
-
-        # timings
-        loop_start_time = tm.time()
-
-        # partition atoms for parallelisation
-        natm = molecule.number_of_atoms()
-        local_atoms = partition_atoms(natm, self.rank, self.nodes)
-
-        # operator component combinations
-        dof = len(self.vector_components)
-        xy_pairs = [(x,y) for x in range(dof) for y in range(x,dof)]
-
-        for f, w in enumerate(self.frequencies):
-            info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
-            self.ostream.print_info(info_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-            if self.rank == mpi_master():
-                orbrsp_results = all_orbrsp_results[w]
-                mo = scf_tensors['C_alpha']  # only alpha part
-                nao = mo.shape[0]
-                nocc = molecule.number_of_alpha_electrons()
-                mo_occ = mo[:, :nocc].copy()
-                mo_vir = mo[:, nocc:].copy()
-                nvir = mo_vir.shape[1]
-                #natm = molecule.number_of_atoms()
-                gs_dm = scf_tensors['D_alpha']  # only alpha part
-
-                x_plus_y = orbrsp_results['x_plus_y_ao']
-                x_minus_y = orbrsp_results['x_minus_y_ao']
-
-                # Lagrange multipliers
-                omega_ao = orbrsp_results['omega_ao'].reshape(
-                    dof, dof, nao, nao)
-                lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
-                lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
-
-                # calculate relaxed density matrix
-                rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
-
-                # initiate polarizability gradient variable with data type set in init()
-                pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                # WIP
-                tmp_scf_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                # DEBUG
-                vlx_hcore_grad = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                vlx_ovlp_grad = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                vlx_dip_grad = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                vlx_eri_grad_rel = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                vlx_eri_grad_xpy_xy = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                vlx_eri_grad_xpy_yx = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                vlx_eri_grad_xmy_xy = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                vlx_eri_grad_xmy_yx = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-
-                # DFT-related
-                #frac_K = self.get_k_fraction()
-                dummy, frac_K = self.get_fock_type_and_x_frac()
-
-                # kinetic energy gradient driver
-                kin_grad_drv = KineticEnergyGeom100Driver()
-
-                # nuclear potential gradienr drivers
-                npot_grad_100_drv = NuclearPotentialGeom100Driver()
-                npot_grad_010_drv = NuclearPotentialGeom010Driver()
-
-                # loop over atoms and contract integral derivatives with density matrices
-                for iatom in range(natm):
-                    # DEBUG
-                    d_hcore, d_ovlp, d_eri, d_dipole = self.import_integrals(
-                        molecule, basis, iatom)
-
-                    # core Hamiltonian contribution to gradients
-                    gmats_kin = kin_grad_drv.compute(molecule, basis, iatom)
-                    gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
-                    gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
-
-                    # DEBUG
-                    tmp_d_hcore = np.zeros((3, nao, nao))
-
-                    for icoord, label in enumerate(['X', 'Y', 'Z']):
-                        gmat_kin = gmats_kin.matrix_to_numpy(label)
-                        gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
-                        gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
-                        gmat_hcore = gmat_kin + gmat_kin.T
-                        gmat_hcore -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
-                        # DEBUG
-                        tmp_d_hcore[icoord] += gmat_hcore
-                        # loop over operator components
-                        for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] += (
-                                    np.linalg.multi_dot([ # xymn,amn->xya
-                                        2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                                        gmat_hcore.reshape(nao**2)])
-                                    )
-                            #vlx_hcore_grad[x, y, iatom, icoord] += (
-                            #        np.linalg.multi_dot([ # xymn,amn->xya
-                            #            2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                            #            gmat_hcore.reshape(nao**2)])
-                            #        )
-
-                    gmats_kin = Matrices()
-                    gmats_npot_100 = Matrices()
-                    gmats_npot_010 = Matrices()
-                    gmat_hcore = Matrices()
-
-                    print('after hcore gradient')
-                    print(np.max(np.abs(d_hcore - tmp_d_hcore)))
-                    self.ostream.flush()
-
-                    # overlap contribution to gradient
-                    ovlp_grad_drv = OverlapGeom100Driver()
-                    gmats_ovlp = ovlp_grad_drv.compute(molecule, basis, iatom)
-
-                    # DEBUG
-                    tmp_d_ovlp = np.zeros((3, nao, nao))
-
-                    for icoord, label in enumerate(['X', 'Y', 'Z']):
-                        gmat_ovlp = gmats_ovlp.matrix_to_numpy(label)
-                        gmat_ovlp += gmat_ovlp.T
-                        # DEBUG
-                        tmp_d_ovlp[icoord] += gmat_ovlp
-                        # loop over operator components
-                        for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] += (
-                                    1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                                    2.0 * omega_ao[x, y].reshape(nao**2),
-                                          #d_ovlp[icoord].reshape(nao**2)]))
-                                          gmat_ovlp.reshape(nao**2)]))
-                            #vlx_ovlp_grad[x, y, iatom, icoord] += (
-                            #        1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                            #        2.0 * omega_ao[x, y].reshape(nao**2),
-                            #              gmat_ovlp.reshape(nao**2)]))
-
-                    gmats_ovlp = Matrices()
-
-                    print('after ovlp gradient')
-                    print(np.max(np.abs(d_ovlp - tmp_d_ovlp)))
-                    self.ostream.flush()
-
-                    # dipole contribution to gradient
-                    dip_grad_drv = ElectricDipoleMomentGeom100Driver()
-                    gmats_dip = dip_grad_drv.compute(molecule, basis, [0.0, 0.0, 0.0], iatom)
-
-                    tmp_d_dipole = np.zeros((dof, 3, nao, nao))
-
-                    # the keys of the dipole gmat
-                    gmats_dip_components = (['X_X', 'X_Y', 'X_Z', 'Y_X' ] 
-                                         + [ 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'])
-
-                    # dictionary to convert from string idx to integer idx
-                    comp_to_idx = {'X': 0, 'Y': 1, 'Z': 2}
-
-                    for i, label in enumerate(gmats_dip_components):
-                        gmat_dip = gmats_dip.matrix_to_numpy(label)
-                        gmat_dip += gmat_dip.T
-
-                        icoord = comp_to_idx[label[0]] # atom coordinate component
-                        icomp = comp_to_idx[label[-1]] # dipole operator component
-
-                        # reorder indices to first is operator comp, second is coord
-                        tmp_d_dipole[icomp, icoord] += gmat_dip
-
-                    for icoord in range(3):
-                        # loop over operator components
-                        for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] += (
-                                    - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
-                                        x_minus_y[x].reshape(nao**2),
-                                        tmp_d_dipole[y, icoord].reshape(nao**2)
-                                    ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                                        tmp_d_dipole[x, icoord].reshape(nao**2),
-                                        x_minus_y[y].reshape(nao**2)
-                                    ]))
-                            #vlx_dip_grad[x, y, iatom, icoord] += (
-                            #        - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
-                            #            x_minus_y[x].reshape(nao**2),
-                            #            tmp_d_dipole[y, icoord].reshape(nao**2)
-                            #        ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                            #            tmp_d_dipole[x, icoord].reshape(nao**2),
-                            #            x_minus_y[y].reshape(nao**2)
-                            #        ]))
-                            if (y != x):
-                                tmp_scf_gradient[y, x, iatom, icoord] += tmp_scf_gradient[x, y, iatom, icoord]
-
-                    gmats_dip = Matrices()
-
-                    print('after dipole gradient')
-                    print(np.max(np.abs(d_dipole - tmp_d_dipole)))
-                    self.ostream.flush()
-
-                ## for Fock matrix gradient
-                ## TODO this is basically the "get_k_frac" function
-                #if self._dft:
-                #    # TODO: range-separated Fock
-                #    #if _scf_drv.xcfun.is_hybrid():
-                #    if self.xcfun.is_hybrid():
-                #        fock_type = '2jkx'
-                #        #exchange_scaling_factor = _scf_drv.xcfun.get_frac_exact_exchange()
-                #        exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
-                #    else:
-                #        fock_type = 'j'
-                #        exchange_scaling_factor = 0.0
-                #else:
-                #    exchange_scaling_factor = 1.0
-                #    fock_type = "2jk"
-
-                ## scaling of ERI gradient for non-hybrid functionals
-                #factor = 2.0 if fock_type == 'j' else 1.0
-
-                ## ERI threshold
-                #thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
-
-                ## Fock gradient driver
-                #fock_grad_drv = FockGeom1000Driver()
-
-                ## screening
-                #screener = T4CScreener()
-                #screener.partition(basis, molecule, 'eri')
-
-                ## contraction with ground state density
-                #den_mat_for_fock_gs = make_matrix(basis, mat_t.symmetric)
-                #den_mat_for_fock_gs.set_values(gs_dm)
-
-                ## DEBUG
-                #pyscf_eri_grad_rel = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                #pyscf_eri_grad_xpy_xy = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                #pyscf_eri_grad_xpy_yx = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                #pyscf_eri_grad_xmy_xy = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                #pyscf_eri_grad_xmy_yx = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-                #vlx_eri_grad_rel_real = np.zeros((dof, dof, natm, 3))#, dtype=self.grad_dt)
-                #vlx_eri_grad_xpy_xy_real = np.zeros((dof, dof, natm, 3))#, dtype=self.grad_dt)
-                #vlx_eri_grad_xpy_yx_real = np.zeros((dof, dof, natm, 3))#, dtype=self.grad_dt)
-                #vlx_eri_grad_xmy_xy_real = np.zeros((dof, dof, natm, 3))#, dtype=self.grad_dt)
-                #vlx_eri_grad_xmy_yx_real = np.zeros((dof, dof, natm, 3))#, dtype=self.grad_dt)
-
-                ## ERI gradient
-                #for iatom in range(natm):
-                #    # DEBUG
-                #    d_hcore, d_ovlp, d_eri, d_dipole = self.import_integrals(
-                #        molecule, basis, iatom)
-
-                #    # screening
-                #    screener_atom = T4CScreener()
-                #    screener_atom.partition_atom(basis, molecule, 'eri', iatom)
-
-                #    # contraction with density matrices
-                #    for x, y in xy_pairs:
-                #        # relaxed DM
-                #        den_mat_for_fock_rel_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_rel_real.set_values(2.0*rel_dm_ao[x,y].real)
-                #        den_mat_for_fock_rel_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_rel_imag.set_values(2.0*rel_dm_ao[x,y].imag)
-                #        # (X+Y)_x
-                #        den_mat_for_fock_xpy_x_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_x_real.set_values(x_plus_y[x].real)
-                #        den_mat_for_fock_xpy_x_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_x_imag.set_values(x_plus_y[x].imag)
-                #        # (X+Y)_y
-                #        den_mat_for_fock_xpy_y_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_y_real.set_values(x_plus_y[y].real)
-                #        den_mat_for_fock_xpy_y_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_y_imag.set_values(x_plus_y[y].imag)
-                #        # (X+Y)_x - (X+Y)_x
-                #        den_mat_for_fock_xpy_m_xpyT_x_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_m_xpyT_x_real.set_values( (x_plus_y[x]
-                #                                                - x_plus_y[x].T).real )
-                #        den_mat_for_fock_xpy_m_xpyT_x_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_m_xpyT_x_imag.set_values( (x_plus_y[x]
-                #                                                - x_plus_y[x].T).imag )
-                #        # (X+Y)_y - (X+Y)_y
-                #        den_mat_for_fock_xpy_m_xpyT_y_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_m_xpyT_y_real.set_values( (x_plus_y[y]
-                #                                                - x_plus_y[y].T).real )
-                #        den_mat_for_fock_xpy_m_xpyT_y_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xpy_m_xpyT_y_imag.set_values( (x_plus_y[y]
-                #                                                - x_plus_y[y].T).imag )
-                #        # (X-Y)_x
-                #        den_mat_for_fock_xmy_x_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_x_real.set_values(x_minus_y[x].real)
-                #        den_mat_for_fock_xmy_x_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_x_imag.set_values(x_minus_y[x].imag)
-                #        # (X-Y)_y
-                #        den_mat_for_fock_xmy_y_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_y_real.set_values(x_minus_y[y].real)
-                #        den_mat_for_fock_xmy_y_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_y_imag.set_values(x_minus_y[y].imag)
-                #        # (X-Y)_x + (X-Y)_x
-                #        den_mat_for_fock_xmy_p_xmyT_x_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_p_xmyT_x_real.set_values( (x_minus_y[x]
-                #                                                + x_minus_y[x].T).real)
-                #        den_mat_for_fock_xmy_p_xmyT_x_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_p_xmyT_x_imag.set_values( (x_minus_y[x]
-                #                                                + x_minus_y[x].T).imag)
-                #        # (X-Y)_y + (X-Y)_y
-                #        den_mat_for_fock_xmy_p_xmyT_y_real = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_p_xmyT_y_real.set_values( (x_minus_y[y]
-                #                                                + x_minus_y[y].T).real)
-                #        den_mat_for_fock_xmy_p_xmyT_y_imag = make_matrix(basis, mat_t.general)
-                #        den_mat_for_fock_xmy_p_xmyT_y_imag.set_values( (x_minus_y[y]
-                #                                                + x_minus_y[y].T).imag)
-                #        # contraction of integrals and DMs
-                #        # Re
-                #        erigrad_rel_re = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_gs,
-                #                                     den_mat_for_fock_rel_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # Im
-                #        erigrad_rel_im = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_gs,
-                #                                     den_mat_for_fock_rel_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReRe
-                #        erigrad_xpy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_x_real,
-                #                                     den_mat_for_fock_xpy_m_xpyT_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImIm
-                #        erigrad_xpy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_x_imag,
-                #                                     den_mat_for_fock_xpy_m_xpyT_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReIm
-                #        erigrad_xpy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_x_real,
-                #                                     den_mat_for_fock_xpy_m_xpyT_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImRe
-                #        erigrad_xpy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_x_imag,
-                #                                     den_mat_for_fock_xpy_m_xpyT_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReRe
-                #        erigrad_xpy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_m_xpyT_x_real,
-                #                                     den_mat_for_fock_xpy_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImIm
-                #        erigrad_xpy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_m_xpyT_x_imag,
-                #                                     den_mat_for_fock_xpy_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReIm
-                #        erigrad_xpy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_m_xpyT_x_real,
-                #                                     den_mat_for_fock_xpy_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImRe
-                #        erigrad_xpy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xpy_m_xpyT_x_imag,
-                #                                     den_mat_for_fock_xpy_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReRe
-                #        erigrad_xmy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_x_real,
-                #                                     den_mat_for_fock_xmy_p_xmyT_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImIm
-                #        erigrad_xmy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_x_imag,
-                #                                     den_mat_for_fock_xmy_p_xmyT_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReIm
-                #        erigrad_xmy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_x_real,
-                #                                     den_mat_for_fock_xmy_p_xmyT_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImRe
-                #        erigrad_xmy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_x_imag,
-                #                                     den_mat_for_fock_xmy_p_xmyT_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReRe
-                #        erigrad_xmy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_p_xmyT_x_real,
-                #                                     den_mat_for_fock_xmy_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImIm
-                #        erigrad_xmy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_p_xmyT_x_imag,
-                #                                     den_mat_for_fock_xmy_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ReIm
-                #        erigrad_xmy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_p_xmyT_x_real,
-                #                                     den_mat_for_fock_xmy_y_imag, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-                #        # ImRe
-                #        erigrad_xmy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
-                #                                     screener,
-                #                                     den_mat_for_fock_xmy_p_xmyT_x_imag,
-                #                                     den_mat_for_fock_xmy_y_real, iatom,
-                #                                     fock_type, exchange_scaling_factor,
-                #                                     0.0, thresh_int)
-
-                #        # DEBUG
-                #        for a in range(natm):
-                #            # eri rel
-                #            pyscf_eri_grad_rel[x, y, iatom, a] += 2.0 * np.linalg.multi_dot([
-                #                    gs_dm.reshape(nao**2), d_eri[a].reshape( nao**2, nao**2),
-                #                    2.0 * rel_dm_ao[x, y].reshape(nao**2)
-                #                ]) - 1.0 * frac_K * np.linalg.multi_dot([
-                #                    gs_dm.reshape(nao**2),
-                #                    d_eri[a].transpose(0, 3, 1, 2).reshape( nao**2, nao**2),
-                #                    2.0 * rel_dm_ao[x, y].reshape(nao**2)
-                #                ])
-                #            # eri x plus y
-                #            pyscf_eri_grad_xpy_xy[x, y, iatom, a] += 1.0 * np.linalg.multi_dot([
-                #                    x_plus_y[x].reshape(nao**2),
-                #                    d_eri[a].transpose(2, 3, 1, 0).reshape(
-                #                        nao**2, nao**2),
-                #                    (x_plus_y[y] - x_plus_y[y].T).reshape(
-                #                        nao**2)
-                #                ]) - 0.5 * frac_K * np.linalg.multi_dot([
-                #                    x_plus_y[x].reshape(nao**2),
-                #                    d_eri[a].transpose(2, 1, 3, 0).reshape(nao**2, nao**2),
-                #                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)
-                #                ])
-                #            pyscf_eri_grad_xpy_yx[x, y, iatom, a] += 1.0 * np.linalg.multi_dot([
-                #                    (x_plus_y[x] - x_plus_y[x].T).reshape(nao**2),
-                #                    d_eri[a].transpose( 1, 0, 2, 3).reshape(nao**2, nao**2),
-                #                    x_plus_y[y].reshape(nao**2)
-                #                ]) - 0.5 * frac_K * np.linalg.multi_dot([
-                #                    (x_plus_y[x] - x_plus_y[x].T).reshape(nao**2),
-                #                    d_eri[a].transpose(3, 0, 2, 1).reshape(nao**2, nao**2),
-                #                    x_plus_y[y].reshape(nao**2)
-                #                ])
-                #            # eri x minus y
-                #            pyscf_eri_grad_xmy_xy[x, y, iatom, a] += 1.0 * np.linalg.multi_dot([
-                #                    x_minus_y[x].reshape(nao**2),
-                #                    d_eri[a].transpose(2, 3, 1, 0).reshape(
-                #                        nao**2, nao**2),
-                #                    (x_minus_y[y] + x_minus_y[y].T).reshape(
-                #                        nao**2)
-                #                ]) - 0.5 * frac_K * np.linalg.multi_dot([
-                #                    x_minus_y[x].reshape(nao**2),
-                #                    d_eri[a].transpose(2, 1, 3, 0).reshape(
-                #                        nao**2, nao**2),
-                #                    (x_minus_y[y] + x_minus_y[y].T).reshape(
-                #                        nao**2)
-                #                ])
-                #            pyscf_eri_grad_xmy_yx[x, y, iatom, a] += 1.0 * np.linalg.multi_dot([
-                #                    (x_minus_y[x] + x_minus_y[x].T
-                #                    ).reshape(nao**2), d_eri[a].transpose(
-                #                        1, 0, 2, 3).reshape(nao**2, nao**2),
-                #                    x_minus_y[y].reshape(nao**2)
-                #                ]) - 0.5 * frac_K * np.linalg.multi_dot([
-                #                    (x_minus_y[x] + x_minus_y[x].T
-                #                    ).reshape(nao**2), d_eri[a].transpose(
-                #                        3, 0, 2, 1).reshape(nao**2, nao**2),
-                #                    x_minus_y[y].reshape(nao**2)
-                #                ])
-                #        vlx_eri_grad_rel_real[x, y, iatom] += (
-                #                np.array(erigrad_rel_re))
-                #        vlx_eri_grad_xpy_xy_real[x, y, iatom] += 0.5 * (
-                #                np.array(erigrad_xpy_xy_rere)
-                #                 - np.array(erigrad_xpy_xy_imim) )
-                #        vlx_eri_grad_xpy_yx_real[x, y, iatom] += 0.5 * (
-                #                np.array(erigrad_xpy_yx_rere)
-                #                - np.array(erigrad_xpy_yx_imim) )
-                #        vlx_eri_grad_xmy_xy_real[x, y, iatom] += 0.5 * (
-                #                np.array(erigrad_xmy_xy_rere)
-                #                - np.array(erigrad_xmy_xy_imim))
-                #        vlx_eri_grad_xmy_yx_real[x, y, iatom] += 0.5 * (
-                #                np.array(erigrad_xmy_yx_rere)
-                #                - np.array(erigrad_xmy_yx_imim) )
-                #        print('rel dm')
-                #        print(np.max(np.abs(pyscf_eri_grad_rel[x,y,iatom].real -
-                #                            vlx_eri_grad_rel_real[x, y, iatom])))
-                #        print('xpy xy')
-                #        print(np.max(np.abs(pyscf_eri_grad_xpy_xy[x,y,iatom].real -
-                #                            vlx_eri_grad_xpy_xy_real[x, y, iatom])))
-                #        print('xpy yx')
-                #        print(np.max(np.abs(pyscf_eri_grad_xpy_yx[x,y,iatom].real -
-                #                            vlx_eri_grad_xpy_yx_real[x, y, iatom])))
-                #        print('xmy xy')
-                #        print(np.max(np.abs(pyscf_eri_grad_xmy_xy[x,y,iatom].real -
-                #                            vlx_eri_grad_xmy_xy_real[x, y, iatom])))
-                #        print('xmy yx')
-                #        print(np.max(np.abs(pyscf_eri_grad_xmy_yx[x,y,iatom].real -
-                #                            vlx_eri_grad_xmy_yx_real[x, y, iatom])))
-                #        print('pyscf xmy yx')
-                #        print(pyscf_eri_grad_xmy_yx[x, y, iatom].real)
-                #        print('vlx xmy yx')
-                #        print(vlx_eri_grad_xmy_yx_real[x, y, iatom])
-                #        print()
-                #        #tmp_scf_gradient[x, y, iatom] += (
-                #        #        np.array(erigrad_rel)*factor)
-                #        #tmp_scf_gradient[x, y, iatom] += 0.5 * (
-                #        #        np.array(erigrad_xpy_xy) * factor)
-                #        #tmp_scf_gradient[x, y, iatom] += 0.5 * (
-                #        #        np.array(erigrad_xpy_yx) * factor)
-                #        #tmp_scf_gradient[x, y, iatom] += 0.5 * (
-                #        #        np.array(erigrad_xmy_xy) * factor)
-                #        #tmp_scf_gradient[x, y, iatom] += 0.5 * (
-                #        #        np.array(erigrad_xmy_yx) * factor)
-
-                #        # Real fmat contribution to gradient
-                #        erigrad_real = np.array(erigrad_rel_re) # real DM
-                #        erigrad_real += 0.5 * np.array(erigrad_xpy_xy_rere) # ReRe
-                #        erigrad_real -= 0.5 * np.array(erigrad_xpy_xy_imim) # ImIm
-                #        erigrad_real += 0.5 * np.array(erigrad_xpy_yx_rere) # ReRe
-                #        erigrad_real -= 0.5 * np.array(erigrad_xpy_yx_imim) # ImIm
-                #        erigrad_real += 0.5 * np.array(erigrad_xmy_xy_rere) # ReRe
-                #        erigrad_real -= 0.5 * np.array(erigrad_xmy_xy_imim) # ImIm
-                #        erigrad_real += 0.5 * np.array(erigrad_xmy_yx_rere) # ReRe
-                #        erigrad_real -= 0.5 * np.array(erigrad_xmy_yx_imim) # ImIm
-                #        erigrad_real *= factor
-
-                #        # Imaginary fmat contribution to gradient
-                #        erigrad_imag = np.array(erigrad_rel_im) # imag DM
-                #        erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_reim) # ReIm
-                #        erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_imre) # ImRe
-                #        erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_reim) # ReIm
-                #        erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_imre) # ImRe
-                #        erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_reim) # ReIm
-                #        erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_imre) # ImRe
-                #        erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_reim) # ReIm
-                #        erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_imre) # ImRe
-                #        erigrad_imag *= factor
-
-                #        # add to complex variable
-                #        #tmp_scf_gradient[x, y, iatom] += erigrad_real + 1j * erigrad_imag
-
-                #        if (y != x):
-                #            tmp_scf_gradient[y, x, iatom] += tmp_scf_gradient[x, y, iatom]
-
-                eri_contrib = self.compute_eri_contrib_complex(molecule, basis, gs_dm,
-                                        rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
-
-                pol_gradient = tmp_scf_gradient + eri_contrib
-            else:
-                gs_dm = None
-                rel_dm_ao = None
-                x_minus_y = None
-                pol_gradient = None
-
-            gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
-
-            if self._dft:
-                xcfun_label = self.xcfun.get_func_label()
-                # compute the XC contribution
-                polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
-                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
-
-                # add contribution to the SCF polarizability gradient
-                if self.rank == mpi_master():
-                    pol_gradient += polgrad_xc_contrib
-
-            if self.rank == mpi_master():
-                polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
-
-        if self.rank == mpi_master():
-            self.polgradient = dict(polgrad_results)
+            n_freqs = len(self.frequencies)
 
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += '{:d} frequencies: {:.6f} sec **'.format(
@@ -1210,19 +596,7 @@ class PolarizabilityGradient():
         :return eri_deriv_contrib:
             The ERI derivative integral contribution to the polarizability gradient.
         """
-
-        #if self._dft:
-        #    # TODO: range-separated Fock
-        #    if self.xcfun.is_hybrid():
-        #        fock_type = '2jkx'
-        #        exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
-        #    else:
-        #        fock_type = 'j'
-        #        exchange_scaling_factor = 0.0
-        #else:
-        #    exchange_scaling_factor = 1.0
-        #    fock_type = "2jk"
-
+       
         fock_type, exchange_scaling_factor = self.get_fock_type_and_x_frac()
 
         # scaling of ERI gradient for non-hybrid functionals
@@ -1244,9 +618,6 @@ class PolarizabilityGradient():
 
         # number of atomic orbitals
         natm = molecule.number_of_atoms()
-
-        # atom partitioning for parallelization
-        #local_atoms = partition_atoms(natm, self.rank, self.nodes)
 
         # degrees of freedom
         dof = len(self.vector_components)
@@ -1333,8 +704,10 @@ class PolarizabilityGradient():
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx) * factor
 
                 # symmetric
-                if (y != x):
-                    eri_deriv_contrib[y, x, iatom] += eri_deriv_contrib[x, y, iatom]
+                #if (y != x):
+                #    eri_deriv_contrib[y, x, iatom] += eri_deriv_contrib[x, y, iatom]
+
+        eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
 
         return eri_deriv_contrib
 
@@ -1363,17 +736,8 @@ class PolarizabilityGradient():
             The ERI derivative integral contribution to the polarizability gradient.
         """
 
-        if self._dft:
-            # TODO: range-separated Fock
-            if self.xcfun.is_hybrid():
-                fock_type = '2jkx'
-                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
-            else:
-                fock_type = 'j'
-                exchange_scaling_factor = 0.0
-        else:
-            exchange_scaling_factor = 1.0
-            fock_type = "2jk"
+        # Fock type and sclaing of exact exhange
+        fock_type, exchange_scaling_factor = self.get_fock_type_and_x_frac()
 
         # scaling of ERI gradient for non-hybrid functionals
         factor = 2.0 if fock_type == 'j' else 1.0
@@ -1395,9 +759,6 @@ class PolarizabilityGradient():
         # number of atomic orbitals
         natm = molecule.number_of_atoms()
 
-        # atom partitioning for parallelization
-        #local_atoms = partition_atoms(natm, self.rank, self.nodes)
-
         # degrees of freedom
         dof = len(self.vector_components)
 
@@ -1406,7 +767,6 @@ class PolarizabilityGradient():
 
         eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
-        # ERI gradient
         for iatom in local_atoms:
             # screening
             screener_atom = T4CScreener()
@@ -1623,8 +983,10 @@ class PolarizabilityGradient():
                 eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
 
                 # symmetric
-                if (y != x):
-                    eri_deriv_contrib[y, x, iatom] += eri_deriv_contrib[x, y, iatom]
+                #if (y != x):
+                #    eri_deriv_contrib[y, x, iatom] += eri_deriv_contrib[x, y, iatom]
+
+        eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
 
         return eri_deriv_contrib
 
@@ -2108,6 +1470,7 @@ class PolarizabilityGradient():
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
             mol_grid, xcfun_label)
+
         polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
 
         return polgrad_xcgrad
