@@ -25,6 +25,10 @@
 import numpy as np
 import time as tm
 
+from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import OverlapGeom200Driver
+from .veloxchemlib import OverlapGeom101Driver
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .griddriver import GridDriver
 from .hessiandriver import HessianDriver
@@ -34,8 +38,6 @@ from .hessianorbitalresponse import HessianOrbitalResponse
 from .profiler import Profiler
 from .matrices import Matrices
 from .dftutils import get_default_grid_level
-from .veloxchemlib import mpi_master
-from .veloxchemlib import XCMolecularHessian
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 
@@ -44,7 +46,6 @@ from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import OverlapGeom100Driver
 
 # For PySCF integral derivatives
-from .import_from_pyscf import overlap_second_deriv
 from .import_from_pyscf import hcore_second_deriv
 from .import_from_pyscf import eri_second_deriv
 from .import_from_pyscf import dipole_deriv
@@ -434,6 +435,9 @@ class ScfHessianDriver(HessianDriver):
                                                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
+        ovlp_hess_200_drv = OverlapGeom200Driver()
+        ovlp_hess_101_drv = OverlapGeom101Driver()
+
         if self.rank == mpi_master():
             t2 = tm.time()
             self.ostream.print_info('First order derivative contributions'
@@ -444,12 +448,50 @@ class ScfHessianDriver(HessianDriver):
 
             # Parts related to second-order integral derivatives
             hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
+
             for i in range(natm):
+
+                ovlp_hess_200_mats = ovlp_hess_200_drv.compute(molecule, ao_basis, i)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        ovlp_label = label_x + label_y if x <= y else label_y + label_x
+                        ovlp_iixy = ovlp_hess_200_mats.matrix_to_numpy(ovlp_label)
+                        # mn,xymn->xy
+                        hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
+                                np.sum(omega_ao * (ovlp_iixy + ovlp_iixy.T)))
+
+                ovlp_hess_200_mats = Matrices()
+
                 # do only upper triangular matrix
                 for j in range(i, natm):
-                    # Get integral second-order derivatives
-                    ovlp_2nd_deriv_ii, ovlp_2nd_deriv_ij = overlap_second_deriv(
-                                                    molecule, ao_basis, i, j)
+
+                    ovlp_hess_101_mats = ovlp_hess_101_drv.compute(molecule, ao_basis, i, j)
+
+                    for x, label_x in enumerate('XYZ'):
+                        for y, label_y in enumerate('XYZ'):
+                            ovlp_label = f'{label_x}_{label_y}' if x <= y else f'{label_y}_{label_x}'
+                            ovlp_ijxy = ovlp_hess_101_mats.matrix_to_numpy(ovlp_label)
+                            # mn,xymn->xy
+                            hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                                    np.sum(omega_ao * (ovlp_ijxy + ovlp_ijxy.T)))
+
+                    ovlp_hess_101_mats = Matrices()
+
+                    """
+                    np.set_printoptions(suppress=True, precision=5)
+                    print()
+                    for x, label_x in enumerate('XYZ'):
+                        for y, label_y in enumerate('XYZ'):
+                            ovlp_label = f'{label_x}_{label_y}' if x <= y else f'{label_y}_{label_x}'
+                            ovlp_hess_101_mats_xy = ovlp_hess_101_mats.matrix_to_numpy(ovlp_label)
+                            val_1 = np.sum(omega_ao * (ovlp_hess_101_mats_xy + ovlp_hess_101_mats_xy.T))
+                            val_2 = np.sum(omega_ao * ovlp_2nd_deriv_ij[x, y])
+                            maxdiff = np.max(np.abs(ovlp_2nd_deriv_ij[x, y] - (ovlp_hess_101_mats_xy + ovlp_hess_101_mats_xy.T)))
+                            print(f'{ovlp_label}: {abs(val_1 - val_2):.7f}')
+                    print()
+                    """
+
                     hcore_2nd_deriv_ij = hcore_second_deriv(
                                             molecule, ao_basis, i, j)
                     eri_2nd_deriv_ii, eri_2nd_deriv_ij = eri_second_deriv(
@@ -465,12 +507,6 @@ class ScfHessianDriver(HessianDriver):
                         aux_ii_Fock_2nd_deriv_k = np.zeros((3, 3, nao, nao))
                         for x in range(3):
                             for y in range(3):
-                                # mn,xymn->xy
-                                hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
-                                        np.linalg.multi_dot([
-                                            omega_ao.reshape(nao**2), 
-                                            ovlp_2nd_deriv_ii[x, y].reshape(nao**2)])
-                                        )
                                 # kl,xymnkl->xymn
                                 aux_ii_Fock_2nd_deriv_j[x, y] = np.linalg.multi_dot([
                                     density.reshape(nao**2), 
@@ -520,11 +556,6 @@ class ScfHessianDriver(HessianDriver):
                                     np.linalg.multi_dot([
                                         density.reshape(nao**2),
                                         aux_ij_Fock_2nd_deriv_k[x, y].reshape(nao**2)]))
-                            # mn,xymn->xy
-                            hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
-                                    np.linalg.multi_dot([
-                                        omega_ao.reshape(nao**2),
-                                        ovlp_2nd_deriv_ij[x, y].reshape(nao**2)]))
                             # mn,xymn->xy
                             hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
                                     np.linalg.multi_dot([
