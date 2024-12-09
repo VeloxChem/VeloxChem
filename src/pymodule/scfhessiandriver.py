@@ -28,6 +28,12 @@ import time as tm
 from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import OverlapGeom200Driver
 from .veloxchemlib import OverlapGeom101Driver
+from .veloxchemlib import KineticEnergyGeom200Driver
+from .veloxchemlib import KineticEnergyGeom101Driver
+from .veloxchemlib import NuclearPotentialGeom200Driver
+from .veloxchemlib import NuclearPotentialGeom020Driver
+from .veloxchemlib import NuclearPotentialGeom110Driver
+from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
@@ -441,6 +447,14 @@ class ScfHessianDriver(HessianDriver):
         ovlp_hess_200_drv = OverlapGeom200Driver()
         ovlp_hess_101_drv = OverlapGeom101Driver()
 
+        kin_hess_200_drv = KineticEnergyGeom200Driver()
+        kin_hess_101_drv = KineticEnergyGeom101Driver()
+
+        npot_hess_200_drv = NuclearPotentialGeom200Driver()
+        npot_hess_020_drv = NuclearPotentialGeom020Driver()
+        npot_hess_110_drv = NuclearPotentialGeom110Driver()
+        npot_hess_101_drv = NuclearPotentialGeom101Driver()
+
         fock_hess_2000_drv = FockGeom2000Driver()
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
@@ -474,6 +488,24 @@ class ScfHessianDriver(HessianDriver):
 
                 ovlp_hess_200_mats = Matrices()
 
+                kin_hess_200_mats = kin_hess_200_drv.compute(molecule, ao_basis, i)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        #kin_label = label_x + label_y if x <= y else label_y + label_x
+                        #kin_iixy = kin_hess_200_mats.matrix_to_numpy(kin_label)
+                        pass
+
+                npot_hess_200_mats = npot_hess_200_drv.compute(molecule, ao_basis, i)
+                npot_hess_020_mats = npot_hess_020_drv.compute(molecule, ao_basis, i)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        #npot_label = label_x + label_y if x <= y else label_y + label_x
+                        #npot_200_iixy = npot_hess_200_mats.matrix_to_numpy(npot_label)
+                        #npot_020_iixy = npot_hess_020_mats.matrix_to_numpy(npot_label)
+                        pass
+
                 # TODO: atom screening
                 # TODO: in-place accumulation with two densities
                 # TODO: pure and hybrid functionals
@@ -503,6 +535,19 @@ class ScfHessianDriver(HessianDriver):
 
                     ovlp_hess_101_mats = Matrices()
 
+                    kin_hess_101_mats = kin_hess_101_drv.compute(molecule, ao_basis, i, j)
+
+                    npot_hess_110_mats_ij = npot_hess_110_drv.compute(molecule, ao_basis, i, j)
+                    npot_hess_110_mats_ji = npot_hess_110_drv.compute(molecule, ao_basis, j, i)
+                    npot_hess_101_mats = npot_hess_101_drv.compute(molecule, ao_basis, i, j)
+
+                    for x, label_x in enumerate('XYZ'):
+                        for y, label_y in enumerate('XYZ'):
+                            #npot_label = f'{label_x}_{label_y}'
+                            #npot_110_ijxy = npot_hess_110_mats.matrix_to_numpy(npot_label)
+                            #npot_101_ijxy = npot_hess_101_mats.matrix_to_numpy(npot_label)
+                            pass
+
                     fock_hess_1100_mats = fock_hess_1100_drv.compute(ao_basis, molecule, den_mat_for_fock, i, j, fock_type, 0.0, 0.0)
                     fock_hess_1010_mats = fock_hess_1010_drv.compute(ao_basis, molecule, den_mat_for_fock, i, j, fock_type, 0.0, 0.0)
 
@@ -523,11 +568,41 @@ class ScfHessianDriver(HessianDriver):
 
                     for x, label_x in enumerate('XYZ'):
                         for y, label_y in enumerate('XYZ'):
-                            # mn,xymn->xy
-                            hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
-                                    np.linalg.multi_dot([
-                                        density.reshape(nao**2),
-                                        hcore_2nd_deriv_ij[x, y].reshape(nao**2)]))
+
+                            if i != j:
+
+                                #kin_label = label_x + label_y if x <= y else label_y + label_x
+                                #kin_200_iixy = kin_hess_200_mats.matrix_to_numpy(kin_label)
+
+                                #npot_label = label_x + label_y if x <= y else label_y + label_x
+                                #npot_200_iixy = npot_hess_200_mats.matrix_to_numpy(npot_label)
+                                #npot_020_iixy = npot_hess_020_mats.matrix_to_numpy(npot_label)
+
+                                kin_label = f'{label_x}_{label_y}'
+                                kin_101_ijxy = kin_hess_101_mats.matrix_to_numpy(kin_label)
+
+                                npot_label = f'{label_x}_{label_y}'
+                                npot_110_ijxy_i = npot_hess_110_mats_ij.matrix_to_numpy(npot_label)
+                                npot_101_ijxy = npot_hess_101_mats.matrix_to_numpy(npot_label)
+
+                                npot_yx_label = f'{label_y}_{label_x}'
+                                npot_110_ijxy_j = npot_hess_110_mats_ji.matrix_to_numpy(npot_yx_label)
+
+                                hcore_hess_xy = (
+                                      + kin_101_ijxy    + kin_101_ijxy.T
+                                      - npot_110_ijxy_i - npot_110_ijxy_i.T
+                                      - npot_110_ijxy_j - npot_110_ijxy_j.T
+                                      - npot_101_ijxy   - npot_101_ijxy.T
+                                      )
+
+                                hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                                    np.sum(density * hcore_hess_xy))
+
+                            else:
+
+                                # mn,xymn->xy
+                                hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                                    np.sum(density * hcore_2nd_deriv_ij[x, y]))
 
                 # lower triangle is transpose of the upper part
                 for j in range(i):
