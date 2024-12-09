@@ -33,6 +33,7 @@ from .veloxchemlib import BasisFunction
 from .veloxchemlib import MolecularBasis
 from .veloxchemlib import tensor_order
 from .veloxchemlib import chemical_element_name
+from .veloxchemlib import chemical_element_identifier
 
 
 def _known_aliases_for_basis_sets():
@@ -211,7 +212,7 @@ def _read_basis_file(basis_name, basis_path, ostream):
     return basis_dict
 
 
-def _gen_basis_key(elem_id, basis_dict):
+def _gen_basis_key(elem_name, basis_dict):
     """
     Generates basis set key for given chemical element.
 
@@ -224,12 +225,11 @@ def _gen_basis_key(elem_id, basis_dict):
         The basis set key.
     """
 
-    basis_key = 'atombasis_{}'.format(chemical_element_name(elem_id).lower())
+    basis_key = 'atombasis_{}'.format(elem_name.lower())
     assert_msg_critical(
         basis_key in basis_dict,
         'MolecularBasis.read: Unsupported chemical element ' +
-        f'{chemical_element_name(elem_id)} in ' +
-        basis_dict['basis_set_name'].upper())
+        f'{elem_name} in ' + basis_dict['basis_set_name'].upper())
 
     return basis_key
 
@@ -264,7 +264,12 @@ def _MolecularBasis_read(molecule,
 
     basis_dict = {}
 
-    atom_basis_labels = molecule.get_atom_basis_labels()
+    atom_basis_labels = []
+    atom_basis_elements = []
+
+    for bas_label, bas_elem in molecule.get_atom_basis_labels():
+        atom_basis_labels.append(bas_label)
+        atom_basis_elements.append(bas_elem)
 
     # read atom basis sets defined in molecule
     for atom_bas_label in set(atom_basis_labels):
@@ -287,10 +292,17 @@ def _MolecularBasis_read(molecule,
             if atom_bas_label == '':
                 atom_bas_label = basis_name.upper()
 
-        basis_key = _gen_basis_key(elem_id, basis_dict[atom_bas_label])
+        basis_key = _gen_basis_key(atom_basis_elements[idx],
+                                   basis_dict[atom_bas_label])
+
+        if elem_id == 0:
+            basis_elem_id = chemical_element_identifier(
+                atom_basis_elements[idx])
+        else:
+            basis_elem_id = elem_id
 
         atom_basis = _read_atom_basis(basis_dict[atom_bas_label][basis_key],
-                                      elem_id, atom_bas_label)
+                                      basis_elem_id, atom_bas_label)
 
         mol_basis.add(atom_basis)
 
@@ -331,17 +343,21 @@ def _MolecularBasis_read_dict(molecule,
 
     mol_basis = MolecularBasis()
 
+    atom_basis_elements = []
+    for bas_label, bas_elem in molecule.get_atom_basis_labels():
+        atom_basis_elements.append(bas_elem)
+
     for index, elem_id in enumerate(molecule.get_identifiers()):
         idxstr = str(index + 1)
         if idxstr in basis_dict:
             lbasis_name = basis_dict[idxstr]
             lbasis_dict = _read_basis_file(lbasis_name, basis_path, ostream)
-            basis_key = _gen_basis_key(elem_id, lbasis_dict)
+            basis_key = _gen_basis_key(atom_basis_elements[index], lbasis_dict)
             atom_basis = _read_atom_basis(lbasis_dict[basis_key], elem_id,
                                           lbasis_name)
             mol_basis.add(atom_basis)
         else:
-            basis_key = _gen_basis_key(elem_id, mbasis_dict)
+            basis_key = _gen_basis_key(atom_basis_elements[index], mbasis_dict)
             atom_basis = _read_atom_basis(mbasis_dict[basis_key], elem_id,
                                           basis_name)
             mol_basis.add(atom_basis)

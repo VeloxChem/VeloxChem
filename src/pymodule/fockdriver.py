@@ -24,10 +24,12 @@
 
 from mpi4py import MPI
 from os import environ
+import math
 import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import _FockDriver
+from .veloxchemlib import T4CScreener
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -87,6 +89,29 @@ class FockDriver:
         translated_ranks = subcomm.allgather(self.comm.Get_rank())
 
         return all((rank in range(self.nodes)) for rank in translated_ranks)
+
+    def compute_eri(self, molecule, basis, eri_thresh=1.0e-12):
+        """
+        Computes ERI as a 4D array.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param eri_thresh:
+            The ERI screening threshold.
+
+        :return:
+            ERI as a 4D array.
+        """
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(basis, molecule, 'eri')
+
+        naos = basis.get_dimensions_of_basis()
+        thresh_int = int(-math.log10(eri_thresh))
+
+        return self._fock_drv.compute_eri(t4c_drv, naos, thresh_int)
 
     def _compute_fock_omp(self, *args):
 

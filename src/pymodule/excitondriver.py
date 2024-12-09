@@ -29,10 +29,6 @@ import time as tm
 import math
 import sys
 
-from .oneeints import compute_nuclear_potential_integrals
-from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import compute_linear_momentum_integrals
-from .veloxchemlib import compute_angular_momentum_integrals
 from .veloxchemlib import KineticEnergyDriver, XCIntegrator
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import (hartree_in_ev, bohr_in_angstrom,
@@ -46,6 +42,10 @@ from .outputstream import OutputStream
 from .molecule import Molecule
 from .scfrestdriver import ScfRestrictedDriver
 from .rspabsorption import Absorption
+from .oneeints import (compute_nuclear_potential_integrals,
+                       compute_electric_dipole_integrals,
+                       compute_linear_momentum_integrals,
+                       compute_angular_momentum_integrals)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
 from .dftutils import get_default_grid_level

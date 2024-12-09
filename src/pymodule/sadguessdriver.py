@@ -741,13 +741,40 @@ class SadGuessDriver:
 
     def get_alpha_beta_occ_for_molecule(self, molecule, net_charge,
                                         num_unpaired_electrons):
+        """
+        Gets alpha and beta occupation numbers for atoms.
 
-        partial_charges = molecule.get_partial_charges(net_charge)
+        :param molecule:
+            The molecule.
+        :param net_charge:
+            The net charge of the molecule.
+        :param num_unpaired_electrons:
+            The number of unpaired electrons.
+
+        :return:
+            A tuple containing alpha and beta occupation numbers.
+        """
+
+        # generate partial charges
+        # note that the ghost atoms need to be properly excluded
+
+        natoms = molecule.number_of_atoms()
+        identifiers = molecule.get_identifiers()
+
+        list_of_real_atoms = [a for a in range(natoms) if identifiers[a] > 0]
+
+        sub_molecule = molecule.slice(list_of_real_atoms)
+        sub_partial_charges = sub_molecule.get_partial_charges(net_charge)
+
+        partial_charges = np.zeros(natoms)
+        for i, a in enumerate(list_of_real_atoms):
+            partial_charges[a] = sub_partial_charges[i]
+
+        # generate alpha and beta occupation numbers
 
         elem_ids = molecule.get_element_ids()
         sum_elem_ids = sum(elem_ids)
 
-        natoms = molecule.number_of_atoms()
         use_hint_for_unpaired_electrons = (len(
             self._num_unpaired_electrons_on_atoms) == natoms)
 
@@ -885,6 +912,10 @@ class SadGuessDriver:
 
             naodim_1 = len(aoinds_1)
             naodim_2 = len(aoinds_2)
+
+            # skip ghost atom
+            if (not alpha_occ[atomidx]) and (not beta_occ[atomidx]):
+                continue
 
             err_ao_size = 'SadGuessDriver._comp_sad_guess: '
             err_ao_size += 'Mismatch between basis set and occupation number'

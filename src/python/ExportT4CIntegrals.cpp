@@ -27,6 +27,7 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
+#include "ExportGeneral.hpp"
 #include "FockDriver.hpp"
 #include "FockGeomX000Driver.hpp"
 #include "T4CScreener.hpp"
@@ -45,6 +46,16 @@ export_t4cintegrals(py::module& m)
     PyClass<CFockDriver>(m, "_FockDriver")
         .def(py::init<>())
         .def("_set_block_size_factor", &CFockDriver::set_block_size_factor, "Sets block size factor.")
+        .def(
+            "compute_eri",
+            [](const CFockDriver&  fock_drv,
+               const CT4CScreener& screener,
+               const int           nao,
+               const int           ithreshold) -> py::array_t<double> {
+                const auto eri_tensor = fock_drv.compute_eri(screener, nao, ithreshold);
+                return vlx_general::pointer_to_numpy(eri_tensor.values(), {eri_tensor.getiIndex(), eri_tensor.getjIndex(), eri_tensor.getkIndex(), eri_tensor.getlIndex()});
+            },
+            "Computes single Fock matrix of requested type for two-electron integrals screener.")
         .def(
             "_compute_fock_omp",
             [](const CFockDriver&     fock_drv,

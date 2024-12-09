@@ -416,6 +416,8 @@ class ShgDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
+        eri_dict = self._init_eri(molecule, ao_basis)
+
         dft_dict = self._init_dft(molecule, scf_results)
 
         # computing all compounded first-order densities
@@ -427,7 +429,7 @@ class ShgDriver(NonlinearSolver):
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, dft_dict, profiler)
+                                       ao_basis, eri_dict, dft_dict, profiler)
 
         profiler.check_memory_usage('Focks')
 
@@ -655,6 +657,7 @@ class ShgDriver(NonlinearSolver):
                       mo,
                       molecule,
                       ao_basis,
+                      eri_dict,
                       dft_dict=None,
                       profiler=None):
         """
@@ -673,6 +676,10 @@ class ShgDriver(NonlinearSolver):
             The molecule
         :param ao_basis:
             The AO basis set
+        :param eri_dict:
+            The dictionary containing ERI information
+        :param dft_dict:
+            The dictionary containing DFT information
 
         :return:
             A dictonary of compounded first-order two-time Fock-matrices. For
@@ -720,13 +727,14 @@ class ShgDriver(NonlinearSolver):
 
             if self.shg_type == 'reduced':
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
-                                                 dft_dict, first_order_dens,
+                                                 eri_dict, dft_dict,
+                                                 first_order_dens,
                                                  second_order_dens, None,
                                                  'shg_red', profiler)
             elif self.shg_type == 'full':
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', dft_dict,
-                                                 first_order_dens,
+                                                 'real_and_imag', eri_dict,
+                                                 dft_dict, first_order_dens,
                                                  second_order_dens, None, 'shg',
                                                  profiler)
 

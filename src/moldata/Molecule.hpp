@@ -28,6 +28,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "Point.hpp"
 
@@ -50,7 +51,7 @@ class CMolecule
     /// @param coordinates The vector of Cartesian coordinates of atoms.
     /// @param unit The unit used to define coordinates of atoms.
     /// @param atom_basis_labels The atom basis labels.
-    CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit, const std::vector<std::string>& atom_basis_labels);
+    CMolecule(const std::vector<int> &identifiers, const std::vector<TPoint<double>> &coordinates, const std::string &unit, const std::vector<std::pair<std::string, std::string>>& atom_basis_labels);
 
     /// @brief The constructor with two molecular fragments.
     /// @param molecule_one The first molecule to merge.
@@ -96,7 +97,7 @@ class CMolecule
     /// @param coordinates The coordinates of atom.
     /// @param unit The unit used to define coordinates of atoms.
     /// @param atom_basis_label The atom basis label.
-    auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit, const std::string& atom_basis_label) -> void;
+    auto add_atom(const int identifier, const TPoint<double> &coordinates, const std::string &unit, const std::pair<std::string, std::string>& atom_basis_label) -> void;
 
     /// @brief Slices given set of atoms into new molecule.
     /// @param atoms The vector of atom indices to be slinced.
@@ -150,7 +151,7 @@ class CMolecule
     auto identifiers() const -> std::vector<int>;
 
     /// Gets vector of atom basis set labels.
-    auto atom_basis_labels() const -> std::vector<std::string>;
+    auto atom_basis_labels() const -> std::vector<std::pair<std::string, std::string>>;
 
     /// @brief Gets vector Cartesian coordinates of atoms in molecule.
     /// @param unit The unit used to define coordinates of atoms.
@@ -236,7 +237,7 @@ class CMolecule
     std::vector<int> _identifiers;
 
     /// @brief The vector of atom basis set labels.
-    std::vector<std::string> _atom_basis_labels;
+    std::vector<std::pair<std::string, std::string>> _atom_basis_labels;
 
     /// @brief Checks if coordinates of atoms are given in Angstrom.
     /// @param unit The unit used to define coordinates of atoms.

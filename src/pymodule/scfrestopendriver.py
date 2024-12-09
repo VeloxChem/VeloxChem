@@ -322,12 +322,16 @@ class ScfRestrictedOpenDriver(ScfDriver):
             The string for spin unrestricted open shell SCF calculation.
         """
 
-        pe_type = " with PE" if self._pe else ""
+        if self.embedding_options is not None:
+            emb_type = ' with ' + self.embedding_options['settings'][
+                'embedding_method']
+        else:
+            emb_type = ''
 
         if self._dft:
-            return "Spin-Restricted Open-Shell Kohn-Sham" + pe_type
+            return "Spin-Restricted Open-Shell Kohn-Sham" + emb_type
 
-        return "Spin-Restricted Open-Shell Hartree-Fock" + pe_type
+        return "Spin-Restricted Open-Shell Hartree-Fock" + emb_type
 
     def __deepcopy__(self, memo):
         """

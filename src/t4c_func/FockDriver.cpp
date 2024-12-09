@@ -11,6 +11,7 @@
 #include "OpenMPFunc.hpp"
 #include "T4CMatricesDistributor.hpp"
 #include "T4CMatrixDistributor.hpp"
+#include "T4CEriTensorDistributor.hpp"
 
 auto
 CFockDriver::compute(const CMolecularBasis& basis,
@@ -69,6 +70,50 @@ CFockDriver::compute(const CMolecularBasis& basis,
     fock_mat.symmetrize();
 
     return fock_mat;
+}
+
+auto
+CFockDriver::compute_eri(const CT4CScreener& screener,
+                         const int           nao,
+                         const int           ithreshold) const -> CDense4DTensor
+{
+    // set up ERI tensor
+
+    auto eri_tensor = CDense4DTensor(nao, nao, nao, nao);
+
+    eri_tensor.zero();
+
+    auto ptr_screener = &screener;
+
+    auto ptr_eri_tensor = &eri_tensor;
+
+    auto bsfac = _determine_block_size_factor(nao);
+
+#pragma omp parallel shared(ptr_screener, ptr_eri_tensor)
+    {
+#pragma omp single nowait
+        {
+            auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
+
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, bsfac);
+
+            std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
+                const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
+                const auto ket_gpairs = gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
+                const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
+                const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
+                const bool diagonal   = (task[0] == task[1]) && (task[2] == task[3]) && (bra_range == ket_range);
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal)
+                {
+                    CT4CEriTensorDistributor distributor(ptr_eri_tensor);
+                    distributor.set_indices(bra_gpairs, ket_gpairs);
+                    erifunc::compute<CT4CEriTensorDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal);
+                }
+            });
+        }
+    }
+
+    return eri_tensor;
 }
 
 auto

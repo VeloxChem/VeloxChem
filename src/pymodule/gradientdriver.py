@@ -156,6 +156,7 @@ class GradientDriver:
 
         # atom coordinates (nx3)
         coords = molecule.get_coordinates_in_bohr()
+        atom_basis_labels = molecule.get_atom_basis_labels()
 
         # charge and spin multiplicity
         charge = molecule.get_charge()
@@ -167,26 +168,26 @@ class GradientDriver:
         for i in range(molecule.number_of_atoms()):
             for d in range(3):
                 coords[i, d] += self.delta_h
-                new_mol = Molecule(labels, coords, 'au')
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 e_plus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] -= 2.0 * self.delta_h
-                new_mol = Molecule(labels, coords, 'au')
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 e_minus = self.compute_energy(new_mol, *args)
 
                 if self.do_four_point:
                     coords[i, d] -= self.delta_h
-                    new_mol = Molecule(labels, coords, 'au')
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
                     e_minus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] += 4.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, 'au')
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
                     e_plus2 = self.compute_energy(new_mol, *args)
@@ -215,8 +216,6 @@ class GradientDriver:
         :return:
             The energy.
         """
-
-        # TODO: remove compute_energy and use grad_drv.get_energy()
 
         return
 
