@@ -219,8 +219,7 @@ class PolarizabilityGradient():
                 polgrad_sanity_check(self, self.flag, lr_results)
                 self.check_real_or_complex_input(lr_results)
             # compute
-            #self.compute_analytical(molecule, basis, scf_tensors, lr_results)
-            self.compute_analytical_vlx_integrals(molecule, basis, scf_tensors, lr_results)
+            self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
             self.print_geometry(molecule)
@@ -236,7 +235,7 @@ class PolarizabilityGradient():
     def compute_analytical_pyscf(self, molecule, basis, scf_tensors, lr_results):
         """
         Performs calculation of the both real and complex analytical
-        polarizability gradient.
+        polarizability gradient using pySCF integrals.
 
         :param molecule:
             The molecule.
@@ -334,7 +333,7 @@ class PolarizabilityGradient():
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
-
+           
     def compute_analytical(self, molecule, basis, scf_tensors, lr_results):
         """
         Performs calculation of the analytical polarizability gradient
@@ -405,9 +404,6 @@ class PolarizabilityGradient():
 
                 # WIP
                 tmp_scf_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-
-                # DFT-related
-                #frac_K = self.get_k_fraction()
 
                 # kinetic energy gradient driver
                 kin_grad_drv = KineticEnergyGeom100Driver()
@@ -616,7 +612,8 @@ class PolarizabilityGradient():
                 vlx_eri_grad_xmy_yx = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
                 # DFT-related
-                frac_K = self.get_k_fraction()
+                #frac_K = self.get_k_fraction()
+                dummy, frac_K = self.get_fock_type_and_x_frac()
 
                 # kinetic energy gradient driver
                 kin_grad_drv = KineticEnergyGeom100Driver()
@@ -1214,17 +1211,19 @@ class PolarizabilityGradient():
             The ERI derivative integral contribution to the polarizability gradient.
         """
 
-        if self._dft:
-            # TODO: range-separated Fock
-            if self.xcfun.is_hybrid():
-                fock_type = '2jkx'
-                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
-            else:
-                fock_type = 'j'
-                exchange_scaling_factor = 0.0
-        else:
-            exchange_scaling_factor = 1.0
-            fock_type = "2jk"
+        #if self._dft:
+        #    # TODO: range-separated Fock
+        #    if self.xcfun.is_hybrid():
+        #        fock_type = '2jkx'
+        #        exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+        #    else:
+        #        fock_type = 'j'
+        #        exchange_scaling_factor = 0.0
+        #else:
+        #    exchange_scaling_factor = 1.0
+        #    fock_type = "2jk"
+
+        fock_type, exchange_scaling_factor = self.get_fock_type_and_x_frac()
 
         # scaling of ERI gradient for non-hybrid functionals
         factor = 2.0 if fock_type == 'j' else 1.0
@@ -1797,7 +1796,9 @@ class PolarizabilityGradient():
 
         dof = len(self.vector_components)
 
-        frac_K = self.get_k_fraction()
+        #frac_K = self.get_k_fraction()
+        dummy, frac_K = self.get_fock_type_and_x_frac()
+
         scf_polgrad = np.zeros((dof, dof, 3), dtype=self.grad_dt)
 
         gradient_start_time = tm.time()
@@ -2237,6 +2238,30 @@ class PolarizabilityGradient():
             frac_k = 1.0
 
         return frac_k
+
+    def get_fock_type_and_x_frac(self):
+        """
+        Determines fock type and fraction of exact exchange.
+
+        :return fock_type:
+            Fock type for fock build.
+        :return exchange_scaling_factor:
+            The fraction of exact exchange.
+        """
+
+        if self._dft:
+            # TODO: range-separated Fock
+            if self.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+        else:
+            exchange_scaling_factor = 1.0
+            fock_type = "2jk"
+
+        return fock_type, exchange_scaling_factor
 
     def construct_numerical_gradient(self, molecule, ao_basis, scf_drv, lr_drv):
         """
