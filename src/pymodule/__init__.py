@@ -43,6 +43,7 @@ from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import XCMolecularGradient
+from .veloxchemlib import SubMatrix
 
 # for backward compatibility only
 from .veloxchemlib import ElectricDipoleIntegralsDriver
