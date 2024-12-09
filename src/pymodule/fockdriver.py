@@ -24,10 +24,12 @@
 
 from mpi4py import MPI
 from os import environ
+import math
 import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import _FockDriver
+from .veloxchemlib import T4CScreener
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -88,11 +90,34 @@ class FockDriver:
 
         return all((rank in range(self.nodes)) for rank in translated_ranks)
 
+    def compute_eri(self, molecule, basis, eri_thresh=1.0e-12):
+        """
+        Computes ERI as a 4D array.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param eri_thresh:
+            The ERI screening threshold.
+
+        :return:
+            ERI as a 4D array.
+        """
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(basis, molecule, 'eri')
+
+        naos = basis.get_dimensions_of_basis()
+        thresh_int = int(-math.log10(eri_thresh))
+
+        return self._fock_drv.compute_eri(t4c_drv, naos, thresh_int)
+
     def _compute_fock_omp(self, *args):
 
         return self._fock_drv._compute_fock_omp(*args)
 
-    def _set_block_size_factor(self, factor, naos):
+    def _set_block_size_factor(self, factor):
 
         assert_msg_critical(
             factor in [1, 2, 4, 8, 16, 32, 64, 128],
@@ -100,16 +125,11 @@ class FockDriver:
 
         total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
 
-        if total_cores >= 2048:
-            if naos >= 4500:
-                extra_factor = 4
-            else:
-                extra_factor = 2
-
-        elif total_cores >= 1024:
-            extra_factor = 2
-
-        else:
+        if total_cores < 1024:
             extra_factor = 1
+        elif total_cores < 4096:
+            extra_factor = 2
+        else:
+            extra_factor = 4
 
         self._fock_drv._set_block_size_factor(factor * extra_factor)

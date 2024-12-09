@@ -360,6 +360,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
+        eri_dict = self._init_eri(molecule, ao_basis)
+
         dft_dict = self._init_dft(molecule, scf_tensors)
 
         # computing all compounded first-order densities
@@ -371,7 +373,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, dft_dict)
+                                       ao_basis, eri_dict, dft_dict)
 
         profiler.check_memory_usage('Focks')
 
@@ -529,6 +531,7 @@ class QuadraticResponseDriver(NonlinearSolver):
                       mo,
                       molecule,
                       ao_basis,
+                      eri_dict,
                       dft_dict=None):
         """
         Computes the Fock matrices for a quadratic response function
@@ -545,6 +548,10 @@ class QuadraticResponseDriver(NonlinearSolver):
             The molecule
         :param ao_basis:
             The AO basis set
+        :param eri_dict:
+            The dictionary containing ERI information
+        :param dft_dict:
+            The dictionary containing DFT information
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -584,8 +591,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             time_start_fock = time.time()
 
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                             'real_and_imag', dft_dict,
-                                             first_order_dens,
+                                             'real_and_imag', eri_dict,
+                                             dft_dict, first_order_dens,
                                              second_order_dens, None, 'qrf')
 
             self._print_fock_time(time.time() - time_start_fock)

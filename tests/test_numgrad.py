@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import FockGeom1000Driver, T4CScreener
-from veloxchem.veloxchemlib import partition_atoms, make_matrix
+from veloxchem.veloxchemlib import make_matrix
 from veloxchem.veloxchemlib import mpi_master, mat_t
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -47,7 +47,8 @@ class TestNumericalGradient:
         tmat2 = scf_drv.comm.bcast(tmat2, root=mpi_master())
 
         natoms = mol.number_of_atoms()
-        local_atoms = partition_atoms(natoms, scf_drv.rank, scf_drv.nodes)
+
+        local_atoms = list(range(natoms))[scf_drv.rank::scf_drv.nodes]
 
         fock_grad_drv = FockGeom1000Driver()
 
@@ -90,6 +91,8 @@ class TestNumericalGradient:
 
             labels = mol.get_labels()
             coords = mol.get_coordinates_in_bohr()
+            atom_basis_labels = mol.get_atom_basis_labels()
+
             charge = mol.get_charge()
             multiplicity = mol.get_multiplicity()
 
@@ -100,7 +103,7 @@ class TestNumericalGradient:
             for i in range(mol.number_of_atoms()):
                 for d in range(3):
                     coords[i, d] += delta_h
-                    new_mol = Molecule(labels, coords, 'au')
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
 
@@ -117,7 +120,7 @@ class TestNumericalGradient:
                     f_plus = scf_drv.comm.reduce(f_plus, root=mpi_master())
 
                     coords[i, d] -= 2.0 * delta_h
-                    new_mol = Molecule(labels, coords, 'au')
+                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                     new_mol.set_charge(charge)
                     new_mol.set_multiplicity(multiplicity)
 

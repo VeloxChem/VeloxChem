@@ -60,7 +60,7 @@ from .import_from_pyscf import eri_deriv
 from .import_from_pyscf import dipole_deriv
 
 
-class PolarizabilityGradient():
+class PolarizabilityGradient:
     """
     Implements the dipole polarizability gradient.
 
@@ -115,6 +115,7 @@ class PolarizabilityGradient():
         self._dft = False
         self.grid_level = None
         self.xcfun = None
+        self._xcfun_ldstaging = 1024
 
         self.flag = 'Polarizability Gradient Driver'
         self.frequencies = (0,)

@@ -35,6 +35,7 @@ from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
+from .loprop import LoPropDriver
 from .scfgradientdriver import ScfGradientDriver
 from .tddftgradientdriver import TddftGradientDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
@@ -646,6 +647,12 @@ def main():
         vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
+
+    # LoProp
+
+    if task_type == 'loprop':
+        loprop_driver = LoPropDriver(task.mpi_comm, task.ostream)
+        loprop_driver.compute(task.molecule, task.ao_basis, scf_results)
 
     # RESP and ESP charges
 

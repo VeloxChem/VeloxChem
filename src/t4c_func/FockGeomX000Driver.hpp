@@ -97,7 +97,7 @@ class CFockGeomX000Driver
     auto set_block_size_factor(const int factor) -> void;
 
    private:
-    int _block_size_factor = 16;
+    int _block_size_factor = 4;
 
     auto _get_nao(const CMatrix& mat) const -> int;
 
@@ -346,19 +346,23 @@ template <int N>
 auto
 CFockGeomX000Driver<N>::_determine_block_size_factor(const int nao) const -> int
 {
-    if (nao < 450)
+    if (nao < 300)
+    {
+        return 32 * _block_size_factor;
+    }
+    else if (nao < 1500)
     {
         return 16 * _block_size_factor;
     }
-    else if (nao < 900)
+    else if (nao < 3000)
     {
         return 8 * _block_size_factor;
     }
-    else if (nao < 1800)
+    else if (nao < 6000)
     {
         return 4 * _block_size_factor;
     }
-    else if (nao < 3600)
+    else if (nao < 10000)
     {
         return 2 * _block_size_factor;
     }

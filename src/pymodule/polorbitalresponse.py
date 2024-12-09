@@ -157,16 +157,16 @@ class PolOrbitalResponse(CphfSolver):
         else:
             return None
 
-    def compute_rhs(self, molecule, basis, scf_tensors, lr_results):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
 
         if self.is_complex:
-            return self.compute_rhs_complex(molecule, basis, scf_tensors,
+            return self.compute_rhs_complex(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict,
                                             lr_results)
         else:
-            return self.compute_rhs_real(molecule, basis, scf_tensors,
+            return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict,
                                          lr_results)
 
-    def compute_rhs_complex(self, molecule, basis, scf_tensors, lr_results):
+    def compute_rhs_complex(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
         """
         Computes the complex right-hand side (RHS) of the polarizability
         orbital response equation including the necessary density matrices
@@ -517,7 +517,7 @@ class PolOrbitalResponse(CphfSolver):
         else:
             return {}
 
-    def compute_rhs_real(self, molecule, basis, scf_tensors, lr_results):
+    def compute_rhs_real(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
         """
         Computes the right-hand side (RHS) of the Real polarizability
         orbital response equation including the necessary density matrices

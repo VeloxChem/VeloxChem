@@ -345,15 +345,15 @@ angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
 {
     const auto angmom = ang_pair.first + ang_pair.second;
     
-    if (angmom > 8) return 64;
+    if (angmom > 8) return 128;
 
-    if (angmom > 6) return 128;
+    if (angmom > 6) return 256;
 
-    if (angmom > 4) return 256;
+    if (angmom > 4) return 512;
 
-    if (angmom > 2) return 512;
+    if (angmom > 2) return 1024;
     
-    return 1024;
+    return 2048;
 }
 
 auto

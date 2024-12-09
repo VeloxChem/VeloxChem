@@ -31,6 +31,7 @@ Contributors
 * Noah Deveaux
 * Magnus Ringholm
 * Thomas Fransson
+* Jonas Vester
 * Bastiaan van Hoorn
 * Gabriel L. S. Rodrigues
 * Mikael T. Scott
@@ -39,4 +40,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2024-11-08 by ``git shortlog -sn``
+The list of contributors was obtained 2024-12-06 by ``git shortlog -sn``

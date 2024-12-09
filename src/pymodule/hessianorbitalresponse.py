@@ -23,18 +23,20 @@
 
 # TODO: remove commented out code;
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time as tm
 import sys
 import math
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
 from .veloxchemlib import AODensityMatrix
-#from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import XCMolecularHessian
-from .veloxchemlib import make_matrix, mat_t, partition_atoms
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import mpi_master, denmat
+from .veloxchemlib import make_matrix, mat_t, partition_atoms
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver,
+                           NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .outputstream import OutputStream
 from .matrices import Matrices
 from .distributedarray import DistributedArray
@@ -44,19 +46,7 @@ from .inputparser import parse_input
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .dftutils import get_default_grid_level
-from scipy.sparse import linalg
 
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import vxc_deriv
-from .import_from_pyscf import eri_deriv
-from .import_from_pyscf import hcore_deriv
-
-# import veloxchem integrals
-from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
-NuclearPotentialGeom100Driver,
-NuclearPotentialGeom010Driver, FockGeom1000Driver)
 
 class HessianOrbitalResponse(CphfSolver):
     """
@@ -78,6 +68,7 @@ class HessianOrbitalResponse(CphfSolver):
         Initializes orbital response driver to default setup.
 
         """
+
         super().__init__(comm, ostream)
 
     def update_settings(self, cphf_dict, method_dict=None):
@@ -92,7 +83,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         super().update_settings(cphf_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, scf_drv):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict):
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
@@ -103,75 +94,73 @@ class HessianOrbitalResponse(CphfSolver):
             The AO basis set.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param scf_drv:
-            The scf_driver
 
         :returns:
             The RHS of the CPHF equations.
         """
 
-        # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
-        # PE information
-        pe_dict = self._init_pe(molecule, basis)
-
         self.profiler.start_timer('RHS')
 
-        # number of atoms
         natm = molecule.number_of_atoms()
-        nao = basis.get_dimensions_of_basis()
         nocc = molecule.number_of_alpha_electrons()
+        nao = basis.get_dimensions_of_basis()
 
         if self.rank == mpi_master():
             density = scf_tensors['D_alpha']
+            eocc = scf_tensors['E_alpha'][:nocc]
             mo = scf_tensors['C_alpha']
-            mo_energies = scf_tensors['E_alpha']
-            eocc = mo_energies[:nocc]
-            tmp_eocc = eocc.reshape(-1,1)
-            # DFT
-            gs_density = dft_dict['gs_density']
         else:
             density = None
-            mol_grid = None
-            gs_density = None
-            tmp_eocc = None
+            eocc = None
             mo = None
 
-        # DFT grid
-        mol_grid = dft_dict['molgrid'] 
-
         density = self.comm.bcast(density, root=mpi_master())
-        gs_density = self.comm.bcast(gs_density, root=mpi_master())
-        tmp_eocc = self.comm.bcast(tmp_eocc, root=mpi_master())
+        eocc = self.comm.bcast(eocc, root=mpi_master())
         mo = self.comm.bcast(mo, root=mpi_master())
 
+        # TODO: double check dft_dict['gs_density']
+        mol_grid = dft_dict['molgrid'] 
+        gs_density = [density]
+
         # MO coefficients
-        mo_occ = mo[:, :nocc]
-        mo_vir = mo[:, nocc:]
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
 
+        omega_ao = -1.0 * np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
+
         # partition atoms for parallellisation
+        # TODO: use partition_atoms in e.g. scfgradientdriver
         local_atoms = partition_atoms(natm, self.rank, self.nodes)
 
-        # preparing the CPHF RHS
-        ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
-        fock_deriv_ao = np.zeros((natm, 3, nao, nao))
+        atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
+        gathered_atom_idx_rank = self.comm.gather(atom_idx_rank)
+        if self.rank == mpi_master():
+            all_atom_idx_rank = []
+            for local_list in gathered_atom_idx_rank:
+                for elem in local_list:
+                    all_atom_idx_rank.append(elem)
+            all_atom_idx_rank = sorted(all_atom_idx_rank)
+        else:
+            all_atom_idx_rank = None
+        all_atom_idx_rank = self.comm.bcast(all_atom_idx_rank, root=mpi_master())
 
-        # import the integral derivatives
-        # For some reason the commented-out line results in a
-        # profiler error which I don't understand. Not sure why.
-        # It works if it's commented out. TODO: remove?
+        # preparing the CPHF RHS
+
+        ovlp_deriv_ao_dict = {(iatom, x): None
+                              for iatom in range(natm)
+                              for x in range(3)}
+
+        fock_deriv_ao_dict = {(iatom, x): None
+                              for iatom in range(natm)
+                              for x in range(3)}
+
+        # TODO: double check the use of profiler
         #self.profiler.set_timing_key('derivs')
         self.profiler.start_timer('derivs')
 
         t0 = tm.time()
 
-        if scf_drv._dft: 
-            xc_mol_hess = XCMolecularHessian()
-
-        # overlap gradient driver:
         ovlp_grad_drv = OverlapGeom100Driver()
 
         for iatom in local_atoms:
@@ -181,110 +170,197 @@ class HessianOrbitalResponse(CphfSolver):
 
             for x, label in enumerate(['X', 'Y', 'Z']):
                 gmat = gmats.matrix_to_numpy(label)
-                ovlp_deriv_ao[iatom, x] = gmat + gmat.T
+                ovlp_deriv_ao_dict[(iatom, x)] = gmat + gmat.T
 
-            gmat = Matrices()
+            gmats = Matrices()
 
-            # compute full Fock integrals  matrix
-            fock_deriv_ao[iatom] = self._compute_fmat_deriv(molecule, basis,
-                                                        scf_drv, density, iatom)
+            # compute full Fock integrals matrix
+            fock_deriv_ao_i = self._compute_fmat_deriv(
+                molecule, basis, density, iatom, eri_dict)
 
-            if scf_drv._dft:
+            fock_deriv_ao_dict[(iatom, 0)] = fock_deriv_ao_i[0]
+            fock_deriv_ao_dict[(iatom, 1)] = fock_deriv_ao_i[1]
+            fock_deriv_ao_dict[(iatom, 2)] = fock_deriv_ao_i[2]
+
+        # Note: Parallelization of DFT integration is done over grid points
+        # instead of atoms.
+
+        if self._dft:
+            xc_mol_hess = XCMolecularHessian()
+
+            for iatom, root_rank in all_atom_idx_rank:
                 vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
-                                    molecule, basis, gs_density, mol_grid,
-                                    scf_drv.xcfun.get_func_label(), iatom)
-                vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
+                    molecule, basis, gs_density, mol_grid,
+                    self.xcfun.get_func_label(), iatom)
 
-                fock_deriv_ao[iatom] += vxc_deriv_i
-
-        ovlp_deriv_ao = self.comm.allreduce(ovlp_deriv_ao, op=MPI.SUM)
-        fock_deriv_ao = self.comm.allreduce(fock_deriv_ao, op=MPI.SUM)
+                for x in range(3):
+                    vxc_deriv_ix = self.comm.reduce(vxc_deriv_i[x],
+                                                    root=root_rank)
+                    if self.rank == root_rank:
+                        fock_deriv_ao_dict[(iatom, x)] += vxc_deriv_ix
 
         t1 = tm.time()
 
         if self.rank == mpi_master():
             self.ostream.print_info("CPHF/CPKS import of integral derivatives"
-                                    + ' took'
-                                    + ' {:.2f} sec.'.format(t1 - t0))
+                                    + ' took {:.2f} sec.'.format(t1 - t0))
             self.ostream.print_blank()
             self.ostream.flush()
             
         self.profiler.stop_timer('derivs')
 
-        ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
-        ovlp_deriv_oo = np.zeros((natm, 3, nocc, nocc))
-        fock_deriv_ov = np.zeros((natm, 3, nocc, nvir))
-        orben_ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
-
-        # transform integral derivatives to MO basis
-        for iatom in local_atoms:
-            for x in range(3):
-                ovlp_deriv_ov[iatom,x] = np.linalg.multi_dot([
-                    mo_occ.T, ovlp_deriv_ao[iatom,x], mo_vir
-                ])
-                ovlp_deriv_oo[iatom,x] = np.linalg.multi_dot([
-                    mo_occ.T, ovlp_deriv_ao[iatom,x], mo_occ
-                ])
-                fock_deriv_ov[iatom,x] = np.linalg.multi_dot([
-                    mo_occ.T, fock_deriv_ao[iatom,x], mo_vir
-                ])
-                orben_ovlp_deriv_ov[iatom,x] = np.multiply(
-                    tmp_eocc, ovlp_deriv_ov[iatom,x]
-                ) 
-
-        # the oo part of the CPHF coefficients in AO basis,
-        # transforming the oo overlap derivative back to AO basis
-        # (not equal to the initial one)
-        uij_ao = np.zeros((natm, 3, nao, nao))
-        
-        for iatom in local_atoms:
-            for x in range(3):
-                uij_ao[iatom,x] = np.linalg.multi_dot([
-                   mo_occ, -0.5 * ovlp_deriv_oo[iatom,x], mo_occ.T 
-                ])
-
-        uij_ao = uij_ao.reshape(3*natm, nao, nao)
-        uij_ao = self.comm.reduce(uij_ao, root=mpi_master())
-                   
         if self.rank == mpi_master():
-            num_uij = len(uij_ao)
+            hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
         else:
-            num_uij = None
-        num_uij = self.comm.bcast(num_uij, root=mpi_master())
+            hessian_first_integral_derivatives = None
+
+        for iatom, root_rank_i in all_atom_idx_rank:
+            for x in range(3):
+
+                ovlp_deriv_ao_ix = self.comm.bcast(
+                        ovlp_deriv_ao_dict[(iatom,x)], root=root_rank_i)
+
+                fock_deriv_ao_ix = self.comm.bcast(
+                        fock_deriv_ao_dict[(iatom,x)], root=root_rank_i)
+
+                for jatom, root_rank_j in all_atom_idx_rank:
+                    if jatom < iatom:
+                        continue
+                    for y in range(3):
+
+                        ovlp_deriv_ao_jy = self.comm.bcast(
+                                ovlp_deriv_ao_dict[(jatom,y)], root=root_rank_j)
+
+                        fock_deriv_ao_jy = self.comm.bcast(
+                                fock_deriv_ao_dict[(jatom,y)], root=root_rank_j)
+
+                        if self.rank == mpi_master():
+
+                            Fix_Sjy = np.sum(
+                                np.matmul(density, fock_deriv_ao_ix) *
+                                np.matmul(density, ovlp_deriv_ao_jy).T)
+
+                            Fjy_Six = np.sum(
+                                np.matmul(density, fock_deriv_ao_jy) *
+                                np.matmul(density, ovlp_deriv_ao_ix).T)
+
+                            Six_Sjy = 2.0 * np.sum(
+                                np.matmul(omega_ao, ovlp_deriv_ao_ix) *
+                                np.matmul(density, ovlp_deriv_ao_jy).T)
+
+                            hess_ijxy = -2.0 * (Fix_Sjy + Fjy_Six + Six_Sjy)
+                            hessian_first_integral_derivatives[iatom,jatom,x,y] += hess_ijxy
+                            if iatom != jatom:
+                                hessian_first_integral_derivatives[jatom,iatom,y,x] += hess_ijxy
+
+        dist_cphf_rhs = []
 
         if self.rank == mpi_master():
-            uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
+            hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
         else:
-            uij_ao_list = [None for idx in range(num_uij)]
+            hessian_eri_overlap = None
 
-        for idx in range(num_uij):
-            uij_ao_list[idx] = self.comm.bcast(uij_ao_list[idx], root=mpi_master())
+        for iatom, root_rank in all_atom_idx_rank:
 
-        # create AODensity and Fock matrix objects, contract with ERI
-        fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis,
-                           eri_dict, dft_dict, pe_dict, self.profiler)
-
-        # _comp_lr_fock only returns value to master
-        fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
-       
-        fock_uij_numpy = np.zeros((natm, 3, nao, nao))
-        fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
-
-        for iatom in local_atoms:
+            # the oo part of the CPHF coefficients in AO basis
+            uij_ao_list = []
             for x in range(3):
-                tmp_uij_ao = fock_uij[3*iatom + x]
-                # transform to MO basis
-                fock_uij_mo[iatom,x] = np.linalg.multi_dot([
-                    mo_occ.T, tmp_uij_ao, mo_vir
+                ovlp_deriv_ao_ix = self.comm.bcast(
+                        ovlp_deriv_ao_dict[(iatom,x)], root=root_rank)
+                uij_ao_list.append(np.linalg.multi_dot([
+                   density, -0.5 * ovlp_deriv_ao_ix, density
+                ]))
+
+            # create AODensity and Fock matrix objects, contract with ERI
+            fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
+                                          dft_dict, pe_dict, self.profiler)
+
+            # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
+            # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
+            # response
+
+            for jatom, root_rank_j in all_atom_idx_rank:
+                if jatom < iatom:
+                    continue
+
+                hess_ij = np.zeros((3, 3))
+
+                for y in range(3):
+                    ovlp_deriv_ao_jy = self.comm.bcast(
+                            ovlp_deriv_ao_dict[(jatom,y)], root=root_rank_j)
+                    uij_ao_jy = np.linalg.multi_dot([
+                       density, -0.5 * ovlp_deriv_ao_jy, density
                     ])
-                fock_uij_numpy[iatom,x] = tmp_uij_ao
-                
-        # sum up the terms of the RHS
-        cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov
-                        + 2 * fock_uij_mo)
 
-        fock_uij_numpy = self.comm.reduce(fock_uij_numpy, root=mpi_master())
-        cphf_rhs = self.comm.reduce(cphf_rhs, root=mpi_master())
+                    if self.rank == mpi_master():
+                        for x in range(3):
+                            # xmn,ymn->xy
+                            hess_ij[x, y] = 2.0 * (np.sum(
+                                fock_uij[x] * uij_ao_jy))
+
+                if self.rank == mpi_master():
+                    hessian_eri_overlap[iatom,jatom,:,:] += 4.0 * hess_ij
+                    if iatom != jatom:
+                        hessian_eri_overlap[jatom,iatom,:,:] += 4.0 * hess_ij.T
+
+            for x in range(3):
+
+                # form dist_fock_uij_ov_2 from mpi_master
+
+                if self.rank == mpi_master():
+                    # transform to MO basis
+                    fock_uij_ov_2 = 2.0 * np.linalg.multi_dot([
+                        mo_occ.T, fock_uij[x], mo_vir])
+                    fock_uij_ov_2 = fock_uij_ov_2.reshape(nocc * nvir)
+                else:
+                    fock_uij_ov_2 = None
+
+                dist_fock_uij_ov_2 = DistributedArray(fock_uij_ov_2, self.comm)
+
+                # form dist_fock_deriv_ov_ix and dist_orben_ovlp_deriv_ov_ix
+                # from root_rank
+
+                if self.rank == root_rank:
+
+                    fock_deriv_ov_dict_ix = np.linalg.multi_dot([
+                        mo_occ.T, fock_deriv_ao_dict[(iatom,x)], mo_vir
+                    ]).reshape(nocc * nvir)
+
+                    ovlp_deriv_ov_ix = np.linalg.multi_dot([
+                        mo_occ.T, ovlp_deriv_ao_dict[(iatom,x)], mo_vir
+                    ])
+
+                    orben_ovlp_deriv_ov_ix = (
+                        eocc.reshape(-1, 1) * ovlp_deriv_ov_ix
+                    ).reshape(nocc * nvir)
+
+                else:
+                    fock_deriv_ov_dict_ix = None
+                    orben_ovlp_deriv_ov_ix = None
+
+                dist_fock_deriv_ov_ix = DistributedArray(
+                        fock_deriv_ov_dict_ix,
+                        self.comm,
+                        root=root_rank)
+
+                dist_orben_ovlp_deriv_ov_ix = DistributedArray(
+                        orben_ovlp_deriv_ov_ix,
+                        self.comm,
+                        root=root_rank)
+
+                dist_cphf_rhs_ix_data = (dist_fock_uij_ov_2.data +
+                                         dist_fock_deriv_ov_ix.data -
+                                         dist_orben_ovlp_deriv_ov_ix.data)
+
+                dist_cphf_rhs_ix = DistributedArray(
+                        dist_cphf_rhs_ix_data,
+                        self.comm,
+                        distribute=False)
+
+                dist_cphf_rhs.append(dist_cphf_rhs_ix)
+
+        ovlp_deriv_ao_dict.clear()
+        fock_deriv_ao_dict.clear()
 
         t2 = tm.time() 
 
@@ -296,17 +372,16 @@ class HessianOrbitalResponse(CphfSolver):
 
         self.profiler.stop_timer('RHS')
 
-        if self.rank == mpi_master():
-            return {
-                'cphf_rhs': cphf_rhs.reshape(natm*3, nocc, nvir),
-                'ovlp_deriv_oo': ovlp_deriv_oo,
-                'fock_deriv_ao': fock_deriv_ao,
-                'fock_uij': fock_uij_numpy,
-            }
-        else:
-            return {}
+        return {
+            'dist_cphf_rhs': dist_cphf_rhs,
+            # 'ovlp_deriv_oo': ovlp_deriv_oo,
+            # 'fock_deriv_ao': fock_deriv_ao,
+            # 'fock_uij': fock_uij,
+            'hessian_first_integral_derivatives': hessian_first_integral_derivatives,
+            'hessian_eri_overlap': hessian_eri_overlap,
+        }
 
-    def _compute_fmat_deriv(self, molecule, basis, scf_drv, density, i):
+    def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):
         """
         Computes the derivative of the Fock matrix with respect
         to the coordinates of atom i.
@@ -317,10 +392,10 @@ class HessianOrbitalResponse(CphfSolver):
             The basis set.
         :param density:
             The density matrix in AO basis.
-        :param scf_drv:
-            The SCF Driver.
         :param i:
             The atom index.
+        :param eri_dict:
+            The dictionary containing ERI information.
 
         :return fmat_deriv:
             The derivative of the Fock matrix wrt. atom i.
@@ -334,67 +409,75 @@ class HessianOrbitalResponse(CphfSolver):
 
         # kinetic integral gadient
         kin_grad_drv = KineticEnergyGeom100Driver()
+
         gmats_kin = kin_grad_drv.compute(molecule, basis, i)
+
+        for x, label in enumerate(['X', 'Y', 'Z']):
+            gmat_kin = gmats_kin.matrix_to_numpy(label)
+            fmat_deriv[x] += gmat_kin + gmat_kin.T
+
+        gmats_kin = Matrices()
 
         # nuclear potential integral gradients
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
+
         gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, i)
         gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, i)
 
-        # for Fock matrix gradient
-        #exchange_scaling_factor = 1.0
-        #fock_type = "2jk"
+        for x, label in enumerate(['X', 'Y', 'Z']):
+            gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
+            gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
+            fmat_deriv[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
 
-        # for Fock matrix gradient
-        if scf_drv._dft:
-            # TODO: range-separated Fock
-            if scf_drv.xcfun.is_hybrid():
+        gmats_npot_100 = Matrices()
+        gmats_npot_010 = Matrices()
+
+        if self._dft:
+            if self.xcfun.is_hybrid():
                 fock_type = '2jkx'
-                exchange_scaling_factor = scf_drv.xcfun.get_frac_exact_exchange()
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
             else:
                 fock_type = 'j'
                 exchange_scaling_factor = 0.0
         else:
             exchange_scaling_factor = 1.0
             fock_type = "2jk"
+
+        # TODO: range-separated Fock
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'HessianOrbitalResponse: Not implemented for' +
+                ' range-separated functional')
         
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
 
         # ERI threshold
-        thresh_int = int(-math.log10(scf_drv.eri_thresh))
+        thresh_int = int(-math.log10(self.eri_thresh))
 
         # screening
-        screener = T4CScreener()
-        screener.partition(basis, molecule, 'eri')
+        screener = eri_dict['screening']
+
         screener_atom = T4CScreener()
         screener_atom.partition_atom(basis, molecule, 'eri', i)
 
         # Fock gradient
         fock_grad_drv = FockGeom1000Driver()
         gmats_eri = fock_grad_drv.compute(basis, screener_atom, screener,
-                                      den_mat_for_fock, i, fock_type,
-                                      exchange_scaling_factor, 0.0,
-                                      thresh_int)
+                                          den_mat_for_fock, i, fock_type,
+                                          exchange_scaling_factor, 0.0,
+                                          thresh_int)
 
-        # scaling of ERI gradient for non-hybrid functionals
+        # scaling of Fock gradient for non-hybrid functionals
         factor = 2.0 if fock_type == 'j' else 1.0
 
         # calculate gradient contributions
         for x, label in enumerate(['X', 'Y', 'Z']):
-            gmat_kin = gmats_kin.matrix_to_numpy(label)
-            gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
-            gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
             gmat_eri = gmats_eri.matrix_to_numpy(label)
-
-            fmat_deriv[x] += gmat_kin + gmat_kin.T
-            fmat_deriv[x] -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
             fmat_deriv[x] += gmat_eri * factor
 
-        gmats_kin = Matrices()
-        gmats_npot_100 = Matrices()
-        gmats_npot_010 = Matrices()
         gmats_eri = Matrices()
 
         return fmat_deriv

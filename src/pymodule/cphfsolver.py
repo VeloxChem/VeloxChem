@@ -28,24 +28,16 @@ import time as tm
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
-from .veloxchemlib import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .dftutils import get_default_grid_level
-from scipy.sparse import linalg
-
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import vxc_deriv
-from .import_from_pyscf import eri_deriv
 
 class CphfSolver(LinearSolver):
     """
@@ -172,13 +164,29 @@ class CphfSolver(LinearSolver):
 
         self.start_time = tm.time()
 
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self)
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
+
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
+
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
         # Timing information
+        # TODO: use Profiler
         timing_dict = {}
 
         if self.rank == mpi_master():
@@ -200,41 +208,24 @@ class CphfSolver(LinearSolver):
         mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
         eov = self.comm.bcast(eov, root=mpi_master())
         nao = self.comm.bcast(nao, root=mpi_master())
+
         nmo = mo_energies.shape[0]
         nocc = molecule.number_of_alpha_electrons()
         natm =  molecule.number_of_atoms()
         nvir = nmo - nocc
 
-        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, *args)
+        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args)
 
-        if self.rank == mpi_master():
-            # get rhs, find out how many degrees of freedom, and reshape
-            cphf_rhs = cphf_rhs_dict['cphf_rhs']
-            dof = cphf_rhs.shape[0]
-            cphf_rhs = cphf_rhs.reshape(dof, nocc * nvir)
-        else:
-            cphf_rhs = None
-            dof = None
-
-        dof = self.comm.bcast(dof, root=mpi_master())
+        dist_rhs = cphf_rhs_dict['dist_cphf_rhs']
+        dof = len(dist_rhs)
 
         # Initialize trial and sigma vectors
         self.dist_trials = None
         self.dist_sigmas = None
 
         # the preconditioner: 1 / (eocc - evir)
-        precond = (1 / eov).reshape(nocc * nvir)
+        precond = (1.0 / eov).reshape(nocc * nvir)
         dist_precond = DistributedArray(precond, self.comm)
-
-        # create list of distributed arrays for RHS
-        dist_rhs = []
-        # TODO: are these loops over all degrees of freedom really efficient?
-        for k in range(dof):
-            if self.rank == mpi_master():
-                cphf_rhs_k = cphf_rhs[k]
-            else:
-                cphf_rhs_k = None
-            dist_rhs.append(DistributedArray(cphf_rhs_k, self.comm))
 
         # setup and precondition trial vectors
         dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
@@ -244,9 +235,10 @@ class CphfSolver(LinearSolver):
                           dft_dict, pe_dict, timing_dict)
 
         # lists that will hold the solutions and residuals
-        solutions = list(np.zeros((dof)))
+        # TODO: double check residuals in setup_trials
+        solutions = [None for x in range(dof)]
         residuals = list(np.zeros((dof)))
-        relative_residual_norm = np.ones((dof))
+        relative_residual_norm = [None for x in range(dof)]
 
         # start iterations
         for iteration in range(self.max_iter):
@@ -364,23 +356,11 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
-        # transform Distributed arrays into numpy arrays
-        # TODO: decide whether using Distributed arrays in
-        # ScfHessianDriver is more convenient/efficient etc.
-
-            cphf_ov = np.zeros((dof, nocc, nvir))
-
-        for i in range(dof):
-            sol = solutions[i].get_full_vector(0)
-            if self.rank == mpi_master():
-                cphf_ov[i] = sol.reshape(nocc, nvir)
-
         # merge the rhs dict with the solution
-        if self.rank == mpi_master():
-            return {**cphf_rhs_dict,
-                'cphf_ov': cphf_ov,
-            }
-        return None
+        return {
+            **cphf_rhs_dict,
+            'dist_cphf_ov': solutions,
+        }
 
     # To avoid init_eri, init_dft at each iteration, we do it once and pass it on to
     # build_sigmas.
@@ -438,6 +418,9 @@ class CphfSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 vec_list = []
+            else:
+                vec_list = None
+
             # loop over columns / trial vectors
             for col in range(batch_start, batch_end):
                 vec = dist_trials.get_full_vector(col)
@@ -447,24 +430,19 @@ class CphfSolver(LinearSolver):
                     vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     vec_list.append(vec_ao)
 
-            if self.rank != mpi_master():
-                vec_list = None
-
-            # TODO: bcast array by array
-            vec_list = self.comm.bcast(vec_list, root=mpi_master())
-
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
-                              dft_dict, pe_dict, self.profiler)
+                                      dft_dict, pe_dict, self.profiler)
 
-            sigmas = None
-
+            # create sigma vectors
             if self.rank == mpi_master():
-                # create sigma vectors
-                sigmas = np.zeros((nocc * nvir, num_vecs))
+                sigmas = np.zeros((nocc * nvir, batch_end - batch_start))
+            else:
+                sigmas = None
 
-            for ifock in range(batch_start, batch_end):
-                vec = dist_trials.get_full_vector(ifock)
+            for col in range(batch_start, batch_end):
+                vec = dist_trials.get_full_vector(col)
+                ifock = col - batch_start
 
                 if self.rank == mpi_master():
                     fock_vec = fock[ifock]
@@ -472,7 +450,7 @@ class CphfSolver(LinearSolver):
                         - np.linalg.multi_dot([mo_occ.T, fock_vec, mo_vir])
                         - np.linalg.multi_dot([mo_vir.T, fock_vec, mo_occ]).T
                         + vec.reshape(nocc,nvir) * eov
-                      )
+                        )
                     sigmas[:, ifock] = cphf_mo.reshape(nocc*nvir)
 
             dist_sigmas = DistributedArray(sigmas, self.comm)
@@ -520,9 +498,7 @@ class CphfSolver(LinearSolver):
         # distributed array for all trial vectors
         trials = []
 
-        n = len(dist_rhs)
-
-        for k in range(n):
+        for k in range(len(dist_rhs)):
             v = DistributedArray(dist_precond.data * dist_rhs[k].data,
                                  self.comm, distribute=False)
             norm = np.sqrt(v.squared_norm())
@@ -597,6 +573,18 @@ class CphfSolver(LinearSolver):
         """
 
         self.start_time = tm.time()
+
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self)
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -689,6 +677,12 @@ class CphfSolver(LinearSolver):
         :returns:
             The ov block of the CPHF coefficients.
         """
+
+        try:
+            from scipy.sparse import linalg
+        except ImportError:
+            raise ImportError('Unable to import scipy. Please install scipy ' +
+                              'via pip or conda.')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
