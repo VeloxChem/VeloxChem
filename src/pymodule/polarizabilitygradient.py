@@ -368,6 +368,9 @@ class PolarizabilityGradient():
         dof = len(self.vector_components)
         xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
 
+        # number of atomic orbitals
+        nao = basis.get_dimensions_of_basis()
+
         for f, w in enumerate(self.frequencies):
             info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
             self.ostream.print_info(info_msg)
@@ -376,12 +379,12 @@ class PolarizabilityGradient():
 
             if self.rank == mpi_master():
                 orbrsp_results = all_orbrsp_results[w]
-                mo = scf_tensors['C_alpha']  # only alpha part
-                nao = mo.shape[0]
-                nocc = molecule.number_of_alpha_electrons()
-                mo_occ = mo[:, :nocc].copy()
-                mo_vir = mo[:, nocc:].copy()
-                nvir = mo_vir.shape[1]
+                #mo = scf_tensors['C_alpha']  # only alpha part
+                #nao = mo.shape[0]
+                #nocc = molecule.number_of_alpha_electrons()
+                #mo_occ = mo[:, :nocc].copy()
+                #mo_vir = mo[:, nocc:].copy()
+                #nvir = mo_vir.shape[1]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
                 x_plus_y = orbrsp_results['x_plus_y_ao']
@@ -395,123 +398,143 @@ class PolarizabilityGradient():
 
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
+            else:
+                orbrsp_results = None
+                gs_dm = None
+                x_plus_y = None
+                x_minus_y = None
+                omega_ao = None
+                rel_dm_ao = None
 
-                # initiate polarizability gradient variable with data type set in init()
-                pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
+            orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
+            gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
+            x_plus_y= self.comm.bcast(x_plus_y, root=mpi_master())
+            x_minus_y = self.comm.bcast(x_minus_y, root=mpi_master())
+            omega_ao = self.comm.bcast(omega_ao, root=mpi_master())
+            rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
 
-                # WIP
-                tmp_scf_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
+            # initiate polarizability gradient variable with data type set in init()
+            pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
-                # kinetic energy gradient driver
-                kin_grad_drv = KineticEnergyGeom100Driver()
+            # WIP
+            #tmp_scf_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
-                # nuclear potential gradienr drivers
-                npot_grad_100_drv = NuclearPotentialGeom100Driver()
-                npot_grad_010_drv = NuclearPotentialGeom010Driver()
+            # kinetic energy gradient driver
+            kin_grad_drv = KineticEnergyGeom100Driver()
 
-                # loop over atoms and contract integral derivatives with density matrices
-                for iatom in range(natm):
-                    # core Hamiltonian contribution to gradients
-                    gmats_kin = kin_grad_drv.compute(molecule, basis, iatom)
-                    gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
-                    gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
+            # nuclear potential gradienr drivers
+            npot_grad_100_drv = NuclearPotentialGeom100Driver()
+            npot_grad_010_drv = NuclearPotentialGeom010Driver()
 
-                    for icoord, label in enumerate(['X', 'Y', 'Z']):
-                        gmat_kin = gmats_kin.matrix_to_numpy(label)
-                        gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
-                        gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
-                        gmat_hcore = gmat_kin + gmat_kin.T
-                        gmat_hcore -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
+            # loop over atoms and contract integral derivatives with density matrices
+            for iatom in local_atoms:
+                # core Hamiltonian contribution to gradients
+                gmats_kin = kin_grad_drv.compute(molecule, basis, iatom)
+                gmats_npot_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
+                gmats_npot_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
 
-                        # loop over operator components
-                        for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] += (
-                                    np.linalg.multi_dot([ # xymn,amn->xya
-                                        2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                                        gmat_hcore.reshape(nao**2)])
-                                    )
+                for icoord, label in enumerate(['X', 'Y', 'Z']):
+                    gmat_kin = gmats_kin.matrix_to_numpy(label)
+                    gmat_npot_100 = gmats_npot_100.matrix_to_numpy(label)
+                    gmat_npot_010 = gmats_npot_010.matrix_to_numpy(label)
+                    gmat_hcore = gmat_kin + gmat_kin.T
+                    gmat_hcore -= gmat_npot_100 + gmat_npot_100.T + gmat_npot_010
 
-                    gmats_kin = Matrices()
-                    gmats_npot_100 = Matrices()
-                    gmats_npot_010 = Matrices()
-                    gmat_hcore = Matrices()
+                    # loop over operator components
+                    for x, y in xy_pairs:
+                        #tmp_scf_gradient[x, y, iatom, icoord] += (
+                        pol_gradient[x, y, iatom, icoord] += (
+                                np.linalg.multi_dot([ # xymn,amn->xya
+                                    2.0 * rel_dm_ao[x, y].reshape(nao**2),
+                                    gmat_hcore.reshape(nao**2)])
+                                )
 
-                    # overlap contribution to gradient
-                    ovlp_grad_drv = OverlapGeom100Driver()
-                    gmats_ovlp = ovlp_grad_drv.compute(molecule, basis, iatom)
+                gmats_kin = Matrices()
+                gmats_npot_100 = Matrices()
+                gmats_npot_010 = Matrices()
+                gmat_hcore = Matrices()
 
-                    for icoord, label in enumerate(['X', 'Y', 'Z']):
-                        gmat_ovlp = gmats_ovlp.matrix_to_numpy(label)
-                        gmat_ovlp += gmat_ovlp.T
-                        # loop over operator components
-                        for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] += (
-                                    1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                                    2.0 * omega_ao[x, y].reshape(nao**2),
-                                          gmat_ovlp.reshape(nao**2)]))
+                # overlap contribution to gradient
+                ovlp_grad_drv = OverlapGeom100Driver()
+                gmats_ovlp = ovlp_grad_drv.compute(molecule, basis, iatom)
 
-                    gmats_ovlp = Matrices()
+                for icoord, label in enumerate(['X', 'Y', 'Z']):
+                    gmat_ovlp = gmats_ovlp.matrix_to_numpy(label)
+                    gmat_ovlp += gmat_ovlp.T
+                    # loop over operator components
+                    for x, y in xy_pairs:
+                        #tmp_scf_gradient[x, y, iatom, icoord] += (
+                        pol_gradient[x, y, iatom, icoord] += (
+                                1.0 * np.linalg.multi_dot([ # xymn,amn->xya
+                                2.0 * omega_ao[x, y].reshape(nao**2),
+                                      gmat_ovlp.reshape(nao**2)]))
 
-                    # dipole contribution to gradient
-                    dip_grad_drv = ElectricDipoleMomentGeom100Driver()
-                    gmats_dip = dip_grad_drv.compute(molecule, basis, [0.0, 0.0, 0.0], iatom)
+                gmats_ovlp = Matrices()
 
-                    # the keys of the dipole gmat
-                    gmats_dip_components = (['X_X', 'X_Y', 'X_Z', 'Y_X' ] 
-                                         + [ 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'])
+                # dipole contribution to gradient
+                dip_grad_drv = ElectricDipoleMomentGeom100Driver()
+                gmats_dip = dip_grad_drv.compute(molecule, basis, [0.0, 0.0, 0.0], iatom)
 
-                    # dictionary to convert from string idx to integer idx
-                    comp_to_idx = {'X': 0, 'Y': 1, 'Z': 2}
+                # the keys of the dipole gmat
+                gmats_dip_components = (['X_X', 'X_Y', 'X_Z', 'Y_X' ]
+                                     + [ 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'])
 
-                    d_dipole = np.zeros((dof, 3, nao, nao))
+                # dictionary to convert from string idx to integer idx
+                comp_to_idx = {'X': 0, 'Y': 1, 'Z': 2}
 
-                    for i, label in enumerate(gmats_dip_components):
-                        gmat_dip = gmats_dip.matrix_to_numpy(label)
-                        gmat_dip += gmat_dip.T
+                d_dipole = np.zeros((dof, 3, nao, nao))
 
-                        icoord = comp_to_idx[label[0]] # atom coordinate component
-                        icomp = comp_to_idx[label[-1]] # dipole operator component
+                for i, label in enumerate(gmats_dip_components):
+                    gmat_dip = gmats_dip.matrix_to_numpy(label)
+                    gmat_dip += gmat_dip.T
 
-                        # reorder indices to first is operator comp, second is coord
-                        d_dipole[icomp, icoord] += gmat_dip
+                    icoord = comp_to_idx[label[0]] # atom coordinate component
+                    icomp = comp_to_idx[label[-1]] # dipole operator component
 
-                    for icoord in range(3):
-                        # loop over operator components
-                        for x, y in xy_pairs:
-                            tmp_scf_gradient[x, y, iatom, icoord] += (
-                                    - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
-                                        x_minus_y[x].reshape(nao**2),
-                                        d_dipole[y, icoord].reshape(nao**2)
-                                    ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                                        d_dipole[x, icoord].reshape(nao**2),
-                                        x_minus_y[y].reshape(nao**2)
-                                    ]))
+                    # reorder indices to first is operator comp, second is coord
+                    d_dipole[icomp, icoord] += gmat_dip
 
-                            # symmetric
-                            #if (y != x):
-                            #    tmp_scf_gradient[y, x, iatom, icoord] += tmp_scf_gradient[x, y, iatom, icoord]
+                for icoord in range(3):
+                    # loop over operator components
+                    for x, y in xy_pairs:
+                        #tmp_scf_gradient[x, y, iatom, icoord] += (
+                        pol_gradient[x, y, iatom, icoord] += (
+                                - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
+                                    x_minus_y[x].reshape(nao**2),
+                                    d_dipole[y, icoord].reshape(nao**2)
+                                ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
+                                    d_dipole[x, icoord].reshape(nao**2),
+                                    x_minus_y[y].reshape(nao**2)
+                                ]))
 
-                    gmats_dip = Matrices()
+                        # symmetric
+                        #if (y != x):
+                        #    tmp_scf_gradient[y, x, iatom, icoord] += tmp_scf_gradient[x, y, iatom, icoord]
 
-                tmp_scf_gradient = self.comm.reduce(tmp_scf_gradient, root=mpi_master())
-                # ERI contribution
-                eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
-                                        rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
+                gmats_dip = Matrices()
 
-                if self.rank == mpi_master():
-                    pol_gradient = tmp_scf_gradient + eri_contrib
-                    for x in range(dof):
-                        for y in range(x + 1, dof):
-                            pol_gradient[y, x] += pol_gradient[x, y]
+            #tmp_scf_gradient = self.comm.reduce(tmp_scf_gradient, root=mpi_master())
+            # ERI contribution
+            eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
+                                    rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
+
+            pol_gradient += eri_contrib
+            pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
+
+            if self.rank == mpi_master():
+                #pol_gradient = tmp_scf_gradient + eri_contrib
+                for x in range(dof):
+                    for y in range(x + 1, dof):
+                        pol_gradient[y, x] += pol_gradient[x, y]
 
                 #pol_gradient = tmp_scf_gradient + eri_contrib
-            else:
-                gs_dm = None
-                rel_dm_ao = None
-                x_minus_y = None
-                pol_gradient = None
+            #else:
+            #    gs_dm = None
+            #    rel_dm_ao = None
+            #    x_minus_y = None
+            #    pol_gradient = None
 
-            gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
+            #gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
 
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
