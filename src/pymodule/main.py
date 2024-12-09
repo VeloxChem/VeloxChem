@@ -33,6 +33,7 @@ from .scfrestopendriver import ScfRestrictedOpenDriver
 from .forcefieldgenerator import ForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
+from .rixsdriver import RixsDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .loprop import LoPropDriver
@@ -463,6 +464,22 @@ def main():
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
         pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
         pulsed_response.compute(task.molecule, task.ao_basis, scf_results)
+
+    # Resonant Inelastic X-ray scattering
+    if task_type == 'rixs':# and scf_drv.scf_type == 'restricted':
+        rixs_dict = (task.input_dict['rixs']
+                     if 'rixs' in task.input_dict else {})
+        rixs_dict['program_end_time'] = program_end_time
+        rixs_dict['filename'] = task.input_dict['filename']
+
+        cvs_rsp = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
+        cvs_rsp.init_driver(task.mpi_comm, task.ostream)
+        cvs_rsp_res = cvs_rsp.compute(task.molecule, task.ao_basis, scf_results)
+
+        rixs_drv = RixsDriver(task.mpi_comm, task.ostream)
+        rixs_drv.update_settings(method_dict, rixs_dict)
+        rixs_drv.compute(task.molecule, task.ao_basis, scf_results, valence, cvs_rsp_res)
+    
 
     # MP2 perturbation theory
 

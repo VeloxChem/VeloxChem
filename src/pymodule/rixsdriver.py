@@ -26,6 +26,7 @@
 from mpi4py import MPI
 import numpy as np
 import math
+import h5py
 import sys
 
 from .veloxchemlib import bohr_in_angstrom, mpi_master
@@ -88,8 +89,9 @@ class RixsDriver:
         # input keywords
         self.input_keywords = {
             'rixs': {
-                'angle': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
+                'theta': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
                 'gamma': ('float', 'broadening term'),
+                'nr_CO': ('int', 'number of involved core-orbitals'),
             },
         }
 
@@ -144,8 +146,11 @@ class RixsDriver:
         """
 
         X_val_mo = tda_res_val['eigenvectors'].reshape(self.nocc,self.nvir,self.nr_ve)
-        X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
-        X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
+        if self.nr_CO > 0:
+            X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
+            X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
+        else:
+            X_cor_mo = tda_res_core['eigenvectors'].reshape(self.nocc,self.nvir,self.nr_ce)
 
         # Electron- and hole density matrices
         gamma_ab = np.einsum('ipJ, iqI -> pqIJ', X_cor_mo, X_val_mo, optimize=True)
@@ -176,8 +181,11 @@ class RixsDriver:
         returns the GS-to-state transition-density-matrix in ao-basis
         """
 
-        X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
-        X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
+        if self.nr_CO > 0:
+            X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
+            X_cor_mo[:self.nr_CO] = tda_res_core['eigenvectors'].reshape(self.nr_CO, self.nvir, self.nr_ce)
+        else:
+            X_cor_mo = tda_res_core['eigenvectors'].reshape(self.nocc,self.nvir,self.nr_ce)
 
         # Transform
         C_ab = scf_results['C_alpha'][:,self.nocc:]
@@ -239,6 +247,7 @@ class RixsDriver:
         F = self.F_xy(w, f, gamma_ao,
          gamma_ng_ao, tda_res_core,
          dipole_ints)
+        self.F_mat = F
         
         sigma = w_prime/w * 1/15 * ((2 - (1/2) * np.sin(theta) ** 2) * np.sum(np.abs(F)**2) 
                    + ((3/4) * np.sin(theta) ** 2 - 1/2) * (np.sum(F * F.T.conj())
@@ -254,7 +263,7 @@ class RixsDriver:
         return np.array(d_E)
     
     def find_nr_CO(self, excitation_details):
-        largest_core = 1  # Initialize the largest core index as 0
+        largest_core = 0  # Initialize the largest core index as 0
 
         for detail in excitation_details:
             entry = detail[0]
@@ -285,21 +294,24 @@ class RixsDriver:
         if self.photon_energy is None:
             self.photon_energy = omega_n # resonant
         
-        ene_loss     = np.zeros((self.nr_ve, len(self.photon_energy)))
-        emiss        = np.zeros((self.nr_ve, len(self.photon_energy)))
-        crossections = np.zeros((self.nr_ve, len(self.photon_energy)))
+        ene_loss              = np.zeros((self.nr_ve, len(self.photon_energy)))
+        emiss                 = np.zeros((self.nr_ve, len(self.photon_energy)))
+        crossections          = np.zeros((self.nr_ve, len(self.photon_energy)))
+        scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
 
-        for vs_i in range(self.nr_ve):
+        for j,vs_i in enumerate(range(self.nr_ve)):
             for k, w_n in enumerate(self.photon_energy):
                 emiss[vs_i, k]        = w_n - omega_f[vs_i]
                 ene_loss[vs_i, k]     = w_n - (w_n - omega_f[vs_i])
                 crossections[vs_i, k] = self.rixs_xsection(w_n, vs_i, tdm_fn, 
                                                             tdm_ng, tda_res_core, tda_res_val, 
                                                             dipole_ints, self.theta).real
+                scattering_amp_tensor[:,:, j, k] = self.F_mat
 
-        self.emission     = emiss
-        self.ene_loss     = ene_loss
-        self.crossections = crossections
+        self.emission      = emiss
+        self.ene_loss      = ene_loss
+        self.crossections  = crossections
+        self.scatt_amp_mat = scattering_amp_tensor
         
         emission_ene             = self.omega_p(tda_res_core, tda_res_val)
         self.emission_energy_map = emission_ene
@@ -308,6 +320,110 @@ class RixsDriver:
         T_fn = self.transition_dipole_mom(tdm_fn, dipole_ints)
         f_f  = self.osc_str(T_fn, emission_ene) 
         self.oscillator_strength = f_f
+
+    def write_hdf5(self, fname):
+        """
+        Writes the RIXS {output?} to the specified output file in h5
+        format. The h5 file saved contains the following datasets:
+
+        - amplitudes
+            The scattering amplitudes for the calculated truncated_freqs,
+            as 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
+        - zero_padded
+            Is the dataset zero padded or not
+        - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
+            =>  Amplitudes for all directions
+        - zero_padded_freqs
+            The zero padded frequency list
+        - zero_padded_amplitudes
+            The pulse amplitudes for the calculated frequencies zero
+            padded to match th zero padded frequencies.
+
+        :param fname:
+            Name of the checkpoint file.
+        """
+
+        if not fname:
+            raise ValueError('No filename given to write_hdf5()')
+
+        # Add the .h5 extension if not given
+        if not fname[-3:] == '.h5':
+            fname += '.h5'
+
+        # Convert the boolean to a a numpy array value
+        zeropad = np.array([self.zero_pad])
+
+        # Save all the internal data to the h5 datafile named 'fname'
+        try:
+            with h5py.File(fname, 'w') as hf:
+                hf.create_dataset('frequencies', data=self.zero_padded_freqs)
+                hf.create_dataset('amplitudes',
+                                  data=self.zero_padded_amplitudes)
+                hf.create_dataset('zero_padded', data=zeropad)
+
+                # Loop over all directions
+                for xyz1 in ['x', 'y', 'z']:
+                    for xyz2 in ['x', 'y', 'z']:
+                        polarizability = []
+                        # Add all polarizability for the give direction
+                        for freq in self.zero_padded_freqs:
+                            polarizability.append(
+                                self.results['properties_zeropad'][(xyz1, xyz2,
+                                                                    freq)])
+
+                        hf.create_dataset('{}{}'.format(xyz1, xyz2),
+                                          data=np.array(polarizability))
+
+        except Exception as e:
+            print('Pulsed response failed to create h5 data file: {}'.format(e),
+                  file=sys.stdout)
+            
+    def print_header(self):
+        """
+        Prints RIXS calculation setup details to output
+        stream.
+        """
+
+        # Print string width (global norm)
+        str_width = 60
+
+        # PRT header
+        self.ostream.print_blank()
+        title = 'RIXS Linear Reponse CVS Calculation'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        # Print all settings
+        header_fields = {
+            'field_cutoff_ratio': 'Field cutoff ratio',
+            'envelope': 'Envelope',
+            'pulse_widths': 'Pulse Duration',
+            'carrier_frequencies': 'Carrier Frequency',
+            'centers': 'Pulse Center time',
+            'field_max': 'Max Field',
+            'pol_dir': 'Polarization Direction',
+            'frequency_range': 'Frequency Range',
+            'zero_pad': 'Zero padding results',
+        }
+
+        # Print the header information fields
+        for key, text in header_fields.items():
+            cur_str = '{0:30s} : {1:s}'.format(text,
+                                                str(self.pulse_settings[key]))
+            self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+
+        # Print the list of truncated frequencies and their amplitudes
+        valstr = '{:<12s}  |  {:>18s}'.format('Frequency', 'Amplitude')
+        self.ostream.print_header(valstr.ljust(str_width))
+        self.ostream.print_header(('-' * 45).ljust(str_width))
+
+        for freq, amp in zip(self.truncated_freqs, self.amplitudes):
+            cur_str = '{:<12.6f}  :  {:>12.8f}   {:>+12.8f}j'.format(
+                freq, amp.real, amp.imag)
+            self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
 
 
     
