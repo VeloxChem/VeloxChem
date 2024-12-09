@@ -36,6 +36,9 @@ from .veloxchemlib import NuclearPotentialGeom100Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
+from .veloxchemlib import FockGeom2000Driver
+from .veloxchemlib import FockGeom1100Driver
+from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
