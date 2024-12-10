@@ -32,6 +32,10 @@ from .cphfsolver import CphfSolver
 from .inputparser import parse_input
 from .sanitychecks import polgrad_sanity_check
 from .oneeints import compute_electric_dipole_integrals
+from .distributedarray import DistributedArray
+from .batchsize import get_batch_size
+from .batchsize import get_number_of_batches
+from .profiler import Profiler
 
 
 class PolOrbitalResponse(CphfSolver):
@@ -187,11 +191,11 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        #dft_dict = self._init_dft(molecule, scf_tensors)
         # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        #eri_dict = self._init_eri(molecule, basis)
         # PE information
-        pe_dict = self._init_pe(molecule, basis)
+        #pe_dict = self._init_pe(molecule, basis)
 
         self.profiler.start_timer('RHS')
 
@@ -211,7 +215,7 @@ class PolOrbitalResponse(CphfSolver):
                     'Building RHS for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
-                ovlp = scf_tensors['S']
+                #ovlp = scf_tensors['S']
                 mo = scf_tensors['C_alpha']  # only alpha part
 
                 nao = mo.shape[0]
@@ -474,6 +478,7 @@ class PolOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 # reduce dimensions of RHS to unique operator component combinations
                 xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+                red_dof = len(xy_pairs)
                 rhs_tmp = rhs_mo.reshape(dof, dof, nocc, nvir).copy()
                 rhs_red = []
 
@@ -538,11 +543,11 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        #dft_dict = self._init_dft(molecule, scf_tensors)
         # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        #eri_dict = self._init_eri(molecule, basis)
         # PE information
-        pe_dict = self._init_pe(molecule, basis)
+        #pe_dict = self._init_pe(molecule, basis)
 
         self.profiler.start_timer('RHS')
 
@@ -554,7 +559,44 @@ class PolOrbitalResponse(CphfSolver):
 
         loop_start_time = tm.time()
 
+        natm = molecule.number_of_atoms()
+        nocc = molecule.number_of_alpha_electrons()
+        nao = basis.get_dimensions_of_basis()
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        if self.rank == mpi_master():
+            # check if response vectors exist for desired frequency of gradient
+            polgrad_sanity_check(self, self.flag, lr_results)
+
+            density = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']  # only alpha part
+
+            # reduce dimensions of RHS to unique operator component combinations
+            xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+            dof_red = len(xy_pairs)
+        else:
+            density = None
+            mo = None
+            dof_red = None
+
+        mo = self.comm.bcast(mo, root=mpi_master())
+        density = self.comm.bcast(density, root=mpi_master())
+        dof_red = self.comm.bcast(dof_red, root=mpi_master())
+
+        # TODO: double check dft_dict['gs_density']
+        # TODO: maybe rename to mol_grid
+        molgrid = dft_dict['molgrid']
+        gs_density = [density]
+
+        # MO coefficients
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
         orbrsp_rhs = {}
+
         for f, w in enumerate(self.frequencies):
 
             if self.rank == mpi_master():
@@ -562,16 +604,16 @@ class PolOrbitalResponse(CphfSolver):
                     'Building RHS for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
-                ovlp = scf_tensors['S']
-                mo = scf_tensors['C_alpha']  # only alpha part
-                nao = mo.shape[0]
-                nocc = molecule.number_of_alpha_electrons()
-                mo_occ = mo[:, :nocc].copy()
-                mo_vir = mo[:, nocc:].copy()
-                nvir = mo_vir.shape[1]
+                #ovlp = scf_tensors['S']
+                #mo = scf_tensors['C_alpha']  # only alpha part
+                #nao = mo.shape[0]
+                #nocc = molecule.number_of_alpha_electrons()
+#                mo_occ = mo[:, :nocc].copy()
+#                mo_vir = mo[:, nocc:].copy()
+#                nvir = mo_vir.shape[1]
 
                 # check if response vectors exist for desired frequency of gradient
-                polgrad_sanity_check(self, self.flag, lr_results)
+                #polgrad_sanity_check(self, self.flag, lr_results)
 
             full_vec = [
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
@@ -585,7 +627,7 @@ class PolOrbitalResponse(CphfSolver):
                     full_vec[idx] *= -1.0
 
                 # number of vector components
-                dof = len(self.vector_components)
+                #dof = len(self.vector_components)
 
                 # extract the excitation and de-excitation components
                 # from the full solution vector.
@@ -627,21 +669,23 @@ class PolOrbitalResponse(CphfSolver):
                     # construct density matrices for E[3] term:
                     perturbed_dm_ao_list, zero_dm_ao_list = self.construct_dft_e3_dm_real(x_minus_y_ao)
             else:
-                dof = None
+                #dof = None
                 dm_ao_rhs_list = None
+
                 if self._dft:
                     perturbed_dm_ao_list = None
                     zero_dm_ao_list = None
 
-            dof = self.comm.bcast(dof, root=mpi_master())
+            #dof = self.comm.bcast(dof, root=mpi_master())
 
             dm_ao_rhs_list = self.comm.bcast(dm_ao_rhs_list, root=mpi_master())
+
             if self._dft:
                 perturbed_dm_ao_list = self.comm.bcast(perturbed_dm_ao_list, root=mpi_master())
                 zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
 
-            molgrid = dft_dict['molgrid']
-            gs_density = dft_dict['gs_density']
+            #molgrid = dft_dict['molgrid']
+            #gs_density = dft_dict['gs_density']
 
             if self._dft:
                 fock_gxc_ao = []
@@ -715,9 +759,11 @@ class PolOrbitalResponse(CphfSolver):
 
             if self.rank == mpi_master():
                 # reduce dimensions of RHS to unique operator component combinations
-                xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+                #xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+                #dof_red = len(xy_pairs)
                 rhs_red = []
                 rhs_tmp = rhs_mo.reshape(dof, dof, nocc, nvir).copy()
+                #rhs_tmp = rhs_mo.reshape(dof, dof, nocc * nvir).copy()
 
                 for x, y in xy_pairs:
                     rhs_red.append(rhs_tmp[x, y].copy())
@@ -741,18 +787,28 @@ class PolOrbitalResponse(CphfSolver):
                     #tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_red, axis=0)
 
+        # save RHS in distributed array
+        dist_cphf_rhs = []
+        for k in range(dof_red):
+            if self.rank == mpi_master():
+                cphf_rhs_k = tot_rhs_mo[k].reshape(nocc * nvir)
+            else:
+                cphf_rhs_k = None
+            dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm))
+
+        if self.rank == mpi_master():
+            orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
+            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            return orbrsp_rhs
+        else:
+            return {}
+
         valstr = '** Time spent on constructing the orbrsp RHS for '
         valstr += '{} frequencies: '.format(len(self.frequencies))
         valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
-
-        if self.rank == mpi_master():
-            orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
-            return orbrsp_rhs
-        else:
-            return {}
 
     def calculate_unrel_dm(self, molecule, scf_tensors, x_plus_y, x_minus_y):
         """
@@ -780,7 +836,7 @@ class PolOrbitalResponse(CphfSolver):
         dof = len(self.vector_components)
 
         # overlap
-        ovlp = scf_tensors['S']
+        #ovlp = scf_tensors['S']
 
         # MO coefficients
         mo = scf_tensors['C_alpha']  # only alpha part
