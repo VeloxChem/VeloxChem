@@ -285,7 +285,16 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
 
     auto nthreads = omp_get_max_threads();
 
-    CDenseMatrix omp_values(nthreads, 3);
+    CDenseMatrix omp_values;
+
+    if constexpr (N == 1)
+    {
+        omp_values = CDenseMatrix (nthreads, 3);
+    }
+    else if constexpr (N == 2)
+    {
+        omp_values = CDenseMatrix (nthreads, 6);
+    }
 
     omp_values.zero();
 
@@ -312,22 +321,34 @@ CFockGeomX000Driver<N>::compute(const CMolecularBasis& basis,
                 {
                     CT4CGeomX0MatricesDistributor distributor(ptr_density, ptr_density_2, label, exchange_factor, omega);
                     distributor.set_indices(bra_gpairs, ket_gpairs);
-                    erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    if constexpr (N == 1)
+                    {
+                        distributor.set_num_values(3);
+                        erifunc::compute_geom_1000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    }
+                    else if constexpr (N == 2)
+                    {
+                        distributor.set_num_values(6);
+                        erifunc::compute_geom_2000<CT4CGeomX0MatricesDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range);
+                    }
                     auto values = distributor.get_values();
                     auto thread_id = omp_get_thread_num();
-                    ptr_omp_values->row(thread_id)[0] += values[0];
-                    ptr_omp_values->row(thread_id)[1] += values[1];
-                    ptr_omp_values->row(thread_id)[2] += values[2];
+                    for (int idx = 0; idx < static_cast<int>(values.size()); idx++)
+                    {
+                        ptr_omp_values->row(thread_id)[idx] += values[idx];
+                    }
                 }
             });
         }
     }
 
-    std::vector<double> values(3, 0.0);
+    auto n_components = omp_values.getNumberOfColumns();
+
+    std::vector<double> values(n_components, 0.0);
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
-        for (int d = 0; d < 3; d++)
+        for (int d = 0; d < n_components; d++)
         {
             values[d] += omp_values.row(thread_id)[d];
         }

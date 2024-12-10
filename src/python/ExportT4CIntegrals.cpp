@@ -202,7 +202,23 @@ export_t4cintegrals(py::module& m)
                const double                  omega) -> std::shared_ptr<CMatrices> {
                 return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
             },
-            "Computes hessian of Fock matrix of requested type for given molecule and basis.");
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.")
+        .def(
+            "compute",
+            [](const CFockGeomX000Driver<2>& self,
+               const CMolecularBasis&        basis,
+               const CT4CScreener&           screener_atom,
+               const CT4CScreener&           screener,
+               const CMatrix&                density,
+               const CMatrix&                density2,
+               const int                     iatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega,
+               const int                     ithreshold) -> std::vector<double> {
+                return self.compute(basis, screener_atom, screener, density, density2, iatom, label, exchange_factor, omega, ithreshold);
+            },
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.");
     
     // CFockGeom1100Driver class
     PyClass<CFockGeomXY00Driver<1,1>>(m, "FockGeom1100Driver")
