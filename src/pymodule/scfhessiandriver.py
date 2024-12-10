@@ -458,10 +458,30 @@ class ScfHessianDriver(HessianDriver):
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
 
+        # determine fock_type and exchange_scaling_factor
+        if self._dft:
+            if self.scf_driver.xcfun.is_hybrid():
+                fock_type = '2jkx'
+                exchange_scaling_factor = self.scf_driver.xcfun.get_frac_exact_exchange()
+                fock_factor = 1.0
+            else:
+                fock_type = 'j'
+                exchange_scaling_factor = 0.0
+                fock_factor = 2.0
+        else:
+            fock_type = '2jk'
+            exchange_scaling_factor = 1.0
+            fock_factor = 1.0
+
+        # TODO: range-separated Fock
+        need_omega = (self._dft and self.scf_driver.xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'ScfHessianDriver: Not implemented for' +
+                ' range-separated functional')
+
         den_mat_for_fock = make_matrix(ao_basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
-
-        fock_type = '2jk'
 
         if self.rank == mpi_master():
             t2 = tm.time()
@@ -518,13 +538,13 @@ class ScfHessianDriver(HessianDriver):
                 # TODO: pure and hybrid functionals
                 # TODO: range-separated hybrid functionals
 
-                fock_hess_2000_mats = fock_hess_2000_drv.compute(ao_basis, molecule, den_mat_for_fock, i, fock_type, 0.0, 0.0)
+                fock_hess_2000_mats = fock_hess_2000_drv.compute(ao_basis, molecule, den_mat_for_fock, i, fock_type, exchange_scaling_factor, 0.0)
 
                 for x, label_x in enumerate('XYZ'):
                     for y, label_y in enumerate('XYZ'):
                         fock_label = label_x + label_y if x <= y else label_y + label_x
                         fock_hess_2000_mats_xy = fock_hess_2000_mats.matrix_to_numpy(fock_label)
-                        hessian_2nd_order_derivatives[i, i, x, y] += np.sum(density * fock_hess_2000_mats_xy)
+                        hessian_2nd_order_derivatives[i, i, x, y] += fock_factor * np.sum(density * fock_hess_2000_mats_xy)
 
                 fock_hess_2000_mats = Matrices()
 
@@ -572,15 +592,15 @@ class ScfHessianDriver(HessianDriver):
                     npot_hess_110_mats_ji = Matrices()
                     npot_hess_101_mats = Matrices()
 
-                    fock_hess_1100_mats = fock_hess_1100_drv.compute(ao_basis, molecule, den_mat_for_fock, i, j, fock_type, 0.0, 0.0)
-                    fock_hess_1010_mats = fock_hess_1010_drv.compute(ao_basis, molecule, den_mat_for_fock, i, j, fock_type, 0.0, 0.0)
+                    fock_hess_1100_mats = fock_hess_1100_drv.compute(ao_basis, molecule, den_mat_for_fock, i, j, fock_type, exchange_scaling_factor, 0.0)
+                    fock_hess_1010_mats = fock_hess_1010_drv.compute(ao_basis, molecule, den_mat_for_fock, i, j, fock_type, exchange_scaling_factor, 0.0)
 
                     for x, label_x in enumerate('XYZ'):
                         for y, label_y in enumerate('XYZ'):
                             fock_label = f'{label_x}_{label_y}'
                             fock_hess_1100_mats_xy = fock_hess_1100_mats.matrix_to_numpy(fock_label)
                             fock_hess_1010_mats_xy = fock_hess_1010_mats.matrix_to_numpy(fock_label)
-                            hessian_2nd_order_derivatives[i, j, x, y] += np.sum(
+                            hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * np.sum(
                                 density * (fock_hess_1100_mats_xy + fock_hess_1010_mats_xy))
 
                     fock_hess_1100_mats = Matrices()
