@@ -529,11 +529,11 @@ class ScfHessianDriver(HessianDriver):
                 npot_hess_200_mats = Matrices()
                 npot_hess_020_mats = Matrices()
 
-                screener_atom = T4CScreener()
-                screener_atom.partition_atom(ao_basis, molecule, 'eri', i)
+                screener_atom_i = T4CScreener()
+                screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
 
                 fock_hess_2000 = fock_hess_2000_drv.compute(
-                        ao_basis, screener_atom, screener,
+                        ao_basis, screener_atom_i, screener,
                         den_mat_for_fock, den_mat_for_fock2, i,
                         fock_type, exchange_scaling_factor,
                         0.0, thresh_int)
@@ -600,25 +600,22 @@ class ScfHessianDriver(HessianDriver):
                             fock_type, exchange_scaling_factor,
                             0.0, thresh_int)
 
+                    screener_atom_j = T4CScreener()
+                    screener_atom_j.partition_atom(ao_basis, molecule, 'eri', j)
+
+                    # Note: use general matrix on both sides
+                    fock_hess_1010 = fock_hess_1010_drv.compute(
+                            ao_basis, screener_atom_i, screener_atom_j,
+                            den_mat_for_fock2, den_mat_for_fock2, i, j,
+                            fock_type, exchange_scaling_factor,
+                            0.0, thresh_int)
+
                     # 'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
                     xy_pairs = [(x, y) for x in range(3) for y in range(3)]
 
                     for idx, (x, y) in enumerate(xy_pairs):
-                        hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * fock_hess_1100[idx]
-
-                    fock_hess_1010_mats = fock_hess_1010_drv.compute(ao_basis, molecule, den_mat_for_fock, i, j, fock_type, exchange_scaling_factor, 0.0)
-
-                    for x, label_x in enumerate('XYZ'):
-                        for y, label_y in enumerate('XYZ'):
-                            fock_label = f'{label_x}_{label_y}'
-                            fock_hess_1010_mats_xy = fock_hess_1010_mats.matrix_to_numpy(fock_label)
-                            hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * np.sum(
-                                density * (fock_hess_1010_mats_xy))
-
-                    # TODO: atom-based screening
-                    # TODO: in-place accumulation with two densities
-
-                    fock_hess_1010_mats = Matrices()
+                        hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * (
+                                fock_hess_1100[idx] + fock_hess_1010[idx])
 
                 # lower triangle is transpose of the upper part
                 for j in range(i):
