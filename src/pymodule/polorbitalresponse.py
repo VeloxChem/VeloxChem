@@ -597,6 +597,8 @@ class PolOrbitalResponse(CphfSolver):
 
         orbrsp_rhs = {}
 
+        dist_cphf_rhs = []
+
         for f, w in enumerate(self.frequencies):
 
             if self.rank == mpi_master():
@@ -787,14 +789,13 @@ class PolOrbitalResponse(CphfSolver):
                     #tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_red, axis=0)
 
-        # save RHS in distributed array
-        dist_cphf_rhs = []
-        for k in range(dof_red):
-            if self.rank == mpi_master():
-                cphf_rhs_k = tot_rhs_mo[k].reshape(nocc * nvir)
-            else:
-                cphf_rhs_k = None
-            dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm))
+            # save RHS in distributed array
+            for k in range(dof_red):
+                if self.rank == mpi_master():
+                    cphf_rhs_k = rhs_red[k].reshape(nocc * nvir)
+                else:
+                    cphf_rhs_k = None
+                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm))
 
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
@@ -1512,12 +1513,27 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             # number of vector components
             dof = len(self.vector_components)
+            xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
             # number of frequencies
             n_freq = len(self.frequencies)
             # get CPHF results in reduced dimensions
-            all_cphf_red = self.cphf_results['cphf_ov']
+            #all_cphf_red = self.cphf_results['cphf_ov']
+            # TODO WIP
+            if self.use_subspace_solver:
+                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+                all_cphf_red = {}
+                for n, w in enumerate(self.frequencies):
+                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
+                    for xy in range(dof_red):
+                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
+                        all_cphf_red[w] = tmp_cphf_n
+            else:
+                all_cphf_red = self.cphf_results['cphf_ov']
+
             # map CPHF results to dof*dof dimensions
             all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+
             # MO coefficients
             nocc = molecule.number_of_alpha_electrons()
             mo = scf_tensors['C_alpha']
