@@ -207,7 +207,45 @@ class PolOrbitalResponse(CphfSolver):
 
         loop_start_time = tm.time()
 
+        nocc = molecule.number_of_alpha_electrons()
+        nao = basis.get_dimensions_of_basis()
+
+        # number of vector components
+        dof = len(self.vector_components)
+
+        if self.rank == mpi_master():
+            # check if response vectors exist for desired frequency of gradient
+            polgrad_sanity_check(self, self.flag, lr_results)
+
+            density = scf_tensors['D_alpha']
+            mo = scf_tensors['C_alpha']  # only alpha part
+
+            # reduce dimensions of RHS to unique operator component combinations
+            xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+            dof_red = len(xy_pairs)
+        else:
+            density = None
+            mo = None
+            dof_red = None
+
+        mo = self.comm.bcast(mo, root=mpi_master())
+        density = self.comm.bcast(density, root=mpi_master())
+        dof_red = self.comm.bcast(dof_red, root=mpi_master())
+
+        # TODO: double check dft_dict['gs_density']
+        # TODO: maybe rename to mol_grid
+        molgrid = dft_dict['molgrid']
+        gs_density = [density]
+
+        # MO coefficients
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
         orbrsp_rhs = {}
+
+        dist_cphf_rhs = []
+
         for f, w in enumerate(self.frequencies):
 
             if self.rank == mpi_master():
@@ -216,16 +254,16 @@ class PolOrbitalResponse(CphfSolver):
                 self.ostream.flush()
 
                 #ovlp = scf_tensors['S']
-                mo = scf_tensors['C_alpha']  # only alpha part
+#                mo = scf_tensors['C_alpha']  # only alpha part
 
-                nao = mo.shape[0]
-                nocc = molecule.number_of_alpha_electrons()
-                mo_occ = mo[:, :nocc].copy()
-                mo_vir = mo[:, nocc:].copy()
-                nvir = mo_vir.shape[1]
+                #nao = mo.shape[0]
+                #nocc = molecule.number_of_alpha_electrons()
+                #mo_occ = mo[:, :nocc].copy()
+                #mo_vir = mo[:, nocc:].copy()
+                #nvir = mo_vir.shape[1]
 
                 # check if response vectors exist for desired frequency of gradient
-                polgrad_sanity_check(self, self.flag, lr_results)
+                #polgrad_sanity_check(self, self.flag, lr_results)
 
             full_vec = [
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
@@ -294,35 +332,37 @@ class PolOrbitalResponse(CphfSolver):
                     perturbed_dm_ao_list_imre = []
                     zero_dm_ao_list = []
 
-                    xy_pairs = [(x, y) for x in range(dof) for y in range(dof)]
+                    #xy_pairs = [(x, y) for x in range(dof) for y in range(dof)]
 
-                    for x, y in xy_pairs:
-                        perturbed_dm_ao_list_rere.extend([
-                            np.array(x_minus_y_ao[x].real),
-                            np.array(0 * x_minus_y_ao[x].real),
-                            np.array(x_minus_y_ao[y].real),
-                            np.array(0 * x_minus_y_ao[y].real)])
-                        perturbed_dm_ao_list_imim.extend([
-                            np.array(x_minus_y_ao[x].imag),
-                            np.array(0 * x_minus_y_ao[x].imag),
-                            np.array(x_minus_y_ao[y].imag),
-                            np.array(0 * x_minus_y_ao[y].imag)])
+                    for x in range(dof):
+                        for y in range(dof):
+                    #for x, y in xy_pairs:
+                            perturbed_dm_ao_list_rere.extend([
+                                np.array(x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(x_minus_y_ao[y].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+                            perturbed_dm_ao_list_imim.extend([
+                                np.array(x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(x_minus_y_ao[y].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
 
-                        # complex cross-terms
-                        perturbed_dm_ao_list_reim.extend([
-                            np.array(x_minus_y_ao[x].real),
-                            np.array(0 * x_minus_y_ao[x].real),
-                            np.array(x_minus_y_ao[y].imag),
-                            np.array(0 * x_minus_y_ao[y].imag)])
-                        perturbed_dm_ao_list_imre.extend([
-                            np.array(x_minus_y_ao[x].imag),
-                            np.array(0 * x_minus_y_ao[x].imag),
-                            np.array(x_minus_y_ao[y].real),
-                            np.array(0 * x_minus_y_ao[y].real)])
-                 
-                        zero_dm_ao_list.extend([
-                            np.array(0 * x_minus_y_ao[x].real),
-                            np.array(0 * x_minus_y_ao[y].real)])
+                            # complex cross-terms
+                            perturbed_dm_ao_list_reim.extend([
+                                np.array(x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(x_minus_y_ao[y].imag),
+                                np.array(0 * x_minus_y_ao[y].imag)])
+                            perturbed_dm_ao_list_imre.extend([
+                                np.array(x_minus_y_ao[x].imag),
+                                np.array(0 * x_minus_y_ao[x].imag),
+                                np.array(x_minus_y_ao[y].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
+
+                            zero_dm_ao_list.extend([
+                                np.array(0 * x_minus_y_ao[x].real),
+                                np.array(0 * x_minus_y_ao[y].real)])
 
             else:
                 dof = None
@@ -477,8 +517,8 @@ class PolOrbitalResponse(CphfSolver):
 
             if self.rank == mpi_master():
                 # reduce dimensions of RHS to unique operator component combinations
-                xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
-                red_dof = len(xy_pairs)
+                #xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+                #red_dof = len(xy_pairs)
                 rhs_tmp = rhs_mo.reshape(dof, dof, nocc, nvir).copy()
                 rhs_red = []
 
@@ -508,6 +548,25 @@ class PolOrbitalResponse(CphfSolver):
                     tot_rhs_mo = np.concatenate(
                         #(tot_rhs_mo, rhs_mo.real, rhs_mo.imag))
                         (tot_rhs_mo, rhs_red.real, rhs_red.imag))
+            #
+            # save RHS in distributed array
+            for k in range(dof_red):
+                if self.rank == mpi_master():
+                    cphf_rhs_k_re = rhs_red[k].real.reshape(nocc * nvir)
+                    cphf_rhs_k_im = rhs_red[k].imag.reshape(nocc * nvir)
+                    #cphf_rhs_k = np.concatenate((cphf_rhs_k_re, cphf_rhs_k_im))
+                else:
+                    cphf_rhs_k_re = None
+                    cphf_rhs_k_im = None
+                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_re, self.comm))
+                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_im, self.comm))
+
+        if self.rank == mpi_master():
+            orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
+            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            return orbrsp_rhs
+        else:
+            return {}
 
         valstr = '** Time spent on constructing the orbrsp RHS for '
         valstr += '{} frequencies: '.format(len(self.frequencies))
@@ -515,12 +574,6 @@ class PolOrbitalResponse(CphfSolver):
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
-
-        if self.rank == mpi_master():
-            orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
-            return orbrsp_rhs
-        else:
-            return {}
 
     def compute_rhs_real(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
         """
@@ -559,7 +612,6 @@ class PolOrbitalResponse(CphfSolver):
 
         loop_start_time = tm.time()
 
-        natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
         nao = basis.get_dimensions_of_basis()
 
@@ -765,7 +817,6 @@ class PolOrbitalResponse(CphfSolver):
                 #dof_red = len(xy_pairs)
                 rhs_red = []
                 rhs_tmp = rhs_mo.reshape(dof, dof, nocc, nvir).copy()
-                #rhs_tmp = rhs_mo.reshape(dof, dof, nocc * nvir).copy()
 
                 for x, y in xy_pairs:
                     rhs_red.append(rhs_tmp[x, y].copy())
@@ -1720,7 +1771,18 @@ class PolOrbitalResponse(CphfSolver):
             n_freqs = len(self.frequencies)
             # get CPHF results
             #all_cphf_ov = self.cphf_results['cphf_ov']
-            all_cphf_red = self.cphf_results['cphf_ov']
+            #all_cphf_red = self.cphf_results['cphf_ov']
+            # TODO WIP
+            if self.use_subspace_solver:
+                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+                all_cphf_red = {}
+                for n, w in enumerate(self.frequencies):
+                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
+                    for xy in range(2 * dof_red):
+                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
+                        all_cphf_red[w] = tmp_cphf_n
+            else:
+                all_cphf_red = self.cphf_results['cphf_ov']
             # map CPHF results to dof*dof dimensions
             all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
         else:
