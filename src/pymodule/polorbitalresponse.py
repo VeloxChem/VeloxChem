@@ -550,6 +550,8 @@ class PolOrbitalResponse(CphfSolver):
                         (tot_rhs_mo, rhs_red.real, rhs_red.imag))
             #
             # save RHS in distributed array
+            dist_cphf_rhs_re = []
+            dist_cphf_rhs_im = []
             for k in range(dof_red):
                 if self.rank == mpi_master():
                     cphf_rhs_k_re = rhs_red[k].real.reshape(nocc * nvir)
@@ -558,12 +560,15 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     cphf_rhs_k_re = None
                     cphf_rhs_k_im = None
-                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_re, self.comm))
-                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_im, self.comm))
+                dist_cphf_rhs_re.append(DistributedArray(cphf_rhs_k_re, self.comm, distribute=False))
+                dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm, distribute=False))
+                #dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_re, self.comm, distribute=False))
+                #dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_im, self.comm, distribute=False))
+            dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
 
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
-            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs#_re + dist_cphf_rhs_im
             return orbrsp_rhs
         else:
             return {}
@@ -846,7 +851,7 @@ class PolOrbitalResponse(CphfSolver):
                     cphf_rhs_k = rhs_red[k].reshape(nocc * nvir)
                 else:
                     cphf_rhs_k = None
-                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm))
+                dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm, root=mpi_master()))
 
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
