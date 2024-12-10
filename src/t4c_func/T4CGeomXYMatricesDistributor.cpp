@@ -19,6 +19,46 @@ CT4CGeomXYMatricesDistributor::CT4CGeomXYMatricesDistributor(CMatrices*         
 
     , _density(density)
 
+    , _density_2(nullptr)
+
+    , _label(format::lower_case(label))
+
+    , _exchange_factor(exchange_factor)
+
+    , _omega(omega)
+
+    , _matrices(CMatrices())
+
+    , _a_loc_indices(std::vector<size_t>())
+
+    , _b_loc_indices(std::vector<size_t>())
+
+    , _c_loc_indices(std::vector<size_t>())
+
+    , _d_loc_indices(std::vector<size_t>())
+
+    , _a_glob_indices(std::vector<size_t>())
+
+    , _b_glob_indices(std::vector<size_t>())
+
+    , _c_glob_indices(std::vector<size_t>())
+
+    , _d_glob_indices(std::vector<size_t>())
+{
+}
+
+CT4CGeomXYMatricesDistributor::CT4CGeomXYMatricesDistributor(const CMatrix*     density,
+                                                             const CMatrix*     density_2,
+                                                             const std::string& label,
+                                                             const double       exchange_factor,
+                                                             const double       omega)
+
+    : _focks(nullptr)
+
+    , _density(density)
+
+    , _density_2(density_2)
+
     , _label(format::lower_case(label))
 
     , _exchange_factor(exchange_factor)
@@ -55,6 +95,18 @@ auto
 CT4CGeomXYMatricesDistributor::need_omega() const -> bool
 {
     return (_label == "j_rs") || (_label == "k_rs") || (_label == "kx_rs");
+}
+
+auto
+CT4CGeomXYMatricesDistributor::get_values() const -> std::vector<double>
+{
+    return _values;
+}
+
+auto
+CT4CGeomXYMatricesDistributor::set_num_values(int num_values) -> void
+{
+    _values = std::vector<double>(num_values, 0.0);
 }
 
 auto
@@ -96,16 +148,19 @@ CT4CGeomXYMatricesDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_blo
 
     // adds submatrices storage
 
-    auto keys = _focks->keys();
-
-    if (const auto nkeys = keys.size(); nkeys > 0)
+    if (_focks != nullptr)
     {
-        std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
-            t4cfunc::add_local_matrices(_matrices, _label, mat_t::general, std::to_string(i), a_dims, b_dims, c_dims, d_dims);
-        });
-    }
+        auto keys = _focks->keys();
 
-    _matrices.zero();
+        if (const auto nkeys = keys.size(); nkeys > 0)
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
+                t4cfunc::add_local_matrices(_matrices, _label, mat_t::general, std::to_string(i), a_dims, b_dims, c_dims, d_dims);
+            });
+        }
+
+        _matrices.zero();
+    }
 }
 
 auto
@@ -122,10 +177,12 @@ CT4CGeomXYMatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                           const size_t                     ibra_gto,
                                           const std::pair<size_t, size_t>& ket_range) -> void
 {
-    auto keys = _focks->keys();
-
-    if (const auto nkeys = keys.size(); nkeys > 0)
+    if (_focks != nullptr)
     {
+        auto keys = _focks->keys();
+
+        const auto nkeys = keys.size();
+
         const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
 
         std::ranges::for_each(std::views::iota(size_t{0}, nkeys), [&](const auto i) {
@@ -151,6 +208,32 @@ CT4CGeomXYMatricesDistributor::distribute(const CSimdArray<double>&        buffe
                                                        ibra_gto,
                                                        ket_range);
         });
+    }
+    else
+    {
+        const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
+
+        for (int i = 0; i < static_cast<int>(_values.size()); i++)
+        {
+            t4cfunc::local_distribute_geom_no_symm(_values,
+                                           i,
+                                           _density,
+                                           _density_2,
+                                           _label,
+                                           _exchange_factor,
+                                           buffer,
+                                           offset + i * ncomps,
+                                           a_indices,
+                                           b_indices,
+                                           c_indices,
+                                           d_indices,
+                                           a_angmom,
+                                           b_angmom,
+                                           c_angmom,
+                                           d_angmom,
+                                           ibra_gto,
+                                           ket_range);
+        };
     }
 }
 
