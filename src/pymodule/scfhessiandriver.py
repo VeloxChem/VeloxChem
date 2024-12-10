@@ -25,18 +25,20 @@
 import numpy as np
 import time as tm
 
-from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import OverlapGeom200Driver
 from .veloxchemlib import OverlapGeom101Driver
+from .veloxchemlib import OverlapGeom100Driver
 from .veloxchemlib import KineticEnergyGeom200Driver
 from .veloxchemlib import KineticEnergyGeom101Driver
 from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom020Driver
 from .veloxchemlib import NuclearPotentialGeom110Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
+from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
+from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import make_matrix, mat_t
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
@@ -51,12 +53,6 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 
-# vlx integrals
-from .veloxchemlib import ElectricDipoleMomentGeom100Driver
-from .veloxchemlib import OverlapGeom100Driver
-
-# For PySCF integral derivatives
-from .import_from_pyscf import dipole_deriv
 
 class ScfHessianDriver(HessianDriver):
     """
@@ -145,7 +141,7 @@ class ScfHessianDriver(HessianDriver):
 
         start_time = tm.time()
 
-        # TODO: find a better place for the profiler?
+        # TODO: make use of profiler
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -418,24 +414,13 @@ class ScfHessianDriver(HessianDriver):
                                     orben_ovlp_deriv_oo,
                                     self.perturbed_density, profiler)
         else:
-            # TODO: should we also take ovlp_deriv_ao from cphf_solution_dict?
             hessian_first_order_derivatives = self.compute_furche(molecule,
                                     ao_basis, dist_cphf_rhs, dist_cphf_ov,
                                     hessian_first_integral_derivatives,
                                     hessian_eri_overlap, profiler)
 
-        # TODO: need to test LDA and pure GGA functional
-
-        # amount of exact exchange
-        frac_K = 1.0
-
         # DFT:
         if self._dft:
-            if self.scf_driver.xcfun.is_hybrid():
-                frac_K = self.scf_driver.xcfun.get_frac_exact_exchange()
-            else:
-                frac_K = 0.0
-
             xc_mol_hess = XCMolecularHessian()
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule,
                                                 ao_basis,
@@ -483,6 +468,7 @@ class ScfHessianDriver(HessianDriver):
         den_mat_for_fock = make_matrix(ao_basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
 
+        # TODO: parallelize over atoms
         if self.rank == mpi_master():
             t2 = tm.time()
             self.ostream.print_info('First order derivative contributions'
@@ -533,10 +519,8 @@ class ScfHessianDriver(HessianDriver):
                 npot_hess_200_mats = Matrices()
                 npot_hess_020_mats = Matrices()
 
-                # TODO: atom screening
+                # TODO: atom-based screening
                 # TODO: in-place accumulation with two densities
-                # TODO: pure and hybrid functionals
-                # TODO: range-separated hybrid functionals
 
                 fock_hess_2000_mats = fock_hess_2000_drv.compute(ao_basis, molecule, den_mat_for_fock, i, fock_type, exchange_scaling_factor, 0.0)
 
@@ -1278,40 +1262,6 @@ class ScfHessianDriver(HessianDriver):
 
         if self.rank == mpi_master():
             self.dipole_gradient = dipole_gradient.reshape(3, 3 * natm)
-
-    # TODO remove this function
-    def compute_pyscf_dipole_integral_derivatives(self, molecule, ao_basis):
-        """
-        LEGACY FUNCTION:  REPLACED BY VLX INTEGRALS
-        Imports the analytical derivatives of dipole integrals.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-
-        :return:
-            The dipole integral derivatives.
-        """
-
-        # number of atoms
-        natm = molecule.number_of_atoms()
-
-        #scf_tensors = self.scf_driver.scf_tensors
-        # number of atomic orbitals
-        #nao = scf_tensors['D_alpha'].shape[0]
-        nao = ao_basis.get_dimensions_of_basis()
-
-        # 3 dipole components x No. atoms x 3 atomic coordinates
-        # x No. basis x No. basis
-        dipole_integrals_gradient = np.zeros((3, natm, 3, nao, nao))
-
-        for i in range(natm):
-            dipole_integrals_gradient[:,i,:,:,:] = (
-                                dipole_deriv(molecule, ao_basis, i)
-                                )
-
-        return dipole_integrals_gradient
 
     def compute_dipole_integral_derivatives(self, molecule, ao_basis):
         """

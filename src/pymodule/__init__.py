@@ -157,9 +157,6 @@ from .symmetryanalyzer import SymmetryAnalyzer
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import eri_deriv
 from .oneeints import compute_overlap_integrals
 from .oneeints import compute_kinetic_energy_integrals
 from .oneeints import compute_nuclear_potential_integrals
