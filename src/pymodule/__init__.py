@@ -34,12 +34,20 @@ from .veloxchemlib import KineticEnergyGeom100Driver
 from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+from .veloxchemlib import NuclearPotentialGeom200Driver
+from .veloxchemlib import NuclearPotentialGeom110Driver
+from .veloxchemlib import NuclearPotentialGeom101Driver
+from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
+from .veloxchemlib import FockGeom2000Driver
+from .veloxchemlib import FockGeom1100Driver
+from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import XCMolecularGradient
+from .veloxchemlib import SubMatrix
 
 # for backward compatibility only
 from .veloxchemlib import ElectricDipoleIntegralsDriver
@@ -149,9 +157,6 @@ from .symmetryanalyzer import SymmetryAnalyzer
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import eri_deriv
 from .oneeints import compute_overlap_integrals
 from .oneeints import compute_kinetic_energy_integrals
 from .oneeints import compute_nuclear_potential_integrals

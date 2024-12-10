@@ -256,25 +256,35 @@ class TddftGradientDriver(GradientDriver):
             x_plus_y_ao = orbrsp_results['x_plus_y_ao']
             x_minus_y_ao = orbrsp_results['x_minus_y_ao']
 
-            # CPHF/CPKS coefficients (lambda Lagrange multipliers)
-            cphf_ov = orbrsp_results['cphf_ov']
-            unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao']
             dof = x_plus_y_ao.shape[0]
-            cphf_ao = np.array([
-                np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
-                for x in range(dof)
-            ])
-            relaxed_density_ao = ( unrelaxed_density_ao + 2.0 * cphf_ao
-                        + 2.0 * cphf_ao.transpose(0,2,1) )
         else:
             dof = None
+        dof = self.comm.bcast(dof, root=mpi_master())
+
+        dist_cphf_ov = orbrsp_results['dist_cphf_ov']
+
+        cphf_ao = []
+        for x in range(dof):
+            cphf_ov_x = dist_cphf_ov[x].get_full_vector(0)
+
+            if self.rank == mpi_master():
+                # CPHF/CPKS coefficients (lambda Lagrange multipliers)
+                cphf_ao.append(
+                    np.linalg.multi_dot([mo_occ, cphf_ov_x.reshape(nocc, nvir), mo_vir.T])
+                )
+
+        if self.rank == mpi_master():
+            cphf_ao = np.array(cphf_ao)
+            unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao']
+            relaxed_density_ao = ( unrelaxed_density_ao + 2.0 * cphf_ao
+                            + 2.0 * cphf_ao.transpose(0,2,1) )
+        else:
             natm = None
             gs_dm = None
             relaxed_density_ao = None
             x_plus_y_ao = None
             x_minus_y_ao = None
 
-        dof = self.comm.bcast(dof, root=mpi_master())
         natm = self.comm.bcast(natm, root=mpi_master())
         gs_dm = self.comm.bcast(gs_dm,
                                 root=mpi_master())
