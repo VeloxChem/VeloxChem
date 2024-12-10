@@ -4,99 +4,106 @@
 #include <cstddef>
 #include <vector>
 
+#include "BaseCorePotential.hpp"
+
 /// @brief Class CAtomCorePotential stores data about atom core potential and
-/// provides set of methods for handling of base core potential data.
+/// provides set of methods for handling of atom core potential data.
 class CAtomCorePotential
 {
    public:
     /// @brief The default constructor.
     CAtomCorePotential();
 
-    /// @brief The constructor with exponents, expansion factors, and radial orders.
-    /// @param exponents The vector of exponents of primitive local potentials.
-    /// @param factors The vector of expansion factors of primitive local potential.
-    /// @param radial_orders The vector of radial orders of primitive local potentials.
-    CAtomCorePotential(const std::vector<double> &exponents,
-                       const std::vector<double> &factors,
-                       const std::vector<int>    &radial_orders);
+    /// @brief The constructor with local and projected potentials.
+    /// @param local_potential The local potential of atom's core potential.
+    /// @param projected_potentials The vector of projected potentials of atom's core potential.
+    /// @param angular_momentums The vector of angular momentums associated with projected potentials.
+    /// @param core_electrons The number of core electrons.
+    CAtomCorePotential(const CBaseCorePotential              &local_potential,
+                       const std::vector<CBaseCorePotential> &projected_potentials,
+                       const std::vector<int>                &angular_momentums,
+                       const int                             core_electrons);
 
     /// @brief The default copy constructor.
-    /// @param other The base core potential to be copied.
+    /// @param other The atom core potential to be copied.
     CAtomCorePotential(const CAtomCorePotential &other);
 
     /// @brief The default move constructor.
-    /// @param other The base core potential to be moved.
+    /// @param other The atom core potential to be moved.
     CAtomCorePotential(CAtomCorePotential &&other) noexcept;
 
     /// @brief The default destructor.
     ~CAtomCorePotential() = default;
 
     /// @brief The default copy assignment operator.
-    /// @param other The base core potential to be copy assigned.
-    /// @return The assigned base core potential.
+    /// @param other The atom core potential to be copy assigned.
+    /// @return The assigned atom core potential.
     auto operator=(const CAtomCorePotential &other) -> CAtomCorePotential&;
 
     /// @brief The default move assignment operator.
-    /// @param other The base core potential to be move assigned.
-    /// @return The assigned base core potential.
+    /// @param other The atom core potential to be move assigned.
+    /// @return The assigned atom core potential.
     auto operator=(CAtomCorePotential &&other) noexcept -> CAtomCorePotential &;
 
     /// @brief The equality operator.
-    /// @param other The base core potential to be compared.
-    /// @return True if base core potentials are equal, False otherwise.
+    /// @param other The atom core potential to be compared.
+    /// @return True if atom core potentials are equal, False otherwise.
     auto operator==(const CAtomCorePotential &other) const -> bool;
 
     /// @brief The equality operator.
-    /// @param other The base core potential to be compared.
-    /// @return True if base core potentials are not equal, False otherwise.
+    /// @param other The atom core potential to be compared.
+    /// @return True if atom core potentials are not equal, False otherwise.
     auto operator!=(const CAtomCorePotential &other) const -> bool;
 
-    /// @brief Sets exponents of primittive base core potentials to specific vector
-    /// of exponents.
-    /// @param exponents The vector of exponents.
-    auto set_exponents(const std::vector<double> &exponents) -> void;
+    /// @brief Sets local potential in atom core potential.
+    /// @param local_potential The local potential.
+    auto set_local_potential(const CBaseCorePotential &local_potential) -> void;
 
-    /// @brief Sets expansion factors of primitive base core potentials to
-    /// specific vector of expansion factors.
-    /// @param factors The vector of expansion factors.
-    auto set_factors(const std::vector<double> &factors) -> void;
+    /// @brief Sets projected core potentials and associated angular momentums in atom core potential.
+    /// @param projected_potentials The vector of projected core potentials.
+    /// @param angular_momentums The vector of angular momentums.
+    auto set_projected_potentials(const std::vector<CBaseCorePotential> &projected_potentials,
+                                  const std::vector<int>                &angular_momentums) -> void;
+   
+    /// @brief Adds projected potential to atom core potential.
+    /// @param projected_potential The projected potential.
+    /// @param angular_momentum The angular momentum of projected potential.
+    auto add_projected_potential(const CBaseCorePotential &projected_potential,
+                                 const int                 angular_momentum) -> void;
+
+    /// @brief Sets number of core electrons..
+    /// @param core_electrons The number of core electrons..
+    auto set_number_core_electrons(const int core_electrons) -> void;
     
-    /// @brief Sets radial orders of primitive base core potentials to
-    /// specific vector of radial orders.
-    /// @param radial_orders The vector of radial orders.
-    auto set_radial_orders(const std::vector<int> &radial_orders) -> void;
+    /// @brief Gets local potential from atom core potential.
+    /// @return The local potential.
+    auto get_local_potential() const -> CBaseCorePotential;
 
-    /// @brief Adds primittive base core potential to base core potential.
-    /// @param exponent The exponent of primitive base core potential.
-    /// @param factor The expansion factor of primitive base core potential.
-    /// @param radial_order  The radial order of primitive base core potential.
-    auto add(const double exponent, const double factor, const int radial_order) -> void;
+    /// @brief Gets vector of projected potentials from atom core potential.
+    /// @return The vector of projected potentials.
+    auto get_projected_potentials() const -> std::vector<CBaseCorePotential>;
 
-    /// @brief Gets vector of exponents of primitive base core potentials.
-    /// @return The vector of exponents of primitive base core potentials.
-    auto get_exponents() const -> std::vector<double>;
+    /// @brief Gets vector of angular momentums associated with projected potentials in atom core potential.
+    /// @return The vector of angular momentums.
+    auto get_angular_momentums() const -> std::vector<int>;
 
-    /// @brief Gets vector of expansion factors of primitive base core potentials.
-    /// @return The vector of expansion factors of primitive base core potentials.
-    auto get_factors() const -> std::vector<double>;
-
-    /// @brief Gets vector of radial orders of primitive base core potentials.
-    /// @return The vector of radial orders of primitive base core potentials.
-    auto get_radial_orders() const -> std::vector<int>;
-
-    /// @brief Gets number of primitive  base core potentials in base core potential.
-    /// @return The number of primitive  base core potentials in base core potential.
-    auto number_of_primitive_potentials() const -> size_t;
+    /// @brief Gets number of core electrons in atom core potential.
+    /// @return The number of core electrons.
+    auto number_of_core_electrons() const -> int;
 
    private:
-    /// @brief The vector of exponents of primitive local potentials.
-    std::vector<double> _exponents;
+    
+    /// @brief The local core potential.
+    CBaseCorePotential _local_potential;
 
-    /// @brief The vector of expansion factors of primitive local potentials.
-    std::vector<double> _factors;
+    /// @brief The vector of projected core potentials.
+    std::vector<CBaseCorePotential> _projected_potentials;
 
-    /// @brief The vector of radial orders of primitive local potentials.
-    std::vector<int> _radial_orders;
+    /// @brief The vector of angular momentums associated with projected core potentials.
+    std::vector<int> _angular_momentums;
+    
+    /// @brief The number of core electrons.
+    int _core_electrons;
 };
 
 #endif /* AtomCorePotential_hpp */
