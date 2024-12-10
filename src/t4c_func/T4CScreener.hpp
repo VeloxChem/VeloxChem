@@ -60,6 +60,8 @@ class CT4CScreener
 
     auto partition_atom(const CMolecularBasis& basis, const CMolecule& molecule, const std::string& label, const int iatom) -> void;
 
+    auto partition_atom_pair(const CMolecularBasis& basis, const CMolecule& molecule, const std::string& label, const int iatom, const int jatom) -> void;
+
     /// @brief Gets vector of blocked basis function pair blocks.
     /// @return The vector of  blocked basis function pair blocks.
     auto gto_pair_blocks() const -> std::vector<CBlockedGtoPairBlock>;
