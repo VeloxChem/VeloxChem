@@ -330,7 +330,7 @@ class EvbForceFieldBuilder():
         # Seperate all molecules into seperate graphs
         product_graphs = EvbForceFieldBuilder._split_graphs(pro_graph)
         reactant_graphs = EvbForceFieldBuilder._split_graphs(rea_graph)
-        print(f"{len(reactant_graphs)} reactant molecule and {len(product_graphs)} product molecules")
+        print(f"{len(reactant_graphs)} reactant molecule(s) and {len(product_graphs)} product molecule(s)")
 
         A = reactant_graphs
         B = product_graphs

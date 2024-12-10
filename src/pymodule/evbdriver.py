@@ -47,22 +47,21 @@ class EvbDriver():
         self.reactant: ForceFieldGenerator
         self.product: ForceFieldGenerator
         self.products: list[ForceFieldGenerator]
-        self.input_folder: str = "input_files"
+        self.input_folder: str = "./input_files"
 
         self.name: str
         self.system_confs: list[dict] = []
         self.debug = False
 
-    def build_and_run_default_water_EVB(self, reactant: str, product: str | list[str], barrier, free_energy):
+    def build_and_run_default_water_EVB(self, reactant: str, product: str | list[str], barrier, free_energy, ordered_input=False):
         
         Lambda = list(np.linspace(0, 1, 51))
         if self.debug:
             Lambda = [0, 0.5, 1]
-        self.build_forcefields(reactant, product)
+        self.build_forcefields(reactant, product, ordered_input=ordered_input)
         self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
         self.run_FEP(test_run=self.debug)
         self.compute_energy_profiles(barrier, free_energy)
-
 
     def build_forcefields(
         self,
@@ -74,7 +73,6 @@ class EvbDriver():
         reparameterise: bool = True,
         optimise: bool = False,
         ordered_input: bool = False,
-        breaking_bonds: list[tuple[int, int]] = [],
     ):
         self.name = reactant_file
         if isinstance(product_file, str):
