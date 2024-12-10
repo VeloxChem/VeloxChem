@@ -158,9 +158,9 @@ comp_sum_erf_nuclear_potential_geom_10_df(T& distributor,
                 {
                     t2cfunc::comp_distances_pc(factors, 17, 8, coords[l]);
 
-                    t2cfunc::comp_boys_args(bf_data, 6, factors, 17, a_exp, omegas[l]);
+                    t2cfunc::comp_boys_args(bf_data, 7, factors, 17, a_exp, omegas[l]);
 
-                    bf_table.compute(bf_data, 0, 6, factors, a_exp, omegas[l]);
+                    bf_table.compute(bf_data, 0, 7, factors, a_exp, omegas[l]);
 
                     npotrec::comp_prim_nuclear_potential_ss(pbuffer, 1, 0, bf_data, 0, factors, a_exp);
 
