@@ -34,9 +34,12 @@ from .veloxchemlib import OverlapGeom100Driver
 from .veloxchemlib import KineticEnergyGeom100Driver
 from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
-from .veloxchemlib import NuclearPotentialErfGeom010Driver
+from .veloxchemlib import NuclearPotentialGeom200Driver
+from .veloxchemlib import NuclearPotentialGeom110Driver
+from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
-from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+from .veloxchemlib import NuclearPotentialErfGeom010Driver
+from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator

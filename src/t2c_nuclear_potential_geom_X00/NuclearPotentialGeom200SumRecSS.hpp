@@ -83,9 +83,9 @@ comp_sum_nuclear_potential_geom_20_ss(T&                               distribut
 
     // setup Boys function data
 
-    const CBoysFunc<0> bf_table;
+    const CBoysFunc<2> bf_table;
 
-    CSimdArray<double> bf_data(2, ket_npgtos);
+    CSimdArray<double> bf_data(4, ket_npgtos);
 
     // set up ket partitioning
 
@@ -139,9 +139,9 @@ comp_sum_nuclear_potential_geom_20_ss(T&                               distribut
                 {
                     t2cfunc::comp_distances_pc(factors, 14, 8, coords[l]);
 
-                    t2cfunc::comp_boys_args(bf_data, 1, factors, 14, a_exp);
+                    t2cfunc::comp_boys_args(bf_data, 3, factors, 14, a_exp);
 
-                    bf_table.compute(bf_data, 0, 1);
+                    bf_table.compute(bf_data, 0, 3);
 
                     npotrec::comp_prim_nuclear_potential_ss(pbuffer, 1, 0, bf_data, 0, factors, a_exp);
 

@@ -38,6 +38,7 @@
 #include "NuclearPotentialGeomX00Driver.hpp"
 #include "NuclearPotentialGeomX0YDriver.hpp"
 #include "NuclearPotentialGeomXY0Driver.hpp"
+#include "NuclearPotentialErfGeomX00Driver.hpp"
 #include "OverlapDriver.hpp"
 #include "OverlapGeomX00Driver.hpp"
 #include "OverlapGeomX0YDriver.hpp"
@@ -229,6 +230,17 @@ export_t2cintegrals(py::module& m)
                const std::vector<std::array<double, 3>>& coords_array,
                const std::vector<double>& charges) -> CMatrices { return geom_drv.compute(basis, molecule, iatom, coords_array, charges); },
             "Computes nuclear potential first derivatives matrices for given molecule, basis, selected atom, and point charges.");
+                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+            "Computes nuclear potential first derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CNuclearPotentialErfGeom100Driver class
+    PyClass<CNuclearPotentialErfGeomX00Driver<1>>(m, "NuclearPotentialErfGeom100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CNuclearPotentialErfGeomX00Driver<1>& geom_drv, const std::vector<double> &omegas, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
+                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(omegas, basis, molecule, iatom)); },
+            "Computes nuclear potential first derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom200Driver class
     PyClass<CNuclearPotentialGeomX00Driver<2>>(m, "NuclearPotentialGeom200Driver")
