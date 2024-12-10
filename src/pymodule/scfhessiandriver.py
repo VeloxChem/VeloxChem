@@ -24,6 +24,7 @@
 
 import numpy as np
 import time as tm
+import math
 
 from .veloxchemlib import OverlapGeom200Driver
 from .veloxchemlib import OverlapGeom101Driver
@@ -39,6 +40,7 @@ from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import T4CScreener
 from .veloxchemlib import make_matrix, mat_t
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
@@ -468,6 +470,14 @@ class ScfHessianDriver(HessianDriver):
         den_mat_for_fock = make_matrix(ao_basis, mat_t.symmetric)
         den_mat_for_fock.set_values(density)
 
+        den_mat_for_fock2 = make_matrix(ao_basis, mat_t.general)
+        den_mat_for_fock2.set_values(density)
+
+        screener = T4CScreener()
+        screener.partition(ao_basis, molecule, 'eri')
+
+        thresh_int = int(-math.log10(self.scf_driver.eri_thresh))
+
         # TODO: parallelize over atoms
         if self.rank == mpi_master():
             t2 = tm.time()
@@ -519,18 +529,23 @@ class ScfHessianDriver(HessianDriver):
                 npot_hess_200_mats = Matrices()
                 npot_hess_020_mats = Matrices()
 
-                # TODO: atom-based screening
-                # TODO: in-place accumulation with two densities
+                screener_atom = T4CScreener()
+                screener_atom.partition_atom(ao_basis, molecule, 'eri', i)
 
-                fock_hess_2000_mats = fock_hess_2000_drv.compute(ao_basis, molecule, den_mat_for_fock, i, fock_type, exchange_scaling_factor, 0.0)
+                fock_hess_2000 = fock_hess_2000_drv.compute(
+                        ao_basis, screener_atom, screener,
+                        den_mat_for_fock, den_mat_for_fock2, i,
+                        fock_type, exchange_scaling_factor,
+                        0.0, thresh_int)
 
-                for x, label_x in enumerate('XYZ'):
-                    for y, label_y in enumerate('XYZ'):
-                        fock_label = label_x + label_y if x <= y else label_y + label_x
-                        fock_hess_2000_mats_xy = fock_hess_2000_mats.matrix_to_numpy(fock_label)
-                        hessian_2nd_order_derivatives[i, i, x, y] += fock_factor * np.sum(density * fock_hess_2000_mats_xy)
+                # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
+                xy_pairs = [(x, y) for x in range(3) for y in range(x, 3)]
 
-                fock_hess_2000_mats = Matrices()
+                for idx, (x, y) in enumerate(xy_pairs):
+                    hess_val = fock_factor * fock_hess_2000[idx]
+                    hessian_2nd_order_derivatives[i, i, x, y] += hess_val
+                    if x != y:
+                        hessian_2nd_order_derivatives[i, i, y, x] += hess_val
 
                 # do only upper triangular matrix
                 for j in range(i, natm):
@@ -586,6 +601,9 @@ class ScfHessianDriver(HessianDriver):
                             fock_hess_1010_mats_xy = fock_hess_1010_mats.matrix_to_numpy(fock_label)
                             hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * np.sum(
                                 density * (fock_hess_1100_mats_xy + fock_hess_1010_mats_xy))
+
+                    # TODO: atom-based screening
+                    # TODO: in-place accumulation with two densities
 
                     fock_hess_1100_mats = Matrices()
                     fock_hess_1010_mats = Matrices()
