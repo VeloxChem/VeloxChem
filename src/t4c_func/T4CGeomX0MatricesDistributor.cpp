@@ -108,6 +108,12 @@ CT4CGeomX0MatricesDistributor::get_values() const -> std::vector<double>
 }
 
 auto
+CT4CGeomX0MatricesDistributor::set_num_values(int num_values) -> void
+{
+    _values = std::vector<double>(num_values, 0.0);
+}
+
+auto
 CT4CGeomX0MatricesDistributor::set_indices(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void
 {
     // set up local indices
@@ -211,7 +217,7 @@ CT4CGeomX0MatricesDistributor::distribute(const CSimdArray<double>&        buffe
     {
         const auto ncomps = tensor::number_of_spherical_components(std::array<int, 4>{a_angmom, b_angmom, c_angmom, d_angmom});
 
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < static_cast<int>(_values.size()); i++)
         {
             t4cfunc::local_distribute_geom(_values,
                                            i,
