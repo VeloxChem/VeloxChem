@@ -83,7 +83,8 @@ class HessianOrbitalResponse(CphfSolver):
 
         super().update_settings(cphf_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args):
+
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
