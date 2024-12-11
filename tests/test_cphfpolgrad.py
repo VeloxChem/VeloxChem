@@ -13,10 +13,10 @@ from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polorbitalresponse import PolOrbitalResponse
 
-try:
-    import pyscf
-except ImportError:
-    pass
+#try:
+#    import pyscf
+#except ImportError:
+#    pass
 
 class TestCphfPolgrad:
 
@@ -227,8 +227,8 @@ class TestCphfPolgrad:
             # there might be sign differences; we compare absolute values instead.
             assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_cphfpolgrad_coefficients(self):
         h2o_xyz = """3
 
@@ -248,8 +248,8 @@ class TestCphfPolgrad:
         self.run_cphfpolgrad_cg_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex")
         self.run_cphfpolgrad_ss_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex")
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_cpkspolgrad_coefficients(self):
         h2o_xyz = """3
 

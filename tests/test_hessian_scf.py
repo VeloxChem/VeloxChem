@@ -10,10 +10,10 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
-try:
-    import pyscf
-except ImportError:
-    pass
+#try:
+#    import pyscf
+#except ImportError:
+#    pass
 
 class TestScfHessianDriver:
 
@@ -62,8 +62,8 @@ class TestScfHessianDriver:
 
         task.finish()
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_analytical_scf_hessian_pople(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -90,8 +90,8 @@ class TestScfHessianDriver:
             assert diff_hessian < 1e-6
         
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_analytical_scf_hessian_furche(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -117,8 +117,8 @@ class TestScfHessianDriver:
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_analytical_pbe_hessian_pople(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -147,8 +147,8 @@ class TestScfHessianDriver:
             assert diff_hessian < 1e-6
         
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_analytical_pbe_hessian_furche(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')

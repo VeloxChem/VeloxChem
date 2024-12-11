@@ -12,10 +12,10 @@ from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polarizabilitygradient import PolarizabilityGradient
 
-try:
-    import pyscf
-except ImportError:
-    pass
+#try:
+#    import pyscf
+#except ImportError:
+#    pass
 
 class TestPolgrad:
 
@@ -164,8 +164,8 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_hf_polarizabilitygradient(self):
         h2o_xyz = """3
 
@@ -181,8 +181,8 @@ class TestPolgrad:
         self.run_polgrad_real(molecule, basis, None, "polarizabilitygradient_hf_real")
         self.run_polgrad_complex(molecule, basis, None, "polarizabilitygradient_hf_complex")
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_ks_polarizabilitygradient(self):
         h2o_xyz = """3
 
