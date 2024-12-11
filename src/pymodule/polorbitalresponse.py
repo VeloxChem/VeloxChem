@@ -548,7 +548,7 @@ class PolOrbitalResponse(CphfSolver):
                     tot_rhs_mo = np.concatenate(
                         #(tot_rhs_mo, rhs_mo.real, rhs_mo.imag))
                         (tot_rhs_mo, rhs_red.real, rhs_red.imag))
-            #
+
             # save RHS in distributed array
             dist_cphf_rhs_re = []
             dist_cphf_rhs_im = []
@@ -560,18 +560,19 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     cphf_rhs_k_re = None
                     cphf_rhs_k_im = None
-                dist_cphf_rhs_re.append(DistributedArray(cphf_rhs_k_re, self.comm, distribute=False))
-                dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm, distribute=False))
-                #dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_re, self.comm, distribute=False))
-                #dist_cphf_rhs.append(DistributedArray(cphf_rhs_k_im, self.comm, distribute=False))
+                dist_cphf_rhs_re.append(DistributedArray(cphf_rhs_k_re, self.comm, root=mpi_master()))
+                dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm, root=mpi_master()))
             dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
+
 
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
-            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs#_re + dist_cphf_rhs_im
+            orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
             return orbrsp_rhs
         else:
-            return {}
+            return {
+                'dist_cphf_rhs': dist_cphf_rhs,
+            }
 
         valstr = '** Time spent on constructing the orbrsp RHS for '
         valstr += '{} frequencies: '.format(len(self.frequencies))
@@ -858,7 +859,9 @@ class PolOrbitalResponse(CphfSolver):
             orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
             return orbrsp_rhs
         else:
-            return {}
+            return {
+                'dist_cphf_rhs': dist_cphf_rhs,
+            }
 
         valstr = '** Time spent on constructing the orbrsp RHS for '
         valstr += '{} frequencies: '.format(len(self.frequencies))
@@ -1567,37 +1570,43 @@ class PolOrbitalResponse(CphfSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         if self.rank == mpi_master():
-            # number of vector components
-            dof = len(self.vector_components)
-            xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
-            dof_red = len(xy_pairs)
-            # number of frequencies
-            n_freq = len(self.frequencies)
-            # get CPHF results in reduced dimensions
-            #all_cphf_red = self.cphf_results['cphf_ov']
-            # TODO WIP
-            if self.use_subspace_solver:
-                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-                all_cphf_red = {}
-                for n, w in enumerate(self.frequencies):
-                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
-                    for xy in range(dof_red):
-                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
-                        all_cphf_red[w] = tmp_cphf_n
-            else:
-                all_cphf_red = self.cphf_results['cphf_ov']
-
-            # map CPHF results to dof*dof dimensions
-            all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
-
             # MO coefficients
             nocc = molecule.number_of_alpha_electrons()
             mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             nvir = mo_vir.shape[1]
+
             # number of atomic orbitals
-            nao = mo_occ.shape[0]
+            nao = basis.get_dimensions_of_basis()
+
+            # number of vector components
+            dof = len(self.vector_components)
+            xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
+            # number of frequencies
+            n_freq = len(self.frequencies)
+
+            # get CPHF results in reduced dimensions
+            #all_cphf_red = self.cphf_results['cphf_ov']
+            # TODO WIP
+            if self.use_subspace_solver:
+                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+                #all_cphf_red = {}
+                all_cphf_red = []
+                for n, w in enumerate(self.frequencies):
+                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
+                    for xy in range(dof_red):
+                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
+                    all_cphf_red.append(tmp_cphf_n)
+
+                all_cphf_red = np.array(all_cphf_red).reshape(n_freq * dof_red, nocc, nvir)
+            else:
+                all_cphf_red = self.cphf_results['cphf_ov']
+
+            # map CPHF results to dof*dof dimensions
+            all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+
         else:
             dof = None
 
@@ -1664,9 +1673,16 @@ class PolOrbitalResponse(CphfSolver):
             dof = self.comm.bcast(dof, root=mpi_master())
             cphf_ao_list = self.comm.bcast(cphf_ao_list, root=mpi_master())
 
+            # DEBUG
+            print('*** after bcast of cphf ao list')
+            self.ostream.flush()
+
             # TODO: what has to be on MPI master and what not?
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
                                eri_dict, dft_dict, pe_dict, self.profiler)
+            # DEBUG
+            print('*** after _comp_lr_fock')
+            self.ostream.flush()
 
             # For now we:
             # - loop over indices m and n
@@ -1770,8 +1786,21 @@ class PolOrbitalResponse(CphfSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         if self.rank == mpi_master():
+            # MO coefficients
+            nocc = molecule.number_of_alpha_electrons()
+            mo = scf_tensors['C_alpha']
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            nvir = mo_vir.shape[1]
+
+            # number of atomic orbitals
+            nao = basis.get_dimensions_of_basis()
+
             # number of vector components
             dof = len(self.vector_components)
+            xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
+
             # number of frequencies
             n_freqs = len(self.frequencies)
             # get CPHF results
@@ -1780,12 +1809,12 @@ class PolOrbitalResponse(CphfSolver):
             # TODO WIP
             if self.use_subspace_solver:
                 dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-                all_cphf_red = {}
+                all_cphf_red = []
                 for n, w in enumerate(self.frequencies):
                     tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
                     for xy in range(2 * dof_red):
                         tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
-                        all_cphf_red[w] = tmp_cphf_n
+                    all_cphf_red.append(tmp_cphf_n)
             else:
                 all_cphf_red = self.cphf_results['cphf_ov']
             # map CPHF results to dof*dof dimensions
@@ -1812,12 +1841,12 @@ class PolOrbitalResponse(CphfSolver):
                 self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
                 self.ostream.flush()
 
-                nocc = molecule.number_of_alpha_electrons()
-                mo = scf_tensors['C_alpha']
-                mo_occ = mo[:, :nocc]
-                mo_vir = mo[:, nocc:]
-                nvir = mo_vir.shape[1]
-                nao = mo_occ.shape[0]
+                #nocc = molecule.number_of_alpha_electrons()
+                #mo = scf_tensors['C_alpha']
+                #mo_occ = mo[:, :nocc]
+                #mo_vir = mo[:, nocc:]
+                #nvir = mo_vir.shape[1]
+                #nao = mo_occ.shape[0]
                
                 # get fock matrices from cphf_results
                 fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
