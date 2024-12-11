@@ -65,10 +65,10 @@ auto GpuData::allocateBoysFunctionData() -> void
          hipSafe(hipSetDevice(gpuId));
 
          hipSafe(hipMalloc(&_storage[gpuId].d_boys_func_table, boys_func_table.size() * sizeof(double)));
-         hipSafe(hipMemcpy(_storage[gpuId].d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
-
          hipSafe(hipMalloc(&_storage[gpuId].d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
-         hipSafe(hipMemcpy(_storage[gpuId].d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+
+	 hipSafe(hipMemcpyAsync(_storage[gpuId].d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
+         hipSafe(hipMemcpyAsync(_storage[gpuId].d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
      }
 }
 
