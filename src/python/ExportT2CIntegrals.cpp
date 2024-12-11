@@ -38,6 +38,7 @@
 #include "NuclearPotentialGeomX00Driver.hpp"
 #include "NuclearPotentialGeomX0YDriver.hpp"
 #include "NuclearPotentialGeomXY0Driver.hpp"
+#include "NuclearPotentialErfGeom0X0Driver.hpp"
 #include "NuclearPotentialErfGeomX00Driver.hpp"
 #include "OverlapDriver.hpp"
 #include "OverlapGeomX00Driver.hpp"
@@ -174,6 +175,30 @@ export_t2cintegrals(py::module& m)
             "compute",
             [](const CNuclearPotentialGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
+            "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
+    
+    // CNuclearPotentialGeom010Driver class
+    PyClass<CNuclearPotentialErfGeom0X0Driver<1>>(m, "NuclearPotentialErfGeom010Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CNuclearPotentialErfGeom0X0Driver<1>&  geom_drv,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                dipoles,
+               const std::vector<std::array<double, 3>>& coords,
+               const std::vector<double>&                omegas) -> std::shared_ptr<CMatrices> {
+                auto points = std::vector<TPoint<double>>();
+                points.reserve(coords.size());
+                std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+                return std::make_shared<CMatrices>(geom_drv.compute(dipoles, points, omegas, basis, molecule));
+            },
+            "Computes nuclear potential derivatives matrices for given molecule, basis and vector of external "
+            "dipoles.")
+        .def(
+            "compute",
+            [](const CNuclearPotentialErfGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const double omega, const int iatom)
+                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, omega, iatom)); },
             "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom020Driver class
