@@ -87,7 +87,11 @@ comp_prim_nuclear_potential_geom_010_ss(CSimdArray<double>&       pbuffer,
 #pragma omp simd aligned(pc_x, pc_y, pc_z, ta1_x_0_0_0, ta1_y_0_0_0, ta1_z_0_0_0, ta_0_0_1, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
-        const double fact = 2.0 * (a_exp + b_exps[i]) * ta_0_0_1[i];
+        const double frho = a_exp + b_exps[i];
+
+        const double fact = 2.0 * omega * omega * frho * ta_0_0_1[i] / (omega * omega + frho);
+        
+        //const double fact = 2.0 * (a_exp + b_exps[i]) * ta_0_0_1[i];
 
         ta1_x_0_0_0[i] = fact * pc_x[i];
 
