@@ -157,7 +157,6 @@ class HessianOrbitalResponse(CphfSolver):
                               for x in range(3)}
 
         # TODO: double check the use of profiler
-        #self.profiler.set_timing_key('derivs')
         self.profiler.start_timer('derivs')
 
         t0 = tm.time()

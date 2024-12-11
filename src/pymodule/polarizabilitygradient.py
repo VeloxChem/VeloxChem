@@ -53,13 +53,6 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
 from .veloxchemlib import partition_atoms, make_matrix, mat_t
 from .veloxchemlib import T4CScreener
 
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import hcore_deriv
-from .import_from_pyscf import eri_deriv
-from .import_from_pyscf import dipole_deriv
-
-
 class PolarizabilityGradient:
     """
     Implements the dipole polarizability gradient.
@@ -218,7 +211,7 @@ class PolarizabilityGradient:
                 raise ValueError(error_message)
             if self.rank == mpi_master():
                 polgrad_sanity_check(self, self.flag, lr_results)
-                self.check_real_or_complex_input(lr_results)
+                self._check_real_or_complex_input(lr_results)
             # compute
             self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
@@ -233,108 +226,6 @@ class PolarizabilityGradient:
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_analytical_pyscf(self, molecule, basis, scf_tensors, lr_results):
-        """
-        Performs calculation of the both real and complex analytical
-        polarizability gradient using pySCF integrals.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
-        :param lr_results:
-            The results of the linear response calculation.
-        """
-
-        # get orbital response results
-        all_orbrsp_results = self.compute_orbital_response(
-            molecule, basis, scf_tensors, lr_results)
-
-        # number of frequencies
-        n_freqs = len(self.frequencies)
-
-        # dictionary for polarizability gradient
-        polgrad_results = {}
-
-        # timings
-        loop_start_time = tm.time()
-
-        for f, w in enumerate(self.frequencies):
-            info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
-            self.ostream.print_info(info_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-            if self.rank == mpi_master():
-                orbrsp_results = all_orbrsp_results[w]
-                mo = scf_tensors['C_alpha']  # only alpha part
-                nao = mo.shape[0]
-                nocc = molecule.number_of_alpha_electrons()
-                mo_occ = mo[:, :nocc].copy()
-                mo_vir = mo[:, nocc:].copy()
-                nvir = mo_vir.shape[1]
-                natm = molecule.number_of_atoms()
-                gs_dm = scf_tensors['D_alpha']  # only alpha part
-
-                x_plus_y = orbrsp_results['x_plus_y_ao']
-                x_minus_y = orbrsp_results['x_minus_y_ao']
-
-                dof = len(self.vector_components)
-
-                # Lagrange multipliers
-                omega_ao = orbrsp_results['omega_ao'].reshape(
-                    dof, dof, nao, nao)
-                lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
-                lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
-
-                # calculate relaxed density matrix
-                rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
-
-                # initiate polarizability gradient variable with data type set in init()
-                pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-
-                # loop over atoms and contract integral derivatives with density matrices
-                for i in range(natm):
-                    # import integrals
-                    d_hcore, d_ovlp, d_eri, d_dipole = self.import_integrals(
-                        molecule, basis, i)
-
-                    # construct polarizability gradient
-                    pol_gradient[:,:,i,:] = self.construct_scf_polgrad(
-                        gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
-                        d_hcore, d_ovlp, d_eri, d_dipole, nao, i)
-            else:
-                gs_dm = None
-                rel_dm_ao = None
-                x_minus_y = None
-                pol_gradient = None
-
-            gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
-
-            if self._dft:
-                xcfun_label = self.xcfun.get_func_label()
-                # compute the XC contribution
-                polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
-                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
-                # add contribution to the SCF polarizability gradient
-                if self.rank == mpi_master():
-                    pol_gradient += polgrad_xc_contrib
-
-            if self.rank == mpi_master():
-                polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
-
-        if self.rank == mpi_master():
-            self.polgradient = dict(polgrad_results)
-
-            valstr = '** Time spent on constructing the analytical gradient for '
-            valstr += '{:d} frequencies: {:.6f} sec **'.format(
-                n_freqs, tm.time() - loop_start_time)
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
-           
     def compute_analytical(self, molecule, basis, scf_tensors, lr_results):
         """
         Performs calculation of the analytical polarizability gradient
@@ -380,12 +271,6 @@ class PolarizabilityGradient:
 
             if self.rank == mpi_master():
                 orbrsp_results = all_orbrsp_results[w]
-                #mo = scf_tensors['C_alpha']  # only alpha part
-                #nao = mo.shape[0]
-                #nocc = molecule.number_of_alpha_electrons()
-                #mo_occ = mo[:, :nocc].copy()
-                #mo_vir = mo[:, nocc:].copy()
-                #nvir = mo_vir.shape[1]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
                 x_plus_y = orbrsp_results['x_plus_y_ao']
@@ -417,9 +302,6 @@ class PolarizabilityGradient:
             # initiate polarizability gradient variable with data type set in init()
             pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
-            # WIP
-            #tmp_scf_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
-
             # kinetic energy gradient driver
             kin_grad_drv = KineticEnergyGeom100Driver()
 
@@ -443,7 +325,6 @@ class PolarizabilityGradient:
 
                     # loop over operator components
                     for x, y in xy_pairs:
-                        #tmp_scf_gradient[x, y, iatom, icoord] += (
                         pol_gradient[x, y, iatom, icoord] += (
                                 np.linalg.multi_dot([ # xymn,amn->xya
                                     2.0 * rel_dm_ao[x, y].reshape(nao**2),
@@ -464,7 +345,6 @@ class PolarizabilityGradient:
                     gmat_ovlp += gmat_ovlp.T
                     # loop over operator components
                     for x, y in xy_pairs:
-                        #tmp_scf_gradient[x, y, iatom, icoord] += (
                         pol_gradient[x, y, iatom, icoord] += (
                                 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
                                 2.0 * omega_ao[x, y].reshape(nao**2),
@@ -498,7 +378,6 @@ class PolarizabilityGradient:
                 for icoord in range(3):
                     # loop over operator components
                     for x, y in xy_pairs:
-                        #tmp_scf_gradient[x, y, iatom, icoord] += (
                         pol_gradient[x, y, iatom, icoord] += (
                                 - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
                                     x_minus_y[x].reshape(nao**2),
@@ -508,13 +387,8 @@ class PolarizabilityGradient:
                                     x_minus_y[y].reshape(nao**2)
                                 ]))
 
-                        # symmetric
-                        #if (y != x):
-                        #    tmp_scf_gradient[y, x, iatom, icoord] += tmp_scf_gradient[x, y, iatom, icoord]
-
                 gmats_dip = Matrices()
 
-            #tmp_scf_gradient = self.comm.reduce(tmp_scf_gradient, root=mpi_master())
             # ERI contribution
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                     rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
@@ -523,19 +397,9 @@ class PolarizabilityGradient:
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             if self.rank == mpi_master():
-                #pol_gradient = tmp_scf_gradient + eri_contrib
                 for x in range(dof):
                     for y in range(x + 1, dof):
                         pol_gradient[y, x] += pol_gradient[x, y]
-
-                #pol_gradient = tmp_scf_gradient + eri_contrib
-            #else:
-            #    gs_dm = None
-            #    rel_dm_ao = None
-            #    x_minus_y = None
-            #    pol_gradient = None
-
-            #gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
 
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
@@ -726,10 +590,6 @@ class PolarizabilityGradient:
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_yx) * factor
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy) * factor
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx) * factor
-
-                # symmetric
-                #if (y != x):
-                #    eri_deriv_contrib[y, x, iatom] += eri_deriv_contrib[x, y, iatom]
 
         eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
 
@@ -1006,10 +866,6 @@ class PolarizabilityGradient:
                 # add to complex variable
                 eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
 
-                # symmetric
-                #if (y != x):
-                #    eri_deriv_contrib[y, x, iatom] += eri_deriv_contrib[x, y, iatom]
-
         eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
 
         return eri_deriv_contrib
@@ -1107,173 +963,6 @@ class PolarizabilityGradient:
             self.ostream.flush()
 
         return orbrsp_drv.cphf_results
-
-    def import_integrals(self, molecule, basis, idx):
-        """
-        Imports integrals from PySCF for analytical polarizability
-        gradient.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The basis set.
-        :param idx:
-            The atom index
-
-        :return d_hcore:
-            The derivative H_core integrals.
-        :return d_ovlp:
-            The derivative overlap integrals.
-        :return d_eri:
-            The derivative electron-repulsion integrals.
-        :return d_dipole:
-            The derivative dipole moment integrals.
-        """
-
-        # timings
-        integral_start_time = tm.time()
-
-        # importing integral derivatives from pyscf
-        d_hcore = hcore_deriv(molecule, basis, idx)
-        d_ovlp = overlap_deriv(molecule, basis, idx)
-        d_eri = eri_deriv(molecule, basis, idx)
-        d_dipole = dipole_deriv(molecule, basis, idx)
-
-        valstr = ' * Time spent importing integrals for atom #{}: '.format(
-            idx + 1)
-        valstr += '{:.6f} sec * '.format(tm.time() - integral_start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        return d_hcore, d_ovlp, d_eri, d_dipole
-
-    def construct_scf_polgrad(self, gs_dm, rel_dm_ao, omega_ao, x_plus_y, x_minus_y,
-                              d_hcore, d_ovlp, d_eri, d_dipole, nao, idx):
-        """
-        Constructs the SCF polarizability gradient
-
-        :param gs_dm:
-            The ground state density matrix.
-        :param rel_dm_ao:
-            The relaxed one-particle density matrix in AO basis.
-        :param omega_ao:
-            The omega Lagrangian multipliers.
-        :param x_plus_y:
-            The X+Y response vectors.
-        :param x_minus_y:
-            The X-Y response vectors.
-        :param d_hcore:
-            The derivative H_core integrals.
-        :param d_ovlp:
-            The derivative overlap integrals.
-        :param d_eri:
-            The derivative electron-repulsion integrals.
-        :param d_dipole:
-            The derivative dipole moment integrals.
-        :param nao:
-            The number of atomic orbitals.
-        :param idx:
-            The index of the atom.
-
-        :return scf_polgrad:
-            The SCF polarizability gradient.
-        """
-
-        dof = len(self.vector_components)
-
-        #frac_K = self.get_k_fraction()
-        dummy, frac_K = self.get_fock_type_and_x_frac()
-
-        scf_polgrad = np.zeros((dof, dof, 3), dtype=self.grad_dt)
-
-        gradient_start_time = tm.time()
-
-        # construct the analytic polarizability gradient
-        for x in range(dof):
-            for y in range(x, dof):
-                for a in range(3): # nuclear cartesian coordinate components
-                    scf_polgrad[x, y, a] += (
-                        np.linalg.multi_dot([ # xymn,amn->xya
-                            2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                            d_hcore[a].reshape(nao**2)
-                        ]) + 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                            2.0 * omega_ao[x, y].reshape(nao**2),
-                            d_ovlp[a].reshape(nao * nao)
-                        ]) + 2.0 * np.linalg.multi_dot([ # mt,xynp,amtnp->xya
-                            gs_dm.reshape(nao**2), d_eri[a].reshape(
-                                nao**2, nao**2),
-                            2.0 * rel_dm_ao[x, y].reshape(nao**2)
-                        ]) - 1.0 * frac_K * np.linalg.multi_dot([ # mt,xynp,amnpt->xya
-                            gs_dm.reshape(nao**2),
-                            d_eri[a].transpose(0, 3, 1, 2).reshape(
-                                nao**2, nao**2),
-                            2.0 * rel_dm_ao[x, y].reshape(nao**2)
-                        ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
-                            x_plus_y[x].reshape(nao**2),
-                            d_eri[a].transpose(2, 3, 1, 0).reshape(
-                                nao**2, nao**2),
-                            (x_plus_y[y] - x_plus_y[y].T).reshape(
-                                nao**2)
-                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
-                            x_plus_y[x].reshape(nao**2),
-                            d_eri[a].transpose(2, 1, 3, 0).reshape(
-                                nao**2, nao**2),
-                            (x_plus_y[y] - x_plus_y[y].T).reshape(
-                                nao**2)
-                        ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->xya
-                            x_minus_y[x].reshape(nao**2),
-                            d_eri[a].transpose(2, 3, 1, 0).reshape(
-                                nao**2, nao**2),
-                            (x_minus_y[y] + x_minus_y[y].T).reshape(
-                                nao**2)
-                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->xya
-                            x_minus_y[x].reshape(nao**2),
-                            d_eri[a].transpose(2, 1, 3, 0).reshape(
-                                nao**2, nao**2),
-                            (x_minus_y[y] + x_minus_y[y].T).reshape(
-                                nao**2)
-                        ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
-                            x_minus_y[x].reshape(nao**2),
-                            d_dipole[y, a].reshape(nao**2)
-                        ])
-                        + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
-                            (x_plus_y[x] - x_plus_y[x].T
-                            ).reshape(nao**2), d_eri[a].transpose(
-                                1, 0, 2, 3).reshape(nao**2, nao**2),
-                            x_plus_y[y].reshape(nao**2)
-                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
-                            (x_plus_y[x] - x_plus_y[x].T
-                            ).reshape(nao**2), d_eri[a].transpose(
-                                3, 0, 2, 1).reshape(nao**2, nao**2),
-                            x_plus_y[y].reshape(nao**2)
-                        ]) + 1.0 * np.linalg.multi_dot([ # xmn,ypt,atpmn->yxa
-                            (x_minus_y[x] + x_minus_y[x].T
-                            ).reshape(nao**2), d_eri[a].transpose(
-                                1, 0, 2, 3).reshape(nao**2, nao**2),
-                            x_minus_y[y].reshape(nao**2)
-                        ]) - 0.5 * frac_K * np.linalg.multi_dot([ # xmn,ypt,atnmp->yxa
-                            (x_minus_y[x] + x_minus_y[x].T
-                            ).reshape(nao**2), d_eri[a].transpose(
-                                3, 0, 2, 1).reshape(nao**2, nao**2),
-                            x_minus_y[y].reshape(nao**2)
-                        ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                            d_dipole[x, a].reshape(nao**2),
-                            x_minus_y[y].reshape(nao**2)
-                        ]))
-
-                    if (y != x):
-                        scf_polgrad[y, x, a] += scf_polgrad[x, y, a]
-
-        valstr = ' * Time spent constructing pol. gradient for '
-        valstr += 'atom #{:d}: {:.6f} sec * '.format(
-            (idx + 1),
-            tm.time() - gradient_start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        return scf_polgrad
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
                                     x_minus_y, xcfun_label):
@@ -1609,23 +1298,6 @@ class PolarizabilityGradient:
         else:
             return None
 
-    def get_k_fraction(self):
-        """
-        Determines fraction of exact exchange, prefactor for K.
-
-        :return frac_k:
-            The fraction
-        """
-        if self._dft:
-            if self.xcfun.is_hybrid():
-                frac_k = self.xcfun.get_frac_exact_exchange()
-            else:
-                frac_k = 0.0
-        else:
-            frac_k = 1.0
-
-        return frac_k
-
     def get_fock_type_and_x_frac(self):
         """
         Determines fock type and fraction of exact exchange.
@@ -1948,7 +1620,7 @@ class PolarizabilityGradient:
 
         self.ostream.print_block(molecule.get_string())
 
-    def check_real_or_complex_input(self, lr_results):
+    def _check_real_or_complex_input(self, lr_results):
         """
         Checks if the input LR results and polgrad settings are
         both real or both complex.
