@@ -32,7 +32,7 @@ import sys
 import os
 
 from .veloxchemlib import AODensityMatrix, denmat
-from .veloxchemlib import ScreeningData, GpuDevices
+from .veloxchemlib import ScreeningData, GpuData, GpuDevices
 from .veloxchemlib import mpi_master
 from .veloxchemlib import (
     compute_fock_gpu,
@@ -914,6 +914,8 @@ class ScfDriver:
         screener = ScreeningData(molecule, ao_basis, num_gpus_per_node,
                                  self.pair_thresh, self.density_thresh)
 
+        gpu_data = GpuData(num_gpus_per_node)
+
         self.ostream.print_info(
             f'Using {num_gpus_per_node} GPU devices per MPI rank.')
         self.ostream.print_blank()
@@ -923,7 +925,7 @@ class ScfDriver:
         self.ostream.print_blank()
 
         ovl_mat, kin_mat, npot_mat = self._comp_one_ints(
-            molecule, ao_basis, screener)
+            molecule, ao_basis, screener, gpu_data)
 
         linear_dependency = False
 
@@ -997,7 +999,7 @@ class ScfDriver:
 
             dmat = AODensityMatrix([den_mat], denmat.rest)
 
-            fock_mat = self._comp_2e_fock(dmat, molecule, ao_basis, screener,
+            fock_mat = self._comp_2e_fock(dmat, molecule, ao_basis, screener, gpu_data,
                                           e_grad, profiler)
 
             profiler.start_timer('ErrVec')
@@ -1207,7 +1209,7 @@ class ScfDriver:
 
         sys.exit(0)
 
-    def _comp_one_ints(self, molecule, basis, screener):
+    def _comp_one_ints(self, molecule, basis, screener, gpu_data):
         """
         Computes one-electron integrals (overlap, kinetic energy and nuclear
         potential) using molecular data.
@@ -1224,10 +1226,10 @@ class ScfDriver:
         t0 = tm.time()
 
         ovl_mat, kin_mat = compute_overlap_and_kinetic_energy_integrals_gpu(
-            molecule, basis, screener)
+            molecule, basis, screener, gpu_data)
 
         npot_mat = compute_nuclear_potential_integrals_gpu(
-            molecule, basis, screener)
+            molecule, basis, screener, gpu_data)
 
         naos = ovl_mat.number_of_rows()
 
@@ -1273,6 +1275,7 @@ class ScfDriver:
                       molecule,
                       basis,
                       screener,
+                      gpu_data,
                       e_grad=None,
                       profiler=None):
         """
@@ -1286,6 +1289,8 @@ class ScfDriver:
             The basis set.
         :param screener:
             The screening container object.
+        :param gpu_data:
+            The gpu resident data pointers.
         :param e_grad:
             The electronic gradient.
         :param profiler:
@@ -1309,7 +1314,7 @@ class ScfDriver:
         # Hartree-Fock
         fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 1.0, 0.0,
                                     'symm', self.eri_thresh,
-                                    self.prelink_thresh, screener)
+                                    self.prelink_thresh, screener, gpu_data)
         fock_mat_local = fock_mat.to_numpy()
 
         coulomb_timing += np.array(

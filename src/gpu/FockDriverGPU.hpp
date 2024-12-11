@@ -29,19 +29,20 @@
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "GpuData.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "ScreeningData.hpp"
 
 namespace gpu {
 
-auto computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix;
+auto computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData) -> CDenseMatrix;
 
-auto computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
+auto computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData) -> std::vector<CDenseMatrix>;
 
-auto computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix;
+auto computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData) -> CDenseMatrix;
 
-auto computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix;
+auto computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix;
 
 auto transformDensity(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
 
@@ -54,7 +55,8 @@ auto computeFockOnGPU(const              CMolecule& molecule,
                       const std::string& flag_K,
                       const double       eri_threshold,
                       const double       prelink_threshold,
-                      CScreeningData&    screening) -> CDenseMatrix;
+                      CScreeningData&    screening,
+		      const GpuData& gpuData) -> CDenseMatrix;
 
 }  // namespace gpu
 

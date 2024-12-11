@@ -236,8 +236,6 @@ class CScreeningData
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node, const double pair_threshold, const double density_threshold);
 
-    ~CScreeningData();
-
     auto getNumGpusPerNode() const -> const int64_t;
 
     auto setPreLinkTime(const std::string& prelink_elapsed_time) -> void;

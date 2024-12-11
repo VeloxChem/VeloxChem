@@ -71,7 +71,7 @@ zeroData(double* d_data, const uint32_t n)
 }
 
 auto
-computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
+computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -124,11 +124,11 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     // Boys function (tabulated for order 0-28)
 
-    auto& gpuData = screening.accessGpuData(gpu_id);
+    auto& storage = gpuData.accessStorage(gpu_id);
 
 
-    double* d_boys_func_table = gpuData.d_boys_func_table;
-    double* d_boys_func_ft = gpuData.d_boys_func_ft;
+    double* d_boys_func_table = storage.d_boys_func_table;
+    double* d_boys_func_ft = storage.d_boys_func_ft;
 
     // GTOs blocks and number of AOs
 
@@ -537,7 +537,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 }
 
 auto
-computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
+computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -1096,7 +1096,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 }
 
 auto
-computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
+computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData) -> CDenseMatrix
 {
     const auto mol_charges = molecule.getCharges();
     const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
@@ -1112,11 +1112,11 @@ computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecula
         points_info[a + natoms * 3] = mol_charges[a];
     }
 
-    return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screening, points_info.data(), natoms);
+    return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screening, gpuData, points_info.data(), natoms);
 }
 
 auto
-computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix
+computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const GpuData& gpuData, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -1149,11 +1149,11 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     hipSafe(hipSetDevice(gpu_id));
 
-    const auto& gpuData = screening.accessGpuData(gpu_id);
+    const auto& storage = gpuData.accessStorage(gpu_id);
     // Boys function (tabulated for order 0-28)
 
-    double* d_boys_func_table = gpuData.d_boys_func_table;
-    double* d_boys_func_ft = gpuData.d_boys_func_ft;
+    double* d_boys_func_table = storage.d_boys_func_table;
+    double* d_boys_func_ft = storage.d_boys_func_ft;
 
     // GTOs blocks and number of AOs
 
@@ -1757,7 +1757,8 @@ computeFockOnGPU(const              CMolecule& molecule,
                  const std::string& flag_K,
                  const double       eri_threshold,
                  const double       prelink_threshold,
-                 CScreeningData&    screening) -> CDenseMatrix
+                 CScreeningData&    screening,
+		 const GpuData& gpuData) -> CDenseMatrix
 {
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
@@ -2026,11 +2027,11 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     // Boys function (tabulated for order 0-28)
     
-    const auto& gpuData = screening.accessGpuData(gpu_id);
+    const auto& storage = gpuData.accessStorage(gpu_id);
 
-    double* d_boys_func_table = gpuData.d_boys_func_table;
+    double* d_boys_func_table = storage.d_boys_func_table;
 
-    double* d_boys_func_ft = gpuData.d_boys_func_ft;
+    double* d_boys_func_ft = storage.d_boys_func_ft;
 
     timer.stop("Boys func. prep.");
 

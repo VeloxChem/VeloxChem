@@ -34,6 +34,7 @@
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "FockDriverGPU.hpp"
+#include "GpuData.hpp"
 #include "GpuDevices.hpp"
 #include "LinearAlgebraGPU.hpp"
 #include "ScreeningData.hpp"
@@ -54,6 +55,10 @@ export_gpu(py::module& m)
         .def(py::init<>())
         .def("get_number_devices", &CGpuDevices::getNumberOfDevices)
         .def("__str__", &CGpuDevices::getString);
+
+    // GpuData class
+    py::class_<GpuData, std::shared_ptr<GpuData>>(m, "GpuData")
+	.def(py::init<const size_t>());
 
     // CScreeningData class
 
@@ -276,7 +281,7 @@ export_gpu(py::module& m)
 
     m.def(
         "compute_point_charges_integrals_gpu",
-        [](const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screener, const py::array_t<double>& point_charges)
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screener, GpuData& gpuData, const py::array_t<double>& point_charges)
             -> CDenseMatrix {
             std::string errshape("compute_point_charges_integrals_gpu: Invalid shape of point_charges");
             std::string errstyle("compute_point_charges_integrals_gpu: Expecting contiguous numpy array");
@@ -285,7 +290,7 @@ export_gpu(py::module& m)
             auto        c_style = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
             errors::assertMsgCritical(ndim == 4, errshape);
             errors::assertMsgCritical(c_style, errstyle);
-            return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screener, point_charges.data(), npoints);
+            return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screener, gpuData, point_charges.data(), npoints);
         },
         "Computes point charges integrals using GPU.");
 
