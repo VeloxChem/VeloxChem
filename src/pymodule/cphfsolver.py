@@ -69,7 +69,7 @@ class CphfSolver(LinearSolver):
 
         self.use_subspace_solver = True
         self.print_residuals = False
-        self.max_iter = 25
+        self.max_iter = 150
 
         self._input_keywords['orbitalresponse'] = {
             'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
@@ -314,8 +314,7 @@ class CphfSolver(LinearSolver):
 
                 self.profiler.print_memory_tracing(self.ostream)
 
-                if self.print_residuals:
-                    self.print_iteration(relative_residual_norm, molecule)
+                self.print_iteration(relative_residual_norm, molecule)
 
             self.profiler.stop_timer('ReducedSpace')
 
@@ -404,14 +403,15 @@ class CphfSolver(LinearSolver):
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
         if self.rank == mpi_master():
-            batch_str = 'Processing Fock builds...'
-            batch_str += ' (batch size: {:d})'.format(batch_size)
+            batch_str = f'Processing {num_vecs} Fock build'
+            if num_vecs > 1:
+                batch_str += 's'
+            batch_str += '...'
             self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         for batch_ind in range(num_batches):
-            self.ostream.print_info('  batch {}/{}'.format(
-                batch_ind + 1, num_batches))
-            self.ostream.flush()
 
             batch_start = batch_size * batch_ind
             batch_end = min(batch_start + batch_size, num_vecs)
@@ -887,23 +887,27 @@ class CphfSolver(LinearSolver):
             min(relative_residual_norm))
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
-        coord = 'xyz'
 
-        # TODO: change power based on the convergence threshold
-        if self.conv_thresh < 1e-4:
-            power = int(str(self.conv_thresh).split("-")[1]) + 1
-        else:
-            power = 5
-        residual_norm_string = 'Residual Norm: {:.%df}' % (power)
+        if self.print_residuals:
+            coord = 'xyz'
 
-        for i in range(natm):
-            for x in range(3):
-                coord_label = '{:16s}'.format('   '+str(i+1)+' '
-                                             +atom_symbols[i]+'('+coord[x]+')')
-                rel_res = relative_residual_norm[3*i+x]
-                output_iter = residual_norm_string.format(rel_res)
-                self.ostream.print_line(coord_label + output_iter)
-        self.ostream.print_blank()
+            # TODO: change power based on the convergence threshold
+            if self.conv_thresh < 1e-4:
+                power = int(str(self.conv_thresh).split("-")[1]) + 1
+            else:
+                power = 5
+            residual_norm_string = 'Residual Norm: {:.%df}' % (power)
+
+            for i in range(natm):
+                for x in range(3):
+                    coord_label = '{:16s}'.format(
+                            '   ' + str(i + 1) + ' ' + atom_symbols[i] +
+                            '(' + coord[x] + ')')
+                    rel_res = relative_residual_norm[3*i+x]
+                    output_iter = residual_norm_string.format(rel_res)
+                    self.ostream.print_line(coord_label + output_iter)
+            self.ostream.print_blank()
+
         self.ostream.flush()
 
     def print_cphf_header(self, title):

@@ -559,6 +559,11 @@ class VibrationalAnalysis:
             The response driver (for excited state vibrational analysis).
         """
 
+        title = 'Vibrational Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
         number_of_modes = len(self.vib_frequencies)
         n_dom_modes = 5
 
@@ -566,19 +571,23 @@ class VibrationalAnalysis:
             normal_mode_idx_lst = range(number_of_modes)
         elif (self.ir_intensities is not None):
             normal_mode_idx_lst = self.get_dominant_modes(n_dom_modes)
-            warn_msg1 = f'The {n_dom_modes} dominant normal modes are printed below.'
-            self.ostream.print_warning(warn_msg1)
+            nmodes_msg = f'The {n_dom_modes} dominant normal modes are printed below.'
+            self.ostream.print_info(nmodes_msg)
+            self.ostream.print_blank()
         else:
             normal_mode_idx_lst = range(n_dom_modes)
-            warn_msg1 = f'The {n_dom_modes} lowest normal modes are printed below.'
-            self.ostream.print_warning(warn_msg1)
-        warn_msg2 = f'All results are available in txt-format in {self.result_file}.'
-
-        self.ostream.print_warning(warn_msg2)
+            nmodes_msg = f'The {n_dom_modes} lowest normal modes are printed below.'
+            self.ostream.print_info(nmodes_msg)
+            self.ostream.print_blank()
 
         self.print_vibrational_analysis_ostream(molecule, normal_mode_idx_lst,
                                                 filename, rsp_drv)
         self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
+
+        fulltxt_msg = f'Full vibrational analysis results written to: {self.result_file}'
+        self.ostream.print_info(fulltxt_msg)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_vibrational_analysis_ostream(self, molecule, idx_lst, filename=None, rsp_drv=None):
         """
@@ -615,11 +624,6 @@ class VibrationalAnalysis:
         #    self.ostream.print_warning(warn_msg2)
         #else:
         #    normal_mode_idx_lst = range(n_dom_modes)
-
-        title = 'Vibrational Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
 
         width = 52
         for k in idx_lst:

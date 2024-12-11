@@ -202,8 +202,8 @@ class HessianOrbitalResponse(CphfSolver):
         t1 = tm.time()
 
         if self.rank == mpi_master():
-            self.ostream.print_info("CPHF/CPKS import of integral derivatives"
-                                    + ' took {:.2f} sec.'.format(t1 - t0))
+            self.ostream.print_info("CPHF/CPKS integral derivatives computed"
+                                    + ' in {:.2f} sec.'.format(t1 - t0))
             self.ostream.print_blank()
             self.ostream.flush()
             
@@ -365,8 +365,8 @@ class HessianOrbitalResponse(CphfSolver):
         t2 = tm.time() 
 
         if self.rank == mpi_master():
-            self.ostream.print_info('CPHF/CPKS RHS computed in' +
-                                     ' {:.2f} sec.'.format(t2 - t1))
+            self.ostream.print_info('CPHF/CPKS right-hand side computed' +
+                                     ' in {:.2f} sec.'.format(t2 - t1))
             self.ostream.print_blank()
             self.ostream.flush()
 
