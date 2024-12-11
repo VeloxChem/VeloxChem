@@ -30,6 +30,8 @@
 #include "ExportGeneral.hpp"
 #include "FockDriver.hpp"
 #include "FockGeomX000Driver.hpp"
+#include "FockGeomXY00Driver.hpp"
+#include "FockGeomX0Y0Driver.hpp"
 #include "T4CScreener.hpp"
 #include "T4CUtils.hpp"
 
@@ -182,6 +184,59 @@ export_t4cintegrals(py::module& m)
                const double                  omega,
                const int                     ithreshold) -> std::vector<double> {
                 return self.compute(basis, screener_atom, screener, density, density2, iatom, label, exchange_factor, omega, ithreshold);
+            },
+            "Computes gradient of Fock matrix of requested type for given molecule and basis.");
+    
+    // CFockGeom2000Driver class
+    PyClass<CFockGeomX000Driver<2>>(m, "FockGeom2000Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CFockGeomX000Driver<2>& fock_drv,
+               const CMolecularBasis&        basis,
+               const CMolecule&              molecule,
+               const CMatrix&                density,
+               const int                     iatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega) -> std::shared_ptr<CMatrices> {
+                return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
+            },
+            "Computes hessian of Fock matrix of requested type for given molecule and basis.");
+    
+    // CFockGeom1100Driver class
+    PyClass<CFockGeomXY00Driver<1,1>>(m, "FockGeom1100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CFockGeomXY00Driver<1,1>& fock_drv,
+               const CMolecularBasis&        basis,
+               const CMolecule&              molecule,
+               const CMatrix&                density,
+               const int                     iatom,
+               const int                     jatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega) -> std::shared_ptr<CMatrices> {
+                   return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega));
+            },
+            "Computes gradient of Fock matrix of requested type for given molecule and basis.");
+    
+    // CFockGeom1010Driver class
+    PyClass<CFockGeomX0Y0Driver<1,1>>(m, "FockGeom1010Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CFockGeomX0Y0Driver<1,1>& fock_drv,
+               const CMolecularBasis&        basis,
+               const CMolecule&              molecule,
+               const CMatrix&                density,
+               const int                     iatom,
+               const int                     jatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega) -> std::shared_ptr<CMatrices> {
+                   return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega));
             },
             "Computes gradient of Fock matrix of requested type for given molecule and basis.");
 }
