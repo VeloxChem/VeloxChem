@@ -77,13 +77,30 @@ class TestOrbitalResponse:
                                                     task.ao_basis, dft_dict,
                                                     pe_dict, task.ostream)
 
+        dist_cphf_coefficients = orb_resp_results['dist_cphf_ov']
+        dof = len(dist_cphf_coefficients)
+
+        cphf_coefficients = []
+        for x in range(dof):
+            solution_vec = dist_cphf_coefficients[x].get_full_vector(0)
+            if scf_drv.rank == mpi_master():
+                cphf_coefficients.append(solution_vec)
+
         if task.mpi_rank == mpi_master():
             nocc = task.molecule.number_of_alpha_electrons()
             mo = scf_drv.scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
-            lambda_ov = orb_resp_results['cphf_ov']
+            nvir = mo_vir.shape[1]
+            nao = task.ao_basis.get_dimensions_of_basis()
+            #lambda_ov = orb_resp_results['cphf_ov']
+
+            lambda_ov = np.array(cphf_coefficients)
+            dof = lambda_ov.shape[0]
+
+            lambda_ov = lambda_ov.reshape(dof, nocc, nvir)
             lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, lambda_ov, mo_vir)
+            lambda_ao = lambda_ao.reshape(dof, nao, nao)
 
             assert np.max(np.abs(lambda_ao[0] - ref_lambda_ao)) < 5.0e-4
             # TODO: uncomment once TDDFT gradients are working

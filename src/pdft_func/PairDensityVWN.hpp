@@ -38,7 +38,7 @@ namespace pdftvwn_rpa {  // pdftvwn_rpa namespace
  @param exc the functional value.
  @param vrho the 1st-order functional derivative wrt density.
  */
-void compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho);
+void compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho);
 
 }  // namespace pdftvwn_rpa
 
@@ -54,7 +54,7 @@ namespace pdftvwn5 {  // pdftvwn5 namespace
  @param exc the functional value.
  @param vrho the 1st-order functional derivative wrt density.
  */
-void compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho);
+void compute_exc_vxc(const int np, const double* rho, double* exc, double* vrho);
 
 }  // namespace pdftvwn5
 

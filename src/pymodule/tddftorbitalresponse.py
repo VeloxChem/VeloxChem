@@ -31,6 +31,7 @@ from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
+from .distributedarray import DistributedArray
 from .inputparser import (parse_input, parse_seq_fixed)
 from .visualizationdriver import VisualizationDriver
 
@@ -110,7 +111,7 @@ class TddftOrbitalResponse(CphfSolver):
                 else:
                     method = 'RPA'
                 nocc = molecule.number_of_alpha_electrons()
-                mo = scf_tensors['C']
+                mo = scf_tensors['C_alpha']
                 mo_occ = mo[:, :nocc]
                 mo_vir = mo[:, nocc:]
 
@@ -125,7 +126,7 @@ class TddftOrbitalResponse(CphfSolver):
                 rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
                                 + 2.0 * lambda_ao.transpose(0,2,1) )
 
-                unrel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                unrel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
                                  unrel_dm_ao)
             else:
                 unrel_density = None
@@ -138,7 +139,7 @@ class TddftOrbitalResponse(CphfSolver):
 
             # relaxed density and dipole moment
             if self.rank == mpi_master():
-                rel_density = (scf_tensors['D'][0] + scf_tensors['D'][1] +
+                rel_density = (scf_tensors['D_alpha'] + scf_tensors['D_beta'] +
                                rel_dm_ao)
             else:
                 rel_density = None
@@ -176,7 +177,7 @@ class TddftOrbitalResponse(CphfSolver):
         else:
             return None
 
-    def compute_rhs(self, molecule, basis, scf_tensors, rsp_results):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, rsp_results):
         """
         Computes the right-hand side (RHS) of the RPA orbital response equation
         including the necessary density matrices using molecular data.
@@ -194,13 +195,6 @@ class TddftOrbitalResponse(CphfSolver):
             A dictionary containing the orbital-response RHS and
             unrelaxed one-particle density.
         """
-
-        # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
-        # PE information
-        pe_dict = self._init_pe(molecule, basis)
 
         self.profiler.start_timer('RHS')
 
@@ -368,6 +362,8 @@ class TddftOrbitalResponse(CphfSolver):
             for idx in range(len(fock_gxc_ao)):
                 fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx], root=mpi_master())
 
+        dist_rhs_mo = []
+
         # Calculate the RHS and transform it to the MO basis
         if self.rank == mpi_master():
             # Extract the 1PDM contributions
@@ -382,9 +378,9 @@ class TddftOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs[dof + ifock]
                 fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs[2 * dof + ifock]
 
-            # Transform to MO basis:
-            rhs_mo = np.zeros((dof, nocc, nvir))
-            for i in range(dof):
+        # Transform to MO basis:
+        for i in range(dof):
+            if self.rank == mpi_master():
                 fmo_rhs_1pdm = 0.5 * np.linalg.multi_dot([mo_occ.T,
                                                           fock_ao_rhs_1pdm[i], 
                                                           mo_vir])
@@ -408,25 +404,26 @@ class TddftOrbitalResponse(CphfSolver):
                                          x_minus_y_ao[i], ovlp])
                                   )
 
-                rhs_mo[i] = ( fmo_rhs_1pdm 
+                rhs_mo_i = ( fmo_rhs_1pdm 
                      + np.linalg.multi_dot([mo_occ.T, sdp_pds, mo_vir])
                         )
 
-            # Add DFT E[3] contribution to the RHS:
-            if self._dft:
-                gxc_ao = np.zeros((dof, nao, nao))
-                gxc_mo = np.zeros((dof, nocc, nvir))
-                for ifock in range(dof):
-                    gxc_ao[ifock] = fock_gxc_ao[2*ifock]
-                    gxc_mo[ifock] = np.linalg.multi_dot([mo_occ.T, gxc_ao[ifock],
-                                                         mo_vir])
-                rhs_mo += 0.25 * gxc_mo
+                # Add DFT E[3] contribution to the RHS:
+                if self._dft:
+                    gxc_mo_i = np.linalg.multi_dot([mo_occ.T, fock_gxc_ao[2*i], mo_vir])
+                    rhs_mo_i += 0.25 * gxc_mo_i
+
+                rhs_mo_i = rhs_mo_i.reshape(nocc*nvir)
+            else:
+                rhs_mo_i = None
+            dist_rhs_mo.append(DistributedArray(rhs_mo_i, self.comm))
+
 
         self.profiler.stop_timer('RHS')
 
         if self.rank == mpi_master():
             return {
-                'cphf_rhs': rhs_mo,
+                'dist_cphf_rhs': dist_rhs_mo,
                 'density_occ_occ': dm_oo,
                 'density_vir_vir': dm_vv,
                 'x_plus_y_ao': x_plus_y_ao,
@@ -436,7 +433,9 @@ class TddftOrbitalResponse(CphfSolver):
                 'fock_gxc_ao': fock_gxc_ao, # None if not DFT
             }
         else:
-            return {}
+            return {
+                'dist_cphf_rhs': dist_rhs_mo,
+                }
 
     def compute_omega(self, molecule, basis, scf_tensors):
         """
@@ -533,22 +532,22 @@ class TddftOrbitalResponse(CphfSolver):
                 Fm2_oo[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T
                 ])
-
-            # Construct fock_lambda (the lambda multipliers/cphf coefficients
-            # contracted with the two-electron integrals)
-            cphf_ov = self.cphf_results['cphf_ov']
-            lambda_ao = np.array([
-                np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
-                for x in range(dof)
-            ])
-            lambda_ao_list = list([lambda_ao[s] for s in range(dof)])
         else:
-            lambda_ao_list = None
+            dof = None
+        dof = self.comm.bcast(dof, root=mpi_master())
 
-        lambda_ao_list = self.comm.bcast(lambda_ao_list, root=mpi_master())
+        # Construct fock_lambda (the lambda multipliers/cphf coefficients
+        # contracted with the two-electron integrals)
+        dist_cphf_ov = self.cphf_results['dist_cphf_ov']
+
+        lambda_ao_list = []
+        for x in range(dof):
+            cphf_ov_x = dist_cphf_ov[x].get_full_vector(0)
+            if self.rank == mpi_master():
+                lambda_ao_list.append(np.linalg.multi_dot([mo_occ, cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
 
         fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                           eri_dict, dft_dict, pe_dict, self.profiler)
+                                         eri_dict, dft_dict, pe_dict, self.profiler)
 
         if self.rank == mpi_master():
             # Compute the contributions from the relaxed 1PDM
@@ -596,7 +595,11 @@ class TddftOrbitalResponse(CphfSolver):
 
             epsilon_dm_ao = np.zeros((dof, nao, nao))
             epsilon_lambda_ao = np.zeros((dof, nao, nao))
-            for s in range(dof):
+
+        for s in range(dof):
+            cphf_ov_s = dist_cphf_ov[s].get_full_vector(0)
+
+            if self.rank == mpi_master():
                 epsilon_dm_ao[s] = np.linalg.multi_dot([
                     mo_occ, eo_diag, dm_oo[s], mo_occ.T
                 ])
@@ -604,11 +607,12 @@ class TddftOrbitalResponse(CphfSolver):
                     mo_vir, ev_diag, dm_vv[s], mo_vir.T
                 ])
                 epsilon_lambda_ao[s] = np.linalg.multi_dot([
-                    mo_occ, eo_diag, cphf_ov[s], mo_vir.T 
+                    mo_occ, eo_diag, cphf_ov_s.reshape(nocc, nvir), mo_vir.T 
                 ])
                 epsilon_dm_ao[s] += (epsilon_lambda_ao[s] 
                                      + epsilon_lambda_ao[s].T)
                 
+        if self.rank == mpi_master():
 
             omega = - epsilon_dm_ao - omega_1pdm_2pdm_contribs
 

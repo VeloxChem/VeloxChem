@@ -1,9 +1,13 @@
 target_sources(vlxobjs
   PRIVATE
     FockDriver.cpp
+    T4CDebug.cpp
     T4CDiagonalDistributor.cpp
+    T4CEriTensorDistributor.cpp
     T4CGeomX0MatricesDistributor.cpp
+    T4CGeomXYMatricesDistributor.cpp
     T4CLocalDistributor.cpp
+    T4CLocalEriTensorDistributor.cpp
     T4CLocalGeomDistributor.cpp
     T4CMatricesDistributor.cpp
     T4CMatrixDistributor.cpp

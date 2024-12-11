@@ -75,11 +75,26 @@ class CMolecularGrid
     CMolecularGrid();
 
     /**
+     Creates an empty molecular grid object.
+
+     @param maxNumberOfGridPointsPerBox the maximum number of grid points per box.
+     */
+    CMolecularGrid(const int maxNumberOfGridPointsPerBox);
+
+    /**
      Creates a molecular grid object.
 
      @param gridPoints the 2D memory block object with grid points data.
      */
     CMolecularGrid(const CDenseMatrix& gridPoints);
+
+    /**
+     Creates a molecular grid object.
+
+     @param gridPoints the 2D memory block object with grid points data.
+     @param maxNumberOfGridPointsPerBox the maximum number of grid points per box.
+     */
+    CMolecularGrid(const CDenseMatrix& gridPoints, const int maxNumberOfGridPointsPerBox);
 
     /**
      Creates a molecular grid object by copying other molecular grid object.

@@ -36,7 +36,6 @@ monkey:cron_deploy:
     - CC=gcc MPICC=mpicc python -m pip install
         mpi4py --no-binary=mpi4py
     - CC=gcc CXX=g++ python -m pip install
-        cppe
         MDAnalysis
   script:
     - cmake

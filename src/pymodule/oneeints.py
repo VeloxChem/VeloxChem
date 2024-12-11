@@ -22,8 +22,50 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from .veloxchemlib import OverlapDriver
+from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
 from .veloxchemlib import ElectricDipoleMomentDriver
+from .veloxchemlib import compute_linear_momentum_integrals
+from .veloxchemlib import compute_angular_momentum_integrals
+
+
+def compute_overlap_integrals(molecule, basis):
+    """
+    Computes overlap integrals.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+
+    :return:
+        The overlap integral matrix.
+    """
+
+    ovl_drv = OverlapDriver()
+    ovl_mat = ovl_drv.compute(molecule, basis)
+
+    return ovl_mat.to_numpy()
+
+
+def compute_kinetic_energy_integrals(molecule, basis):
+    """
+    Computes kinetic energy integrals.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+
+    :return:
+        The kinetic energy integral matrix.
+    """
+
+    kin_drv = KineticEnergyDriver()
+    kin_mat = kin_drv.compute(molecule, basis)
+
+    return kin_mat.to_numpy()
 
 
 def compute_nuclear_potential_integrals(molecule,

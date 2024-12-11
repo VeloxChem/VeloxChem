@@ -30,6 +30,12 @@ class CT4CGeomX0MatricesDistributor
                                   const double       exchange_factor,
                                   const double       omega);
 
+    CT4CGeomX0MatricesDistributor(const CMatrix*     density,
+                                  const CMatrix*     density_2,
+                                  const std::string& label,
+                                  const double       exchange_factor,
+                                  const double       omega);
+
     /// @brief The default copy constructor.
     /// @param other The distributor to be copied.
     CT4CGeomX0MatricesDistributor(const CT4CGeomX0MatricesDistributor& other) = delete;
@@ -69,6 +75,10 @@ class CT4CGeomX0MatricesDistributor
     /// @return The range separation
     auto need_omega() const -> bool;
 
+    auto get_values() const -> std::vector<double>;
+
+    auto set_num_values(int num_values) -> void;
+
     /// Sets local matrices and their local/global indices.
     /// @param bra_gto_pair_block The basis function pairs block on bra side.
     /// @param ket_gto_pair_block The basis function pairs block on ket side.
@@ -104,12 +114,19 @@ class CT4CGeomX0MatricesDistributor
     /// @param ket_gto_pair_block The basis function pairs block on ket side.
     auto accumulate(const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void;
 
+    auto accumulate_values(double* values, const CMatrix* density, const CGtoPairBlock& bra_gto_pair_block, const CGtoPairBlock& ket_gto_pair_block) -> void;
+
    private:
     /// @brief The Fock matrices associated with distributor.
     CMatrices* _focks;
 
+    std::vector<double> _values;
+
     /// @brief The density matrix associated with distributor.
     const CMatrix* _density;
+
+    /// @brief The 2nd density matrix associated with distributor.
+    const CMatrix* _density_2;
 
     /// @brief The standard Fock matrix type label.
     std::string _label;

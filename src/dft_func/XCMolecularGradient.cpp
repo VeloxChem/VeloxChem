@@ -46,6 +46,7 @@
 #include "XCFunctional.hpp"
 #include "XCMolecularGradientForLDA.hpp"
 #include "XCMolecularGradientForGGA.hpp"
+#include "XCMolecularGradientForPDFT.hpp"
 
 CXCMolecularGradient::CXCMolecularGradient()
 
@@ -190,5 +191,48 @@ CXCMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
         errors::assertMsgCritical(false, erropenshell);
     }
 
+    return CDenseMatrix();
+}
+
+auto
+CXCMolecularGradient::integrateVxcPDFTGradient(const CMolecule&                    molecule,
+                                        const CMolecularBasis&              basis,
+                                        const double*                       densityMatrixPointer,
+                                        const CDenseMatrix&                 twoBodyDensityMatrix,
+                                        const CDenseMatrix&                 activeMOs,
+                                        const CMolecularGrid&               molecularGrid,
+                                        const CXCPairDensityFunctional&     fvxc,
+                                        const double                        rs_omega) const -> CDenseMatrix
+{
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (xcfuntype == "PLDA")
+    {
+        return xcgradpdft::integrateVxcPDFTGradientForLDA(molecule,
+                                                  basis,
+                                                  densityMatrixPointer,
+                                                  twoBodyDensityMatrix,
+                                                  activeMOs,
+                                                  molecularGrid,
+                                                 _screeningThresholdForGTOValues,
+                                                  fvxc, rs_omega);
+    }
+    else if (xcfuntype == "PGGA")
+    {
+        return xcgradpdft::integrateVxcPDFTGradientForGGA(molecule,
+                                                  basis,
+                                                  densityMatrixPointer,
+                                                  twoBodyDensityMatrix,
+                                                  activeMOs,
+                                                  molecularGrid,
+                                                  _screeningThresholdForGTOValues,
+                                                  fvxc, rs_omega);
+    }
+    else
+    {
+        std::string errxcfuntype("XCMolecularGradient.integrateVxcPDFTGradient: Only implemented for PLDA/PGGA");
+
+        errors::assertMsgCritical(false, errxcfuntype);
+    }
     return CDenseMatrix();
 }

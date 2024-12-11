@@ -21,13 +21,24 @@
 #
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
-import numpy as np
-import time as tm
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import AODensityMatrix
+from mpi4py import MPI
+from copy import deepcopy
+from os import environ
+import numpy as np
+import time
+import math
+
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver,
+                           NuclearPotentialGeom010Driver, FockGeom1000Driver)
+from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
+from .veloxchemlib import T4CScreener
+from .veloxchemlib import partition_atoms, make_matrix
+from .matrices import Matrices
+from .profiler import Profiler
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .molecule import Molecule
 from .lrsolver import LinearResponseSolver
@@ -36,11 +47,6 @@ from .scfgradientdriver import ScfGradientDriver
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, parse_seq_fixed)
 from .sanitychecks import dft_sanity_check
-
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import hcore_deriv
-from .import_from_pyscf import eri_deriv
 
 class TddftGradientDriver(GradientDriver):
     """
@@ -63,12 +69,25 @@ class TddftGradientDriver(GradientDriver):
         - do_four_point: Flag for four-point finite difference.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    # TODO: add response driver here? Save scf_drv as an instance variable?
+    def __init__(self, scf_drv):
         """
         Initializes gradient driver.
+
+        :param scf_drv:
+            The Scf driver.
         """
 
-        super().__init__(comm, ostream)
+        super().__init__(scf_drv.comm, scf_drv.ostream)
+        self._debug = scf_drv._debug
+        self._scf_drv = scf_drv
+
+        # TODO: double check _block_size_factor
+        self._block_size_factor = 4
+
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
+        self.timing = scf_drv.timing
 
         self.flag = 'RPA Gradient Driver'
 
@@ -91,7 +110,8 @@ class TddftGradientDriver(GradientDriver):
             }
         )
 
-    def update_settings(self, grad_dict, rsp_dict, orbrsp_dict=None, method_dict=None):
+    def update_settings(self, grad_dict, rsp_dict, orbrsp_dict=None,
+                        method_dict=None):
         """
         Updates settings in gradient driver.
 
@@ -170,15 +190,17 @@ class TddftGradientDriver(GradientDriver):
             else:
                 self.print_header(self.state_deriv_index)
 
-        start_time = tm.time()
+        start_time = time.time()
 
         # NOTE: the numerical gradient is calculated for the first state only.
         if self.numerical:
             scf_drv.ostream.mute()
+            rsp_drv.ostream.mute()
             self.compute_numerical(molecule, basis, scf_drv, rsp_drv, rsp_results)
+            rsp_drv.ostream.unmute()
             scf_drv.ostream.unmute()
         else:
-            self.compute_analytical(molecule, basis, scf_drv, rsp_results)
+            self.compute_analytical(molecule, basis, rsp_results)
 
         if self.rank == mpi_master():
             self.print_geometry(molecule)
@@ -188,12 +210,12 @@ class TddftGradientDriver(GradientDriver):
                 self.print_gradient(molecule, self.state_deriv_index)
 
             valstr = '*** Time spent in gradient calculation: '
-            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+            valstr += '{:.2f} sec ***'.format(time.time() - start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_analytical(self, molecule, basis, scf_drv, rsp_results):
+    def compute_analytical(self, molecule, basis, rsp_results):
         """
         Performs calculation of analytical gradient.
 
@@ -201,14 +223,11 @@ class TddftGradientDriver(GradientDriver):
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_drv:
-            The SCF driver.
         :param rsp_results:
             The results of the RPA or TDA calculation.
         """
 
-        # SCF results
-        scf_tensors = scf_drv.scf_tensors
+        scf_tensors = self._scf_drv.scf_tensors
 
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
@@ -221,7 +240,7 @@ class TddftGradientDriver(GradientDriver):
 
         if self.rank == mpi_master():
             # only alpha part
-            gs_dm = scf_drv.scf_tensors['D_alpha']
+            gs_dm = scf_tensors['D_alpha']
             nocc = molecule.number_of_alpha_electrons()
             natm = molecule.number_of_atoms()
             mo = scf_tensors['C_alpha']
@@ -237,30 +256,56 @@ class TddftGradientDriver(GradientDriver):
             x_plus_y_ao = orbrsp_results['x_plus_y_ao']
             x_minus_y_ao = orbrsp_results['x_minus_y_ao']
 
-            # CPHF/CPKS coefficients (lambda Lagrange multipliers)
-            cphf_ov = orbrsp_results['cphf_ov']
-            unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao']
             dof = x_plus_y_ao.shape[0]
-            cphf_ao = np.array([
-                np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
-                for x in range(dof)
-            ])
-            relaxed_density_ao = ( unrelaxed_density_ao + 2.0 * cphf_ao
-                        + 2.0 * cphf_ao.transpose(0,2,1) )
         else:
             dof = None
-
         dof = self.comm.bcast(dof, root=mpi_master())
 
+        dist_cphf_ov = orbrsp_results['dist_cphf_ov']
+
+        cphf_ao = []
+        for x in range(dof):
+            cphf_ov_x = dist_cphf_ov[x].get_full_vector(0)
+
+            if self.rank == mpi_master():
+                # CPHF/CPKS coefficients (lambda Lagrange multipliers)
+                cphf_ao.append(
+                    np.linalg.multi_dot([mo_occ, cphf_ov_x.reshape(nocc, nvir), mo_vir.T])
+                )
+
+        if self.rank == mpi_master():
+            cphf_ao = np.array(cphf_ao)
+            unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao']
+            relaxed_density_ao = ( unrelaxed_density_ao + 2.0 * cphf_ao
+                            + 2.0 * cphf_ao.transpose(0,2,1) )
+        else:
+            natm = None
+            gs_dm = None
+            relaxed_density_ao = None
+            x_plus_y_ao = None
+            x_minus_y_ao = None
+
+        natm = self.comm.bcast(natm, root=mpi_master())
+        gs_dm = self.comm.bcast(gs_dm,
+                                root=mpi_master())
+        relaxed_density_ao = self.comm.bcast(relaxed_density_ao,
+                                             root=mpi_master())
+        x_plus_y_ao = self.comm.bcast(x_plus_y_ao,
+                                      root=mpi_master())
+        x_minus_y_ao = self.comm.bcast(x_minus_y_ao,
+                                       root=mpi_master())
+        omega_ao = self.comm.bcast(omega_ao,
+                                   root=mpi_master())
+
         # ground state gradient
-        t1 = tm.time()
-        gs_grad_drv = ScfGradientDriver(scf_drv)
+        t1 = time.time()
+        gs_grad_drv = ScfGradientDriver(self._scf_drv)
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
         gs_grad_drv.ostream.mute()
-        gs_grad_drv.compute(molecule, basis, scf_drv.scf_tensors)
+        gs_grad_drv.compute(molecule, basis, scf_tensors)
         gs_grad_drv.ostream.unmute()
-        t2 = tm.time()
+        t2 = time.time()
 
         if self.rank == mpi_master():
             if gs_grad_drv.numerical:
@@ -273,76 +318,181 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-            self.gradient = np.zeros((dof, natm, 3))
-            self.gradient += gs_grad_drv.get_gradient()
+            gs_gradient = gs_grad_drv.get_gradient()
 
-            # loop over atoms and contract integral derivatives
-            # with density matrices
-            # add the corresponding contribution to the gradient
-            for i in range(natm):
-                t0 = tm.time()
-                # taking integral derivatives from pyscf
-                d_ovlp = overlap_deriv(molecule, basis, i)
-                d_hcore = hcore_deriv(molecule, basis, i)
-                d_eri = eri_deriv(molecule, basis, i)
+        self.gradient = np.zeros((dof, natm, 3))
 
-                if self._dft:
-                    if self.xcfun.is_hybrid():
-                        frac_K = self.xcfun.get_frac_exact_exchange()
-                    else:
-                        frac_K = 0.0
-                else:
-                    frac_K = 1.0
+        local_atoms = partition_atoms(natm, self.rank, self.nodes)
 
+        # kinetic energy contribution to gradient
+
+        kin_grad_drv = KineticEnergyGeom100Driver()
+
+        self._print_debug_info('before kin_grad')
+
+        for iatom in local_atoms:
+            gmats = kin_grad_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
                 for s in range(dof):
-                    for x in range(3):
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            relaxed_density_ao[s].reshape(nao**2),
-                            (d_hcore[x].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            2.0 * omega_ao[s].reshape(nao**2),
-                            (d_ovlp[x].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += 2.0 * np.linalg.multi_dot([
-                            gs_dm.reshape(nao**2),
-                            d_eri[x].transpose(1,0,3,2).reshape(nao**2,nao**2),
-                            relaxed_density_ao[s].reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += -1.0 * frac_K * np.linalg.multi_dot([
-                           gs_dm.reshape(nao**2),
-                           d_eri[x].transpose(3,0,2,1).reshape(nao**2,nao**2),
-                           relaxed_density_ao[s].reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            x_plus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(3,2,0,1).reshape(nao**2,nao**2),
-                            (x_plus_y_ao[s] - x_plus_y_ao[s].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += - 0.5 * frac_K * np.linalg.multi_dot([
-                            x_plus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(1,2,0,3).reshape(nao**2,nao**2),
-                            (x_plus_y_ao[s] - x_plus_y_ao[s].T).reshape(nao**2)
-                        ]) 
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            x_minus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(3,2,0,1).reshape(nao**2,nao**2),
-                            (x_minus_y_ao[s] + x_minus_y_ao[s].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] -= 0.5 * frac_K * np.linalg.multi_dot([
-                            x_minus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(1,2,0,3).reshape(nao**2,nao**2),
-                            (x_minus_y_ao[s] + x_minus_y_ao[s].T).reshape(nao**2)
-                        ])
-                        
+                    # Sum of alpha + beta already in relaxed_density_ao
+                    self.gradient[s, iatom, i] += np.sum((gmat + gmat.T) 
+                                                 * relaxed_density_ao[s])
+
+            gmats = Matrices()
+
+        self._print_debug_info('after  kin_grad')
+
+        # nuclear potential contribution to gradient
+
+        self._print_debug_info('before npot_grad')
+
+        npot_grad_100_drv = NuclearPotentialGeom100Driver()
+        npot_grad_010_drv = NuclearPotentialGeom010Driver()
+
+        for iatom in local_atoms:
+            gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom)
+            gmats_010 = npot_grad_010_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                gmat_010 = gmats_010.matrix_to_numpy(label)
+
+                # TODO: move minus sign into function call (such as in oneints)
+                for s in range(dof):
+                    # summation of alpha and beta already included
+                    # in relaxed_density_ao
+                    self.gradient[s, iatom, i] -=  np.sum(
+                        (gmat_100 + gmat_100.T) * relaxed_density_ao[s])
+                    self.gradient[s, iatom, i] -=  np.sum(gmat_010 
+                                                * relaxed_density_ao[s])
+
+            gmats_100 = Matrices()
+            gmats_010 = Matrices()
+
+        self._print_debug_info('after  npot_grad')
+        
+        # orbital response contribution to gradient
+
+        self._print_debug_info('before ovl_grad')
+
+        ovl_grad_drv = OverlapGeom100Driver()
+
+        for iatom in local_atoms:
+            gmats = ovl_grad_drv.compute(molecule, basis, iatom)
+
+            for i, label in enumerate(['X', 'Y', 'Z']):
+                gmat = gmats.matrix_to_numpy(label)
+                for s in range(dof):
+                    self.gradient[s, iatom, i] += 2.0 * np.sum(
+                        (gmat + gmat.T) * omega_ao[s])
+            gmats = Matrices()
+
+        self._print_debug_info('after  ovl_grad')
+
+        # ERI contribution to gradient
+
+        # determine the Fock type and exchange scaling factor
+        if self._dft:
+            if self.xcfun.is_hybrid():
+                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+                fock_type = '2jkx'
+            else:
+                exchange_scaling_factor = 0.0
+                fock_type = 'j'
+        else:
+            exchange_scaling_factor = 1.0
+            fock_type = '2jk'
+
+        # TODO: range-separated Fock
+        need_omega = (self._dft and self.xcfun.is_range_separated())
+        if need_omega:
+            assert_msg_critical(
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
+
+        fock_timing = {
+            'Screening': 0.0,
+            'FockGrad': 0.0,
+            }
+
+        self._print_debug_info('before fock_grad')
+        fock_grad_drv = FockGeom1000Driver()
+
+        extra_factor = self._get_extra_block_size_factor(
+            basis.get_dimensions_of_basis())
+        fock_grad_drv._set_block_size_factor(self._block_size_factor *
+                                             extra_factor)
+        t0 = time.time()
+
+        screener = T4CScreener()
+        screener.partition(basis, molecule, 'eri')
+
+        fock_timing['Screening'] += time.time() - t0
+
+        thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
+
+        factor = 2.0 if fock_type == 'j' else 1.0
+
+        den_mat_for_fock_gs = make_matrix(basis, mat_t.symmetric)
+        den_mat_for_fock_gs.set_values(gs_dm)
+
+        for iatom in local_atoms:
+
+            screener_atom = T4CScreener()
+            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+            t0 = time.time()
+
+            for idx in range(dof):
+                den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_rel.set_values(relaxed_density_ao[idx])
+                den_mat_for_fock_xpy = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xpy.set_values(x_plus_y_ao[idx])
+                den_mat_for_fock_xpy_m_xpyT = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xpy_m_xpyT.set_values( x_plus_y_ao[idx]
+                                                      - x_plus_y_ao[idx].T)
+                den_mat_for_fock_xmy = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xmy.set_values(x_minus_y_ao[idx])
+                den_mat_for_fock_xmy_p_xmyT = make_matrix(basis, mat_t.general)
+                den_mat_for_fock_xmy_p_xmyT.set_values( x_minus_y_ao[idx]
+                                                      + x_minus_y_ao[idx].T)
+
+                atomgrad_rel = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_gs,
+                                             den_mat_for_fock_rel, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                atomgrad_xpy = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_xpy,
+                                             den_mat_for_fock_xpy_m_xpyT, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                atomgrad_xmy = fock_grad_drv.compute(basis, screener_atom,
+                                             screener,
+                                             den_mat_for_fock_xmy,
+                                             den_mat_for_fock_xmy_p_xmyT, iatom,
+                                             fock_type, exchange_scaling_factor,
+                                             0.0, thresh_int)
+                
+                self.gradient[idx, iatom, :] += np.array(atomgrad_rel) * factor
+                self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xpy) * factor
+                self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xmy) * factor
+
+        fock_timing['FockGrad'] += time.time() - t0
+
+        self._print_debug_info('after  fock_grad')
 
         # TODO: enable multiple DMs for DFT to avoid for-loops.
         if self._dft:
-            xcfun_label = scf_drv.xcfun.get_func_label()
+            xcfun_label = self._scf_drv.xcfun.get_func_label()
 
             for s in range(dof):
                 if self.rank == mpi_master():
-                    gs_dm = scf_drv.scf_tensors['D_alpha']
+                    gs_dm = scf_tensors['D_alpha']
 
                     rhow_dm = 0.5 * relaxed_density_ao[s]
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
@@ -363,6 +513,17 @@ class TddftGradientDriver(GradientDriver):
 
                 if self.rank == mpi_master():
                     self.gradient[s] += tddft_xcgrad
+
+        if self.rank == mpi_master():
+            self.gradient += gs_grad_drv.get_gradient()
+
+        self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
+
+        if self.timing and self.rank == mpi_master():
+            self.ostream.print_info('Fock timing decomposition')
+            for key, val in fock_timing.items():
+                self.ostream.print_info(f'    {key:<10s}:  {val:.2f} sec')
+            self.ostream.print_blank()
 
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """
@@ -461,3 +622,39 @@ class TddftGradientDriver(GradientDriver):
         scf_drv.ostream.unmute()
 
         return dipole_moment
+
+    # TODO: this routine is used by both ScfGradientDriver and
+    # TddftGradientDriver. It can be moved to the parent class.
+    def _print_debug_info(self, label):
+        """
+        Prints debug information.
+
+        :param label:
+            The label of debug information.
+        """
+
+        if self._debug:
+            profiler = Profiler()
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
+                                    profiler.get_available_memory())
+            self.ostream.flush()
+
+    # TODO: this routine is used by both ScfGradientDriver and
+    # TddftGradientDriver. It can be moved to the parent class.
+    def _get_extra_block_size_factor(self, naos):
+
+        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
+
+        if total_cores >= 2048:
+            if naos >= 4500:
+                extra_factor = 4
+            else:
+                extra_factor = 2
+
+        elif total_cores >= 1024:
+            extra_factor = 2
+
+        else:
+            extra_factor = 1
+
+        return extra_factor

@@ -35,6 +35,7 @@ from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
+from .loprop import LoPropDriver
 from .scfgradientdriver import ScfGradientDriver
 from .tddftgradientdriver import TddftGradientDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
@@ -374,16 +375,20 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv = TddftGradientDriver(scf_drv)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                  rsp_prop.rsp_driver)
+                                  rsp_prop._rsp_driver,
+                                  rsp_prop._rsp_property)
 
     # Hessian
     # TODO reconsider keeping this after introducing vibrationalanalysis class
     if task_type == 'hessian':
         hessian_dict = (task.input_dict['hessian']
                         if 'hessian' in task.input_dict else {})
+
+        orbrsp_dict = (task.input_dict['orbital_response']
+                       if 'orbital_response' in task.input_dict else {})
 
         if use_xtb:
             hessian_drv = XtbHessianDriver(xtb_drv)
@@ -392,7 +397,7 @@ def main():
 
         elif scf_drv.scf_type == 'restricted':
             hessian_drv = ScfHessianDriver(scf_drv)
-            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
 
     # Geometry optimization
@@ -450,14 +455,15 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv = TddftGradientDriver(scf_drv)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True
             opt_drv.update_settings(opt_dict)
             opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                          rsp_prop.rsp_driver)
+                                          rsp_prop._rsp_driver,
+                                      	  rsp_prop._rsp_property)
 
     # Vibrational analysis
 
@@ -566,7 +572,7 @@ def main():
             # Excited state gradient
             if 'gradient' in task.input_dict:
                 grad_dict = task.input_dict['gradient']
-                tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+                tddftgrad_drv = TddftGradientDriver(scf_drv)
                 tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
                                               method_dict)
                 tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
@@ -588,7 +594,7 @@ def main():
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:
                 opt_dict = task.input_dict['optimize_excited_state']
-                tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+                tddftgrad_drv = TddftGradientDriver(scf_drv)
                 tddftgrad_drv.update_settings(opt_dict, rsp_dict, orbrsp_dict,
                                               method_dict)
                 opt_drv = OptimizationDriver(tddftgrad_drv)
@@ -641,6 +647,12 @@ def main():
         vis_drv = VisualizationDriver(task.mpi_comm)
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
+
+    # LoProp
+
+    if task_type == 'loprop':
+        loprop_driver = LoPropDriver(task.mpi_comm, task.ostream)
+        loprop_driver.compute(task.molecule, task.ao_basis, scf_results)
 
     # RESP and ESP charges
 

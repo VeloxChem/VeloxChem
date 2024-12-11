@@ -38,10 +38,7 @@ class TestOptimizeSCF:
                                       task.min_basis)
 
         grad_drv = ScfGradientDriver(scf_drv)
-        # So far testing with the numerical gradient
-        grad_drv.numerical = True
         opt_drv = OptimizationDriver(grad_drv)
-
         opt_drv.update_settings({
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
