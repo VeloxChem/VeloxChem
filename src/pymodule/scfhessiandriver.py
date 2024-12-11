@@ -362,7 +362,10 @@ class ScfHessianDriver(HessianDriver):
 
         else:
             density = None
+            omega_ao = None
+
         density = self.comm.bcast(density, root=mpi_master())
+        omega_ao = self.comm.bcast(omega_ao, root=mpi_master())
         nao = density.shape[0]
 
         # Solve CPHF equations
@@ -378,7 +381,6 @@ class ScfHessianDriver(HessianDriver):
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
         
         if self.rank == mpi_master():
-
             t1 = tm.time()
         
             # Parts related to first-order integral derivatives
@@ -420,15 +422,6 @@ class ScfHessianDriver(HessianDriver):
                                     ao_basis, dist_cphf_rhs, dist_cphf_ov,
                                     hessian_first_integral_derivatives,
                                     hessian_eri_overlap, profiler)
-
-        # DFT:
-        if self._dft:
-            xc_mol_hess = XCMolecularHessian()
-            hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule,
-                                                ao_basis,
-                                                [density], self.scf_driver._mol_grid,
-                                                self.scf_driver.xcfun.get_func_label())
-            hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
         ovlp_hess_200_drv = OverlapGeom200Driver()
         ovlp_hess_101_drv = OverlapGeom101Driver()
@@ -481,146 +474,172 @@ class ScfHessianDriver(HessianDriver):
         # TODO: parallelize over atoms
         if self.rank == mpi_master():
             t2 = tm.time()
+
             self.ostream.print_info('First order derivative contributions'
                                     + ' to the Hessian computed in' +
                                      ' {:.2f} sec.'.format(t2 - t1))
             self.ostream.print_blank()
             self.ostream.flush()
 
-            # Parts related to second-order integral derivatives
-            hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
+        # Parts related to second-order integral derivatives
+        hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
-            for i in range(natm):
+        # TODO: use alternative way to partition atoms
+        local_atoms = list(range(natm))[self.rank::self.nodes]
 
-                ovlp_hess_200_mats = ovlp_hess_200_drv.compute(molecule, ao_basis, i)
+        for i in local_atoms:
 
-                for x, label_x in enumerate('XYZ'):
-                    for y, label_y in enumerate('XYZ'):
-                        ovlp_label = label_x + label_y if x <= y else label_y + label_x
-                        ovlp_iixy = ovlp_hess_200_mats.matrix_to_numpy(ovlp_label)
-                        hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
-                                np.sum(omega_ao * (ovlp_iixy + ovlp_iixy.T)))
+            ovlp_hess_200_mats = ovlp_hess_200_drv.compute(molecule, ao_basis, i)
 
-                ovlp_hess_200_mats = Matrices()
+            for x, label_x in enumerate('XYZ'):
+                for y, label_y in enumerate('XYZ'):
+                    ovlp_label = label_x + label_y if x <= y else label_y + label_x
+                    ovlp_iixy = ovlp_hess_200_mats.matrix_to_numpy(ovlp_label)
+                    hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
+                            np.sum(omega_ao * (ovlp_iixy + ovlp_iixy.T)))
 
-                kin_hess_200_mats = kin_hess_200_drv.compute(molecule, ao_basis, i)
+            ovlp_hess_200_mats = Matrices()
 
-                for x, label_x in enumerate('XYZ'):
-                    for y, label_y in enumerate('XYZ'):
-                        kin_label = label_x + label_y if x <= y else label_y + label_x
-                        kin_200_iixy = kin_hess_200_mats.matrix_to_numpy(kin_label)
-                        hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
-                                np.sum(density * (kin_200_iixy  + kin_200_iixy.T)))
+            kin_hess_200_mats = kin_hess_200_drv.compute(molecule, ao_basis, i)
 
-                kin_hess_200_mats = Matrices()
+            for x, label_x in enumerate('XYZ'):
+                for y, label_y in enumerate('XYZ'):
+                    kin_label = label_x + label_y if x <= y else label_y + label_x
+                    kin_200_iixy = kin_hess_200_mats.matrix_to_numpy(kin_label)
+                    hessian_2nd_order_derivatives[i, i, x, y] += 2.0 * (
+                            np.sum(density * (kin_200_iixy  + kin_200_iixy.T)))
 
-                npot_hess_200_mats = npot_hess_200_drv.compute(molecule, ao_basis, i)
-                npot_hess_020_mats = npot_hess_020_drv.compute(molecule, ao_basis, i)
+            kin_hess_200_mats = Matrices()
 
-                for x, label_x in enumerate('XYZ'):
-                    for y, label_y in enumerate('XYZ'):
-                        npot_label = label_x + label_y if x <= y else label_y + label_x
-                        npot_200_iixy = npot_hess_200_mats.matrix_to_numpy(npot_label)
-                        npot_020_iixy = npot_hess_020_mats.matrix_to_numpy(npot_label)
-                        # TODO: move minus sign into function call (such as in oneints)
-                        hessian_2nd_order_derivatives[i, i, x, y] += -2.0 * (
-                                np.sum(density * (npot_200_iixy + npot_200_iixy.T + npot_020_iixy)))
+            npot_hess_200_mats = npot_hess_200_drv.compute(molecule, ao_basis, i)
+            npot_hess_020_mats = npot_hess_020_drv.compute(molecule, ao_basis, i)
 
-                npot_hess_200_mats = Matrices()
-                npot_hess_020_mats = Matrices()
+            for x, label_x in enumerate('XYZ'):
+                for y, label_y in enumerate('XYZ'):
+                    npot_label = label_x + label_y if x <= y else label_y + label_x
+                    npot_200_iixy = npot_hess_200_mats.matrix_to_numpy(npot_label)
+                    npot_020_iixy = npot_hess_020_mats.matrix_to_numpy(npot_label)
+                    # TODO: move minus sign into function call (such as in oneints)
+                    hessian_2nd_order_derivatives[i, i, x, y] += -2.0 * (
+                            np.sum(density * (npot_200_iixy + npot_200_iixy.T + npot_020_iixy)))
 
-                screener_atom_i = T4CScreener()
-                screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
+            npot_hess_200_mats = Matrices()
+            npot_hess_020_mats = Matrices()
 
-                fock_hess_2000 = fock_hess_2000_drv.compute(
-                        ao_basis, screener_atom_i, screener,
-                        den_mat_for_fock, den_mat_for_fock2, i,
-                        fock_type, exchange_scaling_factor,
-                        0.0, thresh_int)
+            screener_atom_i = T4CScreener()
+            screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
 
-                # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
-                xy_pairs_upper_triang = [(x, y) for x in range(3) for y in range(x, 3)]
+            fock_hess_2000 = fock_hess_2000_drv.compute(
+                    ao_basis, screener_atom_i, screener,
+                    den_mat_for_fock, den_mat_for_fock2, i,
+                    fock_type, exchange_scaling_factor,
+                    0.0, thresh_int)
 
-                for idx, (x, y) in enumerate(xy_pairs_upper_triang):
-                    hess_val = fock_factor * fock_hess_2000[idx]
-                    hessian_2nd_order_derivatives[i, i, x, y] += hess_val
-                    if x != y:
-                        hessian_2nd_order_derivatives[i, i, y, x] += hess_val
+            # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
+            xy_pairs_upper_triang = [(x, y) for x in range(3) for y in range(x, 3)]
 
-                # do only upper triangular matrix
-                for j in range(i, natm):
+            for idx, (x, y) in enumerate(xy_pairs_upper_triang):
+                hess_val = fock_factor * fock_hess_2000[idx]
+                hessian_2nd_order_derivatives[i, i, x, y] += hess_val
+                if x != y:
+                    hessian_2nd_order_derivatives[i, i, y, x] += hess_val
 
-                    ovlp_hess_101_mats = ovlp_hess_101_drv.compute(molecule, ao_basis, i, j)
+        # do only upper triangular matrix
+        all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
 
-                    for x, label_x in enumerate('XYZ'):
-                        for y, label_y in enumerate('XYZ'):
-                            ovlp_label = f'{label_x}_{label_y}'
-                            ovlp_ijxy = ovlp_hess_101_mats.matrix_to_numpy(ovlp_label)
-                            hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
-                                    np.sum(omega_ao * (ovlp_ijxy + ovlp_ijxy.T)))
+        # TODO: use alternative way to partition atom pairs
+        local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
 
-                    ovlp_hess_101_mats = Matrices()
+        for i, j in local_atom_pairs:
 
-                    kin_hess_101_mats = kin_hess_101_drv.compute(molecule, ao_basis, i, j)
+            ovlp_hess_101_mats = ovlp_hess_101_drv.compute(molecule, ao_basis, i, j)
 
-                    for x, label_x in enumerate('XYZ'):
-                        for y, label_y in enumerate('XYZ'):
-                            kin_label = f'{label_x}_{label_y}'
-                            kin_101_ijxy = kin_hess_101_mats.matrix_to_numpy(kin_label)
-                            hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
-                                    np.sum(density * (kin_101_ijxy  + kin_101_ijxy.T)))
+            for x, label_x in enumerate('XYZ'):
+                for y, label_y in enumerate('XYZ'):
+                    ovlp_label = f'{label_x}_{label_y}'
+                    ovlp_ijxy = ovlp_hess_101_mats.matrix_to_numpy(ovlp_label)
+                    hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                            np.sum(omega_ao * (ovlp_ijxy + ovlp_ijxy.T)))
 
-                    kin_hess_101_mats = Matrices()
+            ovlp_hess_101_mats = Matrices()
 
-                    npot_hess_110_mats_ij = npot_hess_110_drv.compute(molecule, ao_basis, i, j)
-                    npot_hess_110_mats_ji = npot_hess_110_drv.compute(molecule, ao_basis, j, i)
-                    npot_hess_101_mats = npot_hess_101_drv.compute(molecule, ao_basis, i, j)
+            kin_hess_101_mats = kin_hess_101_drv.compute(molecule, ao_basis, i, j)
 
-                    for x, label_x in enumerate('XYZ'):
-                        for y, label_y in enumerate('XYZ'):
-                            npot_xy_label = f'{label_x}_{label_y}'
-                            npot_yx_label = f'{label_y}_{label_x}'
-                            npot_110_ijxy = (npot_hess_110_mats_ij.matrix_to_numpy(npot_xy_label) +
-                                             npot_hess_110_mats_ji.matrix_to_numpy(npot_yx_label))
-                            npot_101_ijxy = npot_hess_101_mats.matrix_to_numpy(npot_xy_label)
-                            # TODO: move minus sign into function call (such as in oneints)
-                            hessian_2nd_order_derivatives[i, j, x, y] += -2.0 * (
-                                np.sum(density * (npot_110_ijxy + npot_110_ijxy.T + npot_101_ijxy + npot_101_ijxy.T)))
+            for x, label_x in enumerate('XYZ'):
+                for y, label_y in enumerate('XYZ'):
+                    kin_label = f'{label_x}_{label_y}'
+                    kin_101_ijxy = kin_hess_101_mats.matrix_to_numpy(kin_label)
+                    hessian_2nd_order_derivatives[i, j, x, y] += 2.0 * (
+                            np.sum(density * (kin_101_ijxy  + kin_101_ijxy.T)))
 
-                    npot_hess_110_mats_ij = Matrices()
-                    npot_hess_110_mats_ji = Matrices()
-                    npot_hess_101_mats = Matrices()
+            kin_hess_101_mats = Matrices()
 
-                    screener_atom_pair = T4CScreener()
-                    screener_atom_pair.partition_atom_pair(ao_basis, molecule, 'eri', i, j)
+            npot_hess_110_mats_ij = npot_hess_110_drv.compute(molecule, ao_basis, i, j)
+            npot_hess_110_mats_ji = npot_hess_110_drv.compute(molecule, ao_basis, j, i)
+            npot_hess_101_mats = npot_hess_101_drv.compute(molecule, ao_basis, i, j)
 
-                    fock_hess_1100 = fock_hess_1100_drv.compute(
-                            ao_basis, screener_atom_pair, screener,
-                            den_mat_for_fock, den_mat_for_fock2, i, j,
-                            fock_type, exchange_scaling_factor,
-                            0.0, thresh_int)
+            for x, label_x in enumerate('XYZ'):
+                for y, label_y in enumerate('XYZ'):
+                    npot_xy_label = f'{label_x}_{label_y}'
+                    npot_yx_label = f'{label_y}_{label_x}'
+                    npot_110_ijxy = (npot_hess_110_mats_ij.matrix_to_numpy(npot_xy_label) +
+                                     npot_hess_110_mats_ji.matrix_to_numpy(npot_yx_label))
+                    npot_101_ijxy = npot_hess_101_mats.matrix_to_numpy(npot_xy_label)
+                    # TODO: move minus sign into function call (such as in oneints)
+                    hessian_2nd_order_derivatives[i, j, x, y] += -2.0 * (
+                        np.sum(density * (npot_110_ijxy + npot_110_ijxy.T + npot_101_ijxy + npot_101_ijxy.T)))
 
-                    screener_atom_j = T4CScreener()
-                    screener_atom_j.partition_atom(ao_basis, molecule, 'eri', j)
+            npot_hess_110_mats_ij = Matrices()
+            npot_hess_110_mats_ji = Matrices()
+            npot_hess_101_mats = Matrices()
 
-                    # Note: use general matrix on both sides
-                    fock_hess_1010 = fock_hess_1010_drv.compute(
-                            ao_basis, screener_atom_i, screener_atom_j,
-                            den_mat_for_fock2, den_mat_for_fock2, i, j,
-                            fock_type, exchange_scaling_factor,
-                            0.0, thresh_int)
+            screener_atom_pair = T4CScreener()
+            screener_atom_pair.partition_atom_pair(ao_basis, molecule, 'eri', i, j)
 
-                    # 'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
-                    xy_pairs = [(x, y) for x in range(3) for y in range(3)]
+            fock_hess_1100 = fock_hess_1100_drv.compute(
+                    ao_basis, screener_atom_pair, screener,
+                    den_mat_for_fock, den_mat_for_fock2, i, j,
+                    fock_type, exchange_scaling_factor,
+                    0.0, thresh_int)
 
-                    for idx, (x, y) in enumerate(xy_pairs):
-                        hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * (
-                                fock_hess_1100[idx] + fock_hess_1010[idx])
+            screener_atom_i = T4CScreener()
+            screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
 
-                # lower triangle is transpose of the upper part
-                for j in range(i):
-                    hessian_2nd_order_derivatives[i,j] += (
-                                hessian_2nd_order_derivatives[j,i].T )
+            screener_atom_j = T4CScreener()
+            screener_atom_j.partition_atom(ao_basis, molecule, 'eri', j)
+
+            # Note: use general matrix on both sides
+            fock_hess_1010 = fock_hess_1010_drv.compute(
+                    ao_basis, screener_atom_i, screener_atom_j,
+                    den_mat_for_fock2, den_mat_for_fock2, i, j,
+                    fock_type, exchange_scaling_factor,
+                    0.0, thresh_int)
+
+            # 'X_X', 'X_Y', 'X_Z', 'Y_X', 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'
+            xy_pairs = [(x, y) for x in range(3) for y in range(3)]
+
+            for idx, (x, y) in enumerate(xy_pairs):
+                hessian_2nd_order_derivatives[i, j, x, y] += fock_factor * (
+                        fock_hess_1100[idx] + fock_hess_1010[idx])
+
+            # lower triangle is transpose of the upper part
+            if i != j:
+                hessian_2nd_order_derivatives[j,i] += (
+                    hessian_2nd_order_derivatives[i,j].T)
+
+        hessian_2nd_order_derivatives = self.comm.reduce(
+                hessian_2nd_order_derivatives, root=mpi_master())
+
+        # DFT:
+        if self._dft:
+            xc_mol_hess = XCMolecularHessian()
+            hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule,
+                                                ao_basis,
+                                                [density], self.scf_driver._mol_grid,
+                                                self.scf_driver.xcfun.get_func_label())
+            hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
+
+        if self.rank == mpi_master():
 
             ## Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
