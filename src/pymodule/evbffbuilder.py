@@ -80,10 +80,10 @@ class EvbForceFieldBuilder():
                     shutil.rmtree(item_path)
 
         # Never merge the reactant forcefield generators, for these we actually need positions
-        self.product, product_geom= self._create_combined_forcefield(products)
-        reactant_geom = self.reactant.molecule.get_coordinates_in_angstrom()
+        self.product= self._create_combined_forcefield(products)
+        
         if not ordered_input:
-            self.product = self._match_reactant_and_product(self.reactant, self.product, reactant_geom, product_geom, breaking_bonds)
+            self.product = self._match_reactant_and_product(self.reactant, self.product, breaking_bonds)
         self.product.ostream.flush()
         self._summarise_reaction(self.reactant, self.product)
         self.save_forcefield(self.product, "_".join(product_file) + "_combined")
@@ -306,12 +306,8 @@ class EvbForceFieldBuilder():
     def _match_reactant_and_product(
         reactant: ForceFieldGenerator,
         product: ForceFieldGenerator,
-        reactant_geom,
-        product_geom,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ) -> ForceFieldGenerator:
-        A_geom = reactant_geom
-        B_geom = product_geom
         # Turn the reactand and product into graphs
         rea_graph = nx.Graph()
         reactant_bonds = list(reactant.bonds.keys())
@@ -350,7 +346,6 @@ class EvbForceFieldBuilder():
             # If the largest graph is in B, swap A and B, the reactant is now being treated as the product or vice versa
             if len(A[0].nodes) < len(B[0].nodes):
                 A, B = B, A
-                A_geom, B_geom = B_geom, A_geom
 
                 if swapped is False:
                     swapped = True
@@ -358,10 +353,10 @@ class EvbForceFieldBuilder():
                     swapped = False
 
             # Find the next largest subgraph isomorphism of the elements of B in A[0]
-            new_mapping, mapping_index = EvbForceFieldBuilder._find_next_subgraph(A[0], B, reactant_geom, product_geom)
+            new_mapping, mapping_index = EvbForceFieldBuilder._find_next_subgraph(A[0], B)
 
             # Save the obtained mapping
-            # If the reactant is being treated as the product, the mapping needs to be inverted
+            # If the reactant is being treated as the product, the mapping needs to be inverted before saving
             if swapped:
                 total_mapping.update({v: k for k, v in new_mapping.items()})
             else:
@@ -374,12 +369,6 @@ class EvbForceFieldBuilder():
             # Remove the corresponding nodes from A
             A[0] = nx.Graph(A[0])  # Unfreeze the graph to allow for node removal
             A[0].remove_nodes_from(new_mapping.values())
-
-            # Remove the corresponding geometry points
-            for a_index,b_index in new_mapping.items():
-                A_geom = np.delete(A_geom, a_index)
-                B_geom = np.delete(B_geom, b_index)
-
         print(f"Mapping: {total_mapping}")
 
         EvbForceFieldBuilder._apply_mapping_to_forcefield(product, total_mapping)
@@ -387,7 +376,7 @@ class EvbForceFieldBuilder():
 
     # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
     @staticmethod
-    def _create_combined_forcefield(forcefields: list[ForceFieldGenerator]) -> tuple[ForceFieldGenerator, np.ndarray]:
+    def _create_combined_forcefield(forcefields: list[ForceFieldGenerator]) -> ForceFieldGenerator:
         forcefield = ForceFieldGenerator()
         forcefield.atoms = {}
         forcefield.bonds = {}
@@ -395,7 +384,7 @@ class EvbForceFieldBuilder():
         forcefield.dihedrals = {}
         forcefield.impropers = {}
         atom_count = 0
-        geom = np.empty((0, 3))
+        
         for product_ffgen in forcefields:
             # Shift all atom keys by the current atom count so that every atom has a unique ID
             # todo make this more robust, check if shifting is necessary
@@ -408,8 +397,8 @@ class EvbForceFieldBuilder():
             forcefield.angles.update(product_ffgen.angles)
             forcefield.dihedrals.update(product_ffgen.dihedrals)
             forcefield.impropers.update(product_ffgen.impropers)
-            geom = np.concatenate((geom, product_ffgen.molecule.get_coordinates_in_angstrom()))
-        return forcefield, geom
+            
+        return forcefield
 
     # Split a graph into a list of connected graphs
     @staticmethod
@@ -460,7 +449,7 @@ class EvbForceFieldBuilder():
     # Loops through B and finds the largest subgraph isomorphism in A that leaves the least scattered atoms
     # Returns the mapping and the index of the subgraph in B
     @staticmethod
-    def _find_next_subgraph(a: nx.Graph, B: list[nx.Graph], geoma, geomb):
+    def _find_next_subgraph(a: nx.Graph, B: list[nx.Graph]):
         # find largest graph B in other that is subgraph isomorphic
         B = sorted(B, key=lambda graph: len(graph.nodes), reverse=True)
 
@@ -470,29 +459,20 @@ class EvbForceFieldBuilder():
             # Get all subgraph isomorphisms
             sub_graph_mappings = [sub for sub in GM.subgraph_isomorphisms_iter()]
 
-            # If there are any subgraph isomorphisms, find the one with the smallest remaining distribution of atoms
+            # If there are any subgraph isomorphisms, find the one with the smallest number of connected components in the remaining graph
             if len(sub_graph_mappings) > 0:
                 best_mapping = None
-                best_norm = -1
+                best_res = -1
+
                 for mapping in sub_graph_mappings:
-                    nodesa = list(mapping.keys())
-                    nodesb = list(mapping.values()) 
 
-                    # Remove the geometry points that are in the mapping
-                    filtered_geoma = [item for idx, item in enumerate(geoma) if idx not in nodesa]
-                    filtered_geomb = [item for idx, item in enumerate(geomb) if idx not in nodesb]
-
-                    norm = 0
-                    for i, coordi in enumerate(filtered_geoma):
-                        for coordj in filtered_geoma[i:]:
-                            norm += np.linalg.norm(coordi - coordj)
-
-                    for i, coordi in enumerate(filtered_geomb):
-                        for coordj in filtered_geomb[i:]:
-                            norm += np.linalg.norm(coordi - coordj)
-                    if best_norm == -1 or norm < best_norm:
-                        best_norm = norm
+                    temp_a = nx.Graph(a)  # Unfreeze the graph to allow for node removal
+                    temp_a.remove_nodes_from(mapping.keys())
+                    res = nx.number_connected_components(temp_a)
+                    if best_res == -1 or res < best_res:
+                        best_res = res
                         best_mapping = mapping
+
 
                 inverted_mapping = {v: k for k, v in best_mapping.items()}  # type: ignore
                 return inverted_mapping, graph_index

@@ -315,7 +315,6 @@ class EvbDriver():
         step_size=0.001,
         equil_step_size=0.002,
         initial_equil_step_size=0.002,
-        platform="CPU",
         test_run=False
     ):
                 

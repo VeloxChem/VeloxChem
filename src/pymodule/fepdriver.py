@@ -33,7 +33,7 @@ class FepDriver():
             else:
                 ostream = OutputStream(None)
 
-        self.platform: str = "CPU"
+        self.platform: mm.Platform = None
         self.systems: dict
         self.topology: mmapp.Topology
         self.Lambda: list
@@ -144,7 +144,7 @@ class FepDriver():
                 topology,
                 system,
                 integrator,
-                platform=mm.Platform.getPlatformByName(self.platform),
+                self.platform,
             )
 
             simulation.context.setPositions(initial_positions)
@@ -193,7 +193,7 @@ class FepDriver():
                 topology,
                 system,
                 integrator,
-                platform=mm.Platform.getPlatformByName(self.platform),
+                self.platform,
             )
             runsimulation.context.setPositions(equil_positions)
 
@@ -311,25 +311,25 @@ class FepDriver():
             self.topology,
             self.systems["reactant"],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
         simulation_product_reference = mmapp.Simulation(
             self.topology,
             self.systems["product"],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
         simulation_reactant_run = mmapp.Simulation(
             self.topology,
             self.systems[0],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
         simulation_product_run = mmapp.Simulation(
             self.topology,
             self.systems[1],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
 
         lsims = []
@@ -341,7 +341,7 @@ class FepDriver():
                         self.topology,
                         self.systems[lam],
                         mm.VerletIntegrator(integrator_step_size),
-                        platform=mm.Platform.getPlatformByName(self.platform),
+                        self.platform,
                     ))
 
         # loop over lambda instead
@@ -457,25 +457,25 @@ class FepDriver():
             self.topology,
             self.systems["reactant"],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
         simulation_product_reference = mmapp.Simulation(
             self.topology,
             self.systems["product"],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
         simulation_reactant_run = mmapp.Simulation(
             self.topology,
             self.systems[0],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
         simulation_product_run = mmapp.Simulation(
             self.topology,
             self.systems[1],
             mm.VerletIntegrator(integrator_step_size),
-            platform=mm.Platform.getPlatformByName(self.platform),
+            self.platform,
         )
 
         lsims = []
@@ -487,7 +487,7 @@ class FepDriver():
                         self.topology,
                         self.systems[lam],
                         mm.VerletIntegrator(integrator_step_size),
-                        platform=mm.Platform.getPlatformByName(self.platform),
+                        self.platform,
                     ))
 
         # loop over lambda instead
