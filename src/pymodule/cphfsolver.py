@@ -39,7 +39,7 @@ from .inputparser import parse_input
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .dftutils import get_default_grid_level
-from scipy.sparse import linalg
+
 
 class CphfSolver(LinearSolver):
     """
