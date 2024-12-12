@@ -21,7 +21,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-# TODO: remove commented out code;
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
@@ -39,6 +38,7 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .outputstream import OutputStream
 from .matrices import Matrices
+from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
 from .errorhandler import assert_msg_critical
@@ -100,7 +100,14 @@ class HessianOrbitalResponse(CphfSolver):
             The RHS of the CPHF equations.
         """
 
-        self.profiler.start_timer('RHS')
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        profiler.set_timing_key(f'RHS')
 
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
@@ -156,12 +163,13 @@ class HessianOrbitalResponse(CphfSolver):
                               for iatom in range(natm)
                               for x in range(3)}
 
-        # TODO: double check the use of profiler
-        self.profiler.start_timer('derivs')
+        profiler.start_timer('dOvlpFock')
 
         t0 = tm.time()
 
         ovlp_grad_drv = OverlapGeom100Driver()
+
+        # TODO: calculate ovlp and fock derivatives in different loops
 
         for iatom in local_atoms:
 
@@ -182,6 +190,9 @@ class HessianOrbitalResponse(CphfSolver):
             fock_deriv_ao_dict[(iatom, 1)] = fock_deriv_ao_i[1]
             fock_deriv_ao_dict[(iatom, 2)] = fock_deriv_ao_i[2]
 
+        profiler.stop_timer('dOvlpFock')
+        profiler.start_timer('dXC')
+
         # Note: Parallelization of DFT integration is done over grid points
         # instead of atoms.
 
@@ -199,6 +210,8 @@ class HessianOrbitalResponse(CphfSolver):
                     if self.rank == root_rank:
                         fock_deriv_ao_dict[(iatom, x)] += vxc_deriv_ix
 
+        profiler.stop_timer('dXC')
+
         t1 = tm.time()
 
         if self.rank == mpi_master():
@@ -207,12 +220,12 @@ class HessianOrbitalResponse(CphfSolver):
             self.ostream.print_blank()
             self.ostream.flush()
             
-        self.profiler.stop_timer('derivs')
-
         if self.rank == mpi_master():
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
         else:
             hessian_first_integral_derivatives = None
+
+        profiler.start_timer('1stHess')
 
         for iatom, root_rank_i in all_atom_idx_rank:
             for x in range(3):
@@ -253,6 +266,8 @@ class HessianOrbitalResponse(CphfSolver):
                             if iatom != jatom:
                                 hessian_first_integral_derivatives[jatom,iatom,y,x] += hess_ijxy
 
+        profiler.stop_timer('1stHess')
+
         dist_cphf_rhs = []
 
         if self.rank == mpi_master():
@@ -261,6 +276,8 @@ class HessianOrbitalResponse(CphfSolver):
             hessian_eri_overlap = None
 
         for iatom, root_rank in all_atom_idx_rank:
+
+            uij_t0 = tm.time()
 
             # the oo part of the CPHF coefficients in AO basis
             uij_ao_list = []
@@ -271,9 +288,11 @@ class HessianOrbitalResponse(CphfSolver):
                    density, -0.5 * ovlp_deriv_ao_ix, density
                 ]))
 
+            profiler.add_timing_info('UijAO', tm.time() - uij_t0)
+
             # create AODensity and Fock matrix objects, contract with ERI
             fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, self.profiler)
+                                          dft_dict, pe_dict, profiler)
 
             # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
             # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
@@ -284,6 +303,8 @@ class HessianOrbitalResponse(CphfSolver):
                     continue
 
                 hess_ij = np.zeros((3, 3))
+
+                uij_t0 = tm.time()
 
                 for y in range(3):
                     ovlp_deriv_ao_jy = self.comm.bcast(
@@ -298,12 +319,16 @@ class HessianOrbitalResponse(CphfSolver):
                             hess_ij[x, y] = 2.0 * (np.sum(
                                 fock_uij[x] * uij_ao_jy))
 
+                profiler.add_timing_info('UijDot', tm.time() - uij_t0)
+
                 if self.rank == mpi_master():
                     hessian_eri_overlap[iatom,jatom,:,:] += 4.0 * hess_ij
                     if iatom != jatom:
                         hessian_eri_overlap[jatom,iatom,:,:] += 4.0 * hess_ij.T
 
             for x in range(3):
+
+                uij_t0 = tm.time()
 
                 # form dist_fock_uij_ov_2 from mpi_master
 
@@ -359,6 +384,8 @@ class HessianOrbitalResponse(CphfSolver):
 
                 dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
+                profiler.add_timing_info('distRHS', tm.time() - uij_t0)
+
         ovlp_deriv_ao_dict.clear()
         fock_deriv_ao_dict.clear()
 
@@ -370,7 +397,8 @@ class HessianOrbitalResponse(CphfSolver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-        self.profiler.stop_timer('RHS')
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
         return {
             'dist_cphf_rhs': dist_cphf_rhs,

@@ -357,6 +357,13 @@ class ScfHessianDriver(HessianDriver):
         # Solve CPHF equations
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+        # TODO: double check propagation of cphf settings
+        profiler_keywords = {
+            'timing', 'profiling', 'memory_profiling', 'memory_tracing'
+        }
+        for key in profiler_keywords:
+            setattr(cphf_solver, key, getattr(self, key))
+
         cphf_solver.compute(molecule, ao_basis, scf_tensors)
 
         cphf_solution_dict = cphf_solver.cphf_results

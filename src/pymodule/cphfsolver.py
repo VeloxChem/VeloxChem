@@ -118,13 +118,6 @@ class CphfSolver(LinearSolver):
             contracted with the two-electron integrals).
         """
 
-        self.profiler = Profiler({
-            'timing': self.timing,
-            'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
-            'memory_tracing': self.memory_tracing,
-        })
-
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
@@ -164,6 +157,13 @@ class CphfSolver(LinearSolver):
             To be determined. (Dict with RHS, CPHF coefficients, ...)
         """
 
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         self.start_time = tm.time()
 
         # check molecule
@@ -186,10 +186,6 @@ class CphfSolver(LinearSolver):
 
         # PE information
         pe_dict = self._init_pe(molecule, basis)
-
-        # Timing information
-        # TODO: use Profiler
-        timing_dict = {}
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E_alpha']
@@ -234,7 +230,7 @@ class CphfSolver(LinearSolver):
 
         # construct the sigma (E*t) vectors
         self.build_sigmas(molecule, basis, scf_tensors, dist_trials, eri_dict,
-                          dft_dict, pe_dict, timing_dict)
+                          dft_dict, pe_dict, profiler)
 
         # lists that will hold the solutions and residuals
         # TODO: double check residuals in setup_trials
@@ -247,8 +243,8 @@ class CphfSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            self.profiler.set_timing_key(f'Iteration {iteration+1}')
-            self.profiler.start_timer('ReducedSpace')
+            profiler.set_timing_key(f'Iteration {iteration+1}')
+            profiler.start_timer('ReducedSpace')
 
             # Orbital Hessian in reduced subspace
             orbhess_red = self.dist_trials.matmul_AtB(self.dist_sigmas)
@@ -302,7 +298,7 @@ class CphfSolver(LinearSolver):
                     '{:d} trial vectors in reduced space'.format(num_vecs))
                 self.ostream.print_blank()
 
-                self.profiler.print_memory_subspace(
+                profiler.print_memory_subspace(
                     {
                         'dist_trials': self.dist_trials,
                         'dist_sigmas': self.dist_sigmas,
@@ -311,14 +307,14 @@ class CphfSolver(LinearSolver):
                         'residuals': residuals,
                     }, self.ostream)
 
-                self.profiler.check_memory_usage(
+                profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
 
-                self.profiler.print_memory_tracing(self.ostream)
+                profiler.print_memory_tracing(self.ostream)
 
                 self.print_iteration(relative_residual_norm, molecule)
 
-            self.profiler.stop_timer('ReducedSpace')
+            profiler.stop_timer('ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -326,29 +322,29 @@ class CphfSolver(LinearSolver):
             if self.is_converged:
                 break
 
-            self.profiler.start_timer('Orthonorm.')
+            profiler.start_timer('Orthonorm.')
 
             # update trial vectors
             new_trials = self.setup_trials(molecule, dist_precond,
                                            residuals, self.dist_trials)
 
-            self.profiler.stop_timer('Orthonorm.')
+            profiler.stop_timer('Orthonorm.')
 
-            self.profiler.start_timer('FockBuild')
+            profiler.start_timer('FockBuild')
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials, eri_dict,
-                              dft_dict, pe_dict, timing_dict)
+                              dft_dict, pe_dict, profiler)
 
-            self.profiler.stop_timer('FockBuild')
-            self.profiler.check_memory_usage(
+            profiler.stop_timer('FockBuild')
+            profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self.profiler.print_timing(self.ostream)
-        self.profiler.print_profiling_summary(self.ostream)
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
-        self.profiler.check_memory_usage('End of ComputeCPHF iterative subspace algorithm')
-        self.profiler.print_memory_usage(self.ostream)
+        profiler.check_memory_usage('End of ComputeCPHF iterative subspace algorithm')
+        profiler.print_memory_usage(self.ostream)
 
         # converged?
         if self.rank == mpi_master():
@@ -363,10 +359,8 @@ class CphfSolver(LinearSolver):
             'dist_cphf_ov': solutions,
         }
 
-    # To avoid init_eri, init_dft at each iteration, we do it once and pass it on to
-    # build_sigmas.
     def build_sigmas(self, molecule, basis, scf_tensors, dist_trials, eri_dict,
-                    dft_dict, pe_dict, timing_dict):
+                    dft_dict, pe_dict, profiler):
         """
         Apply orbital Hessian matrix to a set of trial vectors.
         Appends sigma and trial vectors to member variable.
@@ -434,7 +428,7 @@ class CphfSolver(LinearSolver):
 
             # create Fock matrices and contract with two-electron integrals
             fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, self.profiler)
+                                      dft_dict, pe_dict, profiler)
 
             # create sigma vectors
             if self.rank == mpi_master():
@@ -574,6 +568,13 @@ class CphfSolver(LinearSolver):
             contracted with the two-electron integrals).
         """
 
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         self.start_time = tm.time()
 
         # check molecule
@@ -590,15 +591,15 @@ class CphfSolver(LinearSolver):
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
+
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
+
         # PE information
         pe_dict = self._init_pe(molecule, basis)
-        # Timing information
-        timing_dict = {}
 
-        self.profiler.set_timing_key('CPHF RHS')
-        self.profiler.start_timer('CPHF RHS')
+        profiler.set_timing_key('CPHF RHS')
+        profiler.start_timer('CPHF RHS')
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E_alpha']
@@ -634,20 +635,23 @@ class CphfSolver(LinearSolver):
         else:
             cphf_rhs = None
 
-        self.profiler.stop_timer('CPHF RHS')
+        profiler.stop_timer('CPHF RHS')
 
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
 
         # Solve the CPHF equations using conjugate gradient (cg)
-        cphf_ov = self.solve_cphf_cg(molecule, basis, scf_tensors,
-                                  cphf_rhs # TODO: possibly change the shape
-                                  )
+        cphf_ov = self.solve_cphf_cg(
+                molecule,
+                basis,
+                scf_tensors,
+                cphf_rhs, # TODO: possibly change the shape
+            )
 
-        self.profiler.print_timing(self.ostream)
-        self.profiler.print_profiling_summary(self.ostream)
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
-        self.profiler.check_memory_usage('End of ComputeCPHF CG algorithm')
-        self.profiler.print_memory_usage(self.ostream)
+        profiler.check_memory_usage('End of ComputeCPHF CG algorithm')
+        profiler.print_memory_usage(self.ostream)
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -690,15 +694,16 @@ class CphfSolver(LinearSolver):
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
+
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors)
+
         # PE information
         pe_dict = self._init_pe(molecule, basis)
-        # Timing information
-        timing_dict = {}
 
         nocc = molecule.number_of_alpha_electrons()
         natm = molecule.number_of_atoms()
+
         # degrees of freedom from rhs (can be different from number of atoms)
         dof = cphf_rhs.shape[0]
 
@@ -742,8 +747,8 @@ class CphfSolver(LinearSolver):
             vector with orbital Hessian matrix.
             """
 
-            self.profiler.set_timing_key('Iter ' + str(self._cur_iter) + 'CG')
-            self.profiler.start_timer('Iter ' + str(self._cur_iter) + 'CG')
+            profiler.set_timing_key('Iter ' + str(self._cur_iter) + 'CG')
+            profiler.start_timer('Iter ' + str(self._cur_iter) + 'CG')
 
             # Create AODensityMatrix object from lambda in AO
             if self.rank == mpi_master():
@@ -759,7 +764,7 @@ class CphfSolver(LinearSolver):
             cphf_ao_list = self.comm.bcast(cphf_ao_list, root=mpi_master())
 
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule,
-                              basis, eri_dict, dft_dict, pe_dict, self.profiler)
+                              basis, eri_dict, dft_dict, pe_dict, profiler)
 
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
             # and add diagonal part
@@ -780,12 +785,12 @@ class CphfSolver(LinearSolver):
 
             cphf_mo = self.comm.bcast(cphf_mo, root=mpi_master())
 
-            self.profiler.stop_timer('Iter ' + str(self._cur_iter) + 'CG')
+            profiler.stop_timer('Iter ' + str(self._cur_iter) + 'CG')
 
-            self.profiler.check_memory_usage(
+            profiler.check_memory_usage(
                 'CG Iteration {:d}'.format(self._cur_iter + 1))
 
-            self.profiler.print_memory_tracing(self.ostream)
+            profiler.print_memory_tracing(self.ostream)
 
             # increase iteration counter every time this function is called
             self._cur_iter += 1
