@@ -243,16 +243,13 @@ class HessianOrbitalResponse(CphfSolver):
                         if self.rank == mpi_master():
 
                             Fix_Sjy = np.sum(
-                                np.matmul(density, fock_deriv_ao_ix) *
-                                np.matmul(density, ovlp_deriv_ao_jy).T)
+                                np.linalg.multi_dot([density, fock_deriv_ao_ix, density]) * ovlp_deriv_ao_jy)
 
                             Fjy_Six = np.sum(
-                                np.matmul(density, fock_deriv_ao_jy) *
-                                np.matmul(density, ovlp_deriv_ao_ix).T)
+                                np.linalg.multi_dot([density, ovlp_deriv_ao_ix, density]) * fock_deriv_ao_jy)
 
                             Six_Sjy = 2.0 * np.sum(
-                                np.matmul(omega_ao, ovlp_deriv_ao_ix) *
-                                np.matmul(density, ovlp_deriv_ao_jy).T)
+                                np.linalg.multi_dot([omega_ao, ovlp_deriv_ao_ix, density]) * ovlp_deriv_ao_jy)
 
                             hess_ijxy = -2.0 * (Fix_Sjy + Fjy_Six + Six_Sjy)
                             hessian_first_integral_derivatives[iatom, jatom, x,
@@ -305,14 +302,11 @@ class HessianOrbitalResponse(CphfSolver):
                 for y in range(3):
                     ovlp_deriv_ao_jy = self.comm.bcast(
                         ovlp_deriv_ao_dict[(jatom, y)], root=root_rank_j)
-                    uij_ao_jy = np.linalg.multi_dot(
-                        [density, -0.5 * ovlp_deriv_ao_jy, density])
 
                     if self.rank == mpi_master():
                         for x in range(3):
-                            # xmn,ymn->xy
-                            hess_ij[x,
-                                    y] = 2.0 * (np.sum(fock_uij[x] * uij_ao_jy))
+                            hess_ij[x, y] = 2.0 * (np.sum(
+                                np.linalg.multi_dot([density, fock_uij[x], density]) * (-0.5 * ovlp_deriv_ao_jy)))
 
                 profiler.add_timing_info('UijDot', tm.time() - uij_t0)
 
