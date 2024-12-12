@@ -543,6 +543,7 @@ def main():
             return
 
         # Calculate the excited-state gradient
+        # TODO: do not force computation of gradient if not requested
 
         if 'property' in rsp_dict:
             prop_type = rsp_dict['property'].lower()
@@ -602,6 +603,7 @@ def main():
                                 rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
         else:
+            # TODO: this should not be printed if gradient is not requested
             task.ostream.print_blank()
             info_msg = 'The excited state derivatives '
             info_msg += 'can only be computed if the response '

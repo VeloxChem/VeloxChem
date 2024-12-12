@@ -835,7 +835,7 @@ class CphfSolver(LinearSolver):
 
         return cphf_coefficients_ov.reshape(dof, nocc, nvir)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, scf_drv):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args):
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
@@ -846,8 +846,6 @@ class CphfSolver(LinearSolver):
             The AO basis set.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param scf_drv:
-            The scf_driver
 
         :returns:
             The RHS of the CPHF equations.
