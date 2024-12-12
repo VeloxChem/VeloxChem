@@ -333,7 +333,6 @@ class ScfHessianDriver(HessianDriver):
     def compute_analytical(self, molecule, ao_basis, profiler):
         """
         Computes the analytical nuclear Hessian.
-        So far only for restricted Hartree-Fock with PySCF integral derivatives...
 
         :param molecule:
             The molecule.
