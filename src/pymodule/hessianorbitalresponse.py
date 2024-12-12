@@ -83,7 +83,8 @@ class HessianOrbitalResponse(CphfSolver):
 
         super().update_settings(cphf_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict):
+    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args):
+
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
@@ -156,7 +157,6 @@ class HessianOrbitalResponse(CphfSolver):
                               for x in range(3)}
 
         # TODO: double check the use of profiler
-        #self.profiler.set_timing_key('derivs')
         self.profiler.start_timer('derivs')
 
         t0 = tm.time()

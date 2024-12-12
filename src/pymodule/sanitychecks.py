@@ -180,6 +180,9 @@ def raman_sanity_check(obj):
     Print warning message and set normal Raman flag to False.
     The driver will continue with resonance Raman.
 
+    Checks if zero frequency has been input to resonance Raman. If so,
+    the value is removed from frequency list.
+
     :param obj:
         The object (vibrational analysis driver)
     """
@@ -193,6 +196,25 @@ def raman_sanity_check(obj):
         obj.ostream.flush()
         obj.do_raman = False
 
+    # This check is due to convergence/singulaity issues in the cphf
+    # subspace solver for some molecules.
+    if obj.do_resonance_raman:
+        try:
+            idx0 = obj.frequencies.index(0.0)
+            warn_msg = 'Zero in frequency list for resonance Raman!\n'
+            if len(obj.frequencies) == 1:
+                warn_msg += 'No other frequencies requested.'
+                warn_msg += 'Will continue with normal Raman.'
+                obj.do_raman = True
+                obj.do_resonance_raman = False
+            else:
+                obj.frequencies.pop(idx0)
+                warn_msg += 'It has been removed from the list.'
+                warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
+                warn_msg += str(obj.frequencies)
+            obj.ostream.print_warning(warn_msg)
+        except ValueError:
+            pass
 
 def pe_sanity_check(obj, method_dict=None):
     """

@@ -38,6 +38,8 @@ from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+from .dftutils import get_default_grid_level
+from scipy.sparse import linalg
 
 class CphfSolver(LinearSolver):
     """
@@ -622,11 +624,13 @@ class CphfSolver(LinearSolver):
         natm =  molecule.number_of_atoms()
         nvir = nmo - nocc
 
-        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, *args)
+        #cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, *args)
+        cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, *args)
 
         if self.rank == mpi_master():
             cphf_rhs = cphf_rhs_dict['cphf_rhs']
             dof = cphf_rhs.shape[0]
+            cphf_rhs = cphf_rhs.reshape(dof, nocc, nvir)
         else:
             cphf_rhs = None
 

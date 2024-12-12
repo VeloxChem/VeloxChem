@@ -12,10 +12,10 @@ from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polarizabilitygradient import PolarizabilityGradient
 
-try:
-    import pyscf
-except ImportError:
-    pass
+#try:
+#    import pyscf
+#except ImportError:
+#    pass
 
 class TestPolgrad:
 
@@ -42,7 +42,7 @@ class TestPolgrad:
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
         # test real analytical gradient
-        an_polgrad_drv = PolarizabilityGradient()
+        an_polgrad_drv = PolarizabilityGradient(scf_drv)
         cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'no'}
         polgrad_settings = {'frequencies': (0.0, 0.4)}
         an_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
@@ -67,10 +67,10 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
         # test real numerical gradient
-        num_polgrad_drv = PolarizabilityGradient()
+        num_polgrad_drv = PolarizabilityGradient(scf_drv)
         polgrad_settings = {'numerical': 'yes', 'do_four_point': 'yes', 'frequencies': (0.0, 0.4)}
         cphf_settings = {}
-        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings, scf_drv=scf_drv)
+        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         num_polgrad_drv.ostream.mute()
         num_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results=None)
 
@@ -114,7 +114,7 @@ class TestPolgrad:
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
         # test complex analytical gradient
-        an_polgrad_drv = PolarizabilityGradient()
+        an_polgrad_drv = PolarizabilityGradient(scf_drv)
         cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'no'}
         polgrad_settings = {'frequencies': (0.0, 0.4), 'is_complex': 'yes',
                             'damping': 0.5}
@@ -140,10 +140,10 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
         # test complex numerical gradient
-        num_polgrad_drv = PolarizabilityGradient()
+        num_polgrad_drv = PolarizabilityGradient(scf_drv)
         polgrad_settings = {'frequencies': (0.0, 0.4), 'is_complex': 'yes',
                             'damping': 0.5, 'numerical': 'yes', 'do_four_point': 'yes'}
-        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings, scf_drv=scf_drv)
+        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         num_polgrad_drv.ostream.mute()
         num_polgrad_drv.compute(molecule, basis, scf_tensors)
 
@@ -164,8 +164,8 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_hf_polarizabilitygradient(self):
         h2o_xyz = """3
 
@@ -181,8 +181,8 @@ class TestPolgrad:
         self.run_polgrad_real(molecule, basis, None, "polarizabilitygradient_hf_real")
         self.run_polgrad_complex(molecule, basis, None, "polarizabilitygradient_hf_complex")
 
-    @pytest.mark.skipif('pyscf' not in sys.modules,
-                        reason='pyscf for integral derivatives not available')
+#    @pytest.mark.skipif('pyscf' not in sys.modules,
+#                        reason='pyscf for integral derivatives not available')
     def test_ks_polarizabilitygradient(self):
         h2o_xyz = """3
 

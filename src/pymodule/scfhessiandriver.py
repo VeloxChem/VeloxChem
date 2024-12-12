@@ -143,7 +143,6 @@ class ScfHessianDriver(HessianDriver):
 
         start_time = tm.time()
 
-        # TODO: make use of profiler
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -1355,7 +1354,7 @@ class ScfHessianDriver(HessianDriver):
 
     def compute_orbital_response(self, molecule, ao_basis):
         """
-        TEMPORARY FUNCTION FOR PERFORMACE TESTING
+        TEMPORARY FUNCTION FOR PERFORMANCE TESTING
         Computes the CPHF orbital response.
 
         :param molecule:

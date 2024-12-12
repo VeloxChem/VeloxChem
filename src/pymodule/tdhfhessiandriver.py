@@ -34,12 +34,6 @@ from .hessiandriver import HessianDriver
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
 
-# For PySCF integral derivatives
-from .import_from_pyscf import overlap_deriv
-from .import_from_pyscf import fock_deriv
-from .import_from_pyscf import eri_deriv
-
-
 class TdhfHessianDriver(HessianDriver):
     """
     Implements the Hessian at the TDHF and CIS levels of theory.
