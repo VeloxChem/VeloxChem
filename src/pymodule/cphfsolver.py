@@ -330,13 +330,10 @@ class CphfSolver(LinearSolver):
 
             profiler.stop_timer('Orthonorm.')
 
-            profiler.start_timer('FockBuild')
-
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials, eri_dict,
                               dft_dict, pe_dict, profiler)
 
-            profiler.stop_timer('FockBuild')
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
@@ -599,6 +596,7 @@ class CphfSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         profiler.set_timing_key('CPHF RHS')
+        # TODO: double check use of profiler
         profiler.start_timer('CPHF RHS')
 
         if self.rank == mpi_master():
