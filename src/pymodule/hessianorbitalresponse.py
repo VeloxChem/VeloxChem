@@ -168,6 +168,8 @@ class HessianOrbitalResponse(CphfSolver):
 
             gmats = Matrices()
 
+        self.comm.barrier()
+
         dist_ovlp_deriv_ao = {}
 
         for iatom, root_rank in all_atom_idx_rank:
@@ -182,11 +184,11 @@ class HessianOrbitalResponse(CphfSolver):
 
         # Fock derivatives
 
+        profiler.start_timer('dFock')
+
         fock_deriv_ao_dict = {
             (iatom, x): None for iatom in range(natm) for x in range(3)
         }
-
-        profiler.start_timer('dFock')
 
         for iatom in local_atoms:
 
@@ -197,11 +199,26 @@ class HessianOrbitalResponse(CphfSolver):
             fock_deriv_ao_dict[(iatom, 1)] = fock_deriv_ao_i[1]
             fock_deriv_ao_dict[(iatom, 2)] = fock_deriv_ao_i[2]
 
+        self.comm.barrier()
+
+        dist_fock_deriv_ao = {}
+
+        for iatom, root_rank in all_atom_idx_rank:
+            for x in range(3):
+                key_ix = (iatom, x)
+                dist_fock_deriv_ao[key_ix] = DistributedArray(
+                    fock_deriv_ao_dict[key_ix], self.comm, root=root_rank)
+
+        fock_deriv_ao_dict.clear()
+
         profiler.stop_timer('dFock')
-        profiler.start_timer('dXC')
+
+        # XC derivatives
 
         # Note: Parallelization of DFT integration is done over grid points
         # instead of atoms.
+
+        profiler.start_timer('dXC')
 
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
@@ -212,10 +229,12 @@ class HessianOrbitalResponse(CphfSolver):
                     self.xcfun.get_func_label(), iatom)
 
                 for x in range(3):
-                    vxc_deriv_ix = self.comm.reduce(vxc_deriv_i[x],
-                                                    root=root_rank)
-                    if self.rank == root_rank:
-                        fock_deriv_ao_dict[(iatom, x)] += vxc_deriv_ix
+                    vxc_deriv_ix = self.comm.reduce(vxc_deriv_i[x])
+
+                    dist_vxc_deriv_ix = DistributedArray(vxc_deriv_ix, self.comm)
+
+                    key_ix = (iatom, x)
+                    dist_fock_deriv_ao[key_ix].data += dist_vxc_deriv_ix.data
 
         profiler.stop_timer('dXC')
 
@@ -239,10 +258,7 @@ class HessianOrbitalResponse(CphfSolver):
                 key_ix = (iatom, x)
 
                 ovlp_deriv_ao_ix = dist_ovlp_deriv_ao[key_ix].get_full_matrix() 
-
-                fock_deriv_ao_ix = self.comm.bcast(fock_deriv_ao_dict[(iatom,
-                                                                       x)],
-                                                   root=root_rank_i)
+                fock_deriv_ao_ix = dist_fock_deriv_ao[key_ix].get_full_matrix() 
 
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
@@ -251,9 +267,7 @@ class HessianOrbitalResponse(CphfSolver):
                         key_jy = (jatom, y)
 
                         ovlp_deriv_ao_jy = dist_ovlp_deriv_ao[key_jy].get_full_matrix()
-
-                        fock_deriv_ao_jy = self.comm.bcast(
-                            fock_deriv_ao_dict[(jatom, y)], root=root_rank_j)
+                        fock_deriv_ao_jy = dist_fock_deriv_ao[key_jy].get_full_matrix()
 
                         if self.rank == mpi_master():
 
@@ -361,13 +375,13 @@ class HessianOrbitalResponse(CphfSolver):
 
                 key_ix = (iatom, x)
                 ovlp_deriv_ao_ix = dist_ovlp_deriv_ao[key_ix].get_full_matrix(root=root_rank)
+                fock_deriv_ao_ix = dist_fock_deriv_ao[key_ix].get_full_matrix(root=root_rank)
 
                 # TODO: do this on mpi_master
                 if self.rank == root_rank:
 
                     fock_deriv_ov_dict_ix = np.linalg.multi_dot(
-                        [mo_occ.T, fock_deriv_ao_dict[(iatom, x)],
-                         mo_vir]).reshape(nocc * nvir)
+                        [mo_occ.T, fock_deriv_ao_ix, mo_vir]).reshape(nocc * nvir)
 
                     ovlp_deriv_ov_ix = np.linalg.multi_dot(
                         [mo_occ.T, ovlp_deriv_ao_ix, mo_vir])
@@ -398,8 +412,6 @@ class HessianOrbitalResponse(CphfSolver):
                 dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
                 profiler.add_timing_info('distRHS', tm.time() - uij_t0)
-
-        fock_deriv_ao_dict.clear()
 
         t2 = tm.time()
 
