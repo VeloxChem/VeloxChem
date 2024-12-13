@@ -286,30 +286,30 @@ class HessianOrbitalResponse(CphfSolver):
                     for y in range(3):
                         key_jy = (jatom, y)
 
-                        Fix_Sjy = np.sum(dist_DFD_ix.data * dist_ovlp_deriv_ao[key_jy].data)
+                        Fix_Sjy = np.sum(dist_DFD_ix.data *
+                                         dist_ovlp_deriv_ao[key_jy].data)
 
-                        Fjy_Six = np.sum(dist_DSD_ix.data * dist_fock_deriv_ao[key_jy].data)
+                        Fjy_Six = np.sum(dist_DSD_ix.data *
+                                         dist_fock_deriv_ao[key_jy].data)
 
-                        Six_Sjy = 2.0 * np.sum(
-                            dist_OmegaSD_ix.data * dist_ovlp_deriv_ao[key_jy].data)
+                        Six_Sjy = 2.0 * np.sum(dist_OmegaSD_ix.data *
+                                               dist_ovlp_deriv_ao[key_jy].data)
 
                         hess_ijxy = -2.0 * (Fix_Sjy + Fjy_Six + Six_Sjy)
                         hessian_first_integral_derivatives[iatom, jatom, x,
                                                            y] += hess_ijxy
                         if iatom != jatom:
-                            hessian_first_integral_derivatives[
-                                jatom, iatom, y, x] += hess_ijxy
+                            hessian_first_integral_derivatives[jatom, iatom, y,
+                                                               x] += hess_ijxy
 
-        hessian_first_integral_derivatives = self.comm.allreduce(hessian_first_integral_derivatives)
+        hessian_first_integral_derivatives = self.comm.allreduce(
+            hessian_first_integral_derivatives)
 
         profiler.stop_timer('1stHess')
 
         dist_cphf_rhs = []
 
-        if self.rank == mpi_master():
-            hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
-        else:
-            hessian_eri_overlap = None
+        hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
 
         for iatom, root_rank in all_atom_idx_rank:
 
@@ -339,10 +339,14 @@ class HessianOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 uij_ao_list.clear()
 
-                DFD_ix_list = []
-                for x in range(3):
-                    DFD_ix_list.append(
-                        np.linalg.multi_dot([density, fock_uij[x], density]))
+            dist_DFD_ix_list = []
+            for x in range(3):
+                if self.rank == mpi_master():
+                    DFD_ix = np.linalg.multi_dot(
+                        [density, fock_uij[x], density])
+                else:
+                    DFD_ix = None
+                dist_DFD_ix_list.append(DistributedArray(DFD_ix, self.comm))
 
             # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
             # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
@@ -358,23 +362,17 @@ class HessianOrbitalResponse(CphfSolver):
 
                 for y in range(3):
                     key_jy = (jatom, y)
-                    ovlp_deriv_ao_jy = dist_ovlp_deriv_ao[
-                        key_jy].get_full_matrix()
 
-                    if self.rank == mpi_master():
-                        for x in range(3):
-                            # hess_ij[x, y] = 2.0 * (np.sum(
-                            #     DFD_ix_list[x] * (-0.5 * ovlp_deriv_ao_jy)))
-                            hess_ij[x, y] = -(np.sum(
-                                DFD_ix_list[x] * ovlp_deriv_ao_jy))
+                    for x in range(3):
+                        # 2.0 * (np.sum(DFD_ix_list[x] * (-0.5 * ovlp_deriv_ao_jy)))
+                        hess_ij[x, y] = -np.sum(dist_DFD_ix_list[x].data *
+                                                dist_ovlp_deriv_ao[key_jy].data)
 
                 profiler.add_timing_info('UijDot', tm.time() - uij_t0)
 
-                if self.rank == mpi_master():
-                    hessian_eri_overlap[iatom, jatom, :, :] += 4.0 * hess_ij
-                    if iatom != jatom:
-                        hessian_eri_overlap[jatom,
-                                            iatom, :, :] += 4.0 * hess_ij.T
+                hessian_eri_overlap[iatom, jatom, :, :] += 4.0 * hess_ij
+                if iatom != jatom:
+                    hessian_eri_overlap[jatom, iatom, :, :] += 4.0 * hess_ij.T
 
             for x in range(3):
 
@@ -437,6 +435,8 @@ class HessianOrbitalResponse(CphfSolver):
                 dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
                 profiler.add_timing_info('distRHS', tm.time() - uij_t0)
+
+        hessian_eri_overlap = self.comm.allreduce(hessian_eri_overlap)
 
         t2 = tm.time()
 
