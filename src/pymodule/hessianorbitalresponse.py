@@ -168,8 +168,6 @@ class HessianOrbitalResponse(CphfSolver):
 
             gmats = Matrices()
 
-        self.comm.barrier()
-
         dist_ovlp_deriv_ao = {}
 
         for iatom, root_rank in all_atom_idx_rank:
@@ -201,8 +199,6 @@ class HessianOrbitalResponse(CphfSolver):
             fock_deriv_ao_dict[(iatom, 0)] = fock_deriv_ao_i[0]
             fock_deriv_ao_dict[(iatom, 1)] = fock_deriv_ao_i[1]
             fock_deriv_ao_dict[(iatom, 2)] = fock_deriv_ao_i[2]
-
-        self.comm.barrier()
 
         dist_fock_deriv_ao = {}
 
@@ -339,44 +335,43 @@ class HessianOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 uij_ao_list.clear()
 
-            dist_DFD_ix_list = []
+            uij_t0 = tm.time()
+
             for x in range(3):
                 if self.rank == mpi_master():
                     DFD_ix = np.linalg.multi_dot(
                         [density, fock_uij[x], density])
                 else:
                     DFD_ix = None
-                dist_DFD_ix_list.append(DistributedArray(DFD_ix, self.comm))
 
-            # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
-            # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
-            # response
+                dist_DFD_ix = DistributedArray(DFD_ix, self.comm)
 
-            for jatom, root_rank_j in all_atom_idx_rank:
-                if jatom < iatom:
-                    continue
+                # Note: hessian_eri_overlap, i.e. inner product of P_P_Six_fock_ao and
+                # P_P_Sjy, is obtained from fock_uij and uij_ao_jy in hessian orbital
+                # response
 
-                hess_ij = np.zeros((3, 3))
+                for jatom, root_rank_j in all_atom_idx_rank:
+                    if jatom < iatom:
+                        continue
 
-                uij_t0 = tm.time()
+                    for y in range(3):
+                        key_jy = (jatom, y)
 
-                for y in range(3):
-                    key_jy = (jatom, y)
-
-                    for x in range(3):
                         # 2.0 * (np.sum(DFD_ix_list[x] * (-0.5 * ovlp_deriv_ao_jy)))
-                        hess_ij[x, y] = -np.sum(dist_DFD_ix_list[x].data *
-                                                dist_ovlp_deriv_ao[key_jy].data)
+                        hess_ijxy = -np.sum(
+                            dist_DFD_ix.data * dist_ovlp_deriv_ao[key_jy].data)
 
-                profiler.add_timing_info('UijDot', tm.time() - uij_t0)
+                        hess_ijxy *= 4.0
 
-                hessian_eri_overlap[iatom, jatom, :, :] += 4.0 * hess_ij
-                if iatom != jatom:
-                    hessian_eri_overlap[jatom, iatom, :, :] += 4.0 * hess_ij.T
+                        hessian_eri_overlap[iatom, jatom, x, y] += hess_ijxy
+                        if iatom != jatom:
+                            hessian_eri_overlap[jatom, iatom, y, x] += hess_ijxy
+
+            profiler.add_timing_info('UijDot', tm.time() - uij_t0)
+
+            uij_t0 = tm.time()
 
             for x in range(3):
-
-                uij_t0 = tm.time()
 
                 # form dist_fock_uij_ov_2 from mpi_master
 
@@ -434,7 +429,7 @@ class HessianOrbitalResponse(CphfSolver):
 
                 dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
-                profiler.add_timing_info('distRHS', tm.time() - uij_t0)
+            profiler.add_timing_info('distRHS', tm.time() - uij_t0)
 
         hessian_eri_overlap = self.comm.allreduce(hessian_eri_overlap)
 
