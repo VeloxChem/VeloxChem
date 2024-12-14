@@ -572,6 +572,14 @@ export_dft(py::module& m)
                 return vlx_general::pointer_to_numpy(points.values(), {4, self.getNumberOfGridPoints()});
             },
             "Gets grid points as numpy array of shape (4,N).")
+        .def(
+            "re_distribute_counts_and_displacements",
+            [](CMolecularGrid& self, const int rank, const int nnodes) -> void {
+                self.reDistributeCountsAndDisplacements(rank, nnodes);
+            },
+            "Redo distributing MolecularGrid counts and displacements.",
+            "rank"_a,
+            "nnodes"_a)
         .def(py::self == py::self);
 
     // CGridDriver class

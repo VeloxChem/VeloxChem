@@ -88,7 +88,11 @@ CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
 
     , _gridPointCounts(source._gridPointCounts)
 
+    , _gridPointCountsOriginal(source._gridPointCountsOriginal)
+
     , _gridPointDisplacements(source._gridPointDisplacements)
+
+    , _gridPointDisplacementsOriginal(source._gridPointDisplacementsOriginal)
 
     , _maxNumberOfGridPointsPerBox(source._maxNumberOfGridPointsPerBox)
 {
@@ -104,7 +108,11 @@ CMolecularGrid::CMolecularGrid(CMolecularGrid&& source) noexcept
 
     , _gridPointCounts(std::move(source._gridPointCounts))
 
+    , _gridPointCountsOriginal(std::move(source._gridPointCountsOriginal))
+
     , _gridPointDisplacements(std::move(source._gridPointDisplacements))
+
+    , _gridPointDisplacementsOriginal(std::move(source._gridPointDisplacementsOriginal))
 
     , _maxNumberOfGridPointsPerBox(std::move(source._maxNumberOfGridPointsPerBox))
 {
@@ -127,7 +135,11 @@ CMolecularGrid::operator=(const CMolecularGrid& source) -> CMolecularGrid&
 
     _gridPointCounts = source._gridPointCounts;
 
+    _gridPointCountsOriginal = source._gridPointCountsOriginal;
+
     _gridPointDisplacements = source._gridPointDisplacements;
+
+    _gridPointDisplacementsOriginal = source._gridPointDisplacementsOriginal;
 
     _maxNumberOfGridPointsPerBox = source._maxNumberOfGridPointsPerBox;
 
@@ -147,7 +159,11 @@ CMolecularGrid::operator=(CMolecularGrid&& source) noexcept -> CMolecularGrid&
 
     _gridPointCounts = std::move(source._gridPointCounts);
 
+    _gridPointCountsOriginal = std::move(source._gridPointCountsOriginal);
+
     _gridPointDisplacements = std::move(source._gridPointDisplacements);
+
+    _gridPointDisplacementsOriginal = std::move(source._gridPointDisplacementsOriginal);
 
     _maxNumberOfGridPointsPerBox = std::move(source._maxNumberOfGridPointsPerBox);
 
@@ -165,7 +181,11 @@ CMolecularGrid::operator==(const CMolecularGrid& other) const -> bool
 
     if (_gridPointCounts != other._gridPointCounts) return false;
 
+    if (_gridPointCountsOriginal != other._gridPointCountsOriginal) return false;
+
     if (_gridPointDisplacements != other._gridPointDisplacements) return false;
+
+    if (_gridPointDisplacementsOriginal != other._gridPointDisplacementsOriginal) return false;
 
     if (_maxNumberOfGridPointsPerBox != other._maxNumberOfGridPointsPerBox) return false;
 
@@ -307,7 +327,11 @@ CMolecularGrid::partitionGridPoints() -> std::string
 
         _gridPointCounts = partitioner.getGridPointCounts();
 
+        _gridPointCountsOriginal = partitioner.getGridPointCounts();
+
         _gridPointDisplacements = partitioner.getGridPointDisplacements();
+
+        _gridPointDisplacementsOriginal = partitioner.getGridPointDisplacements();
 
         return partitioner.getGridStatistics();
     }
@@ -326,7 +350,7 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
     {
         _isDistributed = true;
 
-        auto numboxes = _gridPointCounts.size();
+        auto numboxes = _gridPointCountsOriginal.size();
 
         // sort before distribute
 
@@ -334,7 +358,7 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
 
         for (int box_id = 0; box_id < numboxes; box_id++)
         {
-            auto count = _gridPointCounts.data()[box_id];
+            auto count = _gridPointCountsOriginal[box_id];
 
             count_index_pairs.push_back(std::make_pair(count, box_id));
         }
@@ -353,8 +377,8 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
             {
                 auto index = count_index_pairs[box_id].second;
 
-                counts_p.push_back(_gridPointCounts.data()[index]);
-                displs_p.push_back(_gridPointDisplacements.data()[index]);
+                counts_p.push_back(_gridPointCountsOriginal[index]);
+                displs_p.push_back(_gridPointDisplacementsOriginal[index]);
             }
 
             newcounts.push_back(counts_p);
@@ -371,9 +395,11 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
 auto
 CMolecularGrid::reDistributeCountsAndDisplacements(const int rank, const int nnodes) -> void
 {
-    _isPartitioned = false;
+    std::string errpartitioned("MolecularGrid.reDistributeCountsAndDisplacements: Molecular grid must be parttioned and distributed");
 
-    partitionGridPoints();
+    errors::assertMsgCritical((_isPartitioned && _isDistributed), errpartitioned);
+
+    // redistribute counts and displacements
 
     _isDistributed = false;
 

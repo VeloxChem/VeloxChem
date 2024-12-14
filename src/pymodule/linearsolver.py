@@ -1070,6 +1070,10 @@ class LinearSolver:
 
         if self._dft:
             t0 = tm.time()
+
+            molgrid.re_distribute_counts_and_displacements(
+                comm.Get_rank(), comm.Get_size())
+
             xc_drv = XCIntegrator()
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
                                       gs_density, molgrid, self.xcfun)
