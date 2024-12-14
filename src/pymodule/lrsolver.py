@@ -261,8 +261,10 @@ class LinearResponseSolver(LinearSolver):
         else:
             bger, bung = self._setup_trials(dist_grad, precond)
 
+            profiler.set_timing_key('Preparation')
+
             self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict)
+                                eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
 

@@ -275,8 +275,10 @@ class LinearResponseEigenSolver(LinearSolver):
             igs = self._initial_excitations(self.nstates, orb_ene, nocc, norb)
             bger, bung = self._setup_trials(igs, None)
 
+            profiler.set_timing_key('Preparation')
+
             self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict)
+                                eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
 
