@@ -35,6 +35,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
+from .subcommunicators import SubCommunicators
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -49,8 +50,6 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_libxc_reference
 from .checkpoint import write_rsp_hdf5
-from .batchsize import get_batch_size
-from .batchsize import get_number_of_batches
 
 
 class LinearSolver:
@@ -64,7 +63,6 @@ class LinearSolver:
 
     Instance variables
         - eri_thresh: The electron repulsion integrals screening threshold.
-        - batch_size: The batch size for computation of Fock matrices.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
@@ -108,7 +106,6 @@ class LinearSolver:
 
         # ERI settings
         self.eri_thresh = 1.0e-15
-        self.batch_size = None
 
         # dft
         self.xcfun = None
@@ -177,15 +174,18 @@ class LinearSolver:
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
 
+        # serial ratio as in Amdahl's law for estimating parallel efficiency
+        self.serial_ratio = 0.05
+
         # input keywords
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
-                'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
                 'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'serial_ratio': ('float', 'serial ratio as in Amdahl\'s law'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -618,6 +618,8 @@ class LinearSolver:
         n_extra_ger = n_ger - n_general
         n_extra_ung = n_ung - n_general
 
+        n_total = n_general + n_extra_ger + n_extra_ung
+
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
@@ -645,21 +647,84 @@ class LinearSolver:
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
-        # determine number of batches
+        else:
+            mo = None
+            fa = None
+            nocc = None
+            norb = None
+            fa_mo = None
 
-        n_ao = mo.shape[0] if self.rank == mpi_master() else None
+        # determine subcomm size
 
-        n_total = n_general + n_extra_ger + n_extra_ung
+        if self.rank == mpi_master():
+            dt_and_subcomm_size = []
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
-        num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+            for subcomm_size in range(1, self.nodes + 1):
+                if self.nodes % subcomm_size != 0:
+                    continue
+
+                n_subcomms = self.nodes // subcomm_size
+
+                ave, res = divmod(n_total, n_subcomms)
+                counts = [
+                    ave + 1 if p < res else ave for p in range(n_subcomms)
+                ]
+
+                time_per_fock = self.serial_ratio + (
+                    1 - self.serial_ratio) / subcomm_size
+                dt = max(counts) * time_per_fock
+
+                dt_and_subcomm_size.append((dt, subcomm_size))
+
+            # find subcomm_size with smallest dt
+            dt_and_subcomm_size.sort()
+            subcomm_size = dt_and_subcomm_size[0][1]
+        else:
+            subcomm_size = None
+        subcomm_size = self.comm.bcast(subcomm_size, root=mpi_master())
+
+        # create subcomms
+
+        grps = [p // subcomm_size for p in range(self.nodes)]
+        subcomm = SubCommunicators(self.comm, grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+
+        is_local_master = (local_comm.Get_rank() == mpi_master())
+
+        # make data available on local master processes
+        # and determine subcomm indices
+
+        subcomm_index = None
+        local_master_ranks = None
+
+        if is_local_master:
+            mo = cross_comm.bcast(mo, root=mpi_master())
+            fa = cross_comm.bcast(fa, root=mpi_master())
+            nocc = cross_comm.bcast(nocc, root=mpi_master())
+            norb = cross_comm.bcast(norb, root=mpi_master())
+            fa_mo = cross_comm.bcast(fa_mo, root=mpi_master())
+
+            subcomm_index = cross_comm.Get_rank()
+            local_master_ranks = cross_comm.allgather(self.rank)
+
+        subcomm_index = local_comm.bcast(subcomm_index, root=mpi_master())
+        local_master_ranks = local_comm.bcast(local_master_ranks,
+                                              root=mpi_master())
+
+        # batch_size corresponds to the number of subcomms
+        batch_size = self.nodes // subcomm_size
+
+        num_batches = n_total // batch_size
+        if n_total % batch_size != 0:
+            num_batches += 1
 
         # go through batches
 
         if self.rank == mpi_master():
-            batch_str = f'Processing {n_total} Fock build'
-            if n_total > 1:
-                batch_str += 's'
+            batch_str = f'Processing {n_total} Fock builds'
+            if batch_size > 1:
+                batch_str += f' on {batch_size} subcommunicators'
             batch_str += '...'
             self.ostream.print_info(batch_str)
             self.ostream.flush()
@@ -682,13 +747,18 @@ class LinearSolver:
             batch_start = batch_size * batch_ind
             batch_end = min(batch_start + batch_size, n_total)
 
-            if self.rank == mpi_master():
+            if is_local_master:
                 dks = []
                 kns = []
-            else:
-                dks = None
 
-            for col in range(batch_start, batch_end):
+            vec_list = [None for idx in range(len(local_master_ranks))]
+
+            for idx, local_master_rank in enumerate(local_master_ranks):
+
+                if idx + batch_start >= batch_end:
+                    break
+
+                col = idx + batch_start
 
                 # determine vec_type
 
@@ -702,29 +772,41 @@ class LinearSolver:
                 # form full-size vec
 
                 if vec_type == 'general':
-                    v_ger = vecs_ger.get_full_vector(col)
-                    v_ung = vecs_ung.get_full_vector(col)
-                    if self.rank == mpi_master():
-                        # full-size trial vector
-                        vec = np.hstack((v_ger, v_ger))
-                        vec += np.hstack((v_ung, -v_ung))
+                    v_ger = vecs_ger.get_full_vector(col,
+                                                     root=local_master_rank)
+                    v_ung = vecs_ung.get_full_vector(col,
+                                                     root=local_master_rank)
+                    if self.rank == local_master_rank:
+                        # full-size gerade trial vector
+                        vec_list[idx] = np.hstack((v_ger, v_ger))
+                        vec_list[idx] += np.hstack((v_ung, -v_ung))
 
                 elif vec_type == 'gerade':
-                    v_ger = vecs_ger.get_full_vector(col)
-                    if self.rank == mpi_master():
+                    v_ger = vecs_ger.get_full_vector(col,
+                                                     root=local_master_rank)
+                    if self.rank == local_master_rank:
                         # full-size gerade trial vector
-                        vec = np.hstack((v_ger, v_ger))
+                        vec_list[idx] = np.hstack((v_ger, v_ger))
 
                 elif vec_type == 'ungerade':
-                    v_ung = vecs_ung.get_full_vector(col)
-                    if self.rank == mpi_master():
+                    v_ung = vecs_ung.get_full_vector(col,
+                                                     root=local_master_rank)
+                    if self.rank == local_master_rank:
                         # full-size ungerade trial vector
-                        vec = np.hstack((v_ung, -v_ung))
+                        vec_list[idx] = np.hstack((v_ung, -v_ung))
 
-                # build density
+            self.comm.barrier()
 
-                if self.rank == mpi_master():
+            if subcomm_index + batch_start < batch_end:
+
+                local_master_rank = local_master_ranks[subcomm_index]
+
+                if is_local_master:
+                    vec = vec_list[subcomm_index]
+
                     half_size = vec.shape[0] // 2
+
+                    # build density
 
                     if getattr(self, 'core_excitation', False):
                         kn = self.lrvec2mat(vec, nocc, norb,
@@ -743,109 +825,128 @@ class LinearSolver:
 
                     dks.append(dak)
                     kns.append(kn)
+                else:
+                    dks = None
 
-            # form Fock matrices
+                # form Fock matrices
 
-            self._print_mem_debug_info('before Fock build')
+                self._print_mem_debug_info('before Fock build')
 
-            fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, profiler)
+                fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
+                                          dft_dict, pe_dict, profiler,
+                                          local_comm)
 
-            self._print_mem_debug_info('after  Fock build')
+                self._print_mem_debug_info('after  Fock build')
 
-            if self.rank == mpi_master():
-                raw_fock_ger = []
-                raw_fock_ung = []
+                if is_local_master:
+                    raw_fock_ger = []
+                    raw_fock_ung = []
 
-                raw_kns_ger = []
-                raw_kns_ung = []
+                    raw_kns_ger = []
+                    raw_kns_ung = []
 
-                for col in range(batch_start, batch_end):
-                    ifock = col - batch_start
+                    col = subcomm_index + batch_start
 
                     if col < n_general:
-                        raw_fock_ger.append(0.5 * (fock[ifock] - fock[ifock].T))
-                        raw_fock_ung.append(0.5 * (fock[ifock] + fock[ifock].T))
-                        raw_kns_ger.append(0.5 * (kns[ifock] + kns[ifock].T))
-                        raw_kns_ung.append(0.5 * (kns[ifock] - kns[ifock].T))
+                        raw_fock_ger.append(0.5 * (fock[0] - fock[0].T))
+                        raw_fock_ung.append(0.5 * (fock[0] + fock[0].T))
+                        raw_kns_ger.append(0.5 * (kns[0] + kns[0].T))
+                        raw_kns_ung.append(0.5 * (kns[0] - kns[0].T))
 
                     elif n_extra_ger > 0:
-                        raw_fock_ger.append(0.5 * (fock[ifock] - fock[ifock].T))
-                        raw_kns_ger.append(0.5 * (kns[ifock] + kns[ifock].T))
+                        raw_fock_ger.append(0.5 * (fock[0] - fock[0].T))
+                        raw_kns_ger.append(0.5 * (kns[0] + kns[0].T))
 
                     elif n_extra_ung > 0:
-                        raw_fock_ung.append(0.5 * (fock[ifock] + fock[ifock].T))
-                        raw_kns_ung.append(0.5 * (kns[ifock] - kns[ifock].T))
+                        raw_fock_ung.append(0.5 * (fock[0] + fock[0].T))
+                        raw_kns_ung.append(0.5 * (kns[0] - kns[0].T))
 
-                fock = raw_fock_ger + raw_fock_ung
-                kns = raw_kns_ger + raw_kns_ung
+                    fock = raw_fock_ger + raw_fock_ung
+                    kns = raw_kns_ger + raw_kns_ung
 
-                batch_ger = len(raw_fock_ger)
-                batch_ung = len(raw_fock_ung)
+                    batch_ger = len(raw_fock_ger)
+                    batch_ung = len(raw_fock_ung)
 
-            e2_ger = None
-            e2_ung = None
+                e2_ger = None
+                e2_ung = None
 
-            fock_ger = None
-            fock_ung = None
+                fock_ger = None
+                fock_ung = None
 
-            if self.rank == mpi_master():
+                if is_local_master:
 
-                e2_ger = np.zeros((half_size, batch_ger))
-                e2_ung = np.zeros((half_size, batch_ung))
+                    e2_ger = np.zeros((half_size, batch_ger))
+                    e2_ung = np.zeros((half_size, batch_ung))
+
+                    if self.nonlinear:
+                        fock_ger = np.zeros((norb**2, batch_ger))
+                        fock_ung = np.zeros((norb**2, batch_ung))
+
+                    for ifock in range(batch_ger + batch_ung):
+                        fak = fock[ifock]
+
+                        if getattr(self, 'core_excitation', False):
+                            core_exc_orb_inds = list(
+                                range(self.num_core_orbitals)) + list(
+                                    range(nocc, norb))
+                            mo_core_exc = mo[:, core_exc_orb_inds]
+                            fak_mo = np.linalg.multi_dot(
+                                [mo_core_exc.T, fak, mo_core_exc])
+                        else:
+                            fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+
+                        kfa_mo = self.commut(fa_mo.T, kns[ifock])
+
+                        fat_mo = fak_mo + kfa_mo
+
+                        if getattr(self, 'core_excitation', False):
+                            gmo = -self.commut_mo_density(
+                                fat_mo, nocc, self.num_core_orbitals)
+                            gmo_vec_halfsize = self.lrmat2vec(
+                                gmo, nocc, norb,
+                                self.num_core_orbitals)[:half_size]
+                        else:
+                            gmo = -self.commut_mo_density(fat_mo, nocc)
+                            gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
+                                                              norb)[:half_size]
+
+                        # Note: fak_mo_vec uses full MO coefficients matrix since
+                        # it is only for fock_ger/fock_ung in nonlinear response
+                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
+                                                          mo]).reshape(norb**2)
+
+                        if ifock < batch_ger:
+                            e2_ger[:, ifock] = -gmo_vec_halfsize
+                            if self.nonlinear:
+                                fock_ger[:, ifock] = fak_mo_vec
+                        else:
+                            e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
+                            if self.nonlinear:
+                                fock_ung[:, ifock - batch_ger] = fak_mo_vec
+
+            self.comm.barrier()
+
+            for idx, local_master_rank in enumerate(local_master_ranks):
+
+                if idx + batch_start >= batch_end:
+                    break
+
+                vecs_e2_ger = DistributedArray(e2_ger,
+                                               self.comm,
+                                               root=local_master_rank)
+                vecs_e2_ung = DistributedArray(e2_ung,
+                                               self.comm,
+                                               root=local_master_rank)
+                self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
                 if self.nonlinear:
-                    fock_ger = np.zeros((norb**2, batch_ger))
-                    fock_ung = np.zeros((norb**2, batch_ung))
-
-                for ifock in range(batch_ger + batch_ung):
-                    fak = fock[ifock]
-
-                    if getattr(self, 'core_excitation', False):
-                        core_exc_orb_inds = list(range(
-                            self.num_core_orbitals)) + list(range(nocc, norb))
-                        mo_core_exc = mo[:, core_exc_orb_inds]
-                        fak_mo = np.linalg.multi_dot(
-                            [mo_core_exc.T, fak, mo_core_exc])
-                    else:
-                        fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
-
-                    kfa_mo = self.commut(fa_mo.T, kns[ifock])
-
-                    fat_mo = fak_mo + kfa_mo
-
-                    if getattr(self, 'core_excitation', False):
-                        gmo = -self.commut_mo_density(fat_mo, nocc,
-                                                      self.num_core_orbitals)
-                        gmo_vec_halfsize = self.lrmat2vec(
-                            gmo, nocc, norb, self.num_core_orbitals)[:half_size]
-                    else:
-                        gmo = -self.commut_mo_density(fat_mo, nocc)
-                        gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
-                                                          norb)[:half_size]
-
-                    # Note: fak_mo_vec uses full MO coefficients matrix since
-                    # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                      mo]).reshape(norb**2)
-
-                    if ifock < batch_ger:
-                        e2_ger[:, ifock] = -gmo_vec_halfsize
-                        if self.nonlinear:
-                            fock_ger[:, ifock] = fak_mo_vec
-                    else:
-                        e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
-                        if self.nonlinear:
-                            fock_ung[:, ifock - batch_ger] = fak_mo_vec
-
-            vecs_e2_ger = DistributedArray(e2_ger, self.comm)
-            vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
-
-            if self.nonlinear:
-                dist_fock_ger = DistributedArray(fock_ger, self.comm)
-                dist_fock_ung = DistributedArray(fock_ung, self.comm)
-                self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+                    dist_fock_ger = DistributedArray(fock_ger,
+                                                     self.comm,
+                                                     root=local_master_rank)
+                    dist_fock_ung = DistributedArray(fock_ung,
+                                                     self.comm,
+                                                     root=local_master_rank)
+                    self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
 
@@ -858,7 +959,8 @@ class LinearSolver:
                       eri_dict,
                       dft_dict,
                       pe_dict,
-                      profiler=None):
+                      profiler=None,
+                      comm=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -881,28 +983,33 @@ class LinearSolver:
             The Fock matrix (2e part).
         """
 
+        if comm is None:
+            comm = self.comm
+
+        comm_rank = comm.Get_rank()
+
         screening = eri_dict['screening']
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        if self.rank == mpi_master():
+        if comm_rank == mpi_master():
             num_densities = len(dens)
         else:
             num_densities = None
-        num_densities = self.comm.bcast(num_densities, root=mpi_master())
+        num_densities = comm.bcast(num_densities, root=mpi_master())
 
-        if self.rank != mpi_master():
+        if comm_rank != mpi_master():
             dens = [None for idx in range(num_densities)]
 
         for idx in range(num_densities):
-            dens[idx] = self.comm.bcast(dens[idx], root=mpi_master())
+            dens[idx] = comm.bcast(dens[idx], root=mpi_master())
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
         t0 = tm.time()
 
-        fock_drv = FockDriver(self.comm)
+        fock_drv = FockDriver(comm)
         fock_drv._set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
@@ -977,17 +1084,16 @@ class LinearSolver:
                 dm = dens[idx] * 2.0
                 V_emb = self._embedding_drv.compute_pe_contributions(
                     density_matrix=dm)
-                if self.rank == mpi_master():
+                if comm_rank == mpi_master():
                     fock_arrays[idx] += V_emb
 
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
 
         for idx in range(len(fock_arrays)):
-            fock_arrays[idx] = self.comm.reduce(fock_arrays[idx],
-                                                root=mpi_master())
+            fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
 
-        if self.rank == mpi_master():
+        if comm_rank == mpi_master():
             return fock_arrays
         else:
             return None
