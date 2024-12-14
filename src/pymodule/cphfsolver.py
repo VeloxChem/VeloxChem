@@ -507,10 +507,11 @@ class CphfSolver(LinearSolver):
 
                 if is_local_master:
                     sigmas = np.zeros((nocc * nvir, 1))
-                    cphf_mo = (
-                        -np.linalg.multi_dot([mo_occ.T, fock[0], mo_vir]) -
-                        np.linalg.multi_dot([mo_vir.T, fock[0], mo_occ]).T +
-                        vec.reshape(nocc, nvir) * eov)
+                    # -np.linalg.multi_dot([mo_occ.T, fock[0], mo_vir])
+                    # -np.linalg.multi_dot([mo_vir.T, fock[0], mo_occ]).T
+                    cphf_mo = -np.linalg.multi_dot(
+                        [mo_occ.T, (fock[0] + fock[0].T), mo_vir])
+                    cphf_mo += eov * vec.reshape(nocc, nvir)
                     sigmas[:, 0] = cphf_mo.reshape(nocc * nvir)
                 else:
                     sigmas = None
@@ -839,11 +840,10 @@ class CphfSolver(LinearSolver):
             if self.rank == mpi_master():
                 cphf_mo = np.zeros((dof, nocc, nvir))
                 for i in range(dof):
-                    fock_cphf_numpy = fock_cphf[i]
-                    cphf_mo[i] = (-np.linalg.multi_dot(
-                        [mo_occ.T, fock_cphf_numpy, mo_vir]) -
-                                  np.linalg.multi_dot(
-                                      [mo_vir.T, fock_cphf_numpy, mo_occ]).T)
+                    # -np.linalg.multi_dot([mo_occ.T, fock_cphf_numpy, mo_vir])
+                    # -np.linalg.multi_dot([mo_vir.T, fock_cphf_numpy, mo_occ]).T
+                    cphf_mo[i] = -np.linalg.multi_dot(
+                        [mo_occ.T, (fock_cphf[i] + fock_cphf[i].T), mo_vir])
                 cphf_mo += v.reshape(dof, nocc, nvir) * eov
             else:
                 cphf_mo = None
