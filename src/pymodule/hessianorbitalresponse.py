@@ -282,14 +282,17 @@ class HessianOrbitalResponse(CphfSolver):
                     for y in range(3):
                         key_jy = (jatom, y)
 
-                        Fix_Sjy = np.sum(dist_DFD_ix.data *
-                                         dist_ovlp_deriv_ao[key_jy].data)
+                        Fix_Sjy = np.dot(
+                            dist_DFD_ix.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
-                        Fjy_Six = np.sum(dist_DSD_ix.data *
-                                         dist_fock_deriv_ao[key_jy].data)
+                        Fjy_Six = np.dot(
+                            dist_DSD_ix.data.reshape(-1),
+                            dist_fock_deriv_ao[key_jy].data.reshape(-1))
 
-                        Six_Sjy = 2.0 * np.sum(dist_OmegaSD_ix.data *
-                                               dist_ovlp_deriv_ao[key_jy].data)
+                        Six_Sjy = 2.0 * np.dot(
+                            dist_OmegaSD_ix.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
                         hess_ijxy = -2.0 * (Fix_Sjy + Fjy_Six + Six_Sjy)
                         hessian_first_integral_derivatives[iatom, jatom, x,
@@ -357,9 +360,10 @@ class HessianOrbitalResponse(CphfSolver):
                     for y in range(3):
                         key_jy = (jatom, y)
 
-                        # 2.0 * (np.sum(DFD_ix_list[x] * (-0.5 * ovlp_deriv_ao_jy)))
-                        hess_ijxy = -np.sum(
-                            dist_DFD_ix.data * dist_ovlp_deriv_ao[key_jy].data)
+                        # 2.0 * (np.dot(DFD_ix_list[x], (-0.5 * ovlp_deriv_ao_jy)))
+                        hess_ijxy = -np.dot(
+                            dist_DFD_ix.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
                         hess_ijxy *= 4.0
 
