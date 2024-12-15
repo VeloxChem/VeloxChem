@@ -350,7 +350,7 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
     {
         _isDistributed = true;
 
-        auto numboxes = _gridPointCountsOriginal.size();
+        auto numboxes = static_cast<int>(_gridPointCountsOriginal.size());
 
         // sort before distribute
 
@@ -365,30 +365,33 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
 
         std::sort(count_index_pairs.begin(), count_index_pairs.end());
 
-        // re-arrange sorted indices for parallelization
+        // update original counts and displacements
 
-        std::vector<std::vector<int>> newcounts, newdispls;
+        std::vector<int> orig_counts, orig_displs;
 
-        for (int p = 0; p < nnodes; p++)
+        for (int box_id = 0; box_id < numboxes; box_id++)
         {
-            std::vector<int> counts_p, displs_p;
+            auto index = count_index_pairs[box_id].second;
 
-            for (int box_id = numboxes - 1 - p; box_id >= 0; box_id -= nnodes)
-            {
-                auto index = count_index_pairs[box_id].second;
-
-                counts_p.push_back(_gridPointCountsOriginal[index]);
-                displs_p.push_back(_gridPointDisplacementsOriginal[index]);
-            }
-
-            newcounts.push_back(counts_p);
-            newdispls.push_back(displs_p);
+            orig_counts.push_back(_gridPointCountsOriginal[index]);
+            orig_displs.push_back(_gridPointDisplacementsOriginal[index]);
         }
+
+        _gridPointCountsOriginal = orig_counts;
+        _gridPointDisplacementsOriginal = orig_displs;
 
         // update counts and displacements
 
-        _gridPointCounts = newcounts[rank];
-        _gridPointDisplacements = newdispls[rank];
+        std::vector<int> counts_p, displs_p;
+
+        for (int box_id = numboxes - 1 - rank; box_id >= 0; box_id -= nnodes)
+        {
+            counts_p.push_back(_gridPointCountsOriginal[box_id]);
+            displs_p.push_back(_gridPointDisplacementsOriginal[box_id]);
+        }
+
+        _gridPointCounts = counts_p;
+        _gridPointDisplacements = displs_p;
     }
 }
 
@@ -399,11 +402,20 @@ CMolecularGrid::reDistributeCountsAndDisplacements(const int rank, const int nno
 
     errors::assertMsgCritical((_isPartitioned && _isDistributed), errpartitioned);
 
-    // redistribute counts and displacements
+    // recalculate counts and displacements
 
-    _isDistributed = false;
+    auto numboxes = static_cast<int>(_gridPointCountsOriginal.size());
 
-    distributeCountsAndDisplacements(rank, nnodes);
+    std::vector<int> counts_p, displs_p;
+
+    for (int box_id = numboxes - 1 - rank; box_id >= 0; box_id -= nnodes)
+    {
+        counts_p.push_back(_gridPointCountsOriginal[box_id]);
+        displs_p.push_back(_gridPointDisplacementsOriginal[box_id]);
+    }
+
+    _gridPointCounts = counts_p;
+    _gridPointDisplacements = displs_p;
 }
 
 auto
