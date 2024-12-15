@@ -613,10 +613,11 @@ class ScfHessianDriver(HessianDriver):
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
             # Sum up the terms and reshape for final Hessian
-            self.hessian = (hessian_first_order_derivatives +
-                            hessian_2nd_order_derivatives +
-                            hessian_nuclear_nuclear)
-            self.hessian = self.hessian.transpose(0, 2, 1, 3)
+            self.hessian = (
+                hessian_first_order_derivatives +
+                hessian_2nd_order_derivatives.transpose(0, 2, 1, 3) +
+                hessian_nuclear_nuclear.transpose(0, 2, 1, 3))
+
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 
             if self._dft:
@@ -656,7 +657,7 @@ class ScfHessianDriver(HessianDriver):
         natm = molecule.number_of_atoms()
 
         # RHS contracted with CPHF coefficients (ov)
-        hessian_cphf_coeff_rhs = np.zeros((natm, natm, 3, 3))
+        hessian_cphf_coeff_rhs = np.zeros((natm, 3, natm, 3))
 
         for i in range(natm):
             for x in range(3):
@@ -668,11 +669,12 @@ class ScfHessianDriver(HessianDriver):
                             dist_cphf_ov_ix_data,
                             dist_cphf_rhs[j * 3 + y].data))
 
-                        hessian_cphf_coeff_rhs[i, j, x, y] += hess_ijxy
+                        hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
                         if i != j:
-                            hessian_cphf_coeff_rhs[j, i, y, x] += hess_ijxy
+                            hessian_cphf_coeff_rhs[j, y, i, x] += hess_ijxy
 
-        hessian_cphf_coeff_rhs = self.comm.allreduce(hessian_cphf_coeff_rhs)
+        hessian_cphf_coeff_rhs = self.comm.reduce(hessian_cphf_coeff_rhs,
+                                                  root=mpi_master())
 
         # return the sum of the three contributions
         if self.rank == mpi_master():
