@@ -88,6 +88,7 @@ class TestScfHessianDriver:
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
 
+    @pytest.mark.solvers
     def test_analytical_scf_hessian_furche(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -152,6 +153,7 @@ class TestScfHessianDriver:
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
 
+    @pytest.mark.solvers
     def test_analytical_pbe_hessian_furche(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')

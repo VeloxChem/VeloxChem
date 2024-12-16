@@ -111,6 +111,7 @@ class TestScfVibrationalAnalysisDriver:
             #assert rel_diff_raman_static < 1.0e-3
             assert rel_diff_raman_dyn < 1.0e-3
 
+    @pytest.mark.solvers
     def test_scf_vibrational_analysis_driver_analytical(self):
 
         here = Path(__file__).parent
