@@ -249,7 +249,7 @@ class HessianOrbitalResponse(CphfSolver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-        hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
+        hessian_first_integral_derivatives = np.zeros((natm, 3, natm, 3))
 
         profiler.start_timer('1stHess')
 
@@ -282,30 +282,33 @@ class HessianOrbitalResponse(CphfSolver):
                     for y in range(3):
                         key_jy = (jatom, y)
 
-                        Fix_Sjy = np.sum(dist_DFD_ix.data *
-                                         dist_ovlp_deriv_ao[key_jy].data)
+                        Fix_Sjy = np.dot(
+                            dist_DFD_ix.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
-                        Fjy_Six = np.sum(dist_DSD_ix.data *
-                                         dist_fock_deriv_ao[key_jy].data)
+                        Fjy_Six = np.dot(
+                            dist_DSD_ix.data.reshape(-1),
+                            dist_fock_deriv_ao[key_jy].data.reshape(-1))
 
-                        Six_Sjy = 2.0 * np.sum(dist_OmegaSD_ix.data *
-                                               dist_ovlp_deriv_ao[key_jy].data)
+                        Six_Sjy = 2.0 * np.dot(
+                            dist_OmegaSD_ix.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
                         hess_ijxy = -2.0 * (Fix_Sjy + Fjy_Six + Six_Sjy)
-                        hessian_first_integral_derivatives[iatom, jatom, x,
+                        hessian_first_integral_derivatives[iatom, x, jatom,
                                                            y] += hess_ijxy
                         if iatom != jatom:
-                            hessian_first_integral_derivatives[jatom, iatom, y,
+                            hessian_first_integral_derivatives[jatom, y, iatom,
                                                                x] += hess_ijxy
 
-        hessian_first_integral_derivatives = self.comm.allreduce(
-            hessian_first_integral_derivatives)
+        hessian_first_integral_derivatives = self.comm.reduce(
+            hessian_first_integral_derivatives, root=mpi_master())
 
         profiler.stop_timer('1stHess')
 
         dist_cphf_rhs = []
 
-        hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
+        hessian_eri_overlap = np.zeros((natm, 3, natm, 3))
 
         for iatom, root_rank in all_atom_idx_rank:
 
@@ -357,15 +360,16 @@ class HessianOrbitalResponse(CphfSolver):
                     for y in range(3):
                         key_jy = (jatom, y)
 
-                        # 2.0 * (np.sum(DFD_ix_list[x] * (-0.5 * ovlp_deriv_ao_jy)))
-                        hess_ijxy = -np.sum(
-                            dist_DFD_ix.data * dist_ovlp_deriv_ao[key_jy].data)
+                        # 2.0 * (np.dot(DFD_ix_list[x], (-0.5 * ovlp_deriv_ao_jy)))
+                        hess_ijxy = -np.dot(
+                            dist_DFD_ix.data.reshape(-1),
+                            dist_ovlp_deriv_ao[key_jy].data.reshape(-1))
 
                         hess_ijxy *= 4.0
 
-                        hessian_eri_overlap[iatom, jatom, x, y] += hess_ijxy
+                        hessian_eri_overlap[iatom, x, jatom, y] += hess_ijxy
                         if iatom != jatom:
-                            hessian_eri_overlap[jatom, iatom, y, x] += hess_ijxy
+                            hessian_eri_overlap[jatom, y, iatom, x] += hess_ijxy
 
             profiler.add_timing_info('UijDot', tm.time() - uij_t0)
 
@@ -431,7 +435,8 @@ class HessianOrbitalResponse(CphfSolver):
 
             profiler.add_timing_info('distRHS', tm.time() - uij_t0)
 
-        hessian_eri_overlap = self.comm.allreduce(hessian_eri_overlap)
+        hessian_eri_overlap = self.comm.reduce(hessian_eri_overlap,
+                                               root=mpi_master())
 
         t2 = tm.time()
 
