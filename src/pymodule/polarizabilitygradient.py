@@ -294,7 +294,7 @@ class PolarizabilityGradient:
 
             orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
             gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
-            x_plus_y= self.comm.bcast(x_plus_y, root=mpi_master())
+            x_plus_y = self.comm.bcast(x_plus_y, root=mpi_master())
             x_minus_y = self.comm.bcast(x_minus_y, root=mpi_master())
             omega_ao = self.comm.bcast(omega_ao, root=mpi_master())
             rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
@@ -389,6 +389,8 @@ class PolarizabilityGradient:
 
                 gmats_dip = Matrices()
 
+            # TODO do not compute separate array for eri_contrib -- add
+            # on-the-fly to pol_gradient
             # ERI contribution
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                     rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
@@ -591,7 +593,7 @@ class PolarizabilityGradient:
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy) * factor
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx) * factor
 
-        eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
+        #eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
 
         return eri_deriv_contrib
 
@@ -647,7 +649,7 @@ class PolarizabilityGradient:
         dof = len(self.vector_components)
 
         # operator component combinations
-        xy_pairs = [(x,y) for x in range(dof) for y in range(x,dof)]
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
 
         eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
@@ -866,7 +868,7 @@ class PolarizabilityGradient:
                 # add to complex variable
                 eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
 
-        eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
+        #eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
 
         return eri_deriv_contrib
 
