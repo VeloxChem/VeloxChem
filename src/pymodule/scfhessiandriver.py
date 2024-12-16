@@ -90,9 +90,13 @@ class ScfHessianDriver(HessianDriver):
 
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
 
+        self.use_subcomms = False
+
         self._input_keywords['hessian'].update({
             'orbrsp_only':
                 ('bool', 'whether to only run CPHF orbital response'),
+            'use_subcomms':
+                ('bool', 'whether to use subcommunicators in orbital response'),
         })
 
     def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):
@@ -356,10 +360,11 @@ class ScfHessianDriver(HessianDriver):
 
         # Solve CPHF equations
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
-        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+
         # TODO: double check propagation of cphf settings
         profiler_keywords = {
-            'timing', 'profiling', 'memory_profiling', 'memory_tracing'
+            'timing', 'profiling', 'memory_profiling', 'memory_tracing',
+            'use_subcomms'
         }
         for key in profiler_keywords:
             setattr(cphf_solver, key, getattr(self, key))
