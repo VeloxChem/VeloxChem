@@ -320,7 +320,166 @@ class ForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, visualize=False):
+    def validate_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, visualize=False):
+        """
+        Compares the QM scan with the MM scan without reparametrization.
+
+        :param rotatable_bond:
+            The list of indices of the rotatable bond. (1-indexed)
+        :param scan_file:
+            The file with the QM scan. If None is provided it a QM scan will be performed.
+        :param scf_drv:
+            The SCF driver. If None is provided it will use HF.
+        :param basis:
+            The AO basis set. If None is provided it will use 6-31G*.
+        :param scan_range:
+            List with the range of dihedral angles. Default is [0, 360].
+        :param n_points:
+            The number of points to be calculated. Default is 19.
+        :param visualize:
+            If the dihedral scans should be visualized.
+        """
+
+        # If scan file is provided, read it
+        if scan_file is not None:
+            with open(scan_file, 'r') as f:
+                lines = f.readlines()
+
+            for line in lines:
+                if line.startswith('Scan'):
+                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
+                    # Extract the dihedral indices
+                    scanned_dih = [int(i) for i in line.split('Dihedral')[1].split()[0].split('-')]
+                    central_atom_1 = scanned_dih[1] - 1
+                    central_atom_2 = scanned_dih[2] - 1
+
+                    if not (central_atom_1 == rotatable_bond[0] - 1 and central_atom_2 == rotatable_bond[1] - 1):
+                        raise ValueError('The rotatable bond does not match the scan file.')
+
+                    break
+
+        else:
+            central_atom_1 = rotatable_bond[0] - 1
+            central_atom_2 = rotatable_bond[1] - 1
+
+        # Identify the dihedral indices for the rotatable bond
+        dihedral_indices = []
+        dihedral_types = []
+
+        for (i,j,k,l), dihedral in self.dihedrals.items():
+            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
+                dihedral_indices.append([i,j,k,l])
+                dihedral_types.append(dihedral['comment'])
+        
+        # Transform the dihedral indices to 1-indexed for printing
+        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        
+        # Print a header
+        header = 'VeloxChem Dihedral Reparametrization'
+        self.ostream.print_header(header)
+        self.ostream.print_header('=' * len(header))
+        self.ostream.print_blank()
+        self.ostream.flush()
+        # Print some information
+        self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
+        # Print the dihedral indices *in 1 index* and types
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
+        self.ostream.print_info(f'Dihedral types:{dihedral_types}')
+        self.ostream.flush()
+
+        # If the scan file is provided, read it
+        if scan_file is not None:
+            # Check if the name of the file is correct 1-2-3-4.xyz
+            reference_dih = scanned_dih
+            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
+            file = Path(scan_file)
+            if file.stem != f"{reference_dih[0]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[3]}":
+                raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
+            self.read_qm_scan_xyz_files([scan_file])
+        else:
+            self.ostream.print_info('No scan file provided. Performing QM scan...')
+            self.ostream.flush()
+        
+            if scf_drv is None:
+                scf_drv = ScfRestrictedDriver()
+                scf_drv.ostream.mute()
+            
+            if basis is None:
+                basis = MolecularBasis.read(self.molecule,'6-31G*')
+
+            # Perform a SCF calculation
+            if scf_result is None:
+                self.ostream.print_info('Performing SCF calculation...')
+                self.ostream.flush()
+                scf_result = scf_drv.compute(self.molecule, basis)
+            
+            # Take one of the dihedrals to perform the scan
+            reference_dih = dihedral_indices[0]
+            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
+            scf_drv.ostream.mute()
+            opt_drv = OptimizationDriver(scf_drv)
+            opt_drv.ostream.mute()
+            constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
+            opt_drv.constraints = [constraint]
+
+            # Scan the dihedral
+            self.ostream.print_info(f'Dihedral: {reference_dih_name} taken for scan...')
+            self.ostream.print_info(f'Angle range: {scan_range[0]}-{scan_range[1]}')
+            self.ostream.print_info(f'Number of points: {n_points}')
+            self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
+            self.ostream.flush()
+            opt_drv.compute(self.molecule, basis, scf_result)
+            self.ostream.print_info('Scan completed.')
+            self.ostream.flush()
+
+            # Change the default file name to the dihedral indices
+            file = Path("scan-final.xyz")
+            file.rename(f"{reference_dih_name}.xyz")
+            
+            # Print information about the written file
+            self.ostream.print_info(f'Scan file written as {reference_dih_name}.xyz')
+
+            # Read the QM scan
+            self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
+
+        # Group dihedrals by their types
+        dihedral_groups = defaultdict(list)
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            dihedral_type = dihedral['comment']
+            dihedral_groups[dihedral_type].append((i, j, k, l))
+
+        # Extract initial parameters for each dihedral instance
+        barriers = []
+        phases = []
+        periodicities = []
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            if dihedral['multiple'] == True:
+                raise ValueError('RB dihedrals are not supported for reparametrization. Use refine_dihedrals instead.')
+            else:
+                barrier = dihedral['barrier']
+                phase = dihedral['phase']
+                periodicity = dihedral['periodicity']
+                barriers.append(barrier)
+                phases.append(phase)
+                periodicities.append(periodicity)
+
+        # Convert to NumPy arrays
+        barriers = np.array(barriers, dtype=float)
+        phases_array = np.array(phases, dtype=float)
+
+        # Print initial barriers
+        self.ostream.print_info(f"GAFF barriers: {barriers} will be used as initial guess.")
+        self.ostream.flush()
+
+        # Store the original barriers
+        gaff_dihedral = self.validate_force_field(0)
+        if visualize:
+            self.visualize(gaff_dihedral)
+
+
+    def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, visualize=False, fit_extremes=False):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -343,6 +502,8 @@ class ForceFieldGenerator:
 
         try:
             from scipy.optimize import least_squares
+            from scipy.signal import argrelextrema
+
         except ImportError:
             error_msg = 'Scipy is required for fitting dihedral potentials.'
             assert_msg_critical(False, error_msg)
@@ -398,6 +559,7 @@ class ForceFieldGenerator:
         if scan_file is not None:
             # Check if the name of the file is correct 1-2-3-4.xyz
             reference_dih = scanned_dih
+            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
             file = Path(scan_file)
             if file.stem != f"{reference_dih[0]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[3]}":
                 raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
@@ -421,6 +583,7 @@ class ForceFieldGenerator:
             
             # Take one of the dihedrals to perform the scan
             reference_dih = dihedral_indices[0]
+            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
             scf_drv.ostream.mute()
             opt_drv = OptimizationDriver(scf_drv)
             opt_drv.ostream.mute()
@@ -428,10 +591,10 @@ class ForceFieldGenerator:
             opt_drv.constraints = [constraint]
 
             # Scan the dihedral
-            self.ostream.print_info(f'Dihedral: {reference_dih[0] +1}-{reference_dih[1] +1}-{reference_dih[2] +1}-{reference_dih[3] +1} taken for scan...')
+            self.ostream.print_info(f'Dihedral: {reference_dih_name} taken for scan...')
             self.ostream.print_info(f'Angle range: {scan_range[0]}-{scan_range[1]}')
             self.ostream.print_info(f'Number of points: {n_points}')
-            self.ostream.print_info(f'Scanning dihedral {reference_dih[0] +1}-{reference_dih[1] +1}-{reference_dih[2] +1}-{reference_dih[3] +1}...')
+            self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
             self.ostream.flush()
             opt_drv.compute(self.molecule, basis, scf_result)
             self.ostream.print_info('Scan completed.')
@@ -439,10 +602,10 @@ class ForceFieldGenerator:
 
             # Change the default file name to the dihedral indices
             file = Path("scan-final.xyz")
-            file.rename(f"{reference_dih[0]+1}-{reference_dih[1]+1}-{reference_dih[2]+1}-{reference_dih[3]+1}.xyz")
+            file.rename(f"{reference_dih_name}.xyz")
 
             # Read the QM scan
-            self.read_qm_scan_xyz_files([f"{reference_dih[0]+1}-{reference_dih[1]+1}-{reference_dih[2]+1}-{reference_dih[3]+1}.xyz"])
+            self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
 
         # Group dihedrals by their types
         dihedral_groups = defaultdict(list)
@@ -480,6 +643,9 @@ class ForceFieldGenerator:
 
         # Store the original barriers
         original_barriers = barriers.copy()
+        gaff_dihedral = self.validate_force_field(0)
+        if visualize:
+            self.visualize(gaff_dihedral)
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
@@ -487,8 +653,6 @@ class ForceFieldGenerator:
 
         # Validate the dihedral MM parameters
         initial_data = self.validate_force_field(0)
-        if visualize:
-            self.visualize(initial_data)
 
         # Prepare data for fitting
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
@@ -497,7 +661,7 @@ class ForceFieldGenerator:
         # Define the dihedral potential function
         def dihedral_potential(phi, barriers, phases_rad, periodicities):
             total_potential = np.zeros_like(phi)
-            # Group barriers, if some are the same use the same barrier
+            #Group barriers, if some are the same use the same barrier
             if np.unique(barriers).size != barriers.size:
                 unique_barriers = np.unique(barriers)
                 for barrier in unique_barriers:
@@ -509,12 +673,37 @@ class ForceFieldGenerator:
                     total_potential += barrier * (1 + np.cos(periodicity * phi - phase_rad))
 
             return total_potential
+        
+        def extract_maxima(barriers, qm_energies):
 
+            dihedral_energies = dihedral_potential(
+                dihedral_angles_rad,
+                barriers,
+                phases_array_rad,
+                periodicities_array
+            )
+            mm_energies = dihedral_energies + mm_baseline
 
-        # Define the objective function
-        def objective_function(barriers_to_fit):
+            # Relative energies
+            mm_energies_rel = mm_energies - np.min(mm_energies)
+
+            # Identify maxima indices for QM and MM energies
+            qm_maxima_indices = argrelextrema(qm_energies, np.greater)[0]   
+            mm_maxima_indices = argrelextrema(mm_energies_rel, np.greater)[0]
+
+            # Identify the minima for the QM and MM energies
+            qm_minima_indices = argrelextrema(qm_energies, np.less)[0]
+            mm_minima_indices = argrelextrema(mm_energies_rel, np.less)[0]
+
+            # Build the arrays with the maxima and minima
+            qm_maxima_indices = np.concatenate((qm_maxima_indices, qm_minima_indices))
+            mm_maxima_indices = np.concatenate((mm_maxima_indices, mm_minima_indices))
+
+            return qm_maxima_indices, mm_maxima_indices
+
+        def objective_function(barriers_to_fit, qm_maxima_indices, mm_maxima_indices):
+
             # Update the dihedral parameters in the force field
-            # Compute dihedral energy contributions analytically
             dihedral_energies = dihedral_potential(
                 dihedral_angles_rad,
                 barriers_to_fit,
@@ -524,12 +713,43 @@ class ForceFieldGenerator:
             mm_energies_fit = dihedral_energies + mm_baseline
 
             # Relative energies
-            mm_energies_fit_rel = mm_energies_fit - np.min(mm_energies_fit)
-            qm_energies_rel = qm_energies - np.min(qm_energies)
+            #mm_energies_fit_rel = mm_energies_fit - np.min(mm_energies_fit)
+            #qm_energies_rel = qm_energies - np.min(qm_energies)
+            mm_energies_fit_rel = mm_energies_fit
+            qm_energies_rel = qm_energies
 
-            residuals = mm_energies_fit_rel - qm_energies_rel
+            if fit_extremes:
 
-            return residuals
+                # Match QM and MM maxima using nearest x-axis values
+                matched_qm_maxima = []
+                matched_mm_maxima = []
+                for qm_idx in qm_maxima_indices:
+                    # Handle the case where mm_maxima_indices is empty
+                    if len(mm_maxima_indices) > 0:
+                        nearest_mm_idx = mm_maxima_indices[np.argmin(np.abs(mm_maxima_indices - qm_idx))]
+                        matched_qm_maxima.append(qm_energies_rel[qm_idx])
+                        matched_mm_maxima.append(mm_energies_fit_rel[nearest_mm_idx])
+
+                # Convert to arrays
+                matched_qm_rel = np.array(matched_qm_maxima)
+                matched_mm_rel = np.array(matched_mm_maxima)
+
+                qm_energies_rel = matched_qm_rel
+                mm_energies_fit_rel = matched_mm_rel
+
+                # Debug prints
+                print('Matched QM maxima:', matched_qm_rel)
+                print('Matched MM maxima:', matched_mm_rel)
+
+            # Weights based on the energy difference
+            # weights = 2 * np.abs(matched_qm_rel - matched_mm_rel)
+            # print('Weights:', weights)
+
+            # Residuals
+            residuals = (qm_energies_rel - mm_energies_fit_rel) #* weights
+
+            # Return the squared residuals for optimization
+            return residuals**2
 
         self.ostream.print_info('Fitting the dihedral parameters...')
         self.ostream.flush()
@@ -541,6 +761,13 @@ class ForceFieldGenerator:
 
         # Use the original barriers as the initial guess
         initial_guess = original_barriers.copy()
+        
+        # Extract maxima for QM and MM energies
+        if fit_extremes:
+            qm_maxima_indices, mm_maxima_indices = extract_maxima(barriers, qm_energies)
+            args = (qm_maxima_indices, mm_maxima_indices)
+        else:
+            args = (None, None)
 
         result = least_squares(
             fun = objective_function,
@@ -548,6 +775,7 @@ class ForceFieldGenerator:
             jac = '3-point',
             method='dogbox',
             bounds=(lower_bounds, upper_bounds),
+            args=args,
             verbose=0,
             xtol=1e-12,  # Stricter parameter update tolerance
             ftol=1e-12,  # Stricter cost tolerance
@@ -1705,11 +1933,12 @@ class ForceFieldGenerator:
             value: tuple of atom types
         """
 
-        unique_non_rotatable_atom_types = ['c', 'n']
+        unique_non_rotatable_atom_types = ['c', 'n', 'c2', 'ce', 'cf', 'cg', 'ch']
 
         redundant_non_rotatable_atom_types = [
-            'ce', 'cf', 'cg', 'ch',  # Aromatic and conjugated carbons
+               # Aromatic and conjugated carbons
             'c1',  # Sp carbons
+            'c2', # Sp2 carbon
             'nb', 'nc', 'nd', 'ne', 'nf',  # Aromatic and conjugated nitrogens
             'ss',  # Sulfur in thio-ester and thio-ether
             'o', 'oh'  # Oxygen in carbonyl and hydroxyl groups
@@ -2808,7 +3037,7 @@ class ForceFieldGenerator:
         :param validation_result:
             The dictionary containing the result of validation.
         """
-
+        # TODO: Add a spline instead.
         try:
             import matplotlib.pyplot as plt
         except ImportError:
