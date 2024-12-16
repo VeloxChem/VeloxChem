@@ -36,6 +36,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
+from .batchsize import get_batch_size
+from .batchsize import get_number_of_batches
 
 
 class CphfSolver(LinearSolver):
@@ -357,6 +359,18 @@ class CphfSolver(LinearSolver):
 
     def build_sigmas(self, molecule, basis, scf_tensors, dist_trials, eri_dict,
                      dft_dict, pe_dict, profiler):
+
+        if self.use_subcomms:
+            self.build_sigmas_subcomms(molecule, basis, scf_tensors,
+                                       dist_trials, eri_dict, dft_dict, pe_dict,
+                                       profiler)
+        else:
+            self.build_sigmas_single_comm(molecule, basis, scf_tensors,
+                                          dist_trials, eri_dict, dft_dict,
+                                          pe_dict, profiler)
+
+    def build_sigmas_subcomms(self, molecule, basis, scf_tensors, dist_trials,
+                              eri_dict, dft_dict, pe_dict, profiler):
         """
         Apply orbital Hessian matrix to a set of trial vectors.
         Appends sigma and trial vectors to member variable.
@@ -533,6 +547,113 @@ class CphfSolver(LinearSolver):
                                                         distribute=False)
                 else:
                     self.dist_sigmas.append(dist_sigmas, axis=1)
+
+        if self.dist_trials is None:
+            self.dist_trials = DistributedArray(dist_trials.data,
+                                                self.comm,
+                                                distribute=False)
+        else:
+            self.dist_trials.append(dist_trials, axis=1)
+
+    def build_sigmas_single_comm(self, molecule, basis, scf_tensors,
+                                 dist_trials, eri_dict, dft_dict, pe_dict,
+                                 profiler):
+        """
+        Apply orbital Hessian matrix to a set of trial vectors.
+        Appends sigma and trial vectors to member variable.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param dist_trials:
+            Distributed array of trial vectors
+        """
+
+        if self.rank == mpi_master():
+            mo = scf_tensors['C_alpha']
+            nao = mo.shape[0]
+            mo_energies = scf_tensors['E_alpha']
+            # nmo is sometimes different than nao (because of linear
+            # dependencies which get removed during SCF)
+            nmo = mo_energies.shape[0]
+            nocc = molecule.number_of_alpha_electrons()
+            nvir = nmo - nocc
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            eocc = mo_energies[:nocc]
+            evir = mo_energies[nocc:]
+            eov = eocc.reshape(-1, 1) - evir
+        else:
+            nao = None
+
+        num_vecs = dist_trials.shape(1)
+
+        batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
+        num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
+
+        if self.rank == mpi_master():
+            batch_str = f'Processing {num_vecs} Fock build'
+            if num_vecs > 1:
+                batch_str += 's'
+            batch_str += '...'
+            self.ostream.print_info(batch_str)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        for batch_ind in range(num_batches):
+
+            batch_start = batch_size * batch_ind
+            batch_end = min(batch_start + batch_size, num_vecs)
+
+            if self.rank == mpi_master():
+                vec_list = []
+            else:
+                vec_list = None
+
+            # loop over columns / trial vectors
+            for col in range(batch_start, batch_end):
+                vec = dist_trials.get_full_vector(col)
+
+                if self.rank == mpi_master():
+                    vec = vec.reshape(nocc, nvir)
+                    vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
+                    vec_list.append(vec_ao)
+
+            # create Fock matrices and contract with two-electron integrals
+            fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict, profiler)
+
+            # create sigma vectors
+            if self.rank == mpi_master():
+                sigmas = np.zeros((nocc * nvir, batch_end - batch_start))
+            else:
+                sigmas = None
+
+            for col in range(batch_start, batch_end):
+                vec = dist_trials.get_full_vector(col)
+                ifock = col - batch_start
+
+                if self.rank == mpi_master():
+                    fock_vec = fock[ifock]
+                    cphf_mo = (
+                        -np.linalg.multi_dot([mo_occ.T, fock_vec, mo_vir]) -
+                        np.linalg.multi_dot([mo_vir.T, fock_vec, mo_occ]).T +
+                        vec.reshape(nocc, nvir) * eov)
+                    sigmas[:, ifock] = cphf_mo.reshape(nocc * nvir)
+
+            dist_sigmas = DistributedArray(sigmas, self.comm)
+
+            # append new sigma and trial vectors
+            # TODO: create new function for this?
+            if self.dist_sigmas is None:
+                self.dist_sigmas = DistributedArray(dist_sigmas.data,
+                                                    self.comm,
+                                                    distribute=False)
+            else:
+                self.dist_sigmas.append(dist_sigmas, axis=1)
 
         if self.dist_trials is None:
             self.dist_trials = DistributedArray(dist_trials.data,
