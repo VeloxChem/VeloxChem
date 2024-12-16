@@ -54,7 +54,7 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
 
     const auto ntasks = work_groups.size();
 
-#pragma omp parallel num_threads(ntasks) shared(ntasks, ptr_gto_blocks, ptr_work_groups, ptr_ovl_matrix)
+#pragma omp parallel num_threads(ntasks) shared(ptr_gto_blocks, ptr_work_groups, ptr_ovl_matrix)
     {
 #pragma omp single nowait
         {
@@ -132,7 +132,7 @@ COverlapDriver::compute(const CMolecularBasis& bra_basis, const CMolecularBasis&
 
     const auto ntasks = work_groups.size();
     
-#pragma omp parallel num_threads(ntasks) shared(ntasks, ptr_bra_gto_blocks, ptr_ket_gto_blocks, ptr_work_groups, ptr_ovl_matrix)
+#pragma omp parallel num_threads(ntasks) shared(ptr_bra_gto_blocks, ptr_ket_gto_blocks, ptr_work_groups, ptr_ovl_matrix)
     {
 #pragma omp single nowait
         {
