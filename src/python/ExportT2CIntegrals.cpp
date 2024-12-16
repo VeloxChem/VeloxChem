@@ -19,6 +19,7 @@
 #include "OverlapDriver.hpp"
 #include "OverlapGeomX00Driver.hpp"
 #include "OverlapGeomX0YDriver.hpp"
+#include "ThreeCenterOverlapDriver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -321,6 +322,25 @@ export_t2cintegrals(py::module& m)
                 return std::make_shared<CMatrices>(dip_drv.compute(basis, molecule, TPoint<double>(origin), iatom));
             },
             "Computes the electric dipole momentum derivatives matrices for a given molecule, basis and selected atom.");
+    
+    
+    // CThreeCenterOverlapDriver class
+    PyClass<CThreeCenterOverlapDriver>(m, "ThreeCenterOverlapDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+             [](const CThreeCenterOverlapDriver&         t3ovl_drv,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                exponents,
+               const std::vector<double>&                factors,
+               const std::vector<std::array<double, 3>>& coords) -> std::shared_ptr<CMatrix> {
+                auto points = std::vector<TPoint<double>>();
+                points.reserve(coords.size());
+                std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+                   return std::make_shared<CMatrix>(t3ovl_drv.compute(exponents, factors, points, basis, molecule));
+            },
+            "Computes overlap matrix for given molecule, basis and vector of external scaled Gaussians.");
 }
 
 }  // namespace vlx_t2cintegrals
