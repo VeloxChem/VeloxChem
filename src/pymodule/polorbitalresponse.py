@@ -536,6 +536,7 @@ class PolOrbitalResponse(CphfSolver):
                 dist_cphf_rhs_re.append(DistributedArray(cphf_rhs_k_re, self.comm, root=mpi_master()))
                 dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm, root=mpi_master()))
 
+            # NOTE Xin
             dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
 
 
@@ -798,6 +799,7 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     cphf_rhs_k = None
                 dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm, root=mpi_master()))
+            # NOTE Xin
 
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
@@ -1500,6 +1502,7 @@ class PolOrbitalResponse(CphfSolver):
         :param lr_results:
             The results from the linear response calculation.
         """
+        # NOTE Xin
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -1528,6 +1531,7 @@ class PolOrbitalResponse(CphfSolver):
             n_freq = len(self.frequencies)
 
             # get CPHF results in reduced dimensions
+            # NOTE Xin
             if self.use_subspace_solver:
                 dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
                 all_cphf_red = []
@@ -1575,8 +1579,8 @@ class PolOrbitalResponse(CphfSolver):
                 dm_vv = self.cphf_results[w]['dm_vv']
 
                 # get response vectors from cphf_results
-                x_plus_y_ao = self.cphf_results[w]['x_plus_y_ao']
-                x_minus_y_ao = self.cphf_results[w]['x_minus_y_ao']
+                #x_plus_y_ao = self.cphf_results[w]['x_plus_y_ao']
+                #x_minus_y_ao = self.cphf_results[w]['x_minus_y_ao']
 
                 # get the lambda multipliers
                 cphf_ov = all_cphf_ov[f]
@@ -1591,6 +1595,17 @@ class PolOrbitalResponse(CphfSolver):
 
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
+
+                # NOTE WIP
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
+                    for x in range(x_plus_y.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
+                    for x in range(x_minus_y.shape[0])
+                ])
 
                 # calculate dipole contribution to omega
                 omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
@@ -1735,6 +1750,7 @@ class PolOrbitalResponse(CphfSolver):
             n_freqs = len(self.frequencies)
 
             # get CPHF results
+            # NOTE Xin
             if self.use_subspace_solver:
                 dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
                 all_cphf_red = []
@@ -1781,8 +1797,8 @@ class PolOrbitalResponse(CphfSolver):
                 dm_vv = self.cphf_results[w]['dm_vv']  # complex
 
                 # get response vectors from cphf_results
-                x_plus_y_ao = self.cphf_results[w]['x_plus_y_ao']
-                x_minus_y_ao = self.cphf_results[w]['x_minus_y_ao']
+                #x_plus_y_ao = self.cphf_results[w]['x_plus_y_ao']
+                #x_minus_y_ao = self.cphf_results[w]['x_minus_y_ao']
 
                 # get the lambda multipliers and reshape lambda vector to complex
                 cphf_ov = all_cphf_ov[f]
@@ -1798,6 +1814,17 @@ class PolOrbitalResponse(CphfSolver):
 
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
+
+                # NOTE WIP
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
+                    for x in range(x_plus_y.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
+                    for x in range(x_minus_y.shape[0])
+                ])
 
                 # calculate dipole contribution to omega
                 omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
