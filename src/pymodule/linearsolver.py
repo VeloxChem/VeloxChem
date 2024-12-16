@@ -780,6 +780,9 @@ class LinearSolver:
 
             vec_list = [None for idx in range(len(local_master_ranks))]
 
+            e2_ger, e2_ung = None, None
+            fock_ger, fock_ung = None, None
+
             for idx, local_master_rank in enumerate(local_master_ranks):
 
                 if idx + batch_start >= batch_end:
@@ -893,12 +896,6 @@ class LinearSolver:
 
                     batch_ger = len(raw_fock_ger)
                     batch_ung = len(raw_fock_ung)
-
-                e2_ger = None
-                e2_ung = None
-
-                fock_ger = None
-                fock_ung = None
 
                 if is_local_master:
 
