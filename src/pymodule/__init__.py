@@ -92,6 +92,7 @@ from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mp2driver import Mp2Driver
 from .cosmodriver import CosmoDriver
+from .cpcmdriver import CpcmDriver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver

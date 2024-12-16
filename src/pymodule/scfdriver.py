@@ -56,6 +56,7 @@ from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 from .cosmodriver import CosmoDriver
+from .cpcmdriver import CpcmDriver
 
 class ScfDriver:
     """
@@ -209,6 +210,9 @@ class ScfDriver:
         self.cpcm_x = 0 # x in scaling function f
         self.cpcm_grid_per_sphere = 110
         self.cpcm_erf = False
+        self.cpcm_alternative = False
+        self.cpcm_alt_grid = None
+        self.cpcm_alt_swf = None
 
         # split communicators
         self.use_split_comm = False
@@ -520,7 +524,10 @@ class ScfDriver:
         self._pe_sanity_check()
 
         if self._cpcm:
-            self.cpcm_drv = CosmoDriver(self.cpcm_grid_per_sphere, self.comm, self.ostream)
+            if self.cpcm_alternative:
+                self.cpcm_drv = CpcmDriver(self.cpcm_grid_per_sphere, self.cpcm_alt_grid, self.comm, self.ostream)
+            else:
+                self.cpcm_drv = CosmoDriver(self.cpcm_grid_per_sphere, self.comm, self.ostream)
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -590,7 +597,11 @@ class ScfDriver:
             self.ostream.print_blank()
 
         if self._cpcm:
-            self._cpcm_grid, self._cpcm_sw_func = self.cpcm_drv.generate_cosmo_grid(
+            if self.cpcm_alternative:
+                self._cpcm_grid = self.cpcm_alt_grid
+                self._cpcm_sw_func = self.cpcm_alt_swf #self.cpcm_drv.alt_switching_function(molecule, self._cpcm_grid)
+            else:
+                self._cpcm_grid, self._cpcm_sw_func = self.cpcm_drv.generate_cosmo_grid(
                 molecule)
             self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
                 self._cpcm_grid, self._cpcm_sw_func)

@@ -41,9 +41,10 @@ from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
 
 
-class CosmoDriver:
+class CpcmDriver:
+    # add for being able to run with alternative grid
     """
-    Implements COSMO driver.
+    Implements CPCM driver.
 
     :param comm:
         The MPI communicator.
@@ -54,9 +55,9 @@ class CosmoDriver:
         - grid_per_sphere: Number of Lebedev grid points per sphere.
     """
 
-    def __init__(self, gps, comm=None, ostream=None):
+    def __init__(self, gps, qgrid, comm=None, ostream=None):
         """
-        Initializes COSMO driver.
+        Initializes CPCM driver.
         """
 
         if comm is None:
@@ -78,6 +79,7 @@ class CosmoDriver:
 
         # grid information
         self.grid_per_sphere = gps
+        self.qgrid = qgrid
 
         # input keywords
         self.input_keywords = {
@@ -184,6 +186,43 @@ class CosmoDriver:
 
         return sw_func
 
+    def alt_switching_function(self, molecule, grid):
+        grid = self.qgrid
+        atom_radii = molecule.vdw_radii_to_numpy() * 1.2
+        atom_coords = molecule.get_coordinates_in_bohr()
+        #assert_msg_critical(
+        #    atom_coords.shape[0] == atom_radii.shape[0],
+        #    'CosmoDriver.get_switching_function: Inconsistent atom_coords ' +
+        #    'and atom_radii')
+
+        #assert_msg_critical(
+        #    grid.shape[0] == self.grid_per_sphere * atom_coords.shape[0],
+        #    'CosmoDriver.get_switching_function: Should only be used on ' +
+        #    'raw COSMO grid')
+
+        sw_func = np.zeros(grid.shape[0])
+
+        for g in range(grid.shape[0]):
+            gx, gy, gz = grid[g, :3]
+            zeta_g = grid[g, 4]
+
+            sw_func[g] = 1.0
+            atom_idx = g // self.grid_per_sphere
+
+            for i in range(atom_coords.shape[0]):
+                if i == atom_idx:
+                    continue
+
+                ax, ay, az = atom_coords[i]
+                a_radius = atom_radii[i]
+                r_ag = math.sqrt((ax - gx)**2 + (ay - gy)**2 + (az - gz)**2)
+                f_ag = 1.0 - 0.5 * (math.erf(zeta_g * (a_radius - r_ag)) +
+                                    math.erf(zeta_g * (a_radius + r_ag)))
+
+                sw_func[g] *= f_ag
+
+        return sw_func
+
     def get_zeta_dict(self):
 
         return {
@@ -198,6 +237,7 @@ class CosmoDriver:
         }
 
     def form_matrix_A(self, grid, sw_func):
+        grid = self.qgrid
 
         Amat = np.zeros((grid.shape[0], grid.shape[0]))
 
@@ -223,6 +263,8 @@ class CosmoDriver:
         return Amat
 
     def form_matrix_B(self, grid, molecule):
+        grid = self.qgrid
+
         Bmat = np.zeros((grid.shape[0], molecule.number_of_atoms()))
         natoms = molecule.number_of_atoms()
         atom_coords = molecule.get_coordinates_in_bohr()
@@ -237,6 +279,8 @@ class CosmoDriver:
         return Bmat
 
     def form_vector_C(self, grid, molecule, basis, D, erf):
+        grid = self.qgrid
+
         esp = np.zeros(grid.shape[0])
         # electrostatic potential integrals
         node_grps = [p for p in range(self.nodes)]
@@ -276,6 +320,8 @@ class CosmoDriver:
             return None
 
     def get_contribution_to_Fock(self, molecule, basis, grid, q, erf):
+        grid = self.qgrid
+
         grid_coords = grid[:, :3].copy()
         zeta        = grid[:, 4].copy()
 
@@ -406,6 +452,7 @@ class CosmoDriver:
                     for label in labels:
                         temp_.append(-1.0 *grad_010.matrix(label).full_matrix().to_numpy())
                     geom010_mats.append(np.array(temp_))
+                    #geom010_mats.append(np.array([-1.0 * grad_010.matrix_to_numpy(label) for label in labels]))
 
                 grad_100 = geom100_drv.compute(basis, molecule, a, q, grid[:, :3])
 
