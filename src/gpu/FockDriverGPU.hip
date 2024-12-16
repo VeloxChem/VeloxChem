@@ -112,18 +112,15 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         Q_omp[gpu_id] = CDenseMatrix(all_prim_count, all_prim_count);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
-    {
-    auto gpu_id = thread_id / num_threads_per_gpu;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_id = thread_id;
     // auto gpu_count = nnodes * num_gpus_per_node;
 
     // TODO: double check by using different number of gpus per MPI
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    hipSafe(hipSetDevice(gpu_id));
 
     // Boys function (tabulated for order 0-28)
 
@@ -531,7 +528,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
 
-    }}
+    }
 
     CDenseMatrix Q_matrix_sum(all_prim_count, all_prim_count);
 
@@ -579,17 +576,14 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
         T_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
-    {
-    auto gpu_id = thread_id / num_threads_per_gpu;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_id = thread_id;
     // auto gpu_count = nnodes * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    hipSafe(hipSetDevice(gpu_id));
 
     // GTOs blocks and number of AOs
 
@@ -1086,7 +1080,7 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
 
-    }}
+    }
 
     std::vector<CDenseMatrix> ST_matrices(2);
 
@@ -1159,17 +1153,14 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
         V_matrices[gpu_id] = CDenseMatrix(naos, naos);
     }
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
-    {
-    auto gpu_id = thread_id / num_threads_per_gpu;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_id = thread_id;
     // auto gpu_count = nnodes * num_gpus_per_node;
 
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    hipSafe(hipSetDevice(gpu_id));
 
     // Boys function (tabulated for order 0-28)
 
@@ -1681,7 +1672,7 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     hipSafe(hipFree(d_points_info));
 
-    }}
+    }
 
     CDenseMatrix V_matrix(naos, naos);
 
@@ -2047,17 +2038,13 @@ computeFockOnGPU(const              CMolecule& molecule,
     // std::cout << "-------------------------\n";
     // std::cout << timer.getSummary() << std::endl;
 
-#pragma omp parallel
+#pragma omp parallel num_threads(num_gpus_per_node)
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
-    {
-    auto gpu_id = thread_id / num_threads_per_gpu;
-    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
-    // auto gpu_count = nnodes * num_gpus_per_node;
+    auto gpu_id = thread_id;
 
-    hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
+    hipSafe(hipSetDevice(gpu_id));
 
     CMultiTimer timer;
 
@@ -8223,7 +8210,7 @@ computeFockOnGPU(const              CMolecule& molecule,
     // std::cout << "-----------------------\n";
     // std::cout << timer.getSummary() << std::endl;
 
-    }}
+    }
 
     CDenseMatrix mat_Fock_sum (naos, naos);
 
