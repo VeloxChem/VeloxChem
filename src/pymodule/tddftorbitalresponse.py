@@ -29,6 +29,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
+from .profiler import Profiler
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
 from .distributedarray import DistributedArray
@@ -196,7 +197,14 @@ class TddftOrbitalResponse(CphfSolver):
             unrelaxed one-particle density.
         """
 
-        self.profiler.start_timer('RHS')
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        profiler.start_timer('RHS')
 
         # Workflow:
         # 1) Construct the necessary density matrices
@@ -338,7 +346,7 @@ class TddftOrbitalResponse(CphfSolver):
         gs_density = dft_dict['gs_density']
 
         fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis,
-                          eri_dict, dft_dict, pe_dict, self.profiler)
+                          eri_dict, dft_dict, pe_dict, profiler)
 
         if self._dft:
             # Fock matrix for computing gxc
@@ -419,7 +427,7 @@ class TddftOrbitalResponse(CphfSolver):
             dist_rhs_mo.append(DistributedArray(rhs_mo_i, self.comm))
 
 
-        self.profiler.stop_timer('RHS')
+        profiler.stop_timer('RHS')
 
         if self.rank == mpi_master():
             return {
@@ -547,7 +555,7 @@ class TddftOrbitalResponse(CphfSolver):
                 lambda_ao_list.append(np.linalg.multi_dot([mo_occ, cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
 
         fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                                         eri_dict, dft_dict, pe_dict, self.profiler)
+                                         eri_dict, dft_dict, pe_dict)
 
         if self.rank == mpi_master():
             # Compute the contributions from the relaxed 1PDM
