@@ -288,7 +288,7 @@ class TestCphfPolgrad:
 
 #    @pytest.mark.skipif('pyscf' not in sys.modules,
 #                        reason='pyscf for integral derivatives not available')
-    def test_cpkspolgrad_coefficients(self):
+    def test_cpkspolgrad_coefficients_real(self):
         h2o_xyz = """3
 
         O     0.000000    0.000000    0.000000
