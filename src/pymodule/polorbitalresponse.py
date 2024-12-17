@@ -1820,9 +1820,44 @@ class PolOrbitalResponse(CphfSolver):
                 # get response vectors from cphf_results
                 #x_plus_y_ao = self.cphf_results[w]['x_plus_y_ao']
                 #x_minus_y_ao = self.cphf_results[w]['x_minus_y_ao']
+                if self.use_subspace_solver:
+                    tmp_cphf_ov_re = np.zeros((nocc * nvir))
+                    tmp_cphf_ov_im = np.zeros((nocc * nvir))
+                    tmp_cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+                    tmp_cphf_ov_red = np.zeros((dist_dof_red, nocc * nvir), dtype = np.dtype('complex128'))
+
+                    #for idx in range(0, dist_dof_red, 2):
+                    #    print(idx, idx+1)
+                    #    tmp_cphf_ov_re = dist_all_cphf_red[dist_dof_red * f + idx].get_full_vector()
+                    #    tmp_cphf_ov_im = dist_all_cphf_red[dist_dof_red * f + (idx + 1)].get_full_vector()
+
+                    #    tmp_cphf_ov_red[idx] += tmp_cphf_ov_re + 1j * tmp_cphf_ov_im
+
+                    for idx, xy in enumerate(xy_pairs):
+                        x = xy[0]
+                        y = xy[1]
+                        tmp_cphf_re = dist_all_cphf_red[dist_dof_red * f + idx].get_full_vector()
+                        tmp_cphf_im = dist_all_cphf_red[dist_dof_red * f + dof_red + idx].get_full_vector()
+
+                        tmp_cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
+
+                        if (y != x):
+                            tmp_cphf_ov[y, x] += tmp_cphf_ov[x, y]
+
+                    cphf_ov = tmp_cphf_ov.reshape(dof**2, nocc, nvir)
+                else:
+                    # get the lambda multipliers
+                    cphf_ov = all_cphf_ov[f]
 
                 # get the lambda multipliers and reshape lambda vector to complex
-                cphf_ov = all_cphf_ov[f]
+                #cphf_ov = all_cphf_ov[f]
+                #cphf_ov = tmp_cphf_ov
+
+                #self.cphf_results['cphf_ov_og'] = cphf_ov
+                #self.cphf_results['cphf_ov_tmp'] = tmp_cphf_ov
+
+                # NOTE DEBUG
+                #print(np.max(np.abs(cphf_ov - tmp_cphf_ov)))
 
                 # extract the excitation and de-excitation components
                 # from the full solution vector.
