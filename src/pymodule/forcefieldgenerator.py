@@ -785,10 +785,10 @@ class ForceFieldGenerator:
             bounds=(lower_bounds, upper_bounds),
             args=args,
             verbose=0,
-            xtol=1e-12,  # Stricter parameter update tolerance
-            ftol=1e-12,  # Stricter cost tolerance
-            gtol=1e-12,  # Stricter gradient tolerance
-            max_nfev=2000  # Allow more iterations
+            xtol=1e-12,  
+            ftol=1e-12,  
+            gtol=1e-12,  
+            max_nfev=2000  
         )
 
         # Update the force field parameters with the optimized barriers
@@ -857,15 +857,15 @@ class ForceFieldGenerator:
             import matplotlib.pyplot as plt
 
             # Smooth the x (angles) and y (energies) data using a spline
-            dihedral_angles = np.array(self.scan_dih_angles[0])  # x-values
-            qm_energies = np.array(qm_energies)                 # y-values (QM)
-            fitted_energies = np.array(fitted_dihedral_energies)  # y-values (MM)
+            dihedral_angles = np.array(self.scan_dih_angles[0])  
+            qm_energies = np.array(qm_energies)                 
+            fitted_energies = np.array(fitted_dihedral_energies)  
 
             # Create a dense set of angles for smooth interpolation
             dense_angles = np.linspace(dihedral_angles.min(), dihedral_angles.max(), 300)
 
             # Fit splines to QM and MM data
-            qm_spline = make_interp_spline(dihedral_angles, qm_energies, k=3)  # k=3 for cubic spline
+            qm_spline = make_interp_spline(dihedral_angles, qm_energies, k=3)  
             mm_spline = make_interp_spline(dihedral_angles, fitted_energies, k=3)
 
             # Evaluate the splines on the dense set of angles
@@ -874,19 +874,22 @@ class ForceFieldGenerator:
 
             # Plot the smoothed QM and MM energies
             plt.figure(figsize=(8, 6))
-            plt.plot(dense_angles, qm_smooth, label='QM (spline)', linewidth=2)
-            plt.plot(dense_angles, mm_smooth, label='MM (spline)', linewidth=2)
+            plt.plot(dense_angles, qm_smooth, label='QM (spline)', linewidth=4, color='black', alpha=0.7)
+            plt.plot(dense_angles, mm_smooth, label='MM (spline)', linewidth=4, color='darkcyan', alpha=0.7)
 
             # Plot original data points for reference
-            plt.scatter(dihedral_angles, qm_energies, color='blue', s=15, label='QM (points)')
-            plt.scatter(dihedral_angles, fitted_energies, color='orange', s=15, label='MM (points)')
+            plt.scatter(dihedral_angles, qm_energies, color='black', s=25, label='QM (points)')
+            plt.scatter(dihedral_angles, fitted_energies, color='darkcyan', s=25, label='MM (points)')
 
             # Add labels, legend, and grid
-            plt.xlabel('Dihedral angle (deg)')
+            plt.xlabel('dihedral angle {}-{}-{}-{} (deg)'.format(reference_dih[0], 
+                                                                 reference_dih[1], 
+                                                                 reference_dih[2], 
+                                                                 reference_dih[3]))
             plt.ylabel('Energy (kJ/mol)')
-            plt.legend(loc='upper right')
-            plt.grid(True)
-            plt.title(f'Fitted Dihedral Potential for rotatable bond {rotatable_bond[0]}-{rotatable_bond[1]}') 
+            # Center right legend outside the plot
+            plt.legend(loc='center right', bbox_to_anchor=(1.25, 0.5))
+            plt.title(f'Fitted Dihedral Potential for rotatable bond {rotatable_bond[0]}-{rotatable_bond[1]}')
             plt.show()
 
         self.ostream.print_info('Dihedral MM parameters have been reparametrized and updated in the topology.')
@@ -3133,17 +3136,16 @@ class ForceFieldGenerator:
         mm_scan_kJpermol_spl = spl(dihedrals_dense)
 
         # Plot spline
-        plt.plot(dihedrals_dense, qm_scan_kJpermol_spl, label='QM (spline)')
-        plt.plot(dihedrals_dense, mm_scan_kJpermol_spl, label='MM (spline)')
+        plt.plot(dihedrals_dense, qm_scan_kJpermol_spl, color='black', linewidth=4,  label='QM (spline)', alpha=0.7)
+        plt.plot(dihedrals_dense, mm_scan_kJpermol_spl, color='darkcyan', linewidth=4, label='MM (spline)' , alpha=0.7)
 
         # Print the original points 
-        # QM is blue, MM is orange s=15 is the size of the points
-        plt.scatter(dihedral_angles, qm_scan_kJpermol, color='blue', s=15, label='QM (points)')
-        plt.scatter(dihedral_angles, mm_scan_kJpermol, color='orange', s=15, label='MM (points)')
+        plt.scatter(dihedral_angles, qm_scan_kJpermol, color='black', s=25, label='QM (points)')
+        plt.scatter(dihedral_angles, mm_scan_kJpermol, color='darkcyan', s=25, label='MM (points)')
 
-        plt.grid()
-        plt.legend(loc='upper right')
-        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(dihedral_indices[0] + 1,
+        # Legend center right outside the plot
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.xlabel('dihedral angle {}-{}-{}-{} (deg)'.format(dihedral_indices[0] + 1,
                                                        dihedral_indices[1] + 1,
                                                        dihedral_indices[2] + 1,
                                                        dihedral_indices[3] + 1))
