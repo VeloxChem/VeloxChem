@@ -695,9 +695,13 @@ class ForceFieldGenerator:
             qm_minima_indices = argrelextrema(qm_energies, np.less)[0]
             mm_minima_indices = argrelextrema(mm_energies_rel, np.less)[0]
 
+            # Use first and last points as maxima (usual behavior for cosine dihedrals)
+            qm_extremes = [0, len(qm_energies) - 1]
+            mm_extremes = [0, len(mm_energies_rel) - 1]
+
             # Build the arrays with the maxima and minima
-            qm_maxima_indices = np.concatenate((qm_maxima_indices, qm_minima_indices))
-            mm_maxima_indices = np.concatenate((mm_maxima_indices, mm_minima_indices))
+            qm_maxima_indices = np.concatenate((qm_maxima_indices, qm_minima_indices, qm_extremes))
+            mm_maxima_indices = np.concatenate((mm_maxima_indices, mm_minima_indices, mm_extremes))
 
             return qm_maxima_indices, mm_maxima_indices
 
@@ -713,8 +717,6 @@ class ForceFieldGenerator:
             mm_energies_fit = dihedral_energies + mm_baseline
 
             # Relative energies
-            #mm_energies_fit_rel = mm_energies_fit - np.min(mm_energies_fit)
-            #qm_energies_rel = qm_energies - np.min(qm_energies)
             mm_energies_fit_rel = mm_energies_fit
             qm_energies_rel = qm_energies
 
@@ -737,14 +739,6 @@ class ForceFieldGenerator:
                 qm_energies_rel = matched_qm_rel
                 mm_energies_fit_rel = matched_mm_rel
 
-                # Debug prints
-                print('Matched QM maxima:', matched_qm_rel)
-                print('Matched MM maxima:', matched_mm_rel)
-
-            # Weights based on the energy difference
-            # weights = 2 * np.abs(matched_qm_rel - matched_mm_rel)
-            # print('Weights:', weights)
-
             # Residuals
             residuals = (qm_energies_rel - mm_energies_fit_rel) #* weights
 
@@ -752,12 +746,23 @@ class ForceFieldGenerator:
             return residuals**2
 
         self.ostream.print_info('Fitting the dihedral parameters...')
+        if fit_extremes:
+            self.ostream.print_info('Only singular points are used for fitting')
         self.ostream.flush()
 
         # Adjust bounds and initial parameters
-        bounds = [(0, np.inf) for _ in barriers]
-        lower_bounds = [b[0] for b in bounds]
-        upper_bounds = [b[1] for b in bounds]
+        # +/- 90 % of the original barriers
+        # In the case of zero barriers, use a default interval 0-2 kJ/mol
+        lower_bounds = np.zeros_like(barriers)
+        upper_bounds = np.zeros_like(barriers)
+        for idx, barrier in enumerate(barriers):
+            if barrier == 0:
+                lower_bounds[idx] = 0.0
+                upper_bounds[idx] = 2.0
+            else:
+                lower_bounds[idx] = barrier - 0.9 * np.abs(barrier)
+                upper_bounds[idx] = barrier + 0.9 * np.abs(barrier)
+
 
         # Use the original barriers as the initial guess
         initial_guess = original_barriers.copy()
@@ -769,6 +774,9 @@ class ForceFieldGenerator:
         else:
             args = (None, None)
 
+        # Perform the optimization
+        self.ostream.print_info('Optimizing dihedral via Least-Squares fitting...')
+        self.ostream.flush()
         result = least_squares(
             fun = objective_function,
             x0 = initial_guess,
@@ -785,6 +793,14 @@ class ForceFieldGenerator:
 
         # Update the force field parameters with the optimized barriers
         fitted_barriers = result.x
+
+        # Get the final MM energy profile
+        fitted_dihedral_energies = dihedral_potential(
+            dihedral_angles_rad,
+            fitted_barriers,
+            phases_array_rad,
+            periodicities_array
+        ) + mm_baseline
 
         # Adjust the barriers to the dihedral types
         if np.unique(barriers).size != barriers.size:
@@ -804,6 +820,7 @@ class ForceFieldGenerator:
 
         # Print how the barriers have changed
         self.ostream.print_info('Fitted dihedral barriers:')
+        self.ostream.print_blank()
         for idx, dihedral_idx in enumerate(dihedral_indices_print):
             self.ostream.print_info(f'Dihedral {dihedral_idx} type {dihedral_types[idx]}: {barriers[idx]:.3f} -> {fitted_barriers[idx]:.3f}')
         self.ostream.flush()
@@ -812,9 +829,65 @@ class ForceFieldGenerator:
         self.ostream.print_info('Validating fitted parameters...')
         self.ostream.flush()
 
-        fit = self.validate_force_field(0)
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+        self.ostream.print_info(
+            '  ---------------------------------------------------------------')
+        for angle, e_mm, e_qm in zip(self.scan_dih_angles[0], fitted_dihedral_energies, qm_energies):
+            self.ostream.print_info(
+                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                f'{(e_mm - e_qm):10.3f}')
+        self.ostream.print_blank()
+        # Summarize the fitting quality
+        self.ostream.print_info('Fitting quality results:')
+        self.ostream.print_info('  ---------------------------------------------------------------')
+        # Average difference
+        avg_diff = np.mean(fitted_dihedral_energies - qm_energies)
+        self.ostream.print_info(f'Average difference: {abs(avg_diff):.3f} kJ/mol')
+        # Standard deviation
+        std_diff = np.std(fitted_dihedral_energies - qm_energies)
+        self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
+        self.ostream.flush()
+
+        # Visualize the fitted dihedral using a spline
         if visualize:
-            self.visualize(fit)
+
+            from scipy.interpolate import make_interp_spline
+            import matplotlib.pyplot as plt
+
+            # Smooth the x (angles) and y (energies) data using a spline
+            dihedral_angles = np.array(self.scan_dih_angles[0])  # x-values
+            qm_energies = np.array(qm_energies)                 # y-values (QM)
+            fitted_energies = np.array(fitted_dihedral_energies)  # y-values (MM)
+
+            # Create a dense set of angles for smooth interpolation
+            dense_angles = np.linspace(dihedral_angles.min(), dihedral_angles.max(), 300)
+
+            # Fit splines to QM and MM data
+            qm_spline = make_interp_spline(dihedral_angles, qm_energies, k=3)  # k=3 for cubic spline
+            mm_spline = make_interp_spline(dihedral_angles, fitted_energies, k=3)
+
+            # Evaluate the splines on the dense set of angles
+            qm_smooth = qm_spline(dense_angles)
+            mm_smooth = mm_spline(dense_angles)
+
+            # Plot the smoothed QM and MM energies
+            plt.figure(figsize=(8, 6))
+            plt.plot(dense_angles, qm_smooth, label='QM (spline)', linewidth=2)
+            plt.plot(dense_angles, mm_smooth, label='MM (spline)', linewidth=2)
+
+            # Plot original data points for reference
+            plt.scatter(dihedral_angles, qm_energies, color='blue', s=15, label='QM (points)')
+            plt.scatter(dihedral_angles, fitted_energies, color='orange', s=15, label='MM (points)')
+
+            # Add labels, legend, and grid
+            plt.xlabel('Dihedral angle (deg)')
+            plt.ylabel('Energy (kJ/mol)')
+            plt.legend(loc='upper right')
+            plt.grid(True)
+            plt.title(f'Fitted Dihedral Potential for rotatable bond {rotatable_bond[0]}-{rotatable_bond[1]}') 
+            plt.show()
 
         self.ostream.print_info('Dihedral MM parameters have been reparametrized and updated in the topology.')
         self.ostream.flush()
@@ -3040,17 +3113,33 @@ class ForceFieldGenerator:
         # TODO: Add a spline instead.
         try:
             import matplotlib.pyplot as plt
+            from scipy.interpolate import make_interp_spline
         except ImportError:
             raise ImportError('Unable to import Matplotlib. Please install ' +
                               'Matplotlib via \'conda install matplotlib\'')
+        
+
 
         qm_scan_kJpermol = validation_result['qm_scan_kJpermol']
         mm_scan_kJpermol = validation_result['mm_scan_kJpermol']
         dihedral_angles = validation_result['dihedral_angles']
         dihedral_indices = validation_result['dihedral_indices']
 
-        plt.plot(dihedral_angles, qm_scan_kJpermol, '-o', label="QM")
-        plt.plot(dihedral_angles, mm_scan_kJpermol, '-o', label="MM")
+        # Fit spline
+        dihedrals_dense = np.linspace(min(dihedral_angles), max(dihedral_angles), 300)
+        spl = make_interp_spline(dihedral_angles, qm_scan_kJpermol, k=3)
+        qm_scan_kJpermol_spl = spl(dihedrals_dense)
+        spl = make_interp_spline(dihedral_angles, mm_scan_kJpermol, k=3)
+        mm_scan_kJpermol_spl = spl(dihedrals_dense)
+
+        # Plot spline
+        plt.plot(dihedrals_dense, qm_scan_kJpermol_spl, label='QM (spline)')
+        plt.plot(dihedrals_dense, mm_scan_kJpermol_spl, label='MM (spline)')
+
+        # Print the original points 
+        # QM is blue, MM is orange s=15 is the size of the points
+        plt.scatter(dihedral_angles, qm_scan_kJpermol, color='blue', s=15, label='QM (points)')
+        plt.scatter(dihedral_angles, mm_scan_kJpermol, color='orange', s=15, label='MM (points)')
 
         plt.grid()
         plt.legend(loc='upper right')
@@ -3058,8 +3147,9 @@ class ForceFieldGenerator:
                                                        dihedral_indices[1] + 1,
                                                        dihedral_indices[2] + 1,
                                                        dihedral_indices[3] + 1))
-        plt.ylabel('E in kJ/mol')
-        plt.title('dihedral potential of {}'.format(self.molecule_name))
+        plt.ylabel('Energy (kJ/mol)')
+        plt.title('Dihedral Potential for rotatable bond {}-{}'.format(dihedral_indices[1] + 1,
+                                                                       dihedral_indices[2] + 1))
         plt.show()
 
     def get_included_file(self, top_fname):
