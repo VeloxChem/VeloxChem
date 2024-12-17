@@ -536,7 +536,6 @@ class PolOrbitalResponse(CphfSolver):
                 dist_cphf_rhs_re.append(DistributedArray(cphf_rhs_k_re, self.comm, root=mpi_master()))
                 dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm, root=mpi_master()))
 
-            # NOTE Xin
             dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
 
 
@@ -799,7 +798,6 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     cphf_rhs_k = None
                 dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm, root=mpi_master()))
-            # NOTE Xin
 
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
@@ -1502,7 +1500,6 @@ class PolOrbitalResponse(CphfSolver):
         :param lr_results:
             The results from the linear response calculation.
         """
-        # NOTE Xin
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -1531,25 +1528,30 @@ class PolOrbitalResponse(CphfSolver):
             n_freq = len(self.frequencies)
 
             # get CPHF results in reduced dimensions
-            # NOTE Xin
-            if self.use_subspace_solver:
-                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-                all_cphf_red = []
+            #if self.use_subspace_solver:
+            #    dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+            #    all_cphf_red = []
 
-                for n, w in enumerate(self.frequencies):
-                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
+            #    for n, w in enumerate(self.frequencies):
+            #        tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
 
-                    for xy in range(dof_red):
-                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
+            #        for xy in range(dof_red):
+            #            tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
 
-                    all_cphf_red.append(tmp_cphf_n)
+            #        all_cphf_red.append(tmp_cphf_n)
 
-                all_cphf_red = np.array(all_cphf_red).reshape(n_freq * dof_red, nocc, nvir)
-            else:
-                all_cphf_red = self.cphf_results['cphf_ov']
+            #    all_cphf_red = np.array(all_cphf_red).reshape(n_freq * dof_red, nocc, nvir)
+            #else:
+            #    all_cphf_red = self.cphf_results['cphf_ov']
 
             # map CPHF results to dof*dof dimensions
-            all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+            #all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+            if self.use_subspace_solver:
+                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+            else:
+                all_cphf_red = self.cphf_results['cphf_ov']
+                all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+
         else:
             dof = None
 
@@ -1582,8 +1584,27 @@ class PolOrbitalResponse(CphfSolver):
                 #x_plus_y_ao = self.cphf_results[w]['x_plus_y_ao']
                 #x_minus_y_ao = self.cphf_results[w]['x_minus_y_ao']
 
+                # NOTE WIP
                 # get the lambda multipliers
-                cphf_ov = all_cphf_ov[f]
+                if self.use_subspace_solver:
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
+
+                    for idx, xy in enumerate(xy_pairs):
+                        x = xy[0]
+                        y = xy[1]
+                        cphf_ov[x, y] = dist_all_cphf_red[dof_red * f + idx].get_full_vector()
+
+                        if (y != x):
+                            cphf_ov[y, x] += cphf_ov[x, y]
+
+                    cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+                else:
+                    # get the lambda multipliers
+                    cphf_ov = all_cphf_ov[f]
+                #tmp_cphf_ov = all_cphf_ov[f]
+
+                # NOTE DEBUG
+                #print(np.max(np.abs(cphf_ov - tmp_cphf_ov)))
 
                 # create response vectors in MO basis
                 exc_vec = (1.0 / self.sqrt2 *
@@ -1596,7 +1617,6 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                # NOTE WIP
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
@@ -1750,7 +1770,6 @@ class PolOrbitalResponse(CphfSolver):
             n_freqs = len(self.frequencies)
 
             # get CPHF results
-            # NOTE Xin
             if self.use_subspace_solver:
                 dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
                 dist_dof_red = len(dist_all_cphf_red) // n_freqs
@@ -2343,6 +2362,7 @@ class PolOrbitalResponse(CphfSolver):
             for idx, map_idx in map_dof:
                 for x, y in [tnsr_idx for tnsr_idx in map_idx]:
                     cphf_ov[f, x, y] = cphf_sol[idx]
+
         cphf_ov = cphf_ov.reshape(n_freq, dof**2, nocc, nvir)
 
         return cphf_ov
