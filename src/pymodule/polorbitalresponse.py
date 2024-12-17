@@ -1753,12 +1753,14 @@ class PolOrbitalResponse(CphfSolver):
             # NOTE Xin
             if self.use_subspace_solver:
                 dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+                dist_dof_red = len(dist_all_cphf_red) // n_freqs
                 all_cphf_red = []
                 for n, w in enumerate(self.frequencies):
-                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
-                    for xy in range(2 * dof_red):
-                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
+                    tmp_cphf_n = np.zeros((dist_dof_red, nocc * nvir))
+                    for xy in range(dist_dof_red):
+                        tmp_cphf_n[xy] = dist_all_cphf_red[dist_dof_red * n + xy].get_full_vector()
                     all_cphf_red.append(tmp_cphf_n)
+                all_cphf_red = np.array(all_cphf_red).reshape(n_freqs * dist_dof_red, nocc, nvir)
             else:
                 all_cphf_red = self.cphf_results['cphf_ov']
 
