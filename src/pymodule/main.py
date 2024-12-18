@@ -378,8 +378,7 @@ def main():
             tddftgrad_drv = TddftGradientDriver(scf_drv)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                  rsp_prop._rsp_driver,
-                                  rsp_prop._rsp_property)
+                                  rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
     # Hessian
     # TODO reconsider keeping this after introducing vibrationalanalysis class
@@ -463,7 +462,7 @@ def main():
             opt_drv.update_settings(opt_dict)
             opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                           rsp_prop._rsp_driver,
-                                      	  rsp_prop._rsp_property)
+                                          rsp_prop._rsp_property)
 
     # Vibrational analysis
 
@@ -542,8 +541,7 @@ def main():
         if not rsp_prop.is_converged:
             return
 
-        # Calculate the excited-state gradient
-        # TODO: do not force computation of gradient if not requested
+        # Calculate the excited-state gradient if requested
 
         if 'property' in rsp_dict:
             prop_type = rsp_dict['property'].lower()
@@ -600,18 +598,6 @@ def main():
                 opt_drv = OptimizationDriver(tddftgrad_drv)
                 opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                 rsp_prop._rsp_driver, rsp_prop._rsp_property)
-
-        else:
-            # TODO: this should not be printed if gradient is not requested
-            task.ostream.print_blank()
-            info_msg = 'The excited state derivatives '
-            info_msg += 'can only be computed if the response '
-            info_msg += 'property is "absorption", "uv-vis", or "ecd"'
-            task.ostream.print_info(info_msg)
-            info_msg = 'Computation of gradient/Hessian will be skipped.'
-            task.ostream.print_info(info_msg)
-            task.ostream.print_blank()
-            task.ostream.flush()
 
     # Pulsed Linear Response Theory
 
