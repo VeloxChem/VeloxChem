@@ -656,7 +656,7 @@ class ForceFieldGenerator:
 
         # Prepare data for fitting
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
-        mm_baseline = np.min(initial_data['mm_scan_kJpermol'])
+        mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
 
         # Define the dihedral potential function
         def dihedral_potential(phi, barriers, phases_rad, periodicities):
@@ -750,20 +750,6 @@ class ForceFieldGenerator:
             self.ostream.print_info('Only singular points are used for fitting')
         self.ostream.flush()
 
-        # Adjust bounds and initial parameters
-        # +/- 90 % of the original barriers
-        # In the case of zero barriers, use a default interval 0-2 kJ/mol
-        lower_bounds = np.zeros_like(barriers)
-        upper_bounds = np.zeros_like(barriers)
-        for idx, barrier in enumerate(barriers):
-            if barrier == 0:
-                lower_bounds[idx] = 0.0
-                upper_bounds[idx] = 2.0
-            else:
-                lower_bounds[idx] = barrier - 0.9 * np.abs(barrier)
-                upper_bounds[idx] = barrier + 0.9 * np.abs(barrier)
-
-
         # Use the original barriers as the initial guess
         initial_guess = original_barriers.copy()
         
@@ -782,7 +768,6 @@ class ForceFieldGenerator:
             x0 = initial_guess,
             jac = '3-point',
             method='dogbox',
-            bounds=(lower_bounds, upper_bounds),
             args=args,
             verbose=0,
             xtol=1e-12,  
@@ -801,7 +786,6 @@ class ForceFieldGenerator:
             phases_array_rad,
             periodicities_array
         ) + mm_baseline
-
         # Adjust the barriers to the dihedral types
         if np.unique(barriers).size != barriers.size:
 
