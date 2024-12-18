@@ -393,7 +393,9 @@ class PolarizabilityGradient:
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                     rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
 
-            pol_gradient += eri_contrib
+            if self.rank == mpi_master():
+                pol_gradient += eri_contrib
+
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             if self.rank == mpi_master():

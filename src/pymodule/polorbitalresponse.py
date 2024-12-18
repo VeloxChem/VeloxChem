@@ -1537,31 +1537,44 @@ class PolOrbitalResponse(CphfSolver):
             dof = len(self.vector_components)
             xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
-
-            # number of frequencies
-            n_freq = len(self.frequencies)
-
-            # get CPHF results in reduced dimensions
-            if self.use_subspace_solver:
-                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-                all_cphf_red = []
-
-                for n, w in enumerate(self.frequencies):
-                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
-
-                    for xy in range(dof_red):
-                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
-
-                    all_cphf_red.append(tmp_cphf_n)
-
-                all_cphf_red = np.array(all_cphf_red).reshape(n_freq * dof_red, nocc, nvir)
-            else:
-                all_cphf_red = self.cphf_results['cphf_ov']
-
-            # map CPHF results to dof*dof dimensions
-            all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
         else:
             dof = None
+            dof_red = None
+
+        dof_red = self.comm.bcast(dof_red, root=mpi_master())
+
+        # number of frequencies
+        n_freq = len(self.frequencies)
+
+        # get CPHF results in reduced dimensions
+        if self.use_subspace_solver:
+            dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+
+            if self.rank == mpi_master():
+                all_cphf_red = []
+
+            for n, w in enumerate(self.frequencies):
+
+                if self.rank == mpi_master():
+                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
+
+                for xy in range(dof_red):
+                    tmp_cphf_n_xy = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
+                    if self.rank == mpi_master():
+                        tmp_cphf_n[xy, :] = tmp_cphf_n_xy
+
+                if self.rank == mpi_master():
+                    all_cphf_red.append(tmp_cphf_n)
+
+            if self.rank == mpi_master():
+                all_cphf_red = np.array(all_cphf_red).reshape(n_freq * dof_red, nocc, nvir)
+        else:
+            if self.rank == mpi_master():
+                all_cphf_red = self.cphf_results['cphf_ov']
+
+        if self.rank == mpi_master():
+            # map CPHF results to dof*dof dimensions
+            all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
 
         # timings
         loop_start_time = tm.time()
@@ -1755,6 +1768,7 @@ class PolOrbitalResponse(CphfSolver):
                 for n, w in enumerate(self.frequencies):
                     tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
                     for xy in range(2 * dof_red):
+                        # TODO: fix MPI parallelization
                         tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
                     all_cphf_red.append(tmp_cphf_n)
             else:
