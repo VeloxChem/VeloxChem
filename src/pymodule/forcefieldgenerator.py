@@ -1992,53 +1992,54 @@ class ForceFieldGenerator:
             key: tuple of atom indices
             value: tuple of atom types
         """
+        # sp2 Carbon and Nitrogen atom types in conjugated systems (no-rings)
+        carbon_sp2 = {'cp', 'cq', 'c2', 'ce', 'cf'}
+        nitrogen_sp2 = {'na', 'n2', 'ne', 'nf'}
 
-        unique_non_rotatable_atom_types = ['c', 'n', 'c2', 'ce', 'cf', 'cg', 'ch']
+        # Generate lists of non-rotatable bonds
+        carbon_carbon_bonds = []
+        for atom1 in carbon_sp2:
+            for atom2 in carbon_sp2:
+                if (atom1, atom2) == ('c2', 'c2'):
+                    carbon_carbon_bonds.append((atom1, atom2))
+                if atom1 != atom2:
+                    carbon_carbon_bonds.append((atom1, atom2))
+                    carbon_carbon_bonds.append((atom2, atom1))
 
-        redundant_non_rotatable_atom_types = [
-               # Aromatic and conjugated carbons
-            'c1',  # Sp carbons
-            'c2', # Sp2 carbon
-            'nb', 'nc', 'nd', 'ne', 'nf',  # Aromatic and conjugated nitrogens
-            'ss',  # Sulfur in thio-ester and thio-ether
-            'o', 'oh'  # Oxygen in carbonyl and hydroxyl groups
-            ]
+        carbon_nitrogen_bonds = []
+        for atom1 in carbon_sp2:
+            for atom2 in nitrogen_sp2:
+                carbon_nitrogen_bonds.append((atom1, atom2))
+                carbon_nitrogen_bonds.append((atom2, atom1))
 
-        # Make all possible combinations of non-rotatable bonds
-        non_rotatable_bonds = []
+        nitrogen_nitrogen_bonds = []
+        for atom1 in nitrogen_sp2:
+            for atom2 in nitrogen_sp2:
+                if (atom1, atom2) == ('n2', 'n2'):
+                    nitrogen_nitrogen_bonds.append((atom1, atom2))
+                if atom1 != atom2:
+                    nitrogen_nitrogen_bonds.append((atom1, atom2))
+                    nitrogen_nitrogen_bonds.append((atom2, atom1))
 
-        # Combinations between unique_non_rotatable_atom_types and red_non_rotatable_atom_types
-        for i in unique_non_rotatable_atom_types:
-            for j in redundant_non_rotatable_atom_types:
-                non_rotatable_bonds.append((i, j))
-                non_rotatable_bonds.append((j, i))
+        non_rotatable_bonds = carbon_carbon_bonds + carbon_nitrogen_bonds + nitrogen_nitrogen_bonds
 
-        # Combinations within redundant_non_rotatable_atom_types
-        for i in redundant_non_rotatable_atom_types:
-            for j in redundant_non_rotatable_atom_types:
-                non_rotatable_bonds.append((i, j))
-                non_rotatable_bonds.append((j, i))
-        
-        # Combinations within unique_non_rotatable_atom_types
-        # for i in unique_non_rotatable_atom_types:
-        #     for j in unique_non_rotatable_atom_types:
-        #         non_rotatable_bonds.append((i, j))
-        #         non_rotatable_bonds.append((j, i))
-
-        # Collect keys to delete
+        # Identify bonds to delete based on criteria
         bonds_to_delete = []
+
         for (i, j), bond in rotatable_bonds_types.items():
-            # Check if bond is non-rotatable due to atom types
+            # Check if the bond is non-rotatable due to atom types
             if bond in non_rotatable_bonds:
                 bonds_to_delete.append((i, j))
                 continue
-            # Check if bond is part of a ring
+
+            # Check if the bond is part of a ring
             if self.is_bond_in_ring(i, j):
                 bonds_to_delete.append((i, j))
                 continue
 
+        # Remove identified non-rotatable bonds
         for key in bonds_to_delete:
-            rotatable_bonds_types.pop(key)
+            rotatable_bonds_types.pop(key, None)
 
         # Exclude bonds involving terminal atoms
         bonds_to_delete = []
@@ -2049,10 +2050,12 @@ class ForceFieldGenerator:
             if len(atom_i_connections) == 1 or len(atom_j_connections) == 1:
                 bonds_to_delete.append((i, j))
 
+        # Remove terminal atom bonds
         for key in bonds_to_delete:
-            rotatable_bonds_types.pop(key)
+            rotatable_bonds_types.pop(key, None)
 
         return rotatable_bonds_types
+
 
     def is_bond_in_ring(self, atom_i, atom_j):
         """
