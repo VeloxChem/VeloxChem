@@ -283,7 +283,7 @@ class TdaEigenSolver(LinearSolver):
         # start TDA iteration
 
         for i in range(self.max_iter):
-
+            print(f'ITERATION: {i}')
             profiler.set_timing_key(f'Iteration {i + 1}')
 
             # perform linear transformation of trial vectors
