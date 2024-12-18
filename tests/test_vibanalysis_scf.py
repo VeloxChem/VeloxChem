@@ -123,13 +123,11 @@ class TestScfVibrationalAnalysisDriver:
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        # TODO: enable raman
-
         vib_settings = {
             'do_ir': 'yes',
-            #'do_raman': 'yes',
+            'do_raman': 'yes',
             'numerical_hessian': 'no',
-            #'numerical_raman': 'no'
+            'numerical_raman': 'no'
         }
         method_settings = {}
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
@@ -152,14 +150,14 @@ class TestScfVibrationalAnalysisDriver:
             rel_diff_ir = np.max(
                 np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
-            #rel_diff_raman = np.max(
-            #    np.abs(vibanalysis_drv.raman_intensities[0.0] /
-            #           ref_raman_intensities - 1.0))
+            rel_diff_raman = np.max(
+                np.abs(vibanalysis_drv.raman_intensities[0.0] /
+                       ref_raman_intensities - 1.0))
 
             assert diff_hessian < 1.0e-5
             assert rel_diff_freq < 1.0e-3
             assert rel_diff_ir < 1.0e-3
-            #assert rel_diff_raman < 1.0e-3
+            assert rel_diff_raman < 1.0e-3
 
         task.finish()
 

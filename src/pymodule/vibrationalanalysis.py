@@ -475,7 +475,10 @@ class VibrationalAnalysis:
         hessian_drv.update_settings(self.method_dict, self.hessian_dict, cphf_dict=self.cphf_dict)
 
         # Transfer settings for vibrational task to Hessian driver
-        hessian_drv.numerical = self.numerical_hessian
+        if self.is_scf:
+            # only pass numerical option to ScfHessianDriver
+            # since XtbHessianDriver will always be numerical
+            hessian_drv.numerical = self.numerical_hessian
         hessian_drv.do_four_point = self.do_four_point_hessian
         hessian_drv.do_dipole_gradient = self.do_ir
         hessian_drv.do_print_hessian = self.do_print_hessian
