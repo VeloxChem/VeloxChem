@@ -583,8 +583,7 @@ def main():
             # Excited state Hessian and vibrational analysis
             if 'vibrational' in task.input_dict:
                 freq_dict = task.input_dict['vibrational']
-                tdhfhessian_drv = TdhfHessianDriver(scf_drv, task.mpi_comm,
-                                                    task.ostream)
+                tdhfhessian_drv = TdhfHessianDriver(scf_drv)
                 tdhfhessian_drv.update_settings(method_dict, rsp_dict,
                                                 freq_dict, orbrsp_dict)
                 tdhfhessian_drv.compute(task.molecule, task.ao_basis,

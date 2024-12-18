@@ -66,7 +66,7 @@ class ScfHessianDriver(HessianDriver):
         - perturbed_density: The perturbed density
     """
 
-    def __init__(self, scf_drv, comm=None, ostream=None):
+    def __init__(self, scf_drv):
         """
         Initializes SCF Hessian driver.
         """

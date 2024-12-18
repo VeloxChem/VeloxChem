@@ -56,10 +56,6 @@ class VibrationalAnalysis:
     """
     Implements the vibrational analysis driver.
 
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
     :param drv:
         The SCF or XTB driver.
 
@@ -98,31 +94,32 @@ class VibrationalAnalysis:
         - result_file: The name of the vibrational analysis output file (txt format).
     """
 
-    def __init__(self, drv, comm=None, ostream=None):
+    def __init__(self, drv):
         """
         Initializes vibrational analysis driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
-
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
-
         # MPI information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        self.comm = drv.comm
+        self.rank = drv.comm.Get_rank()
+        self.nodes = drv.comm.Get_size()
 
-        self.ostream = ostream
+        # output stream
+        self.ostream = drv.ostream
 
         # filenames
         self.filename = None
         self.checkpoint_file = None
         self.result_file = None
+
+        # option dictionaries from input
+        # TODO: cleanup
+        self.method_dict = {}
+        self.vib_dict = {}
+        self.hessian_dict = {}
+        self.cphf_dict = {}
+        self.rsp_dict = {}
+        self.polgrad_dict = {}
 
         # Hessian driver etc
         self.is_scf = False
@@ -491,6 +488,19 @@ class VibrationalAnalysis:
 
         # save the electronic energy
         self.elec_energy = hessian_drv.elec_energy
+
+    def print_hessian(self, molecule):
+        """
+        Prints the Hessian.
+
+        :param molecule:
+            The molecule.
+        """
+
+        if self.hessian_driver.hessian is None:
+            self.ostream.print_warning('Hessian is not available.')
+        else:
+            self.hessian_driver.print_hessian(molecule)
 
     def compute_polarizability_gradient(self, molecule, ao_basis):
         """
