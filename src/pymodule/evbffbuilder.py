@@ -163,6 +163,24 @@ class EvbForceFieldBuilder():
                 print("Creating topology")
                 forcefield.create_topology(molecule, basis, scf_result=scf_results)
 
+            # The atomtypeidentifier returns water with no lj on the hydrogens, this leads to unstable simulations
+            for atom in forcefield.atoms.values():
+                if atom['type'] == 'ow':
+                    sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
+                    epsilon = 0.0930 * 4.184
+                    atom['type'] = 'oh'
+                    atom['sigma'] = sigma
+                    atom['epsilon'] = epsilon
+                    atom['comment'] = "Reaction-water"
+                elif atom['type'] == 'hw':
+                    
+                    sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
+                    epsilon = 0.0047 * 4.184
+                    atom['type'] = 'ho'
+                    atom['sigma'] = sigma
+                    atom['epsilon'] = epsilon
+                    atom['comment'] = "Reaction-water"
+
             if not charges_found:
                 print("Saving calculated RESP charges to disk")
                 self._save_charges(
