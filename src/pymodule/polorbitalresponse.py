@@ -1525,12 +1525,13 @@ class PolOrbitalResponse(CphfSolver):
             dof_red = len(xy_pairs)
 
             # number of frequencies
-            n_freq = len(self.frequencies)
+            n_freqs = len(self.frequencies)
 
             if not self.use_subspace_solver:
                 all_cphf_red = self.cphf_results['cphf_ov']
                 # TODO replace with solution used for dist. arrays
-                all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+                #all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+                all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
         else:
             xy_pairs = None
             dof_red = None
@@ -1585,10 +1586,29 @@ class PolOrbitalResponse(CphfSolver):
                 dm_vv = self.cphf_results[w]['dm_vv']
 
                 # get the lambda multipliers
-                if self.use_subspace_solver:
-                    cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
-                else:
-                    cphf_ov = all_cphf_ov[f]
+                #if self.use_subspace_solver:
+                #    cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+                #else:
+                #    cphf_ov = all_cphf_ov[f]
+
+                # NOTE WIP
+                if not self.use_subspace_solver:
+                    cphf_ov_red = all_cphf_red[f]
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
+
+                    #tmp_cphf_ov = cphf_ov_red[:dof_red]
+
+                    for idx, xy in enumerate(xy_pairs):
+                        x = xy[0]
+                        y = xy[1]
+
+                        #cphf_ov[x, y] = tmp_cphf_ov[idx]
+                        cphf_ov[x, y] = cphf_ov_red[idx]
+
+                        if (y != x):
+                            cphf_ov[y, x] += cphf_ov[x, y]
+
+                cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
                 # create response vectors in MO basis
                 exc_vec = (1.0 / self.sqrt2 *
@@ -1707,7 +1727,7 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             self.ostream.print_blank()
             valstr = '** Time spent on constructing omega multipliers '
-            valstr += 'for {} frequencies: '.format(len(self.frequencies))
+            valstr += 'for {} frequencies: '.format(n_freqs)
             valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
