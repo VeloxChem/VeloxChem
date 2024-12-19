@@ -250,7 +250,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     // Q on device
 
-    double *d_mat_Q;
+    std::vector<double*> d_mat_Q(6, nullptr);
 
     uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
     uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
@@ -259,7 +259,10 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     uint32_t *d_pd_first_inds_local, *d_pd_second_inds_local;
     uint32_t *d_dd_first_inds_local, *d_dd_second_inds_local;
 
-    hipSafe(hipMalloc(&d_mat_Q, max_prim_pair_count_local * sizeof(double)));
+    for (int i = 0; i < 6; ++i)
+    {
+         hipSafe(hipMalloc(&d_mat_Q[i], max_prim_pair_count_local * sizeof(double)));
+    }
 
     hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
@@ -314,7 +317,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::computeQMatrixSS, num_blocks, threads_per_block, 0, 0,
-                           d_mat_Q,
+                           d_mat_Q[0],
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
                            d_ss_first_inds_local,
@@ -322,18 +325,6 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            static_cast<uint32_t>(ss_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
-
-        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
-        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
-        {
-            const auto i = ss_first_inds_local[ij];
-            const auto j = ss_second_inds_local[ij];
-
-            mat_Q_omp.row(i)[j] = h_mat_Q[ij];
-
-            if (i != j) mat_Q_omp.row(j)[i] = h_mat_Q[ij];
-        }
     }
 
     // Q: SP
@@ -345,7 +336,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::computeQMatrixSP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_Q,
+                           d_mat_Q[1],
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
                            d_p_prim_info,
@@ -355,17 +346,6 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            static_cast<uint32_t>(sp_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
-
-        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
-        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
-        {
-            const auto i = sp_first_inds_local[ij];
-            const auto j = sp_second_inds_local[ij];
-
-            mat_Q_omp.row(i)[s_prim_count + j] = h_mat_Q[ij];
-            mat_Q_omp.row(s_prim_count + j)[i] = h_mat_Q[ij];
-        }
     }
 
     // Q: SD
@@ -377,7 +357,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         dim3 num_blocks((sd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::computeQMatrixSD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_Q,
+                           d_mat_Q[2],
                            d_s_prim_info,
                            static_cast<uint32_t>(s_prim_count),
                            d_d_prim_info,
@@ -387,17 +367,6 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            static_cast<uint32_t>(sd_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
-
-        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-
-        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
-        {
-            const auto i = sd_first_inds_local[ij];
-            const auto j = sd_second_inds_local[ij];
-
-            mat_Q_omp.row(i)[s_prim_count + p_prim_count * 3 + j] = h_mat_Q[ij];
-            mat_Q_omp.row(s_prim_count + p_prim_count * 3 + j)[i] = h_mat_Q[ij];
-        }
     }
 
     // Q: PP
@@ -409,7 +378,7 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::computeQMatrixPP, num_blocks, threads_per_block, 0, 0,
-                           d_mat_Q,
+                           d_mat_Q[3],
                            d_p_prim_info,
                            static_cast<uint32_t>(p_prim_count),
                            d_pp_first_inds_local,
@@ -417,8 +386,95 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                            static_cast<uint32_t>(pp_prim_pair_count_local),
                            d_boys_func_table,
                            d_boys_func_ft);
+    }
 
-        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+    // Q: PD
+
+    if (pd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeQMatrixPD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_Q[4],
+                           d_p_prim_info,
+                           static_cast<uint32_t>(p_prim_count),
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_pd_first_inds_local,
+                           d_pd_second_inds_local,
+                           static_cast<uint32_t>(pd_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+    }
+
+    // Q: DD
+
+    if (dd_prim_pair_count_local > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::computeQMatrixDD, num_blocks, threads_per_block, 0, 0,
+                           d_mat_Q[5],
+                           d_d_prim_info,
+                           static_cast<uint32_t>(d_prim_count),
+                           d_dd_first_inds_local,
+                           d_dd_second_inds_local,
+                           static_cast<uint32_t>(dd_prim_pair_count_local),
+                           d_boys_func_table,
+                           d_boys_func_ft);
+    }
+
+    // copy back results
+    if (ss_prim_pair_count_local > 0)
+    {
+        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q[0], ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+                                                                                                                            
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+        {
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
+                                                                                                                            
+            mat_Q_omp.row(i)[j] = h_mat_Q[ij];
+                                                                                                                            
+            if (i != j) mat_Q_omp.row(j)[i] = h_mat_Q[ij];
+        }
+    }
+
+    if (sp_prim_pair_count_local > 0)
+    {
+        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q[1], sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+        {
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
+
+            mat_Q_omp.row(i)[s_prim_count + j] = h_mat_Q[ij];
+            mat_Q_omp.row(s_prim_count + j)[i] = h_mat_Q[ij];
+        }
+    }
+
+    if (sd_prim_pair_count_local > 0)
+    {
+        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q[2], sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sd_prim_pair_count_local; ij++)
+        {
+            const auto i = sd_first_inds_local[ij];
+            const auto j = sd_second_inds_local[ij];
+
+            mat_Q_omp.row(i)[s_prim_count + p_prim_count * 3 + j] = h_mat_Q[ij];
+            mat_Q_omp.row(s_prim_count + p_prim_count * 3 + j)[i] = h_mat_Q[ij];
+        }
+    }
+
+    if (pp_prim_pair_count_local > 0)
+    {
+        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q[3], pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -431,27 +487,9 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         }
     }
 
-    // Q: PD
-
     if (pd_prim_pair_count_local > 0)
     {
-        dim3 threads_per_block(TILE_DIM);
-
-        dim3 num_blocks((pd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
-        hipLaunchKernelGGL(gpu::computeQMatrixPD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_Q,
-                           d_p_prim_info,
-                           static_cast<uint32_t>(p_prim_count),
-                           d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
-                           d_pd_first_inds_local,
-                           d_pd_second_inds_local,
-                           static_cast<uint32_t>(pd_prim_pair_count_local),
-                           d_boys_func_table,
-                           d_boys_func_ft);
-
-        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q[4], pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pd_prim_pair_count_local; ij++)
         {
@@ -463,25 +501,9 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
         }
     }
 
-    // Q: DD
-
     if (dd_prim_pair_count_local > 0)
     {
-        dim3 threads_per_block(TILE_DIM);
-
-        dim3 num_blocks((dd_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
-
-        hipLaunchKernelGGL(gpu::computeQMatrixDD, num_blocks, threads_per_block, 0, 0,
-                           d_mat_Q,
-                           d_d_prim_info,
-                           static_cast<uint32_t>(d_prim_count),
-                           d_dd_first_inds_local,
-                           d_dd_second_inds_local,
-                           static_cast<uint32_t>(dd_prim_pair_count_local),
-                           d_boys_func_table,
-                           d_boys_func_ft);
-
-        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpyAsync(h_mat_Q.data(), d_mat_Q[5], dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < dd_prim_pair_count_local; ij++)
         {
@@ -498,7 +520,10 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     hipSafe(hipFree(d_p_prim_info));
     hipSafe(hipFree(d_d_prim_info));
 
-    hipSafe(hipFree(d_mat_Q));
+    for (int i = 0; i < 6; ++i)
+    {
+        hipSafe(hipFree(d_mat_Q[i]));
+    }
 
     hipSafe(hipFree(d_ss_first_inds_local));
     hipSafe(hipFree(d_ss_second_inds_local));
