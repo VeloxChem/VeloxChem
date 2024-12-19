@@ -86,6 +86,7 @@ class SystemBuilder:
         # Packing configuration
         self.threshold = 1.8
         self.number_of_attempts = 100
+        self.random_rotation = True
 
         # Molecules
         # Solute
@@ -287,7 +288,7 @@ class SystemBuilder:
         # Insert the counterions
         if self.counterion:
             for _ in range(abs(charge)):
-                result = self._insert_molecule(self.counterion, existing_coords, tree)
+                result = self._insert_molecule(self.counterion, tree)
                 if result:
                     self.system.extend(result)
                     existing_coords = np.array([atom[-1] for atom in self.system])
@@ -322,7 +323,7 @@ class SystemBuilder:
                 attempts = min(batch_size, quantity - added_count)
                 new_molecules = []
                 for _ in range(attempts):
-                    result = self._insert_molecule(solvent, existing_coords, tree)
+                    result = self._insert_molecule(solvent, tree)
                     if result:
                         new_molecules.extend(result)
                         added_count += 1
@@ -421,7 +422,7 @@ class SystemBuilder:
         for i, (solvent, quantity) in enumerate(zip(self.solvents, self.quantities)):
             added_count = 0
             while added_count < quantity:
-                result = self._insert_molecule(solvent, existing_coords, tree)
+                result = self._insert_molecule(solvent, tree)
                 if result:
                     self.system.extend(result)
                     existing_coords = np.array([atom[-1] for atom in self.system])
@@ -801,7 +802,7 @@ class SystemBuilder:
         self.solvent_labels.append(solvent.get_labels())
     
 
-    def _insert_molecule(self, new_molecule, existing_coords, tree):
+    def _insert_molecule(self, new_molecule, tree):
         """
         Insert a molecule with a random rotation without rebuilding the KDTree each time.
         """
@@ -811,11 +812,16 @@ class SystemBuilder:
         total_attempts = self.number_of_attempts
 
         for attempt_num in range(1, total_attempts + 1):
+            
+            if self.random_rotation:
+                # Generate a random rotation
+                rotation_matrix = R.random().as_matrix()
+                # Rotate the molecule coordinates
+                rotated_coords = new_molecule_xyz @ rotation_matrix.T
 
-            # Generate a random rotation
-            rotation_matrix = R.random().as_matrix()
-            # Rotate the molecule coordinates
-            rotated_coords = new_molecule_xyz @ rotation_matrix.T
+            else:
+                rotated_coords = new_molecule_xyz
+
             # Generate a random position for the solvent molecule
             position = np.random.rand(3) * self.box
 
@@ -965,7 +971,7 @@ class SystemBuilder:
         elif solvent == 'chloroform':
             mols_per_nm3 = 7.6
             density = 1494
-            smiles_code = 'ClCCl'
+            smiles_code = 'C(Cl)(Cl)Cl'
 
         elif solvent == 'hexane':
             mols_per_nm3 = 4.7
