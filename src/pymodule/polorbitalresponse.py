@@ -1527,11 +1527,6 @@ class PolOrbitalResponse(CphfSolver):
             # number of frequencies
             n_freq = len(self.frequencies)
 
-            # lambda multipliers
-            #if self.use_subspace_solver:
-            #    dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-            #    cphf_ov = np.zeros((dof, dof, nocc * nvir))
-            #else:
             if not self.use_subspace_solver:
                 all_cphf_red = self.cphf_results['cphf_ov']
                 # TODO replace with solution used for dist. arrays
@@ -1549,10 +1544,6 @@ class PolOrbitalResponse(CphfSolver):
         nocc = self.comm.bcast(nocc , root=mpi_master())
         nvir = self.comm.bcast(nvir , root=mpi_master())
 
-        # NOTE WIP
-        #if self.use_subspace_solver:
-        #     dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-
         # timings
         loop_start_time = tm.time()
 
@@ -1563,19 +1554,11 @@ class PolOrbitalResponse(CphfSolver):
                 for x in self.vector_components
             ]
 
-            # NOTE DEBUG
-            print('*** before cphf_ov')
-            self.ostream.flush()
-            # NOTE WIP
             if self.use_subspace_solver:
                 cphf_ov = np.zeros((dof, dof, nocc * nvir))
 
                 for idx, xy in enumerate(xy_pairs):
-                    #x = xy[0]
-                    #y = xy[1]
-                    #tmp_cphf_ov = dist_all_cphf_red[dof_red * f + idx].get_full_vector()
                     tmp_cphf_ov = self.cphf_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
-                    #cphf_ov[x, y] = dist_all_cphf_red[dof_red * f + idx].get_full_vector()
 
                     if self.rank == mpi_master():
                         x = xy[0]
@@ -1603,25 +1586,9 @@ class PolOrbitalResponse(CphfSolver):
 
                 # get the lambda multipliers
                 if self.use_subspace_solver:
-
-                #    cphf_ov = np.zeros((dof, dof, nocc * nvir))
-
-                #    for idx, xy in enumerate(xy_pairs):
-                #        x = xy[0]
-                #        y = xy[1]
-                #        cphf_ov[x, y] = dist_all_cphf_red[dof_red * f + idx].get_full_vector()
-
-                #        if (y != x):
-                #            cphf_ov[y, x] += cphf_ov[x, y]
-
                     cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
                 else:
-                #if not self.use_subspace_solver:
                     cphf_ov = all_cphf_ov[f]
-
-                # NOTE DEBUG
-                print('*** after cphf_ov')
-                self.ostream.flush()
 
                 # create response vectors in MO basis
                 exc_vec = (1.0 / self.sqrt2 *
@@ -1730,17 +1697,17 @@ class PolOrbitalResponse(CphfSolver):
                         if (n != m):
                             omega[n, m] = omega[m, n]
 
+                # TODO make distributed
                 omega = omega.reshape(dof * dof, nao, nao)
 
                 # save omega multipliers in cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
-                self.cphf_results[(w)]['lambda_mo'] = cphf_ov
                 self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
             valstr = '** Time spent on constructing omega multipliers '
-            valstr += 'for {} frequencies: '.format(n_freq)
+            valstr += 'for {} frequencies: '.format(len(self.frequencies))
             valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
@@ -1783,31 +1750,26 @@ class PolOrbitalResponse(CphfSolver):
             dof = len(self.vector_components)
             xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
-            #dof_red_cmplx = dof_red * 2
 
             # number of frequencies
             n_freqs = len(self.frequencies)
 
-            # get CPHF results
-            #if self.use_subspace_solver:
-            #    dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-            #    dist_dof_red = len(dist_all_cphf_red) // n_freqs
-            #else:
+            # get CPHF results from conj. gradient solver
             if not self.use_subspace_solver:
                 all_cphf_red = self.cphf_results['cphf_ov']
                 # map CPHF results to dof*dof dimensions
-                all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+                #all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+                # NOTE WIP
+                all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
         else:
             xy_pairs = None
             dof_red = None
-            #dof_red_cmplx = None
             dof = None
             nocc = None
             nvir = None
 
         xy_pairs = self.comm.bcast(xy_pairs, root=mpi_master())
         dof_red = self.comm.bcast(dof_red, root=mpi_master())
-        #dof_red_cmplx = self.comm.bcast(dof_red_cmplx, root=mpi_master())
         dof = self.comm.bcast(dof, root=mpi_master())
         nocc = self.comm.bcast(nocc , root=mpi_master())
         nvir = self.comm.bcast(nvir , root=mpi_master())
@@ -1821,10 +1783,6 @@ class PolOrbitalResponse(CphfSolver):
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
             ]
-
-            # NOTE DEBUG
-            print('*** before cphf_ov')
-            self.ostream.flush()
 
             if self.use_subspace_solver:
                 cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
@@ -1866,25 +1824,26 @@ class PolOrbitalResponse(CphfSolver):
                 dm_vv = self.cphf_results[w]['dm_vv']  # complex
 
                 # get response vectors from cphf_results
-                if self.use_subspace_solver:
-                #    cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+                #if self.use_subspace_solver:
+                #    cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+                #else:
+                if not self.use_subspace_solver:
+                    #cphf_ov = all_cphf_ov[f]
+                    cphf_ov_red = all_cphf_red[f]
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
 
-                #    for idx, xy in enumerate(xy_pairs):
-                #        x = xy[0]
-                #        y = xy[1]
-                #        tmp_cphf_re = dist_all_cphf_red[dist_dof_red * f + idx].get_full_vector()
-                #        tmp_cphf_im = dist_all_cphf_red[dist_dof_red * f + dof_red + idx].get_full_vector()
+                    tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
 
-                #        cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
+                    for idx, xy in enumerate(xy_pairs):
+                        x = xy[0]
+                        y = xy[1]
 
-                #        if (y != x):
-                #            cphf_ov[y, x] += cphf_ov[x, y]
+                        cphf_ov[x, y] = tmp_cphf_ov[idx]
 
-                    cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
-                else:
-                #if not self.use_subspace_solver:
-                    # get the lambda multipliers
-                    cphf_ov = all_cphf_ov[f]
+                        if (y != x):
+                            cphf_ov[y, x] += cphf_ov[x, y]
+
+                cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
                 # extract the excitation and de-excitation components
                 # from the full solution vector.
@@ -2031,9 +1990,8 @@ class PolOrbitalResponse(CphfSolver):
                 omega = omega.reshape(dof * dof, nao, nao)
 
                 # TODO purge dict
-                # save omega multipliers in cphf_results dictionary
+                # save omega multipliers in cphf_results dictionary as list of dist. arrays
                 self.cphf_results[(w)]['omega_ao'] = omega
-                self.cphf_results[(w)]['lambda_mo'] = cphf_ov
                 self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
         if self.rank == mpi_master():
