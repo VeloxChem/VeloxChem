@@ -263,36 +263,84 @@ class PolarizabilityGradient:
         # number of atomic orbitals
         nao = basis.get_dimensions_of_basis()
 
+        if self.rank == mpi_master():
+            mo = scf_tensors['C_alpha']  # only alpha part
+
+            # MO coefficients
+            nocc = molecule.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
         for f, w in enumerate(self.frequencies):
-            info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
-            self.ostream.print_info(info_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
+
+            # NOTE WIP
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
 
             if self.rank == mpi_master():
+
+                info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
+                self.ostream.print_info(info_msg)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx in range(len(full_vec)):
+                    full_vec[idx] *= -1.0
+
+                # extract the excitation and de-excitation components
+                # from the full solution vector.
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
+                           np.array(full_vec)[:, :nocc * nvir].reshape(
+                               dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 *
+                             np.array(full_vec)[:, nocc * nvir:].reshape(
+                                 dof, nocc, nvir))
+
+                # construct plus/minus combinations of excitation and
+                # de-excitation part
+                x_plus_y_mo = exc_vec + deexc_vec
+                x_minus_y_mo = exc_vec - deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                x_plus_y = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
+                    for x in range(dof)
+                ])
+                x_minus_y = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
+                    for x in range(dof)
+                ])
+
+                #x_plus_y = orbrsp_results['x_plus_y_ao']
+                #x_minus_y = orbrsp_results['x_minus_y_ao']
+
                 orbrsp_results = all_orbrsp_results[w]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
-                x_plus_y = orbrsp_results['x_plus_y_ao']
-                x_minus_y = orbrsp_results['x_minus_y_ao']
-
                 # Lagrange multipliers
+                # TODO read from dist. array when implemented
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
+                # TODO compute from orbsrsp cphf_ov dist. array
                 lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
 
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
             else:
-                orbrsp_results = None
+                #orbrsp_results = None
                 gs_dm = None
                 x_plus_y = None
                 x_minus_y = None
                 omega_ao = None
                 rel_dm_ao = None
 
-            orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
+            #orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
             gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
             x_plus_y = self.comm.bcast(x_plus_y, root=mpi_master())
             x_minus_y = self.comm.bcast(x_minus_y, root=mpi_master())
@@ -404,6 +452,8 @@ class PolarizabilityGradient:
                         pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
+
+                # TODO move get label to the function computing xc contrib.
                 xcfun_label = self.xcfun.get_func_label()
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
@@ -868,9 +918,69 @@ class PolarizabilityGradient:
                 # add to complex variable
                 eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
 
-        #eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
-
         return eri_deriv_contrib
+
+    def get_full_solution_vector(self, solution):
+        """ Gets a full solution vector from a general distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector
+        """
+
+        if self.is_complex:
+            return self.get_full_solution_vector_complex(solution)
+        else:
+            return self.get_full_solution_vector_real(solution)
+
+    @staticmethod
+    def get_full_solution_vector_complex(solution):
+        """
+        Gets a full complex solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The real and imaginary parts of the full solution vector.
+        """
+        x_realger = solution.get_full_vector(0)
+        x_realung = solution.get_full_vector(1)
+        x_imagung = solution.get_full_vector(2)
+        x_imagger = solution.get_full_vector(3)
+
+        if solution.rank == mpi_master():
+            x_real = np.hstack((x_realger, x_realger)) + np.hstack(
+                (x_realung, -x_realung))
+            x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
+                (x_imagger, x_imagger))
+            return x_real + 1j * x_imag
+        else:
+            return None
+
+    @staticmethod
+    def get_full_solution_vector_real(solution):
+        """
+        Gets a full solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector.
+        """
+
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
+
+        if solution.rank == mpi_master():
+            x_ger_full = np.hstack((x_ger, x_ger))
+            x_ung_full = np.hstack((x_ung, -x_ung))
+            return x_ger_full + x_ung_full
+        else:
+            return None
 
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
