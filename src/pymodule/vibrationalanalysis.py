@@ -127,6 +127,7 @@ class VibrationalAnalysis:
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
+
         if isinstance(drv, ScfRestrictedDriver):
             self.is_scf = True
             self.scf_driver = drv
@@ -135,6 +136,9 @@ class VibrationalAnalysis:
             self.is_xtb = True
             self.scf_driver = None
             self.hessian_driver = XtbHessianDriver(drv)
+        elif isinstance(drv, ScfUnrestrictedDriver):
+            raise NotImplementedError("""Vibrational analysis not implemented
+            for unrestricted SCF.""")
 
         self.hessian = None
         self.reduced_masses = None
