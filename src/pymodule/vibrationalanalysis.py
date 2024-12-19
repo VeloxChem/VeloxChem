@@ -951,6 +951,8 @@ class VibrationalAnalysis:
         for n, Q in enumerate(self.normed_normal_modes, 1):
             normal_mode_grp.create_dataset(str(n), 
                           data = np.array([Q]).reshape(natm, 3))
+
+        hf.create_dataset('hessian', data=self.hessian)
         hf.create_dataset('vib_frequencies',
                           data = np.array([self.vib_frequencies]))
         hf.create_dataset('force_constants',
