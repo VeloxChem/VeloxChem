@@ -43,8 +43,10 @@ class EvbSystemBuilder():
         self.temperature: float
         self.Lambda: list[float]
 
-        self.soft_core_ref = True
-        self.soft_core_run = False
+        self.soft_core_coulomb_ref = True
+        self.soft_core_coulomb_run = True
+        self.soft_core_lj_ref = True
+        self.soft_core_lj_run = False
 
         self.sc_alpha_lj: float = 0.85
         self.sc_alpha_q: float = 0.3
@@ -816,9 +818,9 @@ class EvbSystemBuilder():
         if not no_reactant:
 
             for lam in Lambda:
-                self._add_reaction_forces(self.systems[lam], lam, reference_state=False, soft_core=self.soft_core_run)
-            self._add_reaction_forces(self.systems["reactant"], 0, True, soft_core=self.soft_core_ref)
-            self._add_reaction_forces(self.systems["product"], 1, True, soft_core=self.soft_core_ref)
+                self._add_reaction_forces(self.systems[lam], lam, reference_state=False, lj_soft_core=self.soft_core_lj_run, coul_soft_core=self.soft_core_coulomb_run)
+            self._add_reaction_forces(self.systems["reactant"], 0, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
+            self._add_reaction_forces(self.systems["product"], 1, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
         #Give all forces a unique forcegroup so that they can be recalculated separately later on
         for system in self.systems.values():
             for i, force in enumerate(system.getForces()):
@@ -833,7 +835,7 @@ class EvbSystemBuilder():
         #     if "CNT" in force.getName():
         #         self.systems["product"].removeForce(i)
 
-    def _add_reaction_forces(self, system, lam, reference_state=False, soft_core=False) -> mm.System:
+    def _add_reaction_forces(self, system, lam, reference_state=False, lj_soft_core=False, coul_soft_core=False) -> mm.System:
         reference_state = reference_state
 
         # add morse_couple
@@ -843,7 +845,7 @@ class EvbSystemBuilder():
         forces = forces + self._create_angle_forces(lam)
         forces = forces + self._create_proper_torsion_forces(lam)
         forces = forces + self._create_improper_torsion_forces(lam)
-        forces = forces + self._create_nonbonded_forces(lam, soft_core)
+        forces = forces + self._create_nonbonded_forces(lam, lj_soft_core, coul_soft_core)
         forces = forces + self._create_constraint_forces(lam, reference_state)
 
         for i, force in enumerate(forces):
@@ -923,24 +925,24 @@ class EvbSystemBuilder():
                 else:
 
                     assert (False), "A bond can either be static, or dynamic, in  which case it can be broken or formed"
-                if scale > 0:
-                    # scale morse
-                    if "D" not in bond.keys():
-                        D = self.morse_D_default
-                        if self.verbose:
-                            print(
-                                f"INFO: no D value associated with bond {key[0]} {key[1]}. Setting to default value {self.morse_D_default}"
-                            )
-                    else:
-                        D = bond["D"]
-                    a = math.sqrt(bond["force_constant"] / (2 * D))
-                    re = bond["equilibrium"]
-                    morse_force.addBond(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        [scale * D, a, re],
-                    )
-                    # harm_bond_force.addBond(key[0],key[1],bond['equilibrium'],0.5*scale*bond['force_constant'])
+                # if scale > 0:
+                #     # scale morse
+                if "D" not in bond.keys():
+                    D = self.morse_D_default
+                    if self.verbose:
+                        print(
+                            f"INFO: no D value associated with bond {key[0]} {key[1]}. Setting to default value {self.morse_D_default}"
+                        )
+                else:
+                    D = bond["D"]
+                a = math.sqrt(bond["force_constant"] / (2 * D))
+                re = bond["equilibrium"]
+                morse_force.addBond(
+                    self._reaction_to_total_atomid(key[0]),
+                    self._reaction_to_total_atomid(key[1]),
+                    [scale * D, a, re],
+                )
+                    
 
                 if not reference_state:
                     k = self.restraint_k
@@ -1154,10 +1156,40 @@ class EvbSystemBuilder():
                         )
         return [fourier_force]
 
-    def _get_long_range_expression(self, lam, soft_core: bool):
+    def _get_couloumb_expression(self, soft_core: bool):
         soft_core_expression = (
-            " (1-l) * (LjtotA + CoultotA) "
-            "  + l  * (LjtotB + CoultotB); "
+            " (1-l) * CoultotA + l  * CoultotB; "
+            "CoultotA   = step(r-rqA) * CoulA + step(rqA-r) * CoullinA;"
+            "CoultotB   = step(r-rqB) * CoulB + step(rqB-r) * CoullinB;"
+            "CoullinA   = k * ( ( qqA / rqAdiv^3 ) * r^2 - 3 * ( qqA / rqAdiv^2 ) * r + 3 * ( qqA / rqAdiv ) );"
+            "CoullinB   = k * ( ( qqB / rqBdiv^3 ) * r^2 - 3 * ( qqB / rqBdiv^2 ) * r + 3 * ( qqB / rqBdiv ) );"
+            "rqAdiv     = select(rqA,rqA,1);"
+            "rqBdiv     = select(rqB,rqB,1);"
+            "rqA        = alphaq * ( 1 + sigmaq * qqA )  * 1 ^ pow;"
+            "rqB        = alphaq * ( 1 + sigmaq * qqB )  * 1 ^ pow;"
+            "CoulA      = k*qqA/r; "
+            "CoulB      = k*qqB/r; "
+            ""
+            f"k         = {self.k};"
+            ""
+            f"alphalj   = {self.sc_alpha_lj};"
+            f"alphaq    = {self.sc_alpha_q};"
+            f"sigmaq    = {self.sc_sigma_q};"
+            f"pow       = {self.sc_power};")
+
+        hard_core_expression = (
+            " (1-l) * k*qqA/r + l * k*qqB/r; "
+            ""
+            f"k         = {self.k};")
+            
+        if soft_core:
+            return soft_core_expression
+        else:
+            return hard_core_expression
+
+    def _get_lj_expression(self, soft_core: bool):
+        soft_core_expression = (
+            " (1-l) * LjtotA + l * LjtotB; "
             ""
             "LjtotA     = (step(r - rljA) * LjA + step(rljA - r) * LjlinA);"
             "LjtotB     = (step(r - rljB) * LjB + step(rljB - r) * LjlinB);"
@@ -1175,58 +1207,106 @@ class EvbSystemBuilder():
             "A6         = 4 * epsilonA * sigmaA ^ 6; "
             "B6         = 4 * epsilonB * sigmaB ^ 6; "
             ""
-            "CoultotA   = step(r-rqA) * CoulA + step(rqA-r) * CoullinA;"
-            "CoultotB   = step(r-rqB) * CoulB + step(rqB-r) * CoullinB;"
-            "CoullinA   = k * ( ( qqA / rqAdiv^3 ) * r^2 - 3 * ( qqA / rqAdiv^2 ) * r + 3 * ( qqA / rqAdiv ) );"
-            "CoullinB   = k * ( ( qqB / rqBdiv^3 ) * r^2 - 3 * ( qqB / rqBdiv^2 ) * r + 3 * ( qqB / rqBdiv ) );"
-            "rqAdiv     = select(rqA,rqA,1);"
-            "rqBdiv     = select(rqB,rqB,1);"
-            "rqA        = alphaq * ( 1 + sigmaq * qqA )  * 1 ^ pow;"
-            "rqB        = alphaq * ( 1 + sigmaq * qqB )  * 1 ^ pow;"
-            "CoulA      = k*qqA/r; "
-            "CoulB      = k*qqB/r; "
-            ""
-            f"k         = {self.k};"
-            f"l         = {lam};"
-            ""
             f"alphalj   = {self.sc_alpha_lj};"
             f"alphaq    = {self.sc_alpha_q};"
             f"sigmaq    = {self.sc_sigma_q};"
             f"pow       = {self.sc_power};")
 
-        hard_core_expression = (" (1-l) * (LjtotA + CoultotA) "
-                                "  + l  * (LjtotB + CoultotB); "
-                                ""
-                                "LjtotA     = A12 / r^12 - A6 / r^6;"
-                                "LjtotB     = B12 / r^12 - B6 / r^6;"
-                                "A12        = 4 * epsilonA * sigmaA ^ 12; "
-                                "B12        = 4 * epsilonB * sigmaB ^ 12; "
-                                "A6         = 4 * epsilonA * sigmaA ^ 6; "
-                                "B6         = 4 * epsilonB * sigmaB ^ 6; "
-                                ""
-                                "CoultotA   = k*qqA/r; "
-                                "CoultotB   = k*qqB/r; "
-                                ""
-                                f"k         = {self.k};"
-                                f"l         = {lam};")
+        hard_core_expression = (
+            " (1-l) * LjtotA "
+            "  + l  * LjtotB; "
+            ""
+            "LjtotA     = A12 / r^12 - A6 / r^6;"
+            "LjtotB     = B12 / r^12 - B6 / r^6;"
+            "A12        = 4 * epsilonA * sigmaA ^ 12; "
+            "B12        = 4 * epsilonB * sigmaB ^ 12; "
+            "A6         = 4 * epsilonA * sigmaA ^ 6; "
+            "B6         = 4 * epsilonB * sigmaB ^ 6; ")
 
         if soft_core:
             return soft_core_expression
         else:
             return hard_core_expression
 
-    def _create_nonbonded_forces(self, lam, soft_core=False) -> typing.List[mm.Force]:
-        nonbonded_force = mm.CustomBondForce(self._get_long_range_expression(lam, soft_core))
-        if soft_core:
-            nonbonded_force.setName("Reaction internal nonbonded soft-core")
+    # def _get_long_range_expression(self, soft_core: bool):
+    #     soft_core_expression = (
+    #         " (1-l) * (LjtotA + CoultotA) "
+    #         "  + l  * (LjtotB + CoultotB); "
+    #         ""
+    #         "LjtotA     = (step(r - rljA) * LjA + step(rljA - r) * LjlinA);"
+    #         "LjtotB     = (step(r - rljB) * LjB + step(rljB - r) * LjlinB);"
+    #         "LjlinA     = ( (78*A12) / (rljAdiv^14) - (21*A6) / (rljAdiv^8) )*r^2 - ( (168*A12) / (rljAdiv^13) - (48*A6) / (rljAdiv^7) )*r + ( (91*A12) / (rljAdiv^12) - (28*A6) / (rljAdiv^6) );"
+    #         "LjlinB     = ( (78*B12) / (rljBdiv^14) - (21*B6) / (rljBdiv^8) )*r^2 - ( (168*B12) / (rljBdiv^13) - (48*B6) / (rljBdiv^7) )*r + ( (91*B12) / (rljBdiv^12) - (28*B6) / (rljBdiv^6) );"
+    #         # if rljA = 0, returns 1, otherwise returns rljA. Prevents division by 0 while the step factor is already 0
+    #         "rljAdiv    = select(rljA,rljA,1);"
+    #         "rljBdiv    = select(rljB,rljB,1);"
+    #         "rljA       = alphalj * ( (26/7 ) * A6  * 1 ) ^ pow;"
+    #         "rljB       = alphalj * ( (26/7 ) * B6  * 1 ) ^ pow;"
+    #         "LjA        = A12 / r^12 - A6 / r^6;"
+    #         "LjB        = B12 / r^12 - B6 / r^6;"
+    #         "A12        = 4 * epsilonA * sigmaA ^ 12; "
+    #         "B12        = 4 * epsilonB * sigmaB ^ 12; "
+    #         "A6         = 4 * epsilonA * sigmaA ^ 6; "
+    #         "B6         = 4 * epsilonB * sigmaB ^ 6; "
+    #         ""
+    #         "CoultotA   = step(r-rqA) * CoulA + step(rqA-r) * CoullinA;"
+    #         "CoultotB   = step(r-rqB) * CoulB + step(rqB-r) * CoullinB;"
+    #         "CoullinA   = k * ( ( qqA / rqAdiv^3 ) * r^2 - 3 * ( qqA / rqAdiv^2 ) * r + 3 * ( qqA / rqAdiv ) );"
+    #         "CoullinB   = k * ( ( qqB / rqBdiv^3 ) * r^2 - 3 * ( qqB / rqBdiv^2 ) * r + 3 * ( qqB / rqBdiv ) );"
+    #         "rqAdiv     = select(rqA,rqA,1);"
+    #         "rqBdiv     = select(rqB,rqB,1);"
+    #         "rqA        = alphaq * ( 1 + sigmaq * qqA )  * 1 ^ pow;"
+    #         "rqB        = alphaq * ( 1 + sigmaq * qqB )  * 1 ^ pow;"
+    #         "CoulA      = k*qqA/r; "
+    #         "CoulB      = k*qqB/r; "
+    #         ""
+    #         f"k         = {self.k};"
+    #         ""
+    #         f"alphalj   = {self.sc_alpha_lj};"
+    #         f"alphaq    = {self.sc_alpha_q};"
+    #         f"sigmaq    = {self.sc_sigma_q};"
+    #         f"pow       = {self.sc_power};")
+
+    #     hard_core_expression = (" (1-l) * (LjtotA + CoultotA) "
+    #                             "  + l  * (LjtotB + CoultotB); "
+    #                             ""
+    #                             "LjtotA     = A12 / r^12 - A6 / r^6;"
+    #                             "LjtotB     = B12 / r^12 - B6 / r^6;"
+    #                             "A12        = 4 * epsilonA * sigmaA ^ 12; "
+    #                             "B12        = 4 * epsilonB * sigmaB ^ 12; "
+    #                             "A6         = 4 * epsilonA * sigmaA ^ 6; "
+    #                             "B6         = 4 * epsilonB * sigmaB ^ 6; "
+    #                             ""
+    #                             "CoultotA   = k*qqA/r; "
+    #                             "CoultotB   = k*qqB/r; "
+    #                             ""
+    #                             f"k         = {self.k};")
+
+    #     if soft_core:
+    #         return soft_core_expression
+    #     else:
+    #         return hard_core_expression
+
+    def _create_nonbonded_forces(self, lam, lj_soft_core = False,coul_soft_core=False) -> typing.List[mm.Force]:
+        coulomb_force = mm.CustomBondForce(self._get_couloumb_expression( coul_soft_core))
+        if coul_soft_core:
+            coulomb_force.setName("Reaction internal coulomb")
         else:
-            nonbonded_force.setName("Reaction internal nonbonded hard-core")
-        nonbonded_force.addPerBondParameter("sigmaA")
-        nonbonded_force.addPerBondParameter("sigmaB")
-        nonbonded_force.addPerBondParameter("epsilonA")
-        nonbonded_force.addPerBondParameter("epsilonB")
-        nonbonded_force.addPerBondParameter("qqA")
-        nonbonded_force.addPerBondParameter("qqB")
+            coulomb_force.setName("Reaction internal coulomb")
+        coulomb_force.addPerBondParameter("qqA")
+        coulomb_force.addPerBondParameter("qqB")
+        coulomb_force.addGlobalParameter("l", lam)
+
+        lj_force = mm.CustomBondForce(self._get_lj_expression(lj_soft_core))
+        if lj_soft_core:
+            lj_force.setName("Reaction internal lennard-jones soft-core")
+        else:
+            lj_force.setName("Reaction internal lennard-jones")
+        lj_force.addPerBondParameter("sigmaA")
+        lj_force.addPerBondParameter("sigmaB")
+        lj_force.addPerBondParameter("epsilonA")
+        lj_force.addPerBondParameter("epsilonB")
+        lj_force.addGlobalParameter("l", lam)
 
         reactant_exceptions = self._create_exceptions_from_bonds(self.reactant)
         product_exceptions = self._create_exceptions_from_bonds(self.product)
@@ -1238,46 +1318,24 @@ class EvbSystemBuilder():
                     key = (i, j)
                     # Remove any exception from the nonbondedforce
                     # and add it instead to the exception bond force
-                    if (key in reactant_exceptions.keys() and key in product_exceptions.keys()):
-                        epsilonA = reactant_exceptions[key]["epsilon"]
-                        epsilonB = product_exceptions[key]["epsilon"]
-                        sigmaA = reactant_exceptions[key]["sigma"]
-                        sigmaB = product_exceptions[key]["sigma"]
-                        qqA = reactant_exceptions[key]["qq"]
-                        qqB = product_exceptions[key]["qq"]
-                    elif key in reactant_exceptions.keys():
+                    if key in reactant_exceptions.keys() :
                         epsilonA = reactant_exceptions[key]["epsilon"]
                         sigmaA = reactant_exceptions[key]["sigma"]
                         qqA = reactant_exceptions[key]["qq"]
-
-                        atomB1 = self.product.atoms[key[0]]
-                        atomB2 = self.product.atoms[key[1]]
-
-                        epsilonB = math.sqrt(atomB1["epsilon"] * atomB2["epsilon"])
-                        sigmaB = 0.5 * (atomB1["sigma"] + atomB2["sigma"])
-                        qqB = atomB1["charge"] * atomB2["charge"]
-                    elif key in product_exceptions.keys():
+                    else:
                         atomA1 = self.reactant.atoms[key[0]]
                         atomA2 = self.reactant.atoms[key[1]]
-
                         epsilonA = math.sqrt(atomA1["epsilon"] * atomA2["epsilon"])
                         sigmaA = 0.5 * (atomA1["sigma"] + atomA2["sigma"])
                         qqA = atomA1["charge"] * atomA2["charge"]
 
+                    if key in product_exceptions.keys():
                         epsilonB = product_exceptions[key]["epsilon"]
                         sigmaB = product_exceptions[key]["sigma"]
                         qqB = product_exceptions[key]["qq"]
                     else:
-                        atomA1 = self.reactant.atoms[key[0]]
-                        atomA2 = self.reactant.atoms[key[1]]
-
-                        epsilonA = math.sqrt(atomA1["epsilon"] * atomA2["epsilon"])
-                        sigmaA = 0.5 * (atomA1["sigma"] + atomA2["sigma"])
-                        qqA = atomA1["charge"] * atomA2["charge"]
-
                         atomB1 = self.product.atoms[key[0]]
                         atomB2 = self.product.atoms[key[1]]
-
                         epsilonB = math.sqrt(atomB1["epsilon"] * atomB2["epsilon"])
                         sigmaB = 0.5 * (atomB1["sigma"] + atomB2["sigma"])
                         qqB = atomB1["charge"] * atomB2["charge"]
@@ -1286,14 +1344,20 @@ class EvbSystemBuilder():
                         sigmaA = sigmaB
                     elif sigmaB == 1.0:
                         sigmaB = sigmaA
-                    if not (qqA == 0.0 and qqB == 0.0 and epsilonA == 0.0 and epsilonB == 0.0):
-                        nonbonded_force.addBond(
+                    if not (qqA == 0.0 and qqB == 0.0):
+                        coulomb_force.addBond(
                             self._reaction_to_total_atomid(key[0]),
                             self._reaction_to_total_atomid(key[1]),
-                            [sigmaA, sigmaB, epsilonA, epsilonB, qqA, qqB],
+                            [qqA, qqB],
+                        )
+                    if not (epsilonA == 0.0 and epsilonB == 0.0):
+                        lj_force.addBond(
+                            self._reaction_to_total_atomid(key[0]),
+                            self._reaction_to_total_atomid(key[1]),
+                            [sigmaA, sigmaB, epsilonA, epsilonB],
                         )
 
-        return [nonbonded_force]
+        return [lj_force,coulomb_force]
 
     def _create_exceptions_from_bonds(self, molecule: ForceFieldGenerator) -> dict[tuple[int, int], dict[str, float]]:
         particles = molecule.atoms

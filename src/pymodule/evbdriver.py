@@ -55,12 +55,14 @@ class EvbDriver():
 
     def build_and_run_default_water_EVB(self, reactant: str, product: str | list[str], barrier, free_energy, ordered_input=False):
         
-        Lambda = list(np.linspace(0, 1, 51))
-        if self.debug:
-            Lambda = [0, 0.5, 1]
+        if not self.debug:
+            Lambda = list(np.linspace(0, 1, 51))
+        else:
+            Lambda = [0, 0.1,0.2,0.3,0.4,0.5, 0.6,0.7,0.8,0.9,1]
+            
         self.build_forcefields(reactant, product, ordered_input=ordered_input)
         self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
-        self.run_FEP(test_run=self.debug)
+        self.run_FEP()
         self.compute_energy_profiles(barrier, free_energy)
 
     def build_forcefields(
@@ -214,7 +216,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1.5,
+                "padding": 1.2,
                 "ion_count": 0,
             }
         elif name == "CNT":
@@ -315,24 +317,31 @@ class EvbDriver():
         step_size=0.001,
         equil_step_size=0.002,
         initial_equil_step_size=0.002,
-        test_run=False
     ):
                 
-        if test_run:
+        if self.debug:
             print("Running a test run")
+            # equil_steps = 100
+            # total_sample_steps = 1000
+            # write_step = 100
+            # initial_equil_steps = 100
+            # step_size = 0.001
+            # equil_step_size = 0.002
+            # initial_equil_step_size = 0.002
             equil_steps = 100
-            total_sample_steps = 1000
-            write_step = 100
+            total_sample_steps = 500
+            write_step = 1
             initial_equil_steps = 100
             step_size = 0.001
-            equil_step_size = 0.002
-            initial_equil_step_size = 0.002
+            equil_step_size = 0.001
+            initial_equil_step_size = 0.001
         
         #todo print out details of run
 
         for conf in self.system_confs:
             print(f"Running FEP for {conf['name']}")
             FEP = FepDriver()
+            # FEP.constrain_H = False
             FEP.run_FEP(
                 equilliberation_steps=equil_steps,
                 total_sample_steps=total_sample_steps,
@@ -349,7 +358,9 @@ class EvbDriver():
                 run_folder=conf["run_folder"],
                 data_folder=conf["data_folder"],
             )
-
+        if self.debug:
+            print("Debugging option enabled.Skipping recalculation.")
+        else:
             FEP.recalculate(interpolated_potential=True, force_contributions=True)
 
     def compute_energy_profiles(self, barrier, free_energy):
