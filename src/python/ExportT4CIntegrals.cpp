@@ -132,6 +132,7 @@ export_t4cintegrals(py::module& m)
                         [](py::tuple t) { return CT4CScreener(t[0].cast<std::vector<CBlockedGtoPairBlock>>()); }))
         .def("partition", &CT4CScreener::partition, "Partition basis funtion pairs blocks for given molecule and basis.")
         .def("partition_atom", &CT4CScreener::partition_atom, "Partition basis funtion pairs blocks for given molecule and basis.")
+        .def("partition_atom_pair", &CT4CScreener::partition_atom_pair, "Partition basis funtion pairs blocks for given molecule and basis.")
         .def("gto_pair_blocks", &CT4CScreener::gto_pair_blocks, "Gets vector of blocked basis function pairs blocks.")
         .def("__eq__", [](const CT4CScreener& self, const CT4CScreener& other) { return self == other; })
         .def("__ne__", [](const CT4CScreener& self, const CT4CScreener& other) { return self != other; })
@@ -202,7 +203,23 @@ export_t4cintegrals(py::module& m)
                const double                  omega) -> std::shared_ptr<CMatrices> {
                 return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
             },
-            "Computes hessian of Fock matrix of requested type for given molecule and basis.");
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.")
+        .def(
+            "compute",
+            [](const CFockGeomX000Driver<2>& self,
+               const CMolecularBasis&        basis,
+               const CT4CScreener&           screener_atom,
+               const CT4CScreener&           screener,
+               const CMatrix&                density,
+               const CMatrix&                density2,
+               const int                     iatom,
+               const std::string&            label,
+               const double                  exchange_factor,
+               const double                  omega,
+               const int                     ithreshold) -> std::vector<double> {
+                return self.compute(basis, screener_atom, screener, density, density2, iatom, label, exchange_factor, omega, ithreshold);
+            },
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.");
     
     // CFockGeom1100Driver class
     PyClass<CFockGeomXY00Driver<1,1>>(m, "FockGeom1100Driver")
@@ -220,7 +237,24 @@ export_t4cintegrals(py::module& m)
                const double                  omega) -> std::shared_ptr<CMatrices> {
                    return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega));
             },
-            "Computes gradient of Fock matrix of requested type for given molecule and basis.");
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.")
+        .def(
+            "compute",
+            [](const CFockGeomXY00Driver<1,1>& self,
+               const CMolecularBasis&          basis,
+               const CT4CScreener&             screener_atom_pair,
+               const CT4CScreener&             screener,
+               const CMatrix&                  density,
+               const CMatrix&                  density2,
+               const int                       iatom,
+               const int                       jatom,
+               const std::string&              label,
+               const double                    exchange_factor,
+               const double                    omega,
+               const int                       ithreshold) -> std::vector<double> {
+                return self.compute(basis, screener_atom_pair, screener, density, density2, iatom, jatom, label, exchange_factor, omega, ithreshold);
+            },
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.");
     
     // CFockGeom1010Driver class
     PyClass<CFockGeomX0Y0Driver<1,1>>(m, "FockGeom1010Driver")
@@ -238,7 +272,24 @@ export_t4cintegrals(py::module& m)
                const double                  omega) -> std::shared_ptr<CMatrices> {
                    return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega));
             },
-            "Computes gradient of Fock matrix of requested type for given molecule and basis.");
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.")
+        .def(
+            "compute",
+            [](const CFockGeomX0Y0Driver<1,1>& self,
+               const CMolecularBasis&          basis,
+               const CT4CScreener&             screener_atom_i,
+               const CT4CScreener&             screener_atom_j,
+               const CMatrix&                  density,
+               const CMatrix&                  density2,
+               const int                       iatom,
+               const int                       jatom,
+               const std::string&              label,
+               const double                    exchange_factor,
+               const double                    omega,
+               const int                       ithreshold) -> std::vector<double> {
+                return self.compute(basis, screener_atom_i, screener_atom_j, density, density2, iatom, jatom, label, exchange_factor, omega, ithreshold);
+            },
+            "Computes Hessian of Fock matrix of requested type for given molecule and basis.");
 }
 
 }  // namespace vlx_t4cintegrals

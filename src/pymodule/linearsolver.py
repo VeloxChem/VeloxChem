@@ -35,6 +35,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
+from .subcommunicators import SubCommunicators
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -177,6 +178,10 @@ class LinearSolver:
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
 
+        # serial ratio as in Amdahl's law for estimating parallel efficiency
+        self.serial_ratio = 0.05
+        self.use_subcomms = False
+
         # input keywords
         self._input_keywords = {
             'response': {
@@ -186,6 +191,8 @@ class LinearSolver:
                 'max_iter': ('int', 'maximum number of iterations'),
                 'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
+                'serial_ratio': ('float', 'serial ratio as in Amdahl\'s law'),
+                'use_subcomms': ('bool', 'use subcommunicators for Fock build'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -585,6 +592,400 @@ class LinearSolver:
                        dft_dict,
                        pe_dict,
                        profiler=None):
+
+        if self.use_subcomms:
+            self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
+                                         scf_tensors, eri_dict, dft_dict,
+                                         pe_dict, profiler)
+        else:
+            self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule, basis,
+                                            scf_tensors, eri_dict, dft_dict,
+                                            pe_dict, profiler)
+
+    def _e2n_half_size_subcomms(self,
+                                vecs_ger,
+                                vecs_ung,
+                                molecule,
+                                basis,
+                                scf_tensors,
+                                eri_dict,
+                                dft_dict,
+                                pe_dict,
+                                profiler=None):
+        """
+        Computes the E2 b matrix vector product.
+
+        :param vecs_ger:
+            The gerade trial vectors in half-size.
+        :param vecs_ung:
+            The ungerade trial vectors in half-size.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param profiler:
+            The profiler.
+
+        :return:
+            The gerade and ungerade E2 b matrix vector product in half-size.
+        """
+
+        n_ger = vecs_ger.shape(1)
+        n_ung = vecs_ung.shape(1)
+
+        n_general = min(n_ger, n_ung)
+        n_extra_ger = n_ger - n_general
+        n_extra_ung = n_ung - n_general
+
+        n_total = n_general + n_extra_ger + n_extra_ung
+
+        # prepare molecular orbitals
+
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
+                'LinearSolver._e2n_half_size: '
+                'invalid shape of trial vectors')
+
+            assert_msg_critical(
+                vecs_ger.shape(0) == vecs_ung.shape(0),
+                'LinearSolver._e2n_half_size: '
+                'inconsistent shape of trial vectors')
+
+            mo = scf_tensors['C_alpha']
+            fa = scf_tensors['F_alpha']
+
+            nocc = molecule.number_of_alpha_electrons()
+            norb = mo.shape[1]
+
+            if getattr(self, 'core_excitation', False):
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
+                    range(nocc, norb))
+                mo_core_exc = mo[:, core_exc_orb_inds]
+                fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            else:
+                fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
+
+        else:
+            mo = None
+            fa = None
+            nocc = None
+            norb = None
+            fa_mo = None
+
+        # determine subcomm size
+
+        if self.rank == mpi_master():
+            dt_and_subcomm_size = []
+
+            for subcomm_size in range(1, self.nodes + 1):
+                if self.nodes % subcomm_size != 0:
+                    continue
+
+                n_subcomms = self.nodes // subcomm_size
+
+                ave, res = divmod(n_total, n_subcomms)
+                counts = [
+                    ave + 1 if p < res else ave for p in range(n_subcomms)
+                ]
+
+                time_per_fock = self.serial_ratio + (
+                    1 - self.serial_ratio) / subcomm_size
+                dt = max(counts) * time_per_fock
+
+                dt_and_subcomm_size.append((dt, subcomm_size))
+
+            # find subcomm_size with smallest dt
+            dt_and_subcomm_size.sort()
+            subcomm_size = dt_and_subcomm_size[0][1]
+        else:
+            subcomm_size = None
+        subcomm_size = self.comm.bcast(subcomm_size, root=mpi_master())
+
+        # create subcomms
+
+        grps = [p // subcomm_size for p in range(self.nodes)]
+        subcomm = SubCommunicators(self.comm, grps)
+        local_comm = subcomm.local_comm
+        cross_comm = subcomm.cross_comm
+
+        is_local_master = (local_comm.Get_rank() == mpi_master())
+
+        # make data available on local master processes
+        # and determine subcomm indices
+
+        subcomm_index = None
+        local_master_ranks = None
+
+        if is_local_master:
+            mo = cross_comm.bcast(mo, root=mpi_master())
+            fa = cross_comm.bcast(fa, root=mpi_master())
+            nocc = cross_comm.bcast(nocc, root=mpi_master())
+            norb = cross_comm.bcast(norb, root=mpi_master())
+            fa_mo = cross_comm.bcast(fa_mo, root=mpi_master())
+
+            subcomm_index = cross_comm.Get_rank()
+            local_master_ranks = cross_comm.allgather(self.rank)
+
+        subcomm_index = local_comm.bcast(subcomm_index, root=mpi_master())
+        local_master_ranks = local_comm.bcast(local_master_ranks,
+                                              root=mpi_master())
+
+        # batch_size corresponds to the number of subcomms
+        batch_size = self.nodes // subcomm_size
+
+        num_batches = n_total // batch_size
+        if n_total % batch_size != 0:
+            num_batches += 1
+
+        # go through batches
+
+        if self.rank == mpi_master():
+            batch_str = f'Processing {n_total} Fock builds'
+            if batch_size > 1:
+                batch_str += f' on {batch_size} subcommunicators'
+            batch_str += '...'
+            self.ostream.print_info(batch_str)
+            self.ostream.flush()
+
+        if self._debug:
+            self.ostream.print_info(
+                '==DEBUG== batch_size: {}'.format(batch_size))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        for batch_ind in range(num_batches):
+
+            if self._debug:
+                self.ostream.print_info('==DEBUG== batch {}/{}'.format(
+                    batch_ind + 1, num_batches))
+                self.ostream.flush()
+
+            # form density matrices
+
+            batch_start = batch_size * batch_ind
+            batch_end = min(batch_start + batch_size, n_total)
+
+            if is_local_master:
+                dks = []
+                kns = []
+
+            vec_list = [None for idx in range(len(local_master_ranks))]
+
+            e2_ger, e2_ung = None, None
+            fock_ger, fock_ung = None, None
+
+            for idx, local_master_rank in enumerate(local_master_ranks):
+
+                if idx + batch_start >= batch_end:
+                    break
+
+                col = idx + batch_start
+
+                # determine vec_type
+
+                if col < n_general:
+                    vec_type = 'general'
+                elif n_extra_ger > 0:
+                    vec_type = 'gerade'
+                elif n_extra_ung > 0:
+                    vec_type = 'ungerade'
+
+                # form full-size vec
+
+                if vec_type == 'general':
+                    v_ger = vecs_ger.get_full_vector(col,
+                                                     root=local_master_rank)
+                    v_ung = vecs_ung.get_full_vector(col,
+                                                     root=local_master_rank)
+                    if self.rank == local_master_rank:
+                        # full-size gerade trial vector
+                        vec_list[idx] = np.hstack((v_ger, v_ger))
+                        vec_list[idx] += np.hstack((v_ung, -v_ung))
+
+                elif vec_type == 'gerade':
+                    v_ger = vecs_ger.get_full_vector(col,
+                                                     root=local_master_rank)
+                    if self.rank == local_master_rank:
+                        # full-size gerade trial vector
+                        vec_list[idx] = np.hstack((v_ger, v_ger))
+
+                elif vec_type == 'ungerade':
+                    v_ung = vecs_ung.get_full_vector(col,
+                                                     root=local_master_rank)
+                    if self.rank == local_master_rank:
+                        # full-size ungerade trial vector
+                        vec_list[idx] = np.hstack((v_ung, -v_ung))
+
+            self.comm.barrier()
+
+            if subcomm_index + batch_start < batch_end:
+
+                local_master_rank = local_master_ranks[subcomm_index]
+
+                if is_local_master:
+                    vec = vec_list[subcomm_index]
+
+                    half_size = vec.shape[0] // 2
+
+                    # build density
+
+                    if getattr(self, 'core_excitation', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals)
+                        core_exc_orb_inds = list(range(
+                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_exc, dak, mo_core_exc.T])
+                    else:
+                        kn = self.lrvec2mat(vec, nocc, norb)
+                        dak = self.commut_mo_density(kn, nocc)
+                        dak = np.linalg.multi_dot([mo, dak, mo.T])
+
+                    dks.append(dak)
+                    kns.append(kn)
+                else:
+                    dks = None
+
+                # form Fock matrices
+
+                self._print_mem_debug_info('before Fock build')
+
+                fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
+                                          dft_dict, pe_dict, profiler,
+                                          local_comm)
+
+                self._print_mem_debug_info('after  Fock build')
+
+                if is_local_master:
+                    raw_fock_ger = []
+                    raw_fock_ung = []
+
+                    raw_kns_ger = []
+                    raw_kns_ung = []
+
+                    col = subcomm_index + batch_start
+
+                    if col < n_general:
+                        raw_fock_ger.append(0.5 * (fock[0] - fock[0].T))
+                        raw_fock_ung.append(0.5 * (fock[0] + fock[0].T))
+                        raw_kns_ger.append(0.5 * (kns[0] + kns[0].T))
+                        raw_kns_ung.append(0.5 * (kns[0] - kns[0].T))
+
+                    elif n_extra_ger > 0:
+                        raw_fock_ger.append(0.5 * (fock[0] - fock[0].T))
+                        raw_kns_ger.append(0.5 * (kns[0] + kns[0].T))
+
+                    elif n_extra_ung > 0:
+                        raw_fock_ung.append(0.5 * (fock[0] + fock[0].T))
+                        raw_kns_ung.append(0.5 * (kns[0] - kns[0].T))
+
+                    fock = raw_fock_ger + raw_fock_ung
+                    kns = raw_kns_ger + raw_kns_ung
+
+                    batch_ger = len(raw_fock_ger)
+                    batch_ung = len(raw_fock_ung)
+
+                if is_local_master:
+
+                    e2_ger = np.zeros((half_size, batch_ger))
+                    e2_ung = np.zeros((half_size, batch_ung))
+
+                    if self.nonlinear:
+                        fock_ger = np.zeros((norb**2, batch_ger))
+                        fock_ung = np.zeros((norb**2, batch_ung))
+
+                    for ifock in range(batch_ger + batch_ung):
+                        fak = fock[ifock]
+
+                        if getattr(self, 'core_excitation', False):
+                            core_exc_orb_inds = list(
+                                range(self.num_core_orbitals)) + list(
+                                    range(nocc, norb))
+                            mo_core_exc = mo[:, core_exc_orb_inds]
+                            fak_mo = np.linalg.multi_dot(
+                                [mo_core_exc.T, fak, mo_core_exc])
+                        else:
+                            fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+
+                        kfa_mo = self.commut(fa_mo.T, kns[ifock])
+
+                        fat_mo = fak_mo + kfa_mo
+
+                        if getattr(self, 'core_excitation', False):
+                            gmo = -self.commut_mo_density(
+                                fat_mo, nocc, self.num_core_orbitals)
+                            gmo_vec_halfsize = self.lrmat2vec(
+                                gmo, nocc, norb,
+                                self.num_core_orbitals)[:half_size]
+                        else:
+                            gmo = -self.commut_mo_density(fat_mo, nocc)
+                            gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
+                                                              norb)[:half_size]
+
+                        # Note: fak_mo_vec uses full MO coefficients matrix since
+                        # it is only for fock_ger/fock_ung in nonlinear response
+                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
+                                                          mo]).reshape(norb**2)
+
+                        if ifock < batch_ger:
+                            e2_ger[:, ifock] = -gmo_vec_halfsize
+                            if self.nonlinear:
+                                fock_ger[:, ifock] = fak_mo_vec
+                        else:
+                            e2_ung[:, ifock - batch_ger] = -gmo_vec_halfsize
+                            if self.nonlinear:
+                                fock_ung[:, ifock - batch_ger] = fak_mo_vec
+
+            self.comm.barrier()
+
+            for idx, local_master_rank in enumerate(local_master_ranks):
+
+                if idx + batch_start >= batch_end:
+                    break
+
+                vecs_e2_ger = DistributedArray(e2_ger,
+                                               self.comm,
+                                               root=local_master_rank)
+                vecs_e2_ung = DistributedArray(e2_ung,
+                                               self.comm,
+                                               root=local_master_rank)
+                self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+
+                if self.nonlinear:
+                    dist_fock_ger = DistributedArray(fock_ger,
+                                                     self.comm,
+                                                     root=local_master_rank)
+                    dist_fock_ung = DistributedArray(fock_ung,
+                                                     self.comm,
+                                                     root=local_master_rank)
+                    self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
+
+        self._append_trial_vectors(vecs_ger, vecs_ung)
+
+        self.ostream.print_blank()
+
+    def _e2n_half_size_single_comm(self,
+                                   vecs_ger,
+                                   vecs_ung,
+                                   molecule,
+                                   basis,
+                                   scf_tensors,
+                                   eri_dict,
+                                   dft_dict,
+                                   pe_dict,
+                                   profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -858,7 +1259,8 @@ class LinearSolver:
                       eri_dict,
                       dft_dict,
                       pe_dict,
-                      profiler=None):
+                      profiler=None,
+                      comm=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -881,28 +1283,37 @@ class LinearSolver:
             The Fock matrix (2e part).
         """
 
+        if comm is None:
+            comm = self.comm
+            redistribute_xc_molgrid = False
+        else:
+            # use subcommunicators
+            redistribute_xc_molgrid = True
+
+        comm_rank = comm.Get_rank()
+
         screening = eri_dict['screening']
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        if self.rank == mpi_master():
+        if comm_rank == mpi_master():
             num_densities = len(dens)
         else:
             num_densities = None
-        num_densities = self.comm.bcast(num_densities, root=mpi_master())
+        num_densities = comm.bcast(num_densities, root=mpi_master())
 
-        if self.rank != mpi_master():
+        if comm_rank != mpi_master():
             dens = [None for idx in range(num_densities)]
 
         for idx in range(num_densities):
-            dens[idx] = self.comm.bcast(dens[idx], root=mpi_master())
+            dens[idx] = comm.bcast(dens[idx], root=mpi_master())
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
         t0 = tm.time()
 
-        fock_drv = FockDriver(self.comm)
+        fock_drv = FockDriver(comm)
         fock_drv._set_block_size_factor(self._block_size_factor)
 
         # determine fock_type and exchange_scaling_factor
@@ -963,6 +1374,11 @@ class LinearSolver:
 
         if self._dft:
             t0 = tm.time()
+
+            if redistribute_xc_molgrid:
+                molgrid.re_distribute_counts_and_displacements(
+                    comm.Get_rank(), comm.Get_size())
+
             xc_drv = XCIntegrator()
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
                                       gs_density, molgrid, self.xcfun)
@@ -977,17 +1393,16 @@ class LinearSolver:
                 dm = dens[idx] * 2.0
                 V_emb = self._embedding_drv.compute_pe_contributions(
                     density_matrix=dm)
-                if self.rank == mpi_master():
+                if comm_rank == mpi_master():
                     fock_arrays[idx] += V_emb
 
             if profiler is not None:
                 profiler.add_timing_info('FockPE', tm.time() - t0)
 
         for idx in range(len(fock_arrays)):
-            fock_arrays[idx] = self.comm.reduce(fock_arrays[idx],
-                                                root=mpi_master())
+            fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
 
-        if self.rank == mpi_master():
+        if comm_rank == mpi_master():
             return fock_arrays
         else:
             return None

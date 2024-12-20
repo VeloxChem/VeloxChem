@@ -79,6 +79,13 @@ class OptimizationEngine(geometric.engine.Engine):
 
         self._debug = False
 
+    def lower(self):
+        """
+        Required in order to get MECI optimization working in geomeTRIC
+        """
+
+        return 'custom engine'
+
     def calc_new(self, coords, dirname):
         """
         Implements calc_new method for the engine.

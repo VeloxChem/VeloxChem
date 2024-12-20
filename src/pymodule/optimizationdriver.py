@@ -105,6 +105,7 @@ class OptimizationDriver:
         self.coordsys = 'tric'
         self.constraints = None
         self.check_interval = 0
+        self.trust = 0.1
         self.max_iter = 300
 
         self.conv_energy = None
@@ -132,6 +133,7 @@ class OptimizationDriver:
                 'constraints': ('list', 'constraints'),
                 'check_interval':
                     ('int', 'interval for checking coordinate system'),
+                'trust': ('float', 'trust radius to begin with'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
                 'hessian': ('str_lower', 'hessian flag'),
@@ -275,6 +277,7 @@ class OptimizationDriver:
                     customengine=opt_engine,
                     coordsys=self.coordsys,
                     check=self.check_interval,
+                    trust=self.trust,
                     maxiter=self.max_iter,
                     converge=self.conv_flags(),
                     constraints=constr_filename,
