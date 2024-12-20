@@ -7,6 +7,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .respchargesdriver import RespChargesDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
@@ -101,6 +102,7 @@ class EvbForceFieldBuilder():
         if os.path.exists(f"./{self.input_folder}/{filename}_xtb_opt.xyz"):
             print(f"Loading optimised geometry from ./{self.input_folder}/{filename}_xtb_opt.xyz")
             molecule = Molecule.read_xyz_file(f"./{self.input_folder}/{filename}_xtb_opt.xyz")
+            optimise = False
         else:
             print(f"Loading (possibly unoptimised) geometry from ./{self.input_folder}/{filename}.xyz")
             molecule = Molecule.read_xyz_file(f"{self.input_folder}/{filename}.xyz")
@@ -119,6 +121,7 @@ class EvbForceFieldBuilder():
             forcefield.molecule = molecule
         else:
             print(f"Could not find force field data file ./{self.input_folder}/{filename}_ff_data.json.")
+            print(f"Optimise: {optimise}")
             if optimise:
                 print("Optimising the geometry with xtb.")
                 scf_drv = XtbDriver()
@@ -134,13 +137,11 @@ class EvbForceFieldBuilder():
 
             #Load or calculate the charges
 
-            charges_found = False
             if os.path.exists(f"./{self.input_folder}/{filename}_charges.txt"):
                 forcefield.partial_charges = self._load_charges(filename)
                 print(
                     f"Loading charges from ./{self.input_folder}/{filename}_charges.txt file, total charge = {sum(forcefield.partial_charges)}"
                 )
-                charges_found = True
                 print("Creating topology")
                 forcefield.create_topology(molecule)
             else:
@@ -151,7 +152,6 @@ class EvbForceFieldBuilder():
                     )
                 else:
                     basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
-
                 scf_drv = ScfUnrestrictedDriver()
                 scf_results = scf_drv.compute(molecule, basis)
                 if not scf_drv.is_converged:
@@ -160,6 +160,15 @@ class EvbForceFieldBuilder():
                     scf_results = scf_drv.compute(molecule, basis)
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges on compound {filename} did not converge, aborting"
 
+                resp_drv = RespChargesDriver()
+                print("Calculating RESP charges")
+                forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
+
+                print(f"Saving calculated RESP charges to ./{self.input_folder}/{filename}_charges.txt")
+                self._save_charges(
+                    forcefield.partial_charges,  # type: ignore
+                    filename,
+                )
                 print("Creating topology")
                 forcefield.create_topology(molecule, basis, scf_result=scf_results)
 
@@ -179,14 +188,7 @@ class EvbForceFieldBuilder():
                     atom['type'] = 'ho'
                     atom['sigma'] = sigma
                     atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water"
-
-            if not charges_found:
-                print("Saving calculated RESP charges to disk")
-                self._save_charges(
-                    forcefield.partial_charges,  # type: ignore
-                    filename,
-                )
+                    atom['comment'] = "Reaction-water"         
 
             #Reparameterise the forcefield if necessary and requested
             if reparameterise:

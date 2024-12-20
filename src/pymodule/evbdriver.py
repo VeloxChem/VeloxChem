@@ -60,7 +60,7 @@ class EvbDriver():
         else:
             Lambda = [0, 0.1,0.2,0.3,0.4,0.5, 0.6,0.7,0.8,0.9,1]
             
-        self.build_forcefields(reactant, product, ordered_input=ordered_input)
+        self.build_forcefields(reactant, product, ordered_input=ordered_input,optimise=True)
         self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
         self.run_FEP()
         self.compute_energy_profiles(barrier, free_energy)

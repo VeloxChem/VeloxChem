@@ -821,9 +821,6 @@ class EvbSystemBuilder():
                 self._add_reaction_forces(self.systems[lam], lam, reference_state=False, lj_soft_core=self.soft_core_lj_run, coul_soft_core=self.soft_core_coulomb_run)
             self._add_reaction_forces(self.systems["reactant"], 0, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
             self._add_reaction_forces(self.systems["product"], 1, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
-                self._add_reaction_forces(self.systems[lam], lam, reference_state=False, lj_soft_core=self.soft_core_lj_run, coul_soft_core=self.soft_core_coulomb_run)
-            self._add_reaction_forces(self.systems["reactant"], 0, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
-            self._add_reaction_forces(self.systems["product"], 1, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
         #Give all forces a unique forcegroup so that they can be recalculated separately later on
         for system in self.systems.values():
             for i, force in enumerate(system.getForces()):
@@ -839,7 +836,6 @@ class EvbSystemBuilder():
         #         self.systems["product"].removeForce(i)
 
     def _add_reaction_forces(self, system, lam, reference_state=False, lj_soft_core=False, coul_soft_core=False) -> mm.System:
-    def _add_reaction_forces(self, system, lam, reference_state=False, lj_soft_core=False, coul_soft_core=False) -> mm.System:
         reference_state = reference_state
 
         # add morse_couple
@@ -849,7 +845,6 @@ class EvbSystemBuilder():
         forces = forces + self._create_angle_forces(lam)
         forces = forces + self._create_proper_torsion_forces(lam)
         forces = forces + self._create_improper_torsion_forces(lam)
-        forces = forces + self._create_nonbonded_forces(lam, lj_soft_core, coul_soft_core)
         forces = forces + self._create_nonbonded_forces(lam, lj_soft_core, coul_soft_core)
         forces = forces + self._create_constraint_forces(lam, reference_state)
 
@@ -1180,7 +1175,6 @@ class EvbSystemBuilder():
         return [fourier_force]
 
     def _get_couloumb_expression(self, soft_core: bool):
-    def _get_couloumb_expression(self, soft_core: bool):
         soft_core_expression = (
             " (1-l) * CoultotA + l  * CoultotB; "
             "CoultotA   = step(r-rqA) * CoulA + step(rqA-r) * CoullinA;"
@@ -1314,21 +1308,8 @@ class EvbSystemBuilder():
         lj_force.addPerBondParameter("epsilonA")
         lj_force.addPerBondParameter("epsilonB")
         lj_force.addGlobalParameter("l", lam)
-            coulomb_force.setName("Reaction internal coulomb")
-        coulomb_force.addPerBondParameter("qqA")
-        coulomb_force.addPerBondParameter("qqB")
-        coulomb_force.addGlobalParameter("l", lam)
 
-        lj_force = mm.CustomBondForce(self._get_lj_expression(lj_soft_core))
-        if lj_soft_core:
-            lj_force.setName("Reaction internal lennard-jones soft-core")
-        else:
-            lj_force.setName("Reaction internal lennard-jones")
-        lj_force.addPerBondParameter("sigmaA")
-        lj_force.addPerBondParameter("sigmaB")
-        lj_force.addPerBondParameter("epsilonA")
-        lj_force.addPerBondParameter("epsilonB")
-        lj_force.addGlobalParameter("l", lam)
+        
 
         reactant_exceptions = self._create_exceptions_from_bonds(self.reactant)
         product_exceptions = self._create_exceptions_from_bonds(self.product)
@@ -1341,11 +1322,10 @@ class EvbSystemBuilder():
                     # Remove any exception from the nonbondedforce
                     # and add it instead to the exception bond force
                     if key in reactant_exceptions.keys() :
-                    if key in reactant_exceptions.keys() :
                         epsilonA = reactant_exceptions[key]["epsilon"]
                         sigmaA = reactant_exceptions[key]["sigma"]
                         qqA = reactant_exceptions[key]["qq"]
-                    else:
+                    
                     else:
                         atomA1 = self.reactant.atoms[key[0]]
                         atomA2 = self.reactant.atoms[key[1]]
@@ -1353,7 +1333,6 @@ class EvbSystemBuilder():
                         sigmaA = 0.5 * (atomA1["sigma"] + atomA2["sigma"])
                         qqA = atomA1["charge"] * atomA2["charge"]
 
-                    if key in product_exceptions.keys():
                     if key in product_exceptions.keys():
                         epsilonB = product_exceptions[key]["epsilon"]
                         sigmaB = product_exceptions[key]["sigma"]
@@ -1371,17 +1350,8 @@ class EvbSystemBuilder():
                         sigmaB = sigmaA
                     if not (qqA == 0.0 and qqB == 0.0):
                         coulomb_force.addBond(
-                    if not (qqA == 0.0 and qqB == 0.0):
-                        coulomb_force.addBond(
                             self._reaction_to_total_atomid(key[0]),
                             self._reaction_to_total_atomid(key[1]),
-                            [qqA, qqB],
-                        )
-                    if not (epsilonA == 0.0 and epsilonB == 0.0):
-                        lj_force.addBond(
-                            self._reaction_to_total_atomid(key[0]),
-                            self._reaction_to_total_atomid(key[1]),
-                            [sigmaA, sigmaB, epsilonA, epsilonB],
                             [qqA, qqB],
                         )
                     if not (epsilonA == 0.0 and epsilonB == 0.0):
@@ -1391,7 +1361,6 @@ class EvbSystemBuilder():
                             [sigmaA, sigmaB, epsilonA, epsilonB],
                         )
 
-        return [lj_force,coulomb_force]
         return [lj_force,coulomb_force]
 
     def _create_exceptions_from_bonds(self, molecule: ForceFieldGenerator) -> dict[tuple[int, int], dict[str, float]]:
