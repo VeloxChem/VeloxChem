@@ -91,6 +91,7 @@ from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .mp2driver import Mp2Driver
 from .cubicgrid import CubicGrid
