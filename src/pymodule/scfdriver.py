@@ -132,7 +132,7 @@ class ScfDriver:
         self.max_iter = 50
         self._first_step = False
 
-        # psuedo fractional occupation number (pFON)
+        # pseudo fractional occupation number (pFON)
         # J. Chem. Phys. 110, 695-700 (1999)
         self.pfon = False
         self.pfon_temperature = 1250
@@ -140,6 +140,8 @@ class ScfDriver:
         self.pfon_nocc = 5
         self.pfon_nvir = 5
 
+        # level-shifting
+        # Int. J. Quantum Chem. 7, 699-705 (1973).
         self.level_shifting = 0.0
         self.level_shifting_delta = 0.01
 
@@ -257,7 +259,8 @@ class ScfDriver:
                 'pfon': ('bool', 'use pFON to accelerate convergence'),
                 'pfon_temperature': ('float', 'pFON temperature'),
                 'pfon_delta_temperature': ('float', 'pFON delta temperature'),
-                'pfon_nocc': ('int', 'number of occupied orbitals used in pFON'),
+                'pfon_nocc':
+                    ('int', 'number of occupied orbitals used in pFON'),
                 'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
                 'level_shifting': ('float', 'level shifting parameter'),
                 'level_shifting_delta': ('float', 'level shifting delta'),
@@ -1318,16 +1321,19 @@ class ScfDriver:
 
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
-            if self.rank == mpi_master() and i > 0 and self.level_shifting > 0.0:
+            if (self.rank == mpi_master() and i > 0 and
+                    self.level_shifting > 0.0):
 
-                self.ostream.print_info(f'Applying level-shifting ({self.level_shifting:.2f}au)')
+                self.ostream.print_info(
+                    f'Applying level-shifting ({self.level_shifting:.2f}au)')
 
                 C_alpha = self.molecular_orbitals.alpha_to_numpy()
                 nocc_a = molecule.number_of_alpha_electrons()
                 fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
                 for idx in range(nocc_a, fmo_a.shape[0]):
                     fmo_a[idx, idx] += self.level_shifting
-                fock_mat[0] = np.linalg.multi_dot([S, C_alpha, fmo_a, C_alpha.T, S])
+                fock_mat[0] = np.linalg.multi_dot(
+                    [S, C_alpha, fmo_a, C_alpha.T, S])
 
                 if self.scf_type != 'restricted':
 
@@ -1336,7 +1342,8 @@ class ScfDriver:
                     fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
                     for idx in range(nocc_b, fmo_b.shape[0]):
                         fmo_b[idx, idx] += self.level_shifting
-                    fock_mat[1] = np.linalg.multi_dot([S, C_beta, fmo_b, C_beta.T, S])
+                    fock_mat[1] = np.linalg.multi_dot(
+                        [S, C_beta, fmo_b, C_beta.T, S])
 
                 self.level_shifting -= self.level_shifting_delta
                 if self.level_shifting < 0.0:
@@ -1368,7 +1375,7 @@ class ScfDriver:
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
 
-            #if e_grad < 100.0 * self.conv_thresh:
+            # threshold for deactivating pseudo-FON and level-shifting
             if e_grad < 1.0e-4:
                 if self.pfon:
                     self.pfon_temperature = 0

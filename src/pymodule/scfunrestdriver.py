@@ -269,7 +269,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
             if self.pfon and (self.pfon_temperature > 0):
 
-                self.ostream.print_info(f'Applying pseudo-FON (T={self.pfon_temperature:.0f}K)')
+                self.ostream.print_info(
+                    f'Applying pseudo-FON (T={self.pfon_temperature:.0f}K)')
 
                 kT = boltzmann_in_hartreeperkelvin() * self.pfon_temperature
                 inv_kT = 1.0 / kT
@@ -282,7 +283,8 @@ class ScfUnrestrictedDriver(ScfDriver):
                 sum_pfon_a = 0.0
                 for idx in range(idx_start_a, idx_end_a):
                     try:
-                        exp_ene_kT = math.exp((eigs_a[idx] - e_fermi_a) * inv_kT)
+                        exp_ene_kT = math.exp(
+                            (eigs_a[idx] - e_fermi_a) * inv_kT)
                     except OverflowError:
                         exp_ene_kT = float('inf')
                     pfon_a[idx] = 1.0 / (1.0 + exp_ene_kT)
@@ -300,7 +302,8 @@ class ScfUnrestrictedDriver(ScfDriver):
                 sum_pfon_b = 0.0
                 for idx in range(idx_start_b, idx_end_b):
                     try:
-                        exp_ene_kT = math.exp((eigs_b[idx] - e_fermi_b) * inv_kT)
+                        exp_ene_kT = math.exp(
+                            (eigs_b[idx] - e_fermi_b) * inv_kT)
                     except OverflowError:
                         exp_ene_kT = float('inf')
                     pfon_b[idx] = 1.0 / (1.0 + exp_ene_kT)
