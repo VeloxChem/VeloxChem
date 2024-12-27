@@ -267,7 +267,9 @@ class ScfUnrestrictedDriver(ScfDriver):
             occa = molecule.get_aufbau_alpha_occupation(eigs_a.size)
             occb = molecule.get_aufbau_beta_occupation(eigs_b.size)
 
-            if self.pfon_temperature > 0:
+            if self.pfon and (self.pfon_temperature > 0):
+
+                self.ostream.print_info(f'Applying pseudo-FON (T={self.pfon_temperature:.0f}K)')
 
                 kT = boltzmann_in_hartreeperkelvin() * self.pfon_temperature
                 inv_kT = 1.0 / kT
