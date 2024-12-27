@@ -132,6 +132,13 @@ class ScfDriver:
         self.max_iter = 50
         self._first_step = False
 
+        # psuedo fractional occupation number (pFON)
+        # J. Chem. Phys. 110, 695-700 (1999)
+        self.pfon = False
+        self.pfon_temperature = 1250
+        self.pfon_nocc = 5
+        self.pfon_nvir = 5
+
         # thresholds
         self.conv_thresh = 1.0e-6
         self.ovl_thresh = 1.0e-6
@@ -243,6 +250,10 @@ class ScfDriver:
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
                 'max_err_vecs': ('int', 'maximum number of DIIS error vectors'),
+                'pfon': ('bool', 'use pFON to accelerate convergence'),
+                'pfon_temperature': ('float', 'pFON temperature'),
+                'pfon_nocc': ('int', 'number of occupied orbitals used in pFON'),
+                'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
@@ -1326,6 +1337,9 @@ class ScfDriver:
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
 
+            if self.pfon and (e_grad < 100.0 * self.conv_thresh):
+                self.pfon_temperature = 0
+
             # compute density change and energy change
 
             diff_den = self._comp_density_change(den_mat, self._density)
@@ -1380,6 +1394,11 @@ class ScfDriver:
 
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
+
+            if self.pfon:
+                self.pfon_temperature -= 50
+                if self.pfon_temperature < 0:
+                    self.pfon_temperature = 0
 
             if self._mom is not None:
                 self._apply_mom(molecule, ovl_mat)
