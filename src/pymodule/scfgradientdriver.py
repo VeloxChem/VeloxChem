@@ -40,10 +40,8 @@ from .veloxchemlib import parse_xc_func
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
 from .matrices import Matrices
 from .profiler import Profiler
-from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
-from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 
@@ -286,14 +284,14 @@ class ScfGradientDriver(GradientDriver):
         t0 = time.time()
 
         # point charges contribution
-        if self.scf_driver._point_charges is not None:
-            npoints = self.scf_driver._point_charges.shape[1]
+        if self.scf_driver.point_charges is not None:
+            npoints = self.scf_driver.point_charges.shape[1]
 
             mm_coords = []
             mm_charges = []
             for p in range(npoints):
-                xyz_p = self.scf_driver._point_charges[:3, p]
-                chg_p = self.scf_driver._point_charges[3, p]
+                xyz_p = self.scf_driver.point_charges[:3, p]
+                chg_p = self.scf_driver.point_charges[3, p]
                 mm_coords.append(xyz_p.copy())
                 mm_charges.append(chg_p)
 
@@ -422,25 +420,13 @@ class ScfGradientDriver(GradientDriver):
         if use_dft:
             if self.rank == mpi_master():
                 xcfun_label = scf_results['xcfun']
-                grid_level = scf_results.get('grid_level', None)
             else:
                 xcfun_label = None
-                grid_level = None
-
-            xcfun_label, grid_level = self.comm.bcast((xcfun_label, grid_level),
-                                                      root=mpi_master())
-
-            grid_level = (get_default_grid_level(xcfun_label)
-                          if grid_level is None else grid_level)
-
-            # TODO: take molecular grid from scf
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            xcfun_label = self.comm.bcast(xcfun_label, root=mpi_master())
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(
-                molecule, basis, [D], mol_grid, xcfun_label)
+                molecule, basis, [D], self.scf_driver._mol_grid, xcfun_label)
 
         else:
             xcfun_label = 'hf'
@@ -465,58 +451,59 @@ class ScfGradientDriver(GradientDriver):
 
         # nuclei-point charges contribution to gradient
 
-        if self.scf_driver._point_charges is not None:
+        if self.scf_driver.point_charges is not None:
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
-            npoints = self.scf_driver._point_charges.shape[1]
+            npoints = self.scf_driver.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
                 z_a = nuclear_charges[a]
                 r_a = coords[a]
 
                 for p in range(npoints):
-                    r_p = self.scf_driver._point_charges[:3, p]
-                    q_p = self.scf_driver._point_charges[3, p]
+                    r_p = self.scf_driver.point_charges[:3, p]
+                    q_p = self.scf_driver.point_charges[3, p]
                     r = np.linalg.norm(r_a - r_p)
                     f_ij = z_a * q_p * (r_p - r_a) / r**3
 
                     self.gradient[a] += f_ij
 
-            vdw_grad = np.zeros((natoms, 3))
+            if self.scf_driver.qm_vdw_params is not None:
+                vdw_grad = np.zeros((natoms, 3))
 
-            for a in range(self.rank, natoms, self.nodes):
-                xyz_i = coords[a]
-                sigma_i = self.scf_driver._qm_vdw_params[a, 0]
-                epsilon_i = self.scf_driver._qm_vdw_params[a, 1]
+                for a in range(self.rank, natoms, self.nodes):
+                    xyz_i = coords[a]
+                    sigma_i = self.scf_driver.qm_vdw_params[a, 0]
+                    epsilon_i = self.scf_driver.qm_vdw_params[a, 1]
 
-                for p in range(npoints):
-                    xyz_j = self.scf_driver._point_charges[:3, p]
-                    sigma_j = self.scf_driver._point_charges[4, p]
-                    epsilon_j = self.scf_driver._point_charges[5, p]
+                    for p in range(npoints):
+                        xyz_j = self.scf_driver.point_charges[:3, p]
+                        sigma_j = self.scf_driver.point_charges[4, p]
+                        epsilon_j = self.scf_driver.point_charges[5, p]
 
-                    r_ij = xyz_j - xyz_i
-                    distance_ij = np.linalg.norm(r_ij)
-                    n_ij = r_ij / distance_ij
+                        r_ij = xyz_j - xyz_i
+                        distance_ij = np.linalg.norm(r_ij)
+                        n_ij = r_ij / distance_ij
 
-                    # bohr to nm
-                    distance_ij *= bohr_in_angstrom() * 0.1
+                        # bohr to nm
+                        distance_ij *= bohr_in_angstrom() * 0.1
 
-                    epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
-                    sigma_ij = 0.5 * (sigma_i + sigma_j)
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
 
-                    sigma_r_6 = (sigma_ij / distance_ij)**6
-                    sigma_r_12 = sigma_r_6**2
+                        sigma_r_6 = (sigma_ij / distance_ij)**6
+                        sigma_r_12 = sigma_r_6**2
 
-                    g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij -
-                                              sigma_r_6 / distance_ij)
+                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij
+                                                  - sigma_r_6 / distance_ij)
 
-                    vdw_grad[a] += -g * n_ij
+                        vdw_grad[a] += -g * n_ij
 
-            # convert gradient to atomic unit
-            vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                         bohr_in_angstrom())
+                # convert gradient to atomic unit
+                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
+                             bohr_in_angstrom())
 
-            self.gradient += vdw_grad
+                self.gradient += vdw_grad
 
         grad_timing['classical'] += time.time() - t0
 
@@ -609,14 +596,14 @@ class ScfGradientDriver(GradientDriver):
             gmats_010 = Matrices()
 
         # point charges contribution
-        if self.scf_driver._point_charges is not None:
-            npoints = self.scf_driver._point_charges.shape[1]
+        if self.scf_driver.point_charges is not None:
+            npoints = self.scf_driver.point_charges.shape[1]
 
             mm_coords = []
             mm_charges = []
             for p in range(npoints):
-                xyz_p = self.scf_driver._point_charges[:3, p]
-                chg_p = self.scf_driver._point_charges[3, p]
+                xyz_p = self.scf_driver.point_charges[:3, p]
+                chg_p = self.scf_driver.point_charges[3, p]
                 mm_coords.append(xyz_p.copy())
                 mm_charges.append(chg_p)
 
@@ -739,25 +726,14 @@ class ScfGradientDriver(GradientDriver):
         if use_dft:
             if self.rank == mpi_master():
                 xcfun_label = scf_results['xcfun']
-                grid_level = scf_results.get('grid_level', None)
             else:
                 xcfun_label = None
-                grid_level = None
-
-            xcfun_label, grid_level = self.comm.bcast((xcfun_label, grid_level),
-                                                      root=mpi_master())
-
-            grid_level = (get_default_grid_level(xcfun_label)
-                          if grid_level is None else grid_level)
-
-            # TODO: take molecular grid from scf
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            xcfun_label = self.comm.bcast(xcfun_label, root=mpi_master())
 
             grad_drv = XCMolecularGradient()
             self.gradient += grad_drv.integrate_vxc_gradient(
-                molecule, basis, [Da, Db], mol_grid, xcfun_label)
+                molecule, basis, [Da, Db], self.scf_driver._mol_grid,
+                xcfun_label)
 
         else:
             xcfun_label = 'hf'
@@ -776,58 +752,59 @@ class ScfGradientDriver(GradientDriver):
 
         # nuclei-point charges contribution to gradient
 
-        if self.scf_driver._point_charges is not None:
+        if self.scf_driver.point_charges is not None:
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
-            npoints = self.scf_driver._point_charges.shape[1]
+            npoints = self.scf_driver.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
                 z_a = nuclear_charges[a]
                 r_a = coords[a]
 
                 for p in range(npoints):
-                    r_p = self.scf_driver._point_charges[:3, p]
-                    q_p = self.scf_driver._point_charges[3, p]
+                    r_p = self.scf_driver.point_charges[:3, p]
+                    q_p = self.scf_driver.point_charges[3, p]
                     r = np.linalg.norm(r_a - r_p)
                     f_ij = z_a * q_p * (r_p - r_a) / r**3
 
                     self.gradient[a] += f_ij
 
-            vdw_grad = np.zeros((natoms, 3))
+            if self.scf_driver.qm_vdw_params is not None:
+                vdw_grad = np.zeros((natoms, 3))
 
-            for a in range(self.rank, natoms, self.nodes):
-                xyz_i = coords[a]
-                sigma_i = self.scf_driver._qm_vdw_params[a, 0]
-                epsilon_i = self.scf_driver._qm_vdw_params[a, 1]
+                for a in range(self.rank, natoms, self.nodes):
+                    xyz_i = coords[a]
+                    sigma_i = self.scf_driver.qm_vdw_params[a, 0]
+                    epsilon_i = self.scf_driver.qm_vdw_params[a, 1]
 
-                for p in range(npoints):
-                    xyz_j = self.scf_driver._point_charges[:3, p]
-                    sigma_j = self.scf_driver._point_charges[4, p]
-                    epsilon_j = self.scf_driver._point_charges[5, p]
+                    for p in range(npoints):
+                        xyz_j = self.scf_driver.point_charges[:3, p]
+                        sigma_j = self.scf_driver.point_charges[4, p]
+                        epsilon_j = self.scf_driver.point_charges[5, p]
 
-                    r_ij = xyz_j - xyz_i
-                    distance_ij = np.linalg.norm(r_ij)
-                    n_ij = r_ij / distance_ij
+                        r_ij = xyz_j - xyz_i
+                        distance_ij = np.linalg.norm(r_ij)
+                        n_ij = r_ij / distance_ij
 
-                    # bohr to nm
-                    distance_ij *= bohr_in_angstrom() * 0.1
+                        # bohr to nm
+                        distance_ij *= bohr_in_angstrom() * 0.1
 
-                    epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
-                    sigma_ij = 0.5 * (sigma_i + sigma_j)
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
 
-                    sigma_r_6 = (sigma_ij / distance_ij)**6
-                    sigma_r_12 = sigma_r_6**2
+                        sigma_r_6 = (sigma_ij / distance_ij)**6
+                        sigma_r_12 = sigma_r_6**2
 
-                    g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij -
-                                              sigma_r_6 / distance_ij)
+                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij
+                                                  - sigma_r_6 / distance_ij)
 
-                    vdw_grad[a] += -g * n_ij
+                        vdw_grad[a] += -g * n_ij
 
-            # convert gradient to atomic unit
-            vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                         bohr_in_angstrom())
+                # convert gradient to atomic unit
+                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
+                             bohr_in_angstrom())
 
-            self.gradient += vdw_grad
+                self.gradient += vdw_grad
 
         # collect gradient
 
@@ -849,7 +826,6 @@ class ScfGradientDriver(GradientDriver):
         self.print_header()
 
         self.ostream.mute()
-        # Currently, only numerical gradients activated
         self.compute_numerical(molecule, ao_basis, scf_results)
         self.ostream.unmute()
 
@@ -878,16 +854,21 @@ class ScfGradientDriver(GradientDriver):
             The energy.
         """
 
-        if not self._debug:
-            self.ostream.mute()
+        # if not self._debug:
+        #     self.ostream.mute()
 
-        self.scf_driver.restart = False
+        if self.numerical:
+            # disable restarting scf for numerical gradient
+            self.scf_driver.restart = False
+        else:
+            # always try restarting scf for analytical gradient
+            self.scf_driver.restart = True
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
         assert_msg_critical(self.scf_driver.is_converged,
                             'ScfGradientDriver: SCF did not converge')
 
-        if not self._debug:
-            self.ostream.unmute()
+        # if not self._debug:
+        #     self.ostream.unmute()
 
         if self.rank == mpi_master():
             scf_results.update(new_scf_results)

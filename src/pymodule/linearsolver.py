@@ -28,9 +28,6 @@ import time as tm
 import math
 import sys
 
-from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import (compute_linear_momentum_integrals,
-                           compute_angular_momentum_integrals)
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
@@ -43,6 +40,9 @@ from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .profiler import Profiler
+from .oneeints import (compute_electric_dipole_integrals,
+                       compute_linear_momentum_integrals,
+                       compute_angular_momentum_integrals)
 from .sanitychecks import dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,

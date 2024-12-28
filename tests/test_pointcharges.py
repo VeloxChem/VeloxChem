@@ -40,8 +40,8 @@ class TestPointCharges:
         for scf_drv in [ScfRestrictedDriver(), ScfUnrestrictedDriver()]:
 
             scf_drv.xcfun = xcfun_label
-            scf_drv._point_charges = potfile
-            scf_drv._qm_vdw_params = vdwfile
+            scf_drv.point_charges = potfile
+            scf_drv.qm_vdw_params = vdwfile
             scf_drv.ostream.mute()
 
             scf_results = scf_drv.compute(mol, bas)
