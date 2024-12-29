@@ -27,12 +27,12 @@ import numpy as np
 import math
 import h5py
 
-from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import denmat
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .errorhandler import assert_msg_critical
+
 
 class DensityViewer:
     """
@@ -72,10 +72,15 @@ class DensityViewer:
 
         # flag for using interpolation when computing densities
         self.use_visualization_driver = False
-        self.loop_over_atoms = True
+        # TODO: double check "loop_over_atoms"
+        self.loop_over_atoms = False
 
         # flag for the type of density
         self.den_type = denmat.rest
+
+        self.orbital_color_scheme = 'default'
+        self.orbital_isovalue = 0.05
+        self.orbital_opacity = 0.7
 
         # To focus the grid around only specific atoms (for large systems)
         self.atom_centers = None
@@ -108,7 +113,6 @@ class DensityViewer:
         self._plt_iso_one = None
         self._plt_iso_two = None
 
-
     def read_hdf5(self, fname):
         """
         Reads the dictionary of densities from a checkpoint file.
@@ -124,13 +128,13 @@ class DensityViewer:
         den_dict = {}
 
         valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+                            Path(fname).is_file())
 
         errmsg = f"DensityViewer: {fname} is not a valid checkpoint file."
         assert_msg_critical(valid_checkpoint, errmsg)
 
         h5f = h5py.File(fname, "r")
-    
+
         # TODO: add other density types as they become available
         for key in h5f.keys():
             if "detach" in key or "attach" in key:
@@ -142,8 +146,9 @@ class DensityViewer:
 
         return den_dict
 
-    # TODO: I think the nbextension part is not needed anymore
     def help_string_k3d(self):
+
+        # TODO: double check if the nbextension part is still needed
 
         return ('Unable to import k3d. Please install k3d via pip or conda,\n' +
                 '  and then run\n' +
@@ -264,9 +269,11 @@ class DensityViewer:
         :return:
             A numpy array with the value of the density on the grid.
         """
+
         vis_drv = VisualizationDriver()
         dm_ao = AODensityMatrix([density_matrix], self.den_type)
-        vis_drv.compute(self._grid, self._molecule, self._basis, dm_ao, 0, "alpha")
+        vis_drv.compute(self._grid, self._molecule, self._basis, dm_ao, 0,
+                        'alpha')
 
         return self._grid.values_to_numpy()
 
@@ -288,7 +295,6 @@ class DensityViewer:
         # Initialize the density on the molecular grid
         np_density = np.zeros(self.npoints)
 
-        nao = density_matrix.shape[0]
         identifiers = np.array(self._molecule.get_identifiers()) - 1
 
         # Loop over atoms
@@ -300,17 +306,15 @@ class DensityViewer:
                 ao_indices_j = self._atom_to_ao[j_atom]
                 atom_id_j = identifiers[j_atom]
                 atom_orbs_j = np.array(self._ao_dict[atom_id_j])
-                # Translate the atomic grid from the origin to the position of 
+                # Translate the atomic grid from the origin to the position of
                 # the current atom in the molecular grid and find the indices
                 # of the atomic grid origin in the molecular grid.
                 ti = np.round(
-                         (self._coords[i_atom] - self.origin 
-                        + self._atom_origin) /
-                              self.stepsize).astype('int')
+                    (self._coords[i_atom] - self.origin + self._atom_origin) /
+                    self.stepsize).astype('int')
                 tj = np.round(
-                         (self._coords[j_atom] - self.origin 
-                        + self._atom_origin) /
-                              self.stepsize).astype('int')
+                    (self._coords[j_atom] - self.origin + self._atom_origin) /
+                    self.stepsize).astype('int')
 
                 # indices of the origin on the atomic grid i
                 p1_i = [0, 0, 0]
@@ -342,8 +346,8 @@ class DensityViewer:
                 # and keep track of the indices of the points in the
                 # atomic grids i and j.
                 for x in range(3):
-                    # if the overlaping atomic grid is 
-                    # completely outside the 
+                    # if the overlaping atomic grid is
+                    # completely outside the
                     # molecular grid, discard it.
                     if t[x] >= self.npoints[x]:
                         discard = True
@@ -364,18 +368,20 @@ class DensityViewer:
                     continue
                 # Calculate the value of the density on the
                 # overlaping grid
-                density_matrix_slice = density_matrix[ao_indices_i][:, ao_indices_j]
-                i_aos_grid = atom_orbs_i[:, p1_i[0] : p1_i[0] + no[0],
-                                            p1_i[1] : p1_i[1] + no[1],
-                                            p1_i[2] : p1_i[2] + no[2]]
-                j_aos_grid = atom_orbs_j[:, p1_j[0] : p1_j[0] + no[0],
-                                            p1_j[1] : p1_j[1] + no[1],
-                                            p1_j[2] : p1_j[2] + no[2]]
-                np_density[t[0] : t[0] + no[0],
-                           t[1] : t[1] + no[1],
-                           t[2] : t[2] + no[2]] += np.einsum("mxyz,mn,nxyz->xyz",
-                                                              i_aos_grid, density_matrix_slice, j_aos_grid,
-                                                              optimize=True)
+                density_matrix_slice = density_matrix[
+                    ao_indices_i][:, ao_indices_j]
+                i_aos_grid = atom_orbs_i[:, p1_i[0]:p1_i[0] + no[0],
+                                         p1_i[1]:p1_i[1] + no[1],
+                                         p1_i[2]:p1_i[2] + no[2]]
+                j_aos_grid = atom_orbs_j[:, p1_j[0]:p1_j[0] + no[0],
+                                         p1_j[1]:p1_j[1] + no[1],
+                                         p1_j[2]:p1_j[2] + no[2]]
+                np_density[t[0]:t[0] + no[0], t[1]:t[1] + no[1],
+                           t[2]:t[2] + no[2]] += np.einsum("mxyz,mn,nxyz->xyz",
+                                                           i_aos_grid,
+                                                           density_matrix_slice,
+                                                           j_aos_grid,
+                                                           optimize=True)
         return np_density
 
     def compute_density_simple(self, density_matrix):
@@ -404,26 +410,25 @@ class DensityViewer:
             atom_orb_i = self._ao_dict[this_atom_i][i_orb]
 
             for j_coef in range(nao):
-                # if the absolute value of the density matrix element is 
-                # larger than a pre-set threshold, calculate its value 
+                # if the absolute value of the density matrix element is
+                # larger than a pre-set threshold, calculate its value
                 # on the grid: rho(r) = sum_{i,j} D_ij * Phi_i(r) * Phi_j(r)
                 # Note: i, j are AO indices.
-                if abs(density_matrix[i_coef, j_coef]) > self.dm_element_threshold:
+                if abs(density_matrix[i_coef,
+                                      j_coef]) > self.dm_element_threshold:
                     # Get information about atom j, to which AO j belongs
                     j_atom, j_orb = self._ao_to_atom[j_coef]
                     this_atom_j = self._atomnr[j_atom]
                     atom_orb_j = self._ao_dict[this_atom_j][j_orb]
-                    # Translate the atomic grid from the origin to the position of 
+                    # Translate the atomic grid from the origin to the position of
                     # the current atom in the molecular grid and find the indices
                     # of the atomic grid origin in the molecular grid.
                     ti = np.round(
-                             (self._coords[i_atom] - self.origin 
-                            + self._atom_origin) /
-                                  self.stepsize).astype('int')
+                        (self._coords[i_atom] - self.origin + self._atom_origin)
+                        / self.stepsize).astype('int')
                     tj = np.round(
-                             (self._coords[j_atom] - self.origin 
-                            + self._atom_origin) /
-                                  self.stepsize).astype('int')
+                        (self._coords[j_atom] - self.origin + self._atom_origin)
+                        / self.stepsize).astype('int')
 
                     # indices of the origin on the atomic grid i
                     p1_i = [0, 0, 0]
@@ -455,8 +460,8 @@ class DensityViewer:
                     # and keep track of the indices of the points in the
                     # atomic grids i and j.
                     for x in range(3):
-                        # if the overlaping atomic grid is 
-                        # completely outside the 
+                        # if the overlaping atomic grid is
+                        # completely outside the
                         # molecular grid, discard it.
                         if t[x] >= self.npoints[x]:
                             discard = True
@@ -477,17 +482,14 @@ class DensityViewer:
                         continue
                     # Calculate the value of the density on the
                     # overlaping grid
-                    np_density[t[0] : t[0] + no[0],
-                               t[1] : t[1] + no[1],
-                               t[2] : t[2] + no[2]] += (
-                                    density_matrix[i_coef, j_coef]
-                                      * atom_orb_i[p1_i[0] : p1_i[0] + no[0],
-                                                   p1_i[1] : p1_i[1] + no[1],
-                                                   p1_i[2] : p1_i[2] + no[2]]
-                                      * atom_orb_j[p1_j[0] : p1_j[0] + no[0],
-                                                   p1_j[1] : p1_j[1] + no[1],
-                                                   p1_j[2] : p1_j[2] + no[2]]
-                                                                 )
+                    np_density[t[0]:t[0] + no[0], t[1]:t[1] + no[1], t[2]:t[2] +
+                               no[2]] += (density_matrix[i_coef, j_coef] *
+                                          atom_orb_i[p1_i[0]:p1_i[0] + no[0],
+                                                     p1_i[1]:p1_i[1] + no[1],
+                                                     p1_i[2]:p1_i[2] + no[2]] *
+                                          atom_orb_j[p1_j[0]:p1_j[0] + no[0],
+                                                     p1_j[1]:p1_j[1] + no[1],
+                                                     p1_j[2]:p1_j[2] + no[2]])
         return np_density
 
     def plot(self, molecule, basis, den_inp):
@@ -515,13 +517,13 @@ class DensityViewer:
         except ImportError:
             raise ImportError(self.help_string_widgets_and_display())
 
-        # TODO: create the read_hdf5 routine
         if isinstance(den_inp, str):
             den_dict = self.read_hdf5(den_inp)
         elif isinstance(den_inp, dict):
             den_dict = den_inp
         else:
-            assert_msg_critical(False, 'DensityViewer.plot: Invalid density input')
+            assert_msg_critical(False,
+                                'DensityViewer.plot: Invalid density input')
 
         self.initialize(molecule, basis)
 
@@ -531,7 +533,7 @@ class DensityViewer:
             self._density_labels.append(label)
             self._density_list.append(den_dict[label])
 
-        self._i_den = 0 
+        self._i_den = 0
 
         self._this_plot = k3d.plot(grid_visible=False)
         plt_atoms, plt_bonds = self.draw_molecule(molecule)
@@ -628,32 +630,18 @@ class DensityViewer:
             dtype='uint32',
         )
 
-        atomradius = [
-            0.53, 0.31, 1.67, 1.12, 0.87, 0.67, 0.56, 0.48, 0.42, 0.38, 1.90,
-            1.45, 1.18, 1.11, 0.98, 0.88, 0.79, 0.71, 2.43, 1.94, 1.84, 1.76,
-            1.71, 1.66, 1.61, 1.56, 1.52, 1.49, 1.45, 1.42, 1.36, 1.25, 1.14,
-            1.03, 0.94, 0.88, 2.65, 2.19, 2.12, 2.06, 1.98, 1.90, 1.83, 1.78,
-            1.73, 1.69, 1.65, 1.61, 1.56, 1.45, 1.33, 1.23, 1.15, 1.08, 2.98,
-            2.53, 1.95, 1.85, 2.47, 2.06, 2.05, 2.38, 2.31, 2.33, 2.25, 2.28,
-            2.26, 2.26, 2.22, 2.22, 2.17, 2.08, 2.00, 1.93, 1.88, 1.85, 1.80,
-            1.77, 1.74, 1.71, 1.56, 1.54, 1.43, 1.35, 1.27, 1.20
-        ]
+        connectivity_matrix = molecule.get_connectivity_matrix()
 
         natoms = molecule.number_of_atoms()
         coords = molecule.get_coordinates_in_bohr().astype('float32')
 
-        # Create a list of colors and radii
+        # Create a list of colors
         colors = []
-        radii = []
         for nr in self._atomnr:
             if nr < len(atomcolor):
                 colors.append(atomcolor[nr])
             else:
                 colors.append(atomcolor[-1])
-            if nr < len(atomradius):
-                radii.append(atomradius[nr])
-            else:
-                radii.append(2.0)
 
         # Balls
         plt_atoms = k3d.points(positions=coords,
@@ -680,8 +668,7 @@ class DensityViewer:
         for i in range(natoms):
             for j in range(i + 1, natoms):
                 # Check if there is a bond
-                bond = (radii[i] + radii[j]) / bohr_in_angstrom()
-                if np.linalg.norm(coords[i, :] - coords[j, :]) > 1.25 * bond:
+                if connectivity_matrix[i, j] != 1:
                     continue
                 # If single atom type, just record it
                 if self._atomnr[i] == self._atomnr[j]:
@@ -709,15 +696,12 @@ class DensityViewer:
 
         return plt_atoms, plt_bonds
 
-    # TODO: add isovalue?
     def draw_density(self, density):
         """
         Draws an isosurface of the density.
 
         :param density:
             The density on the grid.
-        :param isovalue:
-            The isovalue for isosurfaces.
 
         :return:
             A tuple with the k3d positive and negative isosurfaces.
@@ -742,10 +726,14 @@ class DensityViewer:
         bounds = [xmin, xmax, ymin, ymax, zmin, zmax]
 
         # Default settings
-        isovalue = 0.002
-        opacity = 0.7
+        isovalue = self.orbital_isovalue
+        opacity = self.orbital_opacity
         wireframe = False
-        color = 0x0000ff
+
+        if self.orbital_color_scheme == 'default':
+            color = 0x0000ff
+        elif self.orbital_color_scheme == 'alternative':
+            color = 0x62a0ea
 
         # Find if the user changed the defaults
         if self._plt_iso_one:
@@ -767,7 +755,12 @@ class DensityViewer:
 
         # Find if the user changed the defaults
         isovalue = -isovalue
-        color = 0xff0000
+
+        if self.orbital_color_scheme == 'default':
+            color = 0xff0000
+        elif self.orbital_color_scheme == 'alternative':
+            color = 0xe5a50a
+
         if self._plt_iso_two:
             isovalue = self._plt_iso_two.level
             opacity = self._plt_iso_two.opacity

@@ -625,8 +625,6 @@ class OrbitalViewer:
 
         :param orbital:
             The molecular orbital on the grid.
-        :param isovalue:
-            The isovalue for isosurfaces.
 
         :return:
             A tuple with the k3d positive and negative isosurfaces.
