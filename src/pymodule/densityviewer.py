@@ -78,9 +78,9 @@ class DensityViewer:
         # flag for the type of density
         self.den_type = denmat.rest
 
-        self.orbital_color_scheme = 'default'
-        self.orbital_isovalue = 0.05
-        self.orbital_opacity = 0.7
+        self.density_color_scheme = 'default'
+        self.density_isovalue = 0.002
+        self.density_opacity = 0.7
 
         # To focus the grid around only specific atoms (for large systems)
         self.atom_centers = None
@@ -726,13 +726,13 @@ class DensityViewer:
         bounds = [xmin, xmax, ymin, ymax, zmin, zmax]
 
         # Default settings
-        isovalue = self.orbital_isovalue
-        opacity = self.orbital_opacity
+        isovalue = self.density_isovalue
+        opacity = self.density_opacity
         wireframe = False
 
-        if self.orbital_color_scheme == 'default':
+        if self.density_color_scheme == 'default':
             color = 0x0000ff
-        elif self.orbital_color_scheme == 'alternative':
+        elif self.density_color_scheme == 'alternative':
             color = 0x62a0ea
 
         # Find if the user changed the defaults
@@ -756,9 +756,9 @@ class DensityViewer:
         # Find if the user changed the defaults
         isovalue = -isovalue
 
-        if self.orbital_color_scheme == 'default':
+        if self.density_color_scheme == 'default':
             color = 0xff0000
-        elif self.orbital_color_scheme == 'alternative':
+        elif self.density_color_scheme == 'alternative':
             color = 0xe5a50a
 
         if self._plt_iso_two:
