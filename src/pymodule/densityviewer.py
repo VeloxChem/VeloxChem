@@ -72,7 +72,7 @@ class DensityViewer:
 
         # flag for using interpolation when computing densities
         self.use_visualization_driver = False
-        self.loop_over_atoms = True
+        self.interpolate = False
 
         # flag for the type of density
         self.den_type = denmat.rest
@@ -252,10 +252,7 @@ class DensityViewer:
         if self.use_visualization_driver:
             return self.compute_density_vis_drv(density_matrix)
         else:
-            if self.loop_over_atoms:
-                return self.compute_density_simple_loop_atoms(density_matrix)
-            else:
-                return self.compute_density_simple(density_matrix)
+            return self.compute_density_simple_loop_atoms(density_matrix)
 
     def compute_density_vis_drv(self, density_matrix):
         """
@@ -304,58 +301,74 @@ class DensityViewer:
             atom_id_i = identifiers[i_atom]
             atom_orbs_i = np.array(self._ao_dict[atom_id_i])
 
-            ti = (self._coords[i_atom] - self.origin +
-                  self._atom_origin) / self.stepsize
-            ti_floor = np.floor(ti)
-            alpha_i = ti - ti_floor
+            if self.interpolate:
+                ti = (self._coords[i_atom] - self.origin +
+                      self._atom_origin) / self.stepsize
+                ti_floor = np.floor(ti)
+                alpha_i = ti - ti_floor
 
-            interp_atom_orbs_i = np.zeros(
-                (atom_orbs_i.shape[0], nx + 1, ny + 1, nz + 1))
+                new_atom_orbs_i = np.zeros(
+                    (atom_orbs_i.shape[0], nx + 1, ny + 1, nz + 1))
 
-            for i, j, k in ijk_inds:
-                # coefficient for trilinear interpolation
-                x_coef = (1.0 - alpha_i[0]) if i == 0 else alpha_i[0]
-                y_coef = (1.0 - alpha_i[1]) if j == 0 else alpha_i[1]
-                z_coef = (1.0 - alpha_i[2]) if k == 0 else alpha_i[2]
+                for i, j, k in ijk_inds:
+                    # coefficient for trilinear interpolation
+                    x_coef = (1.0 - alpha_i[0]) if i == 0 else alpha_i[0]
+                    y_coef = (1.0 - alpha_i[1]) if j == 0 else alpha_i[1]
+                    z_coef = (1.0 - alpha_i[2]) if k == 0 else alpha_i[2]
 
-                interp_atom_orbs_i[
-                    :,
-                    i:i + nx,
-                    j:j + ny,
-                    k:k + nz,
-                ] += x_coef * y_coef * z_coef * atom_orbs_i
+                    new_atom_orbs_i[
+                        :,
+                        i:i + nx,
+                        j:j + ny,
+                        k:k + nz,
+                    ] += x_coef * y_coef * z_coef * atom_orbs_i
+
+            else:
+                new_atom_orbs_i = atom_orbs_i
 
             for j_atom in range(natms):
                 ao_indices_j = self._atom_to_ao[j_atom]
                 atom_id_j = identifiers[j_atom]
                 atom_orbs_j = np.array(self._ao_dict[atom_id_j])
 
-                tj = (self._coords[j_atom] - self.origin +
-                      self._atom_origin) / self.stepsize
-                tj_floor = np.floor(tj)
-                alpha_j = tj - tj_floor
+                if self.interpolate:
+                    tj = (self._coords[j_atom] - self.origin +
+                          self._atom_origin) / self.stepsize
+                    tj_floor = np.floor(tj)
+                    alpha_j = tj - tj_floor
 
-                interp_atom_orbs_j = np.zeros(
-                    (atom_orbs_j.shape[0], nx + 1, ny + 1, nz + 1))
+                    new_atom_orbs_j = np.zeros(
+                        (atom_orbs_j.shape[0], nx + 1, ny + 1, nz + 1))
 
-                for i, j, k in ijk_inds:
-                    # coefficient for trilinear interpolation
-                    x_coef = (1.0 - alpha_j[0]) if i == 0 else alpha_j[0]
-                    y_coef = (1.0 - alpha_j[1]) if j == 0 else alpha_j[1]
-                    z_coef = (1.0 - alpha_j[2]) if k == 0 else alpha_j[2]
+                    for i, j, k in ijk_inds:
+                        # coefficient for trilinear interpolation
+                        x_coef = (1.0 - alpha_j[0]) if i == 0 else alpha_j[0]
+                        y_coef = (1.0 - alpha_j[1]) if j == 0 else alpha_j[1]
+                        z_coef = (1.0 - alpha_j[2]) if k == 0 else alpha_j[2]
 
-                    interp_atom_orbs_j[
-                        :,
-                        i:i + nx,
-                        j:j + ny,
-                        k:k + nz,
-                    ] += x_coef * y_coef * z_coef * atom_orbs_j
+                        new_atom_orbs_j[
+                            :,
+                            i:i + nx,
+                            j:j + ny,
+                            k:k + nz,
+                        ] += x_coef * y_coef * z_coef * atom_orbs_j
+
+                else:
+                    new_atom_orbs_j = atom_orbs_j
 
                 # Translate the atomic grid from the origin to the position of
                 # the current atom in the molecular grid and find the indices
                 # of the atomic grid origin in the molecular grid.
-                ti = ti_floor.astype('int')
-                tj = tj_floor.astype('int')
+                if self.interpolate:
+                    ti = ti_floor.astype('int')
+                    tj = tj_floor.astype('int')
+                else:
+                    ti = np.round(
+                        (self._coords[i_atom] - self.origin + self._atom_origin)
+                        / self.stepsize).astype('int')
+                    tj = np.round(
+                        (self._coords[j_atom] - self.origin + self._atom_origin)
+                        / self.stepsize).astype('int')
 
                 # indices of the origin on the atomic grid i
                 p1_i = [0, 0, 0]
@@ -366,8 +379,14 @@ class DensityViewer:
                 # of an overlaping grid. t is the position of the origin
                 # and no is the number of grid points in the overlap grid.
                 t = np.zeros((3), dtype=int)
-                no = [nx + 1, ny + 1, nz + 1]
+
+                if self.interpolate:
+                    no = [nx + 1, ny + 1, nz + 1]
+                else:
+                    no = [nx, ny, nz]
+
                 discard = False
+
                 for x in range(3):
                     if ti[x] < tj[x]:
                         t[x] = tj[x]
@@ -382,6 +401,7 @@ class DensityViewer:
                     if no[x] <= 0:
                         discard = True
                         break
+
                 # Once we have the overlaping grid, we have to
                 # figure out how it looks in relation with the molecular grid
                 # and keep track of the indices of the points in the
@@ -410,169 +430,26 @@ class DensityViewer:
 
                 # Calculate the value of the density on the
                 # overlaping grid
-                for mu in range(interp_atom_orbs_i.shape[0]):
-                    for nu in range(interp_atom_orbs_j.shape[0]):
+                for mu in range(new_atom_orbs_i.shape[0]):
+                    for nu in range(new_atom_orbs_j.shape[0]):
                         D_mn = density_matrix[ao_indices_i[mu],
                                               ao_indices_j[nu]]
                         np_density[
                             t[0]:t[0] + no[0],
                             t[1]:t[1] + no[1],
                             t[2]:t[2] + no[2],
-                        ] += D_mn * interp_atom_orbs_i[
+                        ] += D_mn * new_atom_orbs_i[
                             mu,
                             p1_i[0]:p1_i[0] + no[0],
                             p1_i[1]:p1_i[1] + no[1],
                             p1_i[2]:p1_i[2] + no[2],
-                        ] * interp_atom_orbs_j[
+                        ] * new_atom_orbs_j[
                             nu,
                             p1_j[0]:p1_j[0] + no[0],
                             p1_j[1]:p1_j[1] + no[1],
                             p1_j[2]:p1_j[2] + no[2],
                         ]
 
-        return np_density
-
-    def compute_density_simple(self, density_matrix):
-        """
-        Compute the density by shifting atom grids.
-
-        :param density_matrix:
-            A numpy array containing the density matrix.
-
-        :return:
-            A numpy array with the value of the density on the grid.
-        """
-
-        nx, ny, nz = self._atom_npoints
-
-        # Initialize the density on the molecular grid
-        np_density = np.zeros(self.npoints)
-
-        nao = density_matrix.shape[0]
-
-        ijk_inds = [(i, j, k) for i in [0, 1] for j in [0, 1] for k in [0, 1]]
-
-        # Loop over AOs
-        for i_coef in range(nao):
-            # Get information about atom i, to which AO i belongs
-            i_atom, i_orb = self._ao_to_atom[i_coef]
-            this_atom_i = self._atomnr[i_atom]
-            atom_orb_i = self._ao_dict[this_atom_i][i_orb]
-
-            ti = (self._coords[i_atom] - self.origin +
-                  self._atom_origin) / self.stepsize
-            ti_floor = np.floor(ti)
-            alpha_i = ti - ti_floor
-
-            interp_atom_orb_i = np.zeros(atom_orb_i.shape + np.array([1, 1, 1]))
-
-            for i, j, k in ijk_inds:
-                # coefficient for trilinear interpolation
-                x_coef = (1.0 - alpha_i[0]) if i == 0 else alpha_i[0]
-                y_coef = (1.0 - alpha_i[1]) if j == 0 else alpha_i[1]
-                z_coef = (1.0 - alpha_i[2]) if k == 0 else alpha_i[2]
-
-                interp_atom_orb_i[i:i + nx, j:j + ny,
-                                  k:k + nz] += (x_coef * y_coef * z_coef *
-                                                atom_orb_i[:, :, :])
-
-            for j_coef in range(nao):
-                # if the absolute value of the density matrix element is
-                # larger than a pre-set threshold, calculate its value
-                # on the grid: rho(r) = sum_{i,j} D_ij * Phi_i(r) * Phi_j(r)
-                # Note: i, j are AO indices.
-                if abs(density_matrix[i_coef,
-                                      j_coef]) > self.dm_element_threshold:
-                    # Get information about atom j, to which AO j belongs
-                    j_atom, j_orb = self._ao_to_atom[j_coef]
-                    this_atom_j = self._atomnr[j_atom]
-                    atom_orb_j = self._ao_dict[this_atom_j][j_orb]
-
-                    tj = (self._coords[j_atom] - self.origin +
-                          self._atom_origin) / self.stepsize
-                    tj_floor = np.floor(tj)
-                    alpha_j = tj - tj_floor
-
-                    interp_atom_orb_j = np.zeros(atom_orb_j.shape +
-                                                 np.array([1, 1, 1]))
-
-                    for i, j, k in ijk_inds:
-                        # coefficient for trilinear interpolation
-                        x_coef = (1.0 - alpha_j[0]) if i == 0 else alpha_j[0]
-                        y_coef = (1.0 - alpha_j[1]) if j == 0 else alpha_j[1]
-                        z_coef = (1.0 - alpha_j[2]) if k == 0 else alpha_j[2]
-
-                        interp_atom_orb_j[i:i + nx, j:j + ny, k:k +
-                                          nz] += (x_coef * y_coef * z_coef *
-                                                  atom_orb_j[:, :, :])
-
-                    # Translate the atomic grid from the origin to the position of
-                    # the current atom in the molecular grid and find the indices
-                    # of the atomic grid origin in the molecular grid.
-                    ti = ti_floor.astype('int')
-                    tj = tj_floor.astype('int')
-
-                    # indices of the origin on the atomic grid i
-                    p1_i = [0, 0, 0]
-                    # indices of the origin on the atomic grid j
-                    p1_j = [0, 0, 0]
-
-                    # Compare the i and j grids to find the indices
-                    # of an overlaping grid. t is the position of the origin
-                    # and no is the number of grid points in the overlap grid.
-                    t = np.zeros((3), dtype=int)
-                    no = [nx + 1, ny + 1, nz + 1]
-                    discard = False
-                    for x in range(3):
-                        if ti[x] < tj[x]:
-                            t[x] = tj[x]
-                            no[x] += ti[x] - tj[x]
-                            p1_i[x] = tj[x] - ti[x]
-                        else:
-                            t[x] = ti[x]
-                            no[x] += tj[x] - ti[x]
-                            p1_j[x] = ti[x] - tj[x]
-                        # if the atomic grids do not overlap,
-                        # discard them.
-                        if no[x] <= 0:
-                            discard = True
-                            break
-                    # Once we have the overlaping grid, we have to
-                    # figure out how it looks in relation with the molecular grid
-                    # and keep track of the indices of the points in the
-                    # atomic grids i and j.
-                    for x in range(3):
-                        # if the overlaping atomic grid is
-                        # completely outside the
-                        # molecular grid, discard it.
-                        if t[x] >= self.npoints[x]:
-                            discard = True
-                            break
-                        if t[x] + no[x] < 0:
-                            discard = True
-                            break
-                        # if only some points of the grid are outside, readjust
-                        if t[x] < 0:
-                            p1_i[x] -= t[x]
-                            p1_j[x] -= t[x]
-                            no[x] += t[x]
-                            t[x] = 0
-                        if t[x] + no[x] >= self.npoints[x]:
-                            no[x] = self.npoints[x] - t[x]
-
-                    if discard:
-                        continue
-                    # Calculate the value of the density on the
-                    # overlaping grid
-                    np_density[t[0]:t[0] + no[0], t[1]:t[1] + no[1],
-                               t[2]:t[2] + no[2]] += (
-                                   density_matrix[i_coef, j_coef] *
-                                   interp_atom_orb_i[p1_i[0]:p1_i[0] + no[0],
-                                                     p1_i[1]:p1_i[1] + no[1],
-                                                     p1_i[2]:p1_i[2] + no[2]] *
-                                   interp_atom_orb_j[p1_j[0]:p1_j[0] + no[0],
-                                                     p1_j[1]:p1_j[1] + no[1],
-                                                     p1_j[2]:p1_j[2] + no[2]])
         return np_density
 
     def plot(self, molecule, basis, den_inp):

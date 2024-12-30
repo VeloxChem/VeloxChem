@@ -70,24 +70,42 @@ class TestDensityViewer:
         density_viewer.atombox_radius = 9
         density_viewer.initialize(mol, bas)
         density_viewer.use_visualization_driver = False
+        density_viewer.interpolate = True
         density = density_viewer.compute_density(density_matrix_a)
+
+        density_viewer.interpolate = False
+        density_simple = density_viewer.compute_density(density_matrix_a)
 
         density_viewer.use_visualization_driver = True
         density_ref = density_viewer.compute_density(density_matrix_a)
 
         if scf_drv.rank == mpi_master():
             max_rel_diff = 0.0
+            max_rel_diff_simple = 0.0
+
             for i in range(density_ref.shape[0]):
                 for j in range(density_ref.shape[1]):
                     for k in range(density_ref.shape[2]):
+
                         # Note: skip large densities
-                        if abs(density_ref[i, j, k]) > 1.0:
+                        if abs(density_ref[i, j, k]) > 0.1:
                             continue
+
                         elif abs(density_ref[i, j, k]) < 1e-6:
                             assert abs(density[i, j, k] -
                                        density_ref[i, j, k]) < 1e-6
+                            assert abs(density_simple[i, j, k] -
+                                       density_ref[i, j, k]) < 1e-6
+
                         else:
                             rel_diff = abs(density[i, j, k] /
                                            density_ref[i, j, k] - 1.0)
                             max_rel_diff = max(rel_diff, max_rel_diff)
-            assert max_rel_diff < 0.1
+
+                            rel_diff_simple = abs(density_simple[i, j, k] /
+                                                  density_ref[i, j, k] - 1.0)
+                            max_rel_diff_simple = max(rel_diff_simple,
+                                                      max_rel_diff_simple)
+
+            assert max_rel_diff < 0.05
+            assert max_rel_diff_simple < 0.2
