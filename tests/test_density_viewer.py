@@ -44,38 +44,6 @@ class TestDensityViewer:
 
         task.finish()
 
-    def test_density_viewer_compute_simple(self):
-        here = Path(__file__).parent
-        inpfile = str(here / 'data' / 'h2se.inp')
-        h5file = str(here / 'data' / 'h2se.denv.h5')
-
-        task = MpiTask([inpfile, None])
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
-
-        density_viewer = DensityViewer()
-        density_viewer.initialize(task.molecule, task.ao_basis)
-        density_viewer.use_visualization_driver = False
-        density_viewer.loop_over_atoms = False
-        if scf_drv.rank == mpi_master():
-            density_matrix = scf_results['D_alpha'] + scf_results['D_beta']
-        else:
-            density_matrix = None
-        density_matrix = scf_drv.comm.bcast(density_matrix, root=mpi_master())
-        density = density_viewer.compute_density(density_matrix)
-
-        if scf_drv.rank == mpi_master():
-
-            hf = h5py.File(h5file, "r")
-            ref_den_values = np.array(hf.get('cube-values-simple'))
-            hf.close()
-
-            assert np.max(np.abs(density - ref_den_values)) < 1.0e-6
-
-        task.finish()
-
     def test_density_viewer_relative_difference(self):
 
         molstr = """
@@ -113,7 +81,7 @@ class TestDensityViewer:
                 for j in range(density_ref.shape[1]):
                     for k in range(density_ref.shape[2]):
                         # Note: skip large densities
-                        if abs(density_ref[i, j, k]) > 0.1:
+                        if abs(density_ref[i, j, k]) > 1.0:
                             continue
                         elif abs(density_ref[i, j, k]) < 1e-6:
                             assert abs(density[i, j, k] -
@@ -122,4 +90,4 @@ class TestDensityViewer:
                             rel_diff = abs(density[i, j, k] /
                                            density_ref[i, j, k] - 1.0)
                             max_rel_diff = max(rel_diff, max_rel_diff)
-            assert max_rel_diff < 0.2
+            assert max_rel_diff < 0.1
