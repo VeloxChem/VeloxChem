@@ -290,48 +290,53 @@ class OrbitalViewer:
                 t_floor = np.floor(t)
                 alpha = t - t_floor
 
+                interp_atom_orb = np.zeros(atom_orb.shape + np.array([1, 1, 1]))
+
                 for i, j, k in ijk_inds:
                     # coefficient for trilinear interpolation
                     x_coef = (1.0 - alpha[0]) if i == 0 else alpha[0]
                     y_coef = (1.0 - alpha[1]) if j == 0 else alpha[1]
                     z_coef = (1.0 - alpha[2]) if k == 0 else alpha[2]
-                    xyz_coef = x_coef * y_coef * z_coef
 
-                    # t1: starting index in molecule grid
-                    # p1: starting index in atom grid
-                    # ncopy: number of grid points to copy from atom grid to
-                    #        molecule grid
-                    t1 = t_floor.astype('int') + np.array([i, j, k])
-                    ncopy = [nx, ny, nz]
-                    p1 = [0, 0, 0]
+                    interp_atom_orb[i:i + nx, j:j + ny,
+                                    k:k + nz] += (x_coef * y_coef * z_coef *
+                                                  atom_orb[:, :, :])
 
-                    discard = False
-                    for i in range(3):
-                        if t[i] >= self.npoints[i]:
-                            discard = True
-                            break
-                        if t[i] + ncopy[i] < 0:
-                            discard = True
-                            break
-                        # match lower bound
-                        if t1[i] < 0:
-                            p1[i] = -t1[i]
-                            t1[i] = 0
-                            ncopy[i] -= p1[i]
-                        # match upper bound
-                        if t1[i] + ncopy[i] > self.npoints[i]:
-                            ncopy[i] = self.npoints[i] - t1[i]
-                    if discard:
-                        continue
-                    np_orb[
-                        t1[0]:t1[0] + ncopy[0],
-                        t1[1]:t1[1] + ncopy[1],
-                        t1[2]:t1[2] + ncopy[2],
-                    ] += xyz_coef * orb_coef * atom_orb[
-                        p1[0]:p1[0] + ncopy[0],
-                        p1[1]:p1[1] + ncopy[1],
-                        p1[2]:p1[2] + ncopy[2],
-                    ]
+                # t1: starting index in molecule grid
+                # p1: starting index in interpolated atom grid
+                # ncopy: number of grid points to copy from interpolated atom
+                #        grid to molecule grid
+                t1 = t_floor.astype('int')
+                ncopy = [nx + 1, ny + 1, nz + 1]
+                p1 = [0, 0, 0]
+
+                discard = False
+                for i in range(3):
+                    if t[i] >= self.npoints[i]:
+                        discard = True
+                        break
+                    if t[i] + ncopy[i] < 0:
+                        discard = True
+                        break
+                    # match lower bound
+                    if t1[i] < 0:
+                        p1[i] = -t1[i]
+                        t1[i] = 0
+                        ncopy[i] -= p1[i]
+                    # match upper bound
+                    if t1[i] + ncopy[i] > self.npoints[i]:
+                        ncopy[i] = self.npoints[i] - t1[i]
+                if discard:
+                    continue
+                np_orb[
+                    t1[0]:t1[0] + ncopy[0],
+                    t1[1]:t1[1] + ncopy[1],
+                    t1[2]:t1[2] + ncopy[2],
+                ] += orb_coef * interp_atom_orb[
+                    p1[0]:p1[0] + ncopy[0],
+                    p1[1]:p1[1] + ncopy[1],
+                    p1[2]:p1[2] + ncopy[2],
+                ]
 
         return np_orb
 
