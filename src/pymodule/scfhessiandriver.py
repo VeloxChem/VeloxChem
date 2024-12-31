@@ -339,6 +339,16 @@ class ScfHessianDriver(HessianDriver):
             The profiler.
         """
 
+        self.ostream.print_info('Computing analytical Hessian...')
+        self.ostream.print_blank()
+        hess_ref = 'P. Deglmann, F. Furche, R. Ahlrichs,'
+        hess_ref += ' Chem. Phys. Lett. 2002, 362, 511-518.'
+        self.ostream.print_reference('Reference: ' + hess_ref)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        # Preparation
+
         natm = molecule.number_of_atoms()
         scf_tensors = self.scf_driver.scf_tensors
 
@@ -358,7 +368,8 @@ class ScfHessianDriver(HessianDriver):
         density = self.comm.bcast(density, root=mpi_master())
         omega_ao = self.comm.bcast(omega_ao, root=mpi_master())
 
-        # Solve CPHF equations
+        # CPHF equations
+
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
 
         # TODO: double check propagation of cphf settings
@@ -379,11 +390,46 @@ class ScfHessianDriver(HessianDriver):
             'hessian_first_integral_derivatives']
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
 
+        # First-order contributions
+
         t1 = tm.time()
 
-        hessian_first_order_derivatives = self.compute_furche(
-            molecule, ao_basis, dist_cphf_rhs, dist_cphf_ov,
-            hessian_first_integral_derivatives, hessian_eri_overlap, profiler)
+        # RHS contracted with CPHF coefficients (ov)
+        hessian_cphf_coeff_rhs = np.zeros((natm, 3, natm, 3))
+
+        for i in range(natm):
+            for x in range(3):
+                dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
+
+                for j in range(i, natm):
+                    for y in range(3):
+                        hess_ijxy = 4.0 * (np.dot(
+                            dist_cphf_ov_ix_data,
+                            dist_cphf_rhs[j * 3 + y].data))
+
+                        hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
+                        if i != j:
+                            hessian_cphf_coeff_rhs[j, y, i, x] += hess_ijxy
+
+        hessian_cphf_coeff_rhs = self.comm.reduce(hessian_cphf_coeff_rhs,
+                                                  root=mpi_master())
+
+        if self.rank == mpi_master():
+            hessian_first_order_derivatives = (
+                hessian_cphf_coeff_rhs + hessian_first_integral_derivatives +
+                hessian_eri_overlap)
+        else:
+            hessian_first_order_derivatives = None
+
+        self.ostream.print_info('First order derivative contributions' +
+                                ' to the Hessian computed in' +
+                                ' {:.2f} sec.'.format(tm.time() - t1))
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        # Second-order contributions
+
+        t2 = tm.time()
 
         ovlp_hess_200_drv = OverlapGeom200Driver()
         ovlp_hess_101_drv = OverlapGeom101Driver()
@@ -433,13 +479,6 @@ class ScfHessianDriver(HessianDriver):
         screener.partition(ao_basis, molecule, 'eri')
 
         thresh_int = int(-math.log10(self.scf_driver.eri_thresh))
-
-        t2 = tm.time()
-        self.ostream.print_info('First order derivative contributions' +
-                                ' to the Hessian computed in' +
-                                ' {:.2f} sec.'.format(t2 - t1))
-        self.ostream.print_blank()
-        self.ostream.flush()
 
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
@@ -628,65 +667,15 @@ class ScfHessianDriver(HessianDriver):
             if self._dft:
                 self.hessian += hessian_dft_xc
 
-            t3 = tm.time()
-            self.ostream.print_info('Second order derivative contributions' +
-                                    ' to the Hessian computed in' +
-                                    ' {:.2f} sec.'.format(t3 - t2))
-            self.ostream.print_blank()
-            self.ostream.flush()
+        self.ostream.print_info('Second order derivative contributions' +
+                                ' to the Hessian computed in' +
+                                ' {:.2f} sec.'.format(tm.time() - t2))
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         # Calculate the gradient of the dipole moment for IR intensities
         if self.do_dipole_gradient:
             self.compute_dipole_gradient(molecule, ao_basis, dist_cphf_ov)
-
-    def compute_furche(self, molecule, ao_basis, dist_cphf_rhs, dist_cphf_ov,
-                       hessian_first_integral_derivatives, hessian_eri_overlap,
-                       profiler):
-        """
-        Computes the analytical nuclear Hessian the Furche/Ahlrichs way.
-        Chem. Phys. Lett. 362, 511–518 (2002).
-        DOI: 10.1016/S0009-2614(02)01084-9
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param dist_cphf_rhs:
-            The distributed RHS of the CPHF equations in MO basis.
-        :param dist_cphf_ov:
-            The distributed ov block of the CPHF coefficients.
-        :param profiler:
-            The profiler.
-        """
-
-        natm = molecule.number_of_atoms()
-
-        # RHS contracted with CPHF coefficients (ov)
-        hessian_cphf_coeff_rhs = np.zeros((natm, 3, natm, 3))
-
-        for i in range(natm):
-            for x in range(3):
-                dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
-
-                for j in range(i, natm):
-                    for y in range(3):
-                        hess_ijxy = 4.0 * (np.dot(
-                            dist_cphf_ov_ix_data,
-                            dist_cphf_rhs[j * 3 + y].data))
-
-                        hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
-                        if i != j:
-                            hessian_cphf_coeff_rhs[j, y, i, x] += hess_ijxy
-
-        hessian_cphf_coeff_rhs = self.comm.reduce(hessian_cphf_coeff_rhs,
-                                                  root=mpi_master())
-
-        # return the sum of the three contributions
-        if self.rank == mpi_master():
-            return (hessian_cphf_coeff_rhs +
-                    hessian_first_integral_derivatives + hessian_eri_overlap)
-        else:
-            return None
 
     def compute_dipole_gradient(self, molecule, ao_basis, dist_cphf_ov):
         """

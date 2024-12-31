@@ -89,7 +89,7 @@ class TestScfHessianDriver:
             assert diff_hessian < 1e-6
 
     @pytest.mark.solvers
-    def test_analytical_scf_hessian_furche(self):
+    def test_analytical_scf_hessian(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
         h5file = str(here / 'data' / 'water_analytical_hessian_scf.h5')
@@ -154,7 +154,7 @@ class TestScfHessianDriver:
             assert diff_hessian < 1e-6
 
     @pytest.mark.solvers
-    def test_analytical_pbe_hessian_furche(self):
+    def test_analytical_pbe_hessian(self):
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
         h5file = str(here / 'data' / 'water_analytical_hessian_pbe.h5')
