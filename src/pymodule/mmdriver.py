@@ -193,31 +193,46 @@ class MMDriver:
 
             for (i, j, k, l), dih in self.force_field[dihedral_key].items():
 
-                assert_msg_critical(
-                    dih['type'] in ['Fourier', 'RB'],
-                    'MMDriver: Invalid type for dihedral potential')
+                if dih['multiple']:
+                    # Barrier, phase, and periodicity are in lists
+                    for barrier, phase, periodicity in zip(dih['barrier'],
+                                                           dih['phase'],
+                                                           dih['periodicity']):
+                        RB_coefs = self.get_RB_coefficients(barrier, phase,
+                                                            periodicity)
+                        (potential_energy, grad_i, grad_j, grad_k,
+                         grad_l) = MMDriver.compute_Ryckaert_Bellemans(
+                             coordinates[i], coordinates[j], coordinates[k],
+                             coordinates[l], RB_coefs)
 
-                if dih['type'] == 'RB':
-                    RB_coefs = dih['RB_coefficients']
-                elif dih['type'] == 'Fourier':
+                        if dihedral_key == 'dihedrals':
+                            self.torsion_potential += potential_energy
+                        elif dihedral_key == 'impropers':
+                            self.improper_potential += potential_energy
+
+                        self.gradient[i] += grad_i
+                        self.gradient[j] += grad_j
+                        self.gradient[k] += grad_k
+                        self.gradient[l] += grad_l
+
+                else:
                     RB_coefs = self.get_RB_coefficients(dih['barrier'],
                                                         dih['phase'],
                                                         dih['periodicity'])
+                    (potential_energy, grad_i, grad_j, grad_k,
+                    grad_l) = MMDriver.compute_Ryckaert_Bellemans(
+                        coordinates[i], coordinates[j], coordinates[k],
+                        coordinates[l], RB_coefs)
 
-                (potential_energy, grad_i, grad_j, grad_k,
-                 grad_l) = MMDriver.compute_Ryckaert_Bellemans(
-                     coordinates[i], coordinates[j], coordinates[k],
-                     coordinates[l], RB_coefs)
+                    if dihedral_key == 'dihedrals':
+                        self.torsion_potential += potential_energy
+                    elif dihedral_key == 'impropers':
+                        self.improper_potential += potential_energy
 
-                if dihedral_key == 'dihedrals':
-                    self.torsion_potential += potential_energy
-                elif dihedral_key == 'impropers':
-                    self.improper_potential += potential_energy
-
-                self.gradient[i] += grad_i
-                self.gradient[j] += grad_j
-                self.gradient[k] += grad_k
-                self.gradient[l] += grad_l
+                    self.gradient[i] += grad_i
+                    self.gradient[j] += grad_j
+                    self.gradient[k] += grad_k
+                    self.gradient[l] += grad_l
 
                 self.exclusions.append((i, l))
 
