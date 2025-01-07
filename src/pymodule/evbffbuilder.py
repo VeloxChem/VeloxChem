@@ -202,12 +202,12 @@ class EvbForceFieldBuilder():
                     print(
                         f"Could not find hessian file at ./{self.input_folder}/{filename}_hess.np, calculating hessian with xtb and saving it"
                     )
-                    scf_drv = XtbDriver()
-                    xtb_hessian_drv = XtbHessianDriver(scf_drv)
+                    xtb_drv = XtbDriver()
+                    xtb_hessian_drv = XtbHessianDriver(xtb_drv)
                     xtb_hessian_drv.compute(molecule)
                     hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
                     np.savetxt(f"{self.input_folder}/{filename}_hess.np", hessian)
-                forcefield.reparameterize(hessian=hessian)
+                forcefield.reparametrize(hessian=hessian)
 
             print("Saving force field data to disk")
             self.save_forcefield(forcefield, filename)

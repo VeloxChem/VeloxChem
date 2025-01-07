@@ -56,14 +56,20 @@ class EvbDriver():
     def build_and_run_default_water_EVB(self, reactant: str, product: str | list[str], barrier, free_energy, ordered_input=False):
         
         if not self.debug:
-            Lambda = list(np.linspace(0, 1, 51))
+            Lambda = np.linspace(0,0.1,11)
+            Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,50))
+            Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,11))
         else:
-            Lambda = [0, 0.1,0.2,0.3,0.4,0.5, 0.6,0.7,0.8,0.9,1]
+            Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
             
         self.build_forcefields(reactant, product, ordered_input=ordered_input,optimise=True)
         self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
+
         self.run_FEP()
-        self.compute_energy_profiles(barrier, free_energy)
+        if not self.debug:
+            self.compute_energy_profiles(barrier, free_energy)
+        else:
+            print("Debugging option enabled. Skipping energy profile calculation because recalculation is necessary.")
 
     def build_forcefields(
         self,
@@ -311,7 +317,7 @@ class EvbDriver():
     def run_FEP(
         self,
         equil_steps=5000,
-        total_sample_steps=100000,
+        total_sample_steps=200000,
         write_step=1000,
         initial_equil_steps=5000,
         step_size=0.001,
@@ -335,8 +341,6 @@ class EvbDriver():
             step_size = 0.001
             equil_step_size = 0.001
             initial_equil_step_size = 0.001
-        
-        #todo print out details of run
 
         for conf in self.system_confs:
             print(f"Running FEP for {conf['name']}")
@@ -358,10 +362,11 @@ class EvbDriver():
                 run_folder=conf["run_folder"],
                 data_folder=conf["data_folder"],
             )
-        if self.debug:
-            print("Debugging option enabled.Skipping recalculation.")
-        else:
-            FEP.recalculate(interpolated_potential=True, force_contributions=True)
+
+            if self.debug:
+                print("Debugging option enabled.Skipping recalculation.")
+            else:
+                FEP.recalculate(interpolated_potential=True, force_contributions=True)
 
     def compute_energy_profiles(self, barrier, free_energy):
         reference_folder = self.system_confs[0]["data_folder"]

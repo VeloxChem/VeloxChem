@@ -29,7 +29,7 @@ class EvbDataProcessing:
         self.kb: float = 1.987204259e-3  # kcal/molK
         self.joule_to_cal: float = 0.239001
         self.verbose: bool = True
-        self.coordinate_bins = np.linspace(-300, 150, 300)
+        self.coordinate_bins = np.linspace(-300, 300, 300)
 
         self.calculate_discrete = True
         self.calculate_analytical = True
@@ -41,16 +41,19 @@ class EvbDataProcessing:
         return 1 / (self.kb * T)
 
     def compute(self, reference_folder: str, target_folders: str | list[str], barrier, free_energy):
-
+        print("Starting data processing")
         if isinstance(target_folders, str):
             target_folders = [target_folders]
 
         self.barrier = barrier
         self.free_energy = free_energy
+        print("Loading files")
         self.load_files(reference_folder, target_folders)
+        print("Fitting H12 and alpha")
         self.alpha, self.H12 = self.fit_EVB_parameters()
+        print("Calculating FEP and EVB curves")
         self.get_FEP_and_EVB()
-        self.print_results()
+        print("Saving results")
         self.save_results()
 
     def save_results(self):
@@ -152,8 +155,9 @@ class EvbDataProcessing:
                 Lambda,
                 Lambda_indices,
             )  # todo use T array instead
-            dGevb_ana = self.calculate_dGevb_analytical(dGfep, Lambda, H12)
-            _, barrier, free_energy = self.calculate_free_energies_and_smooth(dGevb_ana)
+            xi = np.linspace(-10000, 10000, 20000)
+            dGevb_ana = self.calculate_dGevb_analytical(dGfep, Lambda, H12, xi)
+            _, barrier, free_energy = self.calculate_free_energies(dGevb_ana, smooth=False)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
             # print(f"Barrier: {barrier}, difference: {barrier_dif}, Free energy: {free_energy}, difference: {free_energy_dif}")
@@ -227,7 +231,7 @@ class EvbDataProcessing:
         binned_data = np.array(binned_data)
         return binned_data
 
-    def calculate_dGevb_analytical(self, dGfep, Lambda, H12):
+    def calculate_dGevb_analytical(self, dGfep, Lambda, H12,xi):
 
         def R(de):
             return np.sqrt(de**2 + 4 * H12**2)
@@ -238,7 +242,7 @@ class EvbDataProcessing:
         def arg(xi):
             return 0.5 * (1 + xi / R(xi))
 
-        dGevb = shift(self.coordinate_bins) + np.interp(arg(self.coordinate_bins), Lambda, dGfep)
+        dGevb = shift(xi) + np.interp(arg(xi), Lambda, dGfep)
         return dGevb
 
     def calculate_dGevb_discretised(self, dGfep, Eg, V, dE, T, Lambda, Lambda_indices):
@@ -293,11 +297,13 @@ class EvbDataProcessing:
         for X_i in range(S):
 
             dGevb.append(np.sum(np.array(pns[X_i]) * (dGfep + np.array(dGcor[X_i]))))
-        return dGevb, pns, dGcor
+        return dGevb, pns, dGcor,count
 
-    def calculate_free_energies_and_smooth(self, dGevb):
-
-        dGevb_smooth = scipy.signal.savgol_filter(dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+    def calculate_free_energies(self, dGevb, smooth=True):
+        if smooth:
+            dGevb_smooth = scipy.signal.savgol_filter(dGevb, self.smooth_window_size, self.smooth_polynomial_order)
+        else:
+            dGevb_smooth = dGevb
 
         min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
         max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
@@ -328,25 +334,31 @@ class EvbDataProcessing:
             Lambda_indices = result["Lambda_indices"]
             E1_ref = result["E1_ref"]
             E2_ref = result["E2_ref"]
-            print(np.shape(E1_ref))
-            print(np.shape(E2_ref))
-            print(np.shape(Lambda_frame))
-            print(result)
             _, V, dE, Eg = self.calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12, Lambda_frame)
-            dGfep, _, _, _ = self.calculate_dGfep(dE, Temp, Lambda, Lambda_indices)  # todo use T array instead
+            dGfep, _, _, _ = self.calculate_dGfep(dE, Temp, Lambda, Lambda_indices) 
 
+            E1_avg = np.average(self.bin(E1_ref,Lambda_indices),axis =1)
+            E2_avg = np.average(self.bin(E2_ref,Lambda_indices),axis =1)
             result.update({
+                "dE": dE,
+                "Eg": Eg,
+                "V": V,
                 "dGfep": dGfep,
                 "Lambda": Lambda,
+                "E1_avg": E1_avg,
+                "E2_avg": E2_avg,
             })
 
+            
+            
+
             if self.calculate_discrete:
-                dGevb_discrete, pns, dGcor = self.calculate_dGevb_discretised(
+                dGevb_discrete, pns, dGcor,count = self.calculate_dGevb_discretised(
                     dGfep,
                     Eg,
                     V,
                     dE,
-                    Temp,  # todo use T array instead
+                    Temp,  
                     Lambda,
                     Lambda_indices,
                 )
@@ -355,7 +367,7 @@ class EvbDataProcessing:
                     dGevb_discrete,
                     barrier_discretised,
                     reaction_free_energy_discretised,
-                ) = self.calculate_free_energies_and_smooth(dGevb_discrete)
+                ) = self.calculate_free_energies(dGevb_discrete)
 
                 result.update({
                     "discrete": {
@@ -364,17 +376,18 @@ class EvbDataProcessing:
                         "barrier": barrier_discretised,
                         "pns": pns,
                         "dGcor": dGcor,
+                        "count": count,
                     }
                 })
 
             if self.calculate_analytical:
-                dGevb_analytical = self.calculate_dGevb_analytical(dGfep, Lambda, self.H12)
+                dGevb_analytical = self.calculate_dGevb_analytical(dGfep, Lambda, self.H12,self.coordinate_bins)
 
                 (
                     dGevb_analytical,
                     barrier_analytical,
                     reaction_free_energy_analytical,
-                ) = self.calculate_free_energies_and_smooth(dGevb_analytical)
+                ) = self.calculate_free_energies(dGevb_analytical)
 
                 result.update({
                     "analytical": {
@@ -405,7 +418,7 @@ class EvbDataProcessing:
             print("Matplotlib is not installed, plotting is not possible.")
             return
 
-        fig, ax = plt.subplots(1, 2, figsize=(8, 4))
+        fig, ax = plt.subplots(1, 3, figsize=(16, 4))
         bin_indicators = (self.coordinate_bins[:-1] + self.coordinate_bins[1:]) / 2
         colors = mcolors.TABLEAU_COLORS
 
@@ -417,10 +430,16 @@ class EvbDataProcessing:
         else:
             discrete_linestyle = "-"
         for i, (name, result) in enumerate(self.results.items()):
-            ax[0].plot(result["Lambda"], result["dGfep"], label=name)
+
+            #Shift both averages by the same amount so that their relative differences stay the same
+            E1_plot = result["E1_avg"] - np.min(result["E1_avg"])
+            E2_plot = result["E2_avg"] - np.min(result["E1_avg"])
+            ax[0].plot(result["Lambda"], E1_plot, label=name + " E1",color=colors[colorkeys[i]],linestyle="--")
+            ax[0].plot(result["Lambda"], E2_plot, label=name + " E2",color=colors[colorkeys[i]],linestyle=":")
+            ax[1].plot(result["Lambda"], result["dGfep"], label=name)
             if plot_discrete:
                 if "discrete" in result.keys():
-                    ax[1].plot(
+                    ax[2].plot(
                         bin_indicators,
                         result["discrete"]["EVB"][1:-1],
                         label=f"{name} discretised",
@@ -429,7 +448,7 @@ class EvbDataProcessing:
                     )
             if plot_analytical:
                 if "analytical" in result.keys():
-                    ax[1].plot(
+                    ax[2].plot(
                         bin_indicators,
                         result["analytical"]["EVB"][1:],
                         label=f"{name} analytical",
@@ -439,21 +458,29 @@ class EvbDataProcessing:
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
             legend_labels.append(name)
 
+        legend_lines = []
+        legend_labels = []
+        legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
+        legend_labels.append("E1")
+        legend_lines.append(Line2D([0], [0], linestyle=":", color="grey"))
+        legend_labels.append("E2")
+        ax[0].legend(legend_lines, legend_labels)
+
         if plot_analytical and plot_discrete:
-            evb_legend_lines = []
-            evb_legend_labels = []
-            evb_legend_lines.append(Line2D([0], [0], linestyle="-", color="grey"))
-            evb_legend_labels.append("analytical")
-            evb_legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
-            evb_legend_labels.append("discrete")
-            ax[1].legend(evb_legend_lines, evb_legend_labels)
+            legend_lines = []
+            legend_labels = []
+            legend_lines.append(Line2D([0], [0], linestyle="-", color="grey"))
+            legend_labels.append("analytical")
+            legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
+            legend_labels.append("discrete")
+            ax[2].legend(legend_lines, legend_labels)
 
         # ax[0].legend()
-        ax[0].set_xlabel(r"$\lambda$")
-        ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kcal/mol)")
+        ax[1].set_xlabel(r"$\lambda$")
+        ax[1].set_ylabel(r"$\Delta G_{FEP}$ (kcal/mol)")
 
-        ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
-        ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kcal/mol)")
+        ax[2].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
+        ax[2].set_ylabel(r"$\Delta G_{EVB}$ (kcal/mol)")
         fig.legend(
             legend_lines,
             legend_labels,
