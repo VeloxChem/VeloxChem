@@ -233,8 +233,6 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
         self._e_nuc_es = electrostatic_interactions.compute_electrostatic_nuclear_energy(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem=self.classical_subsystem)
-        # TODO: double check
-        self._e_nuc_es = self.comm.allreduce(self._e_nuc_es)
 
         vdw_options = self.options['settings'].get('vdw', {})
         self.vdw_method = vdw_options.get('method', 'LJ')
@@ -270,8 +268,6 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
             self._e_nuc_es = electrostatic_interactions.compute_electrostatic_nuclear_energy(
                 quantum_subsystem=self.quantum_subsystem,
                 classical_subsystem=self.classical_subsystem)
-            # TODO: double check
-            self._e_nuc_es = self.comm.allreduce(self._e_nuc_es)
 
         if self._f_elec_es is None:
             self._f_elec_es = electrostatic_interactions.es_fock_matrix_contributions(
