@@ -76,15 +76,6 @@ auto integrateVxcFockGradientForLDA(const CMolecule&                  molecule,
                                     const CXCFunctional&              xcFunctional,
                                     const int32_t                     atomIdx) -> std::vector<CDenseMatrix>;
 
-/**
- Computes AO-to-atom mapping.
-
- @param ao_to_atom_ids the vector for storing the mapping.
- @param molecule the molecule.
- @param basis the molecular basis.
- */
-auto computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) -> void;
-
 }  // namespace xchesslda
 
 #endif /* XCMolecularHessianForLDA_hpp */
