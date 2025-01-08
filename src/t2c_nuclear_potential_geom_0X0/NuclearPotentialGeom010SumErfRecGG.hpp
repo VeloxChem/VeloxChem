@@ -194,23 +194,23 @@ comp_sum_erf_nuclear_potential_geom_010_gg(T& distributor,
 
                     npotrec::comp_prim_nuclear_potential_ss(pbuffer, 9, 0, bf_data, 9, factors, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 10, 1, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 10, 1, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 13, 2, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 13, 2, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 16, 3, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 16, 3, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 19, 4, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 19, 4, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 22, 5, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 22, 5, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 25, 6, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 25, 6, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 28, 7, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 28, 7, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 31, 8, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 31, 8, factors, 17, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 34, 9, factors, 17, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 34, 9, factors, 17, a_exp);
 
                     npotrec::comp_prim_nuclear_potential_sp(pbuffer, 37, 1, 2, factors, 14, 17);
 
