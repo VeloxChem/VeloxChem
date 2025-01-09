@@ -29,12 +29,14 @@ class EvbDataProcessing:
         self.kb: float = 1.987204259e-3  # kcal/molK
         self.joule_to_cal: float = 0.239001
         self.verbose: bool = True
-        self.coordinate_bins = np.linspace(-300, 300, 300)
 
         self.calculate_discrete = True
         self.calculate_analytical = True
         self.smooth_window_size = 10
         self.smooth_polynomial_order = 3
+        self.coordinate_bins = np.array([])
+        self.bin_size = 10
+        self.dens_threshold = 0.05
         self.results = {}
 
     def beta(self, T) -> float:
@@ -245,21 +247,20 @@ class EvbDataProcessing:
         dGevb = shift(xi) + np.interp(arg(xi), Lambda, dGfep)
         return dGevb
 
-    def calculate_dGevb_discretised(self, dGfep, Eg, V, dE, T, Lambda, Lambda_indices):
+    def calculate_dGevb_discretised(self, dGfep, Eg, V, dE, T, Lambda, Lambda_indices, coordinate_bins):
         N = len(Lambda)  # The amount of frames, every lambda value is a frame
-        S = (len(self.coordinate_bins) + 1
-             )  # The amount of bins, in between every value of X is a bin, and outside the range are two bins
+        S = (len(coordinate_bins) + 1)  # The amount of bins, in between every value of X is a bin, and outside the range are two bins
 
         # Array for storing indices of dE compared to lambda and X, X on the first index, Lambda on the second index,
         bin_i = [[[] for x in range(N)] for x in range(S)]
-        # And an array for immediatly storing Eg-V corresponding to that same index
+        # Array for immediatly storing Eg-V corresponding to that same index
         EgmV = [[[] for x in range(N)] for x in range(S)]
 
         T_sorted = [[[] for x in range(N)] for x in range(S)]
 
         # Assign indices
         for (i, de) in enumerate(dE):
-            X_i = np.searchsorted(self.coordinate_bins, de)
+            X_i = np.searchsorted(coordinate_bins, de)
             bin_i[X_i][Lambda_indices[i]].append(i)
             EgmV[X_i][Lambda_indices[i]].append(Eg[i] - V[i])
             T_sorted[X_i][Lambda_indices[i]].append(T[i])
@@ -326,6 +327,8 @@ class EvbDataProcessing:
 
     def get_FEP_and_EVB(self):
 
+        Lambda_indices = np.array([])
+        Lambda = np.array([])
         for result in self.results.values():
             Temp = result["Temp"]
             set_Temp = result["options"]["temperature"]
@@ -335,7 +338,6 @@ class EvbDataProcessing:
             E1_ref = result["E1_ref"]
             E2_ref = result["E2_ref"]
             _, V, dE, Eg = self.calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12, Lambda_frame)
-            dGfep, _, _, _ = self.calculate_dGfep(dE, Temp, Lambda, Lambda_indices) 
 
             E1_avg = np.average(self.bin(E1_ref,Lambda_indices),axis =1)
             E2_avg = np.average(self.bin(E2_ref,Lambda_indices),axis =1)
@@ -343,24 +345,74 @@ class EvbDataProcessing:
                 "dE": dE,
                 "Eg": Eg,
                 "V": V,
-                "dGfep": dGfep,
                 "Lambda": Lambda,
                 "E1_avg": E1_avg,
                 "E2_avg": E2_avg,
+                "Temp": Temp,
             })
 
-            
-            
+        dE_min = 0
+        dE_max = 0
+        for result in self.results.values():
+            dE = result['dE']
+            L = result['Lambda_indices']
+            xy = np.vstack([dE,L])
+            dens = scipy.stats.gaussian_kde(xy)(xy)
+            dens = dens / np.max(dens)
+            result.update({"dE_dens": dens})
 
+            dE_bins = np.linspace(-2000,2000,2000)
+            bin_inds = np.digitize(dE,dE_bins)
+            dens_max = np.array([])
+            for i, bin in enumerate(dE_bins):
+                inds = np.where(bin_inds == i)[0]
+                dE_hist = []
+                for ind in inds:
+                    dE_hist.append(dens[ind])
+                if len(dE_hist) > 0:
+                    dens_max = np.append(dens_max, np.max(dE_hist))
+                else:
+                    dens_max = np.append(dens_max, 0)
+            middle = len(dens_max) // 2
+            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3) #todo maybe get rid of this?
+            min_inds = np.where(dens_max[:middle] < self.dens_threshold)[0]
+            max_inds = np.where(dens_max[middle:] < self.dens_threshold)[0]
+
+            if len(min_inds) == 0:
+                min_inds = [0]
+            if len(max_inds) == 0:
+                max_inds = [len(dE_bins) - middle - 1]
+
+            dE_min_new = dE_bins[min_inds[-1]].round()
+            dE_max_new = dE_bins[max_inds[0] + middle].round()
+            if dE_min_new < dE_min:
+                dE_min = dE_min_new
+            if dE_max_new > dE_max:
+                dE_max = dE_max_new
+        
+
+        coordinate_bins = np.arange(dE_min,dE_max,self.bin_size)
+        self.coordinate_bins = coordinate_bins
+
+        for result in self.results.values():
+            dE = result["dE"]
+            Temp = result["Temp"]
+            Lambda = result["Lambda"]
+            Lambda_indices = result["Lambda_indices"]
+
+            dGfep, _, _, _ = self.calculate_dGfep(dE, Temp, Lambda, Lambda_indices) 
+
+            result.update({"dGfep": dGfep})
             if self.calculate_discrete:
                 dGevb_discrete, pns, dGcor,count = self.calculate_dGevb_discretised(
                     dGfep,
-                    Eg,
-                    V,
-                    dE,
-                    Temp,  
+                    result["Eg"],
+                    result["V"],
+                    result["dE"],
+                    result["Temp"],
                     Lambda,
-                    Lambda_indices,
+                    result["Lambda_indices"],
+                    coordinate_bins,
                 )
 
                 (
@@ -381,7 +433,12 @@ class EvbDataProcessing:
                 })
 
             if self.calculate_analytical:
-                dGevb_analytical = self.calculate_dGevb_analytical(dGfep, Lambda, self.H12,self.coordinate_bins)
+                dGevb_analytical = self.calculate_dGevb_analytical(
+                    result["dGfep"],
+                    result["Lambda"],
+                    self.H12,
+                    coordinate_bins,
+)
 
                 (
                     dGevb_analytical,
@@ -397,6 +454,59 @@ class EvbDataProcessing:
                     }
                 })
 
+    @staticmethod
+    def import_matplotlib():
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.colors as mcolors
+            from matplotlib.lines import Line2D
+            return plt, mcolors, Line2D
+        except ImportError:
+            raise ImportError("Matplotlib is not installed, plotting is not possible.")
+
+    def plot_dE_density(self):
+        plt, mcolors, Line2D = self.import_matplotlib()
+
+        fig, ax = plt.subplots(len(self.results), 2, figsize=(12, 4*len(self.results)))
+        dE_min = self.coordinate_bins[0]
+        dE_max = self.coordinate_bins[-1]
+        dE_bins = np.linspace(-2000,2000,2000)
+        for j, (name, result) in enumerate(self.results.items()):
+            dE = result["dE"]
+            L = result["Lambda_indices"]
+            dens = result["dE_dens"]
+
+            dens_max = np.array([])
+            bin_inds = np.digitize(dE,dE_bins)
+            for i, bin in enumerate(dE_bins):
+                inds = np.where(bin_inds == i)[0]
+                dE_hist = []
+                for ind in inds:
+                    dE_hist.append(dens[ind])
+                if len(dE_hist)>0:
+                    dens_max = np.append(dens_max, np.max(dE_hist))
+                else:
+                    dens_max = np.append(dens_max, 0)
+            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3) #todo maybe get rid of this?
+
+            # print(np.shape(L))
+            # print(np.shape(dE))
+            # print(np.shape(dens))
+            ax[j,0].scatter(dE,L,c=dens,s=5)
+            ax[j,0].plot([dE_min,dE_min],[0,L[-1]/3])
+            ax[j,0].plot([dE_max,dE_max],[2*L[-1]/3,L[-1]])
+
+            middle = len(dens_max) // 2
+            start = np.where(dens_max[:middle] ==0)[0][-1]
+            end = np.where(dens_max[middle:] ==0)[0][0] + middle
+
+            ax[j,1].scatter(dE,dens,s=1)
+            ax[j,1].plot([-start,end],[0.05,0.05])
+            ax[j,1].plot(dE_bins[start:end],dens_max[start:end])
+            ax[j,1].plot([dE_min,dE_min],[0,1])
+            ax[j,1].plot([dE_max,dE_max],[0,1])
+
+
     def print_results(self):
         print(f"{'Discrete':<30}\t Barrier \t\t Free Energy")
         for name, result in self.results.items():
@@ -410,13 +520,7 @@ class EvbDataProcessing:
                 print(f"{name:<30} \t {result['analytical']['barrier']} \t {result['analytical']['free_energy']}")
 
     def plot_results(self, plot_analytical=True, plot_discrete=True):
-        try:
-            import matplotlib.pyplot as plt
-            import matplotlib.colors as mcolors
-            from matplotlib.lines import Line2D
-        except ImportError:
-            print("Matplotlib is not installed, plotting is not possible.")
-            return
+        plt, mcolors, Line2D = self.import_matplotlib()
 
         fig, ax = plt.subplots(1, 3, figsize=(16, 4))
         bin_indicators = (self.coordinate_bins[:-1] + self.coordinate_bins[1:]) / 2
@@ -458,22 +562,22 @@ class EvbDataProcessing:
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
             legend_labels.append(name)
 
-        legend_lines = []
-        legend_labels = []
-        legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
-        legend_labels.append("E1")
-        legend_lines.append(Line2D([0], [0], linestyle=":", color="grey"))
-        legend_labels.append("E2")
-        ax[0].legend(legend_lines, legend_labels)
+        E_legend_lines = []
+        E_legend_labels = []
+        E_legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
+        E_legend_labels.append("E1")
+        E_legend_lines.append(Line2D([0], [0], linestyle=":", color="grey"))
+        E_legend_labels.append("E2")
+        ax[0].legend(E_legend_lines, E_legend_labels)
 
         if plot_analytical and plot_discrete:
-            legend_lines = []
-            legend_labels = []
-            legend_lines.append(Line2D([0], [0], linestyle="-", color="grey"))
-            legend_labels.append("analytical")
-            legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
-            legend_labels.append("discrete")
-            ax[2].legend(legend_lines, legend_labels)
+            EVB_legend_lines = []
+            EVB_legend_labels = []
+            EVB_legend_lines.append(Line2D([0], [0], linestyle="-", color="grey"))
+            EVB_legend_labels.append("analytical")
+            EVB_legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
+            EVB_legend_labels.append("discrete")
+            ax[2].legend(EVB_legend_lines, EVB_legend_labels)
 
         # ax[0].legend()
         ax[1].set_xlabel(r"$\lambda$")

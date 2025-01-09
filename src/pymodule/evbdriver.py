@@ -57,8 +57,9 @@ class EvbDriver():
         
         if not self.debug:
             Lambda = np.linspace(0,0.1,11)
-            Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,50))
+            Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,41))
             Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,11))
+            Lambda = np.round(Lambda,3)
         else:
             Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
             
@@ -147,6 +148,19 @@ class EvbDriver():
 
             if not os.path.exists(data_folder):
                 os.makedirs(data_folder)
+            else:
+                import shutil
+
+                folder = f"./{data_folder}"
+                for filename in os.listdir(folder):
+                    file_path = os.path.join(folder, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        print("Failed to delete %s. Reason: %s" % (file_path, e))
 
             if not os.path.exists(run_folder):
                 os.makedirs(run_folder)
@@ -193,7 +207,6 @@ class EvbDriver():
                 open(f"{data_folder}/topology.pdb", "w"),
             )
 
-            #todo save all options from configuration
             with open(f"{data_folder}/options.json", "w") as file:
                 json.dump(
                     {

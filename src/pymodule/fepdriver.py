@@ -239,7 +239,7 @@ class FepDriver():
             f"{self.data_folder}/Data_combined.dat",
             data,
             header=
-            """#Step, Potential Energy (kJ/mole), Kinetic Energy (kJ/mole), Temperature (K), Box Volume (nm^3), Density (g/mL)"""
+            """Step, Potential Energy (kJ/mole), Kinetic Energy (kJ/mole), Temperature (K), Box Volume (nm^3), Density (g/mL), Lambda"""
         )
         step = 0
         for l in self.Lambda:
