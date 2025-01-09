@@ -78,7 +78,6 @@ class EmbeddingIntegralDriver:
 
     def electronic_fields(self, coordinates: np.ndarray,
                           density_matrix: np.ndarray) -> np.ndarray:
-        # TODO: double check electronic fields...
         """Calculate the electronic fields on coordinates.
 
         Args:
@@ -93,7 +92,7 @@ class EmbeddingIntegralDriver:
             Electronic fields. Shape: (number of atoms, 3) Dtype: np.float64.
         """
 
-        return -1.0 * compute_electric_field_values(self.molecule, self.basis,
+        return compute_electric_field_values(self.molecule, self.basis,
                                                     coordinates, density_matrix)
 
     def induced_dipoles_potential_integrals(
@@ -255,10 +254,11 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
         else:
             self._e_vdw = 0.0
 
-        # TODO: double check default environment_energy option
-        self._environment_energy = (self.classical_subsystem.environment_energy
+        self._environment_energy = (self.classical_subsystem.
+                                    environment_energy(vdw_method=self.vdw_method,
+                                                       vdw_combination_rule=self.vdw_combination_rule)
                                     if self.options['settings'].get(
-                                        'environment_energy', True) else 0.0)
+                                        'environment_energy', False) else 0.0)
 
         self.pe_summary = None
 
