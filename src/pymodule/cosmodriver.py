@@ -114,7 +114,7 @@ class CosmoDriver:
             TODO
         """
 
-        valid_grid_numbers = [50, 110, 194, 302, 434, 590, 770, 974]
+        valid_grid_numbers = [50, 110, 194, 302, 434, 590, 770, 974, 2030]
 
         assert_msg_critical(
             self.grid_per_sphere in valid_grid_numbers,
@@ -123,6 +123,9 @@ class CosmoDriver:
         unit_grid = gen_lebedev_grid(self.grid_per_sphere)
         unit_grid_coords = unit_grid[:, :3]
         unit_grid_weights = unit_grid[:, 3:]
+        
+        # standard normalization of lebedev weights -- unit sphere surface; 1 -> 4pi
+        #unit_grid_weights *= 4 * np.pi
 
         zeta = self.get_zeta_dict()[self.grid_per_sphere]
 
@@ -185,7 +188,21 @@ class CosmoDriver:
         return sw_func
 
     def get_zeta_dict(self):
+        # ref: B. A. Gregersen and D. M. York, J. Chem. Phys. 122, 194110 (2005)
 
+        return {
+            50: 4.89250673295,
+            110: 4.90101060987,
+            194: 4.90337644248,
+            302: 4.90498088169,
+            434: 4.90567349080,
+            590: 4.90624071359,
+            770: 4.90656435779,
+            974: 4.90685167998,
+            2030: 4.90744499142,
+        }
+
+        """
         return {
             50: 4.893,
             110: 4.901,
@@ -195,7 +212,9 @@ class CosmoDriver:
             590: 4.905,
             770: 4.899,
             974: 4.907,
+            2030: 4.907,
         }
+        """
 
     def form_matrix_A(self, grid, sw_func):
 
