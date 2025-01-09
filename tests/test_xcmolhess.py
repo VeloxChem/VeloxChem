@@ -27,9 +27,13 @@ class TestXCMolHess:
         scf_drv.grid_level = grid_level
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
-        gs_dm = scf_drv.density.alpha_to_numpy(0)
+        if scf_drv.rank == mpi_master():
+            gs_dm = scf_results['D_alpha']
+        else:
+            gs_dm = None
+        gs_dm = scf_drv.comm.bcast(gs_dm, root=mpi_master())
 
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
