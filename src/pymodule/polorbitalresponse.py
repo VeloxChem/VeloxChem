@@ -779,11 +779,11 @@ class PolOrbitalResponse(CphfSolver):
 
                 # TODO purge dict
                 orbrsp_rhs[(w)] = {
-                    'cphf_rhs': rhs_red,
+                    #'cphf_rhs': rhs_red,
                     'dm_oo': dm_oo,
                     'dm_vv': dm_vv,
-                    'x_plus_y_ao': x_plus_y_ao,
-                    'x_minus_y_ao': x_minus_y_ao,
+                    #'x_plus_y_ao': x_plus_y_ao,
+                    #'x_minus_y_ao': x_minus_y_ao,
                     'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
@@ -802,8 +802,9 @@ class PolOrbitalResponse(CphfSolver):
                 dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm, root=mpi_master()))
 
         if self.rank == mpi_master():
-            orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
             orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            if not self.use_subspace_solver:
+                orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
             return orbrsp_rhs
         else:
             return {
