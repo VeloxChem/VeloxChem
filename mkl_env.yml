@@ -23,7 +23,6 @@ dependencies:
   - openmm
   - scipy
   - openbabel
-  - cppe
   - xtb
   - geometric
   - libxc<7

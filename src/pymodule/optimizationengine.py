@@ -95,9 +95,11 @@ class OptimizationEngine(geometric.engine.Engine):
         start_time = tm.time()
 
         labels = self.molecule.get_labels()
+        atom_basis_labels = self.molecule.get_atom_basis_labels()
 
         if self.rank == mpi_master():
-            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au')
+            new_mol = Molecule(labels, coords.reshape(-1, 3), 'au',
+                               atom_basis_labels)
             new_mol.set_charge(self.molecule.get_charge())
             new_mol.set_multiplicity(self.molecule.get_multiplicity())
         else:
@@ -117,14 +119,16 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.flush()
 
         if not self._debug:
-            self.grad_drv.ostream.mute()
+            #self.grad_drv.ostream.mute()
+            pass
 
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
         if not self._debug:
-            self.grad_drv.ostream.unmute()
+            #self.grad_drv.ostream.unmute()
+            pass
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

@@ -40,6 +40,10 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
+from .veloxchemlib import XCMolecularGradient
+
+# for backward compatibility only
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 
 # C++ functions
 from .veloxchemlib import is_chemical_element
@@ -62,6 +66,8 @@ from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
+from .veloxchemlib import partition_atoms
+
 # C++ enums
 from .veloxchemlib import mat_t
 from .veloxchemlib import denmat
@@ -90,6 +96,7 @@ from .scfgradientdriver import ScfGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
+from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
 from .cosmodriver import CosmoDriver
 from .cpcmdriver import CpcmDriver
@@ -121,6 +128,7 @@ from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
+from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver
@@ -134,6 +142,12 @@ from .symmetryanalyzer import SymmetryAnalyzer
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
+from .oneeints import compute_overlap_integrals
+from .oneeints import compute_kinetic_energy_integrals
+from .oneeints import compute_nuclear_potential_integrals
+from .oneeints import compute_electric_dipole_integrals
+from .oneeints import compute_linear_momentum_integrals
+from .oneeints import compute_angular_momentum_integrals
 
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking

@@ -126,6 +126,13 @@ class CDenseMatrix
     auto transpose() const -> CDenseMatrix;
 
     /**
+     Scales the matrix: a_ij *= factor.
+
+     @param factor the factor.
+     */
+    auto scale(const double factor) -> void;
+
+    /**
      Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).
      */
     auto symmetrize() -> void;

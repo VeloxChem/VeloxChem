@@ -39,7 +39,7 @@ namespace pdftpbec_erf {  // pdftpbec_erf namespace
  @param vrho the 1st-order functional derivative wrt density.
  @param mu the range-separation parameter.
  */
-void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma, const double mu);
+void compute_exc_vxc(const int np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma, const double mu);
 
 }  // namespace pdftpbec_erf
 
