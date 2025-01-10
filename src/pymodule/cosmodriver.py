@@ -125,7 +125,7 @@ class CosmoDriver:
         unit_grid_weights = unit_grid[:, 3:]
         
         # standard normalization of lebedev weights -- unit sphere surface; 1 -> 4pi
-        #unit_grid_weights *= 4 * np.pi
+        unit_grid_weights *= 4 * np.pi
 
         zeta = self.get_zeta_dict()[self.grid_per_sphere]
 
