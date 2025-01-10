@@ -272,13 +272,39 @@ class PolarizabilityGradient:
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
 
+        else:
+            nocc = None
+            nvir = None
+
+        nocc = self.comm.bcast(nocc, root=mpi_master())
+        nvir = self.comm.bcast(nvir, root=mpi_master())
+
         for f, w in enumerate(self.frequencies):
 
-            # NOTE WIP
             full_vec = [
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
                 for x in self.vector_components
             ]
+
+            # NOTE WIP
+            # cphf subspace solver returns the solution as distributed array
+            if 'dist_cphf_ov' in all_orbrsp_results.keys():
+                if self.rank == mpi_master():
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
+                else:
+                    cphf_ov = None
+
+                for idx, xy in enumerate(xy_pairs):
+                    # get lambda multipliers from distributed array
+                    tmp_cphf_ov = all_orbrsp_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+
+                    if self.rank == mpi_master():
+                        x = xy[0]
+                        y = xy[1]
+                        cphf_ov[x, y] += tmp_cphf_ov
+
+                        if (y != x):
+                            cphf_ov[y, x] += cphf_ov[x, y]
 
             if self.rank == mpi_master():
 
@@ -326,6 +352,7 @@ class PolarizabilityGradient:
                 # TODO read from dist. array when implemented
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
+
                 # TODO compute from orbsrsp cphf_ov dist. array
                 lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
