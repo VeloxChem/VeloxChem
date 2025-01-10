@@ -81,8 +81,8 @@ class CosmoDriver:
 
         # input keywords
         self.input_keywords = {
-            'cosmo': {
-                'grid_per_sphere': (int, 'number of Lebedev grid points'),
+            'cpcm': {
+                'grid_per_sphere': ('int', 'number of Lebedev grid points'),
             },
         }
 
@@ -255,7 +255,7 @@ class CosmoDriver:
 
         return Bmat
 
-    def form_vector_C(self, grid, molecule, basis, D, erf):
+    def form_vector_C(self, grid, molecule, basis, D):
         esp = np.zeros(grid.shape[0])
         # electrostatic potential integrals
         node_grps = [p for p in range(self.nodes)]
@@ -270,14 +270,10 @@ class CosmoDriver:
         end = sum(counts[:self.rank + 1])
 
         local_esp = np.zeros(end - start)
-        npot_drv = NuclearPotentialDriver()
         nerf_drv = NuclearPotentialErfDriver()
         
         for i in range(start, end):
-            if erf:
-                epi_matrix = 1.0 * nerf_drv.compute(molecule, basis, [1.0], [grid[i,:3]], grid[i,4]).full_matrix().to_numpy()
-            else:
-                epi_matrix = 1.0 * npot_drv.compute(molecule, basis, [1.0], [grid[i,:3]]).full_matrix().to_numpy()
+            epi_matrix = 1.0 * nerf_drv.compute(molecule, basis, [1.0], [grid[i,:3]], grid[i,4]).full_matrix().to_numpy()
 
             if local_comm.Get_rank() == mpi_master():
                 local_esp[i - start] -= np.sum(epi_matrix * D)
@@ -294,17 +290,14 @@ class CosmoDriver:
         else:
             return None
 
-    def get_contribution_to_Fock(self, molecule, basis, grid, q, erf):
+    def get_contribution_to_Fock(self, molecule, basis, grid, q):
         grid_coords = grid[:, :3].copy()
         zeta        = grid[:, 4].copy()
 
         if self.rank == mpi_master():
-            if erf:
-                nerf_drv = NuclearPotentialErfDriver()
-                V_es = -1.0 * nerf_drv.compute(molecule, basis, q, grid_coords, zeta).full_matrix().to_numpy()
-            else:
-                npot_drv = NuclearPotentialDriver()
-                V_es = -1.0 * npot_drv.compute(molecule, basis, q, grid_coords).full_matrix().to_numpy()
+            nerf_drv = NuclearPotentialErfDriver()
+            V_es = -1.0 * nerf_drv.compute(molecule, basis, q, grid_coords, zeta).full_matrix().to_numpy()
+
         else:
             V_es = None
 

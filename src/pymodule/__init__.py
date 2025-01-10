@@ -34,6 +34,8 @@ from .veloxchemlib import OverlapGeom100Driver
 from .veloxchemlib import KineticEnergyGeom100Driver
 from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
+from .veloxchemlib import NuclearPotentialErfGeom010Driver
+from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
@@ -98,7 +100,6 @@ from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
-from .cosmodriver import CosmoDriver
 from .cpcmdriver import CpcmDriver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver

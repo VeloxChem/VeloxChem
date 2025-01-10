@@ -57,8 +57,8 @@ from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
-from .cosmodriver import CosmoDriver
 from .cpcmdriver import CpcmDriver
+from .cosmodriver import CosmoDriver
 
 class ScfDriver:
     """
@@ -208,10 +208,7 @@ class ScfDriver:
                                   # of water as the solvent
         self.cpcm_x = 0 # x in scaling function f
         self.cpcm_grid_per_sphere = 110
-        self.cpcm_erf = False
         self.cpcm_alternative = False
-        self.cpcm_alt_grid = None
-        self.cpcm_alt_swf = None
 
         # split communicators
         self.use_split_comm = False
@@ -464,7 +461,7 @@ class ScfDriver:
 
         if self.solvation_model is not None:
             assert_msg_critical(
-                self.solvation_model in ['c_pcm', 'C_PCM'],
+                self.solvation_model in ['cpcm', 'CPCM', 'c-pcm', 'C-PCM', 'c_pcm', 'C_PCM'],
                 'SCF driver: Only the C-PCM solvation model is implemented.')
             self._cpcm = True
 
@@ -538,7 +535,7 @@ class ScfDriver:
 
         if self._cpcm:
             if self.cpcm_alternative:
-                self.cpcm_drv = CpcmDriver(self.cpcm_grid_per_sphere, self.cpcm_alt_grid, self.comm, self.ostream)
+                self.cpcm_drv = CpcmDriver(self.cpcm_grid_per_sphere, self.comm, self.ostream)
             else:
                 self.cpcm_drv = CosmoDriver(self.cpcm_grid_per_sphere, self.comm, self.ostream)
 
@@ -1370,7 +1367,7 @@ class ScfDriver:
             if self._cpcm:
                 Cvec = self.cpcm_drv.form_vector_C(
                     self._cpcm_grid, molecule, ao_basis,
-                    den_mat[0] + den_mat[0], self.cpcm_erf)
+                    den_mat[0] + den_mat[0])
                     #den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0))
 
                 scale_f = -(self.cpcm_epsilon - 1) / (self.cpcm_epsilon + self.cpcm_x)
@@ -1383,7 +1380,7 @@ class ScfDriver:
                 self.cpcm_epol = e_sol
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
-                    self._cpcm_grid, q, self.cpcm_erf)
+                    self._cpcm_grid, q)
                 fock_mat[0] += Fock_sol
 
             if self.rank == mpi_master() and self.electric_field is not None:
