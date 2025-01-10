@@ -53,6 +53,8 @@ from .profiler import Profiler
 from .matrices import Matrices
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 
 
 class ScfHessianDriver(HessianDriver):
@@ -275,6 +277,11 @@ class ScfHessianDriver(HessianDriver):
         :param profiler:
             The profiler.
         """
+
+        # sanity checks
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, self.scf_driver.scf_tensors)
+        dft_sanity_check(self, 'compute', 'hessian')
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
