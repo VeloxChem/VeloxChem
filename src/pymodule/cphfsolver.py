@@ -130,12 +130,6 @@ class CphfSolver(LinearSolver):
             nalpha == nbeta,
             'CphfSolver: not implemented for unrestricted case')
 
-        if self.rank == mpi_master():
-            if self._dft:
-                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
-            else:
-                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
-
         if self.use_subspace_solver:
             self.cphf_results = self.compute_subspace_solver(
                 molecule, basis, scf_tensors, *args)
@@ -178,6 +172,12 @@ class CphfSolver(LinearSolver):
 
         # check pe setup
         pe_sanity_check(self)
+
+        if self.rank == mpi_master():
+            if self._dft:
+                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
+            else:
+                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -782,6 +782,12 @@ class CphfSolver(LinearSolver):
 
         # check pe setup
         pe_sanity_check(self)
+
+        if self.rank == mpi_master():
+            if self._dft:
+                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
+            else:
+                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)

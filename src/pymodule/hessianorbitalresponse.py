@@ -38,6 +38,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
 from .errorhandler import assert_msg_critical
+from .dftutils import get_default_grid_level
 
 
 class HessianOrbitalResponse(CphfSolver):
@@ -585,6 +586,15 @@ class HessianOrbitalResponse(CphfSolver):
         cur_str = 'Convergence Threshold           : {:.1e}'.format(
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()
