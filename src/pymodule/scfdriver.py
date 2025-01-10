@@ -133,6 +133,19 @@ class ScfDriver:
         self.max_iter = 50
         self._first_step = False
 
+        # pseudo fractional occupation number (pFON)
+        # J. Chem. Phys. 110, 695-700 (1999)
+        self.pfon = False
+        self.pfon_temperature = 1250
+        self.pfon_delta_temperature = 50
+        self.pfon_nocc = 5
+        self.pfon_nvir = 5
+
+        # level-shifting
+        # Int. J. Quantum Chem. 7, 699-705 (1973).
+        self.level_shifting = 0.0
+        self.level_shifting_delta = 0.01
+
         # thresholds
         self.conv_thresh = 1.0e-6
         self.ovl_thresh = 1.0e-6
@@ -255,6 +268,15 @@ class ScfDriver:
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
+                'max_err_vecs': ('int', 'maximum number of DIIS error vectors'),
+                'pfon': ('bool', 'use pFON to accelerate convergence'),
+                'pfon_temperature': ('float', 'pFON temperature'),
+                'pfon_delta_temperature': ('float', 'pFON delta temperature'),
+                'pfon_nocc':
+                    ('int', 'number of occupied orbitals used in pFON'),
+                'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
+                'level_shifting': ('float', 'level shifting parameter'),
+                'level_shifting_delta': ('float', 'level shifting delta'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
@@ -1382,6 +1404,33 @@ class ScfDriver:
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
                     self._cpcm_grid, q)
                 fock_mat[0] += Fock_sol
+            if (self.rank == mpi_master() and i > 0 and
+                    self.level_shifting > 0.0):
+
+                self.ostream.print_info(
+                    f'Applying level-shifting ({self.level_shifting:.2f}au)')
+
+                C_alpha = self.molecular_orbitals.alpha_to_numpy()
+                nocc_a = molecule.number_of_alpha_electrons()
+                fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
+                for idx in range(nocc_a, fmo_a.shape[0]):
+                    fmo_a[idx, idx] += self.level_shifting
+                fock_mat[0] = np.linalg.multi_dot(
+                    [S, C_alpha, fmo_a, C_alpha.T, S])
+
+                if self.scf_type != 'restricted':
+
+                    C_beta = self.molecular_orbitals.beta_to_numpy()
+                    nocc_b = molecule.number_of_beta_electrons()
+                    fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
+                    for idx in range(nocc_b, fmo_b.shape[0]):
+                        fmo_b[idx, idx] += self.level_shifting
+                    fock_mat[1] = np.linalg.multi_dot(
+                        [S, C_beta, fmo_b, C_beta.T, S])
+
+                self.level_shifting -= self.level_shifting_delta
+                if self.level_shifting < 0.0:
+                    self.level_shifting = 0.0
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1408,6 +1457,13 @@ class ScfDriver:
 
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
+
+            # threshold for deactivating pseudo-FON and level-shifting
+            if e_grad < 1.0e-4:
+                if self.pfon:
+                    self.pfon_temperature = 0
+                if self.level_shifting > 0.0:
+                    self.level_shifting = 0.0
 
             # compute density change and energy change
 
@@ -1463,6 +1519,11 @@ class ScfDriver:
 
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
+
+            if self.pfon:
+                self.pfon_temperature -= self.pfon_delta_temperature
+                if self.pfon_temperature < 0:
+                    self.pfon_temperature = 0
 
             if self._mom is not None:
                 self._apply_mom(molecule, ovl_mat)

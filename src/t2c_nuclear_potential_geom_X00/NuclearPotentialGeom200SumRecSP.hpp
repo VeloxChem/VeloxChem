@@ -179,7 +179,7 @@ comp_sum_nuclear_potential_geom_20_sp(T&                               distribut
 
                     t2cgeom::comp_prim_op_geom_20_sx(pbuffer, 56, 5, 38, 1, 3, a_exp);
 
-                    t2cfunc::reduce(cbuffer, pbuffer, 0, charges[l], ket_width, ket_npgtos);
+                    t2cfunc::reduce(cbuffer, pbuffer, 56, charges[l], ket_width, ket_npgtos);
                 }
             }
 

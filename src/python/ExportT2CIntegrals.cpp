@@ -255,8 +255,6 @@ export_t2cintegrals(py::module& m)
                const std::vector<std::array<double, 3>>& coords_array,
                const std::vector<double>& charges) -> CMatrices { return geom_drv.compute(basis, molecule, iatom, coords_array, charges); },
             "Computes nuclear potential first derivatives matrices for given molecule, basis, selected atom, and point charges.");
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
-            "Computes nuclear potential first derivatives matrices for given molecule, basis and selected atom.");
     
     // CNuclearPotentialErfGeom100Driver class
     PyClass<CNuclearPotentialErfGeomX00Driver<1>>(m, "NuclearPotentialErfGeom100Driver")
@@ -264,7 +262,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const CNuclearPotentialErfGeomX00Driver<1>& geom_drv, const std::vector<double> &omegas, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(omegas, basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(omegas, basis, molecule, iatom); },
             "Computes nuclear potential first derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom200Driver class
