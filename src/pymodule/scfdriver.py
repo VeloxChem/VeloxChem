@@ -58,7 +58,6 @@ from .sanitychecks import molecule_sanity_check, dft_sanity_check, pe_sanity_che
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 from .cpcmdriver import CpcmDriver
-from .cosmodriver import CosmoDriver
 
 class ScfDriver:
     """
@@ -215,13 +214,9 @@ class ScfDriver:
         self._embedding_drv = None
 
         # solvation model
-        self._cpcm = False
         self.solvation_model = None
-        self.cpcm_epsilon = 78.39 # standard setting is for that
-                                  # of water as the solvent
-        self.cpcm_x = 0 # x in scaling function f
-        self.cpcm_grid_per_sphere = 110
-        self.cpcm_alternative = False
+        self._cpcm = False
+        self.cpcm_drv = None
 
         # split communicators
         self.use_split_comm = False
@@ -486,6 +481,7 @@ class ScfDriver:
                 self.solvation_model in ['cpcm', 'CPCM', 'c-pcm', 'C-PCM', 'c_pcm', 'C_PCM'],
                 'SCF driver: Only the C-PCM solvation model is implemented.')
             self._cpcm = True
+            self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
 
     def _pe_sanity_check(self, method_dict=None):
         """
@@ -555,12 +551,6 @@ class ScfDriver:
         # check pe setup
         pe_sanity_check(self)
 
-        if self._cpcm:
-            if self.cpcm_alternative:
-                self.cpcm_drv = CpcmDriver(self.cpcm_grid_per_sphere, self.comm, self.ostream)
-            else:
-                self.cpcm_drv = CosmoDriver(self.cpcm_grid_per_sphere, self.comm, self.ostream)
-
         # check print level (verbosity of output)
         if self.print_level < 2:
             self.print_level = 1
@@ -622,7 +612,7 @@ class ScfDriver:
 
         # set up polarizable continuum model
         if self._cpcm:
-            self._cpcm_grid, self._cpcm_sw_func = self.cpcm_drv.generate_cosmo_grid(
+            self._cpcm_grid, self._cpcm_sw_func = self.cpcm_drv.generate_cpcm_grid(
                 molecule)
             self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
                 self._cpcm_grid, self._cpcm_sw_func)
@@ -1387,12 +1377,12 @@ class ScfDriver:
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
             if self._cpcm:
-                Cvec = self.cpcm_drv.form_vector_C(
-                    self._cpcm_grid, molecule, ao_basis,
+                Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
+                    self._cpcm_grid,
                     den_mat[0] + den_mat[0])
                     #den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0))
 
-                scale_f = -(self.cpcm_epsilon - 1) / (self.cpcm_epsilon + self.cpcm_x)
+                scale_f = -(self.cpcm_drv.epsilon - 1) / (self.cpcm_drv.epsilon + self.cpcm_drv.x)
                 rhs = scale_f * (self._cpcm_Bzvec + Cvec)
                 q = np.linalg.solve(self._cpcm_Amat, rhs)
                 self._cpcm_q = q
@@ -1404,6 +1394,7 @@ class ScfDriver:
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
                     self._cpcm_grid, q)
                 fock_mat[0] += Fock_sol
+
             if (self.rank == mpi_master() and i > 0 and
                     self.level_shifting > 0.0):
 
