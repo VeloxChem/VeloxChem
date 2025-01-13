@@ -64,8 +64,16 @@ auto make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> 
 
 /// @brief Generates work groups for OMP tasks manager.
 /// @param gto_pair_blocks The vector of basis functions pair blocks.
+/// @param ithreshold The screening threshold of integrals.
 /// @return The vector of work tasks.
 auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int ithreshold) -> std::vector<std::array<size_t, 8>>;
+
+/// @brief Generates work groups for OMP tasks manager.
+/// @param gto_pair_blocks The vector of basis functions pair blocks.
+/// @param min_threshold The minimal screening threshold of integrals.
+/// @param max_threshold The maximum screening threshold of integrals.
+/// @return The vector of work tasks.
+auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int min_threshold, const int max_threshold) -> std::vector<std::array<size_t, 8>>;
 
 /// @brief Gets angular momentum scaling factor for SIMD width.
 /// @param ang_pair The angular momentum pair.

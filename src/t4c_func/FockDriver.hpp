@@ -76,6 +76,20 @@ class CFockDriver
                  const double        exchange_factor,
                  const double        omega,
                  const int           ithreshold) const -> CMatrix;
+    
+    /// @brief Computes Fock matrix for given density..
+    /// @param screener The screener with basis function pairs data.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param label The label of Fock matrix type.
+    /// @param exchange_factor The exchange-correlation factors.
+    /// @param omega The range separation factor.
+    /// @return The Fock matrix.
+    auto compute_mixpre(const CT4CScreener &screener,
+                        const CMatrix      &density,
+                        const std::string  &label,
+                        const double        exchange_factor,
+                        const double        omega,
+                        const int           ithreshold) const -> CMatrix;
 
     /// @brief Computes Fock matrices for given densities.
     /// @param screener The screener with basis function pairs data.
