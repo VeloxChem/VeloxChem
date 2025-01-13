@@ -32,8 +32,8 @@ CThreeCenterOverlapDriver::compute(const std::vector<double>         &exponents,
     std::ranges::for_each(std::views::iota(size_t{0}, exponents.size()), [&](const auto index) {
         auto bf = CBasisFunction({exponents[index], }, {1.0, }, 0);
         bf.normalize();
-        gnorms.push_back(factors[index] * bf.get_normalization_factors()[0]);
-        //gnorms.push_back(factors[index]);
+        //gnorms.push_back(factors[index] * bf.get_normalization_factors()[0]);
+        gnorms.push_back(factors[index]);
     } );
 
     auto ptr_coordinates = &coordinates;
