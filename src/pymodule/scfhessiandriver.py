@@ -193,8 +193,11 @@ class ScfHessianDriver(HessianDriver):
 
         self.ostream.mute()
 
-        # atom labels
+        # atom labels and atom basis labels
         labels = molecule.get_labels()
+        atom_basis_labels = molecule.get_atom_basis_labels()
+
+        # main basis label
         basis_label = ao_basis.get_label()
 
         # number of atoms
@@ -222,7 +225,7 @@ class ScfHessianDriver(HessianDriver):
             for x in range(3):
 
                 coords[i, x] += self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 new_bas = MolecularBasis.read(new_mol, basis_label)
@@ -235,7 +238,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_plus = prop.get_property('dipole moment')
 
                 coords[i, x] -= 2.0 * self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 new_bas = MolecularBasis.read(new_mol, basis_label)
