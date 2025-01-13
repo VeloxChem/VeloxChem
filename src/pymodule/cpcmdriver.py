@@ -732,11 +732,11 @@ class CpcmDriver:
         grad_C_nuc[-1] = -np.sum(grad_C_nuc[:-1], axis=0)
         return grad_C_nuc + grad_C_cav
 
-    def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D, eps, x):
+    def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D):
         """
         Collects the CPCM gradient contribution.
         """
-        gradA = self.grad_Aij(molecule, grid, q, eps, x) + self.grad_Aii(molecule, grid, sw_f, q, eps, x)
+        gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x) + self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
         gradB = self.grad_B(molecule, grid, q)
         gradC = self.grad_C(molecule, basis, grid, q, D)
         return gradA + gradB + gradC

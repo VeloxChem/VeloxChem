@@ -455,9 +455,7 @@ class ScfGradientDriver(GradientDriver):
                                                 self.scf_driver._cpcm_grid,
                                                 self.scf_driver._cpcm_sw_func,
                                                 self.scf_driver._cpcm_q, 
-                                                2 * D,
-                                                self.scf_driver.cpcm_epsilon,
-                                                self.scf_driver.cpcm_x)
+                                                2 * D)
 
         # nuclei-point charges contribution to gradient
 
