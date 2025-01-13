@@ -220,7 +220,7 @@ class CpcmDriver:
 
                 ax, ay, az = atom_coords[i]
                 a_radius = atom_radii[i]
-                r_ag = math.sqrt((ax - gx)**2 + (ay - gy)**2 + (az - gz)**2)
+                r_ag = np.sqrt((ax - gx)**2 + (ay - gy)**2 + (az - gz)**2)
                 f_ag = 1.0 - 0.5 * (math.erf(zeta_g * (a_radius - r_ag)) +
                                     math.erf(zeta_g * (a_radius + r_ag)))
 
@@ -263,7 +263,7 @@ class CpcmDriver:
 
         Amat = np.zeros((grid.shape[0], grid.shape[0]))
 
-        sqrt_2_invpi = math.sqrt(2.0 / math.pi)
+        sqrt_2_invpi = np.sqrt(2.0 / np.pi)
 
         for i in range(grid.shape[0]):
             xi, yi, zi, wi, zeta_i, atom_idx = grid[i]
@@ -274,9 +274,9 @@ class CpcmDriver:
                 xj, yj, zj, wj, zeta_j, atom_idx = grid[j]
 
                 zeta_j2 = zeta_j**2
-                zeta_ij = zeta_i * zeta_j / math.sqrt(zeta_i2 + zeta_j2)
+                zeta_ij = zeta_i * zeta_j / np.sqrt(zeta_i2 + zeta_j2)
 
-                r_ij = math.sqrt((xi - xj)**2 + (yi - yj)**2 + (zi - zj)**2)
+                r_ij = np.sqrt((xi - xj)**2 + (yi - yj)**2 + (zi - zj)**2)
 
                 Aij = math.erf(zeta_ij * r_ij) / r_ij
                 Amat[i, j] = Aij
@@ -306,7 +306,7 @@ class CpcmDriver:
             xi, yi, zi, wi, zeta_i, atom_idx = grid[i]
             for a in range(natoms):
                 xa, ya, za = atom_coords[a]
-                r_ia = math.sqrt((xi - xa)**2 + (yi - ya)**2 + (zi - za)**2)
+                r_ia = np.sqrt((xi - xa)**2 + (yi - ya)**2 + (zi - za)**2)
                 Bmat[i, a] = math.erf(zeta_i * r_ia) / r_ia
 
         return Bmat
@@ -439,7 +439,7 @@ class CpcmDriver:
         The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         # Defnine constants
-        two_sqrt_invpi = 2.0 / np.sqrt(math.pi)
+        two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
         natoms         = molecule.number_of_atoms()
         scale_f        = -(eps - 1) / (eps + x)
         avoid_div_0    = 1e-12
@@ -513,7 +513,7 @@ class CpcmDriver:
         The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         # Basic constants
-        sqrt_2_inv_pi = np.sqrt(2.0 / math.pi)
+        sqrt_2_inv_pi = np.sqrt(2.0 / np.pi)
         scale_f       = -(eps - 1) / (eps + x)
         avoid_div_0   = 1e-12
         natoms        = molecule.number_of_atoms()
@@ -556,7 +556,7 @@ class CpcmDriver:
 
         # Derivative of fiJ: dfiJ_driJ
         z2 = _zeta**2
-        dfiJ_driJ = (_zeta / math.sqrt(math.pi)) * (
+        dfiJ_driJ = (_zeta / np.sqrt(np.pi)) * (
             -np.exp(-z2 * (RJ - _r_iJ)**2) + np.exp(-z2 * (RJ + _r_iJ)**2))
 
         # Avoid division by zero
@@ -621,7 +621,7 @@ class CpcmDriver:
         # Define constants
         # M = Nr. of grid points
         M              = grid_coords.shape[0]
-        two_sqrt_invpi = 2.0 / np.sqrt(math.pi)
+        two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
         avoid_div_0    = 1e-12
         dB_mat         = np.zeros((M, natoms, natoms, 3))
 
@@ -741,7 +741,7 @@ class CpcmDriver:
         gradC = self.grad_C(molecule, basis, grid, q, D)
         return gradA + gradB + gradC
 
-    def cosmo_grad_contribution(self, molecule, basis, grid, sw_f, q, D, eps, x):
+    def non_vec_cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D, eps, x):
         # get the C-PCM gradient contribution (non-vectorized)
 
         # Helper functions
@@ -763,7 +763,7 @@ class CpcmDriver:
             atom_coords = molecule.get_coordinates_in_bohr()
             natoms = molecule.number_of_atoms()
             natoms_ = natoms
-            two_sqrt_invpi = 2 / math.sqrt(math.pi)
+            two_sqrt_invpi = 2 / np.sqrt(np.pi)
             dB_mat = np.zeros((grid.shape[0], natoms, natoms, 3))
 
             for I in range(natoms - 1):
@@ -777,7 +777,7 @@ class CpcmDriver:
 
                         ri = np.array([xi, yi, zi])
                         r_ia_2 = (xi - xa)**2 + (yi - ya)**2 + (zi - za)**2
-                        r_ia = math.sqrt(r_ia_2)
+                        r_ia = np.sqrt(r_ia_2)
 
                         dr_ia = factor * dr_rij(ri, ra)
 
@@ -837,7 +837,7 @@ class CpcmDriver:
             return grad_C_nuc + grad_C_cav
 
         def grad_Aij(molecule, grid, q, eps, x):
-            two_sqrt_invpi = 2 / math.sqrt(math.pi)
+            two_sqrt_invpi = 2 / np.sqrt(np.pi)
             natoms         = molecule.number_of_atoms()
             scale_f        = -(eps - 1) / (eps + x)
             grad           = np.zeros((grid.shape[0], grid.shape[0], natoms, 3)) # (grid_pts, grid_pts, natoms, 3)
@@ -873,7 +873,7 @@ class CpcmDriver:
             natoms = molecule.number_of_atoms()
             natoms_ = natoms
             grad = np.zeros((grid.shape[0], grid.shape[0], natoms, 3))
-            sqrt_2_inv_pi = math.sqrt(2 / math.pi)
+            sqrt_2_inv_pi = np.sqrt(2 / np.pi)
             atom_radii = molecule.vdw_radii_to_numpy() * 1.2
             atom_coords = molecule.get_coordinates_in_bohr()
             scale_f = -(eps - 1) / (eps + x)
@@ -894,7 +894,7 @@ class CpcmDriver:
                         
                         dr_iJ = factor * dr_rij(r_i, r_J) 
                         fiJ = 1 - 0.5 * (math.erf(zeta_i * (RJ - r_iJ)) + math.erf(zeta_i * (RJ + r_iJ)))
-                        dfiJ_driJ = zeta_i/math.sqrt(math.pi) * (-1.0 * math.exp(-1.0 * zeta_i**2 * (RJ - r_iJ)**2) + math.exp(-1.0 * zeta_i**2 * (RJ + r_iJ)**2))
+                        dfiJ_driJ = zeta_i/np.sqrt(np.pi) * (-1.0 * math.exp(-1.0 * zeta_i**2 * (RJ - r_iJ)**2) + math.exp(-1.0 * zeta_i**2 * (RJ + r_iJ)**2))
                         summed_fi += dfiJ_driJ / fiJ * dr_iJ
                     
                     grad_F_i = -1.0 * F_i * summed_fi
