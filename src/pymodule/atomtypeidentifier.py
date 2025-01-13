@@ -991,7 +991,7 @@ class AtomTypeIdentifier:
 
                             hydrogen_type = {
                                 'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'hox{info["AtomNumber"]}'
+                                'gaff': f'hx{info["AtomNumber"]}'
                             }
 
                         self.atom_types_dict[
@@ -1944,7 +1944,7 @@ class AtomTypeIdentifier:
         else:
             return list(common_cycle_numbers)
 
-    def generate_gaff_atomtypes(self, molecule):
+    def generate_gaff_atomtypes(self, molecule, connectivity_matrix=None):
         """
         Generates GAFF (General Amber Force Field) atom types for a given molecule.
 
@@ -1959,7 +1959,13 @@ class AtomTypeIdentifier:
         self.coordinates = molecule.get_coordinates_in_angstrom()
         self.atomic_symbols = molecule.get_labels()
 
-        self.connectivity_matrix = molecule.get_connectivity_matrix()
+        if connectivity_matrix is None:
+            self.connectivity_matrix = molecule.get_connectivity_matrix()
+        
+        # For the add bond feature
+        else:
+            self.connectivity_matrix = connectivity_matrix  
+
         self.distance_matrix = molecule.get_distance_matrix_in_angstrom()
 
         self.detect_closed_cyclic_structures()
@@ -2013,7 +2019,7 @@ class AtomTypeIdentifier:
         self.ostream.flush()
 
         return list(self.gaff_atom_types)
-
+    
     @staticmethod
     def get_atom_number(atom_type_str):
         """

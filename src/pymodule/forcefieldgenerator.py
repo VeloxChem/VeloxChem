@@ -123,6 +123,7 @@ class ForceFieldGenerator:
         self.nrexcl = 3
         self.force_field_data = None
         self.force_field_data_extension = None
+        self.topology_update_flag = False
 
         # number of rounds for fitting dihedral potentials
         self.n_rounds = 3
@@ -1095,7 +1096,7 @@ class ForceFieldGenerator:
         :param molecule:
             The molecule.
         :param basis:
-            The AO basis set.
+            The AO basis set.create_topology
         :param scf_result:
             A converged SCF result.
         :param resp:
@@ -1134,12 +1135,18 @@ class ForceFieldGenerator:
         # set GAFF version
         atomtypeidentifier.gaff_version = gaff_version
 
-        self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
-            self.molecule)
+        if self.topology_update_flag:
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
+                self.molecule, self.connectivity_matrix)
+            # The partial charges have to be recalculated
+            self.partial_charges = None
+        else:
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
+                self.molecule)
+            self.connectivity_matrix = np.copy(
+                atomtypeidentifier.connectivity_matrix)
+            
         atomtypeidentifier.identify_equivalences()
-
-        self.connectivity_matrix = np.copy(
-            atomtypeidentifier.connectivity_matrix)
         
         self.atom_info_dict = atomtypeidentifier.atom_info_dict
 
@@ -1932,68 +1939,99 @@ class ForceFieldGenerator:
 
         return []
 
-    def add_bond(self, bond, force_constant=250000.00, equilibrium=None):
+    def add_bond(self, bond):
         """
         Adds a bond to the topology.
 
         :param bond:
-            The bond to be added. As a tuple of 1-based atom indices.
+            The bond to be added. As a list of 1-based atom indices.
         :param force_constant:
             The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
         :param equilibrium:
             The equilibrium distance of the bond. If none it will be calculated.
         """
 
+        # Extract indices from the list
         i, j = bond
 
         # Convert to zero-based indices
         i = i - 1
         j = j - 1
 
-        if equilibrium is None:
-            coords = self.molecule.get_coordinates_in_angstrom()
-            equilibrium = np.linalg.norm(coords[i] - coords[j]) * 0.1
+        # Update the connectivity matrix
+        self.connectivity_matrix[i, j] = 1
 
-        self.bonds[(i, j)] = {
-            'type': 'harmonic',
-            'force_constant': force_constant,
-            'equilibrium': equilibrium,
-            'comment': 'User-defined'
-        }
+        # Change the topology update flag to True
+        self.topology_update_flag = True
 
-    def add_angle(self, angle, force_constant=1000.00, equilibrium=None):
+        # Print the information
+        msg = f'Added bond {i + 1}-{j + 1}'
+        self.ostream.print_info(msg)
+        self.ostream.flush()
+
+        msg = "Re-run create_topology() to update the topology."
+        self.ostream.print_info(msg)
+        self.ostream.flush()
+    
+    def add_dihedral(self, dihedral, barrier=1, phase=0, periodicity=1):
         """
-        Adds an angle to the topology.
+        Adds a dihedral to the an existing dihedral in the topology
+        converting it in a multiple dihedral.
 
-        :param angle:
-            The angle to be added. As a tuple of 1-based atom indices.
-        :param force_constant:
-            The force constant of the angle. Default is 1000.00 kJ/mol/rad^2.
-        :param equilibrium:
-            The equilibrium angle of the angle. If none it will be calculated.
+        :param dihedral:
+            The dihedral to be added. As a list of 1-based atom indices.
+        :param barrier:
+            The barrier of the dihedral. Default is 1.00 kJ/mol.
+        :param phase:
+            The phase of the dihedral. Default is 0.00 degrees.
+        :param periodicity:
+            The periodicity of the dihedral. Default is 1.
         """
 
-        i, j, k = angle
+        # Extract indices from the list
+        i, j, k, l = dihedral
 
         # Convert to zero-based indices
         i = i - 1
         j = j - 1
         k = k - 1
+        l = l - 1
 
-        if equilibrium is None:
-            coords = self.molecule.get_coordinates_in_angstrom()
-            a = coords[i] - coords[j]
-            b = coords[k] - coords[j]
-            equilibrium = safe_arccos(
-                np.dot(a, b) / np.linalg.norm(a) /
-                np.linalg.norm(b)) * 180 / np.pi
+        # Exctract the original dihedral parameters
+        original_dihedral = self.dihedrals[(i, j, k, l)]
+        if original_dihedral['multiple']:
+            # Values are already in lists
+            barriers_list = original_dihedral['barrier']
+            phases_list = original_dihedral['phase']
+            periodicities_list = original_dihedral['periodicity']
+            comments_list = original_dihedral['comment']
+        else:
+            barriers_list = [original_dihedral['barrier']]
+            phases_list = [original_dihedral['phase']]
+            periodicities_list = [original_dihedral['periodicity']]
+            comments_list = [original_dihedral['comment']]
 
-        self.angles[(i, j, k)] = {
-            'type': 'harmonic',
-            'force_constant': force_constant,
-            'equilibrium': equilibrium,
-            'comment': 'User-defined'
+        # Update the dihedral's data lists
+        barriers_list.append(barrier)
+        phases_list.append(phase)
+        # Negative periodicity implies multitermed dihedral
+        periodicities_list.append(-periodicity)
+        comments_list.append(f'Added {i + 1}-{j + 1}-{k + 1}-{l + 1} dihedral')
+
+        # Update the dihedral in the topology
+        self.dihedrals[(i, j, k, l)] = {
+            'type': 'Fourier',
+            'multiple': True,
+            'barrier': barriers_list,
+            'phase': phases_list,
+            'periodicity': periodicities_list,
+            'comment': comments_list
         }
+
+        # Print the information
+        msg = f'Added dihedral {i + 1}-{j + 1}-{k + 1}-{l + 1}'
+        self.ostream.print_info(msg)
+        self.ostream.flush()
 
     def check_rotatable_bonds(self, rotatable_bonds_types):
         """
