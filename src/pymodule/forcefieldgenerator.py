@@ -321,167 +321,6 @@ class ForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def validate_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, visualize=False):
-        """
-        Compares the QM scan with the MM scan without reparametrization.
-
-        :param rotatable_bond:
-            The list of indices of the rotatable bond. (1-indexed)
-        :param scan_file:
-            The file with the QM scan. If None is provided it a QM scan will be performed.
-        :param scf_drv:
-            The SCF driver. If None is provided it will use HF.
-        :param basis:
-            The AO basis set. If None is provided it will use 6-31G*.
-        :param scan_range:
-            List with the range of dihedral angles. Default is [0, 360].
-        :param n_points:
-            The number of points to be calculated. Default is 19.
-        :param visualize:
-            If the dihedral scans should be visualized.
-        """
-
-        # If scan file is provided, read it
-        if scan_file is not None:
-            with open(scan_file, 'r') as f:
-                lines = f.readlines()
-
-            for line in lines:
-                if line.startswith('Scan'):
-                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
-                    # Extract the dihedral indices
-                    scanned_dih = [int(i) for i in line.split('Dihedral')[1].split()[0].split('-')]
-                    central_atom_1 = scanned_dih[1] - 1
-                    central_atom_2 = scanned_dih[2] - 1
-
-                    if not (central_atom_1 == rotatable_bond[0] - 1 and central_atom_2 == rotatable_bond[1] - 1):
-                        raise ValueError('The rotatable bond does not match the scan file.')
-
-                    break
-
-        else:
-            central_atom_1 = rotatable_bond[0] - 1
-            central_atom_2 = rotatable_bond[1] - 1
-
-        # Identify the dihedral indices for the rotatable bond
-        dihedral_indices = []
-        dihedral_types = []
-
-        for (i,j,k,l), dihedral in self.dihedrals.items():
-            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
-                dihedral_indices.append([i,j,k,l])
-                dihedral_types.append(dihedral['comment'])
-        
-        # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
-        
-        # Print a header
-        header = 'VeloxChem Dihedral Reparametrization'
-        self.ostream.print_header(header)
-        self.ostream.print_header('=' * len(header))
-        self.ostream.print_blank()
-        self.ostream.flush()
-        # Print some information
-        self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
-        # Print the dihedral indices *in 1 index* and types
-        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
-        self.ostream.print_info(f'Dihedral types:{dihedral_types}')
-        self.ostream.flush()
-
-        # If the scan file is provided, read it
-        if scan_file is not None:
-            # Check if the name of the file is correct 1-2-3-4.xyz
-            reference_dih = scanned_dih
-            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
-            file = Path(scan_file)
-            # Note: Sometimes geomeTRIC writes the terminal dihedral atoms in reverse order
-            if file.stem not in [f"{reference_dih[0]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[3]}",
-                                 f"{reference_dih[3]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[0]}"]:
-                
-                raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
-            self.read_qm_scan_xyz_files([scan_file])
-        else:
-            self.ostream.print_info('No scan file provided. Performing QM scan...')
-            self.ostream.flush()
-        
-            if scf_drv is None:
-                scf_drv = ScfRestrictedDriver()
-                scf_drv.ostream.mute()
-            
-            if basis is None:
-                basis = MolecularBasis.read(self.molecule,'6-31G*')
-
-            # Perform a SCF calculation
-            if scf_result is None:
-                self.ostream.print_info('Performing SCF calculation...')
-                self.ostream.flush()
-                scf_result = scf_drv.compute(self.molecule, basis)
-            
-            # Take one of the dihedrals to perform the scan
-            reference_dih = dihedral_indices[0]
-            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
-            scf_drv.ostream.mute()
-            opt_drv = OptimizationDriver(scf_drv)
-            opt_drv.ostream.mute()
-            constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
-            opt_drv.constraints = [constraint]
-
-            # Scan the dihedral
-            self.ostream.print_info(f'Dihedral: {reference_dih_name} taken for scan...')
-            self.ostream.print_info(f'Angle range: {scan_range[0]}-{scan_range[1]}')
-            self.ostream.print_info(f'Number of points: {n_points}')
-            self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
-            self.ostream.flush()
-            opt_drv.compute(self.molecule, basis, scf_result)
-            self.ostream.print_info('Scan completed.')
-            self.ostream.flush()
-
-            # Change the default file name to the dihedral indices
-            file = Path("scan-final.xyz")
-            file.rename(f"{reference_dih_name}.xyz")
-            
-            # Print information about the written file
-            self.ostream.print_info(f'Scan file written as {reference_dih_name}.xyz')
-
-            # Read the QM scan
-            self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
-
-        # Group dihedrals by their types
-        dihedral_groups = defaultdict(list)
-        for i, j, k, l in dihedral_indices:
-            dihedral = self.dihedrals[(i, j, k, l)]
-            dihedral_type = dihedral['comment']
-            dihedral_groups[dihedral_type].append((i, j, k, l))
-
-        # Extract initial parameters for each dihedral instance
-        barriers = []
-        phases = []
-        periodicities = []
-        for i, j, k, l in dihedral_indices:
-            dihedral = self.dihedrals[(i, j, k, l)]
-            if dihedral['multiple'] == True:
-                raise ValueError('RB dihedrals are not supported for reparametrization. Use refine_dihedrals instead.')
-            else:
-                barrier = dihedral['barrier']
-                phase = dihedral['phase']
-                periodicity = dihedral['periodicity']
-                barriers.append(barrier)
-                phases.append(phase)
-                periodicities.append(periodicity)
-
-        # Convert to NumPy arrays
-        barriers = np.array(barriers, dtype=float)
-        phases_array = np.array(phases, dtype=float)
-
-        # Print initial barriers
-        self.ostream.print_info(f"GAFF barriers: {barriers} will be used as initial guess.")
-        self.ostream.flush()
-
-        # Store the original barriers
-        gaff_dihedral = self.validate_force_field(0)
-        if visualize:
-            self.visualize(gaff_dihedral)
-
     def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
@@ -574,9 +413,9 @@ class ForceFieldGenerator:
             reference_dih = scanned_dih
             print('Reference dihedral:',reference_dih)
             reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
-            file = Path(scan_file)
+            file_path = Path(scan_file)
             # Note: Sometimes geomeTRIC writes the dihedral atoms in reverse order
-            if file.stem not in [f"{reference_dih[0]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[3]}",
+            if file_path.stem not in [f"{reference_dih[0]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[3]}",
                                  f"{reference_dih[3]}-{reference_dih[2]}-{reference_dih[1]}-{reference_dih[0]}"]:
                 
                 raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
@@ -628,8 +467,8 @@ class ForceFieldGenerator:
             self.ostream.flush()
 
             # Change the default file name to the dihedral indices
-            file = Path("scan-final.xyz")
-            file.rename(f"{reference_dih_name}.xyz")
+            file_path = Path("scan-final.xyz")
+            file_path.rename(f"{reference_dih_name}.xyz")
 
             # Read the QM scan
             self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
@@ -1096,7 +935,7 @@ class ForceFieldGenerator:
         :param molecule:
             The molecule.
         :param basis:
-            The AO basis set.create_topology
+            The AO basis set.
         :param scf_result:
             A converged SCF result.
         :param resp:
@@ -1652,59 +1491,6 @@ class ForceFieldGenerator:
                     'comment': dihedral_comments,
                 }
 
-        # Eliminate this
-        # convert multi-termed dihedral to RB type
-        # for (i, j, k, l), dih in self.dihedrals.items():
-
-        #     if dih['multiple']:
-
-        #         valid_phases = True
-        #         for phase in dih['phase']:
-        #             if not (abs(phase) < 1.0e-6 or abs(phase - 180.0) < 1.0e-6):
-        #                 valid_phases = False
-        #                 break
-
-        #         valid_periodicity = True
-        #         for periodicity in dih['periodicity']:
-        #             if abs(periodicity) not in [1, 2, 3, 4]:
-        #                 valid_periodicity = False
-        #                 break
-
-        #         if not (valid_phases and valid_periodicity):
-        #             continue
-
-        #         F_coefs = {x: 0.0 for x in [1, 2, 3, 4]}
-        #         E_shift = 0.0
-
-        #         for barrier, phase, periodicity in zip(dih['barrier'],
-        #                                                dih['phase'],
-        #                                                dih['periodicity']):
-        #             if abs(phase) < 1.0e-6:
-        #                 # phase == 0 degree
-        #                 F_coefs[abs(periodicity)] += barrier
-        #             else:
-        #                 # phase == 180 degree
-        #                 F_coefs[abs(periodicity)] -= barrier
-        #                 E_shift += 2.0 * barrier
-
-        #         C_coefs = [0.0 for x in range(6)]
-
-        #         # JPCA 2021, 125, 2673-2681
-        #         # Note that we also take into account the phases in Fourier series
-        #         C_coefs[0] = (F_coefs[1] + F_coefs[3] + 2.0 * F_coefs[4] +
-        #                       E_shift)
-        #         C_coefs[1] = -1.0 * F_coefs[1] + 3.0 * F_coefs[3]
-        #         C_coefs[2] = 2.0 * F_coefs[2] - 8.0 * F_coefs[4]
-        #         C_coefs[3] = -4.0 * F_coefs[3]
-        #         C_coefs[4] = 8.0 * F_coefs[4]
-        #         C_coefs[5] = 0.0
-
-        #         self.dihedrals[(i, j, k, l)] = {
-        #             'type': 'RB',
-        #             'RB_coefficients': C_coefs,
-        #             'comment': dih['comment'][0] + ' RB',
-        #         }
-
         # Fetch the rotatable bonds from the molecule and the atom types involved
         rotatable_bonds_types = {}
         for i, j, k, l in self.dihedrals:
@@ -2046,21 +1832,30 @@ class ForceFieldGenerator:
         carbon_sp2 = {'cp', 'cq', 'c2', 'ce', 'cf'}
         nitrogen_sp2 = {'na', 'n2', 'ne', 'nf'}
 
-        # Generate lists of non-rotatable bonds
+        # Generate lists of non-rotatable bonds (double bonds)
         carbon_carbon_bonds = []
         for atom1 in carbon_sp2:
             for atom2 in carbon_sp2:
-                if (atom1, atom2) == ('c2', 'c2'):
+                # If two sp2 carbon atomtypes are the same generally
+                # are single bonds, except for c2-c2
+                if (atom1, atom2) in [('c2', 'c2')]:
                     carbon_carbon_bonds.append((atom1, atom2))
                 if atom1 != atom2:
-                    carbon_carbon_bonds.append((atom1, atom2))
-                    carbon_carbon_bonds.append((atom2, atom1))
+                    # If two sp2 carbon atomtypes are different generally
+                    # are double bonds, except for cc/cd-cf/cd are single bonds
+                    single_sp2_carbon_bonds = [('cc', 'cf'), ('cf', 'cc'), ('cd', 'cf'), ('cf', 'cd'),
+                                                ('cd', 'ce'), ('ce', 'cd'), ('cc', 'ce'), ('ce', 'cc')]
+                    if (atom1, atom2) not in single_sp2_carbon_bonds:
+                        carbon_carbon_bonds.append((atom1, atom2))
+                        carbon_carbon_bonds.append((atom2, atom1))
 
         carbon_nitrogen_bonds = []
         for atom1 in carbon_sp2:
             for atom2 in nitrogen_sp2:
-                carbon_nitrogen_bonds.append((atom1, atom2))
-                carbon_nitrogen_bonds.append((atom2, atom1))
+                # Single bond cc-ne, ce-ne
+                if (atom1, atom2) not in [('cc', 'ne'), ('ce', 'ne')]:
+                    carbon_nitrogen_bonds.append((atom1, atom2))
+                    carbon_nitrogen_bonds.append((atom2, atom1))
 
         nitrogen_nitrogen_bonds = []
         for atom1 in nitrogen_sp2:

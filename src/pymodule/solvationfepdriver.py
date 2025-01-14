@@ -33,11 +33,11 @@ from pymbar import MBAR, timeseries
 from mpi4py import MPI
 import h5py
 
-from .systembuilder import SystemBuilder
+from .solvationbuilder import SolvationBuilder
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 
-class OMMExplicitSolvation:
+class SolvationFEPDriver:
     """
     Computes the solvation free energy using OpenMM.
 
@@ -93,9 +93,7 @@ class OMMExplicitSolvation:
         # Output stream
         self.ostream = ostream
 
-        # Options for the system builder
-        # This padding is on the safe side. 
-        # A padding of 1.0 produces sometimes NaNs in OpenMM.
+        # Options for the SolvationBuilder
         self.padding = 2.0
         self.solvent_name = 'spce'
         
@@ -155,9 +153,9 @@ class OMMExplicitSolvation:
         :return:
             A list containing the free energy calculations for each stage.
         """
-        sys_builder = SystemBuilder()
+        sol_builder = SolvationBuilder()
 
-        sys_builder.solvate(solute=molecule, 
+        sol_builder.solvate(solute=molecule, 
                             solvent=solvent,
                             solvent_molecule=solvent_molecule, 
                             padding=self.padding,
@@ -169,10 +167,10 @@ class OMMExplicitSolvation:
         
         # Note: GROMACS files will be used instead of OpenMM files.
         # For some reason, the results are more consistent. (?)
-        sys_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
+        sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
 
         if not ff_gen_solute:
-            self.solute_ff = sys_builder.solute_ff
+            self.solute_ff = sol_builder.solute_ff
         else:
             self.solute_ff = ff_gen_solute
 

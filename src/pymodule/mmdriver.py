@@ -193,6 +193,10 @@ class MMDriver:
 
             for (i, j, k, l), dih in self.force_field[dihedral_key].items():
 
+                assert_msg_critical(
+                    dih['type'] in ['Fourier'],
+                    'MMDriver: Invalid type for dihedral potential')
+
                 if dih['multiple']:
                     # Barrier, phase, and periodicity are in lists
                     for barrier, phase, periodicity in zip(dih['barrier'],
@@ -452,13 +456,9 @@ class MMDriver:
 
         cos123 = -np.dot(r21_unit, r32_unit)
         sin123 = np.sqrt(1.0 - cos123**2)
-        # Regularize the sin123 to avoid division by zero
-        sin123 = max(sin123, 1e-8)
 
         cos234 = -np.dot(r32_unit, r43_unit)
         sin234 = np.sqrt(1.0 - cos234**2)
-        # Regularize the sin234 to avoid division by zero
-        sin234 = max(sin234, 1e-8)
 
         cos134 = -np.dot(r21_unit, r43_unit)
 

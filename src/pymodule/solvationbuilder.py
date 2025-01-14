@@ -37,7 +37,7 @@ from .forcefieldgenerator import ForceFieldGenerator
 from .molecule import Molecule
 from .outputstream import OutputStream
 
-class SystemBuilder:
+class SolvationBuilder:
     """
     Builds systems for molecular dynamics simulations.
 
@@ -111,7 +111,6 @@ class SystemBuilder:
         self.quantities = []
         self.added_solvent_counts = []
         self.solvent_name = None
-        # TODO: Graphene
 
         # System
         self.system_molecule = None

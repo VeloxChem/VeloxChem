@@ -1560,19 +1560,12 @@ class AtomTypeIdentifier:
                             }
                         
                         #  hypervalent phosphorus, 3 subst.
-                        elif oxygen_count >= 1:
+                        else:
                             phosphorus_type = {
                                 'opls': 'opls_900P',
                                 'gaff': 'p4'
                             }
-
-                        else:
-                            phosphorus_type = {
-                                'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'px{info["AtomNumber"]}'
-                            }
-                        
-                        
+                                                
                     # sp2 phosphorus (C=P, etc.)
                     elif info['NumConnectedAtoms'] == 2:
                         phosphorus_type = {
@@ -1617,7 +1610,7 @@ class AtomTypeIdentifier:
                             self.atom_types_dict[
                                 f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
 
-                # Cyclic structures
+                # Other cases 
                 else:
                     phosphorus_type = {
                         'opls': f'opls_x{info["AtomNumber"]}',
@@ -1961,10 +1954,9 @@ class AtomTypeIdentifier:
 
         if connectivity_matrix is None:
             self.connectivity_matrix = molecule.get_connectivity_matrix()
-        
-        # For the add bond feature
         else:
-            self.connectivity_matrix = connectivity_matrix  
+            # For the add bond feature
+            self.connectivity_matrix = connectivity_matrix.copy()  
 
         self.distance_matrix = molecule.get_distance_matrix_in_angstrom()
 
