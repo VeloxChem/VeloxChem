@@ -153,6 +153,7 @@ class CpcmDriver:
         unit_grid_coords = unit_grid[:, :3]
         unit_grid_weights = unit_grid[:, 3:]
         # standard normalization of lebedev weights -- unit sphere surface; 1 -> 4pi
+        # Ref.: B. A. Gregersen and D. M. York, J. Chem. Phys. 122, 194110 (2005)
         unit_grid_weights *= 4 * np.pi
 
         zeta = self.get_zeta_dict()[self.grid_per_sphere]
@@ -323,7 +324,7 @@ class CpcmDriver:
             The grid object containing the grid positions, weights, 
             the Gaussian exponents, and indices for which atom they belong to.
         :param D:
-            The density matrix.
+            The AO density matrix.
 
         :return:
             The total (electronic) electrostatic potential at each grid point.
@@ -436,7 +437,7 @@ class CpcmDriver:
             the scaling function f.
 
         :return:
-        The gradient array of each cartesian component -- of shape (nAtoms, 3).
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         # Defnine constants
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
@@ -445,6 +446,7 @@ class CpcmDriver:
         avoid_div_0    = 1e-12
         grid_coords    = grid[:, :3]
         zeta           = grid[:, 4]
+        zeta_2         = zeta**2
         atom_indices   = grid[:, 5]
         
         # M = Nr. of grid pts.
@@ -458,7 +460,6 @@ class CpcmDriver:
         dr_rij      = delta_r / r_ij[..., None]
 
         # Construct the explicit terms appearing in the gradient
-        zeta_2   = zeta**2
         zeta_ij  = (zeta[:, None] * zeta[None, :]) / np.sqrt(zeta_2[:, None] + zeta_2[None, :])
         erf_term = erf(zeta_ij * r_ij)
         exp_term = np.exp(-zeta_ij**2 * r_ij_2_avoid)
@@ -510,7 +511,7 @@ class CpcmDriver:
             the scaling function f.
 
         :return:
-        The gradient array of each cartesian component -- of shape (nAtoms, 3).
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         # Basic constants
         sqrt_2_inv_pi = np.sqrt(2.0 / np.pi)
@@ -521,7 +522,7 @@ class CpcmDriver:
         atom_radii    = molecule.vdw_radii_to_numpy() * 1.2
 
         # Grid info
-        M = grid.shape[0]
+        M           = grid.shape[0]
         grid_coords = grid[:, :3]
         zeta_i      = grid[:, 4]
         atom_idx    = grid[:, 5]
@@ -657,7 +658,7 @@ class CpcmDriver:
         
         # Translational invariance
         dB_mat[:, :, :-1, :] = _dB_mat
-        dB_mat[:, :, -1, :] = -np.sum(dB_mat[:, :, :-1, :], axis=2)
+        dB_mat[:, :, -1, :]  = -np.sum(dB_mat[:, :, :-1, :], axis=2)
         
         # Contract
         #gradBvec = np.einsum('m,mzax,z -> ax', q, dB_mat, molecule.get_element_ids())
