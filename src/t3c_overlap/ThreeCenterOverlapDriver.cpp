@@ -29,16 +29,7 @@ CThreeCenterOverlapDriver::compute(const std::vector<double>         &exponents,
     
     auto gnorms = exponents;
     
-    std::ranges::for_each(std::views::iota(size_t{0}, exponents.size()), [&](const auto index) {
-        auto bf = CBasisFunction({exponents[index], }, {1.0, }, 0);
-        bf.normalize();
-        //gnorms.push_back(factors[index] * bf.get_normalization_factors()[0]);
-        gnorms.push_back(factors[index]);
-    } );
-
-    auto ptr_coordinates = &coordinates;
-
-    auto ptr_gnorms = &gnorms;
+    gnorms.insert(gnorms.end(), factors.cbegin(), factors.cend());
     
     // prepare pointers for OMP parallel region
 
@@ -47,6 +38,10 @@ CThreeCenterOverlapDriver::compute(const std::vector<double>         &exponents,
     auto ptr_molecule = &molecule;
 
     auto ptr_ovl_mat = &ovl_mat;
+
+    auto ptr_coordinates = &coordinates;
+
+    auto ptr_gnorms = &gnorms;
 
     // execute OMP tasks with static scheduling
 
