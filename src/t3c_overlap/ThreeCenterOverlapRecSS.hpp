@@ -39,8 +39,6 @@ comp_overlap_ss(T&                               distributor,
     // intialize external charge(s)
 
     const auto exgtos = distributor.data();
-    
-    std::cout << " * EX GAU * " << exgtos[0] << " v " << exgtos[1] << std::endl;
 
     // intialize GTOs data on bra side
 
@@ -134,8 +132,6 @@ comp_overlap_ss(T&                               distributor,
 
                     t2cfunc::reduce(cbuffer, pbuffer, 1, ket_width, ket_npgtos);
                 }
-                
-                std::cout << " * TEST * " << cbuffer.data(0)[0] << " EXP A " << a_exp << std::endl;
             }
 
             distributor.distribute(cbuffer, bra_gto_indices, ket_gto_indices, 0, 0, j, ket_range, bra_eq_ket);

@@ -41,10 +41,7 @@ class TestThreeCenterOverlapDriver:
         # check full overlap matrix
         fmat = ovl_mat.full_matrix()
         fref = SubMatrix([0, 0, 2, 2])
-        #fref.set_values(np.ascontiguousarray(ref_mat))
-        #assert fmat == fref
-        print(fmat.to_numpy())
-        
-        assert False
-
-   
+        ref_mat = np.array([[0.042137564466, 0.034857221722],
+                            [0.034857221722, 0.244902091288]])
+        fref.set_values(np.ascontiguousarray(ref_mat))
+        assert fmat == fref
