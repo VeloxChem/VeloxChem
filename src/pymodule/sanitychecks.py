@@ -209,7 +209,7 @@ def raman_sanity_check(obj):
                 obj.do_resonance_raman = False
             else:
                 obj.frequencies.pop(idx0)
-                warn_msg += 'It has been removed from the list.'
+                warn_msg += 'It has been removed from the list.\n'
                 warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
                 warn_msg += str(obj.frequencies)
             obj.ostream.print_warning(warn_msg)
