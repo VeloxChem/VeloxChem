@@ -191,7 +191,8 @@ class RixsDriver:
         :tda_res_val       : linear-response results for the valence calculation
         :tda_res_core      : linear-response results for the core calculation
 
-        returns the GS-to-state transition-density-matrix in ao-basis
+        :returns: 
+            the GS-to-state transition-density-matrix in ao-basis
         """
 
         if self.sra:
@@ -238,11 +239,14 @@ class RixsDriver:
     
     def osc_str(self, tdpm, omega_prime):# tda_res_core, tda_res_val):
         """
-        Computes the oscillator strength in  between the core and valence states
+        Computes the oscillator strength between the core and valence states
 
-        returns: oscillator strengths as array, shape = (core-exc, valence-exc)
+        returns: oscillator strengths as array, shape = (core_exc, valence_exc)
         """
-        unweighted_f = (2/3) * np.einsum('fnx->nf', tdpm ** 2)
+        if tdpm.ndim == 3:
+            unweighted_f = (2/3) * np.einsum('fnx->nf', tdpm ** 2)
+        elif tdpm.ndim == 2:
+            unweighted_f = (2/3) * np.einsum('nx->n', tdpm ** 2)
         f = omega_prime * unweighted_f
         return f
 
@@ -257,7 +261,7 @@ class RixsDriver:
         :param f            : Index of the final/target excited state
         :param theta        : Scattering angle 
         :param gamma_factor : Broadening factor for Lorentzian profile
-        :param tda_res(_val)  : The results tensor of the TDDFT/TDA ground to valence excited state
+        :param tda_res(_val) : The results tensor of the TDDFT/TDA ground to valence excited state
         
         returns the RIXS transition intensity for the given frequencies, w (and) and state f
         """
@@ -277,7 +281,10 @@ class RixsDriver:
         return sigma
 
     def transition_dipole_mom(self, gamma_ao, dipole_integrals):
-        T_fn = np.einsum('ijfn,xij->fnx', gamma_ao, -dipole_integrals)
+        if gamma_ao.ndim == 3:
+            T_fn = np.einsum('ijn,xij->nx', gamma_ao, -dipole_integrals)
+        elif gamma_ao.ndim == 4:
+            T_fn = np.einsum('ijfn,xij->fnx', gamma_ao, -dipole_integrals)
         return T_fn
 
     def omega_p(self, core_eigenvalues, val_eigenvalues):
@@ -294,12 +301,25 @@ class RixsDriver:
                 largest_core = max(largest_core, core_index)
         return largest_core
 
+    def resonant(self, eigenvals_core, eigenvals_val):
+        _ene_loss              = np.zeros((self.nr_ve, len(self.photon_energy)))
+        _emiss                 = np.zeros((self.nr_ve, len(self.photon_energy)))
+        _crossections          = np.zeros((self.nr_ve, len(self.photon_energy)))
+        #_scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
+
+
+        self.res_ene_loss              = _ene_loss
+        self.res_emissison             = _emiss
+        self.res_crossections          = _crossections
+        #self.res_scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
+
     def compute(self, molecule, ao_basis, scf_results, tda_res_val, tda_res_core=None, nr_CO=None, nr_vir=None, nr_val=None):
         self.norb = scf_results['C_alpha'].shape[0]
         self.nocc = int(sum(scf_results['occ_alpha'])) #molecule.number_of_alpha_electrons()
         self.nvir = self.norb - self.nocc
 
         if not tda_res_core:
+            # SRA
             assert_msg_critical(nr_CO is not None,
                                 'RixsDriver: need the number of core, valence, and virtual orbitals involved for subspace-restricted approx.')
             self.sra = True
@@ -316,7 +336,7 @@ class RixsDriver:
             valence_eigenvectors  = eigenvector[:, : , :self.nr_ve]
             valence_eigenvalues   = tda_res_val['eigenvalues'][:self.nr_ve]
         else: 
-            # CVS
+            # CVS, i.e., two-shot approach
             self.nr_ve = len(tda_res_val['excitation_details'])
             self.nr_ce = len(tda_res_core['excitation_details'])
             self.nr_CO = self.find_nr_CO(tda_res_core['excitation_details'])
@@ -363,8 +383,10 @@ class RixsDriver:
         self.ene_loss_map        = np.array([ce - emission_ene[i] for i, ce in enumerate(core_eigenvalues)])
 
         T_fn = self.transition_dipole_mom(tdm_fn, dipole_ints)
-        f_f  = self.osc_str(T_fn, emission_ene) 
-        self.oscillator_strength = f_f
+        self.oscillator_strength  = self.osc_str(T_fn, emission_ene) 
+
+        T_gn = self.transition_dipole_mom(tdm_ng, dipole_ints)
+        self.resonant_osc_str = self.osc_str(T_gn, core_eigenvalues)
 
     def write_hdf5(self, fname):
         """
