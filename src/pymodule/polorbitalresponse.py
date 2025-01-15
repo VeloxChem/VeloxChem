@@ -1752,18 +1752,56 @@ class PolOrbitalResponse(CphfSolver):
             # get CPHF results
             # NOTE Xin
             if self.use_subspace_solver:
-                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-                all_cphf_red = []
+                #dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
+                #all_cphf_red = []
+                all_cphf_ov = np.zeros((n_freqs, dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+
                 for n, w in enumerate(self.frequencies):
-                    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
-                    for xy in range(2 * dof_red):
-                        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
-                    all_cphf_red.append(tmp_cphf_n)
+                #    tmp_cphf_n = np.zeros((dof_red, nocc * nvir))
+                #    for xy in range(2 * dof_red):
+                #        tmp_cphf_n[xy] = dist_all_cphf_red[dof_red * n + xy].get_full_vector()
+                #    all_cphf_red.append(tmp_cphf_n)
+                # TEST
+                    for idx, xy in enumerate(xy_pairs):
+                        tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
+                            2 * dof_red * n + idx].get_full_vector()
+                        tmp_cphf_im = self.cphf_results['dist_cphf_ov'][
+                            2 * dof_red * n + dof_red + idx].get_full_vector()
+
+                        #all_cphf_red.append(tmp_cphf_re + 1j * tmp_cphf_im)
+
+                        if self.rank == mpi_master():
+                            x = xy[0]
+                            y = xy[1]
+
+                            all_cphf_ov[n, x, y] += tmp_cphf_re + 1j * tmp_cphf_im
+
+                            if (y != x):
+                                all_cphf_ov[n, y, x] += all_cphf_ov[n, x, y]
+
+                #all_cphf_red = np.array(all_cphf_red)
             else:
-                all_cphf_red = self.cphf_results['cphf_ov']
+                if self.rank == mpi_master():
+                    all_cphf_red = self.cphf_results['cphf_ov']
+                    all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
+
+                    all_cphf_ov = np.zeros((n_freqs, dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+
+                    for n, w in enumerate(self.frequencies):
+                        tmp_cphf_ov = cphf_ov_red[n, :dof_red] + 1j * cphf_ov_red[n, dof_red:]
+
+                        for idx, xy in enumerate(xy_pairs):
+                            x = xy[0]
+                            y = xy[1]
+
+                            all_cphf_ov[n, x, y] = tmp_cphf_ov[idx]
+
+                            if (y != x):
+                                all_cphf_ov[n, y, x] += all_cphf_ov[n, x, y]
 
             # map CPHF results to dof*dof dimensions
-            all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+            #all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
+            all_cphf_ov = all_cphf_ov.reshape(n_freqs, dof * dof, nocc, nvir)
         else:
             dof = None
 
