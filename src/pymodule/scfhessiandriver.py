@@ -45,12 +45,14 @@ from .veloxchemlib import make_matrix, mat_t
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .griddriver import GridDriver
 from .scfgradientdriver import ScfGradientDriver
 from .hessiandriver import HessianDriver
 from .firstorderprop import FirstOrderProperties
 from .hessianorbitalresponse import HessianOrbitalResponse
 from .profiler import Profiler
 from .matrices import Matrices
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
@@ -592,9 +594,17 @@ class ScfHessianDriver(HessianDriver):
 
         # DFT:
         if self._dft:
+            grid_drv = GridDriver(self.comm)
+            grid_level = (get_default_grid_level(self.scf_driver.xcfun)
+                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
+            # make sure to use high grid level for DFT Hessian
+            grid_level = max(6, grid_level)
+            grid_drv.set_level(grid_level)
+            mol_grid = grid_drv.generate(molecule)
+
             xc_mol_hess = XCMolecularHessian()
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(
-                molecule, ao_basis, [density], self.scf_driver._mol_grid,
+                molecule, ao_basis, [density], mol_grid,
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
