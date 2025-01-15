@@ -1791,7 +1791,7 @@ class PolOrbitalResponse(CphfSolver):
                     all_cphf_ov = np.zeros((n_freqs, dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
 
                     for n, w in enumerate(self.frequencies):
-                        tmp_cphf_ov = cphf_ov_red[n, :dof_red] + 1j * cphf_ov_red[n, dof_red:]
+                        tmp_cphf_ov = all_cphf_red[n, :dof_red] + 1j * all_cphf_red[n, dof_red:]
 
                         for idx, xy in enumerate(xy_pairs):
                             x = xy[0]
