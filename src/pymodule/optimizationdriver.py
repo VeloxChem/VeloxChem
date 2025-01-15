@@ -29,7 +29,7 @@ import numpy as np
 import time as tm
 import tempfile
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -105,6 +105,7 @@ class OptimizationDriver:
         self.coordsys = 'tric'
         self.constraints = None
         self.check_interval = 0
+        self.trust = 0.1
         self.max_iter = 300
 
         self.conv_energy = None
@@ -120,7 +121,7 @@ class OptimizationDriver:
 
         self.keep_files = False
 
-        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
         self.grad_drv = grad_drv
 
         self._debug = False
@@ -132,6 +133,7 @@ class OptimizationDriver:
                 'constraints': ('list', 'constraints'),
                 'check_interval':
                     ('int', 'interval for checking coordinate system'),
+                'trust': ('float', 'trust radius to begin with'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
                 'hessian': ('str_lower', 'hessian flag'),
@@ -223,7 +225,7 @@ class OptimizationDriver:
             temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(temp_dir.name)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.filename is not None:
             self.clean_up_file(Path(self.filename + '.log'))
             self.clean_up_file(
                 Path(self.filename + '.tmp', 'hessian', 'hessian.txt'))
@@ -232,10 +234,16 @@ class OptimizationDriver:
 
         # filename is used by geomeTRIC to create .log and other files
 
-        if self.rank == mpi_master() and self.keep_files:
-            filename = self.filename
+        if self.filename is not None:
+            base_fname = self.filename
         else:
-            filename = Path(self.filename).name
+            name_string = get_random_string_parallel(self.comm)
+            base_fname = 'vlx_' + name_string
+
+        if self.rank == mpi_master() and self.keep_files:
+            filename = base_fname
+        else:
+            filename = Path(base_fname).name
             filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
@@ -269,6 +277,7 @@ class OptimizationDriver:
                     customengine=opt_engine,
                     coordsys=self.coordsys,
                     check=self.check_interval,
+                    trust=self.trust,
                     maxiter=self.max_iter,
                     converge=self.conv_flags(),
                     constraints=constr_filename,

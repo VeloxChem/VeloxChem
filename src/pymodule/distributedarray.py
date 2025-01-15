@@ -49,7 +49,7 @@ class DistributedArray:
         - data: The numpy array stored in the distributed array.
     """
 
-    def __init__(self, array, comm, distribute=True):
+    def __init__(self, array, comm, distribute=True, root=mpi_master()):
         """
         Initializes distributed array.
         """
@@ -64,7 +64,7 @@ class DistributedArray:
             self.data = array.copy()
             return
 
-        if self.rank == mpi_master():
+        if self.rank == root:
             # determine counts and displacements for scatter
             ave, res = divmod(array.shape[0], self.nodes)
             counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
@@ -81,18 +81,18 @@ class DistributedArray:
             counts = None
             batch_size = None
             n_total = None
-        batch_size = comm.bcast(batch_size, root=mpi_master())
-        n_total = comm.bcast(n_total, root=mpi_master())
+        batch_size = comm.bcast(batch_size, root=root)
+        n_total = comm.bcast(n_total, root=root)
 
         if n_total == 0:
-            counts = comm.bcast(counts, root=mpi_master())
+            counts = comm.bcast(counts, root=root)
             self.data = np.zeros((counts[self.rank], 0))
             return
 
         for batch_start in range(0, n_total, batch_size):
             batch_end = min(batch_start + batch_size, n_total)
 
-            if self.rank == mpi_master():
+            if self.rank == root:
                 if array.ndim == 1:
                     array_list = [
                         array[displacements[p]:displacements[p] + counts[p]]
@@ -106,7 +106,7 @@ class DistributedArray:
             else:
                 array_list = None
 
-            recvbuf = comm.scatter(array_list, root=mpi_master())
+            recvbuf = comm.scatter(array_list, root=root)
             if self.data is None:
                 self.data = recvbuf
             else:
@@ -195,30 +195,47 @@ class DistributedArray:
         else:
             return None
 
-    def get_full_vector(self, col=None):
+    def get_full_vector(self, col=None, root=mpi_master()):
         """
         Gets a full column vector from a distributed array.
 
         :param: col:
             The column index (used only when self.data.ndim is 2).
         :return:
-            The full vector on the master node, None on other nodes.
+            The full vector on the root rank, None on other ranks.
         """
 
         data = None
 
         if self.data.ndim == 1:
-            data = self.comm.gather(self.data, root=mpi_master())
+            data = self.comm.gather(self.data, root=root)
         elif self.data.ndim == 2 and col is not None:
-            data = self.comm.gather(self.data[:, col], root=mpi_master())
+            data = self.comm.gather(self.data[:, col], root=root)
 
-        if self.rank == mpi_master():
+        if self.rank == root:
             full_shape_0 = sum([m.shape[0] for m in data])
             return np.hstack(data).reshape(full_shape_0)
         else:
             return None
 
-    def matmul_AtB(self, dist_array, factor=None):
+    def get_full_matrix(self, root=mpi_master()):
+        """
+        Gets full column matrix of a distributed array.
+
+        :return:
+            The full matrix on the root rank, None on other ranks.
+        """
+
+        if self.data.ndim == 2:
+            data = self.comm.gather(self.data, root=root)
+            if self.rank == root:
+                return np.vstack(data)
+            else:
+                return None
+        else:
+            return None
+
+    def matmul_AtB(self, dist_array, factor=None, root=mpi_master()):
         """
         Computes matrix-matrix multiplication between self.T and a distributed
         array.
@@ -236,7 +253,7 @@ class DistributedArray:
         if factor is not None:
             mat *= factor
 
-        mat = self.comm.reduce(mat, op=MPI.SUM, root=mpi_master())
+        mat = self.comm.reduce(mat, op=MPI.SUM, root=root)
 
         return mat
 

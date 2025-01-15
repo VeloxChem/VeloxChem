@@ -8,6 +8,7 @@ target_sources(vlxobjs
     LinearMomentumIntegrals.cpp
     NuclearPotentialValues.cpp
     QuadrupoleIntegrals.cpp
+    OldOneElecIntsDrivers.cpp
   )
 
 target_include_directories(vlxobjs

@@ -77,6 +77,8 @@ class CT4CGeomX0MatricesDistributor
 
     auto get_values() const -> std::vector<double>;
 
+    auto set_num_values(int num_values) -> void;
+
     /// Sets local matrices and their local/global indices.
     /// @param bra_gto_pair_block The basis function pairs block on bra side.
     /// @param ket_gto_pair_block The basis function pairs block on ket side.

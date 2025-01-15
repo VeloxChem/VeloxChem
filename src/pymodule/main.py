@@ -38,6 +38,9 @@ from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
 from .loprop import LoPropDriver
 from .scfgradientdriver import ScfGradientDriver
+from .tddftgradientdriver import TddftGradientDriver
+from .tddftorbitalresponse import TddftOrbitalResponse
+from .scfhessiandriver import ScfHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
 from .rsppolarizability import Polarizability
@@ -48,10 +51,15 @@ from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
 from .rsptpa import TPA
+from .tdhfhessiandriver import TdhfHessianDriver
+from .polarizabilitygradient import PolarizabilityGradient
+from .vibrationalanalysis import VibrationalAnalysis
+#from .cphfsolver import CphfSolver
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 
@@ -280,7 +288,8 @@ def main():
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
-        'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop'
+        'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
+        'vibrational', 'freq', 'cphf', 'polarizability_gradient'
     ]
 
     scf_type = 'restricted'
@@ -367,10 +376,29 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv = TddftGradientDriver(scf_drv)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                  rsp_prop.rsp_driver)
+                                  rsp_prop._rsp_driver, rsp_prop._rsp_property)
+
+    # Hessian
+    # TODO reconsider keeping this after introducing vibrationalanalysis class
+    if task_type == 'hessian':
+        hessian_dict = (task.input_dict['hessian']
+                        if 'hessian' in task.input_dict else {})
+
+        orbrsp_dict = (task.input_dict['orbital_response']
+                       if 'orbital_response' in task.input_dict else {})
+
+        if use_xtb:
+            hessian_drv = XtbHessianDriver(xtb_drv)
+            hessian_drv.update_settings(method_dict, hessian_dict)
+            hessian_drv.compute(task.molecule)
+
+        elif scf_drv.scf_type == 'restricted':
+            hessian_drv = ScfHessianDriver(scf_drv)
+            hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
+            hessian_drv.compute(task.molecule, task.ao_basis)
 
     # Geometry optimization
 
@@ -427,14 +455,76 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+            tddftgrad_drv = TddftGradientDriver(scf_drv)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True
             opt_drv.update_settings(opt_dict)
             opt_results = opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                          rsp_prop.rsp_driver)
+                                          rsp_prop._rsp_driver,
+                                          rsp_prop._rsp_property)
+
+    # Vibrational analysis
+
+    if task_type == 'vibrational':
+
+        vib_dict = (task.input_dict['vibrational']
+                    if 'vibrational' in task.input_dict else {})
+        hessian_dict = (task.input_dict['hessian']
+                        if 'hessian' in task.input_dict else {})
+        polgrad_dict = (task.input_dict['polarizability_gradient']
+                        if 'polarizability_gradient' in task.input_dict else {})
+        orbrsp_dict = (task.input_dict['orbital_response']
+                       if 'orbital_response' in task.input_dict else {})
+        rsp_dict = (task.input_dict['response']
+                    if 'response' in task.input_dict else {})
+        rsp_dict['filename'] = task.input_dict['filename']
+        vib_dict['filename'] = task.input_dict['filename']
+
+        if use_xtb:
+            vibrational_drv = VibrationalAnalysis(xtb_drv)
+            vibrational_drv.update_settings(method_dict,
+                                            vib_dict,
+                                            hessian_dict=hessian_dict,
+                                            cphf_dict=orbrsp_dict,
+                                            rsp_dict=rsp_dict,
+                                            polgrad_dict=polgrad_dict)
+        elif scf_drv.scf_type == 'restricted':
+            vibrational_drv = VibrationalAnalysis(scf_drv)
+            vibrational_drv.update_settings(method_dict,
+                                            vib_dict,
+                                            hessian_dict=hessian_dict,
+                                            cphf_dict=orbrsp_dict,
+                                            rsp_dict=rsp_dict,
+                                            polgrad_dict=polgrad_dict)
+
+        vibrational_drv.compute(task.molecule, task.ao_basis)
+
+    # Polarizability gradient
+
+    if task_type == 'polarizability_gradient':
+
+        polgrad_dict = (task.input_dict['polarizability_gradient']
+                        if 'polarizability_gradient' in task.input_dict else {})
+        orbrsp_dict = (task.input_dict['orbital_response']
+                       if 'orbital_response' in task.input_dict else {})
+        rsp_dict = (task.input_dict['response']
+                    if 'response' in task.input_dict else {})
+
+        rsp_dict['program_end_time'] = program_end_time
+        rsp_dict['filename'] = task.input_dict['filename']
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+
+        polgrad_drv = PolarizabilityGradient(task.mpi_comm, task.ostream)
+        polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict,
+                                    scf_drv)
+        polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+                            rsp_prop._rsp_property)
 
     # Response
 
@@ -451,6 +541,64 @@ def main():
 
         if not rsp_prop.is_converged:
             return
+
+        # Calculate the excited-state gradient if requested
+
+        if 'property' in rsp_dict:
+            prop_type = rsp_dict['property'].lower()
+        else:
+            prop_type = None
+
+        if prop_type in ['absorption', 'uv-vis', 'ecd']:
+
+            if 'orbital_response' in task.input_dict:
+                orbrsp_dict = task.input_dict['orbital_response']
+                if 'tamm_dancoff' in rsp_dict:
+                    orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+                # TODO: if gradient dict is not defined, do just the
+                # orbital response. This is for testing/benchmarking
+                # only and should be removed or done in a better way
+                # (e.g. task_type = orbital-response)
+                if 'gradient' not in task.input_dict:
+                    orbrsp_drv = TddftOrbitalResponse(task.mpi_comm,
+                                                      task.ostream)
+                    orbrsp_drv.update_settings(orbrsp_dict, method_dict)
+                    orbrsp_drv.compute(task.molecule, task.ao_basis,
+                                       scf_drv.scf_tensors,
+                                       rsp_prop._rsp_property)
+            else:
+                orbrsp_dict = {}
+
+            # Excited state gradient
+            if 'gradient' in task.input_dict:
+                grad_dict = task.input_dict['gradient']
+                tddftgrad_drv = TddftGradientDriver(scf_drv)
+                tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
+                                              method_dict)
+                tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
+                                      rsp_prop._rsp_driver,
+                                      rsp_prop._rsp_property)
+
+            # Excited state Hessian and vibrational analysis
+            if 'vibrational' in task.input_dict:
+                freq_dict = task.input_dict['vibrational']
+                tdhfhessian_drv = TdhfHessianDriver(scf_drv)
+                tdhfhessian_drv.update_settings(method_dict, rsp_dict,
+                                                freq_dict, orbrsp_dict)
+                tdhfhessian_drv.compute(task.molecule, task.ao_basis,
+                                        rsp_prop._rsp_driver)
+                if task.mpi_rank == mpi_master():
+                    tdhfhessian_drv.vibrational_analysis(task.molecule)
+
+            # Excited state optimization
+            if 'optimize_excited_state' in task.input_dict:
+                opt_dict = task.input_dict['optimize_excited_state']
+                tddftgrad_drv = TddftGradientDriver(scf_drv)
+                tddftgrad_drv.update_settings(opt_dict, rsp_dict, orbrsp_dict,
+                                              method_dict)
+                opt_drv = OptimizationDriver(tddftgrad_drv)
+                opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
+                                rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
     # Pulsed Linear Response Theory
 

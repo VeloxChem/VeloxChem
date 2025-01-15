@@ -79,6 +79,13 @@ class OptimizationEngine(geometric.engine.Engine):
 
         self._debug = False
 
+    def lower(self):
+        """
+        Required in order to get MECI optimization working in geomeTRIC
+        """
+
+        return 'custom engine'
+
     def calc_new(self, coords, dirname):
         """
         Implements calc_new method for the engine.
@@ -119,14 +126,16 @@ class OptimizationEngine(geometric.engine.Engine):
             self.grad_drv.ostream.flush()
 
         if not self._debug:
-            self.grad_drv.ostream.mute()
+            #self.grad_drv.ostream.mute()
+            pass
 
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
         if not self._debug:
-            self.grad_drv.ostream.unmute()
+            #self.grad_drv.ostream.unmute()
+            pass
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

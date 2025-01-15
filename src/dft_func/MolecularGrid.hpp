@@ -58,10 +58,14 @@ class CMolecularGrid
      */
     std::vector<int> _gridPointCounts;
 
+    std::vector<int> _gridPointCountsOriginal;
+
     /**
      The displacement of grid points in the partitioned grid boxes.
      */
     std::vector<int> _gridPointDisplacements;
+
+    std::vector<int> _gridPointDisplacementsOriginal;
 
     /**
      The maximum number of grid points in a grid box.

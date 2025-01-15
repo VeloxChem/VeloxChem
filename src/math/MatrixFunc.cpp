@@ -130,11 +130,37 @@ make_matrix(const std::string& label, const size_t nrows, const size_t ncols) ->
         
         matrix.add({0, 0, nrows, ncols}, {2, 5});
     }
+
+    // add submatrices for 3rd-order case
+    
+    if (format::upper_case(label) == "3RD_ORDER")
+    {
+        matrix.add({0, 0, nrows, ncols}, {0, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 0});
+        matrix.add({0, 0, nrows, ncols}, {1, 1});
+        matrix.add({0, 0, nrows, ncols}, {1, 2});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 0});
+        matrix.add({0, 0, nrows, ncols}, {2, 1});
+        matrix.add({0, 0, nrows, ncols}, {2, 2});
+        matrix.add({0, 0, nrows, ncols}, {2, 3});
+        matrix.add({0, 0, nrows, ncols}, {2, 4});
+        matrix.add({0, 0, nrows, ncols}, {2, 5});
+
+        matrix.add({0, 0, nrows, ncols}, {3, 0});
+        matrix.add({0, 0, nrows, ncols}, {3, 1});
+        matrix.add({0, 0, nrows, ncols}, {3, 2});
+        matrix.add({0, 0, nrows, ncols}, {3, 3});
+        matrix.add({0, 0, nrows, ncols}, {3, 4});
+        matrix.add({0, 0, nrows, ncols}, {3, 5});
+        matrix.add({0, 0, nrows, ncols}, {3, 6});
+        matrix.add({0, 0, nrows, ncols}, {3, 7});
+        matrix.add({0, 0, nrows, ncols}, {3, 8});
+        matrix.add({0, 0, nrows, ncols}, {3, 9});
+    }
     
     return matrix;
 }
-
-
-
 
 }  // namespace matfunc
