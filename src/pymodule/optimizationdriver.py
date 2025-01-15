@@ -29,13 +29,14 @@ import numpy as np
 import time as tm
 import tempfile
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
@@ -147,6 +148,22 @@ class OptimizationDriver:
                 '_debug': ('bool', 'print debug info'),
             },
         }
+
+    @property
+    def is_scf(self):
+        """
+        Checks if optimization uses SCF driver.
+
+        :return:
+            True if optimization uses SCF driver.
+        """
+
+        if hasattr(self.grad_drv, 'scf_driver'):
+            return isinstance(self.grad_drv.scf_driver,
+                              (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                               ScfRestrictedOpenDriver))
+        else:
+            return False
 
     def print_keywords(self):
         """
@@ -267,6 +284,19 @@ class OptimizationDriver:
             constr_filename = None
 
         optinp_filename = Path(filename + '.optinp').as_posix()
+
+        if self.is_scf and self.transition:
+            hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
+            hessian_drv.compute(molecule, args[0])
+
+            if self.rank == mpi_master():
+                hessian_filename = Path(self.filename + '.tmp', 'hessian',
+                                        'hessian.txt').as_posix()
+                coords_filename = Path(self.filename + '.tmp', 'hessian',
+                                       'coords.xyz').as_posix()
+                np.savetxt(hessian_filename, hessian_drv.hessian)
+                molecule.write_xyz_file(coords_filename)
+            self.comm.barrier()
 
         # redirect geomeTRIC stdout/stderr
 

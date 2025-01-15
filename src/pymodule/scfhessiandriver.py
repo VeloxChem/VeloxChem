@@ -181,7 +181,6 @@ class ScfHessianDriver(HessianDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    # TODO: check if compute numerical works with MPI
     def compute_numerical(self, molecule, ao_basis):
         """
         Performs the calculation of a numerical Hessian based only
@@ -224,6 +223,12 @@ class ScfHessianDriver(HessianDriver):
         grad_drv = ScfGradientDriver(self.scf_driver)
 
         for i in range(natm):
+
+            self.ostream.unmute()
+            self.ostream.print_info(f'Processing atom {i + 1}/{natm}...')
+            self.ostream.flush()
+            self.ostream.mute()
+
             for x in range(3):
 
                 coords[i, x] += self.delta_h
@@ -596,9 +601,13 @@ class ScfHessianDriver(HessianDriver):
         if self._dft:
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.scf_driver.xcfun)
-                          if self.scf_driver.grid_level is None else self.scf_driver.grid_level)
+                          if self.scf_driver.grid_level is None else
+                          self.scf_driver.grid_level)
             # make sure to use high grid level for DFT Hessian
-            grid_level = max(6, grid_level)
+            if molecule.get_charge() == 0:
+                grid_level = max(6, grid_level)
+            else:
+                grid_level = max(7, grid_level)
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
 
