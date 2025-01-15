@@ -1531,14 +1531,11 @@ class PolOrbitalResponse(CphfSolver):
             n_freqs = len(self.frequencies)
 
             # get CPHF results in reduced dimensions
-            # NOTE Xin
             if self.use_subspace_solver:
                 dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-                #all_cphf_red = []
 
                 all_cphf_ov = np.zeros((n_freqs, dof, dof, nocc * nvir))
                 for n, w in enumerate(self.frequencies):
-
                     for idx, xy in enumerate(xy_pairs):
                         x = xy[0]
                         y = xy[1]
@@ -1549,7 +1546,6 @@ class PolOrbitalResponse(CphfSolver):
                         if (y != x):
                             all_cphf_ov[n, y, x] += all_cphf_ov[n, x, y]
 
-                #all_cphf_red = np.array(all_cphf_red).reshape(n_freq * dof_red, nocc, nvir)
             else:
                 all_cphf_red = self.cphf_results['cphf_ov']
                 all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
@@ -1557,8 +1553,6 @@ class PolOrbitalResponse(CphfSolver):
                 all_cphf_ov = np.zeros((n_freqs, dof, dof, nocc * nvir))
 
                 for n, w in enumerate(self.frequencies):
-                    #tmp_cphf_ov = all_cphf_ov_red[n]
-
                     for idx, xy in enumerate(xy_pairs):
                         x = xy[0]
                         y = xy[1]
@@ -1570,8 +1564,6 @@ class PolOrbitalResponse(CphfSolver):
 
             all_cphf_ov = all_cphf_ov.reshape(n_freqs, dof * dof, nocc, nvir)
 
-            # map CPHF results to dof*dof dimensions
-            #all_cphf_ov = self.map_cphf_results(molecule, scf_tensors, all_cphf_red)
         else:
             dof = None
 
@@ -2322,75 +2314,6 @@ class PolOrbitalResponse(CphfSolver):
         )
 
         return omega_gxc_contrib
-
-    def map_cphf_results(self, molecule, scf_tensors, cphf_red):
-        """
-        Maps reduced array of tensor elements for CPHF
-        multipliers to full dof*dof array
-
-        :param molecule:
-            The molecule.
-        :param cphf_red:
-            The CPHF multipliers in reduced dimension.
-        """
-
-        # MO coefficients
-        nocc = molecule.number_of_alpha_electrons()
-        nmo = scf_tensors['C_alpha'].shape[1]
-        nvir = nmo - nocc
-
-        # number of frequencies
-        n_freq = len(self.frequencies)
-
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        # number of tensor elements computed
-        red_dim = cphf_red.shape[0] // n_freq
-
-        # reshape the reduced array
-        # original dimensions: (n_freq*red_dim, nocc, nvir)
-        cphf_red = cphf_red.reshape(n_freq, red_dim, nocc, nvir)
-        
-        if self.is_complex:
-            cphf_dt = np.dtype('complex128')
-            cmplx_dim = red_dim // 2
-            cphf_red = cphf_red[:, :cmplx_dim] + 1j * cphf_red[:, cmplx_dim:]
-        else:
-            cphf_dt = np.dtype('float64')
-
-        # map for dof = 1
-        map_1 = [[[0], [[0,0]]]]
-
-        # map for dof = 2
-        map_2 = [[[0], [[0,0]]],
-                 [[1], [[0,1], [1,0]]],
-                 [[2], [[1,1]]]]
-
-        # map for dof = 3
-        map_3 = [[[0], [[0,0]]],
-                 [[1], [[0,1], [1,0]]],
-                 [[2], [[0,2], [2,0]]],
-                 [[3], [[1,1]]],
-                 [[4], [[1,2], [2,1]]],
-                 [[5], [[2,2]]]]
-
-        if dof == 1:
-            map_dof = map_1.copy()
-        elif dof == 2:
-            map_dof = map_2.copy()
-        elif dof == 3:
-            map_dof = map_3.copy()
-
-        cphf_ov = np.zeros((n_freq, dof, dof, nocc, nvir), dtype=cphf_dt)
-
-        for f, cphf_sol in enumerate(cphf_red):
-            for idx, map_idx in map_dof:
-                for x, y in [tnsr_idx for tnsr_idx in map_idx]:
-                    cphf_ov[f, x, y] = cphf_sol[idx]
-        cphf_ov = cphf_ov.reshape(n_freq, dof**2, nocc, nvir)
-
-        return cphf_ov
 
     def print_cphf_header(self, title):
         self.ostream.print_blank()
