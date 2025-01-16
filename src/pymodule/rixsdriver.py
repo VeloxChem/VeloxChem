@@ -177,7 +177,7 @@ class RixsDriver:
         gamma_ij_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ij, gamma_ij, C_ij, optimize=True)
 
         gamma_ao = gamma_ab_ao - gamma_ij_ao
-        gamma_ao *= 2 # alpha and beta spin
+        gamma_ao *= np.sqrt(2) #2 # alpha and beta spin
         return gamma_ao
 
     def gts_tdm(self, scf_results, core_eigenvectors):
@@ -185,11 +185,16 @@ class RixsDriver:
         The GS-to-state transition-density-matrix (GS to core) in ao --
         essentially transformed and reshaped eigenvector
 
-        :param molecule    : molecule object (could be removed w/ small modifications)
-        :param ao_basis    : atomic orbital basis (could be removed)
-        :param scf_results : results of the SCF calculation (could be removed w/ small modifications)
-        :tda_res_val       : linear-response results for the valence calculation
-        :tda_res_core      : linear-response results for the core calculation
+        :param molecule: 
+            molecule object (could be removed w/ small modifications)
+        :param ao_basis: 
+            atomic orbital basis (could be removed)
+        :param scf_results: 
+            results of the SCF calculation (could be removed w/ small modifications)
+        :tda_res_val:
+            linear-response results for the valence calculation
+        :tda_res_core:
+            linear-response results for the core calculation
 
         :returns: 
             the GS-to-state transition-density-matrix in ao-basis
@@ -213,9 +218,8 @@ class RixsDriver:
             C_ab = scf_results['C_alpha'][:,self.nocc:]
         C_ij = scf_results['C_alpha'][:,:self.nocc]
         gamma_ng_ao = np.einsum('vp, pqJ, wq -> vwJ', C_ij, X_cor_mo, C_ab, optimize=True)
-        gamma_ng_ao *= 2 # alpha and beta spin
+        gamma_ng_ao *= np.sqrt(2) # 2 # alpha and beta spin
         return gamma_ng_ao
-
 
     def F_xy(self, w, f, gamma_ao,
          gamma_ng_ao, core_eigenvalues,
@@ -223,12 +227,17 @@ class RixsDriver:
         """
         The RIXS scattering amptlitude (sum-over-states transition strength).
         
-        :param w            : Energy of incoming photon 
-        :param f            : Which, out of the nr_ve, final valence states to end at
-        :param gamma_factor : Broadening factor, or half-width of the core-excited state; 
-                             in the resonant case corresponding to state with eigenvalue w
+        :param w:
+            Energy of incoming photon 
+        :param f: 
+            Which, out of the nr_ve, final valence states to end at
+        :param gamma_factor: 
+            Broadening factor, or half-width of the core-excited state; 
+            in the resonant case corresponding to state with eigenvalue w
     
-        returns the scattering amplitude/transition strength for all molecular directions and outgoing photon polarisation
+        :return: 
+            The scattering amplitude/transition strength 
+            for all molecular directions and outgoing photon polarisation
         """
         
         eigenvalues = core_eigenvalues # excitation energies
@@ -301,17 +310,22 @@ class RixsDriver:
                 largest_core = max(largest_core, core_index)
         return largest_core
 
-    def resonant(self, eigenvals_core, eigenvals_val):
-        _ene_loss              = np.zeros((self.nr_ve, len(self.photon_energy)))
-        _emiss                 = np.zeros((self.nr_ve, len(self.photon_energy)))
-        _crossections          = np.zeros((self.nr_ve, len(self.photon_energy)))
-        #_scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
+    def resonant_rixs_xsection(self, eigenvals_core, dipole_ints, gamma_ng_ao, theta):
+        sigma = np.zeros((self.nr_ce), dtype=np.complex128)
 
+        #_scattering_xmp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
+        # excitation energies
+        e_n = np.array([(1 / (en - eigenvals_core - self.gamma_n*1j)) for en in eigenvals_core]) # denominator
+        #print(f'e_n:{e_n.shape}, dip:{dipole_ints.shape} gamma:{gamma_ao[:,:,f].shape}, gamma_ng:{gamma_ng_ao.shape}')
+        F = np.einsum('kn, xij, ijn, yab, abn -> kxy', e_n, -dipole_ints, gamma_ng_ao, -dipole_ints, gamma_ng_ao, optimize='greedy')
+        #F = e_n * np.einsum('xij, ijf, yab, abf -> nxy', -dipole_ints, gamma_ng_ao, -dipole_ints, gamma_ng_ao, optimize='greedy')
 
-        self.res_ene_loss              = _ene_loss
-        self.res_emissison             = _emiss
-        self.res_crossections          = _crossections
-        #self.res_scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
+        for n in range(self.nr_ce):
+            _F = F[n]
+            sigma[n] = 1/15 * ((2 - (1/2) * np.sin(theta) ** 2) * np.sum(np.abs(_F)**2) 
+                   + ((3/4) * np.sin(theta) ** 2 - 1/2) * (np.sum(_F * _F.T.conj())
+                                                   + np.trace(np.abs(_F)**2)))
+        return sigma
 
     def compute(self, molecule, ao_basis, scf_results, tda_res_val, tda_res_core=None, nr_CO=None, nr_vir=None, nr_val=None):
         self.norb = scf_results['C_alpha'].shape[0]
@@ -385,8 +399,7 @@ class RixsDriver:
         T_fn = self.transition_dipole_mom(tdm_fn, dipole_ints)
         self.oscillator_strength  = self.osc_str(T_fn, emission_ene) 
 
-        T_gn = self.transition_dipole_mom(tdm_ng, dipole_ints)
-        self.resonant_osc_str = self.osc_str(T_gn, core_eigenvalues)
+        self.resonant_rixs = self.resonant_rixs_xsection(omega_n, dipole_ints, tdm_ng, self.theta).real
 
     def write_hdf5(self, fname):
         """
