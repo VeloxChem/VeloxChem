@@ -233,6 +233,16 @@ export_t2cintegrals(py::module& m)
             "compute",
             [](const CNuclearPotentialGeomX00Driver<2>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
+            "Computes nuclear potential second derivatives matrices for given molecule, basis and selected atom.")
+        .def(
+            "compute",
+            [](const CNuclearPotentialGeomX00Driver<2>& geom_drv,
+               const CMolecule& molecule,
+               const CMolecularBasis& basis,
+               const int iatom,
+               const std::vector<std::array<double, 3>>& coordinates,
+               const std::vector<double>& charges)
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom, coordinates, charges); },
             "Computes nuclear potential second derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom101Driver class

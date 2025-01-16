@@ -485,6 +485,30 @@ class ScfHessianDriver(HessianDriver):
             npot_hess_200_mats = Matrices()
             npot_hess_020_mats = Matrices()
 
+            if self.scf_driver.point_charges is not None:
+                npoints = self.scf_driver.point_charges.shape[1]
+
+                mm_coords = []
+                mm_charges = []
+                for p in range(npoints):
+                    xyz_p = self.scf_driver.point_charges[:3, p]
+                    chg_p = self.scf_driver.point_charges[3, p]
+                    mm_coords.append(xyz_p.copy())
+                    mm_charges.append(chg_p)
+
+                hmats_200 = npot_hess_200_drv.compute(molecule, ao_basis, i,
+                                                      mm_coords, mm_charges)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        npot_label = label_x + label_y if x <= y else label_y + label_x
+                        npot_200_iixy = hmats_200.matrix_to_numpy(npot_label)
+                        # TODO: move minus sign into function call (such as in oneints)
+                        hessian_2nd_order_derivatives[i, i, x, y] += -2.0 * (
+                            np.sum(density * (npot_200_iixy + npot_200_iixy.T)))
+
+                hmats_200 = Matrices()
+
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
 
