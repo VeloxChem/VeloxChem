@@ -42,7 +42,7 @@ from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import make_matrix, mat_t
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .griddriver import GridDriver
@@ -664,32 +664,72 @@ class ScfHessianDriver(HessianDriver):
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
             # nuclei-point charges contribution
+            # TODO: parallelize over MPI
             if self.scf_driver.point_charges is not None:
 
                 qm_coords = molecule.get_coordinates_in_bohr()
                 nuclear_charges = molecule.get_element_ids()
 
                 for i in range(natm):
-                    z_a = nuclear_charges[i]
-                    r_a = qm_coords[i]
+                    q_i = nuclear_charges[i]
+                    xyz_i = qm_coords[i]
 
                     for j in range(len(mm_charges)):
-                        z_b = mm_charges[j]
-                        r_b = mm_coords[j]
+                        q_j = mm_charges[j]
+                        xyz_j = mm_coords[j]
 
-                        vec_ab = r_b - r_a
-                        rab = np.linalg.norm(vec_ab)
+                        vec_ij = xyz_j - xyz_i
+                        rij = np.linalg.norm(vec_ij)
 
-                        for k in range(3):
-                            for l in range(3):
+                        hess_ii = q_i * q_j * (3.0 * np.outer(vec_ij, vec_ij) /
+                                               rij**5 - np.eye(3) / rij**3)
 
-                                hess_iikl = (3.0 * z_a * z_b * vec_ab[k] *
-                                             vec_ab[l] / rab**5)
+                        hessian_nuclear_nuclear[i, i, :, :] += hess_ii
 
-                                if k == l:
-                                    hess_iikl -= z_a * z_b / rab**3
+                # TODO: parallelize over MPI
+                if self.scf_driver.qm_vdw_params is not None:
 
-                                hessian_nuclear_nuclear[i, i, k, l] += hess_iikl
+                    for i in range(natm):
+                        xyz_i = qm_coords[i]
+                        sigma_i = self.scf_driver.qm_vdw_params[i, 0]
+                        epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
+
+                        for j in range(len(mm_charges)):
+                            xyz_j = self.scf_driver.point_charges[:3, j]
+                            sigma_j = self.scf_driver.point_charges[4, j]
+                            epsilon_j = self.scf_driver.point_charges[5, j]
+
+                            vec_ij = xyz_j - xyz_i
+
+                            # convert vector to nm
+                            vec_ij *= bohr_in_angstrom() * 0.1
+
+                            epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                            sigma_ij = 0.5 * (sigma_i + sigma_j)
+
+                            if epsilon_ij == 0.0:
+                                continue
+
+                            rij = np.linalg.norm(vec_ij)
+                            inv_r2 = 1.0 / rij**2
+                            inv_r4 = inv_r2**2
+
+                            sigma_r_6 = (sigma_ij / rij)**6
+                            sigma_r_12 = sigma_r_6**2
+
+                            coef_rr = (28.0 * sigma_r_12 -
+                                       8.0 * sigma_r_6) * inv_r4
+                            coef_I = (2.0 * sigma_r_12 - sigma_r_6) * inv_r2
+
+                            hess_ii = 24.0 * epsilon_ij * (
+                                coef_rr * np.outer(vec_ij, vec_ij) -
+                                coef_I * np.eye(3))
+
+                            # convert hessian to atomic unit
+                            hess_ii /= (4.184 * hartree_in_kcalpermol() *
+                                        (10.0 / bohr_in_angstrom())**2)
+
+                            hessian_nuclear_nuclear[i, i, :, :] += hess_ii
 
             # Sum up the terms and reshape for final Hessian
             self.hessian = (
