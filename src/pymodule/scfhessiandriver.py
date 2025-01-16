@@ -663,6 +663,34 @@ class ScfHessianDriver(HessianDriver):
             # Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
+            # nuclei-point charges contribution
+            if self.scf_driver.point_charges is not None:
+
+                qm_coords = molecule.get_coordinates_in_bohr()
+                nuclear_charges = molecule.get_element_ids()
+
+                for i in range(natm):
+                    z_a = nuclear_charges[i]
+                    r_a = qm_coords[i]
+
+                    for j in range(len(mm_charges)):
+                        z_b = mm_charges[j]
+                        r_b = mm_coords[j]
+
+                        vec_ab = r_b - r_a
+                        rab = np.linalg.norm(vec_ab)
+
+                        for k in range(3):
+                            for l in range(3):
+
+                                hess_iikl = (3.0 * z_a * z_b * vec_ab[k] *
+                                             vec_ab[l] / rab**5)
+
+                                if k == l:
+                                    hess_iikl -= z_a * z_b / rab**3
+
+                                hessian_nuclear_nuclear[i, i, k, l] += hess_iikl
+
             # Sum up the terms and reshape for final Hessian
             self.hessian = (
                 hessian_first_order_derivatives +
