@@ -25,11 +25,10 @@
 
 from mpi4py import MPI
 import numpy as np
-import os
 import sys
 from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation as R
-# For profiling purposes only
+from pathlib import Path
 import time
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
@@ -63,6 +62,7 @@ class SolvationBuilder:
         - box: The dimensions of the box (x, y, z).
         - centered_solute: The list of tuples with the molecule id, atom labels and coordinates of the centered solute.
         - system: The list of tuples with the molecule id, atom labels and coordinates of the system.
+        - equilibration_flag: Boolean flag to indicate if an has been requested.
         - temperature: The temperature of the for the equilibration in Kelvin.
         - pressure: The pressure for the equilibration in bar.
         - steps: The number of steps for the equilibration.
@@ -120,6 +120,7 @@ class SolvationBuilder:
         self.system = []
 
         # NPT Equilibration options
+        self.equilibration_flag = False
         self.temperature = 300
         self.pressure = 1
         self.steps = 5000
@@ -368,7 +369,7 @@ class SolvationBuilder:
         self.system_molecule = self._save_molecule()
 
         if equilibrate:
-            
+            self.equilibration_flag = True
             self.ostream.print_blank()
             self.ostream.print_info("Equilibrating the system")
             self.ostream.print_blank()
@@ -632,9 +633,7 @@ class SolvationBuilder:
             self.ostream.print_info("liquid.xml file written")
             self.ostream.flush()
             # Write the system PDB file
-            self._write_system_pdb(filename='liquid.pdb')
-            self.ostream.print_info("liquid.pdb file written")
-            self.ostream.flush()
+            filename = 'liquid.pdb'
 
         else:
             # Solute
@@ -653,10 +652,17 @@ class SolvationBuilder:
                 self.ostream.print_info(f'Remember to include amber03.xml and the {self.solvent_name}.xml file while creating the OpenMM system')
                 self.ostream.flush()
 
-            # Write the system PDB file
-            self._write_system_pdb()
-            self.ostream.print_info("system.pdb file written")
-            self.ostream.flush()
+            filename = 'system.pdb'
+
+        # Write the system PDB file
+        if self.equilibration_flag:
+            # If the system was equilibrated, OpenMM has already written the PDB file
+            Path('equilibrated_system.pdb').rename(filename)
+        else:
+            self._write_system_pdb(filename=filename)
+        # Print information
+        self.ostream.print_info(f"{filename} file written")
+        self.ostream.flush()
 
     def perform_equilibration(self):
         """
@@ -735,13 +741,12 @@ class SolvationBuilder:
 
         # Exctract the new box size from the simulation context
         box_vectors = simulation.context.getState().getPeriodicBoxVectors()
-        # Update the box size
-        self.box = [box_vectors[0][0].value_in_unit(unit.nanometer), box_vectors[1][1].value_in_unit(unit.nanometer), box_vectors[2][2].value_in_unit(unit.nanometer)]
-        self.ostream.print_info(f'The box size after equilibration is: {self.box[0]:.2f} x {self.box[1]:.2f} x {self.box[2]:.2f} nm^3')
+        # Update the box size in angstrom
+        self.box = [box_vectors[0][0].value_in_unit(unit.angstroms), box_vectors[1][1].value_in_unit(unit.angstroms), box_vectors[2][2].value_in_unit(unit.angstroms)]
+        self.ostream.print_info(f'The box size after equilibration is: {self.box[0] * 0.1:.2f} x {self.box[1] * 0.1:.2f} x {self.box[2] * 0.1:.2f} nm^3')
         self.ostream.flush()
         # Recalculate the available volume for the solvent
-        volume_nm3 = self.box[0] * self.box[1] * self.box[2] - self._get_volume(self.solute) * 1e-3
-
+        volume_nm3 = (self.box[0] * self.box[1] * self.box[2] - self._get_volume(self.solute)) * 1e-3
         # Recalculate the density of the solvent
         self.ostream.print_info(f'The density of the solvent after equilibration is: {self._check_density(self.solvents[0], self.added_solvent_counts[0], volume_nm3)} kg/m^3')
         self.ostream.flush()
@@ -749,21 +754,21 @@ class SolvationBuilder:
         with open('equilibrated_system.pdb', 'w') as f:
             app.PDBFile.writeFile(simulation.topology, positions, f)
 
-        # Delete the produced gro and top files
+        # Delete the produced gro and top files with Path
         if self.solvent_name == 'itself':
-            os.remove('liquid.gro')
-            os.remove('liquid.top')
-            os.remove('liquid.itp')
+            Path('liquid.gro').unlink()
+            Path('liquid.top').unlink()
+            Path('liquid.itp').unlink()
         elif self.solvent_name in ['spce', 'tip3p']:
-            os.remove('system.gro')
-            os.remove('system.top')
-            os.remove('solute.itp')
+            Path('system.gro').unlink()
+            Path('system.top').unlink()
+            Path('solute.itp').unlink()
         else:
-            os.remove('system.gro')
-            os.remove('system.top')
-            os.remove('solute.itp')
+            Path('system.gro').unlink()
+            Path('system.top').unlink()
+            Path('solute.itp').unlink()
             for i in range(len(self.solvent_ffs)):
-                os.remove(f'solvent_{i+1}.itp')
+                Path(f'solvent_{i+1}.itp').unlink()
 
         # Update the system molecule
         self.system_molecule = Molecule.read_pdb_file('equilibrated_system.pdb')
