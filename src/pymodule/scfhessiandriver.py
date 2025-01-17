@@ -291,7 +291,7 @@ class ScfHessianDriver(HessianDriver):
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_tensors)
-        dft_sanity_check(self, 'compute', 'hessian')
+        dft_sanity_check(self, 'compute')
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
