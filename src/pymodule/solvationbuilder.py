@@ -1134,7 +1134,7 @@ class SolvationBuilder:
                 self.solvent_ffs = []
                 self.solvent_ffs.append(self.solute_ff)
             # Non-water solvents
-            if self.solvent_name not in ['spce', 'tip3p']:
+            elif self.solvent_name not in ['spce', 'tip3p']:
                 self.solvent_ffs = []
                 for solvent in self.solvents:
                     solvent_ff = ForceFieldGenerator()

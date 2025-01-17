@@ -1013,9 +1013,12 @@ class OpenMMDynamics:
                 self.kinetic_energies.append(kin)
 
                 # Temperature
-                R_kjmol = 0.00831446261815324
-                particles = self.system.getNumParticles() * 1.5
-                temp = kin / (particles * R_kjmol)
+                dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
+                if hasattr(self.integrator, 'computeSystemTemperature'):
+                    temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+                else:
+                    temp = (2*state.getKineticEnergy()/(dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin) 
+
                 self.temperatures.append(temp)
                 print('Temperature:', temp, 'K')
 
@@ -1219,9 +1222,11 @@ class OpenMMDynamics:
             self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
 
             # Temperature
-            R_kjmol = 0.00831446261815324
-            particles = self.system.getNumParticles() * 1.5
-            temp = kinetic.value_in_unit(unit.kilojoules_per_mole) / (particles * R_kjmol)
+            dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
+            if hasattr(self.integrator, 'computeSystemTemperature'):
+                temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+            else:
+                temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
             self.temperatures.append(temp)
 
             # Total energy
