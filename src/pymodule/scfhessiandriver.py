@@ -268,7 +268,7 @@ class ScfHessianDriver(HessianDriver):
                                                    (2.0 * self.delta_h))
 
         # reshaped Hessian as member variable
-        self.hessian = hessian.reshape(3 * natm, 3 * natm)
+        self.hessian = hessian.reshape(natm * 3, natm * 3)
 
         # restore scf_drv to initial state
         scf_results = self.scf_driver.compute(molecule, ao_basis)

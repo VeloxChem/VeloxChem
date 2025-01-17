@@ -291,16 +291,16 @@ class OptimizationDriver:
         if self.is_scf and self.hessian == 'first':
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
             hessian_drv.compute(molecule, args[0])
-
             if self.rank == mpi_master():
-                hessian_dir = temp_path / f'rank_{self.rank}'
-                hessian_dir.mkdir(parents=True, exist_ok=True)
-                hessian_filename = (hessian_dir / 'hessian.txt').as_posix()
-                np.savetxt(hessian_filename, hessian_drv.hessian)
+                hess_data = hessian_drv.hessian.copy()
             else:
-                hessian_filename = None
-            hessian_filename = self.comm.bcast(hessian_filename,
-                                               root=mpi_master())
+                hess_data = None
+            hess_data = self.comm.bcast(hess_data, root=mpi_master())
+
+            hessian_dir = temp_path / f'rank_{self.rank}'
+            hessian_dir.mkdir(parents=True, exist_ok=True)
+            hessian_filename = (hessian_dir / 'hessian.txt').as_posix()
+            np.savetxt(hessian_filename, hess_data)
             self.hessian = f'file:{hessian_filename}'
 
         # redirect geomeTRIC stdout/stderr
