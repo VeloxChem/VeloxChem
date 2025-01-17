@@ -121,6 +121,9 @@ class VibrationalAnalysis:
         self.rsp_dict = {}
         self.polgrad_dict = {}
 
+        # dictionary of vibrational analysis results
+        self._results = {}
+
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
@@ -258,6 +261,9 @@ class VibrationalAnalysis:
             The AO basis set.
         :param min_basis:
             The minimal AO basis set.
+
+        :returns:
+            The dictionary with vibrational analysis results.
         """
 
         # compute the Hessian
@@ -270,20 +276,34 @@ class VibrationalAnalysis:
             self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():
+            # Save the molecule xyz string in the results dictionary
+            self._results['molecule_xyz_string'] = molecule.get_xyz_string()
+
             # get vibrational frequencies and normal modes
             self.frequency_analysis(molecule, filename=None)
+            self._results['vib_frequencies'] = self.vib_frequencies
+            # FIXME: normalized or not? What should the user get?
+            self._results['normal_modes'] = self.normal_modes
 
             # calculate force constants
             self.reduced_masses, self.force_constants = self.calculate_force_constant()
+            self._results['reduced_masses'] = self.reduced_masses
+            self._results['force_constants'] = self.force_constants
 
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
                 self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
+                self._results['ir_intensities'] = self.ir_intensities
 
             # calculate the analytical polarizability gradient for Raman intensities
+            # FIXME: should the instance variable be called raman_intensities, or
+            # rather raman_activities?
             if (self.do_raman or self.do_resonance_raman) and self.is_scf:
                 self.raman_intensities, depol_ratio = self.calculate_raman_activity(
                         self.normal_modes)
+                self._results['raman_intensities'] = self.raman_intensities
+                if depol_ratio is not None:
+                    self._results['depolarization_ratios'] = depol_ratio
 
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
@@ -299,6 +319,8 @@ class VibrationalAnalysis:
 
             # create binary file and save vibrational analysis results
             self._write_final_hdf5(molecule)
+
+            return self._results
 
         return
    

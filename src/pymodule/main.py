@@ -498,7 +498,7 @@ def main():
                                             rsp_dict=rsp_dict,
                                             polgrad_dict=polgrad_dict)
 
-        vibrational_drv.compute(task.molecule, task.ao_basis)
+        vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 
     # Polarizability gradient
 
