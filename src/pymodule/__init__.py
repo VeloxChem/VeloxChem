@@ -26,6 +26,7 @@ from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import ElectricDipoleMomentumGeom100Driver
 from .veloxchemlib import ThreeCenterOverlapDriver
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
