@@ -312,11 +312,10 @@ class RixsDriver:
 
     def resonant_rixs_xsection(self, eigenvals_core, dipole_ints, gamma_ng_ao, theta):
         sigma = np.zeros((self.nr_ce), dtype=np.complex128)
-
-        #_scattering_xmp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
         # excitation energies
         e_n = np.array([(1 / (en - eigenvals_core - self.gamma_n*1j)) for en in eigenvals_core]) # denominator
         #print(f'e_n:{e_n.shape}, dip:{dipole_ints.shape} gamma:{gamma_ao[:,:,f].shape}, gamma_ng:{gamma_ng_ao.shape}')
+
         F = np.einsum('kn, xij, ijn, yab, abn -> kxy', e_n, -dipole_ints, gamma_ng_ao, -dipole_ints, gamma_ng_ao, optimize='greedy')
         #F = e_n * np.einsum('xij, ijf, yab, abf -> nxy', -dipole_ints, gamma_ng_ao, -dipole_ints, gamma_ng_ao, optimize='greedy')
 
@@ -337,13 +336,12 @@ class RixsDriver:
             assert_msg_critical(nr_CO is not None,
                                 'RixsDriver: need the number of core, valence, and virtual orbitals involved for subspace-restricted approx.')
             self.sra = True
-            print(f'SRA: {self.sra}')
             self.nr_CO = nr_CO
             self.nr_val = nr_val
             self.nvir = nr_vir
             self.nr_ce = nr_CO * nr_vir
-            self.nr_ve = nr_val * nr_vir #len(tda_res_val['excitation_details']) 
-            #self.nstates = len(tda_res_val['excitation_details'])
+            self.nr_ve = nr_val * nr_vir
+
             eigenvector = tda_res_val['eigenvectors'].reshape(self.nr_CO + self.nr_val, self.nvir, self.nr_ce + self.nr_ve)
             core_eigenvectors     = eigenvector[:, : , self.nr_ve:]
             core_eigenvalues      = tda_res_val['eigenvalues'][self.nr_ve:]
