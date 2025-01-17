@@ -263,7 +263,7 @@ class TestFockGeom2000Driver:
                                                                 sket:eket]))
                                             
                 # compare submatrices
-                print(i, " ", j, " xx", np.max(rmat.to_numpy() - cmat.to_numpy()))
+                #print(i, " ", j, " xx", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 #assert cmat == rmat
 
         # check full Fock matrix
@@ -289,7 +289,7 @@ class TestFockGeom2000Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[0,1][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                print(i, " ", j, " xy", np.max(rmat.to_numpy() - cmat.to_numpy()))
+                #print(i, " ", j, " xy", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 #assert cmat == rmat
 
         # check full Fock matrix
@@ -315,7 +315,7 @@ class TestFockGeom2000Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[0,2][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                print(i, " ", j, " xz", np.max(rmat.to_numpy() - cmat.to_numpy()))
+                #print(i, " ", j, " xz", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 #assert cmat == rmat
 
         # check full Fock matrix
@@ -341,7 +341,7 @@ class TestFockGeom2000Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[1,1][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                print(i, " ", j, " yy", np.max(rmat.to_numpy() - cmat.to_numpy()))
+                #print(i, " ", j, " yy", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 #assert cmat == rmat
 
         # check full Fock matrix
@@ -367,7 +367,7 @@ class TestFockGeom2000Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[1,2][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                print(i, " ", j, " yz", np.max(rmat.to_numpy() - cmat.to_numpy()))
+                #print(i, " ", j, " yz", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 #assert cmat == rmat
 
         # check full Fock matrix
@@ -393,7 +393,7 @@ class TestFockGeom2000Driver:
                 rmat.set_values(np.ascontiguousarray(ref_mat[2,2][sbra:ebra,
                                                                 sket:eket]))
                 # compare submatrices
-                print(i, " ", j, " zz", np.max(rmat.to_numpy() - cmat.to_numpy()))
+                #print(i, " ", j, " zz", np.max(rmat.to_numpy() - cmat.to_numpy()))
                 #assert cmat == rmat
 
         # check full Fock matrix
