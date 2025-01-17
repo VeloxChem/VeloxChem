@@ -143,12 +143,93 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
             obj.ostream.print_warning(warn_msg)
         obj.ostream.flush()
 
+    # check grid level for Hessian calculation
+    if obj._dft and response_flag.lower() == 'hessian':
+        hessian_grid_level = max(6, get_default_grid_level(obj.xcfun))
+        if obj.grid_level is None:
+            dft_grid_level = get_default_grid_level(obj.xcfun)
+        else:
+            dft_grid_level = obj.grid_level
+        if dft_grid_level < hessian_grid_level:
+            warn_msg = 'DFT grid level for Hessian calculation is below the '
+            warn_msg += f'recommended value ({hessian_grid_level}). '
+            warn_msg += 'Please double check.'
+            obj.ostream.print_warning(warn_msg)
+            obj.ostream.print_blank()
+            obj.ostream.flush()
+
     # check if SCAN family of functional is used in nonliear response
     if obj._dft and response_flag.lower() == 'nonlinear':
         err_msg_scan = f'{type(obj).__name__}: Nonlinear response with '
         err_msg_scan += 'SCAN family of functional is not supported'
         assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
                             err_msg_scan)
+
+
+def polgrad_sanity_check(obj, method_flag, lr_results):
+    """
+    Checks settings for polarizability gradient and polarizability
+    orbital response against linear response results.
+
+    :param obj:
+        The object (polarizability gradient or orbital response driver).
+    :param method_flag:
+        The flag indicating the method in which the sanity check is
+        called.
+    :param lr_results:
+        A dictionary containing linear response results.
+    """
+
+    response_results = lr_results.get('solutions', None)
+    for frequency in obj.frequencies:
+        if (obj.vector_components[0], frequency) not in response_results.keys():
+            error_msg = 'Frequency {:2.3f} in '.format(frequency)
+            error_msg += method_flag + ' not found in linear response results '
+            error_msg += 'for vector compontent ' + obj.vector_components[0]
+            raise ValueError(error_msg)
+
+
+def raman_sanity_check(obj):
+    """
+    Checks whether both normal and resonance Raman has been requested.
+    Print warning message and set normal Raman flag to False.
+    The driver will continue with resonance Raman.
+
+    Checks if zero frequency has been input to resonance Raman. If so,
+    the value is removed from frequency list.
+
+    :param obj:
+        The object (vibrational analysis driver)
+    """
+
+    if (obj.do_raman and obj.do_resonance_raman):
+        warn_msg = 'Both normal and resonance Raman have been requested, '
+        warn_msg += 'but only one can run at a time.\n'
+        obj.ostream.print_warning(warn_msg)
+        info_msg = 'Will continue with resonance Raman.'
+        obj.ostream.print_warning(info_msg)
+        obj.ostream.flush()
+        obj.do_raman = False
+
+    # This check is due to convergence/singulaity issues in the cphf
+    # subspace solver for some molecules.
+    if obj.do_resonance_raman:
+        try:
+            idx0 = obj.frequencies.index(0.0)
+            warn_msg = 'Zero in frequency list for resonance Raman!\n'
+            if len(obj.frequencies) == 1:
+                warn_msg += 'No other frequencies requested.'
+                warn_msg += 'Will continue with normal Raman.'
+                obj.do_raman = True
+                obj.do_resonance_raman = False
+            else:
+                obj.frequencies.pop(idx0)
+                warn_msg += 'It has been removed from the list.'
+                warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
+                warn_msg += str(obj.frequencies)
+            obj.ostream.print_warning(warn_msg)
+        except ValueError:
+            pass
 
 
 def pe_sanity_check(obj, method_dict=None):

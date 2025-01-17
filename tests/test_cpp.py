@@ -11,7 +11,13 @@ from veloxchem.cppsolver import ComplexResponse
 @pytest.mark.solvers
 class TestCPP:
 
-    def run_cpp(self, xcfun_label, cpp_flag, ref_x_data, ref_y_data, tol):
+    def run_cpp(self,
+                xcfun_label,
+                cpp_flag,
+                ref_x_data,
+                ref_y_data,
+                tol,
+                use_subcomms=False):
 
         xyz_string = """6
         xyz
@@ -37,6 +43,7 @@ class TestCPP:
         lr_drv.ostream.mute()
         lr_drv.set_cpp_flag(cpp_flag)
         lr_drv.frequencies = list(ref_x_data)
+        lr_drv.use_subcomms = use_subcomms
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -67,6 +74,13 @@ class TestCPP:
 
         self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-6)
 
+        self.run_cpp(xcfun_label,
+                     cpp_flag,
+                     ref_x_data,
+                     ref_y_data,
+                     1.0e-6,
+                     use_subcomms=True)
+
     def test_b3lyp_absorption(self):
 
         # vlxtag: RKS, Absorption, CPP
@@ -88,3 +102,10 @@ class TestCPP:
         ref_y_data = [0.48472627, -1.18394788, -9.81377126]
 
         self.run_cpp(xcfun_label, cpp_flag, ref_x_data, ref_y_data, 1.0e-4)
+
+        self.run_cpp(xcfun_label,
+                     cpp_flag,
+                     ref_x_data,
+                     ref_y_data,
+                     1.0e-4,
+                     use_subcomms=True)

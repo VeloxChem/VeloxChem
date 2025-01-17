@@ -74,6 +74,8 @@ class ScfGradientDriver(GradientDriver):
 
         self._block_size_factor = 4
 
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
@@ -130,7 +132,7 @@ class ScfGradientDriver(GradientDriver):
 
         return list_atoms[self.rank::self.nodes]
 
-    def compute(self, molecule, basis, scf_results):
+    def compute(self, molecule, basis, scf_results=None):
         """
         Performs calculation of gradient.
 
@@ -142,42 +144,38 @@ class ScfGradientDriver(GradientDriver):
             The dictionary containing converged SCF results.
         """
 
-        if self.numerical:
-            self.compute_numerical_gradient(molecule, basis, scf_results)
-        else:
-            self.compute_analytical_gradient(molecule, basis, scf_results)
-
-    def compute_analytical_gradient(self, molecule, basis, scf_results):
-        """
-        Performs calculation of gradient.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_results:
-            The dictionary containing converged SCF results.
-        """
+        if scf_results is None:
+            scf_results = self.scf_driver.scf_tensors
 
         start_time = time.time()
         self.print_header()
 
-        if self.rank == mpi_master():
-            scf_type = scf_results['scf_type']
-        else:
-            scf_type = None
-        scf_type = self.comm.bcast(scf_type, root=mpi_master())
+        if self.numerical:
 
-        if scf_type == 'restricted':
-            self.compute_restricted(molecule, basis, scf_results)
-
-        elif scf_type == 'unrestricted':
-            self.compute_unrestricted(molecule, basis, scf_results)
+            self.ostream.mute()
+            self.compute_numerical(molecule, basis, scf_results)
+            self.ostream.unmute()
 
         else:
-            assert_msg_critical(
-                False,
-                'ScfGradientDriver: Not implemented for restricted open-shell')
+
+            if self.rank == mpi_master():
+                scf_type = scf_results['scf_type']
+            else:
+                scf_type = None
+            scf_type = self.comm.bcast(scf_type, root=mpi_master())
+
+            if scf_type == 'restricted':
+                self.compute_analytical_restricted(molecule, basis, scf_results)
+
+            elif scf_type == 'unrestricted':
+                self.compute_analytical_unrestricted(molecule, basis,
+                                                     scf_results)
+
+            else:
+                assert_msg_critical(
+                    False,
+                    'ScfGradientDriver: Not implemented for restricted open-shell'
+                )
 
         # print gradient
         self.print_geometry(molecule)
@@ -189,7 +187,7 @@ class ScfGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_restricted(self, molecule, basis, scf_results):
+    def compute_analytical_restricted(self, molecule, basis, scf_results):
         """
         Performs calculation of gradient for restricted SCF.
 
@@ -517,7 +515,7 @@ class ScfGradientDriver(GradientDriver):
                 self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
-    def compute_unrestricted(self, molecule, basis, scf_results):
+    def compute_analytical_unrestricted(self, molecule, basis, scf_results):
         """
         Performs calculation of gradient for unrestricted SCF.
 
@@ -809,35 +807,6 @@ class ScfGradientDriver(GradientDriver):
         # collect gradient
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
-
-    def compute_numerical_gradient(self, molecule, ao_basis, scf_results):
-        """
-        Performs calculation of gradient.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param scf_results:
-            The dictionary containing converged SCF results.
-        """
-
-        start_time = time.time()
-        self.print_header()
-
-        self.ostream.mute()
-        self.compute_numerical(molecule, ao_basis, scf_results)
-        self.ostream.unmute()
-
-        # print gradient
-        self.print_geometry(molecule)
-        self.print_gradient(molecule)
-
-        valstr = '*** Time spent in gradient calculation: '
-        valstr += '{:.2f} sec ***'.format(time.time() - start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def compute_energy(self, molecule, ao_basis, scf_results):
         """

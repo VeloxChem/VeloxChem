@@ -293,7 +293,7 @@ class TestPDFT:
 
         return xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a
 
-    def test_H20_PBE(self):
+    def test_H2O_PBE(self):
         pfunc = {"name": "tPBE", "components": {"TPBE_X": 1.0, 'TPBE_C': 1.0}}
         xc_energy, pdft_xc_energy, np_xcmat_a, pdft_np_xcmat_a = self.run_RDFT(
             'pbe', pfunc)
