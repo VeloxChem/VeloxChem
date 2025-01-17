@@ -189,11 +189,9 @@ class OptimizationDriver:
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']
 
+        # update hessian option for transition state search
         if ('hessian' not in opt_dict) and self.transition:
             self.hessian = 'first'
-
-        if self.hessian == 'only':
-            self.hessian = 'stop'
 
     def compute(self, molecule, *args):
         """
@@ -207,6 +205,10 @@ class OptimizationDriver:
         :return:
             The tuple with final geometry, and energy of molecule.
         """
+
+        # update hessian option for transition state search
+        if self.hessian == 'never' and self.transition:
+            self.hessian = 'first'
 
         if self.hessian or self.transition:
             err_msg = (
@@ -285,18 +287,21 @@ class OptimizationDriver:
 
         optinp_filename = Path(filename + '.optinp').as_posix()
 
-        if self.is_scf and self.transition:
+        # pre-compute Hessian
+        if self.is_scf and self.hessian == 'first':
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
             hessian_drv.compute(molecule, args[0])
 
             if self.rank == mpi_master():
-                hessian_filename = Path(self.filename + '.tmp', 'hessian',
-                                        'hessian.txt').as_posix()
-                coords_filename = Path(self.filename + '.tmp', 'hessian',
-                                       'coords.xyz').as_posix()
+                hessian_dir = temp_path / f'rank_{self.rank}'
+                hessian_dir.mkdir(parents=True, exist_ok=True)
+                hessian_filename = (hessian_dir / 'hessian.txt').as_posix()
                 np.savetxt(hessian_filename, hessian_drv.hessian)
-                molecule.write_xyz_file(coords_filename)
-            self.comm.barrier()
+            else:
+                hessian_filename = None
+            hessian_filename = self.comm.bcast(hessian_filename,
+                                               root=mpi_master())
+            self.hessian = f'file:{hessian_filename}'
 
         # redirect geomeTRIC stdout/stderr
 
