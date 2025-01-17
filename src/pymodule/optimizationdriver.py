@@ -442,7 +442,7 @@ class OptimizationDriver:
         if self.conv_drms is not None:
             opt_flags.append('drms')
             opt_flags.append(self.conv_drms)
-        if self.conv_gmax is not None:
+        if self.conv_dmax is not None:
             opt_flags.append('dmax')
             opt_flags.append(self.conv_dmax)
         return opt_flags
