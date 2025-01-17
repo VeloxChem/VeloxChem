@@ -36,6 +36,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
@@ -105,6 +106,7 @@ class OptimizationDriver:
         self.coordsys = 'tric'
         self.constraints = None
         self.check_interval = 0
+        self.trust = 0.1
         self.max_iter = 300
 
         self.conv_energy = None
@@ -120,7 +122,7 @@ class OptimizationDriver:
 
         self.keep_files = False
 
-        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
+        self.filename = None
         self.grad_drv = grad_drv
 
         self._debug = False
@@ -132,6 +134,7 @@ class OptimizationDriver:
                 'constraints': ('list', 'constraints'),
                 'check_interval':
                     ('int', 'interval for checking coordinate system'),
+                'trust': ('float', 'trust radius to begin with'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
                 'hessian': ('str_lower', 'hessian flag'),
@@ -145,6 +148,22 @@ class OptimizationDriver:
                 '_debug': ('bool', 'print debug info'),
             },
         }
+
+    @property
+    def is_scf(self):
+        """
+        Checks if optimization uses SCF driver.
+
+        :return:
+            True if optimization uses SCF driver.
+        """
+
+        if hasattr(self.grad_drv, 'scf_driver'):
+            return isinstance(self.grad_drv.scf_driver,
+                              (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                               ScfRestrictedOpenDriver))
+        else:
+            return False
 
     def print_keywords(self):
         """
@@ -170,11 +189,9 @@ class OptimizationDriver:
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']
 
+        # update hessian option for transition state search
         if ('hessian' not in opt_dict) and self.transition:
             self.hessian = 'first'
-
-        if self.hessian == 'only':
-            self.hessian = 'stop'
 
     def compute(self, molecule, *args):
         """
@@ -188,6 +205,10 @@ class OptimizationDriver:
         :return:
             The tuple with final geometry, and energy of molecule.
         """
+
+        # update hessian option for transition state search
+        if self.hessian == 'never' and self.transition:
+            self.hessian = 'first'
 
         if self.hessian or self.transition:
             err_msg = (
@@ -223,7 +244,7 @@ class OptimizationDriver:
             temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(temp_dir.name)
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and self.filename is not None:
             self.clean_up_file(Path(self.filename + '.log'))
             self.clean_up_file(
                 Path(self.filename + '.tmp', 'hessian', 'hessian.txt'))
@@ -232,10 +253,16 @@ class OptimizationDriver:
 
         # filename is used by geomeTRIC to create .log and other files
 
-        if self.rank == mpi_master() and self.keep_files:
-            filename = self.filename
+        if self.filename is not None:
+            base_fname = self.filename
         else:
-            filename = Path(self.filename).name
+            name_string = get_random_string_parallel(self.comm)
+            base_fname = 'vlx_' + name_string
+
+        if self.rank == mpi_master() and self.keep_files:
+            filename = base_fname
+        else:
+            filename = Path(base_fname).name
             filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
@@ -260,6 +287,22 @@ class OptimizationDriver:
 
         optinp_filename = Path(filename + '.optinp').as_posix()
 
+        # pre-compute Hessian
+        if self.is_scf and self.hessian == 'first':
+            hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
+            hessian_drv.compute(molecule, args[0])
+            if self.rank == mpi_master():
+                hess_data = hessian_drv.hessian.copy()
+            else:
+                hess_data = None
+            hess_data = self.comm.bcast(hess_data, root=mpi_master())
+
+            hessian_dir = temp_path / f'rank_{self.rank}'
+            hessian_dir.mkdir(parents=True, exist_ok=True)
+            hessian_filename = (hessian_dir / 'hessian.txt').as_posix()
+            np.savetxt(hessian_filename, hess_data)
+            self.hessian = f'file:{hessian_filename}'
+
         # redirect geomeTRIC stdout/stderr
 
         with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
@@ -269,6 +312,7 @@ class OptimizationDriver:
                     customengine=opt_engine,
                     coordsys=self.coordsys,
                     check=self.check_interval,
+                    trust=self.trust,
                     maxiter=self.max_iter,
                     converge=self.conv_flags(),
                     constraints=constr_filename,
@@ -398,7 +442,7 @@ class OptimizationDriver:
         if self.conv_drms is not None:
             opt_flags.append('drms')
             opt_flags.append(self.conv_drms)
-        if self.conv_gmax is not None:
+        if self.conv_dmax is not None:
             opt_flags.append('dmax')
             opt_flags.append(self.conv_dmax)
         return opt_flags

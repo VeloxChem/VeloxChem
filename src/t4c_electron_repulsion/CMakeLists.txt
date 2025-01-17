@@ -31,6 +31,8 @@ target_sources(vlxobjs
     ElectronRepulsionContrRecXXDG.cpp
     ElectronRepulsionContrRecXXDH.cpp
     ElectronRepulsionContrRecXXDI.cpp
+    ElectronRepulsionContrRecXXDP.cpp
+    ElectronRepulsionContrRecXXDS.cpp
     ElectronRepulsionContrRecXXFF.cpp
     ElectronRepulsionContrRecXXFG.cpp
     ElectronRepulsionContrRecXXFH.cpp
@@ -42,6 +44,7 @@ target_sources(vlxobjs
     ElectronRepulsionContrRecXXPI.cpp
     ElectronRepulsionContrRecXXPK.cpp
     ElectronRepulsionContrRecXXPP.cpp
+    ElectronRepulsionContrRecXXPS.cpp
     ElectronRepulsionPrimRecSDSD.cpp
     ElectronRepulsionPrimRecSDSF.cpp
     ElectronRepulsionPrimRecSDSG.cpp

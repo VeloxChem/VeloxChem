@@ -45,7 +45,7 @@
     "classical_subsystems": [{
         "classical_fragments": [{
             "index": 1,
-            "name": "H20",
+            "name": "H2O",
             "atoms": [{
                 "index": 1,
                 "element": "O",
@@ -132,7 +132,7 @@
             }]
         }, {
             "index": 2,
-            "name": "H20",
+            "name": "H2O",
             "atoms": [{
                 "index": 6,
                 "element": "O",

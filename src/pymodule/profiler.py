@@ -253,8 +253,11 @@ class Profiler:
             ostream.print_header(valstr.ljust(width))
             ostream.print_header(('-' * len(valstr)).ljust(width))
 
-            key_0 = list(self.timing_dict.keys())[0]
-            labels = list(self.timing_dict[key_0].keys())
+            labels = []
+            for key in reversed(self.timing_dict.keys()):
+                for label in self.timing_dict[key]:
+                    if label not in labels:
+                        labels.append(label)
 
             valstr = '{:<18s}'.format('')
             for label in labels:

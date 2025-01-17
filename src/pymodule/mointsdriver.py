@@ -174,3 +174,9 @@ class MOIntegralsDriver:
             return tuvw
         elif phys_notation:
             return tuvw.swapaxes(1, 2)
+
+    def compute_in_mem(self, molecule, basis, mol_orbs, mints_type):
+
+        # for backward compatibility only
+        return self.compute_in_memory(molecule, basis, mol_orbs,
+                                      'phys_' + mints_type)

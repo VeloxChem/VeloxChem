@@ -76,6 +76,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -100,6 +101,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -124,6 +126,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_2jk_grad_h2_sto3g(self):
 
@@ -175,6 +178,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -199,6 +203,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -223,6 +228,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_2jk_grad_o1_sto3g(self):
 
@@ -274,6 +280,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -298,6 +305,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -322,6 +330,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_2jkx_grad_h3_sto3g(self):
 
@@ -373,6 +382,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -397,6 +407,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -421,6 +432,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_2jkx_grad_h2_sto3g(self):
 
@@ -472,6 +484,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -496,6 +509,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -520,6 +534,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_2jkx_grad_o1_sto3g(self):
 
@@ -571,6 +586,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -595,6 +611,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -619,6 +636,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_j_grad_h3_sto3g(self):
 
@@ -665,6 +683,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -689,6 +708,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -713,6 +733,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_j_grad_h2_sto3g(self):
 
@@ -759,6 +780,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -783,6 +805,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -807,6 +830,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_j_grad_o1_sto3g(self):
 
@@ -853,6 +877,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -877,6 +902,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -901,6 +927,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_k_grad_h3_sto3g(self):
 
@@ -947,6 +974,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -971,6 +999,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -995,6 +1024,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_k_grad_h2_sto3g(self):
 
@@ -1041,6 +1071,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -1065,6 +1096,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -1089,6 +1121,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_k_grad_o1_sto3g(self):
 
@@ -1135,6 +1168,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -1159,6 +1193,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -1183,6 +1218,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_kx_grad_h3_sto3g(self):
 
@@ -1229,6 +1265,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -1253,6 +1290,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -1277,6 +1315,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_k_grad_h2_sto3g(self):
 
@@ -1323,6 +1362,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -1347,6 +1387,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -1371,6 +1412,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
     def test_h2o_fock_kx_grad_o1_sto3g(self):
 
@@ -1417,6 +1459,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_x.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[0]))
+        assert fmat == fref
         
         # check individual submatrices of Y matrix
         fock_mat_y = fock_mats.matrix("Y")
@@ -1441,6 +1484,7 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_y.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[1]))
+        assert fmat == fref
         
         # check individual submatrices of Z matrix
         fock_mat_z = fock_mats.matrix("Z")
@@ -1465,4 +1509,5 @@ class TestFockGeom1000Driver:
         fmat = fock_mat_z.full_matrix()
         fref = SubMatrix([0, 0, 7, 7])
         fref.set_values(np.ascontiguousarray(ref_mat[2]))
+        assert fmat == fref
         
