@@ -22,14 +22,12 @@ dependencies:
   - mdanalysis
   - openmm
   - scipy
-  - openbabel
+  - rdkit
   - xtb
   - geometric
-  - libxc<7
+  - libxc
   - clang-format
   - yapf
   - toml
   - flake8
-  - openmm
   - pymbar
-
