@@ -48,7 +48,6 @@ class TestMp2Driver:
 
         task = MpiTask([inpfile, None])
         task.molecule.set_multiplicity(3)
-        task.molecule.check_multiplicity()
 
         scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
         scf_results = scf_drv.compute(task.molecule, task.ao_basis,

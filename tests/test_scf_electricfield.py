@@ -20,7 +20,6 @@ class TestScfInElectricField:
         basis_label = 'aug-cc-pvdz'
 
         mol = Molecule.read_molecule_string(mol_string, units='bohr')
-        mol.check_multiplicity()
 
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
