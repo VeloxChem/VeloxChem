@@ -159,9 +159,8 @@ from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
-# Additional classes for MD branch
 from .solvationbuilder import SolvationBuilder
-from .solvationfepdriver import SolvationFEPDriver
+from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 
 # Python functions
