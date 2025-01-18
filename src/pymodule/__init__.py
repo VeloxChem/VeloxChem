@@ -135,7 +135,6 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rsppolarizability import Polarizability
 from .rspabsorption import Absorption
 from .rspc6 import C6
-
 from .rspshg import SHG
 from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
@@ -172,7 +171,6 @@ from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
 from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
-
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
