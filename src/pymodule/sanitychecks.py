@@ -38,8 +38,12 @@ def molecule_sanity_check(mol):
         The molecule.
     """
 
-    mol.check_multiplicity()
-    mol.check_proximity(0.1)
+    assert_msg_critical(
+        mol.check_multiplicity(),
+        'Molecule: Incompatible multiplicity and number of electrons')
+    assert_msg_critical(
+        mol.check_proximity(0.1),
+        'Molecule: Corrupted geometry with closely located atoms')
 
 
 def scf_results_sanity_check(obj, scf_results):
@@ -142,21 +146,6 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
             warn_msg += 'Please double check.'
             obj.ostream.print_warning(warn_msg)
         obj.ostream.flush()
-
-    # check grid level for Hessian calculation
-    if obj._dft and response_flag.lower() == 'hessian':
-        hessian_grid_level = max(6, get_default_grid_level(obj.xcfun))
-        if obj.grid_level is None:
-            dft_grid_level = get_default_grid_level(obj.xcfun)
-        else:
-            dft_grid_level = obj.grid_level
-        if dft_grid_level < hessian_grid_level:
-            warn_msg = 'DFT grid level for Hessian calculation is below the '
-            warn_msg += f'recommended value ({hessian_grid_level}). '
-            warn_msg += 'Please double check.'
-            obj.ostream.print_warning(warn_msg)
-            obj.ostream.print_blank()
-            obj.ostream.flush()
 
     # check if SCAN family of functional is used in nonliear response
     if obj._dft and response_flag.lower() == 'nonlinear':

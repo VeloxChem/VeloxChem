@@ -109,14 +109,20 @@ class HessianOrbitalResponse(CphfSolver):
             density = scf_tensors['D_alpha']
             eocc = scf_tensors['E_alpha'][:nocc]
             mo = scf_tensors['C_alpha']
+            point_charges = scf_tensors.get('point_charges', None)
+            qm_vdw_params = scf_tensors.get('qm_vdw_params', None)
         else:
             density = None
             eocc = None
             mo = None
+            point_charges = None
+            qm_vdw_params = None
 
         density = self.comm.bcast(density, root=mpi_master())
         eocc = self.comm.bcast(eocc, root=mpi_master())
         mo = self.comm.bcast(mo, root=mpi_master())
+        point_charges = self.comm.bcast(point_charges, root=mpi_master())
+        qm_vdw_params = self.comm.bcast(qm_vdw_params, root=mpi_master())
 
         # TODO: double check dft_dict['gs_density']
         mol_grid = dft_dict['molgrid']
@@ -196,7 +202,9 @@ class HessianOrbitalResponse(CphfSolver):
         for iatom in local_atoms:
 
             fock_deriv_ao_i = self._compute_fmat_deriv(molecule, basis, density,
-                                                       iatom, eri_dict)
+                                                       iatom, eri_dict,
+                                                       point_charges,
+                                                       qm_vdw_params)
 
             fock_deriv_ao_dict[(iatom, 0)] = fock_deriv_ao_i[0]
             fock_deriv_ao_dict[(iatom, 1)] = fock_deriv_ao_i[1]
@@ -460,7 +468,14 @@ class HessianOrbitalResponse(CphfSolver):
             'hessian_eri_overlap': hessian_eri_overlap,
         }
 
-    def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):
+    def _compute_fmat_deriv(self,
+                            molecule,
+                            basis,
+                            density,
+                            i,
+                            eri_dict,
+                            point_charges=None,
+                            qm_vdw_params=None):
         """
         Computes the derivative of the Fock matrix with respect
         to the coordinates of atom i.
@@ -511,6 +526,27 @@ class HessianOrbitalResponse(CphfSolver):
 
         gmats_npot_100 = Matrices()
         gmats_npot_010 = Matrices()
+
+        # point charges contribution
+        if point_charges is not None:
+            npoints = point_charges.shape[1]
+
+            mm_coords = []
+            mm_charges = []
+            for p in range(npoints):
+                xyz_p = point_charges[:3, p]
+                chg_p = point_charges[3, p]
+                mm_coords.append(xyz_p.copy())
+                mm_charges.append(chg_p)
+
+            gmats_100 = npot_grad_100_drv.compute(molecule, basis, i, mm_coords,
+                                                  mm_charges)
+
+            for x, label in enumerate(['X', 'Y', 'Z']):
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                fmat_deriv[x] -= gmat_100 + gmat_100.T
+
+            gmats_100 = Matrices()
 
         if self._dft:
             if self.xcfun.is_hybrid():

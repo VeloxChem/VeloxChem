@@ -23,7 +23,6 @@ class TestScfRestrictedDriver:
         basis_label = 'def2-svp'
 
         mol = Molecule.read_xyz_string(xyz_string)
-        mol.check_multiplicity()
 
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
         min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
