@@ -72,6 +72,9 @@ class MMDriver:
             The molecule.
         """
 
+        # TODO: separate the basic part of MMDriver into another class to avoid
+        # cyclic import
+
         # NOTE: Never use this method inside ForceFieldGenerator.
         # Otherwise it will be a cyclic import.
 
@@ -367,6 +370,9 @@ class MMDriver:
         :param molecule:
             The molecule.
         """
+
+        # TODO: automatically generate and load force field if self.force_field
+        # is empty
 
         # Convert coordinates to nm
         bohr_in_nm = bohr_in_angstrom() * 0.1
