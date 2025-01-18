@@ -57,7 +57,7 @@ from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
-
+from .cpcmdriver import CpcmDriver
 
 class ScfDriver:
     """
@@ -213,6 +213,11 @@ class ScfDriver:
         self.embedding_options = None
         self._embedding_drv = None
 
+        # solvation model
+        self.solvation_model = None
+        self._cpcm = False
+        self.cpcm_drv = None
+
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
         self.qm_vdw_params = None
@@ -287,6 +292,7 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'solvation_model': ('str', 'solvation model'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -467,12 +473,12 @@ class ScfDriver:
             # field
             self.restart = False
 
-        if self.point_charges is not None:
+        if self.solvation_model is not None:
             assert_msg_critical(
-                not self._pe,
-                'SCF driver: The \'point_charges\' option is incompatible ' +
-                'with polarizable embedding')
-            # Note: we allow restarting SCF with point charges
+                self.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+                'SCF driver: Only the C-PCM solvation model is implemented.')
+            self._cpcm = True
+            self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -566,6 +572,17 @@ class ScfDriver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+        # set up polarizable continuum model
+        if self._cpcm:
+            self._cpcm_grid, self._cpcm_sw_func = self.cpcm_drv.generate_cpcm_grid(
+                molecule)
+            self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
+                self._cpcm_grid, self._cpcm_sw_func)
+            self._cpcm_Bmat = self.cpcm_drv.form_matrix_B(
+                self._cpcm_grid, molecule)
+            self._cpcm_Bzvec = np.dot(self._cpcm_Bmat,
+                                     molecule.get_element_ids())
+        
         # set up polarizable embedding
         if self._pe:
 
@@ -1320,6 +1337,25 @@ class ScfDriver:
                                      npot_mat, den_mat)
 
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
+
+            if self._cpcm:
+                Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
+                    self._cpcm_grid,
+                    den_mat[0] + den_mat[0])
+                    #den_mat.alpha_to_numpy(0) + den_mat.beta_to_numpy(0))
+
+                scale_f = -(self.cpcm_drv.epsilon - 1) / (self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                rhs = scale_f * (self._cpcm_Bzvec + Cvec)
+                q = np.linalg.solve(self._cpcm_Amat, rhs)
+                self._cpcm_q = q
+
+                e_sol = self.cpcm_drv.compute_solv_energy(self._cpcm_Bzvec, Cvec, q)
+                e_el += e_sol
+                self.cpcm_epol = e_sol
+
+                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(molecule, ao_basis,
+                    self._cpcm_grid, q)
+                fock_mat[0] += Fock_sol
 
             if (self.rank == mpi_master() and i > 0 and
                     self.level_shifting > 0.0):

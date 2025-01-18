@@ -32,11 +32,13 @@
 #include <algorithm>
 #include <vector>
 
+#include "DenseMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
+#include "LebedevLaikovQuadrature.hpp"
 #include "MolecularGrid.hpp"
 #include "XCComponent.hpp"
 #include "XCFunctional.hpp"
@@ -880,6 +882,29 @@ export_dft(py::module& m)
           &vxcfuncs::getExchangeCorrelationFunctional,
           "Converts exchange-correlation functional label to exchange-correlation functional object.",
           "xcLabel"_a);
+
+    m.def(
+        "gen_lebedev_grid",
+        [](const int32_t napoints) -> py::array_t<double> {
+            CLebedevLaikovQuadrature aquad(napoints);
+            auto                     apoints = aquad.generate();
+            auto                     rax     = apoints.row(0);
+            auto                     ray     = apoints.row(1);
+            auto                     raz     = apoints.row(2);
+            auto                     raw     = apoints.row(3);
+            std::vector<double>      grid(napoints * 4);
+            for (int32_t g = 0; g < napoints; g++)
+            {
+                grid[g * 4 + 0] = rax[g];
+                grid[g * 4 + 1] = ray[g];
+                grid[g * 4 + 2] = raz[g];
+                grid[g * 4 + 3] = raw[g];
+            }
+            return vlx_general::pointer_to_numpy(grid.data(), {napoints, 4});
+        },
+        "Generates Lebedev grid points.",
+        "napoints"_a);
+
 }
 
 }  // namespace vlx_dft
