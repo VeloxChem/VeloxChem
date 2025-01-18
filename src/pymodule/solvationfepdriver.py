@@ -30,16 +30,20 @@ import numpy as np
 import os, sys, csv, argparse
 import time
 import h5py
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
 
-from .solvationbuilder import SolvationBuilder
 from .veloxchemlib import mpi_master
+from .solvationbuilder import SolvationBuilder
 from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
-    from pymbar import MBAR, timeseries
+    try:
+        from pymbar import MBAR, timeseries
+        import openmm as mm
+        import openmm.app as app
+        import openmm.unit as unit
+    except ImportError:
+        pass
 
 
 class SolvationFepDriver:
@@ -81,6 +85,11 @@ class SolvationFepDriver:
         """
         Initialize the OpenMMSolvator class.
         """
+
+        assert_msg_critical(
+            'pymbar' in sys.modules and 'openmm' in sys.modules,
+            'pymbar and OpenMM are required for SolvationFepDriver.')
+
         if comm is None:
             comm = MPI.COMM_WORLD
 
