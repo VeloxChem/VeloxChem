@@ -59,6 +59,7 @@ from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 from .cpcmdriver import CpcmDriver
 
+
 class ScfDriver:
     """
     Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
@@ -472,6 +473,13 @@ class ScfDriver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
+
+        if self.point_charges is not None:
+            assert_msg_critical(
+                not self._pe,
+                'SCF driver: The \'point_charges\' option is incompatible ' +
+                'with polarizable embedding')
+            # Note: we allow restarting SCF with point charges
 
         if self.solvation_model is not None:
             assert_msg_critical(
