@@ -32,12 +32,7 @@
 #include <algorithm>
 #include <vector>
 
-//#include "DenseMatrix.hpp"
-//#include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
-//#include "DensityGrid.hpp"
-//#include "ExportGeneral.hpp"
-//#include "ExportMath.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
@@ -897,10 +892,6 @@ export_dft(py::module& m)
             auto                     ray     = apoints.row(1);
             auto                     raz     = apoints.row(2);
             auto                     raw     = apoints.row(3);
-//            auto                     rax     = apoints.data(0);
-//            auto                     ray     = apoints.data(1);
-//            auto                     raz     = apoints.data(2);
-//            auto                     raw     = apoints.data(3);
             std::vector<double>      grid(napoints * 4);
             for (int32_t g = 0; g < napoints; g++)
             {

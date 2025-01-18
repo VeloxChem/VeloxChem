@@ -229,20 +229,6 @@ export_t2cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CNuclearPotentialGeomX00Driver<1>  &geom_drv,
-               const CMolecularBasis                    &basis,
-               const CMolecule                          &molecule,
-               const int                                 iatom,
-               const std::vector<double>                &charges,
-               const std::vector<std::array<double, 3>> &coordinates)
-                -> std::shared_ptr<CMatrices> { 
-                    auto points = std::vector<TPoint<double>>();
-                    points.reserve(coordinates.size());
-                    std::ranges::transform(coordinates, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                    return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom, charges, points)); },
-            "Computes nuclear potential first derivatives matrices for given molecule, basis, charges, coordinates, and selected atom.")
-        .def(
-            "compute",
             [](const CNuclearPotentialGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes nuclear potential first derivatives matrices for given molecule, basis and selected atom.")

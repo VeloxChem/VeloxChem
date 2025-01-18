@@ -6,7 +6,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
-@pytest.mark.solvers
 class TestCpcmSolvation:
 
     def run_cpcm_solvation(self, xcfun_label, ref_solv_energy, tol):
@@ -45,5 +44,3 @@ class TestCpcmSolvation:
     def test_b3lyp(self):
 
         self.run_cpcm_solvation('b3lyp', -0.020249892377218158, 1.0e-6)
-
-        

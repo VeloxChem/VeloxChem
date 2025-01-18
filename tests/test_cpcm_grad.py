@@ -7,7 +7,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfgradientdriver import ScfGradientDriver
 
 
-@pytest.mark.solvers
 class TestGradCpcm:
 
     def run_grad(self,

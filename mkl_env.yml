@@ -1,4 +1,4 @@
-name: cpcm_vlxenv
+name: vlxenv
 channels:
   - conda-forge
 dependencies:
@@ -25,7 +25,7 @@ dependencies:
   - openbabel
   - xtb
   - geometric
-  - libxc<7
+  - libxc
   - clang-format
   - yapf
   - toml

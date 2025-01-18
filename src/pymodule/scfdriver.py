@@ -218,9 +218,6 @@ class ScfDriver:
         self._cpcm = False
         self.cpcm_drv = None
 
-        # split communicators
-        self.use_split_comm = False
-        self._split_comm_ratio = None
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
         self.qm_vdw_params = None
@@ -478,45 +475,10 @@ class ScfDriver:
 
         if self.solvation_model is not None:
             assert_msg_critical(
-                self.solvation_model in ['cpcm', 'CPCM', 'c-pcm', 'C-PCM', 'c_pcm', 'C_PCM'],
+                self.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
                 'SCF driver: Only the C-PCM solvation model is implemented.')
             self._cpcm = True
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
-
-    def _pe_sanity_check(self, method_dict=None):
-        """
-        Checks PE settings and updates relevant attributes.
-
-        :param method_dict:
-            The dicitonary of method settings.
-        """
-
-        if method_dict:
-            if 'pe_options' in method_dict:
-                self.pe_options = dict(method_dict['pe_options'])
-            else:
-                self.pe_options = {}
-
-        if self.potfile:
-            self.pe_options['potfile'] = self.potfile
-
-        self._pe = ('potfile' in self.pe_options)
-
-        if self._pe:
-            potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-            potfile = self.comm.bcast(potfile, root=mpi_master())
-            self.pe_options['potfile'] = potfile
-        if self.point_charges is not None:
-            assert_msg_critical(
-                not self._pe,
-                'SCF driver: The \'point_charges\' option is incompatible ' +
-                'with polarizable embedding')
-            # Note: we allow restarting SCF with point charges
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
