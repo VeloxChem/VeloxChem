@@ -31,6 +31,8 @@ import h5py
 from pathlib import Path
 
 from .scfrestdriver import ScfRestrictedDriver
+from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfhessiandriver import ScfHessianDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -124,7 +126,8 @@ class VibrationalAnalysis:
         # Hessian driver etc
         self.is_scf = False
         self.is_xtb = False
-        if isinstance(drv, ScfRestrictedDriver):
+        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                            ScfRestrictedOpenDriver)):
             self.is_scf = True
             self.scf_driver = drv
             self.hessian_driver = ScfHessianDriver(drv)

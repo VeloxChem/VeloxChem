@@ -288,6 +288,11 @@ class ScfHessianDriver(HessianDriver):
             The profiler.
         """
 
+        assert_msg_critical(
+            self.scf_driver.scf_type == 'restricted',
+            'ScfHessianDriver: Analytical gradient only implemented ' +
+            'for restricted case')
+
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_tensors)

@@ -394,7 +394,7 @@ def main():
             hessian_drv.update_settings(method_dict, hessian_dict)
             hessian_drv.compute(task.molecule)
 
-        elif scf_drv.scf_type == 'restricted':
+        else:
             hessian_drv = ScfHessianDriver(scf_drv)
             hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
@@ -489,7 +489,8 @@ def main():
                                             cphf_dict=orbrsp_dict,
                                             rsp_dict=rsp_dict,
                                             polgrad_dict=polgrad_dict)
-        elif scf_drv.scf_type == 'restricted':
+
+        else:
             vibrational_drv = VibrationalAnalysis(scf_drv)
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
