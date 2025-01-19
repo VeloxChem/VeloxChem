@@ -30,7 +30,6 @@ class TestHessianMethanol:
 
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.numerical_hessian = numerical_hessian
-        vibanalysis_drv.update_settings(method_dict={'xcfun': 'pbe0'})
         vibanalysis_drv.ostream.mute()
         vibanalysis_drv.compute(mol, bas)
 

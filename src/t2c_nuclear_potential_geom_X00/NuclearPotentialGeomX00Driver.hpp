@@ -266,6 +266,10 @@ CNuclearPotentialGeomX00Driver<N>::compute(const CMolecularBasis &basis, const C
                     {
                         npotfunc::compute_geom_100(distributor, bra_gtos, ket_gtos, bra_indices, ket_indices, false);
                     }
+                    if constexpr (N == 2)
+                    {
+                        npotfunc::compute_geom_200(distributor, bra_gtos, ket_gtos, bra_indices, ket_indices, false);
+                    }
                 }
             });
         }

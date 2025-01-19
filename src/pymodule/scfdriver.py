@@ -1612,6 +1612,11 @@ class ScfDriver:
                     self._scf_tensors['E_emb'] = e_emb
                     self._scf_tensors['F_emb'] = V_emb
 
+                if self.point_charges is not None:
+                    self._scf_tensors['point_charges'] = self.point_charges
+                if self.qm_vdw_params is not None:
+                    self._scf_tensors['qm_vdw_params'] = self.qm_vdw_params
+
             else:
                 self._scf_tensors = None
                 self._density = AODensityMatrix()
