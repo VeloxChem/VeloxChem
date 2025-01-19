@@ -31,7 +31,7 @@ class TestCpcmSolvation:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.update_settings({}, {'solvation_model': 'c_pcm'})
+        scf_drv.update_settings({}, {'solvation_model': 'cpcm'})
         scf_drv.cpcm_erf = True
         scf_drv.compute(mol, bas, min_bas)
 
@@ -46,4 +46,4 @@ class TestCpcmSolvation:
 
         self.run_cpcm_solvation('b3lyp', -0.020249892377218158, 1.0e-6)
 
-        
+

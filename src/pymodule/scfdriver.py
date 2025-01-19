@@ -1377,6 +1377,7 @@ class ScfDriver:
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
             if self._cpcm:
+                # TODO: add support for unrestricted case
                 Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
                     self._cpcm_grid,
                     den_mat[0] + den_mat[0])
