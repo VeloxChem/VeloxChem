@@ -359,9 +359,6 @@ def main():
 
         elif run_excited_state_gradient:
 
-            # TODO: enable excited state gradient
-            assert False
-
             rsp_dict = dict(task.input_dict['response'])
             rsp_dict['program_end_time'] = program_end_time
             rsp_dict['filename'] = task.input_dict['filename']
@@ -434,9 +431,6 @@ def main():
                                               scf_results)
 
         elif run_excited_state_gradient:
-
-            # TODO: enable excited state optimization
-            assert False
 
             grad_dict = (task.input_dict['gradient']
                          if 'gradient' in task.input_dict else {})

@@ -1828,45 +1828,12 @@ class ForceFieldGenerator:
             key: tuple of atom indices
             value: tuple of atom types
         """
-        # sp2 Carbon and Nitrogen atom types in conjugated systems (no-rings)
-        carbon_sp2 = {'cp', 'cq', 'c2', 'ce', 'cf'}
-        nitrogen_sp2 = {'na', 'n2', 'ne', 'nf'}
 
-        # Generate lists of non-rotatable bonds (double bonds)
-        carbon_carbon_bonds = []
-        for atom1 in carbon_sp2:
-            for atom2 in carbon_sp2:
-                # If two sp2 carbon atomtypes are the same generally
-                # are single bonds, except for c2-c2
-                if (atom1, atom2) in [('c2', 'c2')]:
-                    carbon_carbon_bonds.append((atom1, atom2))
-                if atom1 != atom2:
-                    # If two sp2 carbon atomtypes are different generally
-                    # are double bonds, except for cc/cd-cf/cd are single bonds
-                    single_sp2_carbon_bonds = [('cc', 'cf'), ('cf', 'cc'), ('cd', 'cf'), ('cf', 'cd'),
-                                                ('cd', 'ce'), ('ce', 'cd'), ('cc', 'ce'), ('ce', 'cc')]
-                    if (atom1, atom2) not in single_sp2_carbon_bonds:
-                        carbon_carbon_bonds.append((atom1, atom2))
-                        carbon_carbon_bonds.append((atom2, atom1))
-
-        carbon_nitrogen_bonds = []
-        for atom1 in carbon_sp2:
-            for atom2 in nitrogen_sp2:
-                # Single bond cc-ne, ce-ne
-                if (atom1, atom2) not in [('cc', 'ne'), ('ce', 'ne')]:
-                    carbon_nitrogen_bonds.append((atom1, atom2))
-                    carbon_nitrogen_bonds.append((atom2, atom1))
-
-        nitrogen_nitrogen_bonds = []
-        for atom1 in nitrogen_sp2:
-            for atom2 in nitrogen_sp2:
-                if (atom1, atom2) == ('n2', 'n2'):
-                    nitrogen_nitrogen_bonds.append((atom1, atom2))
-                if atom1 != atom2:
-                    nitrogen_nitrogen_bonds.append((atom1, atom2))
-                    nitrogen_nitrogen_bonds.append((atom2, atom1))
-
-        non_rotatable_bonds = carbon_carbon_bonds + carbon_nitrogen_bonds + nitrogen_nitrogen_bonds
+        non_rotatable_bonds = []
+        for atom1 in ['c2', 'n2', 'cc', 'ce', 'nc', 'ne']:
+            for atom2 in ['c2', 'n2', 'cd', 'cf', 'nd', 'nf']:
+                non_rotatable_bonds.append((atom1, atom2))
+                non_rotatable_bonds.append((atom2, atom1))
 
         # Identify bonds to delete based on criteria
         bonds_to_delete = []
