@@ -6,6 +6,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
+@pytest.mark.solvers
 class TestCpcmSolvation:
 
     def run_cpcm_solvation(self, xcfun_label, ref_solv_energy, tol):
@@ -19,20 +20,17 @@ class TestCpcmSolvation:
         H   -0.5650842  11.3134964  -1.2949455
         H    0.9282185  11.0652990  -1.3134026
         """
-        basis_label = 'def2-svp'
-
         mol = Molecule.read_xyz_string(xyz_string)
-        mol.check_multiplicity()
 
+        basis_label = 'def2-svp'
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
-        min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.update_settings({}, {'solvation_model': 'c_pcm'})
-        scf_drv.cpcm_erf = True
-        scf_drv.compute(mol, bas, min_bas)
+        scf_drv.solvation_model = 'cpcm'
+        scf_drv.cpcm_grid_per_sphere = 110
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol, bas)
 
         if scf_drv.rank == mpi_master():
             assert abs(ref_solv_energy - scf_drv.cpcm_epol) < tol

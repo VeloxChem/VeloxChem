@@ -453,16 +453,14 @@ class ScfGradientDriver(GradientDriver):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient().to_numpy()
-            
+
             # CPCM contribution to gradient
+            # TODO: parallelize over MPI
             if self.scf_driver._cpcm:
                 self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
-                                                molecule, 
-                                                basis,
-                                                self.scf_driver._cpcm_grid,
-                                                self.scf_driver._cpcm_sw_func,
-                                                self.scf_driver._cpcm_q, 
-                                                2 * D)
+                    molecule, basis, self.scf_driver._cpcm_grid,
+                    self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
+                    2.0 * D)
 
         # nuclei-point charges contribution to gradient
 
@@ -764,6 +762,14 @@ class ScfGradientDriver(GradientDriver):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient().to_numpy()
+
+            # CPCM contribution to gradient
+            # TODO: parallelize over MPI
+            if self.scf_driver._cpcm:
+                self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
+                    molecule, basis, self.scf_driver._cpcm_grid,
+                    self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
+                    Da + Db)
 
         # nuclei-point charges contribution to gradient
 

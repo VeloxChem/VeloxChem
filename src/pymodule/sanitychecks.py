@@ -371,3 +371,32 @@ def embedding_options_sanity_check(options):
         raise KeyError(
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
+
+
+def solvation_model_sanity_check(obj):
+    """
+    Checks solvation model and updates relevant attributes.
+    """
+
+    if obj.solvation_model is not None:
+        assert_msg_critical(
+            not obj._pe,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'polarizable embedding')
+
+        assert_msg_critical(
+            obj.point_charges is None,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'point charges')
+
+        assert_msg_critical(
+            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+            type(obj).__name__ +
+            ': Only the C-PCM solvation model is implemented.')
+
+        obj._cpcm = True
+
+    else:
+        obj._cpcm = False

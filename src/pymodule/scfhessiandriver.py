@@ -293,6 +293,10 @@ class ScfHessianDriver(HessianDriver):
             'ScfHessianDriver: Analytical gradient only implemented ' +
             'for restricted case')
 
+        assert_msg_critical(
+            self.scf_driver.solvation_model is None,
+            'ScfHessianDriver: Solvation model not implemented')
+
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_tensors)

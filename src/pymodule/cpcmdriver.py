@@ -81,7 +81,7 @@ class CpcmDriver:
         # model settings
         # standard value for dielectric const. is for that of water
         self.epsilon         = 78.39 
-        self.grid_per_sphere = 110
+        self.grid_per_sphere = 194
         self.x               = 0
         
         # input keywords
