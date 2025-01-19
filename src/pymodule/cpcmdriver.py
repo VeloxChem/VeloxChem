@@ -443,7 +443,6 @@ class CpcmDriver:
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
         natoms         = molecule.number_of_atoms()
         scale_f        = -(eps - 1) / (eps + x)
-        avoid_div_0    = 1
         grid_coords    = grid[:, :3]
         zeta           = grid[:, 4]
         zeta_2         = zeta**2
@@ -695,9 +694,8 @@ class CpcmDriver:
             
             partial_nuc = np.tensordot(geom010_mats, DM, axes=([2, 3], [0, 1]))
             grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
-            #grad_C_nuc[a] = np.einsum('kxij,ij -> x', geom010_mats, DM)
+
             grad_C_cav[a] = np.tensordot(DM, geom100_mats, axes=([0, 1], [1, 2]))
-            #grad_C_cav[a] = np.einsum('xij,ij-> x', geom100_mats, DM)
 
         # Translational invariance
         grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
