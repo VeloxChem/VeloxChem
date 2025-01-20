@@ -55,7 +55,10 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
 
         mol_bare = Chem.MolFromSmiles(smiles_str)
         mol_full = Chem.AddHs(mol_bare)
-        AllChem.EmbedMolecule(mol_full)
+
+        use_random_coords = (mol_full.GetNumConformers() == 0)
+        AllChem.EmbedMolecule(mol_full, useRandomCoords=use_random_coords)
+
         if optimize:
             AllChem.UFFOptimizeMolecule(mol_full)
 

@@ -1829,11 +1829,12 @@ class ForceFieldGenerator:
             value: tuple of atom types
         """
 
-        non_rotatable_bonds = []
+        non_rotatable_bonds = set()
         for atom1 in ['c2', 'n2', 'cc', 'ce', 'nc', 'ne']:
             for atom2 in ['c2', 'n2', 'cd', 'cf', 'nd', 'nf']:
-                non_rotatable_bonds.append((atom1, atom2))
-                non_rotatable_bonds.append((atom2, atom1))
+                non_rotatable_bonds.add((atom1, atom2))
+                non_rotatable_bonds.add((atom2, atom1))
+        non_rotatable_bonds = list(non_rotatable_bonds)
 
         # Identify bonds to delete based on criteria
         bonds_to_delete = []
