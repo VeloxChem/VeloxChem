@@ -259,6 +259,13 @@ class OptimizationDriver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
+        if self.is_scf and self.grad_drv.scf_driver.checkpoint_file is None:
+            # make sure that the scfdriver has checkpoint_file
+            fpath = Path(base_fname)
+            fpath = fpath.with_name(f'{fpath.stem}_scf{fpath.suffix}')
+            fpath = fpath.with_suffix('.h5')
+            self.grad_drv.scf_driver.checkpoint_file = fpath.as_posix()
+
         if self.rank == mpi_master() and self.keep_files:
             filename = base_fname
         else:
