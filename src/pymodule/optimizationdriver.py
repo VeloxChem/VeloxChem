@@ -106,7 +106,8 @@ class OptimizationDriver:
         self.coordsys = 'tric'
         self.constraints = None
         self.check_interval = 0
-        self.trust = 0.1
+        self.trust = None
+        self.tmax = None
         self.max_iter = 300
 
         self.conv_energy = None
@@ -135,6 +136,7 @@ class OptimizationDriver:
                 'check_interval':
                     ('int', 'interval for checking coordinate system'),
                 'trust': ('float', 'trust radius to begin with'),
+                'tmax': ('float', 'maximum value of trust radius'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
                 'hessian': ('str_lower', 'hessian flag'),
@@ -295,6 +297,7 @@ class OptimizationDriver:
         optinp_filename = Path(filename + '.optinp').as_posix()
 
         # pre-compute Hessian
+
         if self.is_scf and self.hessian == 'first':
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
             hessian_drv.compute(molecule, args[0])
@@ -310,6 +313,20 @@ class OptimizationDriver:
             np.savetxt(hessian_filename, hess_data)
             self.hessian = f'file:{hessian_filename}'
 
+        # determine trust radius
+
+        if self.trust is None:
+            # from geomeTRIC params.py
+            default_trust = 0.01 if self.transition else 0.1
+        else:
+            default_trust = self.trust
+
+        if self.tmax is None:
+            # from geomeTRIC params.py
+            default_tmax = 0.03 if self.transition else 0.3
+        else:
+            default_tmax = self.tmax
+
         # redirect geomeTRIC stdout/stderr
 
         with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
@@ -319,7 +336,8 @@ class OptimizationDriver:
                     customengine=opt_engine,
                     coordsys=self.coordsys,
                     check=self.check_interval,
-                    trust=self.trust,
+                    trust=default_trust,
+                    tmax=default_tmax,
                     maxiter=self.max_iter,
                     converge=self.conv_flags(),
                     constraints=constr_filename,
