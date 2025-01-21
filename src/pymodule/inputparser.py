@@ -154,7 +154,9 @@ class InputParser:
 
             for line in input_groups[group]:
                 if ':' in line:
-                    key, value = line.split(':')
+                    content = line.split(':')
+                    key = content[0]
+                    value = ':'.join(content[1:])
                     key = '_'.join(key.strip().lower().split())
                     value = value.strip()
                     if value:
