@@ -39,6 +39,7 @@ from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
 from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
+from .batchsize import get_batch_size
 
 
 class HessianOrbitalResponse(CphfSolver):
@@ -235,19 +236,39 @@ class HessianOrbitalResponse(CphfSolver):
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
-            for iatom, root_rank in all_atom_idx_rank:
-                vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
+            naos = basis.get_dimensions_of_basis()
+
+            batch_size = get_batch_size(None, natm * 3, naos, self.comm)
+            batch_size = batch_size // 3
+
+            num_batches = natm // batch_size
+            if natm % batch_size != 0:
+                num_batches += 1
+
+            for batch_ind in range(num_batches):
+
+                batch_start = batch_ind * batch_size
+                batch_end = min(batch_start + batch_size, natm)
+
+                atom_list = list(range(batch_start, batch_end))
+
+                vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
                     molecule, basis, gs_density, mol_grid,
-                    self.xcfun.get_func_label(), iatom)
+                    self.xcfun.get_func_label(), atom_list)
 
-                for x in range(3):
-                    vxc_deriv_ix = self.comm.reduce(vxc_deriv_i[x])
+                for vecind, (iatom, root_rank) in enumerate(
+                        all_atom_idx_rank[batch_start:batch_end]):
 
-                    dist_vxc_deriv_ix = DistributedArray(
-                        vxc_deriv_ix, self.comm)
+                    for x in range(3):
+                        vxc_deriv_ix = self.comm.reduce(
+                            vxc_deriv_batch[vecind * 3 + x])
 
-                    key_ix = (iatom, x)
-                    dist_fock_deriv_ao[key_ix].data += dist_vxc_deriv_ix.data
+                        dist_vxc_deriv_ix = DistributedArray(
+                            vxc_deriv_ix, self.comm)
+
+                        key_ix = (iatom, x)
+                        dist_fock_deriv_ao[
+                            key_ix].data += dist_vxc_deriv_ix.data
 
         profiler.stop_timer('dXC')
 

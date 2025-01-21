@@ -74,7 +74,7 @@ auto integrateVxcFockGradientForLDA(const CMolecule&                  molecule,
                                     const CMolecularGrid&             molecularGrid,
                                     const double                      screeningThresholdForGTOValues,
                                     const CXCFunctional&              xcFunctional,
-                                    const int32_t                     atomIdx) -> std::vector<CDenseMatrix>;
+                                    const int                         atomIdx) -> std::vector<CDenseMatrix>;
 
 }  // namespace xchesslda
 

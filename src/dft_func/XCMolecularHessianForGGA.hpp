@@ -62,7 +62,7 @@ auto integrateExcHessianForGGA(const CMolecule&                  molecule,
  @param gsDensityPointers the pointers to ground state AO density matrix.
  @param molecularGrid the molecular grid.
  @param xcFunctional the exchange-correlation functional.
- @param atomIdx the index of the atom with respect to which gradient is
+ @param atomIdxVec the indices of the atoms with respect to which gradient is
  computed.
  @return the Vxc gradient.
  */
@@ -72,7 +72,15 @@ auto integrateVxcFockGradientForGGA(const CMolecule&                  molecule,
                                     const CMolecularGrid&             molecularGrid,
                                     const double                      screeningThresholdForGTOValues,
                                     const CXCFunctional&              xcFunctional,
-                                    const int32_t                     atomIdx) -> std::vector<CDenseMatrix>;
+                                    const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
+
+auto integrateVxcFockGradientForGGA(const CMolecule&                  molecule,
+                                    const CMolecularBasis&            basis,
+                                    const std::vector<const double*>& gsDensityPointers,
+                                    const CMolecularGrid&             molecularGrid,
+                                    const double                      screeningThresholdForGTOValues,
+                                    const CXCFunctional&              xcFunctional,
+                                    const int                         atomIdxVec) -> std::vector<CDenseMatrix>;
 
 }  // namespace xchessgga
 

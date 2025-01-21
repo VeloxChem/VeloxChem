@@ -86,6 +86,13 @@ class CXCMolecularHessian
                                                        const CMolecularGrid&             molecularGrid,
                                                        const std::string&                xcFuncLabel,
                                                        const int                         atomIdx) const;
+
+    std::vector<CDenseMatrix> integrateVxcFockGradient(const CMolecule&                  molecule,
+                                                       const CMolecularBasis&            basis,
+                                                       const std::vector<const double*>& gsDensityPointers,
+                                                       const CMolecularGrid&             molecularGrid,
+                                                       const std::string&                xcFuncLabel,
+                                                       const std::vector<int>&           atomIdx) const;
 };
 
 #endif /* XCMolecularHessian_hpp */

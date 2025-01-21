@@ -126,7 +126,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -336,14 +336,14 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
             // prepare w0
 
             #pragma omp simd
-            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 w0[g] = local_weights[g] * vrho[2 * g + 0];
             }
 
             // prepare gradient grid
 
-            for (int32_t mu = 0; mu < aocount; mu++)
+            for (int mu = 0; mu < aocount; mu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[mu]];
 
@@ -352,7 +352,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
                 auto mu_offset = mu * npoints;
 
                 #pragma omp simd
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -368,7 +368,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
             // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
             // on the same atom
 
-            for (int32_t mu = 0; mu < aocount; mu++)
+            for (int mu = 0; mu < aocount; mu++)
             {
                 auto iatom = ao_to_atom_ids[aoinds[mu]];
 
@@ -383,7 +383,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
                 double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
                 #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto mu_g = mu_offset + g;
 
@@ -428,7 +428,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
             // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
             // on the same atom and on different atoms
 
-            for (int32_t mu = 0; mu < aocount; mu++)
+            for (int mu = 0; mu < aocount; mu++)
             {
                 auto iatom = ao_to_atom_ids[aoinds[mu]];
 
@@ -438,7 +438,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
 
                 auto mu_offset = mu * npoints;
 
-                for (int32_t nu = 0; nu < aocount; nu++)
+                for (int nu = 0; nu < aocount; nu++)
                 {
                     auto jatom = ao_to_atom_ids[aoinds[nu]];
 
@@ -457,7 +457,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
                     double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
                     #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         auto mu_g = mu_offset + g;
                         auto nu_g = nu_offset + g;
@@ -503,7 +503,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
 
             // other contributions
 
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            for (int iatom = 0; iatom < natoms; iatom++)
             {
                 auto ix = iatom * 3 + 0;
                 auto iy = iatom * 3 + 1;
@@ -511,7 +511,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
 
                 auto i_offset = iatom * npoints;
 
-                for (int32_t jatom = iatom; jatom < natoms; jatom++)
+                for (int jatom = iatom; jatom < natoms; jatom++)
                 {
                     auto jx = jatom * 3 + 0;
                     auto jy = jatom * 3 + 1;
@@ -524,7 +524,7 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
                     double gatmxz = 0.0, gatmyz = 0.0, gatmzz = 0.0;
 
                     #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         auto ig = i_offset + g;
                         auto jg = j_offset + g;
@@ -575,19 +575,19 @@ integrateExcHessianForLDA(const CMolecule&        molecule,
 
     CDenseMatrix molhess(natoms * 3, natoms * 3);
 
-    for (int32_t iatom = 0; iatom < natoms; iatom++)
+    for (int iatom = 0; iatom < natoms; iatom++)
     {
         auto ix = iatom * 3 + 0;
         auto iy = iatom * 3 + 1;
         auto iz = iatom * 3 + 2;
 
-        for (int32_t jatom = iatom; jatom < natoms; jatom++)
+        for (int jatom = iatom; jatom < natoms; jatom++)
         {
             auto jx = jatom * 3 + 0;
             auto jy = jatom * 3 + 1;
             auto jz = jatom * 3 + 2;
 
-            for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+            for (int thread_id = 0; thread_id < nthreads; thread_id++)
             {
                 molhess.row(ix)[jx] += molhess_threads.row(thread_id)[ix * (natoms * 3) + jx];
                 molhess.row(ix)[jy] += molhess_threads.row(thread_id)[ix * (natoms * 3) + jy];
@@ -629,7 +629,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                                const CMolecularGrid&   molecularGrid,
                                const double            screeningThresholdForGTOValues,
                                const CXCFunctional&    xcFunctional,
-                               const int32_t           atomIdx) -> std::vector<CDenseMatrix>
+                               const int           atomIdx) -> std::vector<CDenseMatrix>
 {
     CMultiTimer timer;
 
@@ -698,7 +698,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -895,7 +895,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
             // prepare gradient density
 
-            for (int32_t nu = 0; nu < aocount; nu++)
+            for (int nu = 0; nu < aocount; nu++)
             {
                 auto iatom = ao_to_atom_ids[aoinds[nu]];
 
@@ -904,7 +904,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -916,12 +916,12 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
             // Vxc matrix element gradient
 
-            for (int32_t nu = 0; nu < aocount; nu++)
+            for (int nu = 0; nu < aocount; nu++)
             {
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -984,7 +984,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
     // std::cout << "------------------------" << std::endl;
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
     //{
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;

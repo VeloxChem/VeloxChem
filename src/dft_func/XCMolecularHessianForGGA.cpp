@@ -146,7 +146,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -443,7 +443,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
             // prepare w0, wx, wy and wz
 
             #pragma omp simd 
-            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 w0[g] = local_weights[g] * vrho[2 * g + 0];
 
@@ -458,7 +458,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
 
             // prepare gradient grid
 
-            for (int32_t mu = 0; mu < aocount; mu++)
+            for (int mu = 0; mu < aocount; mu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[mu]];
 
@@ -467,7 +467,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
                 auto mu_offset = mu * npoints;
 
                 #pragma omp simd 
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -498,7 +498,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
             // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi,\zeta)}
             // on the same atom
 
-            for (int32_t mu = 0; mu < aocount; mu++)
+            for (int mu = 0; mu < aocount; mu++)
             {
                 auto iatom = ao_to_atom_ids[aoinds[mu]];
 
@@ -513,7 +513,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
                 double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
                 #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) 
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto mu_g = mu_offset + g;
 
@@ -630,7 +630,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
             // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi,\zeta)}
             // on the same atom and on different atoms
 
-            for (int32_t mu = 0; mu < aocount; mu++)
+            for (int mu = 0; mu < aocount; mu++)
             {
                 auto iatom = ao_to_atom_ids[aoinds[mu]];
 
@@ -640,7 +640,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
 
                 auto mu_offset = mu * npoints;
 
-                for (int32_t nu = 0; nu < aocount; nu++)
+                for (int nu = 0; nu < aocount; nu++)
                 {
                     auto jatom = ao_to_atom_ids[aoinds[nu]];
 
@@ -659,7 +659,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
                     double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
                     #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) 
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         auto mu_g = mu_offset + g;
                         auto nu_g = nu_offset + g;
@@ -773,7 +773,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
 
             // other contributions
 
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            for (int iatom = 0; iatom < natoms; iatom++)
             {
                 auto ix = iatom * 3 + 0;
                 auto iy = iatom * 3 + 1;
@@ -781,7 +781,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
 
                 auto i_offset = iatom * npoints;
 
-                for (int32_t jatom = iatom; jatom < natoms; jatom++)
+                for (int jatom = iatom; jatom < natoms; jatom++)
                 {
                     auto jx = jatom * 3 + 0;
                     auto jy = jatom * 3 + 1;
@@ -794,7 +794,7 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
                     double gatmxz = 0.0, gatmyz = 0.0, gatmzz = 0.0;
 
                     #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) 
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         auto ig = i_offset + g;
                         auto jg = j_offset + g;
@@ -946,19 +946,19 @@ integrateExcHessianForGGA(const CMolecule&        molecule,
 
     CDenseMatrix molhess(natoms * 3, natoms * 3);
 
-    for (int32_t iatom = 0; iatom < natoms; iatom++)
+    for (int iatom = 0; iatom < natoms; iatom++)
     {
         auto ix = iatom * 3 + 0;
         auto iy = iatom * 3 + 1;
         auto iz = iatom * 3 + 2;
 
-        for (int32_t jatom = iatom; jatom < natoms; jatom++)
+        for (int jatom = iatom; jatom < natoms; jatom++)
         {
             auto jx = jatom * 3 + 0;
             auto jy = jatom * 3 + 1;
             auto jz = jatom * 3 + 2;
 
-            for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+            for (int thread_id = 0; thread_id < nthreads; thread_id++)
             {
                 molhess.row(ix)[jx] += molhess_threads.row(thread_id)[ix * (natoms * 3) + jx];
                 molhess.row(ix)[jy] += molhess_threads.row(thread_id)[ix * (natoms * 3) + jy];
@@ -1000,8 +1000,10 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                                const CMolecularGrid&   molecularGrid,
                                const double            screeningThresholdForGTOValues,
                                const CXCFunctional&    xcFunctional,
-                               const int32_t           atomIdx) -> std::vector<CDenseMatrix>
+                               const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
 {
+    auto natoms = static_cast<int>(atomIdxVec.size());
+
     CMultiTimer timer;
 
     timer.start("Total timing");
@@ -1026,11 +1028,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
     // Vxc Fock gradeints (in x,y,z directions)
 
-    std::vector<CDenseMatrix> vxcgrads;
-
-    vxcgrads.push_back(CDenseMatrix(naos, naos));
-    vxcgrads.push_back(CDenseMatrix(naos, naos));
-    vxcgrads.push_back(CDenseMatrix(naos, naos));
+    std::vector<CDenseMatrix> vxcgrads(natoms * 3, CDenseMatrix(naos, naos));
 
     // GTOs on grid points
 
@@ -1082,7 +1080,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -1136,6 +1134,10 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
         CDenseMatrix mat_atom_chi_x(aocount, npoints);
         CDenseMatrix mat_atom_chi_y(aocount, npoints);
         CDenseMatrix mat_atom_chi_z(aocount, npoints);
+
+        std::vector<CDenseMatrix> mat_atomvec_chi_x(natoms, CDenseMatrix(aocount, npoints));
+        std::vector<CDenseMatrix> mat_atomvec_chi_y(natoms, CDenseMatrix(aocount, npoints));
+        std::vector<CDenseMatrix> mat_atomvec_chi_z(natoms, CDenseMatrix(aocount, npoints));
 
         CDenseMatrix mat_chi_xx(aocount, npoints);
         CDenseMatrix mat_chi_xy(aocount, npoints);
@@ -1212,11 +1214,14 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
                     auto iatom = ao_to_atom_ids[pre_ao_inds[nu]];
 
-                    if (iatom == atomIdx)
+                    for (int vecind = 0; vecind < natoms; vecind++)
                     {
-                        std::memcpy(mat_atom_chi_x.row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                        std::memcpy(mat_atom_chi_y.row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                        std::memcpy(mat_atom_chi_z.row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        if (atomIdxVec[vecind] == iatom)
+                        {
+                        std::memcpy(mat_atomvec_chi_x[vecind].row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        std::memcpy(mat_atomvec_chi_y[vecind].row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        std::memcpy(mat_atomvec_chi_z[vecind].row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        }
                     }
 
                     std::memcpy(mat_chi_xx.row(idx) + grid_batch_offset, submat_xx_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
@@ -1243,7 +1248,46 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
         dengridgen::generateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat, timer);
 
-        // generate density gradient grid
+        timer.start("Density grad. grid matmul");
+
+        auto mat_F = denblas::multAB(gs_sub_dens_mat, mat_chi);
+
+        auto mat_F_x = denblas::multAB(gs_sub_dens_mat, mat_chi_x);
+        auto mat_F_y = denblas::multAB(gs_sub_dens_mat, mat_chi_y);
+        auto mat_F_z = denblas::multAB(gs_sub_dens_mat, mat_chi_z);
+
+        timer.stop("Density grad. grid matmul");
+
+        auto F_val = mat_F.values();
+
+        auto F_x_val = mat_F_x.values();
+        auto F_y_val = mat_F_y.values();
+        auto F_z_val = mat_F_z.values();
+
+        auto chi_val = mat_chi.values();
+
+        auto chi_x_val = mat_chi_x.values();
+        auto chi_y_val = mat_chi_y.values();
+        auto chi_z_val = mat_chi_z.values();
+
+        auto chi_xx_val = mat_chi_xx.values();
+        auto chi_xy_val = mat_chi_xy.values();
+        auto chi_xz_val = mat_chi_xz.values();
+        auto chi_yy_val = mat_chi_yy.values();
+        auto chi_yz_val = mat_chi_yz.values();
+        auto chi_zz_val = mat_chi_zz.values();
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
+
+        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+
+        std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
+
+        timer.stop("XC functional eval.");
 
         timer.start("Density grad. grid prep.");
 
@@ -1279,51 +1323,6 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
         auto gdenzy = dengradzy.values();
         auto gdenzz = dengradzz.values();
 
-        timer.stop("Density grad. grid prep.");
-
-        timer.start("Density grad. grid matmul");
-
-        auto mat_F = denblas::multAB(gs_sub_dens_mat, mat_chi);
-
-        auto mat_F_x = denblas::multAB(gs_sub_dens_mat, mat_chi_x);
-        auto mat_F_y = denblas::multAB(gs_sub_dens_mat, mat_chi_y);
-        auto mat_F_z = denblas::multAB(gs_sub_dens_mat, mat_chi_z);
-
-        timer.stop("Density grad. grid matmul");
-
-        // compute exchange-correlation functional derivative
-
-        timer.start("XC functional eval.");
-
-        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
-
-        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
-
-        std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
-
-        timer.stop("XC functional eval.");
-
-        timer.start("Vxc matrix G");
-
-        auto F_val = mat_F.values();
-
-        auto F_x_val = mat_F_x.values();
-        auto F_y_val = mat_F_y.values();
-        auto F_z_val = mat_F_z.values();
-
-        auto chi_val = mat_chi.values();
-
-        auto chi_x_val = mat_chi_x.values();
-        auto chi_y_val = mat_chi_y.values();
-        auto chi_z_val = mat_chi_z.values();
-
-        auto chi_xx_val = mat_chi_xx.values();
-        auto chi_xy_val = mat_chi_xy.values();
-        auto chi_xz_val = mat_chi_xz.values();
-        auto chi_yy_val = mat_chi_yy.values();
-        auto chi_yz_val = mat_chi_yz.values();
-        auto chi_zz_val = mat_chi_zz.values();
-
         CDenseMatrix vxc_w(aocount, npoints);
         CDenseMatrix vxc_wx(aocount, npoints);
         CDenseMatrix vxc_wy(aocount, npoints);
@@ -1333,6 +1332,38 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
         auto vxc_wx_val = vxc_wx.values();
         auto vxc_wy_val = vxc_wy.values();
         auto vxc_wz_val = vxc_wz.values();
+
+        timer.stop("Density grad. grid prep.");
+
+        for (int vecind = 0; vecind < natoms; vecind++)
+        {
+
+        auto atomIdx = atomIdxVec[vecind];
+
+        // generate density gradient grid
+
+        timer.start("Vxc matrix G");
+
+        dengradx.zero();
+        dengrady.zero();
+        dengradz.zero();
+
+        dengradxx.zero();
+        dengradxy.zero();
+        dengradxz.zero();
+
+        dengradyx.zero();
+        dengradyy.zero();
+        dengradyz.zero();
+
+        dengradzx.zero();
+        dengradzy.zero();
+        dengradzz.zero();
+
+        vxc_w.zero();
+        vxc_wx.zero();
+        vxc_wy.zero();
+        vxc_wz.zero();
 
         #pragma omp parallel
         {
@@ -1344,7 +1375,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
             // prepare gradient density
 
-            for (int32_t nu = 0; nu < aocount; nu++)
+            for (int nu = 0; nu < aocount; nu++)
             {
                 auto iatom = ao_to_atom_ids[aoinds[nu]];
 
@@ -1353,7 +1384,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd 
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -1377,7 +1408,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
             // Vxc matrix element gradient
 
-            for (int32_t nu = 0; nu < aocount; nu++)
+            for (int nu = 0; nu < aocount; nu++)
             {
                 auto iatom = ao_to_atom_ids[aoinds[nu]];
 
@@ -1386,7 +1417,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd 
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -1526,9 +1557,9 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
         timer.start("Vxc matrix matmul");
 
-        auto vxc_gx_first_contrib = denblas::multABt(mat_atom_chi_x, vxc_w);
-        auto vxc_gy_first_contrib = denblas::multABt(mat_atom_chi_y, vxc_w);
-        auto vxc_gz_first_contrib = denblas::multABt(mat_atom_chi_z, vxc_w);
+        auto vxc_gx_first_contrib = denblas::multABt(mat_atomvec_chi_x[vecind], vxc_w);
+        auto vxc_gy_first_contrib = denblas::multABt(mat_atomvec_chi_y[vecind], vxc_w);
+        auto vxc_gz_first_contrib = denblas::multABt(mat_atomvec_chi_z[vecind], vxc_w);
 
         auto vxc_gx_second_contrib = denblas::multABt(mat_chi, vxc_wx);
         auto vxc_gy_second_contrib = denblas::multABt(mat_chi, vxc_wy);
@@ -1546,11 +1577,13 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
         timer.start("Vxc matrix dist.");
 
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[0], vxc_gx, aoinds, naos);
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[1], vxc_gy, aoinds, naos);
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[2], vxc_gz, aoinds, naos);
+        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 0], vxc_gx, aoinds, naos);
+        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 1], vxc_gy, aoinds, naos);
+        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 2], vxc_gz, aoinds, naos);
 
         timer.stop("Vxc matrix dist.");
+
+        }
     }
 
     timer.stop("Total timing");
@@ -1559,13 +1592,33 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
     // std::cout << "------------------------" << std::endl;
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
     //{
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
 
     return vxcgrads;
+}
+
+auto
+integrateVxcFockGradientForGGA(const CMolecule&        molecule,
+                               const CMolecularBasis&  basis,
+                               const std::vector<const double*>& gsDensityPointers,
+                               const CMolecularGrid&   molecularGrid,
+                               const double            screeningThresholdForGTOValues,
+                               const CXCFunctional&    xcFunctional,
+                               const int               atomIdx) -> std::vector<CDenseMatrix>
+{
+    std::vector<int> atomIdxVec({atomIdx});
+
+    return integrateVxcFockGradientForGGA(molecule,
+                                          basis,
+                                          gsDensityPointers,
+                                          molecularGrid,
+                                          screeningThresholdForGTOValues,
+                                          xcFunctional,
+                                          atomIdxVec);
 }
 
 }  // namespace xchessgga

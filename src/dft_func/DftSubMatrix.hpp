@@ -98,10 +98,10 @@ auto distributeSubMatrixToFock(const std::vector<double*>& aoFockPointers,
                                const std::vector<int>&     aoIndices,
                                const int                   naos) -> void;
 
-void distributeSubMatrixToDenseMatrix(CDenseMatrix&               matrix,
-                                      const CDenseMatrix&         subMatrix,
-                                      const std::vector<int32_t>& aoIndices,
-                                      const int32_t               naos);
+void distributeSubMatrixToDenseMatrix(CDenseMatrix&           matrix,
+                                      const CDenseMatrix&     subMatrix,
+                                      const std::vector<int>& aoIndices,
+                                      const int               naos);
 
 /**
  Distributes partial Wxc tensor (pair functional) to full Wxc tensor.
