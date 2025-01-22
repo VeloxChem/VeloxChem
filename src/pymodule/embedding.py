@@ -12,6 +12,8 @@ try:
                                    induction_interactions,
                                    repulsion_interactions,
                                    dispersion_interactions)
+    from pyframe.embedding.subsystem import ClassicalSubsystem, QuantumSubsystem
+    from pyframe.simulation_box import SimulationBox
 except ImportError:
     raise ImportError('Unable to import PyFraME. Please install PyFraME.')
 
@@ -187,21 +189,48 @@ class PolarizableEmbedding:
         self._threshold = induced_dipoles_options.get('threshold', 1e-8)
         self._max_iterations = induced_dipoles_options.get(
             'max_iterations', 100)
-        self._solver = induced_dipoles_options.get('solver', 'jacobi')
+        self._solver = induced_dipoles_options.get('solver', 'jidiis')
+        self._mic = induced_dipoles_options.get('mic', True)
 
     def _create_pyframe_objects(self):
+        def categorize_subsystems(reader_output):
+            """Categorize components from the reader output tuple."""
+            simulation_box = np.array([])
+            quantum_subsystems = []
+            classical_subsystems = []
+
+            for item in reader_output:
+                if isinstance(item, SimulationBox):
+                    simulation_box = item
+                elif isinstance(item, QuantumSubsystem):
+                    quantum_subsystems.append(item)
+                elif isinstance(item, ClassicalSubsystem):
+                    classical_subsystems.append(item)
+                else:
+                    raise ValueError(f"Unexpected object type returned by reader: {type(item)}")
+
+            return simulation_box, quantum_subsystems, classical_subsystems
 
         if "json_file" in self.options['inputs']:
             with redirect_stdout(StringIO()) as fg_out:
-                (self.quantum_subsystem,
-                 self.classical_subsystem) = read_input.reader(
-                     input_data=self.options['inputs']['json_file'],
-                     comm=self.comm)
+                reader_output = read_input.reader(
+                    input_data=self.options['inputs']['json_file'],
+                    comm=self.comm
+                )
+                simulation_box, quantum_subsystems, classical_subsystems = categorize_subsystems(reader_output)
+
+                # Handle single or multiple quantum/classical subsystems
+                self.simulation_box = simulation_box
+                self.quantum_subsystem = quantum_subsystems if len(quantum_subsystems) > 1 else \
+                quantum_subsystems[0] if quantum_subsystems else None
+                self.classical_subsystem = classical_subsystems if len(classical_subsystems) > 1 else \
+                classical_subsystems[0] if classical_subsystems else None
 
         elif "objects" in self.options['inputs']:
-            self.quantum_subsystem, self.classical_subsystem = (
-                self.options['inputs']['objects']['quantum_subsystem'],
-                self.options['inputs']['objects']['classical_subsystem'])
+            # Directly use the provided objects
+            self.simulation_box = self.options['inputs']['objects']['simulation_box']
+            self.quantum_subsystem = self.options['inputs']['objects']['quantum_subsystem']
+            self.classical_subsystem = self.options['inputs']['objects']['classical_subsystem']
 
 
 class PolarizableEmbeddingSCF(PolarizableEmbedding):
@@ -288,7 +317,9 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
             external_fields=(el_fields + nuc_fields),
             threshold=self._threshold,
             max_iterations=self._max_iterations,
-            solver=self._solver)
+            solver=self._solver,
+            mic=self._mic,
+            box=self.simulation_box)
 
         self._e_induction = induction_interactions.compute_induction_energy(
             induced_dipoles=self.classical_subsystem.induced_dipoles.
@@ -354,7 +385,10 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
             threshold=self._threshold,
             max_iterations=self._max_iterations,
             solver=self._solver,
-            exclude_static_internal_fields=True)
+            exclude_static_internal_fields=True,
+            mic=self._mic,
+            box=self.simulation_box
+            )
 
         f_elec_induction = induction_interactions.ind_fock_matrix_contributions(
             classical_subsystem=self.classical_subsystem,
