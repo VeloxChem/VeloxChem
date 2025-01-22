@@ -25,11 +25,10 @@
 
 from mpi4py import MPI
 import numpy as np
-import os
 import sys
 from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation as R
-# For profiling purposes only
+from pathlib import Path
 import time
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
@@ -37,7 +36,7 @@ from .forcefieldgenerator import ForceFieldGenerator
 from .molecule import Molecule
 from .outputstream import OutputStream
 
-class SystemBuilder:
+class SolvationBuilder:
     """
     Builds systems for molecular dynamics simulations.
 
@@ -48,17 +47,29 @@ class SystemBuilder:
 
     Instance variables:
         - threshold: The threshold for overlap between molecules in angstrom.
-        - solute: The solute molecule.
-        - solute_labels: The atom labels of the solute molecule.
-        - solute_ff: The ForceField object of the solute molecule.
-        - solvents: The list of solvent molecules.
-        - solvent_labels: The atom labels of the solvent molecules.
-        - quantities: The quantities of each solvent molecule.
-        - added_solvent_counts: The number of solvent molecules added to the system.
-        - system_molecule: The VeloxChem molecule object of the system.
-        - box: The dimensions of the box.
-        - centered_solute: The solute molecule centered in the box.
-        - system: The list of tuples with the atom labels and coordinates of the system.
+        - acceleration_threshold: The threshold of number of molecules to increase the batch size to speed up the process.
+        - number_of_attempts: The number of attempts to insert a molecule.
+        - random_rotation: Boolean flag to indicate if the solvent molecules will be randomly rotated. False for linear molecules.
+        - solute: The VeloxChem molecule object of the solute.
+        - solute_labels: The list of atom labels of the solute.
+        - solute_ff: The ForceField object of the solute.
+        - solvents: The list of VeloxChem molecule objects of the solvent molecules.
+        - solvent_labels: The list of atom labels of the solvent molecules.
+        - quantities: The list of quantities of each solvent molecule.
+        - added_solvent_counts: The list of the number of solvent molecules added to the system.
+        - solvent_name: The name of the solvent molecule.
+        - system_molecule: The VeloxChem molecule object of the solvated system.
+        - box: The dimensions of the box (x, y, z).
+        - centered_solute: The list of tuples with the molecule id, atom labels and coordinates of the centered solute.
+        - system: The list of tuples with the molecule id, atom labels and coordinates of the system.
+        - equilibration_flag: Boolean flag to indicate if an has been requested.
+        - temperature: The temperature of the for the equilibration in Kelvin.
+        - pressure: The pressure for the equilibration in bar.
+        - steps: The number of steps for the equilibration.
+        - pcharge: The positive charge for the counterion. Default is 'Na'.
+        - ncharge: The negative charge for the counterion. Default is 'Cl'.
+        - counterion: The VeloxChem molecule object of the counterion.
+        - parent_forcefield: The name of the parent forcefield. Default is 'amber03'.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -85,8 +96,10 @@ class SystemBuilder:
 
         # Packing configuration
         self.threshold = 1.8
+        self.acceleration_threshold = 1000
         self.number_of_attempts = 100
         self.random_rotation = True
+        self.failures_factor = 0.7
 
         # Molecules
         # Solute
@@ -99,7 +112,6 @@ class SystemBuilder:
         self.quantities = []
         self.added_solvent_counts = []
         self.solvent_name = None
-        # TODO: Graphene
 
         # System
         self.system_molecule = None
@@ -109,6 +121,7 @@ class SystemBuilder:
         self.system = []
 
         # NPT Equilibration options
+        self.equilibration_flag = False
         self.temperature = 300
         self.pressure = 1
         self.steps = 5000
@@ -297,10 +310,20 @@ class SystemBuilder:
                                 
         # Solvate the solute with the solvent molecules
         # This dynamic batch size is used to avoid building too often the KDTree.
-        # It does produce a small overlap that is corrected by equilibration.
 
         max_batch_size = int(number_of_solvents / 2)  
         min_batch_size = 10   
+
+        # Check linearity of the solvent molecule
+        if self.solvent_name == 'itself':
+            solvent_molecule = solute
+        else:
+            solvent_molecule = solvent_molecule
+
+        if self._molecule_linearity(solvent_molecule):
+            self.ostream.print_info(f"The solvent molecule is linear, random rotation is disabled")
+            self.ostream.flush()
+            self.random_rotation = False
 
         # Solvate the solute with the solvent molecules
         start = time.time()
@@ -308,7 +331,7 @@ class SystemBuilder:
 
             added_count = 0
             # If the quantity is small, set the batch size to 1
-            if quantity < 1000:
+            if quantity < self.acceleration_threshold:
                 batch_size = 1
             else:
                 # Speed up the process by increasing the batch size
@@ -318,8 +341,11 @@ class SystemBuilder:
                     min_batch_size=min_batch_size,
                     total_quantity=quantity
                 )
-            while added_count < quantity:
 
+            failure_count = 0
+            max_failures = self.failures_factor * quantity
+
+            while added_count < quantity:
                 attempts = min(batch_size, quantity - added_count)
                 new_molecules = []
                 for _ in range(attempts):
@@ -327,11 +353,21 @@ class SystemBuilder:
                     if result:
                         new_molecules.extend(result)
                         added_count += 1
+                        failure_count = 0
+                    else:
+                        failure_count += 1
+
+                if failure_count >= max_failures:
+                    self.ostream.print_info(f"Failed to pack {quantity - added_count} out of {quantity} molecules after {failure_count} attempts")
+                    self.ostream.flush()
+                    break  
+
                 if new_molecules:
                     self.system.extend(new_molecules)
                     new_coords = np.array([atom[-1] for atom in new_molecules])
                     existing_coords = np.vstack((existing_coords, new_coords))
                     tree = cKDTree(existing_coords)
+
             self.added_solvent_counts.append(added_count)
             msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
             self.ostream.print_info(msg)
@@ -347,7 +383,7 @@ class SystemBuilder:
         self.system_molecule = self._save_molecule()
 
         if equilibrate:
-            
+            self.equilibration_flag = True
             self.ostream.print_blank()
             self.ostream.print_info("Equilibrating the system")
             self.ostream.print_blank()
@@ -611,9 +647,7 @@ class SystemBuilder:
             self.ostream.print_info("liquid.xml file written")
             self.ostream.flush()
             # Write the system PDB file
-            self._write_system_pdb(filename='liquid.pdb')
-            self.ostream.print_info("liquid.pdb file written")
-            self.ostream.flush()
+            filename = 'liquid.pdb'
 
         else:
             # Solute
@@ -632,10 +666,17 @@ class SystemBuilder:
                 self.ostream.print_info(f'Remember to include amber03.xml and the {self.solvent_name}.xml file while creating the OpenMM system')
                 self.ostream.flush()
 
-            # Write the system PDB file
-            self._write_system_pdb()
-            self.ostream.print_info("system.pdb file written")
-            self.ostream.flush()
+            filename = 'system.pdb'
+
+        # Write the system PDB file
+        if self.equilibration_flag:
+            # If the system was equilibrated, OpenMM has already written the PDB file
+            Path('equilibrated_system.pdb').rename(filename)
+        else:
+            self._write_system_pdb(filename=filename)
+        # Print information
+        self.ostream.print_info(f"{filename} file written")
+        self.ostream.flush()
 
     def perform_equilibration(self):
         """
@@ -714,13 +755,12 @@ class SystemBuilder:
 
         # Exctract the new box size from the simulation context
         box_vectors = simulation.context.getState().getPeriodicBoxVectors()
-        # Update the box size
-        self.box = [box_vectors[0][0].value_in_unit(unit.nanometer), box_vectors[1][1].value_in_unit(unit.nanometer), box_vectors[2][2].value_in_unit(unit.nanometer)]
-        self.ostream.print_info(f'The box size after equilibration is: {self.box[0]:.2f} x {self.box[1]:.2f} x {self.box[2]:.2f} nm^3')
+        # Update the box size in angstrom
+        self.box = [box_vectors[0][0].value_in_unit(unit.angstroms), box_vectors[1][1].value_in_unit(unit.angstroms), box_vectors[2][2].value_in_unit(unit.angstroms)]
+        self.ostream.print_info(f'The box size after equilibration is: {self.box[0] * 0.1:.2f} x {self.box[1] * 0.1:.2f} x {self.box[2] * 0.1:.2f} nm^3')
         self.ostream.flush()
         # Recalculate the available volume for the solvent
-        volume_nm3 = self.box[0] * self.box[1] * self.box[2] - self._get_volume(self.solute) * 1e-3
-
+        volume_nm3 = (self.box[0] * self.box[1] * self.box[2] - self._get_volume(self.solute)) * 1e-3
         # Recalculate the density of the solvent
         self.ostream.print_info(f'The density of the solvent after equilibration is: {self._check_density(self.solvents[0], self.added_solvent_counts[0], volume_nm3)} kg/m^3')
         self.ostream.flush()
@@ -728,21 +768,21 @@ class SystemBuilder:
         with open('equilibrated_system.pdb', 'w') as f:
             app.PDBFile.writeFile(simulation.topology, positions, f)
 
-        # Delete the produced gro and top files
+        # Delete the produced gro and top files with Path
         if self.solvent_name == 'itself':
-            os.remove('liquid.gro')
-            os.remove('liquid.top')
-            os.remove('liquid.itp')
+            Path('liquid.gro').unlink()
+            Path('liquid.top').unlink()
+            Path('liquid.itp').unlink()
         elif self.solvent_name in ['spce', 'tip3p']:
-            os.remove('system.gro')
-            os.remove('system.top')
-            os.remove('solute.itp')
+            Path('system.gro').unlink()
+            Path('system.top').unlink()
+            Path('solute.itp').unlink()
         else:
-            os.remove('system.gro')
-            os.remove('system.top')
-            os.remove('solute.itp')
+            Path('system.gro').unlink()
+            Path('system.top').unlink()
+            Path('solute.itp').unlink()
             for i in range(len(self.solvent_ffs)):
-                os.remove(f'solvent_{i+1}.itp')
+                Path(f'solvent_{i+1}.itp').unlink()
 
         # Update the system molecule
         self.system_molecule = Molecule.read_pdb_file('equilibrated_system.pdb')
@@ -850,12 +890,11 @@ class SystemBuilder:
                 self.ostream.print_info("Consider reducing the target density")
                 self.ostream.flush()
 
-            return translated_solvent  
+            return translated_solvent
 
         return None
 
-
-
+    
     def _check_overlap(self, new_coords, existing_tree):
         '''
         Check for overlap using a KD-Tree.
@@ -1109,7 +1148,7 @@ class SystemBuilder:
                 self.solvent_ffs = []
                 self.solvent_ffs.append(self.solute_ff)
             # Non-water solvents
-            if self.solvent_name not in ['spce', 'tip3p']:
+            elif self.solvent_name not in ['spce', 'tip3p']:
                 self.solvent_ffs = []
                 for solvent in self.solvents:
                     solvent_ff = ForceFieldGenerator()
@@ -1151,11 +1190,16 @@ class SystemBuilder:
                     for i, atom in self.solute_ff.atoms.items():
                         atom_name = atom['name']
                         line_str = f'{residue_number:>5d}{"MOL":<5s}{atom_name:<5s}{atom_counter:>5d}'
+                        if residue_number > 9999:
+                            residue_number -= 9999
                         for d in range(3):
                             line_str += f'{coords_in_nm[residue_offset + i][d]:{8}.{3}f}'
                         line_str += '\n'
                         f.write(line_str)
                         atom_counter += 1
+                        # GRO has a maximum of 5 digits for the atom index
+                        if atom_counter > 99999:
+                            atom_counter -= 99999
                     # Increment residue_offset after each molecule
                     residue_offset += len(self.solute_ff.atoms)
 
@@ -1190,7 +1234,7 @@ class SystemBuilder:
 
                 # If the solvent is SPCE or TIP3P, the force field is standardized
                 final_residx = 0
-                if self.solvent_name in ['spce', 'tip3p']:
+                if self.solvent_name in ['spce', 'tip3p']:   
                     for i in range(self.added_solvent_counts[0]):
                         for j in range(3):
                             atom_name = ['OW', 'HW1', 'HW2'][j]
@@ -1203,6 +1247,8 @@ class SystemBuilder:
                             line_str += '\n'
                             f.write(line_str)
                             counter_2 += 1
+                            if counter_2 > 99999:
+                                counter_2 -= 99999
                         final_residx = i
 
                 # If the solvent is not SPCE or TIP3P, the information is coming from the force field
@@ -1219,6 +1265,8 @@ class SystemBuilder:
                                 line_str += '\n'
                                 f.write(line_str)
                                 counter_2 += 1
+                                if counter_2 > 99999:
+                                    counter_2 -= 99999
                             final_residx = k
                 
                 # Counterions
@@ -1442,7 +1490,54 @@ class SystemBuilder:
         volume = round(volume, 2)
         
         return volume
+    
+    def _molecule_linearity(self, molecule):
+        """
+        Determines if a molecule is linear based on its moment of inertia tensor.
 
+        Parameters:
+        - molecule: An object with methods `get_coordinates_in_angstrom()` and
+        `number_of_atoms()`. Each atom should have a mass accessible.
+
+        Returns:
+        - bool: True if the molecule is linear, False otherwise.
+        """
+
+        # Get the coordinates and masses
+        coords = molecule.get_coordinates_in_angstrom()
+        masses = molecule.get_masses()
+
+        # Calculate the center of mass (COM)
+        com = np.average(coords, axis=0, weights=masses)
+
+        # Calculate the moment of inertia tensor as:
+        # I = sum(m_i * (ri^2 * 1 - r_i x r_i))
+        inertia_tensor = np.zeros((3, 3))
+        for i in range(molecule.number_of_atoms()):
+            r = coords[i] - com
+            inertia_tensor += masses[i] * np.outer(r, r)
+
+        # Diagonalize the inertia tensor
+        eigvals, _ = np.linalg.eigh(inertia_tensor)
+
+        # Sort eigenvalues in ascending order
+        eigvals = np.sort(eigvals)
+
+        # In a linear molecule one of the eigenvalues is much larger than the other two
+        l_1 = eigvals[0]
+        l_2 = eigvals[1]
+        l_3 = eigvals[2]
+
+        # Linearity coefficient is the ratio of the sum of the two smallest eigenvalues 
+        # to the largest eigenvalue
+        linearity_coefficient = 0.5 * (l_1 + l_2) / l_3
+
+        if linearity_coefficient < 0.05:
+            is_linear = True
+        else:
+            is_linear = False  
+
+        return is_linear
 
     def _compute_batch_size(self, added_count, max_batch_size, min_batch_size, total_quantity):
         """

@@ -43,7 +43,7 @@ from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .forcefieldgenerator import ForceFieldGenerator
-from .systembuilder import SystemBuilder
+from .solvationbuilder import SolvationBuilder
 
 # Drivers
 from .xtbdriver import XtbDriver
@@ -416,17 +416,17 @@ class OpenMMDynamics:
             forcefield_files = [f'{filename}.xml']
 
         if solvent != 'gas':
-            # Solvate the molecule using the SystemBuilder
+            # Solvate the molecule using the SolvationBuilder
             phase = 'periodic'
-            sys_builder = SystemBuilder()
-            sys_builder.steps = 10000
-            sys_builder.solvate(solute=molecule, 
+            sol_builder = SolvationBuilder()
+            sol_builder.steps = 10000
+            sol_builder.solvate(solute=molecule, 
                                 solvent=solvent,
                                 padding=self.padding,
                                 equilibrate=True,
                                 )
             
-            sys_builder.write_openmm_files(solute_ff=ff_gen)
+            sol_builder.write_openmm_files(solute_ff=ff_gen)
             
             if solvent == 'spce':
                 self.water_ff = 'spce.xml'
@@ -442,7 +442,7 @@ class OpenMMDynamics:
                 solvent_ff = 'solvent_1.xml'
                 forcefield_files = [f'{filename}.xml', self.parent_ff, solvent_ff]
 
-            # Load the PDB from the SystemBuilder
+            # Load the PDB from the SolvationBuilder
             self.pdb = app.PDBFile('equilibrated_system.pdb')
 
         # Create the ForceField object        
@@ -1013,9 +1013,12 @@ class OpenMMDynamics:
                 self.kinetic_energies.append(kin)
 
                 # Temperature
-                R_kjmol = 0.00831446261815324
-                particles = self.system.getNumParticles() * 1.5
-                temp = kin / (particles * R_kjmol)
+                dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
+                if hasattr(self.integrator, 'computeSystemTemperature'):
+                    temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+                else:
+                    temp = (2*state.getKineticEnergy()/(dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin) 
+
                 self.temperatures.append(temp)
                 print('Temperature:', temp, 'K')
 
@@ -1219,9 +1222,11 @@ class OpenMMDynamics:
             self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
 
             # Temperature
-            R_kjmol = 0.00831446261815324
-            particles = self.system.getNumParticles() * 1.5
-            temp = kinetic.value_in_unit(unit.kilojoules_per_mole) / (particles * R_kjmol)
+            dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
+            if hasattr(self.integrator, 'computeSystemTemperature'):
+                temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
+            else:
+                temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
             self.temperatures.append(temp)
 
             # Total energy

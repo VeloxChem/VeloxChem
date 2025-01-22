@@ -132,8 +132,8 @@ from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
 # Additional classes for MD branch
-from .systembuilder import SystemBuilder
-from .openmmexplicitsolvation import OMMExplicitSolvation
+from .solvationbuilder import SolvationBuilder
+from .solvationfepdriver import SolvationFEPDriver
 from .openmmdynamics import OpenMMDynamics
 from .evbdriver import EvbDriver
 
