@@ -8,6 +8,7 @@ dependencies:
   - cxx-compiler
   - mpich
   - openblas=*=*openmp*
+  - eigen
   - mpi4py
   - numpy
   - h5py

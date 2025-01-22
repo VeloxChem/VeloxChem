@@ -9,6 +9,7 @@ dependencies:
   - mpich
   - blas=*=*mkl*
   - mkl-include
+  - eigen
   - mpi4py
   - numpy
   - h5py
