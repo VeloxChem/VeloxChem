@@ -76,7 +76,7 @@ class CXCMolecularHessian
      @param gsDensityPointers the pointers to ground state AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
-     @param atomIdx the index of the atom with respect to which gradient is
+     @param atomIdxVec the indices of the atoms with respect to which gradient is
      computed.
      @return the Vxc gradient.
      */
@@ -85,14 +85,7 @@ class CXCMolecularHessian
                                                        const std::vector<const double*>& gsDensityPointers,
                                                        const CMolecularGrid&             molecularGrid,
                                                        const std::string&                xcFuncLabel,
-                                                       const int                         atomIdx) const;
-
-    std::vector<CDenseMatrix> integrateVxcFockGradient(const CMolecule&                  molecule,
-                                                       const CMolecularBasis&            basis,
-                                                       const std::vector<const double*>& gsDensityPointers,
-                                                       const CMolecularGrid&             molecularGrid,
-                                                       const std::string&                xcFuncLabel,
-                                                       const std::vector<int>&           atomIdx) const;
+                                                       const std::vector<int>&           atomIdxVec) const;
 };
 
 #endif /* XCMolecularHessian_hpp */

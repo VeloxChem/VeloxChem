@@ -629,7 +629,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                                const CMolecularGrid&   molecularGrid,
                                const double            screeningThresholdForGTOValues,
                                const CXCFunctional&    xcFunctional,
-                               const int           atomIdx) -> std::vector<CDenseMatrix>
+                               const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
 {
     CMultiTimer timer;
 
@@ -655,11 +655,9 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
     // Vxc Fock gradeints (in x,y,z directions)
 
-    std::vector<CDenseMatrix> vxcgrads;
+    auto natoms = static_cast<int>(atomIdxVec.size());
 
-    vxcgrads.push_back(CDenseMatrix(naos, naos));
-    vxcgrads.push_back(CDenseMatrix(naos, naos));
-    vxcgrads.push_back(CDenseMatrix(naos, naos));
+    std::vector<CDenseMatrix> vxcgrads(natoms * 3, CDenseMatrix(naos, naos));
 
     // GTOs on grid points
 
@@ -749,9 +747,9 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
         CDenseMatrix mat_chi_y(aocount, npoints);
         CDenseMatrix mat_chi_z(aocount, npoints);
 
-        CDenseMatrix mat_atom_chi_x(aocount, npoints);
-        CDenseMatrix mat_atom_chi_y(aocount, npoints);
-        CDenseMatrix mat_atom_chi_z(aocount, npoints);
+        std::vector<CDenseMatrix> mat_atomvec_chi_x(natoms, CDenseMatrix(aocount, npoints));
+        std::vector<CDenseMatrix> mat_atomvec_chi_y(natoms, CDenseMatrix(aocount, npoints));
+        std::vector<CDenseMatrix> mat_atomvec_chi_z(natoms, CDenseMatrix(aocount, npoints));
 
         #pragma omp parallel
         {
@@ -804,11 +802,14 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
                     auto iatom = ao_to_atom_ids[pre_ao_inds[nu]];
 
-                    if (iatom == atomIdx)
+                    for (int vecind = 0; vecind < natoms; vecind++)
                     {
-                        std::memcpy(mat_atom_chi_x.row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                        std::memcpy(mat_atom_chi_y.row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                        std::memcpy(mat_atom_chi_z.row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        if (atomIdxVec[vecind] == iatom)
+                        {
+                        std::memcpy(mat_atomvec_chi_x[vecind].row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        std::memcpy(mat_atomvec_chi_y[vecind].row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        std::memcpy(mat_atomvec_chi_z[vecind].row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                        }
                     }
                 }
             }
@@ -828,25 +829,19 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
         dengridgen::generateDensityForLDA(rho, mat_chi, gs_sub_dens_mat, timer);
 
-        // generate density gradient grid
-
-        timer.start("Density grad. grid prep.");
-
-        CDenseMatrix dengradx(1, npoints);
-        CDenseMatrix dengrady(1, npoints);
-        CDenseMatrix dengradz(1, npoints);
-
-        auto gdenx = dengradx.values();
-        auto gdeny = dengrady.values();
-        auto gdenz = dengradz.values();
-
-        timer.stop("Density grad. grid prep.");
-
         timer.start("Density grad. grid matmul");
 
         auto mat_F = denblas::multAB(gs_sub_dens_mat, mat_chi);
 
         timer.stop("Density grad. grid matmul");
+
+        auto F_val = mat_F.values();
+
+        auto chi_val = mat_chi.values();
+
+        auto chi_x_val = mat_chi_x.values();
+        auto chi_y_val = mat_chi_y.values();
+        auto chi_z_val = mat_chi_z.values();
 
         // compute exchange-correlation functional derivative
 
@@ -860,38 +855,30 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
         timer.stop("XC functional eval.");
 
-        // compute partial contribution to Vxc Fock gradient and distribute partial
-        // Vxc Fock gradient to full matrix
+        timer.start("Parallel Vxc grad.");
 
-        timer.start("Vxc matrix G");
-
-        auto F_val = mat_F.values();
-
-        auto chi_val = mat_chi.values();
-
-        auto chi_x_val = mat_chi_x.values();
-        auto chi_y_val = mat_chi_y.values();
-        auto chi_z_val = mat_chi_z.values();
-
-        CDenseMatrix vxc_w(aocount, npoints);
-        CDenseMatrix vxc_wx(aocount, npoints);
-        CDenseMatrix vxc_wy(aocount, npoints);
-        CDenseMatrix vxc_wz(aocount, npoints);
-
-        auto vxc_w_val  = vxc_w.values();
-        auto vxc_wx_val = vxc_wx.values();
-        auto vxc_wy_val = vxc_wy.values();
-        auto vxc_wz_val = vxc_wz.values();
-
-        #pragma omp parallel
+#pragma omp parallel for schedule(static)
+        for (int vecind = 0; vecind < natoms; vecind++)
         {
-            auto thread_id = omp_get_thread_num();
+            auto atomIdx = atomIdxVec[vecind];
 
-            auto nthreads = omp_get_max_threads();
+            CDenseMatrix dengradx(1, npoints);
+            CDenseMatrix dengrady(1, npoints);
+            CDenseMatrix dengradz(1, npoints);
 
-            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+            auto gdenx = dengradx.values();
+            auto gdeny = dengrady.values();
+            auto gdenz = dengradz.values();
 
-            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+            CDenseMatrix vxc_w(aocount, npoints);
+            CDenseMatrix vxc_wx(aocount, npoints);
+            CDenseMatrix vxc_wy(aocount, npoints);
+            CDenseMatrix vxc_wz(aocount, npoints);
+
+            auto vxc_w_val  = vxc_w.values();
+            auto vxc_wx_val = vxc_wx.values();
+            auto vxc_wy_val = vxc_wy.values();
+            auto vxc_wz_val = vxc_wz.values();
 
             // prepare gradient density
 
@@ -904,7 +891,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -921,7 +908,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -929,7 +916,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
 
                     // 2 f_{\rho_{\alpha}} \phi_{\mu}^{(\xi)} \phi_{\nu}
 
-                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
+                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atomvec_chi_{xyz})
 
                     vxc_w_val[nu_g] = -2.0 * prefac * chi_val[nu_g];
 
@@ -945,37 +932,29 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                     vxc_wz_val[nu_g] = prefac * gdenz[g];
                 }
             }
+
+            auto vxc_gx_first_contrib = denblas::serialMultABt(mat_atomvec_chi_x[vecind], vxc_w);
+            auto vxc_gy_first_contrib = denblas::serialMultABt(mat_atomvec_chi_y[vecind], vxc_w);
+            auto vxc_gz_first_contrib = denblas::serialMultABt(mat_atomvec_chi_z[vecind], vxc_w);
+
+            auto vxc_gx_second_contrib = denblas::serialMultABt(mat_chi, vxc_wx);
+            auto vxc_gy_second_contrib = denblas::serialMultABt(mat_chi, vxc_wy);
+            auto vxc_gz_second_contrib = denblas::serialMultABt(mat_chi, vxc_wz);
+
+            auto vxc_gx = denblas::addAB(vxc_gx_first_contrib, vxc_gx_second_contrib, 1.0);
+            auto vxc_gy = denblas::addAB(vxc_gy_first_contrib, vxc_gy_second_contrib, 1.0);
+            auto vxc_gz = denblas::addAB(vxc_gz_first_contrib, vxc_gz_second_contrib, 1.0);
+
+            vxc_gx.symmetrizeAndScale(0.5);
+            vxc_gy.symmetrizeAndScale(0.5);
+            vxc_gz.symmetrizeAndScale(0.5);
+
+            dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 0], vxc_gx, aoinds, naos);
+            dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 1], vxc_gy, aoinds, naos);
+            dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 2], vxc_gz, aoinds, naos);
         }
 
-        timer.stop("Vxc matrix G");
-
-        timer.start("Vxc matrix matmul");
-
-        auto vxc_gx_first_contrib = denblas::multABt(mat_atom_chi_x, vxc_w);
-        auto vxc_gy_first_contrib = denblas::multABt(mat_atom_chi_y, vxc_w);
-        auto vxc_gz_first_contrib = denblas::multABt(mat_atom_chi_z, vxc_w);
-
-        auto vxc_gx_second_contrib = denblas::multABt(mat_chi, vxc_wx);
-        auto vxc_gy_second_contrib = denblas::multABt(mat_chi, vxc_wy);
-        auto vxc_gz_second_contrib = denblas::multABt(mat_chi, vxc_wz);
-
-        auto vxc_gx = denblas::addAB(vxc_gx_first_contrib, vxc_gx_second_contrib, 1.0);
-        auto vxc_gy = denblas::addAB(vxc_gy_first_contrib, vxc_gy_second_contrib, 1.0);
-        auto vxc_gz = denblas::addAB(vxc_gz_first_contrib, vxc_gz_second_contrib, 1.0);
-
-        vxc_gx.symmetrizeAndScale(0.5);
-        vxc_gy.symmetrizeAndScale(0.5);
-        vxc_gz.symmetrizeAndScale(0.5);
-
-        timer.stop("Vxc matrix matmul");
-
-        timer.start("Vxc matrix dist.");
-
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[0], vxc_gx, aoinds, naos);
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[1], vxc_gy, aoinds, naos);
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[2], vxc_gz, aoinds, naos);
-
-        timer.stop("Vxc matrix dist.");
+        timer.stop("Parallel Vxc grad.");
     }
 
     timer.stop("Total timing");
@@ -985,7 +964,7 @@ integrateVxcFockGradientForLDA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }

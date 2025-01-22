@@ -79,45 +79,6 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
                                               const std::vector<const double*>& gsDensityPointers,
                                               const CMolecularGrid&   molecularGrid,
                                               const std::string&      xcFuncLabel,
-                                              const int               atomIdx) const -> std::vector<CDenseMatrix>
-{
-    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-
-    auto xcfuntype = fvxc.getFunctionalType();
-
-    if (gsDensityPointers.size() == 1)
-    {
-        if (xcfuntype == xcfun::lda)
-        {
-            return xchesslda::integrateVxcFockGradientForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdx);
-        }
-        else if (xcfuntype == xcfun::gga)
-        {
-            return xchessgga::integrateVxcFockGradientForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdx);
-        }
-        else
-        {
-            std::string errxcfuntype("XCMolecularHessian.integrateVxcFockGradient: Only implemented for LDA/GGA");
-
-            errors::assertMsgCritical(false, errxcfuntype);
-        }
-    }
-    else
-    {
-        std::string erropenshell("XCMolecularHessian.integrateVxcFockGradient: Not implemented for open-shell");
-
-        errors::assertMsgCritical(false, erropenshell);
-    }
-
-    return std::vector<CDenseMatrix>();
-}
-
-auto
-CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const std::vector<const double*>& gsDensityPointers,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const std::string&      xcFuncLabel,
                                               const std::vector<int>& atomIdxVec) const -> std::vector<CDenseMatrix>
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
@@ -128,8 +89,7 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            // TODO: LDA
-            //return xchesslda::integrateVxcFockGradientForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdx);
+            return xchesslda::integrateVxcFockGradientForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
         else if (xcfuntype == xcfun::gga)
         {

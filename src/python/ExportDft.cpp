@@ -821,25 +821,6 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const std::string&                      xcFuncLabel,
-               const int                               atomIdx) -> py::array_t<double> {
-                std::vector<int> atomIdxVec({atomIdx});
-                return CXCMolecularHessian_integrate_vxc_fock_gradient(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel, atomIdxVec);
-            },
-            "Integrates exchange-correlation contribution to Vxc gradient.",
-            "molecule"_a,
-            "basis"_a,
-            "gsDensityArrays"_a,
-            "molecularGrid"_a,
-            "xcFuncLabel"_a,
-            "atomIdx"_a)
-        .def(
-            "integrate_vxc_fock_gradient",
-            [](CXCMolecularHessian&                    self,
-               const CMolecule&                        molecule,
-               const CMolecularBasis&                  basis,
-               const std::vector<py::array_t<double>>& gsDensityArrays,
-               const CMolecularGrid&                   molecularGrid,
-               const std::string&                      xcFuncLabel,
                const std::vector<int>&                 atomIdxVec) -> py::array_t<double> {
                 return CXCMolecularHessian_integrate_vxc_fock_gradient(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel, atomIdxVec);
             },

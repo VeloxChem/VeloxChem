@@ -1002,8 +1002,6 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                                const CXCFunctional&    xcFunctional,
                                const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
 {
-    auto natoms = static_cast<int>(atomIdxVec.size());
-
     CMultiTimer timer;
 
     timer.start("Total timing");
@@ -1027,6 +1025,8 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
     aoindices::computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
 
     // Vxc Fock gradeints (in x,y,z directions)
+
+    auto natoms = static_cast<int>(atomIdxVec.size());
 
     std::vector<CDenseMatrix> vxcgrads(natoms * 3, CDenseMatrix(naos, naos));
 
@@ -1131,10 +1131,6 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
         CDenseMatrix mat_chi_y(aocount, npoints);
         CDenseMatrix mat_chi_z(aocount, npoints);
 
-        CDenseMatrix mat_atom_chi_x(aocount, npoints);
-        CDenseMatrix mat_atom_chi_y(aocount, npoints);
-        CDenseMatrix mat_atom_chi_z(aocount, npoints);
-
         std::vector<CDenseMatrix> mat_atomvec_chi_x(natoms, CDenseMatrix(aocount, npoints));
         std::vector<CDenseMatrix> mat_atomvec_chi_y(natoms, CDenseMatrix(aocount, npoints));
         std::vector<CDenseMatrix> mat_atomvec_chi_z(natoms, CDenseMatrix(aocount, npoints));
@@ -1218,9 +1214,9 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                     {
                         if (atomIdxVec[vecind] == iatom)
                         {
-                        std::memcpy(mat_atomvec_chi_x[vecind].row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                        std::memcpy(mat_atomvec_chi_y[vecind].row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                        std::memcpy(mat_atomvec_chi_z[vecind].row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                            std::memcpy(mat_atomvec_chi_x[vecind].row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                            std::memcpy(mat_atomvec_chi_y[vecind].row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                            std::memcpy(mat_atomvec_chi_z[vecind].row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                         }
                     }
 
@@ -1390,7 +1386,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
                     // 2 f_{\rho_{\alpha}} \phi_{\mu}^{(\xi)} \phi_{\nu}
 
-                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
+                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atomvec_chi_{xyz})
 
                     auto prefac = w * vrho[2 * g + 0];
 
@@ -1467,7 +1463,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                     // 2 (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
                     // \nabla\rho_{\alpha} \cdot \nabla\phi_{\nu} \phi_{\mu}^{(\xi)}
 
-                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
+                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atomvec_chi_{xyz})
 
                     prefac = w * (2.0 * f_aa + f_ab);
 

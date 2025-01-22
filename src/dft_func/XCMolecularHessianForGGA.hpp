@@ -74,14 +74,6 @@ auto integrateVxcFockGradientForGGA(const CMolecule&                  molecule,
                                     const CXCFunctional&              xcFunctional,
                                     const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
 
-auto integrateVxcFockGradientForGGA(const CMolecule&                  molecule,
-                                    const CMolecularBasis&            basis,
-                                    const std::vector<const double*>& gsDensityPointers,
-                                    const CMolecularGrid&             molecularGrid,
-                                    const double                      screeningThresholdForGTOValues,
-                                    const CXCFunctional&              xcFunctional,
-                                    const int                         atomIdxVec) -> std::vector<CDenseMatrix>;
-
 }  // namespace xchessgga
 
 #endif /* XCMolecularHessianForGGA_hpp */

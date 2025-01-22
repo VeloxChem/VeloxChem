@@ -94,7 +94,7 @@ serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDens
     auto nbrow = matrixB.getNumberOfRows();
     auto nbcol = matrixB.getNumberOfColumns();
 
-    errors::assertMsgCritical(nacol == nbcol, "__FUNC__: Inconsistent sizes in matrix multiplication");
+    errors::assertMsgCritical(nacol == nbcol, "denblas::serialMultABt: Inconsistent sizes in matrix multiplication");
 
     // allocate dense matrix
 
