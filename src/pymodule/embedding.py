@@ -139,6 +139,8 @@ class PolarizableEmbedding:
                 - solver
                 - threshold
                 - max_iterations
+                - mic
+                - simulation_box
             - environment_energy: bool which decides if the environment energy
                                   will be calculated.
         inputs:
@@ -157,12 +159,14 @@ class PolarizableEmbedding:
         - options: Dictionary with the options and inputs.
         - quantum_subsystem: Instance of PyFraME QuantumSubsystem.
         - classical_subsystem: Instance of PyFraME ClassicalSubsystem.
+        - simulation_box: Instance of PyFraME SimulationBox.
         - _integral_driver: Instance of EmbeddingIntegralDriver to calculate
                             all relevant integrals.
         - _e_induction: Induction energy.
         - _threshold: Threshold for solving induced dipoles.
         - _max_iterations: Maximum iterations for solving induced dipoles.
         - _solver: Solver method for induced dipoles.
+        - _mic: Bool which decides if minimum-image convention (MIC) is used.
     """
 
     def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
@@ -195,7 +199,7 @@ class PolarizableEmbedding:
     def _create_pyframe_objects(self):
         def categorize_subsystems(reader_output):
             """Categorize components from the reader output tuple."""
-            simulation_box = np.array([])
+            simulation_box = SimulationBox()
             quantum_subsystems = []
             classical_subsystems = []
 
@@ -319,7 +323,7 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
             max_iterations=self._max_iterations,
             solver=self._solver,
             mic=self._mic,
-            box=self.simulation_box)
+            box=self.simulation_box.box)
 
         self._e_induction = induction_interactions.compute_induction_energy(
             induced_dipoles=self.classical_subsystem.induced_dipoles.
@@ -387,8 +391,7 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
             solver=self._solver,
             exclude_static_internal_fields=True,
             mic=self._mic,
-            box=self.simulation_box
-            )
+            box=self.simulation_box.box)
 
         f_elec_induction = induction_interactions.ind_fock_matrix_contributions(
             classical_subsystem=self.classical_subsystem,

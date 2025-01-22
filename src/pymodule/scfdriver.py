@@ -599,16 +599,22 @@ class ScfDriver:
                     self.ostream.print_info(f'- {key:<15s} : {settings[key]}')
 
             if 'vdw' in settings:
-                self.ostream.print_info('{- "vdw":<15s}')
+                self.ostream.print_info(f'- {"vdw":<15s}')
                 for key in ['method', 'combination_rule']:
                     self.ostream.print_info(
                         f'  - {key:<15s} : {settings["vdw"][key]}')
 
             if 'induced_dipoles' in settings:
-                self.ostream.print_info('{- "induced_dipoles":<15s}')
-                for key in ['solver', 'threshold', 'max_iterations']:
-                    self.ostream.print_info(
-                        f'  - {key:<15s} : {settings["induced_dipoles"][key]}')
+                self.ostream.print_info(f'- {"induced_dipoles":<15s}')
+                default_values = {
+                    'solver': 'jidiis',
+                    'threshold': 1e-8,
+                    'max_iterations': 100,
+                    'mic': True,
+                }
+                for key, default in default_values.items():
+                    value = settings['induced_dipoles'].get(key, default)
+                    self.ostream.print_info(f'  - {key:<15s} : {value}')
 
             self.ostream.print_blank()
 
