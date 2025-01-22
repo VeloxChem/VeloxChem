@@ -38,6 +38,8 @@ namespace denblas {  // denblas namespace
  */
 auto multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
+auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
+
 /**
  Computes matrix multiplication: A * B^T.
 

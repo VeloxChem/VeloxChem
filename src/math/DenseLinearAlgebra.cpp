@@ -30,6 +30,8 @@
 #include <cblas.h>
 #endif
 
+#include "Eigen/Dense"
+
 #include "ErrorHandler.hpp"
 
 namespace denblas {  // denblas namespace
@@ -75,6 +77,44 @@ multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
                 0.0,
                 mat.values(),
                 nbcol_int32);
+
+    return mat;
+}
+
+auto
+serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
+{
+    // set up dimensions of matrix A
+
+    auto narow = matrixA.getNumberOfRows();
+    auto nacol = matrixA.getNumberOfColumns();
+
+    // set up dimensions of matrix B
+
+    auto nbrow = matrixB.getNumberOfRows();
+    auto nbcol = matrixB.getNumberOfColumns();
+
+    errors::assertMsgCritical(nacol == nbcol, "__FUNC__: Inconsistent sizes in matrix multiplication");
+
+    // allocate dense matrix
+
+    CDenseMatrix mat(narow, nbrow);
+
+    if ((narow == 0) || (nbrow == 0)) return mat;
+
+    // compute matrix-matrix multiplcation
+
+    auto A = matrixA.values();
+    auto B = matrixB.values();
+
+    mat.zero();
+    auto C = mat.values();
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, narow, nbrow);
+
+    ematC.noalias() = ematA * ematB.transpose();
 
     return mat;
 }

@@ -1289,89 +1289,54 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
 
         timer.stop("XC functional eval.");
 
-        timer.start("Density grad. grid prep.");
+        timer.start("Parallel Vxc grad.");
 
-        CDenseMatrix dengradx(1, npoints);
-        CDenseMatrix dengrady(1, npoints);
-        CDenseMatrix dengradz(1, npoints);
-
-        CDenseMatrix dengradxx(1, npoints);
-        CDenseMatrix dengradxy(1, npoints);
-        CDenseMatrix dengradxz(1, npoints);
-
-        CDenseMatrix dengradyx(1, npoints);
-        CDenseMatrix dengradyy(1, npoints);
-        CDenseMatrix dengradyz(1, npoints);
-
-        CDenseMatrix dengradzx(1, npoints);
-        CDenseMatrix dengradzy(1, npoints);
-        CDenseMatrix dengradzz(1, npoints);
-
-        auto gdenx = dengradx.values();
-        auto gdeny = dengrady.values();
-        auto gdenz = dengradz.values();
-
-        auto gdenxx = dengradxx.values();
-        auto gdenxy = dengradxy.values();
-        auto gdenxz = dengradxz.values();
-
-        auto gdenyx = dengradyx.values();
-        auto gdenyy = dengradyy.values();
-        auto gdenyz = dengradyz.values();
-
-        auto gdenzx = dengradzx.values();
-        auto gdenzy = dengradzy.values();
-        auto gdenzz = dengradzz.values();
-
-        CDenseMatrix vxc_w(aocount, npoints);
-        CDenseMatrix vxc_wx(aocount, npoints);
-        CDenseMatrix vxc_wy(aocount, npoints);
-        CDenseMatrix vxc_wz(aocount, npoints);
-
-        auto vxc_w_val  = vxc_w.values();
-        auto vxc_wx_val = vxc_wx.values();
-        auto vxc_wy_val = vxc_wy.values();
-        auto vxc_wz_val = vxc_wz.values();
-
-        timer.stop("Density grad. grid prep.");
-
+#pragma omp parallel for schedule(static)
         for (int vecind = 0; vecind < natoms; vecind++)
         {
+            auto atomIdx = atomIdxVec[vecind];
 
-        auto atomIdx = atomIdxVec[vecind];
+            CDenseMatrix dengradx(1, npoints);
+            CDenseMatrix dengrady(1, npoints);
+            CDenseMatrix dengradz(1, npoints);
 
-        // generate density gradient grid
+            CDenseMatrix dengradxx(1, npoints);
+            CDenseMatrix dengradxy(1, npoints);
+            CDenseMatrix dengradxz(1, npoints);
 
-        timer.start("Vxc matrix G");
+            CDenseMatrix dengradyx(1, npoints);
+            CDenseMatrix dengradyy(1, npoints);
+            CDenseMatrix dengradyz(1, npoints);
 
-        dengradx.zero();
-        dengrady.zero();
-        dengradz.zero();
+            CDenseMatrix dengradzx(1, npoints);
+            CDenseMatrix dengradzy(1, npoints);
+            CDenseMatrix dengradzz(1, npoints);
 
-        dengradxx.zero();
-        dengradxy.zero();
-        dengradxz.zero();
+            auto gdenx = dengradx.values();
+            auto gdeny = dengrady.values();
+            auto gdenz = dengradz.values();
 
-        dengradyx.zero();
-        dengradyy.zero();
-        dengradyz.zero();
+            auto gdenxx = dengradxx.values();
+            auto gdenxy = dengradxy.values();
+            auto gdenxz = dengradxz.values();
 
-        dengradzx.zero();
-        dengradzy.zero();
-        dengradzz.zero();
+            auto gdenyx = dengradyx.values();
+            auto gdenyy = dengradyy.values();
+            auto gdenyz = dengradyz.values();
 
-        vxc_w.zero();
-        vxc_wx.zero();
-        vxc_wy.zero();
-        vxc_wz.zero();
+            auto gdenzx = dengradzx.values();
+            auto gdenzy = dengradzy.values();
+            auto gdenzz = dengradzz.values();
 
-        #pragma omp parallel
-        {
-            auto thread_id = omp_get_thread_num();
+            CDenseMatrix vxc_w(aocount, npoints);
+            CDenseMatrix vxc_wx(aocount, npoints);
+            CDenseMatrix vxc_wy(aocount, npoints);
+            CDenseMatrix vxc_wz(aocount, npoints);
 
-            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+            auto vxc_w_val  = vxc_w.values();
+            auto vxc_wx_val = vxc_wx.values();
+            auto vxc_wy_val = vxc_wy.values();
+            auto vxc_wz_val = vxc_wz.values();
 
             // prepare gradient density
 
@@ -1384,7 +1349,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -1417,7 +1382,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     auto nu_g = nu_offset + g;
 
@@ -1551,39 +1516,30 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                     vxc_wz_val[nu_g] += 2.0 * prefac * dot_val * zcomp;
                 }
             }
-        }
 
-        timer.start("Vxc matrix G");
+            auto vxc_gx_first_contrib = denblas::serialMultABt(mat_atomvec_chi_x[vecind], vxc_w);
+            auto vxc_gy_first_contrib = denblas::serialMultABt(mat_atomvec_chi_y[vecind], vxc_w);
+            auto vxc_gz_first_contrib = denblas::serialMultABt(mat_atomvec_chi_z[vecind], vxc_w);
 
-        timer.start("Vxc matrix matmul");
+            auto vxc_gx_second_contrib = denblas::serialMultABt(mat_chi, vxc_wx);
+            auto vxc_gy_second_contrib = denblas::serialMultABt(mat_chi, vxc_wy);
+            auto vxc_gz_second_contrib = denblas::serialMultABt(mat_chi, vxc_wz);
 
-        auto vxc_gx_first_contrib = denblas::multABt(mat_atomvec_chi_x[vecind], vxc_w);
-        auto vxc_gy_first_contrib = denblas::multABt(mat_atomvec_chi_y[vecind], vxc_w);
-        auto vxc_gz_first_contrib = denblas::multABt(mat_atomvec_chi_z[vecind], vxc_w);
+            auto vxc_gx = denblas::addAB(vxc_gx_first_contrib, vxc_gx_second_contrib, 1.0);
+            auto vxc_gy = denblas::addAB(vxc_gy_first_contrib, vxc_gy_second_contrib, 1.0);
+            auto vxc_gz = denblas::addAB(vxc_gz_first_contrib, vxc_gz_second_contrib, 1.0);
 
-        auto vxc_gx_second_contrib = denblas::multABt(mat_chi, vxc_wx);
-        auto vxc_gy_second_contrib = denblas::multABt(mat_chi, vxc_wy);
-        auto vxc_gz_second_contrib = denblas::multABt(mat_chi, vxc_wz);
+            vxc_gx.symmetrizeAndScale(0.5);
+            vxc_gy.symmetrizeAndScale(0.5);
+            vxc_gz.symmetrizeAndScale(0.5);
 
-        auto vxc_gx = denblas::addAB(vxc_gx_first_contrib, vxc_gx_second_contrib, 1.0);
-        auto vxc_gy = denblas::addAB(vxc_gy_first_contrib, vxc_gy_second_contrib, 1.0);
-        auto vxc_gz = denblas::addAB(vxc_gz_first_contrib, vxc_gz_second_contrib, 1.0);
-
-        vxc_gx.symmetrizeAndScale(0.5);
-        vxc_gy.symmetrizeAndScale(0.5);
-        vxc_gz.symmetrizeAndScale(0.5);
-
-        timer.stop("Vxc matrix matmul");
-
-        timer.start("Vxc matrix dist.");
-
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 0], vxc_gx, aoinds, naos);
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 1], vxc_gy, aoinds, naos);
-        dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 2], vxc_gz, aoinds, naos);
-
-        timer.stop("Vxc matrix dist.");
+            dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 0], vxc_gx, aoinds, naos);
+            dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 1], vxc_gy, aoinds, naos);
+            dftsubmat::distributeSubMatrixToDenseMatrix(vxcgrads[vecind * 3 + 2], vxc_gz, aoinds, naos);
 
         }
+
+        timer.stop("Parallel Vxc grad.");
     }
 
     timer.stop("Total timing");
@@ -1593,7 +1549,7 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
