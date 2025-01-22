@@ -116,7 +116,7 @@ class EvbDriver():
 
     def build_systems(
         self,
-        Lambda: list[float],
+        Lambda: list[float]|np.ndarray,
         configurations: list[str] | list[dict],  # type: ignore
         constraints: dict | list[dict] | None = None,
     ):
@@ -330,7 +330,7 @@ class EvbDriver():
     def run_FEP(
         self,
         equil_steps=5000,
-        total_sample_steps=200000,
+        total_sample_steps=100000,
         write_step=1000,
         initial_equil_steps=5000,
         step_size=0.001,

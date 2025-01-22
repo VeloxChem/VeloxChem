@@ -120,7 +120,7 @@ class FepDriver():
             constrained_H_bonds = []
             if self.constrain_H:
                 harm_bond_forces = [
-                    force for force in system.getForces() if force.__class__.__name__ == "HarmonicBondForce"
+                    force for force in system.getForces() if force.__class__.__name__ == "HarmonicBondForce" #todo type(), minimze __ stuff
                 ]
 
                 count = 0
@@ -130,7 +130,7 @@ class FepDriver():
 
                         if system.getParticleMass(particle1).value_in_unit(
                                 mmunit.dalton) == 1.007947 or system.getParticleMass(particle2).value_in_unit(
-                                    mmunit.dalton) == 1.007947:
+                                    mmunit.dalton) == 1.007947: #todo more robust hydrogen check
                             H_bond = sorted((particle1, particle2))
                             if H_bond not in constrained_H_bonds:
                                 constrained_H_bonds.append(H_bond)
@@ -243,8 +243,8 @@ class FepDriver():
         )
         step = 0
         for l in self.Lambda:
-            _filename = f"{self.run_folder}/data_{l:.3f}.dat"
-            data = np.genfromtxt(_filename, delimiter=",")
+            filename = f"{self.run_folder}/data_{l:.3f}.dat"
+            data = np.genfromtxt(filename, delimiter=",")
 
             # discard the equilliberation steps
             data[:, 0] -= data[0, 0]

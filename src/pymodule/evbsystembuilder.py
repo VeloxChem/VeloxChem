@@ -44,9 +44,9 @@ class EvbSystemBuilder():
         self.Lambda: list[float]
 
         self.soft_core_coulomb_ref = True
-        self.soft_core_coulomb_run = True
+        self.soft_core_coulomb_run = False
         self.soft_core_lj_ref = True
-        self.soft_core_lj_run = True
+        self.soft_core_lj_run = False
 
         self.sc_alpha_lj: float = 0.85
         self.sc_alpha_q: float = 0.3
@@ -227,7 +227,7 @@ class EvbSystemBuilder():
                         nb_force.addParticle(0, sigma, epsilon)
 
                     # Obtain the starting indices for the current unit cell and all adjecent unit cells
-                    cent = cell(m, n)
+                    center = cell(m, n)
                     left = cell(m - 1, n)
                     right = cell(m + 1, n)
                     up = cell(m, n + 1)
@@ -235,60 +235,60 @@ class EvbSystemBuilder():
                     down = cell(m, n - 1)
 
                     # Add bonds and angles
-                    bonds.update({(cent + 0, cent + 1): graphene_bond})
-                    bonds.update({(cent + 1, cent + 2): graphene_bond})
-                    bonds.update({(cent + 2, cent + 3): graphene_bond})
-                    bonds.update({(cent + 3, right + 0): graphene_bond})
-                    bonds.update({(cent + 0, up + 1): graphene_bond})
-                    bonds.update({(cent + 3, up + 2): graphene_bond})
+                    bonds.update({(center + 0, center + 1): graphene_bond})
+                    bonds.update({(center + 1, center + 2): graphene_bond})
+                    bonds.update({(center + 2, center + 3): graphene_bond})
+                    bonds.update({(center + 3, right + 0): graphene_bond})
+                    bonds.update({(center + 0, up + 1): graphene_bond})
+                    bonds.update({(center + 3, up + 2): graphene_bond})
 
-                    angles.update({(cent + 0, cent + 1, cent + 2): graphene_angle})
-                    angles.update({(cent + 1, cent + 2, cent + 3): graphene_angle})
-                    angles.update({(up + 1, cent + 0, cent + 1): graphene_angle})
-                    angles.update({(cent + 2, cent + 3, up + 2): graphene_angle})
-                    angles.update({(left + 3, cent + 0, up + 1): graphene_angle})
-                    angles.update({(left + 3, cent + 0, cent + 1): graphene_angle})
-                    angles.update({(cent + 0, cent + 1, down + 0): graphene_angle})
-                    angles.update({(down + 0, cent + 1, cent + 2): graphene_angle})
-                    angles.update({(cent + 1, cent + 2, down + 3): graphene_angle})
-                    angles.update({(cent + 3, cent + 2, down + 3): graphene_angle})
-                    angles.update({(cent + 2, cent + 3, right + 0): graphene_angle})
-                    angles.update({(right + 0, cent + 3, up + 2): graphene_angle})
+                    angles.update({(center + 0, center + 1, center + 2): graphene_angle})
+                    angles.update({(center + 1, center + 2, center + 3): graphene_angle})
+                    angles.update({(up + 1, center + 0, center + 1): graphene_angle})
+                    angles.update({(center + 2, center + 3, up + 2): graphene_angle})
+                    angles.update({(left + 3, center + 0, up + 1): graphene_angle})
+                    angles.update({(left + 3, center + 0, center + 1): graphene_angle})
+                    angles.update({(center + 0, center + 1, down + 0): graphene_angle})
+                    angles.update({(down + 0, center + 1, center + 2): graphene_angle})
+                    angles.update({(center + 1, center + 2, down + 3): graphene_angle})
+                    angles.update({(center + 3, center + 2, down + 3): graphene_angle})
+                    angles.update({(center + 2, center + 3, right + 0): graphene_angle})
+                    angles.update({(right + 0, center + 3, up + 2): graphene_angle})
 
-                    dihedrals.update({(left + 3, cent + 0, cent + 1, down + 0): graphene_dih_0})
-                    dihedrals.update({(up + 1, cent + 0, cent + 1, down + 0): graphene_dih_180})
-                    dihedrals.update({(left + 3, cent + 0, cent + 1, cent + 2): graphene_dih_180})
-                    dihedrals.update({(left + 3, cent + 0, cent + 1, cent + 2): graphene_dih_0})
+                    dihedrals.update({(left + 3, center + 0, center + 1, down + 0): graphene_dih_0})
+                    dihedrals.update({(up + 1, center + 0, center + 1, down + 0): graphene_dih_180})
+                    dihedrals.update({(left + 3, center + 0, center + 1, center + 2): graphene_dih_180})
+                    dihedrals.update({(left + 3, center + 0, center + 1, center + 2): graphene_dih_0})
 
-                    dihedrals.update({(cent + 0, cent + 1, cent + 2, cent + 3): graphene_dih_0})
-                    dihedrals.update({(down + 0, cent + 1, cent + 2, cent + 3): graphene_dih_180})
-                    dihedrals.update({(cent + 0, cent + 1, cent + 2, down + 3): graphene_dih_180})
-                    dihedrals.update({(down + 0, cent + 1, cent + 2, down + 3): graphene_dih_0})
+                    dihedrals.update({(center + 0, center + 1, center + 2, center + 3): graphene_dih_0})
+                    dihedrals.update({(down + 0, center + 1, center + 2, center + 3): graphene_dih_180})
+                    dihedrals.update({(center + 0, center + 1, center + 2, down + 3): graphene_dih_180})
+                    dihedrals.update({(down + 0, center + 1, center + 2, down + 3): graphene_dih_0})
 
-                    dihedrals.update({(cent + 1, cent + 2, cent + 3, up + 2): graphene_dih_0})
-                    dihedrals.update({(down + 3, cent + 2, cent + 3, up + 2): graphene_dih_180})
-                    dihedrals.update({(cent + 1, cent + 2, cent + 3, right + 0): graphene_dih_180})
-                    dihedrals.update({(down + 3, cent + 2, cent + 3, right + 0): graphene_dih_0})
+                    dihedrals.update({(center + 1, center + 2, center + 3, up + 2): graphene_dih_0})
+                    dihedrals.update({(down + 3, center + 2, center + 3, up + 2): graphene_dih_180})
+                    dihedrals.update({(center + 1, center + 2, center + 3, right + 0): graphene_dih_180})
+                    dihedrals.update({(down + 3, center + 2, center + 3, right + 0): graphene_dih_0})
 
-                    dihedrals.update({(cent + 2, cent + 3, right + 0, right + 1): graphene_dih_0})
-                    dihedrals.update({(up + 2, cent + 3, right + 0, right + 1): graphene_dih_180})
-                    dihedrals.update({(cent + 2, cent + 3, right + 0, upright + 1): graphene_dih_180})
-                    dihedrals.update({(up + 2, cent + 3, right + 0, upright + 1): graphene_dih_0})
+                    dihedrals.update({(center + 2, center + 3, right + 0, right + 1): graphene_dih_0})
+                    dihedrals.update({(up + 2, center + 3, right + 0, right + 1): graphene_dih_180})
+                    dihedrals.update({(center + 2, center + 3, right + 0, upright + 1): graphene_dih_180})
+                    dihedrals.update({(up + 2, center + 3, right + 0, upright + 1): graphene_dih_0})
 
-                    dihedrals.update({(left + 3, cent + 0, up + 1, up + 0): graphene_dih_0})
-                    dihedrals.update({(cent + 1, cent + 0, up + 1, up + 0): graphene_dih_180})
-                    dihedrals.update({(left + 3, cent + 0, up + 1, up + 2): graphene_dih_180})
-                    dihedrals.update({(cent + 1, cent + 0, up + 1, up + 2): graphene_dih_0})
+                    dihedrals.update({(left + 3, center + 0, up + 1, up + 0): graphene_dih_0})
+                    dihedrals.update({(center + 1, center + 0, up + 1, up + 0): graphene_dih_180})
+                    dihedrals.update({(left + 3, center + 0, up + 1, up + 2): graphene_dih_180})
+                    dihedrals.update({(center + 1, center + 0, up + 1, up + 2): graphene_dih_0})
 
-                    dihedrals.update({(cent + 2, cent + 3, up + 2, up + 1): graphene_dih_0})
-                    dihedrals.update({(cent + 2, cent + 3, up + 2, up + 3): graphene_dih_180})
-                    dihedrals.update({(right + 0, cent + 3, up + 2, up + 1): graphene_dih_180})
-                    dihedrals.update({(right + 0, cent + 3, up + 2, up + 3): graphene_dih_0})
+                    dihedrals.update({(center + 2, center + 3, up + 2, up + 1): graphene_dih_0})
+                    dihedrals.update({(center + 2, center + 3, up + 2, up + 3): graphene_dih_180})
+                    dihedrals.update({(right + 0, center + 3, up + 2, up + 1): graphene_dih_180})
+                    dihedrals.update({(right + 0, center + 3, up + 2, up + 3): graphene_dih_0})
 
-                    impropers.update({(left + 3, cent + 0, cent + 1, up + 2): graphene_dih_180})
-                    impropers.update({(cent + 0, cent + 1, down + 0, cent + 2): graphene_dih_180})
-                    impropers.update({(cent + 1, cent + 2, down + 3, cent + 3): graphene_dih_180})
-                    impropers.update({(cent + 2, cent + 3, right + 0, up + 2): graphene_dih_180})
+                    impropers.update({(left + 3, center + 0, center + 1, up + 2): graphene_dih_180})
+                    impropers.update({(center + 0, center + 1, down + 0, center + 2): graphene_dih_180})
+                    impropers.update({(center + 1, center + 2, down + 3, center + 3): graphene_dih_180})
+                    impropers.update({(center + 2, center + 3, right + 0, up + 2): graphene_dih_180})
 
             # carbon_harmonic_bond_force = mm.HarmonicBondForce()
             # carbon_harmonic_bond_force.setName("Carbon harmonic bond")
@@ -819,8 +819,8 @@ class EvbSystemBuilder():
 
             for lam in Lambda:
                 self._add_reaction_forces(self.systems[lam], lam, reference_state=False, lj_soft_core=self.soft_core_lj_run, coul_soft_core=self.soft_core_coulomb_run)
-            self._add_reaction_forces(self.systems["reactant"], 0, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
-            self._add_reaction_forces(self.systems["product"], 1, True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
+            self._add_reaction_forces(self.systems["reactant"], 0, reference_state=True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
+            self._add_reaction_forces(self.systems["product"], 1, reference_state=True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
         #Give all forces a unique forcegroup so that they can be recalculated separately later on
         for system in self.systems.values():
             for i, force in enumerate(system.getForces()):
@@ -837,8 +837,6 @@ class EvbSystemBuilder():
 
     def _add_reaction_forces(self, system, lam, reference_state=False, lj_soft_core=False, coul_soft_core=False) -> mm.System:
         reference_state = reference_state
-
-        # add morse_couple
 
         forces: list[mm.Force] = []
         forces = forces + self._create_bond_forces(lam, reference_state)

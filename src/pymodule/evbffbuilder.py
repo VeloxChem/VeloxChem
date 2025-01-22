@@ -305,7 +305,7 @@ class EvbForceFieldBuilder():
         Returns:
             dict: The dictionary with keys converted to tuple.
         """
-        return {ast.literal_eval(key): value for key, value in dictionary.items()}
+        return {ast.literal_eval(key): value for key, value in dictionary.items()} # todo: why ast.literal_eval?
 
     @staticmethod
     def _tuple_to_str_key(dictionary: dict) -> dict:
