@@ -228,6 +228,100 @@ generateDensityGridForLDA(const CDenseMatrix&     gtoValues,
 }
 
 void
+serialGenerateDensityForGGA(double*             rho,
+                            double*             rhograd,
+                            double*             sigma,
+                            const CDenseMatrix& gtoValues,
+                            const CDenseMatrix& gtoValuesX,
+                            const CDenseMatrix& gtoValuesY,
+                            const CDenseMatrix& gtoValuesZ,
+                            const CDenseMatrix& densityMatrix)
+{
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    CDenseMatrix symmetricDensityMatrix(densityMatrix);
+
+    symmetricDensityMatrix.symmetrizeAndScale(0.5);
+
+    auto mat_F = denblas::serialMultAB(symmetricDensityMatrix, gtoValues);
+
+    auto F_val = mat_F.values();
+
+    auto chi_val = gtoValues.values();
+
+    auto chi_x_val = gtoValuesX.values();
+    auto chi_y_val = gtoValuesY.values();
+    auto chi_z_val = gtoValuesZ.values();
+
+    {
+#pragma omp simd
+        for (int g = 0; g < npoints; g++)
+        {
+            // rho_a
+            rho[2 * g + 0] = 0.0;
+
+            // rho_a_grad
+            rhograd[6 * g + 0] = 0.0;
+            rhograd[6 * g + 1] = 0.0;
+            rhograd[6 * g + 2] = 0.0;
+        }
+
+        for (int nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+#pragma omp simd
+            for (int g = 0; g < npoints; g++)
+            {
+                // rho_a
+                rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+
+                // rho_a_grad
+                rhograd[6 * g + 0] += 2.0 * F_val[nu_offset + g] * chi_x_val[nu_offset + g];
+                rhograd[6 * g + 1] += 2.0 * F_val[nu_offset + g] * chi_y_val[nu_offset + g];
+                rhograd[6 * g + 2] += 2.0 * F_val[nu_offset + g] * chi_z_val[nu_offset + g];
+            }
+        }
+
+#pragma omp simd
+        for (int g = 0; g < npoints; g++)
+        {
+            // rho_b
+            rho[2 * g + 1] = rho[2 * g + 0];
+
+            // rho_b_grad
+            rhograd[6 * g + 3] = rhograd[6 * g + 0];
+            rhograd[6 * g + 4] = rhograd[6 * g + 1];
+            rhograd[6 * g + 5] = rhograd[6 * g + 2];
+        }
+
+        if (sigma != nullptr)
+        {
+#pragma omp simd
+            for (int g = 0; g < npoints; g++)
+            {
+                // simga_aa, sigma_ab, sigma_bb
+                // clang-format off
+                sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
+                                   rhograd[6 * g + 1] * rhograd[6 * g + 1] +
+                                   rhograd[6 * g + 2] * rhograd[6 * g + 2];
+
+                sigma[3 * g + 1] = rhograd[6 * g + 0] * rhograd[6 * g + 3] +
+                                   rhograd[6 * g + 1] * rhograd[6 * g + 4] +
+                                   rhograd[6 * g + 2] * rhograd[6 * g + 5];
+
+                sigma[3 * g + 2] = rhograd[6 * g + 3] * rhograd[6 * g + 3] +
+                                   rhograd[6 * g + 4] * rhograd[6 * g + 4] +
+                                   rhograd[6 * g + 5] * rhograd[6 * g + 5];
+                // clang-format on
+            }
+        }
+    }
+}
+
+void
 generateDensityForGGA(double*             rho,
                       double*             rhograd,
                       double*             sigma,

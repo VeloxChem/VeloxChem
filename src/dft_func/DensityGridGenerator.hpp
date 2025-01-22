@@ -95,6 +95,15 @@ auto generateDensityForGGA(double*             rho,
                            const CDenseMatrix& densityMatrix,
                            CMultiTimer&        timer) -> void;
 
+void serialGenerateDensityForGGA(double*             rho,
+                                 double*             rhograd,
+                                 double*             sigma,
+                                 const CDenseMatrix& gtoValues,
+                                 const CDenseMatrix& gtoValuesX,
+                                 const CDenseMatrix& gtoValuesY,
+                                 const CDenseMatrix& gtoValuesZ,
+                                 const CDenseMatrix& densityMatrix);
+
 /**
  Generates density for GGA.
 
