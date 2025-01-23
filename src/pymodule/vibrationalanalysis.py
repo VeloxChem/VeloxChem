@@ -1240,7 +1240,7 @@ class VibrationalAnalysis:
             print("Invalid type")
             return None
         
-    def animate(self, mode=1, frames=15, amplitude=0.5, width=300, height=300):
+    def animate(self, mode=1, frames=15, amplitude=0.5, width=400, height=300):
         """
         Animate a normal mode.
 
