@@ -27,7 +27,6 @@ from mpi4py import MPI
 import numpy as np
 import math
 import sys
-from scipy.special import erf
 
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
@@ -38,6 +37,11 @@ from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
+
+try:
+    import scipy
+except ImportError:
+    pass
 
 
 class CpcmDriver:
@@ -92,6 +96,18 @@ class CpcmDriver:
                 'x': ('float', 'parameter for scaling function'),
             },
         }
+
+    @staticmethod
+    def erf_array(array):
+        """
+        Computes erf of an array.
+        """
+
+        if 'scipy' in sys.modules:
+            return scipy.special.erf(array)
+        else:
+            # slow alternative in case scipy is not available
+            return np.vectorize(math.erf)(array)
 
     def print_keywords(self):
         """
@@ -460,7 +476,7 @@ class CpcmDriver:
         # Construct the explicit terms appearing in the gradient
         zeta_2   = zeta**2
         zeta_ij  = (zeta[:, None] * zeta[None, :]) / np.sqrt(zeta_2[:, None] + zeta_2[None, :])
-        erf_term = erf(zeta_ij * r_ij)
+        erf_term = self.erf_array(zeta_ij * r_ij)
         exp_term = np.exp(-zeta_ij**2 * r_ij_2_avoid)
 
         dA_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_ij * r_ij * exp_term) / r_ij_2_avoid
@@ -552,7 +568,7 @@ class CpcmDriver:
         # Compute fiJ
         term_m = _zeta * (RJ - _r_iJ)
         term_p = _zeta * (RJ + _r_iJ)
-        fiJ = 1.0 - 0.5*(erf(term_m) + erf(term_p))
+        fiJ = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
 
         # Derivative of fiJ: dfiJ_driJ
         z2 = _zeta**2
@@ -634,7 +650,7 @@ class CpcmDriver:
         dr_iA      = r_iA / d_iA_avoid[..., None]
 
         zeta_r      = zeta_i[:, None] *d_iA
-        erf_term    = erf(zeta_r)
+        erf_term    = self.erf_array(zeta_r)
         exp_term    = np.exp(-1.0 * (zeta_i[:, None]**2) * r_iA_2)
         denominator = np.where(r_iA_2 == 0.0, avoid_div_0, r_iA_2)
 
@@ -855,7 +871,7 @@ class CpcmDriver:
 
             zeta_ij  = (zeta[:, None] * zeta[None, :]) / np.sqrt((zeta_2[:, None] + zeta_2[None, :]))
             delta_ij = np.array([(a == atom_indices[:, None]).astype(int) - (a == atom_indices[None, :]).astype(int) for a in range(natoms - 1)])
-            dA_dr    = -1.0 * (erf(zeta_ij * r_ij) - two_sqrt_invpi * zeta_ij * r_ij * np.exp(-1.0 * zeta_ij**2 * r_ij_2)) / r_ij_2
+            dA_dr    = -1.0 * (self.erf_array(zeta_ij * r_ij) - two_sqrt_invpi * zeta_ij * r_ij * np.exp(-1.0 * zeta_ij**2 * r_ij_2)) / r_ij_2
             
             for a in range(natoms - 1):
                 _delta      = delta_ij[a]
