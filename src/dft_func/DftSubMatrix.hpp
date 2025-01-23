@@ -72,6 +72,11 @@ auto getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vec
  */
 auto distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void;
 
+auto distributeSubMatrixToKohnSham(CAOKohnShamMatrix&      aoKohnShamMatrix,
+                                   const CDenseMatrix&     subMatrix_a,
+                                   const CDenseMatrix&     subMatrix_b,
+                                   const std::vector<int>& aoIndices) -> void;
+
 /**
  Distributes partial matrices to AO Kohn-Sham matrix.
 

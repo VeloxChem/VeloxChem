@@ -52,13 +52,19 @@ namespace xcintgga {  // xcintgga namespace
  @param flag the flag for closed/open shell.
  @return the AO Kohn-Sham matrix.
  */
-auto integrateVxcFockForGGA(const CMolecule&                  molecule,
-                            const CMolecularBasis&            basis,
-                            const std::vector<const double*>& gsDensityPointers,
-                            const CMolecularGrid&             molecularGrid,
-                            const double                      screeningThresholdForGTOValues,
-                            const CXCFunctional&              xcFunctional,
-                            const std::string&                flag = std::string("closedshell")) -> CAOKohnShamMatrix;
+auto integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
+                                       const CMolecularBasis&            basis,
+                                       const std::vector<const double*>& gsDensityPointers,
+                                       const CMolecularGrid&             molecularGrid,
+                                       const double                      screeningThresholdForGTOValues,
+                                       const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
+
+auto integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
+                                     const CMolecularBasis&            basis,
+                                     const std::vector<const double*>& gsDensityPointers,
+                                     const CMolecularGrid&             molecularGrid,
+                                     const double                      screeningThresholdForGTOValues,
+                                     const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
 
 /**
  Integrates GGA contribution to (first-order) Vxc matrix.

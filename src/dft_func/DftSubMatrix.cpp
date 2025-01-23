@@ -150,7 +150,8 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseM
 
 auto
 distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
-                              const std::vector<CDenseMatrix>& subMatrices,
+                              const CDenseMatrix&              subMatrix_a,
+                              const CDenseMatrix&              subMatrix_b,
                               const std::vector<int>&          aoIndices) -> void
 {
     const auto naos = aoKohnShamMatrix.getNumberOfRows();
@@ -159,9 +160,9 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
 
     if (aocount <= naos)
     {
-        auto nrows = subMatrices[0].getNumberOfRows();
+        auto nrows = subMatrix_a.getNumberOfRows();
 
-        auto ncols = subMatrices[0].getNumberOfColumns();
+        auto ncols = subMatrix_a.getNumberOfColumns();
 
         for (int row = 0; row < nrows; row++)
         {
@@ -171,9 +172,9 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
 
             auto ksmat_b_row_orig = aoKohnShamMatrix.betaValues() + row_orig * naos;
 
-            auto submat_a_row = subMatrices[0].row(row);
+            auto submat_a_row = subMatrix_a.row(row);
 
-            auto submat_b_row = subMatrices[1].row(row);
+            auto submat_b_row = subMatrix_b.row(row);
 
             for (int col = 0; col < ncols; col++)
             {
@@ -185,6 +186,14 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
             }
         }
     }
+}
+
+auto
+distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
+                              const std::vector<CDenseMatrix>& subMatrices,
+                              const std::vector<int>&          aoIndices) -> void
+{
+    distributeSubMatrixToKohnSham(aoKohnShamMatrix, subMatrices[0], subMatrices[1], aoIndices);
 }
 
 auto

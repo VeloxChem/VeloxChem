@@ -87,7 +87,14 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
 
     if (xcfuntype == xcfun::gga)
     {
-        return xcintgga::integrateVxcFockForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintgga::integrateVxcFockForGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintgga::integrateVxcFockForGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
     }
 
     if (xcfuntype == xcfun::mgga)

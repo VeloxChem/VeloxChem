@@ -282,7 +282,7 @@ CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
 
     // Create output tensors
 
-    CAOKohnShamMatrix matrixVxc(naos, naos, true);
+    CAOKohnShamMatrix matrixVxc(naos, naos, std::string("closedshell"));
     matrixVxc.zero();
 
     CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
@@ -519,6 +519,7 @@ export_dft(py::module& m)
     PyClass<CAOKohnShamMatrix>(m, "AOKohnShamMatrix")
         .def(py::init<>())
         .def(py::init<int, int, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
+        .def(py::init<int, int, std::string&>(), "nrows"_a, "ncols"_a, "flag"_a)
         .def(
             "alpha_to_numpy",
             [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
