@@ -172,9 +172,9 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
         timer.start("OMP Vxc calc.");
 
-        CDenseMatrix omp_sum_mat_Vxc(aocount, aocount);
+        CDenseMatrix sum_partial_mat_Vxc(aocount, aocount);
 
-        omp_sum_mat_Vxc.zero();
+        sum_partial_mat_Vxc.zero();
 
 #pragma omp parallel reduction(+ : nele, xcene)
         {
@@ -186,10 +186,10 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            CDenseMatrix omp_mat_chi(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_chi_x(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_chi_y(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_chi_z(aocount, grid_batch_size);
+            CDenseMatrix mat_chi(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_x(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_y(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_z(aocount, grid_batch_size);
 
             const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
             const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
@@ -225,10 +225,10 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
                 for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(omp_mat_chi.row(idx), submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(omp_mat_chi_x.row(idx), submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(omp_mat_chi_y.row(idx), submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(omp_mat_chi_z.row(idx), submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx), submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_x.row(idx), submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_y.row(idx), submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_z.row(idx), submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
 
@@ -236,44 +236,44 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Generate density grid");
 
-            auto omp_local_weights = omp_local_weights_data[thread_id].data();
+            auto local_weights = omp_local_weights_data[thread_id].data();
 
-            auto omp_rho     = omp_rho_data[thread_id].data();
-            auto omp_rhograd = omp_rhograd_data[thread_id].data();
-            auto omp_sigma   = omp_sigma_data[thread_id].data();
+            auto rho     = omp_rho_data[thread_id].data();
+            auto rhograd = omp_rhograd_data[thread_id].data();
+            auto sigma   = omp_sigma_data[thread_id].data();
 
-            auto omp_exc    = omp_exc_data[thread_id].data();
-            auto omp_vrho   = omp_vrho_data[thread_id].data();
-            auto omp_vsigma = omp_vsigma_data[thread_id].data();
+            auto exc    = omp_exc_data[thread_id].data();
+            auto vrho   = omp_vrho_data[thread_id].data();
+            auto vsigma = omp_vsigma_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(omp_rho, omp_rhograd, omp_sigma, omp_mat_chi, omp_mat_chi_x, omp_mat_chi_y, omp_mat_chi_z, sub_dens_mat);
+            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
             omptimers[thread_id].start("XC functional eval.");
 
-            omp_xcfuncs[thread_id].compute_exc_vxc_for_gga(grid_batch_size, omp_rho, omp_sigma, omp_exc, omp_vrho, omp_vsigma);
+            omp_xcfuncs[thread_id].compute_exc_vxc_for_gga(grid_batch_size, rho, sigma, exc, vrho, vsigma);
 
             omptimers[thread_id].stop("XC functional eval.");
 
             omptimers[thread_id].start("Copy grid weights");
 
-            std::memcpy(omp_local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
+            std::memcpy(local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
 
             omptimers[thread_id].stop("Copy grid weights");
 
             omptimers[thread_id].start("Vxc matrix G");
 
-            CDenseMatrix omp_mat_G(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_G_gga(aocount, grid_batch_size);
+            CDenseMatrix mat_G(aocount, grid_batch_size);
+            CDenseMatrix mat_G_gga(aocount, grid_batch_size);
 
-            auto omp_G_val     = omp_mat_G.values();
-            auto omp_G_gga_val = omp_mat_G_gga.values();
+            auto G_val     = mat_G.values();
+            auto G_gga_val = mat_G_gga.values();
 
-            auto omp_chi_val   = omp_mat_chi.values();
-            auto omp_chi_x_val = omp_mat_chi_x.values();
-            auto omp_chi_y_val = omp_mat_chi_y.values();
-            auto omp_chi_z_val = omp_mat_chi_z.values();
+            auto chi_val   = mat_chi.values();
+            auto chi_x_val = mat_chi_x.values();
+            auto chi_y_val = mat_chi_y.values();
+            auto chi_z_val = mat_chi_z.values();
 
             for (int nu = 0; nu < aocount; nu++)
             {
@@ -282,14 +282,14 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 #pragma omp simd
                 for (int g = 0; g < grid_batch_size; g++)
                 {
-                    auto vx = 2.0 * omp_vsigma[3 * g + 0] * omp_rhograd[6 * g + 0] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 3];
-                    auto vy = 2.0 * omp_vsigma[3 * g + 0] * omp_rhograd[6 * g + 1] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 4];
-                    auto vz = 2.0 * omp_vsigma[3 * g + 0] * omp_rhograd[6 * g + 2] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 5];
+                    auto vx = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
+                    auto vy = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
+                    auto vz = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
 
-                    omp_G_val[nu_offset + g] = omp_local_weights[g] * omp_vrho[2 * g + 0] * omp_chi_val[nu_offset + g];
+                    G_val[nu_offset + g] = local_weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
 
-                    omp_G_gga_val[nu_offset + g] =
-                        omp_local_weights[g] * (vx * omp_chi_x_val[nu_offset + g] + vy * omp_chi_y_val[nu_offset + g] + vz * omp_chi_z_val[nu_offset + g]);
+                    G_gga_val[nu_offset + g] =
+                        local_weights[g] * (vx * chi_x_val[nu_offset + g] + vy * chi_y_val[nu_offset + g] + vz * chi_z_val[nu_offset + g]);
                 }
             }
 
@@ -297,35 +297,35 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Vxc matmul and symm.");
 
-            auto omp_partial_mat_Vxc = denblas::serialMultABt(omp_mat_chi, denblas::serialAddAB(omp_mat_G, omp_mat_G_gga, 2.0));
+            auto partial_mat_Vxc = denblas::serialMultABt(mat_chi, denblas::serialAddAB(mat_G, mat_G_gga, 2.0));
 
-            omp_partial_mat_Vxc.symmetrizeAndScale(0.5);
+            partial_mat_Vxc.symmetrizeAndScale(0.5);
 
             omptimers[thread_id].stop("Vxc matmul and symm.");
 
             omptimers[thread_id].start("Vxc local matrix dist.");
 
 #pragma omp critical
-            denblas::serialInPlaceAddAB(omp_sum_mat_Vxc, omp_partial_mat_Vxc);
+            denblas::serialInPlaceAddAB(sum_partial_mat_Vxc, partial_mat_Vxc);
 
             omptimers[thread_id].stop("Vxc local matrix dist.");
 
             omptimers[thread_id].start("XC energy and num. elec.");
 
-            double omp_nele = 0.0, omp_xcene = 0.0;
+            double local_nele = 0.0, local_xcene = 0.0;
 
             for (int g = 0; g < grid_batch_size; g++)
             {
-                auto rho_total = omp_rho[2 * g + 0] + omp_rho[2 * g + 1];
+                auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
 
-                omp_nele += omp_local_weights[g] * rho_total;
+                local_nele += local_weights[g] * rho_total;
 
-                omp_xcene += omp_local_weights[g] * omp_exc[g] * rho_total;
+                local_xcene += local_weights[g] * exc[g] * rho_total;
             }
 
-            nele += omp_nele;
+            nele += local_nele;
 
-            xcene += omp_xcene;
+            xcene += local_xcene;
 
             omptimers[thread_id].stop("XC energy and num. elec.");
         }
@@ -334,7 +334,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
         timer.start("Vxc matrix dist.");
 
-        dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, omp_sum_mat_Vxc, aoinds);
+        dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, sum_partial_mat_Vxc, aoinds);
 
         timer.stop("Vxc matrix dist.");
     }
@@ -484,11 +484,11 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
         timer.start("OMP Vxc calc.");
 
-        CDenseMatrix omp_sum_mat_Vxc_a(aocount, aocount);
-        CDenseMatrix omp_sum_mat_Vxc_b(aocount, aocount);
+        CDenseMatrix sum_partial_mat_Vxc_a(aocount, aocount);
+        CDenseMatrix sum_partial_mat_Vxc_b(aocount, aocount);
 
-        omp_sum_mat_Vxc_a.zero();
-        omp_sum_mat_Vxc_b.zero();
+        sum_partial_mat_Vxc_a.zero();
+        sum_partial_mat_Vxc_b.zero();
 
 #pragma omp parallel reduction(+ : nele, xcene)
         {
@@ -500,10 +500,10 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-            CDenseMatrix omp_mat_chi(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_chi_x(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_chi_y(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_chi_z(aocount, grid_batch_size);
+            CDenseMatrix mat_chi(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_x(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_y(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_z(aocount, grid_batch_size);
 
             const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
             const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
@@ -539,10 +539,10 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
                 for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(omp_mat_chi.row(idx), submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(omp_mat_chi_x.row(idx), submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(omp_mat_chi_y.row(idx), submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(omp_mat_chi_z.row(idx), submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx), submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_x.row(idx), submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_y.row(idx), submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_z.row(idx), submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
 
@@ -550,50 +550,50 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Generate density grid");
 
-            auto omp_local_weights = omp_local_weights_data[thread_id].data();
+            auto local_weights = omp_local_weights_data[thread_id].data();
 
-            auto omp_rho     = omp_rho_data[thread_id].data();
-            auto omp_rhograd = omp_rhograd_data[thread_id].data();
-            auto omp_sigma   = omp_sigma_data[thread_id].data();
+            auto rho     = omp_rho_data[thread_id].data();
+            auto rhograd = omp_rhograd_data[thread_id].data();
+            auto sigma   = omp_sigma_data[thread_id].data();
 
-            auto omp_exc    = omp_exc_data[thread_id].data();
-            auto omp_vrho   = omp_vrho_data[thread_id].data();
-            auto omp_vsigma = omp_vsigma_data[thread_id].data();
+            auto exc    = omp_exc_data[thread_id].data();
+            auto vrho   = omp_vrho_data[thread_id].data();
+            auto vsigma = omp_vsigma_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(omp_rho, omp_rhograd, omp_sigma, omp_mat_chi, omp_mat_chi_x, omp_mat_chi_y, omp_mat_chi_z, sub_dens_mat_a, sub_dens_mat_b);
+            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_dens_mat_b);
 
             omptimers[thread_id].stop("Generate density grid");
 
             omptimers[thread_id].start("XC functional eval.");
 
-            omp_xcfuncs[thread_id].compute_exc_vxc_for_gga(grid_batch_size, omp_rho, omp_sigma, omp_exc, omp_vrho, omp_vsigma);
+            omp_xcfuncs[thread_id].compute_exc_vxc_for_gga(grid_batch_size, rho, sigma, exc, vrho, vsigma);
 
             omptimers[thread_id].stop("XC functional eval.");
 
             omptimers[thread_id].start("Copy grid weights");
 
-            std::memcpy(omp_local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
+            std::memcpy(local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
 
             omptimers[thread_id].stop("Copy grid weights");
 
             omptimers[thread_id].start("Vxc matrix G");
 
-            CDenseMatrix omp_mat_G_a(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_G_a_gga(aocount, grid_batch_size);
+            CDenseMatrix mat_G_a(aocount, grid_batch_size);
+            CDenseMatrix mat_G_a_gga(aocount, grid_batch_size);
 
-            CDenseMatrix omp_mat_G_b(aocount, grid_batch_size);
-            CDenseMatrix omp_mat_G_b_gga(aocount, grid_batch_size);
+            CDenseMatrix mat_G_b(aocount, grid_batch_size);
+            CDenseMatrix mat_G_b_gga(aocount, grid_batch_size);
 
-            auto omp_G_a_val     = omp_mat_G_a.values();
-            auto omp_G_a_gga_val = omp_mat_G_a_gga.values();
+            auto G_a_val     = mat_G_a.values();
+            auto G_a_gga_val = mat_G_a_gga.values();
 
-            auto omp_G_b_val     = omp_mat_G_b.values();
-            auto omp_G_b_gga_val = omp_mat_G_b_gga.values();
+            auto G_b_val     = mat_G_b.values();
+            auto G_b_gga_val = mat_G_b_gga.values();
 
-            auto omp_chi_val   = omp_mat_chi.values();
-            auto omp_chi_x_val = omp_mat_chi_x.values();
-            auto omp_chi_y_val = omp_mat_chi_y.values();
-            auto omp_chi_z_val = omp_mat_chi_z.values();
+            auto chi_val   = mat_chi.values();
+            auto chi_x_val = mat_chi_x.values();
+            auto chi_y_val = mat_chi_y.values();
+            auto chi_z_val = mat_chi_z.values();
 
             for (int nu = 0; nu < aocount; nu++)
             {
@@ -602,21 +602,21 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 #pragma omp simd
                 for (int g = 0; g < grid_batch_size; g++)
                 {
-                    auto vxa = 2.0 * omp_vsigma[3 * g + 0] * omp_rhograd[6 * g + 0] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 3];
-                    auto vya = 2.0 * omp_vsigma[3 * g + 0] * omp_rhograd[6 * g + 1] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 4];
-                    auto vza = 2.0 * omp_vsigma[3 * g + 0] * omp_rhograd[6 * g + 2] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 5];
+                    auto vxa = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
+                    auto vya = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
+                    auto vza = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
 
-                    auto vxb = 2.0 * omp_vsigma[3 * g + 2] * omp_rhograd[6 * g + 3] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 0];
-                    auto vyb = 2.0 * omp_vsigma[3 * g + 2] * omp_rhograd[6 * g + 4] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 1];
-                    auto vzb = 2.0 * omp_vsigma[3 * g + 2] * omp_rhograd[6 * g + 5] + omp_vsigma[3 * g + 1] * omp_rhograd[6 * g + 2];
+                    auto vxb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 3] + vsigma[3 * g + 1] * rhograd[6 * g + 0];
+                    auto vyb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 4] + vsigma[3 * g + 1] * rhograd[6 * g + 1];
+                    auto vzb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 5] + vsigma[3 * g + 1] * rhograd[6 * g + 2];
 
-                    omp_G_a_val[nu_offset + g] = omp_local_weights[g] * omp_vrho[2 * g + 0] * omp_chi_val[nu_offset + g];
-                    omp_G_b_val[nu_offset + g] = omp_local_weights[g] * omp_vrho[2 * g + 1] * omp_chi_val[nu_offset + g];
+                    G_a_val[nu_offset + g] = local_weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
+                    G_b_val[nu_offset + g] = local_weights[g] * vrho[2 * g + 1] * chi_val[nu_offset + g];
 
-                    omp_G_a_gga_val[nu_offset + g] =
-                        omp_local_weights[g] * (vxa * omp_chi_x_val[nu_offset + g] + vya * omp_chi_y_val[nu_offset + g] + vza * omp_chi_z_val[nu_offset + g]);
-                    omp_G_b_gga_val[nu_offset + g] =
-                        omp_local_weights[g] * (vxb * omp_chi_x_val[nu_offset + g] + vyb * omp_chi_y_val[nu_offset + g] + vzb * omp_chi_z_val[nu_offset + g]);
+                    G_a_gga_val[nu_offset + g] =
+                        local_weights[g] * (vxa * chi_x_val[nu_offset + g] + vya * chi_y_val[nu_offset + g] + vza * chi_z_val[nu_offset + g]);
+                    G_b_gga_val[nu_offset + g] =
+                        local_weights[g] * (vxb * chi_x_val[nu_offset + g] + vyb * chi_y_val[nu_offset + g] + vzb * chi_z_val[nu_offset + g]);
                 }
             }
 
@@ -624,11 +624,11 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Vxc matmul and symm.");
 
-            auto omp_partial_mat_Vxc_a = denblas::serialMultABt(omp_mat_chi, denblas::serialAddAB(omp_mat_G_a, omp_mat_G_a_gga, 2.0));
-            auto omp_partial_mat_Vxc_b = denblas::serialMultABt(omp_mat_chi, denblas::serialAddAB(omp_mat_G_b, omp_mat_G_b_gga, 2.0));
+            auto partial_mat_Vxc_a = denblas::serialMultABt(mat_chi, denblas::serialAddAB(mat_G_a, mat_G_a_gga, 2.0));
+            auto partial_mat_Vxc_b = denblas::serialMultABt(mat_chi, denblas::serialAddAB(mat_G_b, mat_G_b_gga, 2.0));
 
-            omp_partial_mat_Vxc_a.symmetrizeAndScale(0.5);
-            omp_partial_mat_Vxc_b.symmetrizeAndScale(0.5);
+            partial_mat_Vxc_a.symmetrizeAndScale(0.5);
+            partial_mat_Vxc_b.symmetrizeAndScale(0.5);
 
             omptimers[thread_id].stop("Vxc matmul and symm.");
 
@@ -636,28 +636,28 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
 #pragma omp critical
             {
-                denblas::serialInPlaceAddAB(omp_sum_mat_Vxc_a, omp_partial_mat_Vxc_a);
-                denblas::serialInPlaceAddAB(omp_sum_mat_Vxc_b, omp_partial_mat_Vxc_b);
+                denblas::serialInPlaceAddAB(sum_partial_mat_Vxc_a, partial_mat_Vxc_a);
+                denblas::serialInPlaceAddAB(sum_partial_mat_Vxc_b, partial_mat_Vxc_b);
             }
 
             omptimers[thread_id].stop("Vxc local matrix dist.");
 
             omptimers[thread_id].start("XC energy and num. elec.");
 
-            double omp_nele = 0.0, omp_xcene = 0.0;
+            double local_nele = 0.0, local_xcene = 0.0;
 
             for (int g = 0; g < grid_batch_size; g++)
             {
-                auto rho_total = omp_rho[2 * g + 0] + omp_rho[2 * g + 1];
+                auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
 
-                omp_nele += omp_local_weights[g] * rho_total;
+                local_nele += local_weights[g] * rho_total;
 
-                omp_xcene += omp_local_weights[g] * omp_exc[g] * rho_total;
+                local_xcene += local_weights[g] * exc[g] * rho_total;
             }
 
-            nele += omp_nele;
+            nele += local_nele;
 
-            xcene += omp_xcene;
+            xcene += local_xcene;
 
             omptimers[thread_id].stop("XC energy and num. elec.");
         }
@@ -666,7 +666,7 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
         timer.start("Vxc matrix dist.");
 
-        dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, omp_sum_mat_Vxc_a, omp_sum_mat_Vxc_b, aoinds);
+        dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, sum_partial_mat_Vxc_a, sum_partial_mat_Vxc_b, aoinds);
 
         timer.stop("Vxc matrix dist.");
     }
@@ -763,101 +763,6 @@ integratePartialVxcFockForGGA(const double*       weights,
     timer.stop("Vxc matrix matmul");
 
     return mat_Vxc;
-}
-
-auto
-integratePartialVxcFockForGGAOpenShell(const double*       weights,
-                                       const CDenseMatrix& gtoValues,
-                                       const CDenseMatrix& gtoValuesX,
-                                       const CDenseMatrix& gtoValuesY,
-                                       const CDenseMatrix& gtoValuesZ,
-                                       const double*       rhograd,
-                                       const double*       vrho,
-                                       const double*       vsigma,
-                                       CMultiTimer&        timer) -> std::vector<CDenseMatrix>
-{
-    const auto npoints = gtoValues.getNumberOfColumns();
-
-    // eq.(30), JCTC 2021, 17, 1512-1521
-
-    timer.start("Vxc matrix G");
-
-    auto naos = gtoValues.getNumberOfRows();
-
-    CDenseMatrix mat_G_a(naos, npoints);
-    CDenseMatrix mat_G_b(naos, npoints);
-
-    CDenseMatrix mat_G_a_gga(naos, npoints);
-    CDenseMatrix mat_G_b_gga(naos, npoints);
-
-    auto G_a_val = mat_G_a.values();
-    auto G_b_val = mat_G_b.values();
-
-    auto G_a_gga_val = mat_G_a_gga.values();
-    auto G_b_gga_val = mat_G_b_gga.values();
-
-    auto chi_val = gtoValues.values();
-
-    auto chi_x_val = gtoValuesX.values();
-    auto chi_y_val = gtoValuesY.values();
-    auto chi_z_val = gtoValuesZ.values();
-
-#pragma omp parallel
-    {
-        auto thread_id = omp_get_thread_num();
-
-        auto nthreads = omp_get_max_threads();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
-        for (int nu = 0; nu < naos; nu++)
-        {
-            auto nu_offset = nu * npoints;
-
-#pragma omp simd
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-            {
-                auto vxa = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
-                auto vya = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
-                auto vza = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
-
-                auto vxb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 3] + vsigma[3 * g + 1] * rhograd[6 * g + 0];
-                auto vyb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 4] + vsigma[3 * g + 1] * rhograd[6 * g + 1];
-                auto vzb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 5] + vsigma[3 * g + 1] * rhograd[6 * g + 2];
-
-                G_a_val[nu_offset + g] = weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
-                G_b_val[nu_offset + g] = weights[g] * vrho[2 * g + 1] * chi_val[nu_offset + g];
-
-                G_a_gga_val[nu_offset + g] =
-                    weights[g] * (vxa * chi_x_val[nu_offset + g] + vya * chi_y_val[nu_offset + g] + vza * chi_z_val[nu_offset + g]);
-                G_b_gga_val[nu_offset + g] =
-                    weights[g] * (vxb * chi_x_val[nu_offset + g] + vyb * chi_y_val[nu_offset + g] + vzb * chi_z_val[nu_offset + g]);
-            }
-        }
-    }
-
-    timer.stop("Vxc matrix G");
-
-    // eq.(31), JCTC 2021, 17, 1512-1521
-
-    // Note that we use matrix-matrix multiplication only once, and symmetrize
-    // the result. This is because the density matrix is symmetric, and the
-    // Kohn-Sham matrix from mat_G is also symmetric. Formally only the
-    // mat_G_gga contribution should be symmetrized.
-
-    timer.start("Vxc matrix matmul");
-
-    auto mat_Vxc_a = denblas::multABt(gtoValues, denblas::addAB(mat_G_a, mat_G_a_gga, 2.0));
-    auto mat_Vxc_b = denblas::multABt(gtoValues, denblas::addAB(mat_G_b, mat_G_b_gga, 2.0));
-
-    mat_Vxc_a.symmetrizeAndScale(0.5);
-    mat_Vxc_b.symmetrizeAndScale(0.5);
-
-    timer.stop("Vxc matrix matmul");
-
-    return std::vector<CDenseMatrix>{mat_Vxc_a, mat_Vxc_b};
 }
 
 auto
