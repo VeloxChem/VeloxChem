@@ -42,14 +42,13 @@ namespace xcintgga {  // xcintgga namespace
 
 /**
  Integrates first-order GGA exchange-correlation functional contribution to
- AO Kohn-Sham matrix.
+ closed-shell AO Kohn-Sham matrix.
 
  @param molecule the molecule.
  @param basis the molecular basis.
  @param gsDensityPointers the pointers to AO density matrices.
  @param molecularGrid the molecular grid.
  @param xcFunctional the exchange-correlation functional.
- @param flag the flag for closed/open shell.
  @return the AO Kohn-Sham matrix.
  */
 auto integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
@@ -59,6 +58,17 @@ auto integrateVxcFockForGgaClosedShell(const CMolecule&                  molecul
                                        const double                      screeningThresholdForGTOValues,
                                        const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
 
+/**
+ Integrates first-order GGA exchange-correlation functional contribution to
+ open-shell AO Kohn-Sham matrix.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param gsDensityPointers the pointers to AO density matrices.
+ @param molecularGrid the molecular grid.
+ @param xcFunctional the exchange-correlation functional.
+ @return the AO Kohn-Sham matrix.
+ */
 auto integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
                                      const CMolecularBasis&            basis,
                                      const std::vector<const double*>& gsDensityPointers,
@@ -92,7 +102,7 @@ auto integratePartialVxcFockForGGA(const double*       weights,
 
 /**
  Integrates second-order GGA exchange-correlation functional contribution
- to AO Fock matrix.
+ to closed-shell AO Fock matrix.
 
  @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
@@ -103,14 +113,14 @@ auto integratePartialVxcFockForGGA(const double*       weights,
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
  */
-auto integrateFxcFockForGGA(const std::vector<double*>&       aoFockPointers,
-                            const CMolecule&                  molecule,
-                            const CMolecularBasis&            basis,
-                            const std::vector<const double*>& rwDensityPointers,
-                            const std::vector<const double*>& gsDensityPointers,
-                            const CMolecularGrid&             molecularGrid,
-                            const double                      screeningThresholdForGTOValues,
-                            const CXCFunctional&              xcFunctional) -> void;
+auto integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointers,
+                                       const CMolecule&                  molecule,
+                                       const CMolecularBasis&            basis,
+                                       const std::vector<const double*>& rwDensityPointers,
+                                       const std::vector<const double*>& gsDensityPointers,
+                                       const CMolecularGrid&             molecularGrid,
+                                       const double                      screeningThresholdForGTOValues,
+                                       const CXCFunctional&              xcFunctional) -> void;
 
 /**
  Integrates third-order GGA exchange-correlation functional contribution
