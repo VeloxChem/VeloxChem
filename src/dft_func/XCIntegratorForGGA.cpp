@@ -805,21 +805,21 @@ integrateFxcFockForGGA(const std::vector<double*>&       aoFockPointers,
 
     std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
 
-    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(max_npoints_per_box));
+    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_rhow_data(nthreads, std::vector<double>(dim->rho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_rhowgrad_data(nthreads, std::vector<double>(dim->rho * 3 * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_rhow_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhowgrad_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -884,7 +884,7 @@ integrateFxcFockForGGA(const std::vector<double*>&       aoFockPointers,
 
         auto sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
 
-        std::vector<CDenseMatrix> rw_sub_dens_mat_vec(nthreads);
+        std::vector<CDenseMatrix> rw_sub_dens_mat_vec(rwDensityPointers.size());
 
         for (size_t idensity = 0; idensity < rwDensityPointers.size(); idensity++)
         {
@@ -897,7 +897,7 @@ integrateFxcFockForGGA(const std::vector<double*>&       aoFockPointers,
 
         timer.start("OMP Fxc calc.");
 
-        std::vector<CDenseMatrix> sum_partial_mat_Fxc(nthreads, CDenseMatrix(aocount, aocount));
+        std::vector<CDenseMatrix> sum_partial_mat_Fxc(rwDensityPointers.size(), CDenseMatrix(aocount, aocount));
 
 #pragma omp parallel
         {
