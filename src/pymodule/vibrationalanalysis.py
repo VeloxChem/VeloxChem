@@ -51,6 +51,9 @@ from .sanitychecks import raman_sanity_check
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+
 
 class VibrationalAnalysis:
     """
@@ -999,3 +1002,317 @@ class VibrationalAnalysis:
         hf.close()
 
         return True
+
+
+
+
+    # Mathieu import for plotting, info and animation of vibrational analysis
+
+    def ir(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
+        """
+        Plot a IR spectrum.
+
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value to use in eV.
+        :param ax:
+            A Matplotlib axis object.
+        :param scaling_factor:
+            A scaling factor for the frequencies.
+                        
+        :return:
+            A Matplotlib axis object.
+        """
+        
+        vib_results = self._results
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+    # IR unit km/mol
+    # raman unit   A**4/amu
+
+        ax.set_xlabel('Wavenumber [cm$^{-1}$]')
+        ax.set_ylabel('$\epsilon$ [mol$^{-1}$ cm$^{-1}$]')
+        ax.set_title("IR Spectrum")
+
+        freqs = vib_results['vib_frequencies']
+        ir_ints = vib_results['ir_intensities']
+        if broadening_type == 'lorentzian':
+            x, y = self.lorentzian(freqs, ir_ints, 0, 4000, 1, broadening_value)
+        elif broadening_type == 'gaussian':
+            x, y = self.gaussian(freqs, ir_ints, 0, 4000, 1, broadening_value)
+        
+        ax.plot(x*scaling_factor, y*0.00001,  color="black", alpha= 0.9, linewidth=2.5)
+        
+        legend_bars = mlines.Line2D([], [], color='darkcyan', alpha=0.7, linewidth=2, label='IR intensity')
+        label_spectrum = str(broadening_type)+" broadening "+ str(broadening_value)+" cm$^{-1}$"
+        legend_spectrum = mlines.Line2D([], [], color='black', linestyle='-',linewidth=2.5,  label= label_spectrum)
+        scaling = str(scaling_factor)
+        legend_scaling = mlines.Line2D([], [],  color='white', linestyle='-', alpha=0.0001, label= "Scaling factor: "+scaling)
+        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
+        ax.set_ylim(0, max(y*0.00001)*1.1)
+        ax.set_ylim(bottom=0)
+        
+        
+        ax2 = ax.twinx()
+        ax2.set_ylabel('IR intensity [km/mol]')
+        
+        for i in np.arange(len(vib_results['vib_frequencies'])):
+            ax2.plot(
+                [scaling_factor * vib_results['vib_frequencies'][i], scaling_factor*vib_results['vib_frequencies'][i]],
+                [0.0, vib_results['ir_intensities'][i]],
+                alpha=0.7, linewidth=2,
+                color="darkcyan",
+            ) 
+        
+
+        ax2.set_ylim(bottom=0)
+        
+        
+        return ax
+
+    def raman(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
+        """
+        Plot a raman spectrum.
+
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value to use in eV.
+        :param ax:
+            A Matplotlib axis object.
+        :param scaling_factor:
+            A scaling factor for the frequencies.
+
+                        
+        :return:
+            A Matplotlib axis object.
+        """
+                
+        vib_results = self._results
+        
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+        
+        ax.set_xlabel('Wavenumber [cm$^{-1}$]')
+        ax.set_ylabel('$\epsilon$ [mol$^{-1}$ cm$^{-1}$]')
+        ax.set_title("Raman Spectrum")
+
+
+        freqs = vib_results['vib_frequencies']
+        raman_ints = vib_results['raman_intensities'][0]
+        if broadening_type == 'lorentzian':
+            x, y = self.lorentzian(freqs, raman_ints, 0, 4000, 1, broadening_value)
+        elif broadening_type == 'gaussian':
+            x, y = self.gaussian(freqs, raman_ints, 0, 4000, 1, broadening_value)
+        
+        ax.plot(x*scaling_factor, y*6.0220E-09,  color="black", alpha= 0.9, linewidth=2.5)
+        
+        legend_bars = mlines.Line2D([], [], color='darkcyan', alpha=0.7, linewidth=2, label='Raman intensity')
+        label_spectrum = str(broadening_type)+" broadening "+ str(broadening_value)+" cm$^{-1}$"
+        legend_spectrum = mlines.Line2D([], [], color='black', linestyle='-',linewidth=2.5,  label= label_spectrum)
+        scaling = str(scaling_factor)
+        legend_scaling = mlines.Line2D([], [],  color='white', linestyle='-', alpha=0.0001, label= "Scaling factor: "+scaling)
+        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
+        ax.set_ylim(0, max(y*6.0220E-09)*1.1)
+        ax.set_ylim(bottom=0)
+        
+        ax2 = ax.twinx()
+        ax2.set_ylabel('Raman intensity [A$^4$/amu]')
+        
+        for i in np.arange(len(vib_results['vib_frequencies'])):
+            ax2.plot(
+                [scaling_factor * vib_results['vib_frequencies'][i], scaling_factor*vib_results['vib_frequencies'][i]],
+                [0.0, vib_results['raman_intensities'][0][i]],
+                alpha=0.7, linewidth=2,
+                color="darkcyan",
+            ) 
+        
+
+        ax2.set_ylim(bottom=0)
+        
+        return ax
+
+    def plot(self, broadening_type='lorentzian', broadening_value=20, plot_type='ir',  scaling_factor=1.0):
+        """
+        Plot vibrational analysis results.
+
+        :param vib_results:
+            The vibrational results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value to use in eV.
+        :param plot_type:
+            The type of plot to make. Either 'ir', 'raman', or 'vibrational'.
+        :param scaling_factor:
+            A scaling factor for the frequencies.
+                       
+        :return:
+            A Matplotlib axis object.
+        """
+
+        vib_results = self._results
+        if plot_type == 'ir':
+            x = self.ir(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
+        elif plot_type == 'raman':
+            x = self.raman(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
+        elif plot_type == 'vibrational':
+            fig, axs = plt.subplots(2, 1,figsize=(8, 10))
+            fig.subplots_adjust(hspace=0.3)  # Increase the height space between subplots
+            self.ir(broadening_type=broadening_type,broadening_value=broadening_value, ax=axs[0], scaling_factor=scaling_factor)
+            self.raman(broadening_type=broadening_type, broadening_value=broadening_value, ax=axs[1], scaling_factor=scaling_factor)
+        else:
+            print("Invalid plot type")
+            return None
+        plt.show()
+        return None
+
+    def info(self, type='ir'):
+        """
+        Print information about the vibrational analysis.
+
+        :param type:
+            The type of information to print. Either 'ir', 'raman', or 'vibrational'.
+
+        :return:
+            None
+
+
+        """
+        vib_results = self._results
+        # get the first line of the molecule_xyz_string
+        print("Number of atoms: " + vib_results['molecule_xyz_string'].split('\n')[0])
+        print("Number of normal modes: " + str(len(vib_results['normal_modes'])))
+        print()
+        if type == 'ir':
+            print("3 modes with the highest IR intensity:")
+            print("Mode  Frequency [cm^-1]  Intensity [km/mol]")
+            if vib_results['ir_intensities'] is None:
+                print("No IR intensities available")
+                return None
+            # sort the intensities
+            sorted_indices = np.argsort(vib_results['ir_intensities'])
+            for i in range(1, 4):
+                idx = sorted_indices[-i]
+                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['ir_intensities'][idx]:10.2f}")
+        elif type == 'raman':
+            if vib_results['raman_intensities'] is None:
+                print("No Raman intensities available")
+                return None        
+            print("3 modes with the highest raman intensity:")
+            print("Mode  Frequency [cm^-1]  Intensity [A^4/amu]")
+
+            # sort the intensities
+            sorted_indices = np.argsort(vib_results['raman_intensities'][0])
+            for i in range(1, 4):
+                idx = sorted_indices[-i]
+                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['raman_intensities'][0][idx]:10.2f}")
+        
+        elif type == 'vibrational':
+            print("3 modes with the highest IR intensity:")
+            print("Mode  Frequency [cm^-1]  Intensity [km/mol]")
+            if vib_results['ir_intensities'] is None:
+                print("No IR intensities available")
+                return None
+            if vib_results['raman_intensities'] is None:
+                print("No Raman intensities available")
+                return None
+            if vib_results['raman_intensities'] and vib_results['ir_intensities'] is None:
+                print("No Raman and IR intensities available")
+                return None
+            # sort the intensities
+            sorted_indices = np.argsort(vib_results['ir_intensities'])
+            for i in range(1, 4):
+                idx = sorted_indices[-i]
+                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['ir_intensities'][idx]:10.2f}")
+
+            print()
+            print("3vdrvir modes with the highest raman intensity:")
+            print("Mode  Frequency [cm^-1]  Intensity [A^4/amu]")
+
+            # sort the intensities
+            sorted_indices = np.argsort(vib_results['raman_intensities'][0])
+            for i in range(1, 4):
+                idx = sorted_indices[-i]
+                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['raman_intensities'][0][idx]:10.2f}")
+        else:
+            print("Invalid type")
+            return None
+        
+    def animate(self, mode=1, frames=15, amplitude=0.5, width=300, height=300):
+        """
+        Animate a normal mode.
+
+        :param mode:
+            The normal mode to animate.
+        :param frames:
+            The number of frames to use in the animation.
+        :param amplitude:
+            The amplitude of the vibration.
+        :param width:
+            The width of the animation.
+        :param height:
+            The height of the animation.
+
+        :return:
+            None
+
+        """
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            print("Please install the py3Dmol library to use this function")
+            return None
+        vib_results = self._results
+            
+        xyz = vib_results['molecule_xyz_string']
+        if mode > len(vib_results['normal_modes']):
+            print(f"Your asking to animate the "+ str(mode)+"th mode but the molecule only has " + str(len(vib_results['normal_modes']))+ " normal modes.")
+            return None
+        nm = vib_results['normal_modes'][mode-1]
+
+        xyz_lines = xyz.strip().split('\n')
+        nm_reshaped = nm.reshape(-1, 3)
+        for i in range(2, len(xyz_lines)):
+            # Split the line into its components
+            components = xyz_lines[i].split()
+        
+            # Add the displacement values
+            for j in range(3):
+                components.append(f"{nm_reshaped[i-2][j]:.6f}")
+        
+            # Join the components back into a string
+            xyz_lines[i] = ' '.join(components)
+
+        # Join the lines back into a single string
+        vib_xyz = '\n'.join(xyz_lines)
+
+        view = p3d.view(width=width, height=height)
+        view.addModel(vib_xyz, "xyz", {"vibrate": {"frames": frames, "amplitude": amplitude}})
+        view.setViewStyle({"style": "outline", "width": 0.05})
+        view.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+        view.animate({"loop": "backAndForth"})
+        view.rotate(-90, "x")
+        view.zoomTo()
+        view.show()
+
+    def lorentzian(self, x, y, xmin, xmax, xstep, br):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = (
+                    yi[i]
+                    + y[k] * br / ((xi[i] - x[k]) ** 2 + (br / 2.0) ** 2) / np.pi
+                )
+        return xi, yi
+
+    def gaussian(self, x, y, xmin, xmax, xstep, br):
+        br = br / np.sqrt(4*2*np.log(2))
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(y)):
+                yi[i] = yi[i] + y[k] * np.e ** (-((xi[i] - x[k]) ** 2) / (2 * br ** 2))
+        return xi, yi
