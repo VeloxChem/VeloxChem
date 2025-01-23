@@ -113,40 +113,6 @@ auto integrateFxcFockForGGA(const std::vector<double*>&       aoFockPointers,
                             const CXCFunctional&              xcFunctional) -> void;
 
 /**
- Integrates GGA contribution to (second-order) Fxc matrix.
-
- @param xcFunctional the exchange-correlation functional.
- @param weights the weights of grid points.
- @param gtoValues the GTO values on grid points.
- @param gtoValuesX the GTO gradient X values on grid points.
- @param gtoValuesY the GTO gradient Y values on grid points.
- @param gtoValuesZ the GTO gradient Z values on grid points.
- @param rhow the pointer to perturbed density.
- @param rhograd the pointer to density gradient.
- @param rhowgrad the pointer to perturbed density gradient.
- @param v2rho2 the 2nd-order functional derivative wrt density.
- @param v2rhosigma the 2nd-order functional derivative wrt density and
-        density gradient.
- @param v2sigma2 the 2nd-order functional derivative wrt density gradient.
- @param timer the timer.
- @return the contribution as a CDenseMatrix object.
- */
-auto integratePartialFxcFockForGGA(const CXCFunctional& xcFunctional,
-                                   const double*        weights,
-                                   const CDenseMatrix&  gtoValues,
-                                   const CDenseMatrix&  gtoValuesX,
-                                   const CDenseMatrix&  gtoValuesY,
-                                   const CDenseMatrix&  gtoValuesZ,
-                                   const double*        rhow,
-                                   const double*        rhograd,
-                                   const double*        rhowgrad,
-                                   const double*        vsigma,
-                                   const double*        v2rho2,
-                                   const double*        v2rhosigma,
-                                   const double*        v2sigma2,
-                                   CMultiTimer&         timer) -> CDenseMatrix;
-
-/**
  Integrates third-order GGA exchange-correlation functional contribution
  to AO Fock matrix.
 
