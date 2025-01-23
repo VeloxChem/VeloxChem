@@ -44,6 +44,8 @@ auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> 
 
 auto serialAddAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix;
 
+auto serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> void;
+
 /**
  Computes matrix multiplication: A * B^T.
 

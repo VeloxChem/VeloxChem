@@ -173,7 +173,11 @@ integrateVxcFockForGGA(const CMolecule&                  molecule,
 
         // GTO values on grid points
 
-        timer.start("OMP GTO evaluation");
+        timer.start("OMP Vxc calc.");
+
+        CDenseMatrix omp_sum_mat_Vxc(aocount, aocount);
+
+        omp_sum_mat_Vxc.zero();
 
 #pragma omp parallel reduction(+ : nele, xcene)
         {
@@ -233,6 +237,8 @@ integrateVxcFockForGGA(const CMolecule&                  molecule,
 
             omptimers[thread_id].stop("gtoeval");
 
+            omptimers[thread_id].start("Generate density grid");
+
             auto omp_local_weights = omp_local_weights_data[thread_id].data();
 
             auto omp_rho     = omp_rho_data[thread_id].data();
@@ -245,9 +251,21 @@ integrateVxcFockForGGA(const CMolecule&                  molecule,
 
             dengridgen::serialGenerateDensityForGGA(omp_rho, omp_rhograd, omp_sigma, omp_mat_chi, omp_mat_chi_x, omp_mat_chi_y, omp_mat_chi_z, sub_dens_mat);
 
+            omptimers[thread_id].stop("Generate density grid");
+
+            omptimers[thread_id].start("XC functional eval.");
+
             omp_xcfuncs[thread_id].compute_exc_vxc_for_gga(grid_batch_size, omp_rho, omp_sigma, omp_exc, omp_vrho, omp_vsigma);
 
+            omptimers[thread_id].stop("XC functional eval.");
+
+            omptimers[thread_id].start("Copy grid weights");
+
             std::memcpy(omp_local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
+
+            omptimers[thread_id].stop("Copy grid weights");
+
+            omptimers[thread_id].start("Vxc matrix G");
 
             CDenseMatrix omp_mat_G(aocount, grid_batch_size);
             CDenseMatrix omp_mat_G_gga(aocount, grid_batch_size);
@@ -278,12 +296,24 @@ integrateVxcFockForGGA(const CMolecule&                  molecule,
                 }
             }
 
+            omptimers[thread_id].stop("Vxc matrix G");
+
+            omptimers[thread_id].start("Vxc matmul and symm.");
+
             auto omp_partial_mat_Vxc = denblas::serialMultABt(omp_mat_chi, denblas::serialAddAB(omp_mat_G, omp_mat_G_gga, 2.0));
 
             omp_partial_mat_Vxc.symmetrizeAndScale(0.5);
 
+            omptimers[thread_id].stop("Vxc matmul and symm.");
+
+            omptimers[thread_id].start("Vxc local matrix dist.");
+
 #pragma omp critical
-            dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, omp_partial_mat_Vxc, aoinds);
+            denblas::serialInPlaceAddAB(omp_sum_mat_Vxc, omp_partial_mat_Vxc);
+
+            omptimers[thread_id].stop("Vxc local matrix dist.");
+
+            omptimers[thread_id].start("XC energy and num. elec.");
 
             double omp_nele = 0.0, omp_xcene = 0.0;
 
@@ -299,9 +329,17 @@ integrateVxcFockForGGA(const CMolecule&                  molecule,
             nele += omp_nele;
 
             xcene += omp_xcene;
+
+            omptimers[thread_id].stop("XC energy and num. elec.");
         }
 
-        timer.stop("OMP GTO evaluation");
+        timer.stop("OMP Vxc calc.");
+
+        timer.start("Vxc matrix dist.");
+
+        dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, omp_sum_mat_Vxc, aoinds);
+
+        timer.stop("Vxc matrix dist.");
     }
 
     mat_Vxc.setNumberOfElectrons(nele);
@@ -313,6 +351,12 @@ integrateVxcFockForGGA(const CMolecule&                  molecule,
     // std::cout << "Timing of new integrator" << std::endl;
     // std::cout << "------------------------" << std::endl;
     // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "OpenMP timing" << std::endl;
+    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "Thread " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
 
     return mat_Vxc;
 }

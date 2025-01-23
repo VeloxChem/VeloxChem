@@ -187,6 +187,28 @@ serialAddAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const doub
 }
 
 auto
+serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> void
+{
+    auto narow = matrixA.getNumberOfRows();
+    auto nacol = matrixA.getNumberOfColumns();
+
+    auto nbrow = matrixB.getNumberOfRows();
+    auto nbcol = matrixB.getNumberOfColumns();
+
+    errors::assertMsgCritical((narow == nbrow) && (nacol == nbcol),
+                              "denblas::serialInPlaceAddAB: Inconsistent sizes in matrix addition");
+
+    auto A = matrixA.values();
+    auto B = matrixB.values();
+
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, narow, nacol);
+
+    ematA += ematB;
+}
+
+auto
 multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
