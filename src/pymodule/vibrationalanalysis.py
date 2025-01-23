@@ -1015,7 +1015,7 @@ class VibrationalAnalysis:
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
-            The broadening value to use in eV.
+            The broadening value to use in cm^-1.
         :param ax:
             A Matplotlib axis object.
         :param scaling_factor:
@@ -1078,7 +1078,7 @@ class VibrationalAnalysis:
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
-            The broadening value to use in eV.
+            The broadening value to use in cm^-1.
         :param ax:
             A Matplotlib axis object.
         :param scaling_factor:
@@ -1142,7 +1142,7 @@ class VibrationalAnalysis:
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
-            The broadening value to use in eV.
+            The broadening value to use in cm^-1.
         :param plot_type:
             The type of plot to make. Either 'ir', 'raman', or 'vibrational'.
         :param scaling_factor:
