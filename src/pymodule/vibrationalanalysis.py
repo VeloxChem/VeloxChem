@@ -1006,9 +1006,9 @@ class VibrationalAnalysis:
 
 
 
-    # Mathieu import for plotting, info and animation of vibrational analysis
+    # Mathieu for plotting, info and animation of vibrational analysis
 
-    def ir(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
+    def plot_ir(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
         """
         Plot a IR spectrum.
 
@@ -1052,7 +1052,7 @@ class VibrationalAnalysis:
         ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
         ax.set_ylim(0, max(y*0.00001)*1.1)
         ax.set_ylim(bottom=0)
-        
+        ax.set_xlim(0, 3900)
         
         ax2 = ax.twinx()
         ax2.set_ylabel('IR intensity [km/mol]')
@@ -1071,7 +1071,7 @@ class VibrationalAnalysis:
         
         return ax
 
-    def raman(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
+    def plot_raman(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
         """
         Plot a raman spectrum.
 
@@ -1116,7 +1116,7 @@ class VibrationalAnalysis:
         ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
         ax.set_ylim(0, max(y*6.0220E-09)*1.1)
         ax.set_ylim(bottom=0)
-        
+        ax.set_xlim(0, 3900)
         ax2 = ax.twinx()
         ax2.set_ylabel('Raman intensity [A$^4$/amu]')
         
@@ -1154,14 +1154,14 @@ class VibrationalAnalysis:
 
         vib_results = self._results
         if plot_type == 'ir':
-            x = self.ir(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
+            x = self.plot_ir(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
         elif plot_type == 'raman':
-            x = self.raman(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
+            x = self.plot_raman(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
         elif plot_type == 'vibrational':
             fig, axs = plt.subplots(2, 1,figsize=(8, 10))
             fig.subplots_adjust(hspace=0.3)  # Increase the height space between subplots
-            self.ir(broadening_type=broadening_type,broadening_value=broadening_value, ax=axs[0], scaling_factor=scaling_factor)
-            self.raman(broadening_type=broadening_type, broadening_value=broadening_value, ax=axs[1], scaling_factor=scaling_factor)
+            self.plot_ir(broadening_type=broadening_type,broadening_value=broadening_value, ax=axs[0], scaling_factor=scaling_factor)
+            self.plot_raman(broadening_type=broadening_type, broadening_value=broadening_value, ax=axs[1], scaling_factor=scaling_factor)
         else:
             print("Invalid plot type")
             return None

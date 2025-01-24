@@ -28,6 +28,8 @@ from copy import deepcopy
 import numpy as np
 import time as tm
 import sys
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 
 from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import XCFunctional, MolecularGrid
@@ -90,6 +92,9 @@ class LinearResponseEigenSolver(LinearSolver):
         super().__init__(comm, ostream)
 
         self.nstates = 3
+        
+        # Mathieu: I added the following attributes to the class
+        self._results = {}
 
         self.core_excitation = False
         self.num_core_orbitals = 0
@@ -740,7 +745,8 @@ class LinearResponseEigenSolver(LinearSolver):
                         self.ostream.print_blank()
 
                     self._print_results(ret_dict)
-
+                    # Mathieu : I added the following line
+                    self._results = ret_dict
                     return ret_dict
                 else:
                     return {
@@ -769,7 +775,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     'excitation_details': excitation_details,
                     'electric_transition_dipoles': elec_trans_dipoles,
                 }
-
+                # Mathieu : I added the following line
+                self._results = ret_dict
                 return ret_dict
 
         return None
@@ -1145,6 +1152,239 @@ class LinearResponseEigenSolver(LinearSolver):
 
         return new_rsp_drv
 
+    # Mathieu for plotting
+
+    def plot_uv(self, broadening_type="lorentzian", broadening_value=0.123, ax=None):
+        """
+        Plot the UV spectrum from the response calculation.
+
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+
+        :return:
+            The matplotlib axis.
+    
+        """  
+        
+        rpa_results = self._results
+      
+      
+        ev_to_nm = 1239.84193
+        au2ev = 27.211386
+        ev2au = 1/au2ev
+
+        # initialize the plot
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+        
+        ax.set_xlabel('Wavelength [nm]')
+        ax.set_ylabel('$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
+        
+        ax.set_title("Absorption Spectrum")
+
+        x = (rpa_results['eigenvalues'])
+        y = rpa_results['oscillator_strengths']
+        xmin = min(x) - 0.03
+        xmax = max(x) + 0.03
+        xstep = 0.0001
+
+
+        ax2 = ax.twinx()
+            
+        for i in np.arange(len(rpa_results['eigenvalues'])):
+            ax2.plot(
+                [ev_to_nm/(rpa_results['eigenvalues'][i] * au2ev), 
+                ev_to_nm/(rpa_results['eigenvalues'][i] * au2ev)] ,
+                [0.0, rpa_results['oscillator_strengths'][i]],
+                alpha=0.7, linewidth=2,
+                color="darkcyan",
+            )
+        c = 137.035999
+        NA=6.02214076e23
+        a_0= 5.29177210903e-11
+        
+        if broadening_type == "lorentzian":
+            xi, yi = self.lorentzian(x, y, xmin, xmax, xstep, broadening_value*ev2au)
+        
+
+        elif broadening_type == "gaussian":
+            xi, yi = self.gaussian(x, y, xmin, xmax, xstep, broadening_value*ev2au)
+    
+        sigma = (2*np.pi*np.pi*xi*yi) / c
+        sigma_m2 = sigma * a_0**2
+        sigma_cm2 = sigma_m2 * 10**4
+        epsilon = sigma_cm2 * NA / (np.log(10)*10**3)
+        ax.plot(ev_to_nm/(xi*au2ev), epsilon, color="black", alpha= 0.9, linewidth=2.5)
+    
+
+        legend_bars = mlines.Line2D([], [], color='darkcyan', alpha=0.7, linewidth=2, label='Oscillator Strength')
+        label_spectrum = str(broadening_type)+" broadening "+ str(broadening_value)+" eV"
+        legend_spectrum = mlines.Line2D([], [], color='black', linestyle='-', linewidth=2.5, label= label_spectrum)
+        ax2.legend(handles=[legend_bars, legend_spectrum], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
+        ax2.set_ylim(0, max(abs(rpa_results['oscillator_strengths']))*1.1)
+        ax.set_ylim(0, max(epsilon)*1.1)
+        ax.set_ylim(bottom=0)
+        ax2.set_ylim(bottom=0)
+        ax2.set_ylabel("Oscillator Strength")
+        ax.set_xlim( ev_to_nm/(xmax*au2ev) ,ev_to_nm / (xmin*au2ev))
+
+        # plt.savefig("uv.png")
+        # plt.show()
+        return ax
+
+
+
+
+    def plot_ecd(self, broadening_type="lorentzian", broadening_value=0.123, ax=None):
+        """
+        Plot the ECD spectrum from the response calculation.
+
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        
+        :return:
+            The matplotlib axis.
+          
+
+        """
+        
+        
+        ev_to_nm = 1239.84193
+        au2ev = 27.211386
+        # initialize the plot
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+        ax.set_xlabel("Wavelength [nm]")
+        ax.set_title("ECD Spectrum")
+        ax.set_ylabel('$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
+        
+
+        rpa_results = self._results
+        ax2 = ax.twinx()
+        ax2.set_ylabel('Rotatory strength [10$^{-40}$ cgs]')
+        
+        for i in np.arange(len(rpa_results["eigenvalues"])):
+            ax2.plot(
+                [ev_to_nm/(rpa_results["eigenvalues"][i] * au2ev), 
+                ev_to_nm/(rpa_results["eigenvalues"][i] * au2ev)] ,
+                [0.0, rpa_results["rotatory_strengths"][i]],
+                alpha=0.7, linewidth=2,
+                color="darkcyan",
+            ) 
+        ax2.set_ylim(-max(abs(rpa_results["rotatory_strengths"]))*1.1, max(abs(rpa_results["rotatory_strengths"]))*1.1)
+
+        ax.axhline(y=0, marker=',', color='k', linestyle='-.', markersize=0, linewidth=0.2)
+        
+
+        
+        x = (rpa_results["eigenvalues"])* au2ev
+        y = rpa_results["rotatory_strengths"]
+        xmin = min(x) - 0.8
+        xmax = max(x) + 0.8
+        xstep = 0.003
+        
+        
+        
+
+        if broadening_type == "lorentzian":
+            xi, yi = self.lorentzian_ecd(x, y, xmin, xmax, xstep, broadening_value)
+    
+        elif broadening_type == "gaussian":
+            xi, yi = self.gaussian_ecd(x, y, xmin, xmax, xstep, broadening_value)
+            
+
+        yi = ((yi * xi )/(22.94*np.pi))
+
+        ax.set_ylim(-max(abs(yi))*1.1, max(abs(yi))*1.1)
+
+        ax.plot(ev_to_nm/xi, yi, color="black", alpha= 0.9, linewidth=2.5)
+        #ax.set_xlim(w_min, w_max)
+        ax.set_xlim(ev_to_nm/xmax , ev_to_nm/xmin)   
+        # iclude a legend for the bar and for the broadened spectrum
+        legend_bars = mlines.Line2D([], [], color='darkcyan', alpha=0.7, linewidth=2, label='Rotatory Strength')
+        label_spectrum = str(broadening_type)+" broadening "+ str(broadening_value)+" eV"
+        legend_spectrum = mlines.Line2D([], [], color='black', linestyle='-',linewidth=2.5,  label= label_spectrum)
+        ax.legend(handles=[legend_bars, legend_spectrum], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
+        
+        # plt.savefig("ecd.png")
+        # plt.show()
+        return ax
+    
+
+    def lorentzian(self,x, y, xmin, xmax, xstep, gamma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k]/x[k]*gamma / ((xi[i] - x[k]) ** 2 + gamma** 2)
+        yi = yi / np.pi
+        return xi, yi
+
+
+    def gaussian(self,x, y, xmin, xmax, xstep, sigma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k]/x[k] * np.exp(-((xi[i] - x[k]) ** 2) / (2 * sigma ** 2))
+        yi = yi / (sigma * np.sqrt(2 * np.pi))
+        return xi, yi
+
+    def lorentzian_ecd(self,x, y, xmin, xmax, xstep, gamma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k] * (gamma) / ((xi[i] - x[k]) ** 2 + (gamma) ** 2)
+        return xi, yi
+
+    def gaussian_ecd(self, x, y, xmin, xmax, xstep, sigma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k]) ** 2) / (2 * sigma ** 2))
+        yi =np.pi * yi / (sigma * np.sqrt(2 * np.pi))
+        return xi, yi
+
+    def plot(self, broadening_type="lorentzian", broadening_value=0.2 , plot_type="electronic"):
+        """
+        Plot the UV or ECD spectrum from the response calculation.
+        
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. Either 'uv', 'ecd' or 'electronic'.
+
+        :return:
+            None
+        """
+        rpa_results = self._results
+        if plot_type == "uv":
+            x = self.plot_uv(broadening_type=broadening_type, broadening_value=broadening_value)
+        elif plot_type == "ecd":
+            x = self.plot_ecd(broadening_type=broadening_type, broadening_value=broadening_value)
+        elif plot_type == "electronic":
+            fig, axs = plt.subplots(2, 1,figsize=(8, 10))
+            fig.subplots_adjust(hspace=0.3)  # Increase the height space between subplots
+            self.plot_uv(broadening_type=broadening_type, broadening_value=broadening_value, ax=axs[0])
+            self.plot_ecd(broadening_type=broadening_type, broadening_value=broadening_value, ax=axs[1])
+        else:
+            print("Invalid plot type")
+            return None
+        plt.show()
+        return None
+
     @staticmethod
     def get_absorption_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
         """
@@ -1296,3 +1536,6 @@ class LinearResponseEigenSolver(LinearSolver):
         spectrum['y_data'] = y_data
 
         return spectrum
+
+
+
