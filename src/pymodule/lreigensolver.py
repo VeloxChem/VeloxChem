@@ -1355,7 +1355,7 @@ class LinearResponseEigenSolver(LinearSolver):
         yi =np.pi * yi / (sigma * np.sqrt(2 * np.pi))
         return xi, yi
 
-    def plot(self, broadening_type="lorentzian", broadening_value=0.2 , plot_type="electronic"):
+    def plot(self, broadening_type="lorentzian", broadening_value=0.123 , plot_type="electronic"):
         """
         Plot the UV or ECD spectrum from the response calculation.
         
