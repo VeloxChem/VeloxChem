@@ -22,6 +22,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import time as tm
 import sys
@@ -185,8 +186,9 @@ class CphfSolver(LinearSolver):
         # checkpoint info
         if (self.checkpoint_file is not None and
                 self.checkpoint_file.endswith('.rsp.h5')):
-            self.checkpoint_file = self.checkpoint_file.replace(
-                '.rsp.h5', '.orbrsp.h5')
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -1171,8 +1173,9 @@ class CphfSolver(LinearSolver):
 
         if (self.checkpoint_file is not None and
                 self.checkpoint_file.endswith('.rsp.h5')):
-            self.checkpoint_file = self.checkpoint_file.replace(
-                '.rsp.h5', '.orbrsp.h5')
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
 
         t0 = tm.time()
 

@@ -266,7 +266,7 @@ class OptimizationDriver:
             fpath = Path(base_fname)
             fpath = fpath.with_name(f'{fpath.stem}_scf{fpath.suffix}')
             fpath = fpath.with_suffix('.h5')
-            self.grad_drv.scf_driver.checkpoint_file = fpath.as_posix()
+            self.grad_drv.scf_driver.checkpoint_file = str(fpath)
 
         if self.rank == mpi_master() and self.keep_files:
             filename = base_fname
