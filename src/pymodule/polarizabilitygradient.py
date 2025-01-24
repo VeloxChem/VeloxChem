@@ -357,6 +357,14 @@ class PolarizabilityGradient:
                 # TODO compute from orbsrsp cphf_ov dist. array
                 lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
+                # NOTE WIP
+                lambda_ao_from_dist = np.array([
+                    np.linalg.multi_dot([mo_occ, cphf_ov[x, y], mo_vir.T])
+                    for x in range(dof) for y in range(x, dof)
+                ])
+                lambda_ao_from_dist += lambda_ao_from_dist.transpose(0, 1, 3, 2)
+                print('compare lambdas')
+                print(np.abs(lambda_ao - lambda_ao_from_dist))
 
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
@@ -376,6 +384,7 @@ class PolarizabilityGradient:
             rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
 
             # initiate polarizability gradient variable with data type set in init()
+            # TODO distributed ?
             pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
             # kinetic energy gradient driver
@@ -401,6 +410,7 @@ class PolarizabilityGradient:
 
                     # loop over operator components
                     for x, y in xy_pairs:
+                        # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 np.linalg.multi_dot([ # xymn,amn->xya
                                     2.0 * rel_dm_ao[x, y].reshape(nao**2),
@@ -421,6 +431,7 @@ class PolarizabilityGradient:
                     gmat_ovlp += gmat_ovlp.T
                     # loop over operator components
                     for x, y in xy_pairs:
+                        # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
                                 2.0 * omega_ao[x, y].reshape(nao**2),
@@ -454,6 +465,7 @@ class PolarizabilityGradient:
                 for icoord in range(3):
                     # loop over operator components
                     for x, y in xy_pairs:
+                        # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
                                     x_minus_y[x].reshape(nao**2),
@@ -471,12 +483,15 @@ class PolarizabilityGradient:
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                     rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
 
+            # TODO distributed
             pol_gradient += eri_contrib
+            # TODO distributed
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             if self.rank == mpi_master():
                 for x in range(dof):
                     for y in range(x + 1, dof):
+                        # TODO distributed
                         pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
