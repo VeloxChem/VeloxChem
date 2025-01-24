@@ -259,6 +259,7 @@ class PolarizabilityGradient:
         # operator components and permutation pairs
         dof = len(self.vector_components)
         xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        dof_red  = len(xy_pairs)
 
         # number of atomic orbitals
         nao = basis.get_dimensions_of_basis()
