@@ -184,8 +184,10 @@ class CphfSolver(LinearSolver):
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         # checkpoint info
-        if (self.checkpoint_file is not None and
-                self.checkpoint_file.endswith('.rsp.h5')):
+        if self.checkpoint_file is None and self.filename is not None:
+            self.checkpoint_file = f'{self.filename}.orbrsp.h5'
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('.rsp.h5')):
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
@@ -252,7 +254,7 @@ class CphfSolver(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self._read_cphf_checkpoint(orbrsp_vector_labels)
+            self._read_checkpoint_for_cphf(orbrsp_vector_labels)
         else:
             # setup and precondition trial vectors
             dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
@@ -267,8 +269,12 @@ class CphfSolver(LinearSolver):
         residuals = list(np.zeros((dof)))
         relative_residual_norm = [None for x in range(dof)]
 
+        iter_per_trial_in_hours = None
+
         # start iterations
         for iteration in range(self.max_iter):
+
+            iter_start_time = tm.time()
 
             profiler.set_timing_key(f'Iteration {iteration + 1}')
             profiler.start_timer('ReducedSpace')
@@ -358,19 +364,34 @@ class CphfSolver(LinearSolver):
 
             profiler.stop_timer('Orthonorm.')
 
-            # TODO: write checkpoint only when necessary
-            self._write_cphf_checkpoint(molecule, basis, dft_dict, pe_dict,
-                                        orbrsp_vector_labels)
+            if self.rank == mpi_master():
+                n_new_trials = new_trials.shape(1)
+            else:
+                n_new_trials = None
+            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
+
+            if iter_per_trial_in_hours is not None:
+                next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
+                if self._need_graceful_exit(next_iter_in_hours):
+                    self._graceful_exit_for_cphf(molecule, basis, dft_dict,
+                                                 pe_dict, orbrsp_vector_labels)
+
+            if self.force_checkpoint:
+                self._write_checkpoint_for_cphf(molecule, basis, dft_dict,
+                                                pe_dict, orbrsp_vector_labels)
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials,
                               eri_dict, dft_dict, pe_dict, profiler)
 
+            iter_in_hours = (tm.time() - iter_start_time) / 3600
+            iter_per_trial_in_hours = iter_in_hours / n_new_trials
+
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self._write_cphf_checkpoint(molecule, basis, dft_dict, pe_dict,
-                                    orbrsp_vector_labels)
+        self._write_checkpoint_for_cphf(molecule, basis, dft_dict, pe_dict,
+                                        orbrsp_vector_labels)
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -1148,8 +1169,8 @@ class CphfSolver(LinearSolver):
 
         return None
 
-    def _write_cphf_checkpoint(self, molecule, basis, dft_dict, pe_dict,
-                               labels):
+    def _write_checkpoint_for_cphf(self, molecule, basis, dft_dict, pe_dict,
+                                   labels):
         """
         Writes checkpoint file.
 
@@ -1170,9 +1191,8 @@ class CphfSolver(LinearSolver):
 
         if self.checkpoint_file is None and self.filename is not None:
             self.checkpoint_file = f'{self.filename}.orbrsp.h5'
-
-        if (self.checkpoint_file is not None and
-                self.checkpoint_file.endswith('.rsp.h5')):
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('.rsp.h5')):
             fpath = Path(self.checkpoint_file)
             fpath = fpath.with_name(fpath.stem)
             self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
@@ -1197,7 +1217,7 @@ class CphfSolver(LinearSolver):
             self.ostream.print_info(checkpoint_text)
             self.ostream.print_blank()
 
-    def _read_cphf_checkpoint(self, labels):
+    def _read_checkpoint_for_cphf(self, labels):
         """
         Reads distributed arrays from checkpoint file.
 
@@ -1216,3 +1236,36 @@ class CphfSolver(LinearSolver):
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
+
+    def _graceful_exit_for_cphf(self, molecule, basis, dft_dict, pe_dict,
+                                labels):
+        """
+        Gracefully exits the program.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param labels:
+            The list of labels.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_info('Preparing for a graceful termination...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        self._write_checkpoint_for_cphf(molecule, basis, dft_dict, pe_dict,
+                                        labels)
+
+        self.ostream.print_info('...done.')
+        self.ostream.print_blank()
+        self.ostream.print_info('Exiting program.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        sys.exit(0)
