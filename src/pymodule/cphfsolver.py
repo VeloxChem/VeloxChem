@@ -36,6 +36,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
+from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 
@@ -71,6 +72,8 @@ class CphfSolver(LinearSolver):
         self.use_subspace_solver = True
         self.print_residuals = False
         self.max_iter = 150
+
+        self.orbrsp_type = 'default'
 
         self._input_keywords['orbitalresponse'] = {
             'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
@@ -179,6 +182,12 @@ class CphfSolver(LinearSolver):
             else:
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
+        # checkpoint info
+        if (self.checkpoint_file is not None and
+                self.checkpoint_file.endswith('.rsp.h5')):
+            self.checkpoint_file = self.checkpoint_file.replace(
+                '.rsp.h5', '.orbrsp.h5')
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -226,12 +235,29 @@ class CphfSolver(LinearSolver):
         precond = (1.0 / eov).reshape(nocc * nvir)
         dist_precond = DistributedArray(precond, self.comm)
 
-        # setup and precondition trial vectors
-        dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
+        orbrsp_vector_labels = [
+            self.orbrsp_type.upper() + '_orbrsp_trials',
+            self.orbrsp_type.upper() + '_orbrsp_sigmas',
+        ]
 
-        # construct the sigma (E*t) vectors
-        self.build_sigmas(molecule, basis, scf_tensors, dist_trials, eri_dict,
-                          dft_dict, pe_dict, profiler)
+        # check validity of checkpoint file
+        if self.restart:
+            if self.rank == mpi_master():
+                self.restart = check_rsp_hdf5(self.checkpoint_file,
+                                              orbrsp_vector_labels, molecule,
+                                              basis, dft_dict, pe_dict)
+            self.restart = self.comm.bcast(self.restart, root=mpi_master())
+
+        # read initial guess from restart file
+        if self.restart:
+            self._read_cphf_checkpoint(orbrsp_vector_labels)
+        else:
+            # setup and precondition trial vectors
+            dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
+
+            # construct the sigma (E*t) vectors
+            self.build_sigmas(molecule, basis, scf_tensors, dist_trials,
+                              eri_dict, dft_dict, pe_dict, profiler)
 
         # lists that will hold the solutions and residuals
         # TODO: double check residuals in setup_trials
@@ -330,12 +356,19 @@ class CphfSolver(LinearSolver):
 
             profiler.stop_timer('Orthonorm.')
 
+            # TODO: write checkpoint only when necessary
+            self._write_cphf_checkpoint(molecule, basis, dft_dict, pe_dict,
+                                        orbrsp_vector_labels)
+
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials,
                               eri_dict, dft_dict, pe_dict, profiler)
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
+
+        self._write_cphf_checkpoint(molecule, basis, dft_dict, pe_dict,
+                                    orbrsp_vector_labels)
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -1112,3 +1145,71 @@ class CphfSolver(LinearSolver):
         """
 
         return None
+
+    def _write_cphf_checkpoint(self, molecule, basis, dft_dict, pe_dict,
+                               labels):
+        """
+        Writes checkpoint file.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param labels:
+            The list of labels.
+        """
+
+        if self.checkpoint_file is None and self.filename is None:
+            return
+
+        if self.checkpoint_file is None and self.filename is not None:
+            self.checkpoint_file = f'{self.filename}.orbrsp.h5'
+
+        if (self.checkpoint_file is not None and
+                self.checkpoint_file.endswith('.rsp.h5')):
+            self.checkpoint_file = self.checkpoint_file.replace(
+                '.rsp.h5', '.orbrsp.h5')
+
+        t0 = tm.time()
+
+        if self.rank == mpi_master():
+            success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
+                                     basis, dft_dict, pe_dict, self.ostream)
+        else:
+            success = False
+        success = self.comm.bcast(success, root=mpi_master())
+
+        if success:
+            dist_arrays = [self.dist_trials, self.dist_sigmas]
+
+            for dist_array, label in zip(dist_arrays, labels):
+                dist_array.append_to_hdf5_file(self.checkpoint_file, label)
+
+            checkpoint_text = 'Time spent in writing checkpoint file: '
+            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
+
+    def _read_cphf_checkpoint(self, labels):
+        """
+        Reads distributed arrays from checkpoint file.
+
+        :param labels:
+            The list of labels.
+        """
+
+        dist_arrays = [
+            DistributedArray.read_from_hdf5_file(self.checkpoint_file, label,
+                                                 self.comm) for label in labels
+        ]
+
+        self.dist_trials, self.dist_sigmas = dist_arrays
+
+        checkpoint_text = 'Restarting from checkpoint file: '
+        checkpoint_text += self.checkpoint_file
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()

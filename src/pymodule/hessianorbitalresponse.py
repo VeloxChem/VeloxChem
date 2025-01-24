@@ -65,6 +65,8 @@ class HessianOrbitalResponse(CphfSolver):
 
         super().__init__(comm, ostream)
 
+        self.orbrsp_type = 'hessian'
+
     def update_settings(self, cphf_dict, method_dict=None):
         """
         Updates response and method settings in CPHF solver.

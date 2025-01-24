@@ -334,6 +334,7 @@ class ScfHessianDriver(HessianDriver):
         # CPHF equations
 
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # TODO: double check propagation of cphf settings
         profiler_keywords = {

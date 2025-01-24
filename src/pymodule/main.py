@@ -385,6 +385,8 @@ def main():
 
         orbrsp_dict = (task.input_dict['orbital_response']
                        if 'orbital_response' in task.input_dict else {})
+        orbrsp_dict['program_end_time'] = program_end_time
+        orbrsp_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
             hessian_drv = XtbHessianDriver(xtb_drv)
@@ -464,16 +466,22 @@ def main():
 
         vib_dict = (task.input_dict['vibrational']
                     if 'vibrational' in task.input_dict else {})
+        vib_dict['filename'] = task.input_dict['filename']
+
         hessian_dict = (task.input_dict['hessian']
                         if 'hessian' in task.input_dict else {})
+
         polgrad_dict = (task.input_dict['polarizability_gradient']
                         if 'polarizability_gradient' in task.input_dict else {})
+
         orbrsp_dict = (task.input_dict['orbital_response']
                        if 'orbital_response' in task.input_dict else {})
+        orbrsp_dict['program_end_time'] = program_end_time
+        orbrsp_dict['filename'] = task.input_dict['filename']
+
         rsp_dict = (task.input_dict['response']
                     if 'response' in task.input_dict else {})
         rsp_dict['filename'] = task.input_dict['filename']
-        vib_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
             vibrational_drv = VibrationalAnalysis(xtb_drv)
