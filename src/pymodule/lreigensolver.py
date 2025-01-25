@@ -33,8 +33,8 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
-                           extinction_coefficient_from_beta,
-                           hartree_in_wavenumber)
+                           extinction_coefficient_from_beta, avogadro_constant,
+                           bohr_in_angstrom, hartree_in_wavenumber)
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -1181,9 +1181,9 @@ class LinearResponseEigenSolver(LinearSolver):
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required.')
 
-        ev_to_nm = 1239.84193
-        au2ev = 27.211386
-        ev2au = 1 / au2ev
+        ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
+        au2ev = hartree_in_ev()
+        ev2au = 1.0 / au2ev
 
         # initialize the plot
         if ax is None:
@@ -1205,17 +1205,18 @@ class LinearResponseEigenSolver(LinearSolver):
         for i in np.arange(len(rpa_results['eigenvalues'])):
             ax2.plot(
                 [
-                    ev_to_nm / (rpa_results['eigenvalues'][i] * au2ev),
-                    ev_to_nm / (rpa_results['eigenvalues'][i] * au2ev)
+                    ev_x_nm / (rpa_results['eigenvalues'][i] * au2ev),
+                    ev_x_nm / (rpa_results['eigenvalues'][i] * au2ev),
                 ],
                 [0.0, rpa_results['oscillator_strengths'][i]],
                 alpha=0.7,
                 linewidth=2,
                 color="darkcyan",
             )
-        c = 137.035999
-        NA = 6.02214076e23
-        a_0 = 5.29177210903e-11
+
+        c = 1.0 / fine_structure_constant()
+        NA = avogadro_constant()
+        a_0 = bohr_in_angstrom() * 1.0e-10
 
         if broadening_type.lower() == "lorentzian":
             xi, yi = self.lorentzian_uv_vis(x, y, xmin, xmax, xstep,
@@ -1229,7 +1230,7 @@ class LinearResponseEigenSolver(LinearSolver):
         sigma_m2 = sigma * a_0**2
         sigma_cm2 = sigma_m2 * 10**4
         epsilon = sigma_cm2 * NA / (np.log(10) * 10**3)
-        ax.plot(ev_to_nm / (xi * au2ev),
+        ax.plot(ev_x_nm / (xi * au2ev),
                 epsilon,
                 color="black",
                 alpha=0.9,
@@ -1257,7 +1258,7 @@ class LinearResponseEigenSolver(LinearSolver):
         ax.set_ylim(bottom=0)
         ax2.set_ylim(bottom=0)
         ax2.set_ylabel("Oscillator strength")
-        ax.set_xlim(ev_to_nm / (xmax * au2ev), ev_to_nm / (xmin * au2ev))
+        ax.set_xlim(ev_x_nm / (xmax * au2ev), ev_x_nm / (xmin * au2ev))
 
         return ax
 
@@ -1284,8 +1285,8 @@ class LinearResponseEigenSolver(LinearSolver):
         assert_msg_critical('matplotlib' in sys.modules,
                             'matplotlib is required.')
 
-        ev_to_nm = 1239.84193
-        au2ev = 27.211386
+        ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
+        au2ev = hartree_in_ev()
         # initialize the plot
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
@@ -1299,8 +1300,8 @@ class LinearResponseEigenSolver(LinearSolver):
         for i in np.arange(len(rpa_results["eigenvalues"])):
             ax2.plot(
                 [
-                    ev_to_nm / (rpa_results["eigenvalues"][i] * au2ev),
-                    ev_to_nm / (rpa_results["eigenvalues"][i] * au2ev)
+                    ev_x_nm / (rpa_results["eigenvalues"][i] * au2ev),
+                    ev_x_nm / (rpa_results["eigenvalues"][i] * au2ev),
                 ],
                 [0.0, rpa_results["rotatory_strengths"][i]],
                 alpha=0.7,
@@ -1331,12 +1332,15 @@ class LinearResponseEigenSolver(LinearSolver):
             xi, yi = self.gaussian_ecd(x, y, xmin, xmax, xstep,
                                        broadening_value)
 
-        yi = ((yi * xi) / (22.94 * np.pi))
+        # denorm_factor is roughly 22.96 * PI
+        denorm_factor = (rotatory_strength_in_cgs() /
+                         (extinction_coefficient_from_beta() / 3.0))
+        yi = (yi * xi) / denorm_factor
 
         ax.set_ylim(-max(abs(yi)) * 1.1, max(abs(yi)) * 1.1)
 
-        ax.plot(ev_to_nm / xi, yi, color="black", alpha=0.9, linewidth=2.5)
-        ax.set_xlim(ev_to_nm / xmax, ev_to_nm / xmin)
+        ax.plot(ev_x_nm / xi, yi, color="black", alpha=0.9, linewidth=2.5)
+        ax.set_xlim(ev_x_nm / xmax, ev_x_nm / xmin)
 
         # include a legend for the bar and for the broadened spectrum
         legend_bars = mlines.Line2D([], [],
