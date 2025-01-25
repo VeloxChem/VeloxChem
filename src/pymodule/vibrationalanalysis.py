@@ -318,8 +318,8 @@ class VibrationalAnalysis:
                 self.raman_intensities, self.int_pol, self.int_depol, self.depol_ratio = (
                     self.calculate_raman_activity(self.normal_modes))
                 self._results['raman_intensities'] = self.raman_intensities
-                if depol_ratio is not None:
-                    self._results['depolarization_ratios'] = depol_ratio
+                if self.depol_ratio is not None:
+                    self._results['depolarization_ratios'] = self.depol_ratio
 
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
