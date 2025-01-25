@@ -1411,7 +1411,7 @@ class LinearResponseEigenSolver(LinearSolver):
              broadening_type="lorentzian",
              broadening_value=(1000.0 / hartree_in_wavenumber() *
                                hartree_in_ev()),
-             plot_type="default"):
+             plot_type="electronic"):
         """
         Plot the UV or ECD spectrum from the response calculation.
 
@@ -1420,7 +1420,7 @@ class LinearResponseEigenSolver(LinearSolver):
         :param broadening_value:
             The broadening value in eV.
         :param plot_type:
-            The type of plot to generate. Either 'uv', 'ecd' or 'default'.
+            The type of plot to generate. Either 'uv', 'ecd' or 'electronic'.
         """
 
         assert_msg_critical('matplotlib' in sys.modules,
@@ -1430,11 +1430,13 @@ class LinearResponseEigenSolver(LinearSolver):
             self.plot_uv_vis(rpa_results,
                              broadening_type=broadening_type,
                              broadening_value=broadening_value)
+
         elif plot_type.lower() == "ecd":
             self.plot_ecd(rpa_results,
                           broadening_type=broadening_type,
                           broadening_value=broadening_value)
-        elif plot_type.lower() == "default":
+
+        elif plot_type.lower() == "electronic":
             fig, axs = plt.subplots(2, 1, figsize=(8, 10))
             # Increase the height space between subplots
             fig.subplots_adjust(hspace=0.3)
@@ -1446,6 +1448,7 @@ class LinearResponseEigenSolver(LinearSolver):
                           broadening_type=broadening_type,
                           broadening_value=broadening_value,
                           ax=axs[1])
+
         else:
             assert_msg_critical(False, 'Invalid plot type')
 
