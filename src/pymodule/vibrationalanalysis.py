@@ -22,7 +22,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
 from contextlib import redirect_stderr
 from io import StringIO
 import numpy as np
@@ -42,19 +41,18 @@ from .cppsolver import ComplexResponse
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
-from .veloxchemlib import parse_xc_func
-from .outputstream import OutputStream
-from .griddriver import GridDriver
 from .errorhandler import assert_msg_critical
-from .dftutils import get_default_grid_level
 from .inputparser import parse_input
 from .sanitychecks import raman_sanity_check
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
-import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib.lines as mlines
+except ImportError:
+    pass
 
 
 class VibrationalAnalysis:
@@ -81,7 +79,8 @@ class VibrationalAnalysis:
         - int_pol: Parallel Raman (in A**4/amu).
         - int_depol: Perpendicular Raman (in A**4/amu).
         - depol_ratio: Depolarization ratio (in A**4/amu).
-        - frequencies: the frequency/ies of external electric field (for resonance Raman)
+        - frequencies: the frequency/ies of external electric field (for
+          resonance Raman)
         - flag: The name of the driver.
         - numerical_hessian: Perform numerical Hessian calculation.
         - numerical_raman: Perform numerical polarizability gradient calculation.
@@ -94,7 +93,8 @@ class VibrationalAnalysis:
         - do_ir: Calculate IR intensities.
         - do_raman: Calculate Raman activity.
         - do_resonance_raman: Calculate resonance Raman activity.
-        - rr_damping: Damping factor for complex polarizability gradient (resonance Raman).
+        - rr_damping: Damping factor for complex polarizability gradient
+          (resonance Raman).
         - is_scf: Whether the reference state is SCF.
         - is_xtb: Whether the reference state is XTB.
         - filename: The filename.
@@ -128,9 +128,6 @@ class VibrationalAnalysis:
         self.cphf_dict = {}
         self.rsp_dict = {}
         self.polgrad_dict = {}
-
-        # dictionary of vibrational analysis results
-        self._results = {}
 
         # Hessian driver etc
         self.is_scf = False
@@ -189,25 +186,39 @@ class VibrationalAnalysis:
         self._input_keywords = {
             'vibrational': {
                 'numerical_hessian': ('bool', 'do numerical hessian'),
-                'numerical_raman': ('bool', 'do numerical polarizability gradient'),
-                'do_four_point_hessian': ('bool', 'do four-point numerical integration'),
-                'do_four_point_raman': ('bool', 'do four-point numerical integration'),
+                'numerical_raman':
+                    ('bool', 'do numerical polarizability gradient'),
+                'do_four_point_hessian':
+                    ('bool', 'do four-point numerical integration'),
+                'do_four_point_raman':
+                    ('bool', 'do four-point numerical integration'),
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
                 'do_raman': ('bool', 'whether to calculate Raman activity'),
-                'do_resonance_raman': ('bool', 'whether to calculate resonance Raman activity'),
-                'rr_damping': ('float', 'the damping factor in CPP for resonance Raman (a.u.)'),
+                'do_resonance_raman':
+                    ('bool', 'whether to calculate resonance Raman activity'),
+                'rr_damping':
+                    ('float',
+                     'the damping factor in CPP for resonance Raman (a.u.)'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
-                'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
-                'print_depolarization_ratio': ('bool', 'whether to print Raman depolarization ratio'),
+                'do_print_polgrad':
+                    ('bool', 'whether to print the pol. gradient'),
+                'print_depolarization_ratio':
+                    ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
-                'frequencies': ('seq_range', 'frequencies of external electric field'),
+                'frequencies':
+                    ('seq_range', 'frequencies of external electric field'),
                 'filename': ('str', 'base name of output files'),
-                },
-            }
+            },
+        }
 
-    def update_settings(self, method_dict=None, vib_dict=None, hessian_dict=None, cphf_dict=None,
-                        rsp_dict=None, polgrad_dict=None):
+    def update_settings(self,
+                        method_dict=None,
+                        vib_dict=None,
+                        hessian_dict=None,
+                        cphf_dict=None,
+                        rsp_dict=None,
+                        polgrad_dict=None):
         """
         Updates settings in HessianDriver.
 
@@ -231,8 +242,8 @@ class VibrationalAnalysis:
             vib_dict = {}
 
         vib_keywords = {
-            key: val[0] for key, val in
-            self._input_keywords['vibrational'].items()
+            key: val[0]
+            for key, val in self._input_keywords['vibrational'].items()
         }
 
         parse_input(self, vib_keywords, vib_dict)
@@ -290,36 +301,39 @@ class VibrationalAnalysis:
             self.compute_polarizability_gradient(molecule, ao_basis)
 
         if self.rank == mpi_master():
+            vib_results = {}
+
             # Save the molecule xyz string in the results dictionary
-            self._results['molecule_xyz_string'] = molecule.get_xyz_string()
+            vib_results['molecule_xyz_string'] = molecule.get_xyz_string()
 
             # get vibrational frequencies and normal modes
             self.frequency_analysis(molecule, filename=None)
-            self._results['vib_frequencies'] = self.vib_frequencies
+            vib_results['vib_frequencies'] = self.vib_frequencies
             # FIXME: normalized or not? What should the user get?
-            self._results['normal_modes'] = self.normal_modes
+            vib_results['normal_modes'] = self.normal_modes
 
             # calculate force constants
-            self.reduced_masses, self.force_constants = self.calculate_force_constant()
-            self._results['reduced_masses'] = self.reduced_masses
-            self._results['force_constants'] = self.force_constants
+            (self.reduced_masses,
+             self.force_constants) = self.calculate_force_constant()
+            vib_results['reduced_masses'] = self.reduced_masses
+            vib_results['force_constants'] = self.force_constants
 
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
-                self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
-                self._results['ir_intensities'] = self.ir_intensities
+                self.ir_intensities = self.calculate_ir_intensity(
+                    self.normal_modes)
+                vib_results['ir_intensities'] = self.ir_intensities
 
             # calculate the analytical polarizability gradient for Raman intensities
             # FIXME: should the instance variable be called raman_intensities, or
             # rather raman_activities?
             if (self.do_raman or self.do_resonance_raman) and self.is_scf:
-                #self.raman_intensities, depol_ratio = self.calculate_raman_activity(
-                #        self.normal_modes)
-                self.raman_intensities, self.int_pol, self.int_depol, self.depol_ratio = (
-                    self.calculate_raman_activity(self.normal_modes))
-                self._results['raman_intensities'] = self.raman_intensities
+                (self.raman_intensities, self.int_pol, self.int_depol,
+                 self.depol_ratio) = self.calculate_raman_activity(
+                     self.normal_modes)
+                vib_results['raman_intensities'] = self.raman_intensities
                 if self.depol_ratio is not None:
-                    self._results['depolarization_ratios'] = self.depol_ratio
+                    vib_results['depolarization_ratios'] = self.depol_ratio
 
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
@@ -336,10 +350,10 @@ class VibrationalAnalysis:
             # create binary file and save vibrational analysis results
             self._write_final_hdf5(molecule)
 
-            return self._results
+            return vib_results
+        else:
+            return None
 
-        return
-   
     def frequency_analysis(self, molecule, filename=None):
         """
         Runs the frequency analysis from geomeTRIC to obtain vibrational
@@ -389,7 +403,6 @@ class VibrationalAnalysis:
 
         # frequency of electric field
         freqs = list(self.polarizability_gradient.keys())
-        nfreq = len(freqs)
 
         number_of_modes = len(self.vib_frequencies)
 
@@ -401,7 +414,8 @@ class VibrationalAnalysis:
 
         for freq in freqs:
             # get gradient for current frequency
-            current_polarizability_gradient = (self.polarizability_gradient[freq])
+            current_polarizability_gradient = (
+                self.polarizability_gradient[freq])
             size_x = current_polarizability_gradient.shape[0]
             size_y = current_polarizability_gradient.shape[1]
             size_k = self.normal_modes.shape[0]
@@ -418,15 +432,18 @@ class VibrationalAnalysis:
             for i in range(3):
                 alpha_bar += raman_transmom[i, i] / 3.0
                 for j in range(i + 1, 3):
-                    gamma_bar_tmp_1 = np.abs(raman_transmom[i, i] - raman_transmom[j, j])
+                    gamma_bar_tmp_1 = np.abs(raman_transmom[i, i] -
+                                             raman_transmom[j, j])
                     gamma_bar_tmp_2 = np.abs(raman_transmom[i, j])
-                    gamma_bar_sq += 0.5 * (gamma_bar_tmp_1)**2 + 3.0 * (gamma_bar_tmp_2)**2
+                    gamma_bar_sq += 0.5 * (gamma_bar_tmp_1)**2 + 3.0 * (
+                        gamma_bar_tmp_2)**2
 
             alpha_bar_sq = np.abs(alpha_bar)**2
-            raman_intensities[freq] = (
-                45.0 * alpha_bar_sq + 7.0 * gamma_bar_sq) * raman_conversion_factor
+            raman_intensities[freq] = (45.0 * alpha_bar_sq + 7.0 *
+                                       gamma_bar_sq) * raman_conversion_factor
 
-            if self.print_depolarization_ratio and (freq == 0.0): # TODO dynamic also?
+            if self.print_depolarization_ratio and (
+                    freq == 0.0):  # TODO dynamic also?
                 int_pol = 45.0 * alpha_bar_sq + 4.0 * gamma_bar_sq
                 int_depol = 3.0 * gamma_bar_sq
                 depol_ratio = int_depol / int_pol
@@ -473,9 +490,8 @@ class VibrationalAnalysis:
         reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         force_constants = (4.0 * np.pi**2 *
-                                (c * (self.vib_frequencies / cm_to_m))**2 *
-                                reduced_masses *
-                                amu_in_kg()) * (N_to_mdyne / m_to_A)
+                           (c * (self.vib_frequencies / cm_to_m))**2 *
+                           reduced_masses * amu_in_kg()) * (N_to_mdyne / m_to_A)
         return reduced_masses, force_constants
 
     def get_conversion_factor(self, prop):
@@ -496,11 +512,11 @@ class VibrationalAnalysis:
 
         # conversion factor of IR intensity to km/mol
         if (prop == 'ir'):
-            conv_factor = conv_ir_ea0amu2kmmol = (electron_mass_in_amu() * avogadro_constant()
-                                    * alpha**2 * bohr_in_km * np.pi / 3.0)
+            conv_factor = (electron_mass_in_amu() * avogadro_constant() *
+                           alpha**2 * bohr_in_km * np.pi / 3.0)
         elif (prop == 'raman'):
             conv_factor = 0.078424
-            
+
         return conv_factor
 
     def compute_hessian(self, molecule, ao_basis):
@@ -515,7 +531,9 @@ class VibrationalAnalysis:
 
         hessian_drv = self.hessian_driver
 
-        hessian_drv.update_settings(self.method_dict, self.hessian_dict, cphf_dict=self.cphf_dict)
+        hessian_drv.update_settings(self.method_dict,
+                                    self.hessian_dict,
+                                    cphf_dict=self.cphf_dict)
 
         # Transfer settings for vibrational task to Hessian driver
         if self.is_scf:
@@ -566,14 +584,15 @@ class VibrationalAnalysis:
         scf_tensors = self.scf_driver.scf_tensors
 
         # set up the polarizability gradient driver
-        polgrad_drv = PolarizabilityGradient(self.scf_driver, self.comm, self.ostream)
+        polgrad_drv = PolarizabilityGradient(self.scf_driver, self.comm,
+                                             self.ostream)
         if 'frequencies' not in self.polgrad_dict:
             polgrad_drv.frequencies = self.frequencies
         if self.rr_damping is not None:
             polgrad_drv.damping = self.rr_damping
         polgrad_drv.update_settings(self.polgrad_dict,
-                                    orbrsp_dict = self.cphf_dict,
-                                    method_dict = self.method_dict)
+                                    orbrsp_dict=self.cphf_dict,
+                                    method_dict=self.method_dict)
 
         # transfer settings for vibrational task to polgrad driver
         polgrad_drv.numerical = self.numerical_raman
@@ -639,12 +658,17 @@ class VibrationalAnalysis:
                                                 filename, rsp_drv)
         self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
-        fulltxt_msg = f'Full vibrational analysis results written to: {self.result_file}'
+        fulltxt_msg = 'Full vibrational analysis results written to: '
+        fulltxt_msg += f'{self.result_file}'
         self.ostream.print_info(fulltxt_msg)
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_vibrational_analysis_ostream(self, molecule, idx_lst, filename=None, rsp_drv=None):
+    def print_vibrational_analysis_ostream(self,
+                                           molecule,
+                                           idx_lst,
+                                           filename=None,
+                                           rsp_drv=None):
         """
         Prints the results from the vibrational analysis to the ostream.
 
@@ -659,14 +683,13 @@ class VibrationalAnalysis:
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-        number_of_modes = len(self.vib_frequencies)
 
         # normalize the normal modes
         self.normal_modes /= np.linalg.norm(self.normal_modes,
                                             axis=1)[:, np.newaxis]
-        self.normed_normal_modes = self.normal_modes / np.linalg.norm(self.normal_modes,
-                                            axis=1)[:, np.newaxis]
-       
+        self.normed_normal_modes = self.normal_modes / np.linalg.norm(
+            self.normal_modes, axis=1)[:, np.newaxis]
+
         title = 'Vibrational Analysis'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
@@ -704,17 +727,16 @@ class VibrationalAnalysis:
                     if freq == 0.0:
                         this_freq = 'static'
                     else:
-                        this_freq = str(round(freq,4)) + freq_unit
+                        this_freq = str(round(freq, 4)) + freq_unit
                     raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
-                            'Raman activity:', this_freq, self.raman_intensities[freq][k],
-                            'A**4/amu')
+                        'Raman activity:', this_freq,
+                        self.raman_intensities[freq][k], 'A**4/amu')
                     self.ostream.print_header(raman_intens_string.ljust(width))
 
                 if self.print_depolarization_ratio:
                     raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
                         'Parallel Raman:', self.int_pol[k], 'A**4/amu')
-                    self.ostream.print_header(
-                        raman_parallel_str.ljust(width))
+                    self.ostream.print_header(raman_parallel_str.ljust(width))
 
                     raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
                         'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
@@ -723,8 +745,7 @@ class VibrationalAnalysis:
 
                     depolarization_str = '{:22s}{:20.4f}'.format(
                         'Depolarization ratio:', self.depol_ratio[k])
-                    self.ostream.print_header(
-                        depolarization_str.ljust(width))
+                    self.ostream.print_header(depolarization_str.ljust(width))
 
             normal_mode_string = '{:22s}'.format('Normal mode:')
             self.ostream.print_header(normal_mode_string.ljust(width))
@@ -776,7 +797,8 @@ class VibrationalAnalysis:
             self.ostream.print_header(index_string.ljust(width))
             self.ostream.print_header('-' * width)
 
-            column_string = '{:>16s}  {:>24s}'.format('Frequency', 'Raman activity')
+            column_string = '{:>16s}  {:>24s}'.format('Frequency',
+                                                      'Raman activity')
             self.ostream.print_header(column_string.ljust(width))
             self.ostream.print_header('-' * width)
 
@@ -791,7 +813,10 @@ class VibrationalAnalysis:
 
         self.ostream.flush()
 
-    def print_vibrational_analysis_file(self, molecule, filename=None, rsp_drv=None):
+    def print_vibrational_analysis_file(self,
+                                        molecule,
+                                        filename=None,
+                                        rsp_drv=None):
         """
         Prints the results from the vibrational analysis to a txt formatted file.
 
@@ -811,12 +836,12 @@ class VibrationalAnalysis:
         # normalize the normal modes
         self.normal_modes /= np.linalg.norm(self.normal_modes,
                                             axis=1)[:, np.newaxis]
-        self.normed_normal_modes = self.normal_modes / np.linalg.norm(self.normal_modes,
-                                            axis=1)[:, np.newaxis]
+        self.normed_normal_modes = self.normal_modes / np.linalg.norm(
+            self.normal_modes, axis=1)[:, np.newaxis]
 
         # set name of output file
         if self.result_file is None:
-            self.result_file = f'vib-results.out'
+            self.result_file = 'vib-results.out'
         # open output file
         fout = open(self.result_file, 'w')
 
@@ -864,26 +889,26 @@ class VibrationalAnalysis:
                     if freq == 0.0:
                         this_freq = 'static'
                     else:
-                        this_freq = str(round(freq,4)) + freq_unit
+                        this_freq = str(round(freq, 4)) + freq_unit
                     raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
-                            'Raman activity:', this_freq, self.raman_intensities[freq][k],
-                            'A**4/amu')
+                        'Raman activity:', this_freq,
+                        self.raman_intensities[freq][k], 'A**4/amu')
                     fout.write(raman_intens_string.ljust(width))
                     fout.write('\n')
 
                 if self.print_depolarization_ratio:
                     raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Parallel Raman:', int_pol[k], 'A**4/amu')
+                        'Parallel Raman:', self.int_pol[k], 'A**4/amu')
                     fout.write(raman_parallel_str.ljust(width))
                     fout.write('\n')
 
                     raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Perpendicular Raman:', int_depol[k], 'A**4/amu')
+                        'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
                     fout.write(raman_perpendicular_str.ljust(width))
                     fout.write('\n')
 
                     depolarization_str = '{:22s}{:20.4f}'.format(
-                        'Depolarization ratio:', depol_ratio[k])
+                        'Depolarization ratio:', self.depol_ratio[k])
                     fout.write(depolarization_str.ljust(width))
                     fout.write('\n')
 
@@ -934,10 +959,9 @@ class VibrationalAnalysis:
         # extract the n_targets larges values
         targets = tmp[-n_targets:]
 
-        #targets_idx = [index for index, element in enumerate(lst) if element in targets]
-
-        #return targets_idx
-        return [index for index, element in enumerate(lst) if element in targets]
+        return [
+            index for index, element in enumerate(lst) if element in targets
+        ]
 
     def _write_final_hdf5(self, molecule):
         """
@@ -978,37 +1002,39 @@ class VibrationalAnalysis:
         hf = h5py.File(fname, 'w')
 
         nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset('nuclear_repulsion', data = nuc_rep)
+        hf.create_dataset('nuclear_repulsion', data=nuc_rep)
 
         natm = molecule.number_of_atoms()
 
         normal_mode_grp = hf.create_group('normal_modes')
         for n, Q in enumerate(self.normed_normal_modes, 1):
-            normal_mode_grp.create_dataset(str(n), 
-                          data = np.array([Q]).reshape(natm, 3))
+            normal_mode_grp.create_dataset(str(n),
+                                           data=np.array([Q]).reshape(natm, 3))
 
         hf.create_dataset('hessian', data=self.hessian)
         hf.create_dataset('vib_frequencies',
-                          data = np.array([self.vib_frequencies]))
+                          data=np.array([self.vib_frequencies]))
         hf.create_dataset('force_constants',
-                          data = np.array([self.force_constants]))
+                          data=np.array([self.force_constants]))
         hf.create_dataset('reduced_masses',
-                          data = np.array([self.reduced_masses]))
+                          data=np.array([self.reduced_masses]))
         if self.do_ir:
             hf.create_dataset('ir_intensities',
-                          data = np.array([self.ir_intensities]))
+                              data=np.array([self.ir_intensities]))
         if self.do_raman:
             freqs = self.frequencies
             raman_grp = hf.create_group('raman_activity')
             for i in range(len(freqs)):
-                raman_grp.create_dataset(str(freqs[i]),
-                          data = np.array([self.raman_intensities[freqs[i]]]))
+                raman_grp.create_dataset(
+                    str(freqs[i]),
+                    data=np.array([self.raman_intensities[freqs[i]]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
             raman_grp = hf.create_group('resonance_raman_activity')
             for i in range(len(freqs)):
-                raman_grp.create_dataset(str(freqs[i]),
-                          data = np.array([self.raman_intensities[freqs[i]]]))
+                raman_grp.create_dataset(
+                    str(freqs[i]),
+                    data=np.array([self.raman_intensities[freqs[i]]]))
         hf.close()
 
         return True
@@ -1026,21 +1052,29 @@ class VibrationalAnalysis:
         self.ostream.flush()
 
         self.ostream.print_blank()
-        self.ostream.print_header('The following will be computed:'.ljust(str_width))
+        self.ostream.print_header(
+            'The following will be computed:'.ljust(str_width))
         self.ostream.print_blank()
-        self.ostream.print_header('- Vibrational frequencies and normal modes'.ljust(str_width))
+        self.ostream.print_header(
+            '- Vibrational frequencies and normal modes'.ljust(str_width))
         self.ostream.print_header('- Force constants'.ljust(str_width))
         if self.do_ir:
             self.ostream.print_header('- IR intensities'.ljust(str_width))
         if self.do_raman:
             self.ostream.print_header('- Raman activity'.ljust(str_width))
         if self.do_resonance_raman:
-            self.ostream.print_header('- Resonance Raman ({} frequencies)'.format(
-                len(self.frequencies)).ljust(str_width))
+            self.ostream.print_header(
+                '- Resonance Raman ({} frequencies)'.format(
+                    len(self.frequencies)).ljust(str_width))
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def plot_ir(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
+    def plot_ir(self,
+                vib_results,
+                broadening_type='lorentzian',
+                broadening_value=20,
+                ax=None,
+                scaling_factor=1.0):
         """
         Plot a IR spectrum.
 
@@ -1052,16 +1086,18 @@ class VibrationalAnalysis:
             A Matplotlib axis object.
         :param scaling_factor:
             A scaling factor for the frequencies.
-                        
+
         :return:
             A Matplotlib axis object.
         """
-        
-        vib_results = self._results
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
-    # IR unit km/mol
-    # raman unit   A**4/amu
+        # IR unit km/mol
+        # raman unit   A**4/amu
 
         ax.set_xlabel('Wavenumber [cm$^{-1}$]')
         ax.set_ylabel('$\epsilon$ [mol$^{-1}$ cm$^{-1}$]')
@@ -1069,41 +1105,71 @@ class VibrationalAnalysis:
 
         freqs = vib_results['vib_frequencies']
         ir_ints = vib_results['ir_intensities']
-        if broadening_type == 'lorentzian':
-            x, y = self.lorentzian(freqs, ir_ints, 0, 4000, 1, broadening_value)
-        elif broadening_type == 'gaussian':
-            x, y = self.gaussian(freqs, ir_ints, 0, 4000, 1, broadening_value)
-        
-        ax.plot(x*scaling_factor, y*0.00001,  color="black", alpha= 0.9, linewidth=2.5)
-        
-        legend_bars = mlines.Line2D([], [], color='darkcyan', alpha=0.7, linewidth=2, label='IR intensity')
-        label_spectrum = str(broadening_type)+" broadening "+ str(broadening_value)+" cm$^{-1}$"
-        legend_spectrum = mlines.Line2D([], [], color='black', linestyle='-',linewidth=2.5,  label= label_spectrum)
+        if broadening_type.lower() == 'lorentzian':
+            x, y = self.lorentzian_broadening(freqs, ir_ints, 0, 4000, 1,
+                                              broadening_value)
+        elif broadening_type.lower() == 'gaussian':
+            x, y = self.gaussian_broadening(freqs, ir_ints, 0, 4000, 1,
+                                            broadening_value)
+
+        ax.plot(x * scaling_factor,
+                y * 0.00001,
+                color="black",
+                alpha=0.9,
+                linewidth=2.5)
+
+        legend_bars = mlines.Line2D([], [],
+                                    color='darkcyan',
+                                    alpha=0.7,
+                                    linewidth=2,
+                                    label='IR intensity')
+        label_spectrum = f'{broadening_type.capitalize()} '
+        label_spectrum += f'broadening ({broadening_value:.1f} ' + r'cm$^{-1}$)'
+        legend_spectrum = mlines.Line2D([], [],
+                                        color='black',
+                                        linestyle='-',
+                                        linewidth=2.5,
+                                        label=label_spectrum)
         scaling = str(scaling_factor)
-        legend_scaling = mlines.Line2D([], [],  color='white', linestyle='-', alpha=0.0001, label= "Scaling factor: "+scaling)
-        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
-        ax.set_ylim(0, max(y*0.00001)*1.1)
+        legend_scaling = mlines.Line2D([], [],
+                                       color='white',
+                                       linestyle='-',
+                                       alpha=0.0001,
+                                       label="Scaling factor: " + scaling)
+        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
+                  frameon=False,
+                  borderaxespad=0.,
+                  loc='center left',
+                  bbox_to_anchor=(1.15, 0.5))
+        ax.set_ylim(0, max(y * 0.00001) * 1.1)
         ax.set_ylim(bottom=0)
         ax.set_xlim(0, 3900)
-        
+
         ax2 = ax.twinx()
         ax2.set_ylabel('IR intensity [km/mol]')
-        
+
         for i in np.arange(len(vib_results['vib_frequencies'])):
             ax2.plot(
-                [scaling_factor * vib_results['vib_frequencies'][i], scaling_factor*vib_results['vib_frequencies'][i]],
+                [
+                    scaling_factor * vib_results['vib_frequencies'][i],
+                    scaling_factor * vib_results['vib_frequencies'][i]
+                ],
                 [0.0, vib_results['ir_intensities'][i]],
-                alpha=0.7, linewidth=2,
+                alpha=0.7,
+                linewidth=2,
                 color="darkcyan",
-            ) 
-        
+            )
 
         ax2.set_ylim(bottom=0)
-        
-        
+
         return ax
 
-    def plot_raman(self, broadening_type='lorentzian', broadening_value=20, ax=None, scaling_factor=1.0):
+    def plot_raman(self,
+                   vib_results,
+                   broadening_type='lorentzian',
+                   broadening_value=20,
+                   ax=None,
+                   scaling_factor=1.0):
         """
         Plot a raman spectrum.
 
@@ -1116,56 +1182,83 @@ class VibrationalAnalysis:
         :param scaling_factor:
             A scaling factor for the frequencies.
 
-                        
         :return:
             A Matplotlib axis object.
         """
-                
-        vib_results = self._results
-        
+
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
-        
+
         ax.set_xlabel('Wavenumber [cm$^{-1}$]')
         ax.set_ylabel('$\epsilon$ [mol$^{-1}$ cm$^{-1}$]')
         ax.set_title("Raman Spectrum")
 
-
         freqs = vib_results['vib_frequencies']
         raman_ints = vib_results['raman_intensities'][0]
-        if broadening_type == 'lorentzian':
-            x, y = self.lorentzian(freqs, raman_ints, 0, 4000, 1, broadening_value)
-        elif broadening_type == 'gaussian':
-            x, y = self.gaussian(freqs, raman_ints, 0, 4000, 1, broadening_value)
-        
-        ax.plot(x*scaling_factor, y*6.0220E-09,  color="black", alpha= 0.9, linewidth=2.5)
-        
-        legend_bars = mlines.Line2D([], [], color='darkcyan', alpha=0.7, linewidth=2, label='Raman intensity')
-        label_spectrum = str(broadening_type)+" broadening "+ str(broadening_value)+" cm$^{-1}$"
-        legend_spectrum = mlines.Line2D([], [], color='black', linestyle='-',linewidth=2.5,  label= label_spectrum)
+        if broadening_type.lower() == 'lorentzian':
+            x, y = self.lorentzian_broadening(freqs, raman_ints, 0, 4000, 1,
+                                              broadening_value)
+        elif broadening_type.lower() == 'gaussian':
+            x, y = self.gaussian_broadening(freqs, raman_ints, 0, 4000, 1,
+                                            broadening_value)
+
+        ax.plot(x * scaling_factor,
+                y * 6.0220E-09,
+                color="black",
+                alpha=0.9,
+                linewidth=2.5)
+
+        legend_bars = mlines.Line2D([], [],
+                                    color='darkcyan',
+                                    alpha=0.7,
+                                    linewidth=2,
+                                    label='Raman intensity')
+        label_spectrum = f'{broadening_type.capitalize()} '
+        label_spectrum += f'broadening ({broadening_value:.1f} ' + r'cm$^{-1}$)'
+        legend_spectrum = mlines.Line2D([], [],
+                                        color='black',
+                                        linestyle='-',
+                                        linewidth=2.5,
+                                        label=label_spectrum)
         scaling = str(scaling_factor)
-        legend_scaling = mlines.Line2D([], [],  color='white', linestyle='-', alpha=0.0001, label= "Scaling factor: "+scaling)
-        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling], frameon=False, borderaxespad=0., loc='center left', bbox_to_anchor=(1.15, 0.5))
-        ax.set_ylim(0, max(y*6.0220E-09)*1.1)
+        legend_scaling = mlines.Line2D([], [],
+                                       color='white',
+                                       linestyle='-',
+                                       alpha=0.0001,
+                                       label="Scaling factor: " + scaling)
+        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
+                  frameon=False,
+                  borderaxespad=0.,
+                  loc='center left',
+                  bbox_to_anchor=(1.15, 0.5))
+        ax.set_ylim(0, max(y * 6.0220E-09) * 1.1)
         ax.set_ylim(bottom=0)
         ax.set_xlim(0, 3900)
         ax2 = ax.twinx()
         ax2.set_ylabel('Raman intensity [A$^4$/amu]')
-        
+
         for i in np.arange(len(vib_results['vib_frequencies'])):
             ax2.plot(
-                [scaling_factor * vib_results['vib_frequencies'][i], scaling_factor*vib_results['vib_frequencies'][i]],
+                [
+                    scaling_factor * vib_results['vib_frequencies'][i],
+                    scaling_factor * vib_results['vib_frequencies'][i]
+                ],
                 [0.0, vib_results['raman_intensities'][0][i]],
-                alpha=0.7, linewidth=2,
+                alpha=0.7,
+                linewidth=2,
                 color="darkcyan",
-            ) 
-        
+            )
 
         ax2.set_ylim(bottom=0)
-        
+
         return ax
 
-    def plot(self, broadening_type='lorentzian', broadening_value=20, plot_type='ir',  scaling_factor=1.0):
+    def plot(self,
+             vib_results,
+             broadening_type='lorentzian',
+             broadening_value=20,
+             plot_type='ir',
+             scaling_factor=1.0):
         """
         Plot vibrational analysis results.
 
@@ -1179,100 +1272,128 @@ class VibrationalAnalysis:
             The type of plot to make. Either 'ir', 'raman', or 'vibrational'.
         :param scaling_factor:
             A scaling factor for the frequencies.
-                       
+
         :return:
             A Matplotlib axis object.
         """
 
-        vib_results = self._results
-        if plot_type == 'ir':
-            x = self.plot_ir(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
-        elif plot_type == 'raman':
-            x = self.plot_raman(broadening_type=broadening_type, broadening_value=broadening_value, scaling_factor=scaling_factor)
-        elif plot_type == 'vibrational':
-            fig, axs = plt.subplots(2, 1,figsize=(8, 10))
-            fig.subplots_adjust(hspace=0.3)  # Increase the height space between subplots
-            self.plot_ir(broadening_type=broadening_type,broadening_value=broadening_value, ax=axs[0], scaling_factor=scaling_factor)
-            self.plot_raman(broadening_type=broadening_type, broadening_value=broadening_value, ax=axs[1], scaling_factor=scaling_factor)
-        else:
-            print("Invalid plot type")
-            return None
-        plt.show()
-        return None
+        if plot_type.lower() == 'ir':
+            self.plot_ir(vib_results,
+                         broadening_type=broadening_type,
+                         broadening_value=broadening_value,
+                         scaling_factor=scaling_factor)
 
-    def info(self, type='ir'):
+        elif plot_type.lower() == 'raman':
+            self.plot_raman(vib_results,
+                            broadening_type=broadening_type,
+                            broadening_value=broadening_value,
+                            scaling_factor=scaling_factor)
+
+        elif plot_type.lower() == 'vibrational':
+            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # Increase the height space between subplots
+            fig.subplots_adjust(hspace=0.3)
+            self.plot_ir(vib_results,
+                         broadening_type=broadening_type,
+                         broadening_value=broadening_value,
+                         ax=axs[0],
+                         scaling_factor=scaling_factor)
+            self.plot_raman(vib_results,
+                            broadening_type=broadening_type,
+                            broadening_value=broadening_value,
+                            ax=axs[1],
+                            scaling_factor=scaling_factor)
+
+        else:
+            assert_msg_critical(False, 'Invalid plot type')
+
+        plt.show()
+
+    def print_info(self, vib_results, info_type='ir'):
         """
         Print information about the vibrational analysis.
 
         :param type:
             The type of information to print. Either 'ir', 'raman', or 'vibrational'.
-
-        :return:
-            None
-
-
         """
-        vib_results = self._results
+
         # get the first line of the molecule_xyz_string
-        print("Number of atoms: " + vib_results['molecule_xyz_string'].split('\n')[0])
-        print("Number of normal modes: " + str(len(vib_results['normal_modes'])))
+        print("Number of atoms: " +
+              vib_results['molecule_xyz_string'].splitlines()[0])
+        print("Number of normal modes: " +
+              str(len(vib_results['normal_modes'])))
         print()
-        if type == 'ir':
+
+        if info_type.lower() == 'ir':
+            if vib_results['ir_intensities'] is None:
+                assert_msg_critical(False, "No IR intensities available")
+
             print("3 modes with the highest IR intensity:")
             print("Mode  Frequency [cm^-1]  Intensity [km/mol]")
-            if vib_results['ir_intensities'] is None:
-                print("No IR intensities available")
-                return None
+
             # sort the intensities
             sorted_indices = np.argsort(vib_results['ir_intensities'])
             for i in range(1, 4):
                 idx = sorted_indices[-i]
-                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['ir_intensities'][idx]:10.2f}")
-        elif type == 'raman':
+                print(f"{idx + 1:4d}    " +
+                      f"{vib_results['vib_frequencies'][idx]:10.2f}    " +
+                      f"{vib_results['ir_intensities'][idx]:10.2f}")
+
+        elif info_type.lower() == 'raman':
             if vib_results['raman_intensities'] is None:
-                print("No Raman intensities available")
-                return None        
-            print("3 modes with the highest raman intensity:")
+                assert_msg_critical(False, "No Raman intensities available")
+
+            print("3 modes with the highest Raman intensity:")
             print("Mode  Frequency [cm^-1]  Intensity [A^4/amu]")
 
             # sort the intensities
             sorted_indices = np.argsort(vib_results['raman_intensities'][0])
             for i in range(1, 4):
                 idx = sorted_indices[-i]
-                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['raman_intensities'][0][idx]:10.2f}")
-        
-        elif type == 'vibrational':
+                print(f"{idx + 1:4d}    " +
+                      f"{vib_results['vib_frequencies'][idx]:10.2f}    " +
+                      f"{vib_results['raman_intensities'][0][idx]:10.2f}")
+
+        elif info_type.lower() == 'vibrational':
+            if vib_results['ir_intensities'] is None:
+                assert_msg_critical(False, "No IR intensities available")
+
+            if vib_results['raman_intensities'] is None:
+                assert_msg_critical(False, "No Raman intensities available")
+
             print("3 modes with the highest IR intensity:")
             print("Mode  Frequency [cm^-1]  Intensity [km/mol]")
-            if vib_results['ir_intensities'] is None:
-                print("No IR intensities available")
-                return None
-            if vib_results['raman_intensities'] is None:
-                print("No Raman intensities available")
-                return None
-            if vib_results['raman_intensities'] and vib_results['ir_intensities'] is None:
-                print("No Raman and IR intensities available")
-                return None
+
             # sort the intensities
             sorted_indices = np.argsort(vib_results['ir_intensities'])
             for i in range(1, 4):
                 idx = sorted_indices[-i]
-                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['ir_intensities'][idx]:10.2f}")
-
+                print(f"{idx + 1:4d}    " +
+                      f"{vib_results['vib_frequencies'][idx]:10.2f}    " +
+                      f"{vib_results['ir_intensities'][idx]:10.2f}")
             print()
-            print("3vdrvir modes with the highest raman intensity:")
+
+            print("3 modes with the highest Raman intensity:")
             print("Mode  Frequency [cm^-1]  Intensity [A^4/amu]")
 
             # sort the intensities
             sorted_indices = np.argsort(vib_results['raman_intensities'][0])
             for i in range(1, 4):
                 idx = sorted_indices[-i]
-                print(f"{idx+1:4d}    {vib_results['vib_frequencies'][idx]:10.2f}    {vib_results['raman_intensities'][0][idx]:10.2f}")
+                print(f"{idx + 1:4d}    " +
+                      f"{vib_results['vib_frequencies'][idx]:10.2f}    " +
+                      f"{vib_results['raman_intensities'][0][idx]:10.2f}")
+
         else:
-            print("Invalid type")
-            return None
-        
-    def animate(self, mode=1, frames=15, amplitude=0.5, width=400, height=300):
+            assert_msg_critical(False, 'Invalid plot type')
+
+    def animate(self,
+                vib_results,
+                mode=1,
+                frames=15,
+                amplitude=0.5,
+                width=400,
+                height=300):
         """
         Animate a normal mode.
 
@@ -1286,34 +1407,32 @@ class VibrationalAnalysis:
             The width of the animation.
         :param height:
             The height of the animation.
-
-        :return:
-            None
-
         """
+
         try:
             import py3Dmol as p3d
         except ImportError:
-            print("Please install the py3Dmol library to use this function")
-            return None
-        vib_results = self._results
-            
-        xyz = vib_results['molecule_xyz_string']
-        if mode > len(vib_results['normal_modes']):
-            print(f"Your asking to animate the "+ str(mode)+"th mode but the molecule only has " + str(len(vib_results['normal_modes']))+ " normal modes.")
-            return None
-        nm = vib_results['normal_modes'][mode-1]
+            raise ImportError("py3Dmol is required for this functionality")
 
-        xyz_lines = xyz.strip().split('\n')
+        assert_msg_critical(
+            mode <= len(vib_results['normal_modes']),
+            "Your asking to animate the " + str(mode) +
+            "th mode but the molecule only has " +
+            str(len(vib_results['normal_modes'])) + " normal modes.")
+
+        xyz = vib_results['molecule_xyz_string']
+        nm = vib_results['normal_modes'][mode - 1]
+
+        xyz_lines = xyz.strip().splitlines()
         nm_reshaped = nm.reshape(-1, 3)
         for i in range(2, len(xyz_lines)):
             # Split the line into its components
             components = xyz_lines[i].split()
-        
+
             # Add the displacement values
             for j in range(3):
-                components.append(f"{nm_reshaped[i-2][j]:.6f}")
-        
+                components.append(f"{nm_reshaped[i - 2][j]:.6f}")
+
             # Join the components back into a string
             xyz_lines[i] = ' '.join(components)
 
@@ -1321,7 +1440,11 @@ class VibrationalAnalysis:
         vib_xyz = '\n'.join(xyz_lines)
 
         view = p3d.view(width=width, height=height)
-        view.addModel(vib_xyz, "xyz", {"vibrate": {"frames": frames, "amplitude": amplitude}})
+        view.addModel(vib_xyz, "xyz",
+                      {"vibrate": {
+                          "frames": frames,
+                          "amplitude": amplitude,
+                      }})
         view.setViewStyle({"style": "outline", "width": 0.05})
         view.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
         view.animate({"loop": "backAndForth"})
@@ -1329,22 +1452,23 @@ class VibrationalAnalysis:
         view.zoomTo()
         view.show()
 
-    def lorentzian(self, x, y, xmin, xmax, xstep, br):
+    @staticmethod
+    def lorentzian_broadening(x, y, xmin, xmax, xstep, br):
         xi = np.arange(xmin, xmax, xstep)
         yi = np.zeros(len(xi))
         for i in range(len(xi)):
             for k in range(len(x)):
-                yi[i] = (
-                    yi[i]
-                    + y[k] * br / ((xi[i] - x[k]) ** 2 + (br / 2.0) ** 2) / np.pi
-                )
+                yi[i] = (yi[i] + y[k] * br / ((xi[i] - x[k])**2 +
+                                              (br / 2.0)**2) / np.pi)
         return xi, yi
 
-    def gaussian(self, x, y, xmin, xmax, xstep, br):
-        br = br / np.sqrt(4*2*np.log(2))
+    @staticmethod
+    def gaussian_broadening(x, y, xmin, xmax, xstep, br):
+        br_g = br / np.sqrt(4.0 * 2.0 * np.log(2))
         xi = np.arange(xmin, xmax, xstep)
         yi = np.zeros(len(xi))
         for i in range(len(xi)):
             for k in range(len(y)):
-                yi[i] = yi[i] + y[k] * np.e ** (-((xi[i] - x[k]) ** 2) / (2 * br ** 2))
+                yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
+                                              (2 * br_g**2))
         return xi, yi
