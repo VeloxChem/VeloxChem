@@ -75,6 +75,9 @@ class VibrationalAnalysis:
         - ir_intensities: The IR intensities in km/mol.
         - polarizability_gradient: The gradient of the polarizability.
         - raman_intensities: The Raman intensities (in A**4/amu).
+        - int_pol: Parallel Raman (in A**4/amu).
+        - int_depol: Perpendicular Raman (in A**4/amu).
+        - depol_ratio: Depolarization ratio (in A**4/amu).
         - frequencies: the frequency/ies of external electric field (for resonance Raman)
         - flag: The name of the driver.
         - numerical_hessian: Perform numerical Hessian calculation.
@@ -147,6 +150,9 @@ class VibrationalAnalysis:
         self.ir_intensities = None
         self.polarizability_gradient = None
         self.raman_intensities = None
+        self.int_pol = None
+        self.int_depol = None
+        self.depol_ratio = None
 
         self.flag = 'Vibrational Analysis Driver'
 
@@ -251,9 +257,8 @@ class VibrationalAnalysis:
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
         """
-        Performs vibrational analysis (frequencies and normal modes)
-        based on the molecular Hessian employing the geomeTRIC module:
-        J. Chem. Phys. 144, 214108, DOI: 10.1063/1.4952956
+        Drives the computation of the vibrational analysis and
+        associated properties.
 
         :param molecule:
             The molecule.
@@ -262,6 +267,9 @@ class VibrationalAnalysis:
         :param min_basis:
             The minimal AO basis set.
         """
+
+        if self.rank == mpi_master():
+            self.print_header()
 
         # compute the Hessian
         self.compute_hessian(molecule, ao_basis)
@@ -285,8 +293,10 @@ class VibrationalAnalysis:
 
             # calculate the analytical polarizability gradient for Raman intensities
             if (self.do_raman or self.do_resonance_raman) and self.is_scf:
-                self.raman_intensities, depol_ratio = self.calculate_raman_activity(
-                        self.normal_modes)
+                #self.raman_intensities, depol_ratio = self.calculate_raman_activity(
+                #        self.normal_modes)
+                self.raman_intensities, self.int_pol, self.int_depol, self.depol_ratio = (
+                    self.calculate_raman_activity(self.normal_modes))
 
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
@@ -309,6 +319,9 @@ class VibrationalAnalysis:
         """
         Runs the frequency analysis from geomeTRIC to obtain vibrational
         frequencies and normal modes.
+
+        Based on the molecular Hessian employing the geomeTRIC module:
+        J. Chem. Phys. 144, 214108, DOI: 10.1063/1.4952956
 
         :param molecule:
             The molecule.
@@ -357,6 +370,8 @@ class VibrationalAnalysis:
 
         # dictionary for Raman intensities
         raman_intensities = {}
+        int_pol = None
+        int_depol = None
         depol_ratio = None
 
         for freq in freqs:
@@ -391,7 +406,7 @@ class VibrationalAnalysis:
                 int_depol = 3.0 * gamma_bar_sq
                 depol_ratio = int_depol / int_pol
 
-        return raman_intensities, depol_ratio
+        return raman_intensities, int_pol, int_depol, depol_ratio
 
     def calculate_ir_intensity(self, normal_modes):
         """
@@ -626,19 +641,11 @@ class VibrationalAnalysis:
                                             axis=1)[:, np.newaxis]
         self.normed_normal_modes = self.normal_modes / np.linalg.norm(self.normal_modes,
                                             axis=1)[:, np.newaxis]
-
-        # sort out dominant modes to print to ostream
-        #n_dom_modes = 5
-        #if number_of_modes <= n_dom_modes:
-        #    normal_mode_idx_lst = range(number_of_modes)
-        #elif (self.ir_intensities is not None):
-        #    normal_mode_idx_lst = self.get_dominant_modes(n_dom_modes)
-        #    warn_msg1 = f'The {n_dom_modes} dominant normal modes are printed below.'
-        #    warn_msg2 = f'All results are available in txt-format in {self.result_file}.'
-        #    self.ostream.print_warning(warn_msg1)
-        #    self.ostream.print_warning(warn_msg2)
-        #else:
-        #    normal_mode_idx_lst = range(n_dom_modes)
+       
+        title = 'Vibrational Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
 
         width = 52
         for k in idx_lst:
@@ -680,17 +687,17 @@ class VibrationalAnalysis:
 
                 if self.print_depolarization_ratio:
                     raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Parallel Raman:', int_pol[k], 'A**4/amu')
+                        'Parallel Raman:', self.int_pol[k], 'A**4/amu')
                     self.ostream.print_header(
                         raman_parallel_str.ljust(width))
 
                     raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Perpendicular Raman:', int_depol[k], 'A**4/amu')
+                        'Perpendicular Raman:', self.int_depol[k], 'A**4/amu')
                     self.ostream.print_header(
                         raman_perpendicular_str.ljust(width))
 
                     depolarization_str = '{:22s}{:20.4f}'.format(
-                        'Depolarization ratio:', depol_ratio[k])
+                        'Depolarization ratio:', self.depol_ratio[k])
                     self.ostream.print_header(
                         depolarization_str.ljust(width))
 
@@ -980,3 +987,30 @@ class VibrationalAnalysis:
         hf.close()
 
         return True
+
+    def print_header(self):
+        """
+        Prints vibrational analysis driver details to output stream.
+        """
+
+        str_width = 70
+
+        self.ostream.print_blank()
+        self.ostream.print_header(self.flag)
+        self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.flush()
+
+        self.ostream.print_blank()
+        self.ostream.print_header('The following will be computed:'.ljust(str_width))
+        self.ostream.print_blank()
+        self.ostream.print_header('- Vibrational frequencies and normal modes'.ljust(str_width))
+        self.ostream.print_header('- Force constants'.ljust(str_width))
+        if self.do_ir:
+            self.ostream.print_header('- IR intensities'.ljust(str_width))
+        if self.do_raman:
+            self.ostream.print_header('- Raman activity'.ljust(str_width))
+        if self.do_resonance_raman:
+            self.ostream.print_header('- Resonance Raman ({} frequencies)'.format(
+                len(self.frequencies)).ljust(str_width))
+        self.ostream.print_blank()
+        self.ostream.flush()
