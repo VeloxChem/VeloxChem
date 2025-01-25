@@ -190,7 +190,14 @@ class PolOrbitalResponse(CphfSolver):
             unrelaxed one-particle density.
         """
 
-        self.profiler.start_timer('RHS')
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        profiler.start_timer('RHS')
 
         # Workflow:
         # 1) Construct the necessary density matrices
@@ -421,10 +428,10 @@ class PolOrbitalResponse(CphfSolver):
 
             fock_ao_rhs_real = self._comp_lr_fock(dm_ao_rhs_real_list, molecule,
                                basis, eri_dict, dft_dict, pe_dict,
-                               self.profiler)
+                               profiler)
             fock_ao_rhs_imag = self._comp_lr_fock(dm_ao_rhs_imag_list, molecule,
                                basis, eri_dict, dft_dict, pe_dict,
-                               self.profiler)
+                               profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -491,7 +498,7 @@ class PolOrbitalResponse(CphfSolver):
                     # because here vectors are scaled by 1/sqrt(2)
                     rhs_mo += 0.5 * (gxc_mo)
 
-            self.profiler.stop_timer('RHS')
+            profiler.stop_timer('RHS')
 
             if self.rank == mpi_master():
                 # reduce dimensions of RHS to unique operator component combinations
@@ -577,7 +584,14 @@ class PolOrbitalResponse(CphfSolver):
             unrelaxed one-particle density.
         """
 
-        self.profiler.start_timer('RHS')
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        profiler.start_timer('RHS')
 
         # Workflow:
         # 1) Construct the necessary density matrices
@@ -716,7 +730,7 @@ class PolOrbitalResponse(CphfSolver):
             # vector-related components to general Fock matrix
             # (not 1PDM part)
             fock_ao_rhs = self._comp_lr_fock(dm_ao_rhs_list, molecule, basis,
-                               eri_dict, dft_dict, pe_dict, self.profiler)
+                               eri_dict, dft_dict, pe_dict, profiler)
 
             # calculate the RHS
             if self.rank == mpi_master():
@@ -765,7 +779,7 @@ class PolOrbitalResponse(CphfSolver):
                     # because here vectors are scaled by 1/sqrt(2)
                     rhs_mo += 0.5 * gxc_mo
 
-            self.profiler.stop_timer('RHS')
+            profiler.stop_timer('RHS')
 
             if self.rank == mpi_master():
                 # reduce dimensions of RHS to unique operator component combinations
@@ -1642,8 +1656,9 @@ class PolOrbitalResponse(CphfSolver):
             cphf_ao_list = self.comm.bcast(cphf_ao_list, root=mpi_master())
 
             # TODO: what has to be on MPI master and what not?
+            # TODO: use profiler
             fock_cphf = self._comp_lr_fock(cphf_ao_list, molecule, basis,
-                               eri_dict, dft_dict, pe_dict, self.profiler)
+                               eri_dict, dft_dict, pe_dict)
             # For now we:
             # - loop over indices m and n
             # - select component m or n in x_plus_y, x_minus_y,
@@ -1893,12 +1908,11 @@ class PolOrbitalResponse(CphfSolver):
             cphf_ao_list_imag = self.comm.bcast(cphf_ao_list_imag, root=mpi_master())
 
             # TODO: what has to be on MPI master and what not?
+            # TODO: use profiler
             fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule,
-                               basis, eri_dict, dft_dict, pe_dict,
-                               self.profiler)
+                               basis, eri_dict, dft_dict, pe_dict)
             fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule,
-                               basis, eri_dict, dft_dict, pe_dict,
-                               self.profiler)
+                               basis, eri_dict, dft_dict, pe_dict)
 
             # For now we:
             # - loop over indices m and n

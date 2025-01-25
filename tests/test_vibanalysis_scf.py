@@ -1,7 +1,6 @@
 from pathlib import Path
 import numpy as np
 import h5py
-import sys
 import pytest
 
 from veloxchem.veloxchemlib import mpi_master
@@ -112,7 +111,51 @@ class TestScfVibrationalAnalysisDriver:
             assert rel_diff_raman_dyn < 1.0e-3
 
     @pytest.mark.solvers
-    def test_scf_vibrational_analysis_driver_analytical(self):
+    def test_scf_vibrational_analysis_ir(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
+        h5file = str(here / 'data' / 'water_vib_scf.h5')
+
+        task = MpiTask([inpfile, None])
+        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        vib_settings = {
+            'do_ir': 'yes',
+            'do_raman': 'no',
+            'numerical_hessian': 'no',
+            'numerical_raman': 'no'
+        }
+        method_settings = {}
+        vibanalysis_drv = VibrationalAnalysis(scf_drv)
+        vibanalysis_drv.update_settings(method_settings, vib_settings)
+        vibanalysis_drv.ostream.mute()
+        vibanalysis_drv.compute(task.molecule, task.ao_basis)
+
+        if task.mpi_rank == mpi_master():
+
+            hf = h5py.File(h5file)
+            ref_hessian = np.array(hf.get('hessian'))
+            ref_frequencies = np.array(hf.get('frequencies'))
+            ref_ir_intensities = np.array(hf.get('ir'))
+            hf.close()
+
+            diff_hessian = np.max(np.abs(vibanalysis_drv.hessian - ref_hessian))
+            rel_diff_freq = np.max(
+                np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
+            rel_diff_ir = np.max(
+                np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
+                       1.0))
+
+            assert diff_hessian < 1.0e-5
+            assert rel_diff_freq < 1.0e-3
+            assert rel_diff_ir < 1.0e-3
+
+        task.finish()
+
+    def test_scf_vibrational_analysis_raman(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -161,8 +204,7 @@ class TestScfVibrationalAnalysisDriver:
 
         task.finish()
 
-    # TODO: enabled test
-    def disabled_test_scf_resonance_raman_analytical(self):
+    def test_scf_resonance_raman_analytical(self):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
