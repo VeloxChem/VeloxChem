@@ -41,7 +41,7 @@ class TestScfVibrationalAnalysisDriver:
             ref_hessian = np.array(hf.get('hessian'))
             ref_frequencies = np.array(hf.get('frequencies'))
             ref_ir_intensities = np.array(hf.get('ir'))
-            ref_raman_intensities = np.array(hf.get('raman'))
+            ref_raman_activities = np.array(hf.get('raman'))
             hf.close()
 
             diff_hessian = np.max(np.abs(vibanalysis_drv.hessian - ref_hessian))
@@ -51,8 +51,8 @@ class TestScfVibrationalAnalysisDriver:
                 np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
             rel_diff_raman = np.max(
-                np.abs(vibanalysis_drv.raman_intensities[0.0] /
-                       ref_raman_intensities - 1.0))
+                np.abs(vibanalysis_drv.raman_activities[0.0] /
+                       ref_raman_activities - 1.0))
 
             assert diff_hessian < 1.0e-5
             assert rel_diff_freq < 1.0e-3
@@ -93,18 +93,18 @@ class TestScfVibrationalAnalysisDriver:
             hf = h5py.File(h5file)
             ref_frequencies = np.array(hf.get('frequencies'))
             hf_rr = hf['resonance_raman']
-            ref_raman_intensities = np.array(
+            ref_raman_activities = np.array(
                 [hf_rr.get('0.0'), hf_rr.get('0.4')])
             hf.close()
 
             rel_diff_freq = np.max(
                 np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
             #rel_diff_raman_static = np.max(
-            #    np.abs(vibanalysis_drv.raman_intensities[0.0] /
-            #           ref_raman_intensities[0] - 1.0))
+            #    np.abs(vibanalysis_drv.raman_activities[0.0] /
+            #           ref_raman_activities[0] - 1.0))
             rel_diff_raman_dyn = np.max(
-                np.abs(vibanalysis_drv.raman_intensities[0.4] /
-                       ref_raman_intensities[1] - 1.0))
+                np.abs(vibanalysis_drv.raman_activities[0.4] /
+                       ref_raman_activities[1] - 1.0))
 
             assert rel_diff_freq < 1.0e-3
             #assert rel_diff_raman_static < 1.0e-3
@@ -184,7 +184,7 @@ class TestScfVibrationalAnalysisDriver:
             ref_hessian = np.array(hf.get('hessian'))
             ref_frequencies = np.array(hf.get('frequencies'))
             ref_ir_intensities = np.array(hf.get('ir'))
-            ref_raman_intensities = np.array(hf.get('raman'))
+            ref_raman_activities = np.array(hf.get('raman'))
             hf.close()
 
             diff_hessian = np.max(np.abs(vibanalysis_drv.hessian - ref_hessian))
@@ -194,8 +194,8 @@ class TestScfVibrationalAnalysisDriver:
                 np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
             rel_diff_raman = np.max(
-                np.abs(vibanalysis_drv.raman_intensities[0.0] /
-                       ref_raman_intensities - 1.0))
+                np.abs(vibanalysis_drv.raman_activities[0.0] /
+                       ref_raman_activities - 1.0))
 
             assert diff_hessian < 1.0e-5
             assert rel_diff_freq < 1.0e-3
@@ -235,18 +235,18 @@ class TestScfVibrationalAnalysisDriver:
             hf = h5py.File(h5file)
             ref_frequencies = np.array(hf.get('frequencies'))
             hf_rr = hf['resonance_raman']
-            ref_raman_intensities = np.array(
+            ref_raman_activities = np.array(
                 [hf_rr.get('0.0'), hf_rr.get('0.4')])
             hf.close()
 
             rel_diff_freq = np.max(
                 np.abs(vibanalysis_drv.vib_frequencies / ref_frequencies - 1.0))
             #rel_diff_raman_static = np.max(
-            #    np.abs(vibanalysis_drv.raman_intensities[0.0] /
-            #           ref_raman_intensities[0] - 1.0))
+            #    np.abs(vibanalysis_drv.raman_activities[0.0] /
+            #           ref_raman_activities[0] - 1.0))
             rel_diff_raman_dyn = np.max(
-                np.abs(vibanalysis_drv.raman_intensities[0.4] /
-                       ref_raman_intensities[1] - 1.0))
+                np.abs(vibanalysis_drv.raman_activities[0.4] /
+                       ref_raman_activities[1] - 1.0))
 
             assert rel_diff_freq < 1.0e-3
             #assert rel_diff_raman_static < 1.0e-3
