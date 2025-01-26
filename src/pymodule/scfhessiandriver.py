@@ -98,6 +98,11 @@ class ScfHessianDriver(HessianDriver):
 
         self.use_subcomms = False
 
+        # option dictionaries from input
+        # TODO: cleanup
+        self.method_dict = {}
+        self.cphf_dict = {}
+
         self._input_keywords['hessian'].update({
             'orbrsp_only':
                 ('bool', 'whether to only run CPHF orbital response'),
