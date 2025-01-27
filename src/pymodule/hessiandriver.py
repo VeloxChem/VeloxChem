@@ -318,23 +318,26 @@ class HessianDriver:
 
         self.ostream.print_block(molecule.get_string())
 
-    def print_hessian(self, molecule):
+    def print_hessian(self, molecule, title=None):
         """
         Prints the Hessian.
 
         :param molecule:
             The molecule.
+        :param title:
+            The title.
         """
 
         # atom labels
         labels = molecule.get_labels()
 
-        if self.numerical:
-            title = 'Numerical '
-        else:
-            title = 'Analytical '
-
-        title += 'Hessian (Hartree/Bohr**2)'
+        # TODO: move to child classes
+        if title is None:
+            if self.numerical:
+                title = 'Numerical '
+            else:
+                title = 'Analytical '
+            title += 'Hessian (Hartree/Bohr**2)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * (len(title) + 2))
         self.ostream.print_blank()
