@@ -12,6 +12,7 @@
 #include "StringFormat.hpp"
 #include "TensorComponents.hpp"
 #include "TensorLabels.hpp"
+#include "T3FlatBuffer.hpp"
 
 namespace vlx_general {
 
@@ -118,6 +119,15 @@ export_general(py::module &m) -> void
         .def("__ne__", [](const TPoint<double> &self, const TPoint<double> &other) { return self != other; })
         .def("__copy__", [](const TPoint<double> &self) { return TPoint<double>(self); })
         .def("__deepcopy__", [](const TPoint<double> &self, py::dict) { return TPoint<double>(self); });
+    
+    // CT3FlatBuffer class
+    PyClass<CT3FlatBuffer<double>>(m, "T3FlatBuffer")
+        .def(py::init<>())
+        .def(py::init<const std::vector<size_t>&, const size_t>())
+        .def(py::init<const CT3FlatBuffer<double> &>())
+        .def("indices", &CT3FlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
+        .def("__copy__", [](CT3FlatBuffer<double> &self) { return CT3FlatBuffer<double>(self); })
+        .def("__deepcopy__", [](const CT3FlatBuffer<double> &self, py::dict) { return CT3FlatBuffer<double>(self); });
 }
 
 }  // namespace vlx_general

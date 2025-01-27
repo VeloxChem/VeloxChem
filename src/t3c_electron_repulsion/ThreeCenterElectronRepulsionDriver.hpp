@@ -4,6 +4,7 @@
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "T3FlatBuffer.hpp"
 
 /// @brief Class CThreeCenterElectronRepulsionDriver provides methods for computing three-center electron repulsion integrals.
 class CThreeCenterElectronRepulsionDriver
@@ -48,7 +49,7 @@ class CThreeCenterElectronRepulsionDriver
     /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
     /// @param molecule The molecule.
     /// @return The electron repulsion matrix.
-    auto compute(const CMolecularBasis &basis, const CMolecularBasis &aux_basis, const CMolecule &molecule) const -> CMatrix;
+    auto compute(const CMolecularBasis &basis, const CMolecularBasis &aux_basis, const CMolecule &molecule) const -> CT3FlatBuffer<double>;
 };
 
 

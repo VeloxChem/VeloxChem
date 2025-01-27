@@ -47,6 +47,19 @@ count_elements_by_values(const std::vector<T>& values,
     return static_cast<T>(std::ranges::count(values, selector));
 }
 
+/// @brief Computes linerized upper triangular index (row major arragment)
+/// @param irow  The row of square matrix.
+/// @param icolumn  The column of square matrix.
+/// @return The linearized index.
+template <Integral T>
+inline auto
+uplo_rm_index(const T irow,
+              const T icolumn,
+              const T nrows) -> T
+{
+    return icolumn + irow * nrows - irow * (irow + 1) / 2;
+}
+
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */

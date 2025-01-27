@@ -185,8 +185,7 @@ CFockDriver::compute_mixpre(const CT4CScreener &screener,
                 const auto ket_gpairs = gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
                 const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
                 const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
-                const bool diagonal   = (task[0] == task[1]) && (task[2] == task[3]) && (bra_range == ket_range);
-#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal)
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range)
                 {
                     CT4CMatrixDistributor distributor(ptr_fock, ptr_density, label, exchange_factor, omega);
                     distributor.set_indices(bra_gpairs, ket_gpairs);

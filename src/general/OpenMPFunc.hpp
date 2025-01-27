@@ -75,6 +75,11 @@ auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, c
 /// @return The vector of work tasks.
 auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int min_threshold, const int max_threshold) -> std::vector<std::array<size_t, 8>>;
 
+/// @brief Generates auxilary work groups for OMP tasks manager.
+/// @param gto_blocks The vector of basis functions blocks.
+/// @return The vector of work tasks.
+auto make_aux_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<std::array<size_t, 3>>;
+
 /// @brief Gets angular momentum scaling factor for SIMD width.
 /// @param ang_pair The angular momentum pair.
 /// @return The scaling factor for SIMD width

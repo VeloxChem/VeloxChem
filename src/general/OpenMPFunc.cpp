@@ -377,6 +377,39 @@ auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
 }
 
 auto
+make_aux_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<std::array<size_t, 3>>
+{
+    auto wtasks = std::vector<std::array<size_t, 3>>();
+
+    if (const auto nblocks = gto_blocks.size(); nblocks > 0)
+    {
+        const auto nthreads = omp::get_number_of_threads();
+        
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            const auto gp_size = static_cast<size_t>(gto_blocks[i].number_of_basis_functions());
+            
+            auto bsize = gp_size / nthreads;
+            
+            if (bsize < simd::width<double>()) bsize = simd::width<double>();
+            
+            if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize;
+            
+            const auto bblocks = batch::number_of_batches(gp_size, bsize);
+            
+            for (size_t j = 0; j < bblocks; j++)
+            {
+                const auto bindices = batch::batch_range(j, gp_size, bsize);
+                
+                wtasks.push_back(std::array<size_t, 3>({i, bindices.first, bindices.second}));
+            }
+        }
+    }
+    
+    return wtasks;
+}
+
+auto
 angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
 {
     const auto angmom = ang_pair.first + ang_pair.second;
