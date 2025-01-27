@@ -98,6 +98,7 @@ class SolvationBuilder:
         self.acceleration_threshold = 1000
         self.number_of_attempts = 100
         self.random_rotation = True
+        self.failures_factor = 0.7
 
         # Molecules
         # Solute
@@ -341,8 +342,11 @@ class SolvationBuilder:
                     min_batch_size=min_batch_size,
                     total_quantity=quantity
                 )
-            while added_count < quantity:
 
+            failure_count = 0
+            max_failures = self.failures_factor * quantity
+
+            while added_count < quantity:
                 attempts = min(batch_size, quantity - added_count)
                 new_molecules = []
                 for _ in range(attempts):
@@ -350,11 +354,21 @@ class SolvationBuilder:
                     if result:
                         new_molecules.extend(result)
                         added_count += 1
+                        failure_count = 0
+                    else:
+                        failure_count += 1
+
+                if failure_count >= max_failures:
+                    self.ostream.print_info(f"Failed to pack {quantity - added_count} out of {quantity} molecules after {failure_count} attempts")
+                    self.ostream.flush()
+                    break  
+
                 if new_molecules:
                     self.system.extend(new_molecules)
                     new_coords = np.array([atom[-1] for atom in new_molecules])
                     existing_coords = np.vstack((existing_coords, new_coords))
                     tree = cKDTree(existing_coords)
+
             self.added_solvent_counts.append(added_count)
             msg = f"Solvated system with {added_count} solvent molecules out of {quantity} requested"
             self.ostream.print_info(msg)
@@ -882,7 +896,7 @@ class SolvationBuilder:
                 self.ostream.print_info("Consider reducing the target density")
                 self.ostream.flush()
 
-            return translated_solvent  
+            return translated_solvent
 
         return None
 
