@@ -927,7 +927,81 @@ class ForceFieldGenerator:
 
         return content.splitlines()
 
-    def create_topology(self, molecule, basis=None, scf_result=None, resp=True):
+    @staticmethod
+    def get_gaff_data_dict():
+        """
+        Gets GAFF data into a dictionary.
+        """
+
+        data = {
+            'version': None,
+            'refs': [],
+            'atom_types': [],
+            'bonds': [],
+            'angles': [],
+            'dihedrals': [],
+            'impropers': [],
+            'fudgeQQ': None,
+            'fudgeLJ': None,
+        }
+
+        gaff_path = Path(__file__).parent / 'tests' / 'data' / 'gaff-2.11.xml'
+        tree = ET.parse(str(gaff_path))
+        root = tree.getroot()
+
+        for node in root:
+
+            if node.tag == 'Info':
+                for subnode in node:
+                    if subnode.tag == 'Source':
+                        info = subnode.attrib
+                        data['version'] = info['Source']
+                    elif subnode.tag == 'Reference':
+                        data['refs'].append(subnode.text)
+
+            elif node.tag == 'AtomTypes':
+                for subnode in node:
+                    if subnode.tag == 'Type':
+                        info = subnode.attrib
+                        data['atom_types'].append(info)
+
+            elif node.tag == 'HarmonicBondForce':
+                for subnode in node:
+                    if subnode.tag == 'Bond':
+                        info = subnode.attrib
+                        data['bonds'].append(info)
+
+            elif node.tag == 'HarmonicAngleForce':
+                for subnode in node:
+                    if subnode.tag == 'Angle':
+                        info = subnode.attrib
+                        data['angles'].append(info)
+
+            elif node.tag == 'PeriodicTorsionForce':
+                for subnode in node:
+                    if subnode.tag == 'Proper':
+                        info = subnode.attrib
+                        data['dihedrals'].append(info)
+                    elif subnode.tag == 'Improper':
+                        info = subnode.attrib
+                        data['impropers'].append(info)
+
+            elif node.tag == 'NonbondedForce':
+                info = node.attrib
+                data['fudgeQQ'] = info['coulomb14scale']
+                data['fudgeLJ'] = info['lj14scale']
+
+                for subnode in node:
+                    if subnode.tag == 'Atom':
+                        info = subnode.attrib
+                        for idx in range(len(data['atom_types'])):
+                            if data['atom_types'][idx]['class'] == info['class']:
+                                data['atom_types'][idx]['sigma'] = info['sigma']
+                                data['atom_types'][idx]['epsilon'] = info['epsilon']
+
+        return data
+
+    def create_topology(self, molecule, basis=None, scf_result=None, resp=True, use_xml=True):
         """
         Analyzes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
@@ -943,17 +1017,32 @@ class ForceFieldGenerator:
             If False partial charges will be set to zero.
         """
 
-        # Read the force field data lines.
+        ff_data_dict = None
+        ff_data_lines = None
 
-        if self.force_field_data is None:
+        # Read the force field data
+
+        if use_xml:
+            ff_data_dict = self.get_gaff_data_dict()
+        elif self.force_field_data is None:
             ff_data_lines = self.get_gaff_data_lines()
         else:
             with open(self.force_field_data, 'r') as ff_data:
                 ff_data_lines = ff_data.readlines()
 
         # check GAFF version
+
         gaff_version = None
-        if ff_data_lines[0].startswith('AMBER General Force Field'):
+
+        if use_xml:
+            ff_data_version = ff_data_dict['version'].replace('gaff-', '').replace('.dat', '')
+            if '.' in ff_data_version:
+                version_major = ff_data_version.split('.')[0]
+                version_minor = ff_data_version.split('.')[1]
+                if version_major.isdigit() and version_minor.isdigit():
+                    gaff_version = f'{version_major}.{version_minor}'
+
+        elif ff_data_lines[0].startswith('AMBER General Force Field'):
             ff_data_version = ff_data_lines[0].split('Version')[1].split()[0]
             ff_data_version = ff_data_version.replace(',', '')
             if '.' in ff_data_version:
@@ -1153,15 +1242,26 @@ class ForceFieldGenerator:
                 else:
                     break
 
-            for line in ff_data_lines:
-                if line.startswith(f'  {at}     '):
-                    atom_ff = line[5:].strip().split()
-                    sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
-                    epsilon = float(atom_ff[1]) * 4.184
-                    comment = 'GAFF'
-                    atom_type_found = True
-                    use_gaff = True
-                    break
+            if use_xml:
+                for atom_type_data in ff_data_dict['atom_types']:
+                    # Note: need strip() for converting e.g. 'c ' to 'c'
+                    if atom_type_data['class'] == at.strip():
+                        sigma = float(atom_type_data['sigma'])
+                        epsilon = float(atom_type_data['epsilon'])
+                        comment = 'GAFF'
+                        atom_type_found = True
+                        use_gaff = True
+                        break
+            else:
+                for line in ff_data_lines:
+                    if line.startswith(f'  {at}     '):
+                        atom_ff = line[5:].strip().split()
+                        sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
+                        epsilon = float(atom_ff[1]) * 4.184
+                        comment = 'GAFF'
+                        atom_type_found = True
+                        use_gaff = True
+                        break
 
             if not atom_type_found:
                 if at == 'ow':
@@ -1239,20 +1339,35 @@ class ForceFieldGenerator:
                 re.compile(r'\A' + f'{at_1}-{at_2}  '),
                 re.compile(r'\A' + f'{at_2}-{at_1}  '),
             ]
+            target_bond_types = [
+                # Note: need strip() for converting e.g. 'c ' to 'c'
+                (at_1.strip(), at_2.strip()),
+                (at_2.strip(), at_1.strip()),
+            ]
 
             bond_found = False
             r, k_r, comment = None, None, None
 
-            for line in ff_data_lines:
-                for p in patterns:
-                    m = re.search(p, line)
-                    if m is not None:
-                        bond_ff = line[5:].strip().split()
-                        r = float(bond_ff[1]) * 0.1
-                        k_r = float(bond_ff[0]) * 4.184 * 2 * 100
-                        comment = m.group(0)
-                        bond_found = True
-                        break
+            if use_xml:
+                for bond_data in ff_data_dict['bonds']:
+                    for target_bond in target_bond_types:
+                        if target_bond == (bond_data['class1'], bond_data['class2']):
+                            r = float(bond_data['length'])
+                            k_r = float(bond_data['k'])
+                            comment = '-'.join(target_bond)
+                            bond_found = True
+                            break
+            else:
+                for line in ff_data_lines:
+                    for p in patterns:
+                        m = re.search(p, line)
+                        if m is not None:
+                            bond_ff = line[5:].strip().split()
+                            r = float(bond_ff[1]) * 0.1
+                            k_r = float(bond_ff[0]) * 4.184 * 2 * 100
+                            comment = m.group(0)
+                            bond_found = True
+                            break
 
             if not bond_found:
                 # Default value for bonds
@@ -1300,20 +1415,35 @@ class ForceFieldGenerator:
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
                 re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
             ]
+            target_angle_types = [
+                # Note: need strip() for converting e.g. 'c ' to 'c'
+                (at_1.strip(), at_2.strip(), at_3.strip()),
+                (at_3.strip(), at_2.strip(), at_1.strip()),
+            ]
 
             angle_found = False
             theta, k_theta, comment = None, None, None
 
-            for line in ff_data_lines:
-                for p in patterns:
-                    m = re.search(p, line)
-                    if m is not None:
-                        angle_ff = line[8:].strip().split()
-                        theta = float(angle_ff[1])
-                        k_theta = float(angle_ff[0]) * 4.184 * 2
-                        comment = m.group(0)
-                        angle_found = True
-                        break
+            if use_xml:
+                for angle_data in ff_data_dict['angles']:
+                    for target_angle in target_angle_types:
+                        if target_angle == (angle_data['class1'], angle_data['class2'], angle_data['class3']):
+                            theta = float(angle_data['angle']) / np.pi * 180.0
+                            k_theta = float(angle_data['k'])
+                            comment = '-'.join(target_angle)
+                            angle_found = True
+                            break
+            else:
+                for line in ff_data_lines:
+                    for p in patterns:
+                        m = re.search(p, line)
+                        if m is not None:
+                            angle_ff = line[8:].strip().split()
+                            theta = float(angle_ff[1])
+                            k_theta = float(angle_ff[0]) * 4.184 * 2
+                            comment = m.group(0)
+                            angle_found = True
+                            break
 
             if not angle_found:
                 # Default value for angles
@@ -1349,6 +1479,10 @@ class ForceFieldGenerator:
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3}-{at_4} '),
                 re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
             ]
+            target_dihedral_types = [
+                (at_1.strip(), at_2.strip(), at_3.strip(), at_4.strip()),
+                (at_4.strip(), at_3.strip(), at_2.strip(), at_1.strip()),
+            ]
 
             # special treatment for rotatable bonds, e.g. cc-cc, cd-cd, cc-na
             # and cd-na bonds between non-pure aromatic rings
@@ -1361,6 +1495,9 @@ class ForceFieldGenerator:
                     patterns = [
                         re.compile(r'\A' + 'X -cp-cp-X  '),
                     ]
+                    target_dihedral_types = [
+                        ('', 'cp', 'cp', ''),
+                    ]
                     special_comment = ('(Guessed for rotatable ' +
                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
 
@@ -1372,6 +1509,10 @@ class ForceFieldGenerator:
                         re.compile(r'\A' + 'X -ca-na-X  '),
                         re.compile(r'\A' + 'X -na-ca-X  '),
                     ]
+                    target_dihedral_types = [
+                        ('', 'ca', 'na', ''),
+                        ('', 'na', 'ca', ''),
+                    ]
                     special_comment = ('(Guessed for rotatable ' +
                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
 
@@ -1379,43 +1520,21 @@ class ForceFieldGenerator:
 
             dihedral_ff_lines = []
             dihedral_matches = []
-            for line in ff_data_lines:
-                for p in patterns:
-                    m = re.search(p, line)
-                    if m is not None:
-                        dihedral_ff = line[11:60].strip().split()
-                        if len(dihedral_ff) == 4:
-                            dihedral_ff_lines.append(line)
-                            dihedral_matches.append(
-                                m.group(0) + special_comment)
+
+            dihedral_ff_data = []
+
+            if use_xml:
+                for dihedral_data in ff_data_dict['dihedrals']:
+                    for target_dihedral in target_dihedral_types:
+                        if target_dihedral == (dihedral_data['class1'],
+                                               dihedral_data['class2'],
+                                               dihedral_data['class3'],
+                                               dihedral_data['class4']):
+                            dihedral_ff_data.append(dict(dihedral_data))
+                            dihedral_matches.append(self.get_dihedral_type_string(target_dihedral) + special_comment)
                             dihedral_found = True
                             break
-
-            if not dihedral_found:
-                patterns = [
-                    re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
-                    re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
-                ]
-
-                dihedral_ff_lines = []
-                dihedral_matches = []
-                for line in ff_data_lines:
-                    for p in patterns:
-                        m = re.search(p, line)
-                        if m is not None:
-                            dihedral_ff = line[11:60].strip().split()
-                            if len(dihedral_ff) == 4:
-                                dihedral_ff_lines.append(line)
-                                dihedral_matches.append(m.group(0))
-                                dihedral_found = True
-                                break
-
-            if not dihedral_found:
-                # guesses for proper dihedrals
-                patterns = self.get_dihedral_guess_patterns(at_2, at_3)
-
-                dihedral_ff_lines = []
-                dihedral_matches = []
+            else:
                 for line in ff_data_lines:
                     for p in patterns:
                         m = re.search(p, line)
@@ -1424,10 +1543,91 @@ class ForceFieldGenerator:
                             if len(dihedral_ff) == 4:
                                 dihedral_ff_lines.append(line)
                                 dihedral_matches.append(
-                                    m.group(0) + '(Guessed for ' +
-                                    f'{at_1}-{at_2}-{at_3}-{at_4})')
+                                    m.group(0) + special_comment)
                                 dihedral_found = True
                                 break
+
+            if not dihedral_found:
+                patterns = [
+                    re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
+                    re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
+                ]
+                target_dihedral_types = [
+                    ('', at_2.strip(), at_3.strip(), ''),
+                    ('', at_3.strip(), at_2.strip(), ''),
+                ]
+
+                dihedral_ff_lines = []
+                dihedral_matches = []
+
+                dihedral_ff_data = []
+
+                if use_xml:
+                    for dihedral_data in ff_data_dict['dihedrals']:
+                        for target_dihedral in target_dihedral_types:
+                            if target_dihedral == (dihedral_data['class1'],
+                                                   dihedral_data['class2'],
+                                                   dihedral_data['class3'],
+                                                   dihedral_data['class4']):
+                                dihedral_ff_data.append(dict(dihedral_data))
+                                dihedral_matches.append(self.get_dihedral_type_string(target_dihedral))
+                                dihedral_found = True
+                                break
+                else:
+                    for line in ff_data_lines:
+                        for p in patterns:
+                            m = re.search(p, line)
+                            if m is not None:
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 4:
+                                    dihedral_ff_lines.append(line)
+                                    dihedral_matches.append(m.group(0))
+                                    dihedral_found = True
+                                    break
+
+            if not dihedral_found:
+                # guesses for proper dihedrals
+                patterns = self.get_dihedral_guess_patterns(at_2, at_3)
+                target_dihedral_types = []
+                for p in patterns:
+                    target_dih_str = p.pattern.replace(r'\A', '')
+                    target_dih_tuple = tuple([
+                        x.strip().replace('X', '')
+                        for x in target_dih_str.split('-')
+                    ])
+                    target_dihedral_types.append(target_dih_tuple)
+
+                dihedral_ff_lines = []
+                dihedral_matches = []
+
+                dihedral_ff_data = []
+
+                if use_xml:
+                    for dihedral_data in ff_data_dict['dihedrals']:
+                        for target_dihedral in target_dihedral_types:
+                            if target_dihedral == (dihedral_data['class1'],
+                                                   dihedral_data['class2'],
+                                                   dihedral_data['class3'],
+                                                   dihedral_data['class4']):
+                                dihedral_ff_data.append(dict(dihedral_data))
+                                dihedral_matches.append(self.get_dihedral_type_string(target_dihedral) +
+                                                        '(Guessed for ' +
+                                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
+                                dihedral_found = True
+                                break
+                else:
+                    for line in ff_data_lines:
+                        for p in patterns:
+                            m = re.search(p, line)
+                            if m is not None:
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 4:
+                                    dihedral_ff_lines.append(line)
+                                    dihedral_matches.append(
+                                        m.group(0) + '(Guessed for ' +
+                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
+                                    dihedral_found = True
+                                    break
 
             if not dihedral_found:
                 warnmsg = f'ForceFieldGenerator: dihedral {at_1}-{at_2}-{at_3}-{at_4}'
@@ -1448,26 +1648,41 @@ class ForceFieldGenerator:
             dihedral_periodicities = []
             dihedral_comments = []
 
-            for line, comment in zip(dihedral_ff_lines, dihedral_matches):
-                dihedral_ff = line[11:60].strip().split()
+            if use_xml:
+                for dihedral_data, comment in zip(dihedral_ff_data, dihedral_matches):
+                    dih_param_idx = 1
+                    while f'periodicity{dih_param_idx}' in dihedral_data:
+                        periodicity = int(dihedral_data[f'periodicity{dih_param_idx}'])
+                        barrier = float(dihedral_data[f'k{dih_param_idx}'])
+                        phase = float(dihedral_data[f'phase{dih_param_idx}']) / np.pi * 180.0
 
-                multiplicity = int(dihedral_ff[0])
-                barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
-                phase = float(dihedral_ff[2])
-                # Note: negative periodicity implies multitermed dihedral
-                # See https://ambermd.org/FileFormats.php
-                try:
-                    periodicity = int(dihedral_ff[3])
-                except ValueError:
-                    periodicity = int(float(dihedral_ff[3]))
+                        dihedral_barriers.append(barrier)
+                        dihedral_phases.append(phase)
+                        dihedral_periodicities.append(periodicity)
+                        dihedral_comments.append(comment)
 
-                dihedral_barriers.append(barrier)
-                dihedral_phases.append(phase)
-                dihedral_periodicities.append(periodicity)
-                dihedral_comments.append(comment)
+                        dih_param_idx += 1
+            else:
+                for line, comment in zip(dihedral_ff_lines, dihedral_matches):
+                    dihedral_ff = line[11:60].strip().split()
 
-                if periodicity > 0:
-                    break
+                    multiplicity = int(dihedral_ff[0])
+                    barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
+                    phase = float(dihedral_ff[2])
+                    # Note: negative periodicity implies multitermed dihedral
+                    # See https://ambermd.org/FileFormats.php
+                    try:
+                        periodicity = int(dihedral_ff[3])
+                    except ValueError:
+                        periodicity = int(float(dihedral_ff[3]))
+
+                    dihedral_barriers.append(barrier)
+                    dihedral_phases.append(phase)
+                    dihedral_periodicities.append(periodicity)
+                    dihedral_comments.append(comment)
+
+                    if periodicity > 0:
+                        break
 
             if len(dihedral_barriers) == 1:
 
@@ -1543,22 +1758,44 @@ class ForceFieldGenerator:
                     re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
                     re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
                 ]
+                target_dihedral_types = [
+                    (at_2.strip(), at_3.strip(), at_4.strip(), at_1.strip()),
+                    (at_2.strip(), at_1.strip(), at_4.strip(), at_3.strip()),
+                    (at_2.strip(), at_4.strip(), at_1.strip(), at_3.strip()),
+                    (at_2.strip(), at_3.strip(), at_1.strip(), at_4.strip()),
+                    (at_2.strip(), at_4.strip(), at_3.strip(), at_1.strip()),
+                    (at_2.strip(), at_1.strip(), at_3.strip(), at_4.strip()),
+                ]
 
                 dihedral_found = False
                 barrier, phase, periodicity, comment = None, None, None, None
 
-                for line in ff_data_lines:
-                    for p in patterns:
-                        m = re.search(p, line)
-                        if m is not None:
-                            dihedral_ff = line[11:60].strip().split()
-                            if len(dihedral_ff) == 3:
-                                barrier = float(dihedral_ff[0]) * 4.184
-                                phase = float(dihedral_ff[1])
-                                periodicity = int(float(dihedral_ff[2]))
-                                comment = m.group(0)
+                if use_xml:
+                    for dihedral_data in ff_data_dict['impropers']:
+                        for target_dihedral in target_dihedral_types:
+                            if target_dihedral == (dihedral_data['class1'],
+                                                   dihedral_data['class2'],
+                                                   dihedral_data['class3'],
+                                                   dihedral_data['class4']):
+                                periodicity = int(dihedral_data[f'periodicity1'])
+                                barrier = float(dihedral_data[f'k1'])
+                                phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
+                                comment = self.get_dihedral_type_string(target_dihedral)
                                 dihedral_found = True
                                 break
+                else:
+                    for line in ff_data_lines:
+                        for p in patterns:
+                            m = re.search(p, line)
+                            if m is not None:
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 3:
+                                    barrier = float(dihedral_ff[0]) * 4.184
+                                    phase = float(dihedral_ff[1])
+                                    periodicity = int(float(dihedral_ff[2]))
+                                    comment = m.group(0)
+                                    dihedral_found = True
+                                    break
 
                 if not dihedral_found:
                     patterns = [
@@ -1569,19 +1806,41 @@ class ForceFieldGenerator:
                         re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
                         re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
                     ]
+                    target_dihedral_types = [
+                        (at_2.strip(), '', at_3.strip(), at_1.strip()),
+                        (at_2.strip(), '', at_1.strip(), at_3.strip()),
+                        (at_2.strip(), '', at_4.strip(), at_3.strip()),
+                        (at_2.strip(), '', at_3.strip(), at_4.strip()),
+                        (at_2.strip(), '', at_4.strip(), at_1.strip()),
+                        (at_2.strip(), '', at_1.strip(), at_4.strip()),
+                    ]
 
-                    for line in ff_data_lines:
-                        for p in patterns:
-                            m = re.search(p, line)
-                            if m is not None:
-                                dihedral_ff = line[11:60].strip().split()
-                                if len(dihedral_ff) == 3:
-                                    barrier = float(dihedral_ff[0]) * 4.184
-                                    phase = float(dihedral_ff[1])
-                                    periodicity = int(float(dihedral_ff[2]))
-                                    comment = m.group(0)
+                    if use_xml:
+                        for dihedral_data in ff_data_dict['impropers']:
+                            for target_dihedral in target_dihedral_types:
+                                if target_dihedral == (dihedral_data['class1'],
+                                                       dihedral_data['class2'],
+                                                       dihedral_data['class3'],
+                                                       dihedral_data['class4']):
+                                    periodicity = int(dihedral_data[f'periodicity1'])
+                                    barrier = float(dihedral_data[f'k1'])
+                                    phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
+                                    comment = self.get_dihedral_type_string(target_dihedral)
                                     dihedral_found = True
                                     break
+                    else:
+                        for line in ff_data_lines:
+                            for p in patterns:
+                                m = re.search(p, line)
+                                if m is not None:
+                                    dihedral_ff = line[11:60].strip().split()
+                                    if len(dihedral_ff) == 3:
+                                        barrier = float(dihedral_ff[0]) * 4.184
+                                        phase = float(dihedral_ff[1])
+                                        periodicity = int(float(dihedral_ff[2]))
+                                        comment = m.group(0)
+                                        dihedral_found = True
+                                        break
 
                 if not dihedral_found:
                     patterns = [
@@ -1589,19 +1848,38 @@ class ForceFieldGenerator:
                         re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
                         re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
                     ]
+                    target_dihedral_types = [
+                        (at_2.strip(), '', '', at_3.strip()),
+                        (at_2.strip(), '', '', at_1.strip()),
+                        (at_2.strip(), '', '', at_4.strip()),
+                    ]
 
-                    for line in ff_data_lines:
-                        for p in patterns:
-                            m = re.search(p, line)
-                            if m is not None:
-                                dihedral_ff = line[11:60].strip().split()
-                                if len(dihedral_ff) == 3:
-                                    barrier = float(dihedral_ff[0]) * 4.184
-                                    phase = float(dihedral_ff[1])
-                                    periodicity = int(float(dihedral_ff[2]))
-                                    comment = m.group(0)
+                    if use_xml:
+                        for dihedral_data in ff_data_dict['impropers']:
+                            for target_dihedral in target_dihedral_types:
+                                if target_dihedral == (dihedral_data['class1'],
+                                                       dihedral_data['class2'],
+                                                       dihedral_data['class3'],
+                                                       dihedral_data['class4']):
+                                    periodicity = int(dihedral_data[f'periodicity1'])
+                                    barrier = float(dihedral_data[f'k1'])
+                                    phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
+                                    comment = self.get_dihedral_type_string(target_dihedral)
                                     dihedral_found = True
                                     break
+                    else:
+                        for line in ff_data_lines:
+                            for p in patterns:
+                                m = re.search(p, line)
+                                if m is not None:
+                                    dihedral_ff = line[11:60].strip().split()
+                                    if len(dihedral_ff) == 3:
+                                        barrier = float(dihedral_ff[0]) * 4.184
+                                        phase = float(dihedral_ff[1])
+                                        periodicity = int(float(dihedral_ff[2]))
+                                        comment = m.group(0)
+                                        dihedral_found = True
+                                        break
 
                 if not dihedral_found:
                     # Default values for impropers
@@ -1624,6 +1902,28 @@ class ForceFieldGenerator:
                     'periodicity': periodicity,
                     'comment': comment
                 }
+
+    @staticmethod
+    def get_dihedral_type_string(target_dihedral):
+        """
+        Gets type string of a dihedral.
+
+        :param target_dihedral:
+            A tuple of atom types.
+
+        :return:
+            The type string of a dihedral.
+        """
+
+        new_dih_types = []
+
+        for at in target_dihedral:
+            if at:
+                new_dih_types.append(at)
+            else:
+                new_dih_types.append('X')
+
+        return '-'.join(new_dih_types)
 
     def get_dihedral_guess_patterns(self, at_2, at_3):
         """
