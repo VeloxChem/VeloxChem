@@ -1098,8 +1098,10 @@ class VibrationalAnalysis:
         # raman unit   A**4/amu
 
         ax.set_xlabel('Wavenumber [cm$^{-1}$]')
-        ax.set_ylabel('$\epsilon$ [mol$^{-1}$ cm$^{-1}$]')
+        ax.set_ylabel('IR intensity [km/mol]')
         ax.set_title("IR Spectrum")
+
+        ax2 = ax.twinx()
 
         freqs = vib_results['vib_frequencies']
         ir_ints = vib_results['ir_intensities']
@@ -1110,7 +1112,7 @@ class VibrationalAnalysis:
             x, y = self.gaussian_broadening(freqs, ir_ints, 0, 4000, 1,
                                             broadening_value)
 
-        ax.plot(x * scaling_factor,
+        ax2.plot(x * scaling_factor,
                 y * 0.00001,
                 color="black",
                 alpha=0.9,
@@ -1134,20 +1136,18 @@ class VibrationalAnalysis:
                                        linestyle='-',
                                        alpha=0.0001,
                                        label="Scaling factor: " + scaling)
-        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
+        ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
                   frameon=False,
                   borderaxespad=0.,
                   loc='center left',
-                  bbox_to_anchor=(1.15, 0.5))
-        ax.set_ylim(0, max(y * 0.00001) * 1.1)
-        ax.set_ylim(bottom=0)
-        ax.set_xlim(0, 3900)
+                  bbox_to_anchor=(1.05, 0.5))
+        ax2.set_ylim(0, max(y * 0.00001) * 1.1)
+        ax2.set_ylim(bottom=0)
+        ax2.set_xlim(0, 3900)
+        ax2.yaxis.set_ticks([])
 
-        ax2 = ax.twinx()
-        ax2.set_ylabel('IR intensity [km/mol]')
-
-        for i in np.arange(len(vib_results['vib_frequencies'])):
-            ax2.plot(
+        for i in range(len(vib_results['vib_frequencies'])):
+            ax.plot(
                 [
                     scaling_factor * vib_results['vib_frequencies'][i],
                     scaling_factor * vib_results['vib_frequencies'][i]
@@ -1158,7 +1158,7 @@ class VibrationalAnalysis:
                 color="darkcyan",
             )
 
-        ax2.set_ylim(bottom=0)
+        ax.set_ylim(bottom=0)
 
         return ax
 
@@ -1188,8 +1188,10 @@ class VibrationalAnalysis:
             fig, ax = plt.subplots(figsize=(8, 5))
 
         ax.set_xlabel('Wavenumber [cm$^{-1}$]')
-        ax.set_ylabel('$\epsilon$ [mol$^{-1}$ cm$^{-1}$]')
+        ax.set_ylabel('Raman activity [' + r'${\AA}^4$' + '/amu]')
         ax.set_title("Raman Spectrum")
+
+        ax2 = ax.twinx()
 
         freqs = vib_results['vib_frequencies']
         raman_act = vib_results['raman_activities'][0]
@@ -1200,7 +1202,7 @@ class VibrationalAnalysis:
             x, y = self.gaussian_broadening(freqs, raman_act, 0, 4000, 1,
                                             broadening_value)
 
-        ax.plot(x * scaling_factor,
+        ax2.plot(x * scaling_factor,
                 y * 6.0220E-09,
                 color="black",
                 alpha=0.9,
@@ -1224,19 +1226,18 @@ class VibrationalAnalysis:
                                        linestyle='-',
                                        alpha=0.0001,
                                        label="Scaling factor: " + scaling)
-        ax.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
+        ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
                   frameon=False,
                   borderaxespad=0.,
                   loc='center left',
-                  bbox_to_anchor=(1.15, 0.5))
-        ax.set_ylim(0, max(y * 6.0220E-09) * 1.1)
-        ax.set_ylim(bottom=0)
-        ax.set_xlim(0, 3900)
-        ax2 = ax.twinx()
-        ax2.set_ylabel('Raman activity [A$^4$/amu]')
+                  bbox_to_anchor=(1.05, 0.5))
+        ax2.set_ylim(0, max(y * 6.0220E-09) * 1.1)
+        ax2.set_ylim(bottom=0)
+        ax2.set_xlim(0, 3900)
+        ax2.yaxis.set_ticks([])
 
-        for i in np.arange(len(vib_results['vib_frequencies'])):
-            ax2.plot(
+        for i in range(len(vib_results['vib_frequencies'])):
+            ax.plot(
                 [
                     scaling_factor * vib_results['vib_frequencies'][i],
                     scaling_factor * vib_results['vib_frequencies'][i]
@@ -1247,7 +1248,7 @@ class VibrationalAnalysis:
                 color="darkcyan",
             )
 
-        ax2.set_ylim(bottom=0)
+        ax.set_ylim(bottom=0)
 
         return ax
 
