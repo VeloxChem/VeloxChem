@@ -74,9 +74,11 @@ CT3CDistributor::distribute(const CSimdArray<double>&        buffer,
 
                     if (r <= s)
                     {
-                       // std::cout << "XXX : " << refp << " " << r << " " << s << " " << nrows << " : " <<  mathfunc::uplo_rm_index(r, s, nrows) <<  std::endl;
-                        
                        ptr_values[mathfunc::uplo_rm_index(r, s, nrows)] = curr_buffer[m - ket_range.first];
+                    }
+                    else
+                    {
+                        ptr_values[mathfunc::uplo_rm_index(s, r, nrows)] = curr_buffer[m - ket_range.first];
                     }
                 }
             }

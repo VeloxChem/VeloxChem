@@ -15,7 +15,7 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
 {
     std::vector<size_t> aux_indices(aux_basis.dimensions_of_basis());
     
-    std:iota(aux_indices.begin(), aux_indices.end(), size_t{0});
+    std::iota(aux_indices.begin(), aux_indices.end(), size_t{0});
     
     CT3FlatBuffer<double> buffer(aux_indices, basis.dimensions_of_basis());
     

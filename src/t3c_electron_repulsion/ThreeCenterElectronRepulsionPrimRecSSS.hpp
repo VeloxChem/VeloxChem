@@ -1,5 +1,5 @@
-#ifndef ThreeCenterElectronRepulsionPrimRecSSP_hpp
-#define ThreeCenterElectronRepulsionPrimRecSSP_hpp
+#ifndef ThreeCenterElectronRepulsionPrimRecSSS_hpp
+#define ThreeCenterElectronRepulsionPrimRecSSS_hpp
 
 #include <cstddef>
 
@@ -16,11 +16,11 @@ namespace t3ceri { // t3ceri namespace
 /// @param bf_data The Boys function data.
 /// @param idx_bvals The index of Boys function data.
 auto comp_prim_electron_repulsion_sss(CSimdArray<double>&       pbuffer,
-                                       const size_t              idx_eri_0_sss,
-                                       CSimdArray<double>&       factors,
-                                       const size_t              idx_ovl,
-                                       const CSimdArray<double>& bf_data,
-                                       const size_t              idx_bvals) -> void;
+                                      const size_t              idx_eri_0_sss,
+                                      CSimdArray<double>&       factors,
+                                      const size_t              idx_ovl,
+                                      const CSimdArray<double>& bf_data,
+                                      const size_t              idx_bvals) -> void;
 } // t3ceri namespace
 
-#endif /* ThreeCenterElectronRepulsionPrimRecSSP_hpp */
+#endif /* ThreeCenterElectronRepulsionPrimRecSSS_hpp */

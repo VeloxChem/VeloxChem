@@ -1,5 +1,6 @@
 #include "ExportGeneral.hpp"
 
+#include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -13,6 +14,7 @@
 #include "TensorComponents.hpp"
 #include "TensorLabels.hpp"
 #include "T3FlatBuffer.hpp"
+#include "MathFunc.hpp"
 
 namespace vlx_general {
 
@@ -126,6 +128,28 @@ export_general(py::module &m) -> void
         .def(py::init<const std::vector<size_t>&, const size_t>())
         .def(py::init<const CT3FlatBuffer<double> &>())
         .def("indices", &CT3FlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
+        .def(
+            "values",
+             [](const CT3FlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
+                 const auto ndim = self.width();
+                 const auto nelems = static_cast<py::ssize_t>(ndim * (ndim + 1) / 2);
+                 const auto tdim  = static_cast<py::ssize_t>(sizeof(double));
+                 return py::array_t<double>(
+                                            std::vector<py::ssize_t>({nelems,}), std::vector<py::ssize_t>({tdim, }), self.data(index));
+            },
+            "Gets slice of tensor values along y,z axes.")
+        .def("value",
+             [](const CT3FlatBuffer<double> &self, const size_t index, const size_t i, const size_t j) -> double {
+                if (i <= j)
+                {
+                    return self.data(index)[mathfunc::uplo_rm_index(i, j, self.width())];
+                }
+                else
+                {
+                    return self.data(index)[mathfunc::uplo_rm_index(j, i, self.width())];
+                }
+             },
+             "Gets tensor element value.")
         .def("__copy__", [](CT3FlatBuffer<double> &self) { return CT3FlatBuffer<double>(self); })
         .def("__deepcopy__", [](const CT3FlatBuffer<double> &self, py::dict) { return CT3FlatBuffer<double>(self); });
 }

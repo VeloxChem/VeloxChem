@@ -5,6 +5,64 @@
 namespace t3cfunc {  // t3cfunc namespace
 
 auto
+comp_coordinates_w(CSimdArray<double>&   buffer,
+                   const size_t          index_w,
+                   const size_t          index_q,
+                   const TPoint<double>& r_a,
+                   const double          a_exp) -> void
+{
+    // Set up exponents
+
+    auto c_exps = buffer.data(0);
+
+    auto d_exps = buffer.data(1);
+
+    // set up Cartesian W coordinates
+
+    auto w_x = buffer.data(index_w);
+
+    auto w_y = buffer.data(index_w + 1);
+
+    auto w_z = buffer.data(index_w + 2);
+
+    // set up Cartesian Q coordinates
+
+    auto q_x = buffer.data(index_q);
+
+    auto q_y = buffer.data(index_q + 1);
+
+    auto q_z = buffer.data(index_q + 2);
+
+    // set up Cartesian A coordinates
+
+    const auto xyz = r_a.coordinates();
+
+    const auto a_x = xyz[0];
+
+    const auto a_y = xyz[1];
+
+    const auto a_z = xyz[2];
+
+    // compute Cartesian W center coordinates
+
+    const auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(w_x, w_y, w_z, q_x, q_y, q_z, c_exps, d_exps : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        const double cd_exp = c_exps[i] + d_exps[i];
+
+        const double fact = 1.0 / (a_exp + cd_exp);
+
+        w_x[i] = fact * (a_x * a_exp + q_x[i] * cd_exp);
+
+        w_y[i] = fact * (a_y * a_exp + q_y[i] * cd_exp);
+
+        w_z[i] = fact * (a_z * a_exp + q_z[i] * cd_exp);
+    }
+}
+
+auto
 comp_distances_aq(CSimdArray<double>&   buffer,
                   const size_t          index_aq,
                   const size_t          index_q,

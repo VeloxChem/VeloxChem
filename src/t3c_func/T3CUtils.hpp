@@ -14,6 +14,18 @@
 namespace t3cfunc {  // t3cfunc namespace
 
 
+/// @brief Computes Cartesian W center coordinates.
+/// @param buffer The SIMD array containing factors data.
+/// @param index_w The primary row index of Cartesian Q points coordinates in SIMD array.
+/// @param index_q The primary row index of Cartesian Q points coordinates in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+/// @param a_exp The exponent on A center.
+auto comp_coordinates_w(CSimdArray<double>&   buffer,
+                        const size_t          index_w,
+                        const size_t          index_q,
+                        const TPoint<double>& r_a,
+                        const double          a_exp) -> void;
+
 /// @brief Computes R(AQ) = A - Q distances.
 /// @param buffer The SIMD array containing factors data.
 /// @param index_aq The primary row index of R(AQ) distances in SIMD array.
@@ -79,8 +91,6 @@ bra_transform(CSimdArray<double>&       sbuffer,
     const auto d_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{d_angmom});
 
     const auto a_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{N});
-
-    const auto a_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{N});
 
     for (int i = 0; i < c_cart_comps; i++)
     {

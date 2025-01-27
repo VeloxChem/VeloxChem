@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import math as mt
 
 from veloxchem import ThreeCenterElectronRepulsionDriver
 from veloxchem import MolecularBasis
@@ -41,11 +42,16 @@ class TestThreeCenterElectronRepulsionDriver:
 
         # compute electron repulsion matrix
         eri_drv = ThreeCenterElectronRepulsionDriver()
-        eri_mat = eri_drv.compute(mol, bas, bas)
+        eri_buf = eri_drv.compute(mol, bas, bas)
 
         # load reference kinetic energy data
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'h2o.svp.int2c2e.npy')
-        ref_mat = np.load(npyfile)
+        npyfile = str(here / 'data' / 'h2o.svp.int3c2e.npy')
+        ref_buf = np.load(npyfile)
         
-        assert False
+        indexes = np.triu_indices(24)
+        
+        for i in range(24):
+            for k, l in zip(indexes[0], indexes[1]):
+                print('(',i,"|",k,",",l,") = ", eri_buf.value(i,k,l)," vs. ", ref_buf[k,l,i])
+                assert mt.isclose(eri_buf.value(i,k,l), ref_buf[k,l,i], rel_tol=1.0e-12, abs_tol=1.0e-12)
