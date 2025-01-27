@@ -1,6 +1,5 @@
 import os
-import json
-import ast
+
 import shutil
 
 from .molecule import Molecule
@@ -22,11 +21,6 @@ from networkx.algorithms.isomorphism import categorical_node_match
 class EvbForceFieldBuilder():
 
     def __init__(self):
-
-        self.reactant_charge: int = 0
-        self.product_charge: list[int] = [0]
-        self.reactant_multiplicity: int = 1
-        self.product_multiplicity: list[int] = [1]
         self.optimise: bool = False
         self.reparameterise: bool = True
 
@@ -34,51 +28,57 @@ class EvbForceFieldBuilder():
 
         self.reactant: ForceFieldGenerator
         self.products: list[ForceFieldGenerator]
+        self.gaff_path = None
         pass
 
     def build_forcefields(
         self,
-        reactant_file: str,
-        product_file: list[str],
+        reactant_input: dict,
+        product_input: list[dict],
+        reactant_charge: int = 0,
+        product_charge: list[int] = [0],
+        reactant_multiplicity: int = 1,
+        product_multiplicity: list[int] = [1],
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ):
 
         self.reactant = self.get_forcefield(
-            reactant_file,
-            self.reactant_charge,
-            reparameterise=self.reparameterise,
-            optimise=self.optimise,
-            multiplicity=self.reactant_multiplicity,
+            reactant_input,
+            reactant_charge,
+            reactant_multiplicity,
+            self.reparameterise,
+            self.optimise,
         )
         self.reactant.ostream.flush()
 
         products: list[ForceFieldGenerator] = []
 
-        for i, filename in enumerate(product_file):
+        for i, input in enumerate(product_input):
             products.append(
                 self.get_forcefield(
-                    filename,
-                    self.product_charge[i],
-                    multiplicity=self.product_multiplicity[i],  # type:ignore
-                    reparameterise=self.reparameterise,
-                    optimise=self.optimise,
+                    input,
+                    product_charge[i],
+                    product_multiplicity[i],  # type:ignore
+                    self.reparameterise,
+                    self.optimise,
                 ))
 
+        #todo all this stuff should get removed, at least moved to a higher class, don't want to be managing files here
         # Get all files and directories in the current directory
-        items = os.listdir(".")
+        # items = os.listdir(".")
 
-        for item in items:
-            # If the item starts with 'vlx_'
-            if item.startswith("vlx_"):
-                # Construct full item path
-                item_path = os.path.join(".", item)
-                # If it's a file, remove it
-                if os.path.isfile(item_path):
-                    os.remove(item_path)
-                # If it's a directory, remove it including all its content
-                elif os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
+        # for item in items:
+        #     # If the item starts with 'vlx_'
+        #     if item.startswith("vlx_"):
+        #         # Construct full item path
+        #         item_path = os.path.join(".", item)
+        #         # If it's a file, remove it
+        #         if os.path.isfile(item_path):
+        #             os.remove(item_path)
+        #         # If it's a directory, remove it including all its content
+        #         elif os.path.isdir(item_path):
+        #             shutil.rmtree(item_path)
 
         # Never merge the reactant forcefield generators, for these we actually need positions
         self.product= self._create_combined_forcefield(products)
@@ -87,25 +87,19 @@ class EvbForceFieldBuilder():
             self.product = self._match_reactant_and_product(self.reactant, self.product, breaking_bonds)
         self.product.ostream.flush()
         self._summarise_reaction(self.reactant, self.product)
-        self.save_forcefield(self.product, "_".join(product_file) + "_combined")
+        
         return self.reactant, self.product
 
     def get_forcefield(
         self,
-        filename: str,
+        input: dict,
         charge: int,
-        reparameterise: bool = True,
-        optimise: bool = False,
-        multiplicity: int = 0,
+        multiplicity: int,
+        reparameterise: bool,
+        optimise: bool,
     ) -> ForceFieldGenerator:
 
-        if os.path.exists(f"./{self.input_folder}/{filename}_xtb_opt.xyz"):
-            print(f"Loading optimised geometry from ./{self.input_folder}/{filename}_xtb_opt.xyz")
-            molecule = Molecule.read_xyz_file(f"./{self.input_folder}/{filename}_xtb_opt.xyz")
-            optimise = False
-        else:
-            print(f"Loading (possibly unoptimised) geometry from ./{self.input_folder}/{filename}.xyz")
-            molecule = Molecule.read_xyz_file(f"{self.input_folder}/{filename}.xyz")
+        molecule = input["molecule"]
         molecule.set_multiplicity(multiplicity)
         molecule.set_charge(charge)
 
@@ -113,35 +107,26 @@ class EvbForceFieldBuilder():
 
         # The topology creation will calculate charges if they're not already set
 
-        json_path = f"./{self.input_folder}/{filename}_ff_data.json"
-        if os.path.exists(json_path):
-            print(f"Loading force field data from {json_path}")
-
-            forcefield = self.load_forcefield_from_json(json_path)
+        if input["forcefield"] is not None:
+            forcefield = input["forcefield"]
             forcefield.molecule = molecule
         else:
-            print(f"Could not find force field data file ./{self.input_folder}/{filename}_ff_data.json.")
-            print(f"Optimise: {optimise}")
-            if optimise:
+            if input["optimise"] and optimise:
                 print("Optimising the geometry with xtb.")
                 scf_drv = XtbDriver()
                 opt_drv = OptimizationDriver(scf_drv)
                 opt_drv.hessian = "last"
                 opt_results = opt_drv.compute(molecule)
-                with open(f"./{self.input_folder}/{filename}_xtb_opt.xyz", "w", encoding="utf-8") as file:
-                    file.write(opt_results["final_geometry"])
                 molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
 
             forcefield = ForceFieldGenerator()
-            forcefield.force_field_data = f"./{self.input_folder}/gaff-2.20.dat"
+            if self.gaff_path is not None:
+                forcefield.force_field_data = self.gaff_path
 
             #Load or calculate the charges
-
-            if os.path.exists(f"./{self.input_folder}/{filename}_charges.txt"):
-                forcefield.partial_charges = self._load_charges(filename)
-                print(
-                    f"Loading charges from ./{self.input_folder}/{filename}_charges.txt file, total charge = {sum(forcefield.partial_charges)}"
-                )
+            
+            if input["charges"] is not None:
+                forcefield.partial_charges = input["charges"]
                 print("Creating topology")
                 forcefield.create_topology(molecule)
             else:
@@ -163,12 +148,6 @@ class EvbForceFieldBuilder():
                 resp_drv = RespChargesDriver()
                 print("Calculating RESP charges")
                 forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
-
-                print(f"Saving calculated RESP charges to ./{self.input_folder}/{filename}_charges.txt")
-                self._save_charges(
-                    forcefield.partial_charges,  # type: ignore
-                    filename,
-                )
                 print("Creating topology")
                 forcefield.create_topology(molecule, basis, scf_result=scf_results)
 
@@ -180,7 +159,7 @@ class EvbForceFieldBuilder():
                     atom['type'] = 'oh'
                     atom['sigma'] = sigma
                     atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water"
+                    atom['comment'] = "Reaction-water oxygen"
                 elif atom['type'] == 'hw':
                     
                     sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
@@ -188,138 +167,22 @@ class EvbForceFieldBuilder():
                     atom['type'] = 'ho'
                     atom['sigma'] = sigma
                     atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water"         
+                    atom['comment'] = "Reaction-water hydrogen"         
 
             #Reparameterise the forcefield if necessary and requested
             if reparameterise:
                 print("Reparameterising force field.")
 
-                if os.path.exists(f"./{self.input_folder}/{filename}_hess.np"):
-                    print(
-                        f"Found hessian file at ./{self.input_folder}/{filename}_hess.np, using it to reparameterise.")
-                    hessian = np.loadtxt(f"./{self.input_folder}/{filename}_hess.np")
+                if input["hessian"] is not None:
+                    hessian = input["hessian"]
                 else:
-                    print(
-                        f"Could not find hessian file at ./{self.input_folder}/{filename}_hess.np, calculating hessian with xtb and saving it"
-                    )
                     xtb_drv = XtbDriver()
                     xtb_hessian_drv = XtbHessianDriver(xtb_drv)
                     xtb_hessian_drv.compute(molecule)
                     hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
-                    np.savetxt(f"{self.input_folder}/{filename}_hess.np", hessian)
                 forcefield.reparametrize(hessian=hessian)
-
-            print("Saving force field data to disk")
-            self.save_forcefield(forcefield, filename)
-
         return forcefield
 
-    #todo, should be moved to forcefieldgenerator class
-    @staticmethod
-    def load_forcefield_from_json(path: str) -> ForceFieldGenerator:
-        """
-        Load forcefield data from a JSON file.
-
-        Args:
-            forcefield (ForceFieldGenerator): The forcefield object to load the data into.
-            filename (str): The name of the JSON file, without _ff_data.json.
-
-        Returns:
-            ForceFieldGenerator: The updated forcefield object with the loaded data.
-        """
-        with open(path, "r", encoding="utf-8") as file:
-            forcefield = ForceFieldGenerator()
-            ff_data = json.load(file)
-
-            forcefield.atoms = EvbForceFieldBuilder._str_to_tuple_key(ff_data["atoms"])
-            forcefield.bonds = EvbForceFieldBuilder._str_to_tuple_key(ff_data["bonds"])
-            forcefield.angles = EvbForceFieldBuilder._str_to_tuple_key(ff_data["angles"])
-            forcefield.dihedrals = EvbForceFieldBuilder._str_to_tuple_key(ff_data["dihedrals"])
-            forcefield.impropers = EvbForceFieldBuilder._str_to_tuple_key(ff_data["impropers"])
-        return forcefield
-
-    #todo, should be moved to forcefieldgenerator class
-    def save_forcefield(self, forcefield: ForceFieldGenerator, filename: str):
-        """
-        Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
-
-        Args:
-            forcefield (ForceFieldGenerator): The forcefield object containing the data to be saved.
-            filename (str): The name of the file to save the forcefield data to.
-
-        Returns:
-            None
-        """
-        ff_data = {
-            "atoms": forcefield.atoms,
-            "bonds": self._tuple_to_str_key(forcefield.bonds),
-            "angles": self._tuple_to_str_key(forcefield.angles),
-            "dihedrals": self._tuple_to_str_key(forcefield.dihedrals),
-            "impropers": self._tuple_to_str_key(forcefield.impropers),
-        }
-        with open(f"{self.input_folder}/{filename}_ff_data.json", "w", encoding="utf-8") as file:
-            json.dump(ff_data, file, indent=4)
-
-    def _load_charges(self, filename: str) -> list:
-        """
-        Load a list of charges from a file.
-
-        Args:
-            filename (str): The name of the file to load charges from.
-
-        Returns:
-            list: A list of charges read from the file.
-        """
-        with open(f"{self.input_folder}/{filename}_charges.txt", "r", encoding="utf-8") as file:
-            charges = []
-            for line in file:
-                try:
-                    charges.append(float(line))
-                except ValueError:
-                    print(rf"Could not read line {line} from {filename}_charges.txt. Continuing")
-        return charges
-
-    def _save_charges(self, charges: list, filename: str):
-        """
-        Save the given list of charges to a text file.
-
-        Args:
-            charges (list): A list of charges to be saved.
-            filename (str): The name of the file to save the charges to.
-
-        Returns:
-            None
-        """
-        with open(f"{self.input_folder}/{filename}_charges.txt", "w", encoding="utf-8") as file:
-            for charge in charges:
-                file.write(f"{charge}\n")
-
-    @staticmethod
-    def _str_to_tuple_key(dictionary: dict) -> dict:
-        """
-        Converts the keys of a dictionary from string to tuple.
-
-        Args:
-            dictionary (dict): The dictionary to convert.
-
-        Returns:
-            dict: The dictionary with keys converted to tuple.
-        """
-        return {ast.literal_eval(key): value for key, value in dictionary.items()} # todo: why ast.literal_eval?
-
-    @staticmethod
-    def _tuple_to_str_key(dictionary: dict) -> dict:
-        """
-        Converts the keys of a dictionary from tuples to strings.
-
-        Args:
-            dictionary (dict): The dictionary to be converted.
-
-        Returns:
-            dict: The dictionary with string keys.
-
-        """
-        return {str(key): value for key, value in dictionary.items()}
 
     #Match the indices of the reactant and product forcefield generators
     @staticmethod

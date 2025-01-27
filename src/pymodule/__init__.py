@@ -136,6 +136,11 @@ from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFEPDriver
 from .openmmdynamics import OpenMMDynamics
 from .evbdriver import EvbDriver
+from .evbffbuilder import EvbForceFieldBuilder
+from .evbsystembuilder import EvbSystemBuilder
+from .evbfepdriver import FepDriver
+from .evbdataprocessing import EvbDataProcessing
+
 
 # Python functions
 from .errorhandler import assert_msg_critical

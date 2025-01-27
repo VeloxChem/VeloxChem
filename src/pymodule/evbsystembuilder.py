@@ -40,7 +40,7 @@ class EvbSystemBuilder():
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
 
-        self.temperature: float
+        self.temperature: float = 300
         self.Lambda: list[float]
 
         self.soft_core_coulomb_ref = True
@@ -77,20 +77,25 @@ class EvbSystemBuilder():
         reactant: ForceFieldGenerator,
         product: ForceFieldGenerator,
         Lambda: list,
-        NPT: bool,
-        temperature: float,
-        pressure: float,
-        solvent: str | None,
-        padding: float,  # in nm
-        CNT: bool,
-        Graphene: bool,
-        M: int,
-        N: int,
-        ion_count: int,
-        no_reactant: bool,
-        E_field: list[float],
+        configuration: dict,
+        constraints: list = []
     ):
 
+        self.temperature=configuration.get("temperature", self.temperature)
+        NPT=configuration.get("NPT", False)
+        pressure=configuration.get("pressure", 1)
+        solvent=configuration.get("solvent", None)
+        padding=configuration.get("padding", 1.2)
+        CNT=configuration.get("CNT", False)
+        Graphene=configuration.get("graphene", False)
+        M=configuration.get("M", 5)
+        N=configuration.get("N", 9)
+        ion_count=configuration.get("ion_count", 0)
+        no_reactant=configuration.get("no_reactant", False)
+        E_field=configuration.get("E_field", [0, 0, 0])
+
+        self.constraints = constraints
+        
         system = mm.System()
         topology = mmapp.Topology()
         reaction_chain = topology.addChain()
@@ -742,7 +747,7 @@ class EvbSystemBuilder():
             system.addForce(
                 mm.MonteCarloFlexibleBarostat(
                     pressure * mmunit.bar,  # type: ignore
-                    temperature * mmunit.kelvin,  # type: ignore
+                    self.temperature * mmunit.kelvin,  # type: ignore
                 ))
 
         E_field_force = mm.CustomExternalForce("-q*(Ex*x+Ey*y+Ez*z)")
@@ -1033,57 +1038,9 @@ class EvbSystemBuilder():
             total_atom_id = [self._reaction_to_total_atomid(reaction_atomid) for reaction_atomid in key]
             if (key in self.reactant.dihedrals.keys() and key in self.product.dihedrals.keys()):
                 dihedA = self.reactant.dihedrals[key]
-                if dihedA["type"] == "RB":
-                    RB_force.addTorsion(
-                        total_atom_id[0],
-                        total_atom_id[1],
-                        total_atom_id[2],
-                        total_atom_id[3],
-                        (1 - lam) * dihedA["RB_coefficients"][0],
-                        (1 - lam) * dihedA["RB_coefficients"][1],
-                        (1 - lam) * dihedA["RB_coefficients"][2],
-                        (1 - lam) * dihedA["RB_coefficients"][3],
-                        (1 - lam) * dihedA["RB_coefficients"][4],
-                        (1 - lam) * dihedA["RB_coefficients"][5],
-                    )
-                elif dihedA["type"] == "Fourier":
-                    fourier_force.addTorsion(
-                        total_atom_id[0],
-                        total_atom_id[1],
-                        total_atom_id[2],
-                        total_atom_id[3],
-                        dihedA["periodicity"],
-                        dihedA["phase"] * self.deg_to_rad,
-                        (1 - lam) * dihedA["barrier"],
-                    )
-                else:
-                    assert False, "Unknown dihedral type"
                 dihedB = self.product.dihedrals[key]
-                if dihedB["type"] == "RB":
-                    RB_force.addTorsion(
-                        total_atom_id[0],
-                        total_atom_id[1],
-                        total_atom_id[2],
-                        total_atom_id[3],
-                        lam * dihedB["RB_coefficients"][0],
-                        lam * dihedB["RB_coefficients"][1],
-                        lam * dihedB["RB_coefficients"][2],
-                        lam * dihedB["RB_coefficients"][3],
-                        lam * dihedB["RB_coefficients"][4],
-                        lam * dihedB["RB_coefficients"][5],
-                    )
-                elif dihedB["type"] == "Fourier":
-                    fourier_force.addTorsion(
-                        total_atom_id[0],
-                        total_atom_id[1],
-                        total_atom_id[2],
-                        total_atom_id[3],
-                        dihedB["periodicity"],
-                        dihedB["phase"] * self.deg_to_rad,
-                        lam * dihedB["barrier"],
-                    )
-                else:
-                    assert False, "Unknown dihedral type"
+                self._add_torsion(fourier_force, dihedA, total_atom_id, 1 - lam)
+                self._add_torsion(fourier_force, dihedB, total_atom_id, lam)
             else:
                 if key in self.reactant.dihedrals.keys():
                     scale = 1 - lam
@@ -1092,29 +1049,7 @@ class EvbSystemBuilder():
                     scale = lam
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
-                    if dihed["type"] == "RB":
-                        RB_force.addTorsion(
-                            total_atom_id[0],
-                            total_atom_id[1],
-                            total_atom_id[2],
-                            total_atom_id[3],
-                            scale * dihed["RB_coefficients"][0],
-                            scale * dihed["RB_coefficients"][1],
-                            scale * dihed["RB_coefficients"][2],
-                            scale * dihed["RB_coefficients"][3],
-                            scale * dihed["RB_coefficients"][4],
-                            scale * dihed["RB_coefficients"][5],
-                        )
-                    elif dihed["type"] == "Fourier":
-                        fourier_force.addTorsion(
-                            total_atom_id[0],
-                            total_atom_id[1],
-                            total_atom_id[2],
-                            total_atom_id[3],
-                            dihed["periodicity"],
-                            dihed["phase"] * self.deg_to_rad,
-                            scale * dihed["barrier"],
-                        )
+                    self._add_torsion(fourier_force, dihed, total_atom_id, scale)
         return [fourier_force, RB_force]
 
     def _create_improper_torsion_forces(self, lam) -> typing.List[mm.Force]:
@@ -1127,31 +1062,9 @@ class EvbSystemBuilder():
             total_atom_id = [self._reaction_to_total_atomid(reaction_atomid) for reaction_atomid in key]
             if (key in self.reactant.impropers.keys() and key in self.product.impropers.keys()):
                 dihedA = self.reactant.impropers[key]
-                if dihedA["type"] == "Fourier":
-                    fourier_force.addTorsion(
-                        total_atom_id[0],
-                        total_atom_id[1],
-                        total_atom_id[2],
-                        total_atom_id[3],
-                        dihedA["periodicity"],
-                        dihedA["phase"] * self.deg_to_rad,
-                        (1 - lam) * dihedA["barrier"],
-                    )
-                else:
-                    assert False, "Unknown dihedral type"
+                self._add_torsion(fourier_force, dihedA, total_atom_id, 1 - lam)
                 dihedB = self.product.impropers[key]
-                if dihedB["type"] == "Fourier":
-                    fourier_force.addTorsion(
-                        total_atom_id[0],
-                        total_atom_id[1],
-                        total_atom_id[2],
-                        total_atom_id[3],
-                        dihedB["periodicity"],
-                        dihedB["phase"] * self.deg_to_rad,
-                        lam * dihedB["barrier"],
-                    )
-                else:
-                    assert False, "Unknown dihedral type"
+                self._add_torsion(fourier_force, dihedB, total_atom_id, lam)
             else:
                 if key in self.reactant.impropers.keys():
                     scale = 1 - lam
@@ -1160,52 +1073,37 @@ class EvbSystemBuilder():
                     scale = lam
                     dihed = self.product.impropers[key]
                 if scale > 0:
-                    if dihed["type"] == "Fourier":
-                        fourier_force.addTorsion(
-                            total_atom_id[0],
-                            total_atom_id[1],
-                            total_atom_id[2],
-                            total_atom_id[3],
-                            dihed["periodicity"],
-                            dihed["phase"] * self.deg_to_rad,
-                            scale * dihed["barrier"],
-                        )
+                    self._add_torsion(fourier_force, dihed, total_atom_id, scale)
         return [fourier_force]
+
+    def _add_torsion(self, fourier_force, torsion_dict, total_atom_id, barrier_scaling):
+        if torsion_dict["type"] == "Fourier":
+            if torsion_dict.get("multiple", False):
+                for periodicity, phase, barrier in zip(torsion_dict["periodicity"], torsion_dict["phase"], torsion_dict["barrier"]):
+                    fourier_force.addTorsion(
+                        total_atom_id[0],
+                        total_atom_id[1],
+                        total_atom_id[2],
+                        total_atom_id[3],
+                        abs(periodicity),
+                        phase * self.deg_to_rad,
+                        barrier_scaling * barrier,
+                    )
+            else:
+                fourier_force.addTorsion(
+                    total_atom_id[0],
+                    total_atom_id[1],
+                    total_atom_id[2],
+                    total_atom_id[3],
+                    torsion_dict["periodicity"],
+                    torsion_dict["phase"] * self.deg_to_rad,
+                    barrier_scaling * torsion_dict["barrier"],
+                )
+        else:
+            assert False, "Unknown dihedral type"
 
     def _get_couloumb_expression(self, soft_core: bool):
         soft_core_expression = (
-            " (1-l) * CoultotA + l  * CoultotB; "
-            "CoultotA   = step(r-rqA) * CoulA + step(rqA-r) * CoullinA;"
-            "CoultotB   = step(r-rqB) * CoulB + step(rqB-r) * CoullinB;"
-            "CoullinA   = k * ( ( qqA / rqAdiv^3 ) * r^2 - 3 * ( qqA / rqAdiv^2 ) * r + 3 * ( qqA / rqAdiv ) );"
-            "CoullinB   = k * ( ( qqB / rqBdiv^3 ) * r^2 - 3 * ( qqB / rqBdiv^2 ) * r + 3 * ( qqB / rqBdiv ) );"
-            "rqAdiv     = select(rqA,rqA,1);"
-            "rqBdiv     = select(rqB,rqB,1);"
-            "rqA        = alphaq * ( 1 + sigmaq * qqA )  * 1 ^ pow;"
-            "rqB        = alphaq * ( 1 + sigmaq * qqB )  * 1 ^ pow;"
-            "CoulA      = k*qqA/r; "
-            "CoulB      = k*qqB/r; "
-            ""
-            f"k         = {self.k};"
-            ""
-            f"alphalj   = {self.sc_alpha_lj};"
-            f"alphaq    = {self.sc_alpha_q};"
-            f"sigmaq    = {self.sc_sigma_q};"
-            f"pow       = {self.sc_power};")
-
-        hard_core_expression = (
-            " (1-l) * k*qqA/r + l * k*qqB/r; "
-            ""
-            f"k         = {self.k};")
-            
-        if soft_core:
-            return soft_core_expression
-        else:
-            return hard_core_expression
-
-    def _get_lj_expression(self, soft_core: bool):
-        soft_core_expression = (
-            " (1-l) * LjtotA + l * LjtotB; "
             " (1-l) * CoultotA + l  * CoultotB; "
             "CoultotA   = step(r-rqA) * CoulA + step(rqA-r) * CoullinA;"
             "CoultotB   = step(r-rqB) * CoulB + step(rqB-r) * CoullinB;"
@@ -1260,16 +1158,6 @@ class EvbSystemBuilder():
             f"sigmaq    = {self.sc_sigma_q};"
             f"pow       = {self.sc_power};")
 
-        hard_core_expression = (
-            " (1-l) * LjtotA "
-            "  + l  * LjtotB; "
-            ""
-            "LjtotA     = A12 / r^12 - A6 / r^6;"
-            "LjtotB     = B12 / r^12 - B6 / r^6;"
-            "A12        = 4 * epsilonA * sigmaA ^ 12; "
-            "B12        = 4 * epsilonB * sigmaB ^ 12; "
-            "A6         = 4 * epsilonA * sigmaA ^ 6; "
-            "B6         = 4 * epsilonB * sigmaB ^ 6; ")
         hard_core_expression = (
             " (1-l) * LjtotA "
             "  + l  * LjtotB; "
@@ -1421,10 +1309,10 @@ class EvbSystemBuilder():
         torsion_constraint.setName("Harmonic torsion constraint")
         torsion_constraint.addPerTorsionParameter("theta0")
         torsion_constraint.addPerTorsionParameter("k")
-        # if len(self.constraints) == 0:
-        #     print(f"No constraints found")
-        # else:
-        #     print(f"Adding constraints: {self.constraints}")
+        if len(self.constraints) == 0:
+            print(f"No constraints found")
+        else:
+            print(f"Adding constraints: {self.constraints}")
         if (
                 not reference_state
         ):  # Return the reference state forces empty so that we have the same number of forces in the reference state and run state

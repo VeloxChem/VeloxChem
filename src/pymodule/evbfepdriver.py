@@ -55,18 +55,20 @@ class FepDriver():
         equil_step_size,
         initial_equil_step_size,
         Lambda,
-        systems,
-        topology,
-        temperature,
-        initial_positions,
-        run_folder,
-        data_folder,
+        configuration
     ):
         self.run_folder = run_folder
         self.data_folder = data_folder
         self.Lambda = Lambda
         self.systems = systems
         self.topology = topology
+
+        systems=configuration["systems"]
+        topology=configuration["topology"]
+        temperature=configuration["temperature"]
+        initial_positions=configuration["initial_positions"]
+        run_folder=configuration["run_folder"]
+        data_folder=configuration["data_folder"]
 
         assert (total_sample_steps % write_step == 0), "write_step must be a factor of total_sample_steps"
         assert (total_sample_steps >= 2 * write_step), "total_sample_steps must be at least 2*write_step"

@@ -9,9 +9,7 @@ import h5py
 class EvbDataProcessing:
 
     def __init__(self):
-        self.results: dict  # List of dictionaries with all data
-        self.reference: str  # Folder name with reference data
-        self.targets: list[str]  # List of folder names with target data
+        self.results: dict = {}# Dictionary of dictionaries with all data
 
         self.barrier: float
         self.free_energy: float
@@ -26,8 +24,8 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
-        self.kb: float = 1.987204259e-3  # kcal/molK #todo use vlx
-        self.joule_to_cal: float = 1 / 4.184
+        self.kb = 1.987204259e-3  # kcal/molK #todo use vlx
+        self.joule_to_cal = 1 / 4.184
         self.verbose: bool = True
 
         self.calculate_discrete = True
@@ -41,105 +39,30 @@ class EvbDataProcessing:
     def beta(self, T) -> float:
         return 1 / (self.kb * T)
 
-    def compute(self, reference_folder: str, target_folders: str | list[str], barrier, free_energy):
+    def compute(self, results, barrier, free_energy):
         print("Starting data processing")
-        if isinstance(target_folders, str):
-            target_folders = [target_folders]
+        # if isinstance(target_folders, str):
+        #     target_folders = [target_folders]
 
         self.barrier = barrier
         self.free_energy = free_energy
         print("Loading files")
-        self.load_files(reference_folder, target_folders)
+        self.results = results
         print("Fitting H12 and alpha")
         self.alpha, self.H12 = self.fit_EVB_parameters()
         print("Calculating FEP and EVB curves")
         self.get_FEP_and_EVB()
-        print("Saving results")
-        self.save_results()
+        return results
 
-    def save_results(self):
-        for name, result in self.results.items():
-            with h5py.File(f"{name}.h5", "w") as file:
-                for key, value in result.items():
-                    if isinstance(value, np.ndarray) or isinstance(value, list):
-                        file.create_dataset(key, data=value)
-                    elif isinstance(value, dict):
-                        group = file.create_group(key)
-                        for k, v in value.items():
-                            group.create_dataset(k, data=v)
-                    else:
-                        file.attrs[key] = value
-
-    def load_result(self, file, name):
-        with h5py.File(file, "r") as f:
-            result = {}
-            for key, value in f.items():
-                if isinstance(value, h5py.Dataset):
-                    result[key] = value[()]
-                elif isinstance(value, h5py.Group):
-                    group = {}
-                    for k, v in value.items():
-                        group[k] = v[()]
-                    result[key] = group
-                else:
-                    result[key] = value
-            self.results.update({name: result})
-
-    def load_files(self, reference_folder: str, target_folders: list[str]):
-
-        self.reference = reference_folder.split("/")[-1]
-        self.targets = []
-        for target in target_folders:
-            self.targets.append(target.split("/")[-1])
-
-        folders = [reference_folder] + target_folders
-
-        for name, folder in zip([self.reference] + self.targets, folders):
-
-            E_file = f"{folder}/Energies.dat"
-            data_file = f"{folder}/Data_combined.dat"
-            options_file = f"{folder}/options.json"
-
-            E = np.loadtxt(E_file)
-            E *= self.joule_to_cal
-            E1_ref, E2_ref, E1_run, E2_run, E_m = E.T
-
-            Data = np.loadtxt(data_file)
-            step, Ep, Ek, Temp, Vol, Dens, Lambda_frame = Data.T
-
-            with open(options_file, "r") as file:
-                options = json.load(file)
-            Lambda = options["Lambda"]
-            Temp_set = options["temperature"]
-            options.pop("Lambda")
-            result = {
-                "E1_ref": E1_ref,
-                "E2_ref": E2_ref,
-                "E1_run": E1_run,
-                "E2_run": E2_run,
-                "E_m": E_m,
-                "step": step,
-                "Ep": Ep,
-                "Ek": Ek,
-                "Temp_step": Temp,
-                "Temp_set": Temp_set,
-                "Vol": Vol,
-                "Dens": Dens,
-                "Lambda": Lambda,
-                "Lambda_frame": Lambda_frame,
-                "Lambda_indices": [np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame],
-                "options": options,
-            }
-            self.results.update({name: result})
 
     def fit_EVB_parameters(self):
-
-        Lambda = self.results[self.reference]["Lambda"]
-        Lambda_frame = self.results[self.reference]["Lambda_frame"]
-        E1_ref = self.results[self.reference]["E1_ref"]
-        E2_ref = self.results[self.reference]["E2_ref"]
-        Temp = self.results[self.reference]["Temp_step"]
-        Lambda_indices = self.results[self.reference]["Lambda_indices"]
+        reference_key = list(self.results.keys())[0]
+        Lambda = self.results[reference_key]["Lambda"]
+        Lambda_frame = self.results[reference_key]["Lambda_frame"]
+        E1_ref = self.results[reference_key]["E1_ref"]
+        E2_ref = self.results[reference_key]["E2_ref"]
+        Temp = self.results[reference_key]["Temp_step"]
+        Lambda_indices = self.results[reference_key]["Lambda_indices"]
 
         def get_barrier_and_free_energy_difference(x):
             alpha, H12 = x
@@ -294,7 +217,6 @@ class EvbDataProcessing:
         dGevb = pnsfep+pnscor
 
         return dGevb, pns, dGcor
-        
 
     def calculate_free_energies(self, dGevb, smooth=True):
         if smooth:
@@ -456,6 +378,18 @@ class EvbDataProcessing:
                     }
                 })
 
+    def print_results(self):
+        print(f"{'Discrete':<30}\t Barrier \t\t Free Energy")
+        for name, result in self.results.items():
+            if "discrete" in result.keys():
+                print(f"{name:<30} \t {result['discrete']['barrier']} \t {result['discrete']['free_energy']}")
+
+        print("\n")
+        print("Analytical\t Barrier \t\t Free Energy")
+        for name, result in self.results.items():
+            if "analytical" in result.keys():
+                print(f"{name:<30} \t {result['analytical']['barrier']} \t {result['analytical']['free_energy']}")
+
     @staticmethod
     def import_matplotlib():
         try:
@@ -549,19 +483,6 @@ class EvbDataProcessing:
             )
 
         return fig, ax
-
-
-    def print_results(self):
-        print(f"{'Discrete':<30}\t Barrier \t\t Free Energy")
-        for name, result in self.results.items():
-            if "discrete" in result.keys():
-                print(f"{name:<30} \t {result['discrete']['barrier']} \t {result['discrete']['free_energy']}")
-
-        print("\n")
-        print("Analytical\t Barrier \t\t Free Energy")
-        for name, result in self.results.items():
-            if "analytical" in result.keys():
-                print(f"{name:<30} \t {result['analytical']['barrier']} \t {result['analytical']['free_energy']}")
 
     def plot_results(self, plot_analytical=True, plot_discrete=True):
         plt, mcolors, Line2D = self.import_matplotlib()
@@ -666,263 +587,3 @@ class EvbDataProcessing:
 
         fig.legend([r"$p_{n,s} \Delta G_{FEP}$", r"$p_{n,s} \Delta G_{cor}$", r"$\Delta G_{EVB,disc.}$", r"$\mu$", r"$\nu$", r"$\Delta G_{EVB,ana.}$",])
             
-
-    # def show_snapshots(folder):
-    #     import py3Dmol
-    #     # Read the pdb file and split it into models
-    #     with open(f"{folder}/traj_combined.pdb", "r") as file:
-    #         models = file.read().split("ENDMDL")
-
-    #     # Extract the first and last model
-    #     first_model = models[0] + "ENDMDL"
-    #     last_model = models[-2] + "ENDMDL"  # -2 because the last element is an empty string
-
-    #     # Display the first model
-    #     view = py3Dmol.view(width=400, height=300)
-    #     view.addModel(first_model, "pdb", {"keepH": True})
-    #     view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
-    #     view.zoomTo()
-    #     view.show()
-
-    #     # Display the last model
-    #     view = py3Dmol.view(width=400, height=300)
-    #     view.addModel(last_model, "pdb", {"keepH": True})
-    #     view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
-    #     view.zoomTo()
-    #     view.show()
-
-    # @staticmethod
-    # def discard_data(discard, E1, E2, lambda_frame):
-    #     del_indices = np.array([])
-    #     unique_lambda_frame = np.unique(lambda_frame)
-    #     discard_num = int(len(lambda_frame) * discard / len(unique_lambda_frame))
-
-    #     for l in unique_lambda_frame:
-    #         # all indices where lambda_frame = l
-    #         indices = np.where(lambda_frame == l)
-
-    #         new_del_indices = np.round(np.linspace(indices[0][0], indices[0][-1] - 1, discard_num))
-
-    #         del_indices = np.append(del_indices, new_del_indices)
-    #     del_indices = np.array(del_indices, dtype=int)
-    #     return (
-    #         np.delete(E1, del_indices),
-    #         np.delete(E2, del_indices),
-    #         np.delete(lambda_frame, del_indices),
-    #     )
-
-    # def plot_energies(folder):
-    #     E_file = f"{folder}/Energies.dat"
-    #     options_file = f"{folder}/options.json"
-    #     with open(options_file, "r") as file:
-    #         options = json.load(file)
-    #     Lambda = options["Lambda"]
-    #     ETV_file = f"{folder}/Data_combined.dat"
-
-    #     E1_ref, E2_ref, E1_run, E2_run, E_m = load_energies(E_file)
-    #     steps, E, T, V, lambda_frame = load_ETV(ETV_file)
-
-    #     _, V_ref, dE_ref, Eg_ref = calculate_Eg_V_dE(E1_ref, E2_ref, 0, 0, lambda_frame)
-    #     _, V_run, dE_run, Eg_run = calculate_Eg_V_dE(E1_run, E2_run, 0, 0, lambda_frame)
-
-    #     E1f_ref_file = f"{folder}/E1f_ref.dat"
-    #     E2f_ref_file = f"{folder}/E2f_ref.dat"
-    #     E1f_run_file = f"{folder}/E1f_run.dat"
-    #     E2f_run_file = f"{folder}/E2f_run.dat"
-    #     Vf_ref, ref_headers = get_Vf(E1f_ref_file, E2f_ref_file, lambda_frame)
-    #     Vf_run, run_headers = get_Vf(E1f_run_file, E2f_run_file, lambda_frame)
-
-    #     Efm_file = f"{folder}/Efm.dat"
-    #     Efm = np.loadtxt(Efm_file)
-
-    #     # fig = plt.figure(layout="constrained", figsize=(10, 10))
-    #     # space = 0.1
-    #     # subfigs = fig.subfigures(2, 2, wspace=space, hspace=space)
-
-    #     # ETV_ax = plot_ETV(subfigs[0, 0], E, T, V, steps)
-    #     # joule_to_cal: float = 0.239001
-    #     # V_ax = plot_V(subfigs[1, 0], E * joule_to_cal, E_m, V_ref, V_run, lambda_frame)
-    #     # diabats_ax = plot_diabats(
-    #     #     subfigs[0, 1],
-    #     #     dE_ref,
-    #     #     E1_ref,
-    #     #     E2_ref,
-    #     #     Eg_ref,
-    #     #     dE_run,
-    #     #     E1_run,
-    #     #     E2_run,
-    #     #     Eg_run,
-    #     # )
-    #     # fc_ax = plot_force_contributions(
-    #     #     subfigs[1, 1], Efm, Vf_ref, Vf_run, lambda_frame, ref_headers
-    #     # )
-
-    #     fig = plt.figure(layout="constrained", figsize=(8, 4))
-
-    #     diabats_ax = plot_diabats(
-    #         fig,
-    #         dE_ref,
-    #         E1_ref,
-    #         E2_ref,
-    #         Eg_ref,
-    #         dE_run,
-    #         E1_run,
-    #         E2_run,
-    #         Eg_run,
-    #     )
-
-    #     handles = [
-    #         Line2D(
-    #             [0],
-    #             [0],
-    #             marker="o",
-    #             color="w",
-    #             label="Scatter",
-    #             markerfacecolor=mcolors.TABLEAU_COLORS["tab:blue"],
-    #             markersize=5,
-    #         ),
-    #         Line2D(
-    #             [0],
-    #             [0],
-    #             marker="o",
-    #             color="w",
-    #             label="Scatter",
-    #             markerfacecolor=mcolors.TABLEAU_COLORS["tab:orange"],
-    #             markersize=5,
-    #         ),
-    #         Line2D(
-    #             [0],
-    #             [0],
-    #             marker="o",
-    #             color="w",
-    #             label="Scatter",
-    #             markerfacecolor=mcolors.TABLEAU_COLORS["tab:green"],
-    #             markersize=5,
-    #         ),
-    #     ]
-    #     labels = [r"$\mathcal{E}_1$", r"$\mathcal{E}_2$", r"$E_g$"]
-    #     fig.legend(handles, labels, ncols=3, loc="upper center", bbox_to_anchor=(0.5, 1.1))
-    #     fig.tight_layout(pad=2.0)
-    #     return fig
-
-    # def plot_ETV(fig, E, T, V, steps):
-    #     ax = fig.subplots(3, 1, sharex=True)
-    #     # Plot E
-    #     ax[0].plot(steps, E)
-    #     ax[0].set_ylabel("E")
-
-    #     # Plot T
-    #     ax[1].plot(steps, T)
-    #     ax[1].set_ylabel("T")
-
-    #     # Plot V
-    #     ax[2].plot(steps, V)
-    #     ax[2].set_xlabel("Steps")
-    #     ax[2].set_ylabel("V")
-    #     return ax
-
-    # # def average_per_lambda(lambda_frame, quant):
-    # #     average = []
-    # #     unique_lambda_frame = np.unique(lambda_frame)
-    # #     for lam in unique_lambda_frame:
-    # #         average.append(np.mean(quant[lambda_frame == lam]))
-    # #     return np.array(average), unique_lambda_frame
-
-    # def plot_V(fig, E, Em, V_ref, V_run, lambda_frame):
-    #     ax = fig.subplots(1, 1)
-    #     E_average, Lambda = average_per_lambda(lambda_frame, E)
-    #     Em_average, _ = average_per_lambda(lambda_frame, Em)
-    #     V_ref_average, _ = average_per_lambda(lambda_frame, V_ref)
-    #     V_run_average, _ = average_per_lambda(lambda_frame, V_run)
-    #     # ax.plot(Lambda, E_average, label="E", linewidth=3)
-    #     ax.plot(Lambda, E_average - Em_average, label="Em", linewidth=2)
-    #     ax.plot(Lambda, E_average - V_ref_average, label="V_ref", linewidth=1)
-    #     ax.plot(Lambda, E_average - V_run_average, label="V_run", linewidth=1)
-
-    #     # ax.plot(steps, E, linewidth=2, label="E")
-    #     # opacity = 0.8
-    #     # ax.plot(steps, Em, linewidth=1, alpha=opacity, label="Em")
-    #     # ax.plot(steps, V_run, linewidth=0.5, alpha=opacity, label="V_run")
-    #     # ax.plot(steps, V_ref, linewidth=0.5, alpha=opacity, label="V_ref")
-    #     ax.legend()
-    #     ax.set_xlabel(r"$\lambda$")
-    #     ax.set_ylabel("Energy (kcal/mol)")
-    #     return ax
-
-    # def plot_diabats(fig, dE_ref, E1_ref, E2_ref, Eg_ref, dE_run, E1_run, E2_run, Eg_run):
-    #     ax = fig.subplots(1, 3)
-    #     dotsize = 0.1
-    #     ax[0].scatter(dE_run, E1_run, s=dotsize * 10)
-    #     ax[0].scatter(dE_run, E2_run, s=dotsize * 10)
-    #     ax[0].scatter(dE_run, Eg_run, s=dotsize, alpha=0.8)
-    #     ax[0].set_ylabel("E (kcal/mol)")
-    #     ax[0].text(
-    #         0.5,
-    #         0.9,
-    #         r"$V_{\mathrm{sample}}$",
-    #         horizontalalignment="center",
-    #         transform=ax[0].transAxes,
-    #     )
-    #     ax[0].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
-    #     ax[0].set_xticks([-1500, 0, 1500])
-    #     ax[1].scatter(dE_run, E1_run, s=dotsize * 10)
-    #     ax[1].scatter(dE_run, E2_run, s=dotsize * 10)
-    #     ax[1].scatter(dE_run, Eg_run, s=dotsize, alpha=0.8)
-    #     ax[1].set_ylabel("E (kcal/mol)")
-    #     ax[1].text(
-    #         0.5,
-    #         0.9,
-    #         r"$V_{\mathrm{sample}}$",
-    #         horizontalalignment="center",
-    #         transform=ax[1].transAxes,
-    #     )
-
-    #     ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
-    #     ax[1].set_xlim(-300, 300)
-    #     ax[1].set_ylim(-20, 300)
-    #     ax[2].scatter(dE_ref, E1_ref, s=dotsize * 10)
-    #     ax[2].scatter(dE_ref, E2_ref, s=dotsize * 10)
-    #     ax[2].scatter(dE_ref, Eg_ref, s=dotsize, alpha=0.8)
-    #     ax[2].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
-    #     ax[2].set_ylabel("E (kcal/mol)")
-    #     ax[2].text(
-    #         0.5,
-    #         0.9,
-    #         r"$V_{\mathrm{recalc.}}$",
-    #         horizontalalignment="center",
-    #         transform=ax[2].transAxes,
-    #     )
-
-    #     ax[2].set_xlim(-300, 300)
-    #     ax[2].set_ylim(-20, 300)
-    #     return ax
-
-    # def get_Vf(E1f_file, E2f_file, lambda_frame):
-    #     E1f = np.loadtxt(E1f_file, skiprows=1)
-    #     E2f = np.loadtxt(E2f_file, skiprows=1)
-    #     with open(E1f_file, "r") as file:
-    #         headers = file.readline().split(",")
-    #     Lambda_frame_tiled = np.tile(lambda_frame, (len(headers), 1)).transpose()
-    #     Vf = (1 - Lambda_frame_tiled) * E1f + Lambda_frame_tiled * E2f
-    #     return Vf, headers
-
-    # def plot_force_contributions(fig, Efm, Vf_ref, Vf_run, lambda_frame, headers):
-    #     ax = fig.subplots(1, 1)
-    #     tol = 0.1
-    #     opacity = 1
-    #     for i, force_name in enumerate(headers):
-    #         ref_dif = Efm[:, i] - Vf_run[:, i]
-    #         ref_dif_avg, Lambda = average_per_lambda(lambda_frame, ref_dif)
-    #         run_dif = Efm[:, i] - Vf_ref[:, i]
-    #         run_dif_avg, Lambda = average_per_lambda(lambda_frame, run_dif)
-
-    #         if np.max(np.abs(ref_dif_avg)) > tol:
-    #             ax.plot(Lambda, ref_dif_avg, label=f"Ref {force_name}", alpha=opacity)
-    #             opacity = 0.7
-    #         if np.max(np.abs(run_dif_avg)) > tol:
-    #             ax.plot(Lambda, run_dif_avg, label=f"Run {force_name}", alpha=opacity)
-    #             opacity = 0.7
-    #     ax.set_xlabel(r"$\lambda$")
-    #     ax.set_ylabel("Energy (kcal/mol)")
-    #     ax.legend()
-    #     return ax
