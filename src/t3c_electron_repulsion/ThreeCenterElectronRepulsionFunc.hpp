@@ -10,22 +10,81 @@
 #include "ThreeCenterElectronRepulsionRecSSP.hpp"
 #include "ThreeCenterElectronRepulsionRecSSD.hpp"
 #include "ThreeCenterElectronRepulsionRecSPP.hpp"
+#include "ThreeCenterElectronRepulsionRecSSF.hpp"
 #include "ThreeCenterElectronRepulsionRecSPD.hpp"
+#include "ThreeCenterElectronRepulsionRecSSG.hpp"
+#include "ThreeCenterElectronRepulsionRecSPF.hpp"
 #include "ThreeCenterElectronRepulsionRecSDD.hpp"
+#include "ThreeCenterElectronRepulsionRecSPG.hpp"
+#include "ThreeCenterElectronRepulsionRecSDF.hpp"
+#include "ThreeCenterElectronRepulsionRecSFF.hpp"
+#include "ThreeCenterElectronRepulsionRecSDG.hpp"
+#include "ThreeCenterElectronRepulsionRecSFG.hpp"
+#include "ThreeCenterElectronRepulsionRecSGG.hpp"
 
 #include "ThreeCenterElectronRepulsionRecPSS.hpp"
 #include "ThreeCenterElectronRepulsionRecPSP.hpp"
 #include "ThreeCenterElectronRepulsionRecPSD.hpp"
 #include "ThreeCenterElectronRepulsionRecPPP.hpp"
+#include "ThreeCenterElectronRepulsionRecPSF.hpp"
 #include "ThreeCenterElectronRepulsionRecPPD.hpp"
+#include "ThreeCenterElectronRepulsionRecPSG.hpp"
+#include "ThreeCenterElectronRepulsionRecPPF.hpp"
 #include "ThreeCenterElectronRepulsionRecPDD.hpp"
+#include "ThreeCenterElectronRepulsionRecPPG.hpp"
+#include "ThreeCenterElectronRepulsionRecPDF.hpp"
+#include "ThreeCenterElectronRepulsionRecPFF.hpp"
+#include "ThreeCenterElectronRepulsionRecPDG.hpp"
+#include "ThreeCenterElectronRepulsionRecPFG.hpp"
+#include "ThreeCenterElectronRepulsionRecPGG.hpp"
 
 #include "ThreeCenterElectronRepulsionRecDSS.hpp"
 #include "ThreeCenterElectronRepulsionRecDSP.hpp"
 #include "ThreeCenterElectronRepulsionRecDSD.hpp"
 #include "ThreeCenterElectronRepulsionRecDPP.hpp"
+#include "ThreeCenterElectronRepulsionRecDSF.hpp"
 #include "ThreeCenterElectronRepulsionRecDPD.hpp"
+#include "ThreeCenterElectronRepulsionRecDSG.hpp"
+#include "ThreeCenterElectronRepulsionRecDPF.hpp"
 #include "ThreeCenterElectronRepulsionRecDDD.hpp"
+#include "ThreeCenterElectronRepulsionRecDPG.hpp"
+#include "ThreeCenterElectronRepulsionRecDDF.hpp"
+#include "ThreeCenterElectronRepulsionRecDFF.hpp"
+#include "ThreeCenterElectronRepulsionRecDDG.hpp"
+#include "ThreeCenterElectronRepulsionRecDFG.hpp"
+#include "ThreeCenterElectronRepulsionRecDGG.hpp"
+
+#include "ThreeCenterElectronRepulsionRecFSS.hpp"
+#include "ThreeCenterElectronRepulsionRecFSP.hpp"
+#include "ThreeCenterElectronRepulsionRecFSD.hpp"
+#include "ThreeCenterElectronRepulsionRecFPP.hpp"
+#include "ThreeCenterElectronRepulsionRecFSF.hpp"
+#include "ThreeCenterElectronRepulsionRecFPD.hpp"
+#include "ThreeCenterElectronRepulsionRecFSG.hpp"
+#include "ThreeCenterElectronRepulsionRecFPF.hpp"
+#include "ThreeCenterElectronRepulsionRecFDD.hpp"
+#include "ThreeCenterElectronRepulsionRecFPG.hpp"
+#include "ThreeCenterElectronRepulsionRecFDF.hpp"
+#include "ThreeCenterElectronRepulsionRecFFF.hpp"
+#include "ThreeCenterElectronRepulsionRecFDG.hpp"
+#include "ThreeCenterElectronRepulsionRecFFG.hpp"
+#include "ThreeCenterElectronRepulsionRecFGG.hpp"
+
+#include "ThreeCenterElectronRepulsionRecGSS.hpp"
+#include "ThreeCenterElectronRepulsionRecGSP.hpp"
+#include "ThreeCenterElectronRepulsionRecGSD.hpp"
+#include "ThreeCenterElectronRepulsionRecGPP.hpp"
+#include "ThreeCenterElectronRepulsionRecGSF.hpp"
+#include "ThreeCenterElectronRepulsionRecGPD.hpp"
+#include "ThreeCenterElectronRepulsionRecGSG.hpp"
+#include "ThreeCenterElectronRepulsionRecGPF.hpp"
+#include "ThreeCenterElectronRepulsionRecGDD.hpp"
+#include "ThreeCenterElectronRepulsionRecGPG.hpp"
+#include "ThreeCenterElectronRepulsionRecGDF.hpp"
+#include "ThreeCenterElectronRepulsionRecGFF.hpp"
+#include "ThreeCenterElectronRepulsionRecGDG.hpp"
+#include "ThreeCenterElectronRepulsionRecGFG.hpp"
+#include "ThreeCenterElectronRepulsionRecGGG.hpp"
 
 namespace t3cerifunc {
 
@@ -73,9 +132,30 @@ compute(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+         t3ceri::comp_electron_repulsion_ssf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 2})))
     {
          t3ceri::comp_electron_repulsion_spd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+         t3ceri::comp_electron_repulsion_ssg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+         t3ceri::comp_electron_repulsion_spf(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
@@ -87,6 +167,47 @@ compute(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 4})))
+    {
+         t3ceri::comp_electron_repulsion_spg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+         t3ceri::comp_electron_repulsion_sdf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+         t3ceri::comp_electron_repulsion_sff(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({2, 4})))
+    {
+         t3ceri::comp_electron_repulsion_sdg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({3, 4})))
+    {
+         t3ceri::comp_electron_repulsion_sfg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({4, 4})))
+    {
+         t3ceri::comp_electron_repulsion_sgg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
     
     if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({0, 0})))
     {
@@ -116,9 +237,30 @@ compute(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+         t3ceri::comp_electron_repulsion_psf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({1, 2})))
     {
          t3ceri::comp_electron_repulsion_ppd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+         t3ceri::comp_electron_repulsion_psg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+         t3ceri::comp_electron_repulsion_ppf(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
@@ -129,8 +271,48 @@ compute(T&                               distributor,
 
         return;
     }
-   
     
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({1, 4})))
+    {
+         t3ceri::comp_electron_repulsion_ppg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+         t3ceri::comp_electron_repulsion_pdf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+         t3ceri::comp_electron_repulsion_pff(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({2, 4})))
+    {
+         t3ceri::comp_electron_repulsion_pdg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({3, 4})))
+    {
+         t3ceri::comp_electron_repulsion_pfg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({4, 4})))
+    {
+         t3ceri::comp_electron_repulsion_pgg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
     
     if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({0, 0})))
     {
@@ -160,6 +342,13 @@ compute(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+         t3ceri::comp_electron_repulsion_dsf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({1, 2})))
     {
          t3ceri::comp_electron_repulsion_dpd(distributor, aux_gto_block, gto_pair_block, aux_indices);
@@ -167,9 +356,275 @@ compute(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+         t3ceri::comp_electron_repulsion_dsg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+         t3ceri::comp_electron_repulsion_dpf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({2, 2})))
     {
          t3ceri::comp_electron_repulsion_ddd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({1, 4})))
+    {
+         t3ceri::comp_electron_repulsion_dpg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+         t3ceri::comp_electron_repulsion_ddf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+         t3ceri::comp_electron_repulsion_dff(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({2, 4})))
+    {
+         t3ceri::comp_electron_repulsion_ddg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({3, 4})))
+    {
+         t3ceri::comp_electron_repulsion_dfg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({4, 4})))
+    {
+         t3ceri::comp_electron_repulsion_dgg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({0, 0})))
+    {
+         t3ceri::comp_electron_repulsion_fss(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({0, 1})))
+    {
+         t3ceri::comp_electron_repulsion_fsp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({0, 2})))
+    {
+         t3ceri::comp_electron_repulsion_fsd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+         t3ceri::comp_electron_repulsion_fpp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+         t3ceri::comp_electron_repulsion_fsf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+         t3ceri::comp_electron_repulsion_fpd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+         t3ceri::comp_electron_repulsion_fsg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+         t3ceri::comp_electron_repulsion_fpf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+         t3ceri::comp_electron_repulsion_fdd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({1, 4})))
+    {
+         t3ceri::comp_electron_repulsion_fpg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+         t3ceri::comp_electron_repulsion_fdf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+         t3ceri::comp_electron_repulsion_fff(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({2, 4})))
+    {
+         t3ceri::comp_electron_repulsion_fdg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({3, 4})))
+    {
+         t3ceri::comp_electron_repulsion_ffg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 3) && (ket_angmoms == std::pair<int, int>({4, 4})))
+    {
+         t3ceri::comp_electron_repulsion_fgg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({0, 0})))
+    {
+         t3ceri::comp_electron_repulsion_gss(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({0, 1})))
+    {
+         t3ceri::comp_electron_repulsion_gsp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({0, 2})))
+    {
+         t3ceri::comp_electron_repulsion_gsd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+         t3ceri::comp_electron_repulsion_gpp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+         t3ceri::comp_electron_repulsion_gsf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+         t3ceri::comp_electron_repulsion_gpd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+         t3ceri::comp_electron_repulsion_gsg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+         t3ceri::comp_electron_repulsion_gpf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+         t3ceri::comp_electron_repulsion_gdd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({1, 4})))
+    {
+         t3ceri::comp_electron_repulsion_gpg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+         t3ceri::comp_electron_repulsion_gdf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+         t3ceri::comp_electron_repulsion_gff(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({2, 4})))
+    {
+         t3ceri::comp_electron_repulsion_gdg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({3, 4})))
+    {
+         t3ceri::comp_electron_repulsion_gfg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({4, 4})))
+    {
+         t3ceri::comp_electron_repulsion_ggg(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }

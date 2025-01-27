@@ -53,5 +53,23 @@ class TestThreeCenterElectronRepulsionDriver:
         
         for i in range(24):
             for k, l in zip(indexes[0], indexes[1]):
-                print('(',i,"|",k,",",l,") = ", eri_buf.value(i,k,l)," vs. ", ref_buf[k,l,i])
+                assert mt.isclose(eri_buf.value(i,k,l), ref_buf[k,l,i], rel_tol=1.0e-12, abs_tol=1.0e-12)
+                
+    def test_electron_repulsion_h2o_qzvp(self):
+
+        mol, bas = self.get_data_qzvp()
+
+        # compute electron repulsion matrix
+        eri_drv = ThreeCenterElectronRepulsionDriver()
+        eri_buf = eri_drv.compute(mol, bas, bas)
+
+        # load reference kinetic energy data
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.qzvp.int3c2e.npy')
+        ref_buf = np.load(npyfile)
+        
+        indexes = np.triu_indices(117)
+        
+        for i in range(117):
+            for k, l in zip(indexes[0], indexes[1]):
                 assert mt.isclose(eri_buf.value(i,k,l), ref_buf[k,l,i], rel_tol=1.0e-12, abs_tol=1.0e-12)
