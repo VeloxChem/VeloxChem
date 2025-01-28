@@ -1571,6 +1571,7 @@ class PolOrbitalResponse(CphfSolver):
                         x = xy[0]
                         y = xy[1]
                         cphf_ov[x, y] += tmp_cphf_ov
+
                         if (y != x):
                             cphf_ov[y, x] += cphf_ov[x, y]
 
@@ -1639,8 +1640,8 @@ class PolOrbitalResponse(CphfSolver):
                 # construct fock_lambda (or fock_cphf)
                 # transform to AO basis: mi,xia,na->xmn
                 cphf_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
-                    for x in range(dof**2)
+                    np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
+                    for xy in range(dof**2)
                 ])
                 cphf_ao_list = [cphf_ao[x] for x in range(dof**2)]
             else:
@@ -1798,7 +1799,8 @@ class PolOrbitalResponse(CphfSolver):
             ]
 
             if self.use_subspace_solver:
-                cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+                if self.rank == mpi_master():
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
 
                 for idx, xy in enumerate(xy_pairs):
                     tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
@@ -1812,8 +1814,6 @@ class PolOrbitalResponse(CphfSolver):
                         cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
                         if (y != x):
                             cphf_ov[y, x] += cphf_ov[x, y]
-                    else:
-                        cphf_ov = None
                 del tmp_cphf_re
                 del tmp_cphf_im
 
