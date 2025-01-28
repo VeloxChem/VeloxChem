@@ -28,6 +28,10 @@ from io import StringIO
 import numpy as np
 import time as tm
 import tempfile
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+import py3Dmol as p3d
+import ipywidgets
 
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol
 from .molecule import Molecule
@@ -791,3 +795,51 @@ class OptimizationDriver:
         """
 
         return 'L.-P. Wang and C.C. Song, J. Chem. Phys. 2016, 144, 214108'
+
+# Mathieu add confergence function for optimization
+    def convergence(self, opt_results):
+        """
+        plot the convergence of the optimization
+
+        :param opt_results:
+            The dictionary of optimize results.
+
+        :return:
+            A Plot of the convergence of the optimization
+        """
+        energies = opt_results['opt_energies']
+        geometries = opt_results['opt_geometries']
+        total_steps = len(energies)-1
+        ipywidgets.interact(self.show_iteration, energies=ipywidgets.fixed(energies), geometries=ipywidgets.fixed(geometries),
+                    step=ipywidgets.IntSlider(min=0, max=total_steps, step=1, value=3))
+
+
+    def show_iteration(self, energies, geometries, step=0):
+        """
+        show the geometry at a specific iteration
+
+        """
+        xyz_data_i = geometries[step]
+        steps= range(len(energies))
+        total_steps = len(energies)-1
+        x = np.linspace(0, total_steps, 100)
+        y = np.interp(x, steps, energies)
+        plt.figure(figsize=(8,5))
+        plt.plot(x, y, color='black', alpha= 0.9, linewidth=2.5, ls='-', zorder = 0)
+        plt.scatter(steps,energies, color='black', alpha= 0.7, s=120, facecolors="none", edgecolor="darkcyan", zorder = 1)
+        plt.scatter(step, energies[step], marker='o', color='darkcyan', alpha=1.0, s=120, zorder = 2)
+        plt.xlabel('Iteration')
+        plt.ylabel('Energy (Hartree)')
+        plt.title("Optimization step")
+        plt.tight_layout(); plt.show()
+
+        viewer = p3d.view(width=600, height=300)
+        viewer.addModel(xyz_data_i)
+        viewer.setViewStyle({"style": "outline", "width": 0.05})
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+        viewer.zoomTo()
+        viewer.show()
+
+
+
+
