@@ -5,6 +5,7 @@
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 #include "T3FlatBuffer.hpp"
+#include "RIFockDriver.hpp"
 
 namespace vlx_t3cintegrals {
 
@@ -23,6 +24,13 @@ export_t3cintegrals(py::module& m)
             },
             "Computes electron repulsion integrals for given molecule, basis and auxilary basis.");
     
+    // CRIFockDriver class
+    PyClass<CRIFockDriver>(m, "RIFockDriver")
+        .def(py::init<>())
+        .def(py::init<const CMatrix&>())
+        .def(py::init<const CMatrix&, const CMatrix&>())
+        .def("prepare_buffers", &CRIFockDriver::prepare_buffers, "Computes three center electron repulsion integral buffers.")
+        .def("comp_gamma_vector", &CRIFockDriver::comp_gamma_vector, "Computes Gamma vector required for J fitting.");
 }
 
 }  // namespace vlx_t2cintegrals

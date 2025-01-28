@@ -34,6 +34,7 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
+from .veloxchemlib import RIFockDriver
 
 # C++ functions
 from .veloxchemlib import upper_case

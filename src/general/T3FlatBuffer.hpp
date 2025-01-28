@@ -99,6 +99,14 @@ class CT3FlatBuffer
         return _width;
     }
     
+    /// @brief Gets tensor width along x axis.
+    /// @return The width of tensor along x axis.
+    inline auto
+    aux_width() const -> size_t
+    {
+        return _indices.size();
+    }
+    
    private:
     
     /// @brief Memory block for data storage of tensor slices along flatenned symmetrizes y,z axis.
