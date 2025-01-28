@@ -279,7 +279,7 @@ class PolarizabilityGradient:
             # if Lagr. multipliers not available as dist. array,
             # read it from dict into variable on master
             if 'dist_cphf_ov' not in all_orbrsp_results.keys():
-                all_cphf_red = self.cphf_results['cphf_ov']
+                all_cphf_red = all_orbrsp_results['cphf_ov']
 
                 if self.is_complex:
                     all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
@@ -428,7 +428,8 @@ class PolarizabilityGradient:
 
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
-                del lambda_ao
+
+                del cphf_ov, lambda_ao
             else:
                 #orbrsp_results = None
                 gs_dm = None
@@ -436,9 +437,6 @@ class PolarizabilityGradient:
                 x_minus_y = None
                 omega_ao = None
                 rel_dm_ao = None
-
-                cphf_ov = None
-            del cphf_ov
 
             #orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
             gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
@@ -551,6 +549,8 @@ class PolarizabilityGradient:
             pol_gradient += eri_contrib
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
+            del eri_contrib
+
             if self.rank == mpi_master():
                 for x in range(dof):
                     for y in range(x + 1, dof):
@@ -569,6 +569,8 @@ class PolarizabilityGradient:
                 if self.rank == mpi_master():
                     # TODO distributed?
                     pol_gradient += polgrad_xc_contrib
+
+                del polgrad_xc_contrib
 
             if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
