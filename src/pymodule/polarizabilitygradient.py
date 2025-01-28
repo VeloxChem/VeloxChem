@@ -290,22 +290,44 @@ class PolarizabilityGradient:
             # NOTE WIP
             # cphf subspace solver returns the solution as distributed array
             if 'dist_cphf_ov' in all_orbrsp_results.keys():
-                if self.rank == mpi_master():
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
-                else:
-                    cphf_ov = None
-
-                for idx, xy in enumerate(xy_pairs):
-                    # get lambda multipliers from distributed array
-                    tmp_cphf_ov = all_orbrsp_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+                if self.is_complex:
 
                     if self.rank == mpi_master():
-                        x = xy[0]
-                        y = xy[1]
-                        cphf_ov[x, y] += tmp_cphf_ov
+                        cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
 
-                        if (y != x):
-                            cphf_ov[y, x] += cphf_ov[x, y]
+                    for idx, xy in enumerate(xy_pairs):
+                        tmp_cphf_re = all_orbrsp_results['dist_cphf_ov'][
+                            2 * dof_red * f + idx].get_full_vector()
+                        tmp_cphf_im = all_orbrsp_results['dist_cphf_ov'][
+                            2 * dof_red * f + dof_red + idx].get_full_vector()
+
+                        if self.rank == mpi_master():
+                            x = xy[0]
+                            y = xy[1]
+                            cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
+
+                            if (y != x):
+                                cphf_ov[y, x] += cphf_ov[x, y]
+
+                    del tmp_cphf_re
+                    del tmp_cphf_im
+                else:
+                    if self.rank == mpi_master():
+                        cphf_ov = np.zeros((dof, dof, nocc * nvir))
+
+                    for idx, xy in enumerate(xy_pairs):
+                        # get lambda multipliers from distributed array
+                        tmp_cphf_ov = all_orbrsp_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+
+                        if self.rank == mpi_master():
+                            x = xy[0]
+                            y = xy[1]
+                            cphf_ov[x, y] += tmp_cphf_ov
+
+                            if (y != x):
+                                cphf_ov[y, x] += cphf_ov[x, y]
+
+                    del tmp_cphf_ov
 
             if self.rank == mpi_master():
 
@@ -354,17 +376,21 @@ class PolarizabilityGradient:
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
 
-                # TODO compute from orbsrsp cphf_ov dist. array
                 lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
+
                 # NOTE WIP
+                cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
                 lambda_ao_from_dist = np.array([
-                    np.linalg.multi_dot([mo_occ, cphf_ov[x, y], mo_vir.T])
-                    for x in range(dof) for y in range(x, dof)
+                    np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
+                    for xy in range(dof**2)
                 ])
+
+                lambda_ao_from_dist = lambda_ao_from_dist.reshape(dof, dof, nao, nao)
+                print(lambda_ao_from_dist.shape)
                 lambda_ao_from_dist += lambda_ao_from_dist.transpose(0, 1, 3, 2)
                 print('compare lambdas')
-                print(np.abs(lambda_ao - lambda_ao_from_dist))
+                print(np.max(np.abs(lambda_ao - lambda_ao_from_dist)))
 
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
