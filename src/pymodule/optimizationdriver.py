@@ -830,7 +830,7 @@ class OptimizationDriver:
         plt.scatter(step, energies[step], marker='o', color='darkcyan', alpha=1.0, s=120, zorder = 2)
         plt.xlabel('Iteration')
         plt.ylabel('Energy (Hartree)')
-        plt.title("Optimization step")
+        plt.title("Structure optimization")
         plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))  # Ensure x-axis displays as integers
         plt.tight_layout(); plt.show()
 
