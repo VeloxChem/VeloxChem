@@ -438,7 +438,7 @@ class VibrationalAnalysis:
 
             alpha_bar_sq = np.abs(alpha_bar)**2
             raman_activities[freq] = (45.0 * alpha_bar_sq + 7.0 *
-                                       gamma_bar_sq) * raman_conversion_factor
+                                      gamma_bar_sq) * raman_conversion_factor
 
             if self.print_depolarization_ratio and (
                     freq == 0.0):  # TODO dynamic also?
@@ -1023,16 +1023,16 @@ class VibrationalAnalysis:
             freqs = self.frequencies
             raman_grp = hf.create_group('raman_activity')
             for i in range(len(freqs)):
-                raman_grp.create_dataset(
-                    str(freqs[i]),
-                    data=np.array([self.raman_activities[freqs[i]]]))
+                raman_grp.create_dataset(str(freqs[i]),
+                                         data=np.array(
+                                             [self.raman_activities[freqs[i]]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
             raman_grp = hf.create_group('resonance_raman_activity')
             for i in range(len(freqs)):
-                raman_grp.create_dataset(
-                    str(freqs[i]),
-                    data=np.array([self.raman_activities[freqs[i]]]))
+                raman_grp.create_dataset(str(freqs[i]),
+                                         data=np.array(
+                                             [self.raman_activities[freqs[i]]]))
         hf.close()
 
         return True
@@ -1072,6 +1072,7 @@ class VibrationalAnalysis:
                 broadening_type='lorentzian',
                 broadening_value=20,
                 scaling_factor=1.0,
+                invert_axes=False,
                 ax=None):
         """
         Plot IR spectrum.
@@ -1110,10 +1111,10 @@ class VibrationalAnalysis:
                                             broadening_value)
 
         ax2.plot(x * scaling_factor,
-                y * 0.00001,
-                color="black",
-                alpha=0.9,
-                linewidth=2.5)
+                 y * 0.00001,
+                 color="black",
+                 alpha=0.9,
+                 linewidth=2.5)
 
         legend_bars = mlines.Line2D([], [],
                                     color='darkcyan',
@@ -1134,10 +1135,10 @@ class VibrationalAnalysis:
                                        alpha=0.0001,
                                        label="Scaling factor: " + scaling)
         ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
-                  frameon=False,
-                  borderaxespad=0.,
-                  loc='center left',
-                  bbox_to_anchor=(1.05, 0.5))
+                   frameon=False,
+                   borderaxespad=0.,
+                   loc='center left',
+                   bbox_to_anchor=(1.05, 0.5))
         ax2.set_ylim(0, max(y * 0.00001) * 1.1)
         ax2.set_ylim(bottom=0)
         ax2.set_xlim(0, 3900)
@@ -1156,6 +1157,11 @@ class VibrationalAnalysis:
             )
 
         ax.set_ylim(bottom=0)
+
+        if invert_axes:
+            ax.invert_xaxis()
+            ax.invert_yaxis()
+            ax2.invert_yaxis()
 
     def plot_raman(self,
                    vib_results,
@@ -1197,10 +1203,10 @@ class VibrationalAnalysis:
                                             broadening_value)
 
         ax2.plot(x * scaling_factor,
-                y * 6.0220E-09,
-                color="black",
-                alpha=0.9,
-                linewidth=2.5)
+                 y * 6.0220E-09,
+                 color="black",
+                 alpha=0.9,
+                 linewidth=2.5)
 
         legend_bars = mlines.Line2D([], [],
                                     color='darkcyan',
@@ -1221,10 +1227,10 @@ class VibrationalAnalysis:
                                        alpha=0.0001,
                                        label="Scaling factor: " + scaling)
         ax2.legend(handles=[legend_bars, legend_spectrum, legend_scaling],
-                  frameon=False,
-                  borderaxespad=0.,
-                  loc='center left',
-                  bbox_to_anchor=(1.05, 0.5))
+                   frameon=False,
+                   borderaxespad=0.,
+                   loc='center left',
+                   bbox_to_anchor=(1.05, 0.5))
         ax2.set_ylim(0, max(y * 6.0220E-09) * 1.1)
         ax2.set_ylim(bottom=0)
         ax2.set_xlim(0, 3900)
@@ -1249,7 +1255,8 @@ class VibrationalAnalysis:
              broadening_type='lorentzian',
              broadening_value=20,
              plot_type='ir',
-             scaling_factor=1.0):
+             scaling_factor=1.0,
+             invert_axes=False):
         """
         Plot vibrational analysis results.
 
@@ -1272,7 +1279,8 @@ class VibrationalAnalysis:
             self.plot_ir(vib_results,
                          broadening_type=broadening_type,
                          broadening_value=broadening_value,
-                         scaling_factor=scaling_factor)
+                         scaling_factor=scaling_factor,
+                         invert_axes=invert_axes)
 
         elif plot_type.lower() == 'raman':
             self.plot_raman(vib_results,
