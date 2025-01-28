@@ -1719,7 +1719,8 @@ class PolOrbitalResponse(CphfSolver):
 
                 # save omega multipliers in cphf_results dictionary
                 self.cphf_results[(w)]['omega_ao'] = omega
-                self.cphf_results[(w)]['lambda_ao'] = cphf_ao
+                # TODO remove
+                #self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -1836,12 +1837,8 @@ class PolOrbitalResponse(CphfSolver):
                 dm_oo = self.cphf_results[w]['dm_oo']  # complex
                 dm_vv = self.cphf_results[w]['dm_vv']  # complex
 
-                # get response vectors from cphf_results
-                #if self.use_subspace_solver:
-                #    cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
-                #else:
+                # get Lagrangian lambda multipliers
                 if not self.use_subspace_solver:
-                    #cphf_ov = all_cphf_ov[f]
                     cphf_ov_red = all_cphf_red[f]
                     cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
 
@@ -2001,12 +1998,13 @@ class PolOrbitalResponse(CphfSolver):
                         if (n != m):
                             omega[n, m] = omega[m, n]
 
+                # TODO distributed
                 omega = omega.reshape(dof * dof, nao, nao)
 
-                # TODO purge dict
                 # save omega multipliers in cphf_results dictionary as list of dist. arrays
                 self.cphf_results[(w)]['omega_ao'] = omega
-                self.cphf_results[(w)]['lambda_ao'] = cphf_ao
+                # TODO remove
+                # self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '
