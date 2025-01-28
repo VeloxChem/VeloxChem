@@ -200,11 +200,8 @@ class PolOrbitalResponse(CphfSolver):
 
         loop_start_time = tm.time()
 
-        nocc = molecule.number_of_alpha_electrons()
-        nao = basis.get_dimensions_of_basis()
-
         # number of vector components
-        dof = len(self.vector_components)
+        #dof = len(self.vector_components)
 
         if self.rank == mpi_master():
             # check if response vectors exist for desired frequency of gradient
@@ -213,8 +210,12 @@ class PolOrbitalResponse(CphfSolver):
             density = scf_tensors['D_alpha']
             mo = scf_tensors['C_alpha']  # only alpha part
 
+            # NOTE testing
+            # number of vector components
+            dof = len(self.vector_components)
+
             # reduce dimensions of RHS to unique operator component combinations
-            xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+            xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
         else:
             density = None
@@ -230,9 +231,17 @@ class PolOrbitalResponse(CphfSolver):
         molgrid = dft_dict['molgrid']
         gs_density = [density]
 
+        # number of occupied orbitals
+        nocc = molecule.number_of_alpha_electrons()
+
+        # number of AOs
+        nao = basis.get_dimensions_of_basis()
+
         # MO coefficients
         mo_occ = mo[:, :nocc].copy()
         mo_vir = mo[:, nocc:].copy()
+
+        # number of virtual orbitals
         nvir = mo_vir.shape[1]
 
         orbrsp_rhs = {}
@@ -258,7 +267,7 @@ class PolOrbitalResponse(CphfSolver):
                     full_vec[idx] *= -1.0
 
                 # number of vector components
-                dof = len(self.vector_components)
+            #    dof = len(self.vector_components)
 
                 # extract the excitation and de-excitation components
                 # from the full solution vector.
@@ -344,7 +353,7 @@ class PolOrbitalResponse(CphfSolver):
                                 np.array(0 * x_minus_y_ao[y].real)])
 
             else:
-                dof = None
+                #dof = None
                 dm_ao_rhs_real_list = None
                 dm_ao_rhs_imag_list = None
 
@@ -355,7 +364,7 @@ class PolOrbitalResponse(CphfSolver):
                     perturbed_dm_ao_list_imre = None
                     zero_dm_ao_list = None
 
-            dof = self.comm.bcast(dof, root=mpi_master())
+            #dof = self.comm.bcast(dof, root=mpi_master())
 
             dm_ao_rhs_real_list = self.comm.bcast(dm_ao_rhs_real_list, root=mpi_master())
             dm_ao_rhs_imag_list = self.comm.bcast(dm_ao_rhs_imag_list, root=mpi_master())
@@ -505,11 +514,11 @@ class PolOrbitalResponse(CphfSolver):
 
                 # TODO purge the dict
                 orbrsp_rhs[(w)] = {
-                    'cphf_rhs': rhs_red,
+                    #'cphf_rhs': rhs_red,
                     'dm_oo': dm_oo,
                     'dm_vv': dm_vv,
-                    'x_plus_y_ao': x_plus_y_ao,
-                    'x_minus_y_ao': x_minus_y_ao,
+                    #'x_plus_y_ao': x_plus_y_ao,
+                    #'x_minus_y_ao': x_minus_y_ao,
                     'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs_real': fock_ao_rhs_real,
                     'fock_ao_rhs_imag': fock_ao_rhs_imag,
@@ -538,7 +547,6 @@ class PolOrbitalResponse(CphfSolver):
                 dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm, root=mpi_master()))
 
             dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
-
 
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
@@ -591,7 +599,7 @@ class PolOrbitalResponse(CphfSolver):
         nao = basis.get_dimensions_of_basis()
 
         # number of vector components
-        dof = len(self.vector_components)
+        #dof = len(self.vector_components)
 
         if self.rank == mpi_master():
             # check if response vectors exist for desired frequency of gradient
@@ -605,8 +613,11 @@ class PolOrbitalResponse(CphfSolver):
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
 
+            # number of vector components
+            dof = len(self.vector_components)
+
             # reduce dimensions of RHS to unique operator component combinations
-            xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+            xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
         else:
             density = None
@@ -685,7 +696,6 @@ class PolOrbitalResponse(CphfSolver):
                     # construct density matrices for E[3] term:
                     perturbed_dm_ao_list, zero_dm_ao_list = self.construct_dft_e3_dm_real(x_minus_y_ao)
             else:
-                #dof = None
                 dm_ao_rhs_list = None
 
                 if self._dft:
@@ -779,11 +789,8 @@ class PolOrbitalResponse(CphfSolver):
 
                 # TODO purge dict
                 orbrsp_rhs[(w)] = {
-                    #'cphf_rhs': rhs_red,
                     'dm_oo': dm_oo,
                     'dm_vv': dm_vv,
-                    #'x_plus_y_ao': x_plus_y_ao,
-                    #'x_minus_y_ao': x_minus_y_ao,
                     'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
@@ -803,8 +810,10 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+
             if not self.use_subspace_solver:
                 orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
+
             return orbrsp_rhs
         else:
             return {
@@ -1536,18 +1545,21 @@ class PolOrbitalResponse(CphfSolver):
         else:
             xy_pairs = None
             dof_red = None
-            dof = None
+        #    dof = None
             nocc = None
             nvir = None
 
         xy_pairs = self.comm.bcast(xy_pairs, root=mpi_master())
         dof_red = self.comm.bcast(dof_red, root=mpi_master())
-        dof = self.comm.bcast(dof, root=mpi_master())
+        #dof = self.comm.bcast(dof, root=mpi_master())
         nocc = self.comm.bcast(nocc , root=mpi_master())
         nvir = self.comm.bcast(nvir , root=mpi_master())
 
         # timings
         loop_start_time = tm.time()
+
+        # list for distributed arrays
+        dist_polorb_omega = []
 
         for f, w in enumerate(self.frequencies):
 
@@ -1710,9 +1722,17 @@ class PolOrbitalResponse(CphfSolver):
 
                             omega[m, n] += omega_gxc_contrib
 
+                        # TODO don't bother, save in reduced dimensions
                         # set values in lower off-diagonal
                         if (n != m):
                             omega[n, m] = omega[m, n]
+
+                # NOTE WIP
+                # reduce dimensions for storage
+                omega_red = []
+                for x, y in xy_pairs:
+                    omega_red.append(omega[x, y].copy())
+                omega_red = np.array(omega_red)
 
                 # TODO make distributed
                 omega = omega.reshape(dof * dof, nao, nao)
@@ -1722,6 +1742,19 @@ class PolOrbitalResponse(CphfSolver):
                 # TODO remove
                 #self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
+            # save omega in distributed array
+            for xy in range(dof_red):
+                if self.rank == mpi_master():
+                    polorb_omega_xy = omega_red[xy].reshape(nao * nao)
+                else:
+                    polorb_omega_xy = None
+                dist_polorb_omega.append(
+                    DistributedArray(polorb_omega_xy, self.comm, root=mpi_master())
+                )
+
+        if self.rank == mpi_master():
+            self.cphf_results['dist_polorb_omega'] = dist_polorb_omega
+           
         if self.rank == mpi_master():
             self.ostream.print_blank()
             valstr = '** Time spent on constructing omega multipliers '
@@ -1779,13 +1812,13 @@ class PolOrbitalResponse(CphfSolver):
         else:
             xy_pairs = None
             dof_red = None
-            dof = None
+            #dof = None
             nocc = None
             nvir = None
 
         xy_pairs = self.comm.bcast(xy_pairs, root=mpi_master())
         dof_red = self.comm.bcast(dof_red, root=mpi_master())
-        dof = self.comm.bcast(dof, root=mpi_master())
+        #dof = self.comm.bcast(dof, root=mpi_master())
         nocc = self.comm.bcast(nocc , root=mpi_master())
         nvir = self.comm.bcast(nvir , root=mpi_master())
 
@@ -1900,7 +1933,7 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ao_list_real = None
                 cphf_ao_list_imag = None
 
-            dof = self.comm.bcast(dof, root=mpi_master())
+            #dof = self.comm.bcast(dof, root=mpi_master())
 
             cphf_ao_list_real = self.comm.bcast(cphf_ao_list_real, root=mpi_master())
             cphf_ao_list_imag = self.comm.bcast(cphf_ao_list_imag, root=mpi_master())
@@ -1998,13 +2031,18 @@ class PolOrbitalResponse(CphfSolver):
                         if (n != m):
                             omega[n, m] = omega[m, n]
 
+                # TODO reduce dimensions
+
                 # TODO distributed
+
                 omega = omega.reshape(dof * dof, nao, nao)
 
                 # save omega multipliers in cphf_results dictionary as list of dist. arrays
                 self.cphf_results[(w)]['omega_ao'] = omega
                 # TODO remove
                 # self.cphf_results[(w)]['lambda_ao'] = cphf_ao
+
+        # TODO save list of dist arrays in dict
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '
