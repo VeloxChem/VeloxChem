@@ -280,6 +280,7 @@ class PolarizabilityGradient:
             # read it from dict into variable on master
             if 'dist_cphf_ov' not in all_orbrsp_results.keys():
                 all_cphf_red = self.cphf_results['cphf_ov']
+
                 if self.is_complex:
                     all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
                 else:
@@ -298,9 +299,8 @@ class PolarizabilityGradient:
                 for x in self.vector_components
             ]
 
-            # NOTE WIP
-            # cphf subspace solver returns the solution as distributed array
             if 'dist_cphf_ov' in all_orbrsp_results.keys():
+                # get lambda multipliers from distributed array
                 if self.is_complex:
                     if self.rank == mpi_master():
                         cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
@@ -325,7 +325,6 @@ class PolarizabilityGradient:
                         cphf_ov = np.zeros((dof, dof, nocc * nvir))
 
                     for idx, xy in enumerate(xy_pairs):
-                        # get lambda multipliers from distributed array
                         tmp_cphf_ov = all_orbrsp_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
 
                         if self.rank == mpi_master():
@@ -337,7 +336,8 @@ class PolarizabilityGradient:
                                 cphf_ov[y, x] += cphf_ov[x, y]
                     del tmp_cphf_ov
 
-            else: # conjugate gradient solver writes array to master dict
+            else:
+                # get lambda multipliers from array in orbrsp dict
                 cphf_ov_red = all_cphf_red[f]
 
                 if self.is_complex:
@@ -392,6 +392,7 @@ class PolarizabilityGradient:
                 x_minus_y_mo = exc_vec - deexc_vec
 
                 # transform to AO basis: mi,xia,na->xmn
+                # TODO rename to _ao for clarity
                 x_plus_y = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
                     for x in range(dof)
@@ -400,6 +401,8 @@ class PolarizabilityGradient:
                     np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
                     for x in range(dof)
                 ])
+                del x_plus_y_mo
+                del x_minus_y_mo
 
                 orbrsp_results = all_orbrsp_results[w]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
@@ -409,25 +412,23 @@ class PolarizabilityGradient:
                 omega_ao = orbrsp_results['omega_ao'].reshape(
                     dof, dof, nao, nao)
 
+                # TODO remove
                 #lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
                 #lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
 
-                # NOTE WIP
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
-                lambda_ao_from_ov = np.array([
+                lambda_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
                     for xy in range(dof**2)
                 ])
 
-                lambda_ao_from_ov = lambda_ao_from_ov.reshape(dof, dof, nao, nao)
-                lambda_ao_from_ov += lambda_ao_from_ov.transpose(0, 1, 3, 2)
-
-                # NOTE wip
-                lambda_ao = lambda_ao_from_ov
+                lambda_ao = lambda_ao.reshape(dof, dof, nao, nao)
+                lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
 
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
+                del lambda_ao
             else:
                 #orbrsp_results = None
                 gs_dm = None
@@ -435,6 +436,9 @@ class PolarizabilityGradient:
                 x_minus_y = None
                 omega_ao = None
                 rel_dm_ao = None
+
+                cphf_ov = None
+            del cphf_ov
 
             #orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
             gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
@@ -470,7 +474,7 @@ class PolarizabilityGradient:
 
                     # loop over operator components
                     for x, y in xy_pairs:
-                        # TODO distributed
+                        # TODO distributed ?
                         pol_gradient[x, y, iatom, icoord] += (
                                 np.linalg.multi_dot([ # xymn,amn->xya
                                     2.0 * rel_dm_ao[x, y].reshape(nao**2),
@@ -543,15 +547,14 @@ class PolarizabilityGradient:
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                     rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
 
-            # TODO distributed
+            # TODO distributed ?
             pol_gradient += eri_contrib
-            # TODO distributed
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             if self.rank == mpi_master():
                 for x in range(dof):
                     for y in range(x + 1, dof):
-                        # TODO distributed
+                        # TODO distributed ?
                         pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
@@ -564,6 +567,7 @@ class PolarizabilityGradient:
 
                 # add contribution to the SCF polarizability gradient
                 if self.rank == mpi_master():
+                    # TODO distributed?
                     pol_gradient += polgrad_xc_contrib
 
             if self.rank == mpi_master():
