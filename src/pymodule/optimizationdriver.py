@@ -797,7 +797,7 @@ class OptimizationDriver:
         return 'L.-P. Wang and C.C. Song, J. Chem. Phys. 2016, 144, 214108'
 
 # Mathieu add confergence function for optimization
-    def convergence(self, opt_results):
+    def convergence(self, opt_results, atom_indices=False):
         """
         plot the convergence of the optimization
 
@@ -811,10 +811,10 @@ class OptimizationDriver:
         geometries = opt_results['opt_geometries']
         total_steps = len(energies)-1
         ipywidgets.interact(self.show_iteration, energies=ipywidgets.fixed(energies), geometries=ipywidgets.fixed(geometries),
-                    step=ipywidgets.IntSlider(min=0, max=total_steps, step=1, value=total_steps))
+                    step=ipywidgets.IntSlider(min=0, max=total_steps, step=1, value=total_steps), atom_indices=ipywidgets.fixed(atom_indices))
 
 
-    def show_iteration(self, energies, geometries, step=0):
+    def show_iteration(self, energies, geometries, step=0, atom_indices=False):
         """
         show the geometry at a specific iteration
 
@@ -834,12 +834,8 @@ class OptimizationDriver:
         plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))  # Ensure x-axis displays as integers
         plt.tight_layout(); plt.show()
 
-        viewer = p3d.view(width=600, height=300)
-        viewer.addModel(xyz_data_i)
-        viewer.setViewStyle({"style": "outline", "width": 0.05})
-        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
-        viewer.zoomTo()
-        viewer.show()
+        mol = Molecule.read_xyz_string(xyz_data_i)
+        mol.show(atom_indices=atom_indices, width=800, height=400)
 
 
 
