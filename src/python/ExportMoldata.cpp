@@ -28,6 +28,7 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
+#include "AtomicPartialChargesModel.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "DispersionModel.hpp"
@@ -234,6 +235,10 @@ export_moldata(py::module &m)
         .def(
             "get_partial_charges",
             [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
+            "Gets partial charges for molecule.")
+        .def(
+            "get_partial_charges_new",
+            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return atmparchg::getPartialCharges(self, net_charge); },
             "Gets partial charges for molecule.")
         .def(
             "vdw_radii_to_numpy",

@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    AtomicPartialChargesModel.cpp
     AtomicRadii.cpp
     ChemicalElement.cpp
     CoordinationNumber.cpp
