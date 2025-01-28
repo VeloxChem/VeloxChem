@@ -811,7 +811,7 @@ class OptimizationDriver:
         geometries = opt_results['opt_geometries']
         total_steps = len(energies)-1
         ipywidgets.interact(self.show_iteration, energies=ipywidgets.fixed(energies), geometries=ipywidgets.fixed(geometries),
-                    step=ipywidgets.IntSlider(min=0, max=total_steps, step=1, value=3))
+                    step=ipywidgets.IntSlider(min=0, max=total_steps, step=1, value=total_steps))
 
 
     def show_iteration(self, energies, geometries, step=0):
