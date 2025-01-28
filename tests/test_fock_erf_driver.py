@@ -30,7 +30,7 @@ class TestFockErfDriver:
         bas = MolecularBasis.read(mol, 'def2-tzvp')
 
         return mol, bas
-        
+
     def test_h2o_dimer_fock_k_tzvp_with_screener(self):
 
         mol_h2o_dimer, bas_tzvp = self.get_data_h2o_dimer()
@@ -40,7 +40,7 @@ class TestFockErfDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.tzvp.density.npy')
         den_mat = make_matrix(bas_tzvp, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_tzvp, mol_h2o_dimer, "eri")
@@ -81,7 +81,7 @@ class TestFockErfDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        
+
     def test_h2o_dimer_fock_kx_tzvp_with_screener(self):
 
         mol_h2o_dimer, bas_tzvp = self.get_data_h2o_dimer()
@@ -91,7 +91,7 @@ class TestFockErfDriver:
         npyfile = str(here / 'data' / 'h2o.dimer.tzvp.density.npy')
         den_mat = make_matrix(bas_tzvp, mat_t.symmetric)
         den_mat.set_values(np.load(npyfile))
-        
+
         # screen basis function pairs
         t4c_drv = T4CScreener()
         t4c_drv.partition(bas_tzvp, mol_h2o_dimer, "eri")
@@ -132,4 +132,3 @@ class TestFockErfDriver:
         fref.set_values(np.ascontiguousarray(ref_mat))
 
         assert fmat == fref
-        

@@ -8,6 +8,7 @@ from veloxchem import Molecule
 from veloxchem import SubMatrix
 from veloxchem import T3FlatBuffer
 
+
 class TestThreeCenterElectronRepulsionDriver:
 
     def get_data_svp(self):
@@ -17,12 +18,12 @@ class TestThreeCenterElectronRepulsionDriver:
             H    0.000000000000        0.740848095288        0.582094932012
             H    0.000000000000       -0.740848095288        0.582094932012
         """
-        
+
         mol = Molecule.read_str(h2ostr, 'angstrom')
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-    
+
     def get_data_qzvp(self):
 
         h2ostr = """
@@ -30,7 +31,7 @@ class TestThreeCenterElectronRepulsionDriver:
             H    0.000000000000        0.740848095288        0.582094932012
             H    0.000000000000       -0.740848095288        0.582094932012
         """
-        
+
         mol = Molecule.read_str(h2ostr, 'angstrom')
         bas = MolecularBasis.read(mol, 'def2-qzvp')
 
@@ -48,13 +49,16 @@ class TestThreeCenterElectronRepulsionDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.svp.int3c2e.npy')
         ref_buf = np.load(npyfile)
-        
+
         indexes = np.triu_indices(24)
-        
+
         for i in range(24):
             for k, l in zip(indexes[0], indexes[1]):
-                assert mt.isclose(eri_buf.value(i,k,l), ref_buf[k,l,i], rel_tol=1.0e-12, abs_tol=1.0e-12)
-                
+                assert mt.isclose(eri_buf.value(i, k, l),
+                                  ref_buf[k, l, i],
+                                  rel_tol=1.0e-12,
+                                  abs_tol=1.0e-12)
+
     def test_electron_repulsion_h2o_qzvp(self):
 
         mol, bas = self.get_data_qzvp()
@@ -67,9 +71,12 @@ class TestThreeCenterElectronRepulsionDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.qzvp.int3c2e.npy')
         ref_buf = np.load(npyfile)
-        
+
         indexes = np.triu_indices(117)
-        
+
         for i in range(117):
             for k, l in zip(indexes[0], indexes[1]):
-                assert mt.isclose(eri_buf.value(i,k,l), ref_buf[k,l,i], rel_tol=1.0e-12, abs_tol=1.0e-12)
+                assert mt.isclose(eri_buf.value(i, k, l),
+                                  ref_buf[k, l, i],
+                                  rel_tol=1.0e-12,
+                                  abs_tol=1.0e-12)

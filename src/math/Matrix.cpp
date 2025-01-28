@@ -5,6 +5,7 @@
 #include <ranges>
 
 #include "CustomViews.hpp"
+#include "MathFunc.hpp"
 
 CMatrix::CMatrix()
 
@@ -348,6 +349,68 @@ CMatrix::pointer() -> CMatrix *
 }
 
 auto
+CMatrix::flat_values() const -> std::vector<double>
+{
+    if (const auto nrows = number_of_rows(); nrows > 0)
+    {
+        if (_mat_type == mat_t::symmetric)
+        {
+            std::vector<double> values(nrows * (nrows + 1) / 2, 0.0);
+            
+            std::ranges::for_each(_sub_matrices, [&](const auto &mvalue) {
+                const auto dims = mvalue.second->get_dimensions();
+                if (mvalue.first.first == mvalue.first.second)
+                {
+                    std::ranges::for_each(views::triangular(dims[2]), [&](const auto &index) {
+                        const auto i = dims[0] + index.first;
+                        const auto j = dims[1] + index.second;
+                        if (i < j)
+                        {
+                            values[mathfunc::uplo_rm_index(i, j, nrows)] = 2.0 * mvalue.second->at(index);
+                        }
+                        else
+                        {
+                            values[mathfunc::uplo_rm_index(j, i, nrows)] = mvalue.second->at(index);
+                        }
+                    });
+                }
+                else
+                {
+                    std::ranges::for_each(views::rectangular(dims[2], dims[3]), [&](const auto &index) {
+                        const auto i = dims[0] + index.first;
+                        const auto j = dims[1] + index.second;
+                        if (i <= j)
+                        {
+                            values[mathfunc::uplo_rm_index(i, j, nrows)] = 2.0 * mvalue.second->at(index);
+                        }
+                        else
+                        {
+                            values[mathfunc::uplo_rm_index(j, i, nrows)] = 2.0 * mvalue.second->at(index);
+                        }
+                    });
+                }
+            });
+            
+            return values;
+        }
+        else
+        {
+            const auto ncols = number_of_columns();
+            
+            std::vector<double> values(nrows * ncols, 0.0);
+            
+            // FIX ME : add flattening for general matrix
+            
+            return values;
+        }
+    }
+    else
+    {
+        return std::vector<double>();
+    }
+}
+
+auto
 CMatrix::_row_angular_keys() const -> std::set<int>
 {
     std::set<int> row_keys;
@@ -374,3 +437,5 @@ CMatrix::_deallocate() -> void
 
     _sub_matrices.clear();
 }
+
+

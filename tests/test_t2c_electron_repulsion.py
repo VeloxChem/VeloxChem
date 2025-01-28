@@ -16,12 +16,12 @@ class TestTwoCenterElectronRepulsionDriver:
             H    0.000000000000        0.740848095288        0.582094932012
             H    0.000000000000       -0.740848095288        0.582094932012
         """
-        
+
         mol = Molecule.read_str(h2ostr, 'angstrom')
         bas = MolecularBasis.read(mol, 'def2-svp')
 
         return mol, bas
-    
+
     def get_data_qzvp(self):
 
         h2ostr = """
@@ -29,7 +29,7 @@ class TestTwoCenterElectronRepulsionDriver:
             H    0.000000000000        0.740848095288        0.582094932012
             H    0.000000000000       -0.740848095288        0.582094932012
         """
-        
+
         mol = Molecule.read_str(h2ostr, 'angstrom')
         bas = MolecularBasis.read(mol, 'def2-qzvp')
 
@@ -69,7 +69,7 @@ class TestTwoCenterElectronRepulsionDriver:
         fref = SubMatrix([0, 0, 24, 24])
         fref.set_values(np.ascontiguousarray(ref_mat))
         assert fmat == fref
-        
+
     def test_electron_repulsion_h2o_qzvp(self):
 
         mol, bas = self.get_data_qzvp()

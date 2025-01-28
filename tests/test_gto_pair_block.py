@@ -30,9 +30,9 @@ class TestGtoPairBlock:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         return mol, bas
-        
+
     def test_pickle(self):
-    
+
         mol_co, bas_svp = self.get_data()
 
         # GTO blocks
@@ -44,8 +44,8 @@ class TestGtoPairBlock:
         p3x1_pairs_a = GtoPairBlock(p3_gtos, p1_gtos)
         bobj = pickle.dumps(p3x1_pairs_a)
         p3x1_pairs_b = pickle.loads(bobj)
-        assert  p3x1_pairs_a == p3x1_pairs_b
-    
+        assert p3x1_pairs_a == p3x1_pairs_b
+
     def test_number_of_contracted_pairs(self):
 
         mol_co, bas_svp = self.get_data()
@@ -278,11 +278,11 @@ class TestGtoPairBlock:
         fcoords = p3x1_pairs.ket_coordinates()
         rcoords = [p1coords[0], p1coords[1], p1coords[0], p1coords[1]]
         assert self.eq_coordinates(fcoords, rcoords)
-        
+
     def test_mpi_bcast(self):
-    
+
         comm = MPI.COMM_WORLD
-       
+
         mol_co, bas_svp = self.get_data()
 
         # GTO blocks
@@ -294,6 +294,6 @@ class TestGtoPairBlock:
         p3x1_pairs_a = None
         if comm.Get_rank() == 0:
             p3x1_pairs_a = GtoPairBlock(p3_gtos, p1_gtos)
-        p3x1_pairs_a  = comm.bcast(p3x1_pairs_a)
+        p3x1_pairs_a = comm.bcast(p3x1_pairs_a)
         p3x1_pairs_b = GtoPairBlock(p3_gtos, p1_gtos)
         assert p3x1_pairs_a == p3x1_pairs_b

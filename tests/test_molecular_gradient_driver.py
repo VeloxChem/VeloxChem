@@ -27,7 +27,7 @@ class TestMolecularGradientDriver:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         return mol, bas
-        
+
     def get_data_h2o_dimer(self):
 
         h2o_dimer_str = """
@@ -44,36 +44,37 @@ class TestMolecularGradientDriver:
         return mol, bas
 
     def test_h2o_mpi_comp_electronic_grad(self):
-    
+
         comm = MPI.COMM_WORLD
-            
+
         mol_h2o, bas_sto3g = self.get_data_h2o()
-        
+
         # load density matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
         den_mat = np.load(npyfile)
-        
+
         # load weighted density matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.energy.weighted.density.npy')
         wden_mat = np.load(npyfile)
-        
+
         grad_drv = MolecularGradientDriver()
-        mol_grad = grad_drv.mpi_comp_electronic_grad(comm, mol_h2o, bas_sto3g, den_mat, wden_mat, 0.0, 0.0)
-        
+        mol_grad = grad_drv.mpi_comp_electronic_grad(comm, mol_h2o, bas_sto3g,
+                                                     den_mat, wden_mat, 0.0,
+                                                     0.0)
+
         tot_grad = np.zeros((3, 3))
         comm.Reduce(mol_grad, tot_grad, MPI.SUM, 0)
-        
+
         if comm.Get_rank() == 0:
             # electronic gradient contribution
             here = Path(__file__).parent
             npyfile = str(here / 'data' / 'h2o.sto3g.electronic.gradient.npy')
             ref_grad = np.load(npyfile)
-        
+
             assert np.allclose(ref_grad, tot_grad, 1.0e-12, 1.0e-12, False)
-        
-        
+
     def test_h2o_comp_electronic_grad(self):
 
         mol_h2o, bas_sto3g = self.get_data_h2o()
@@ -82,22 +83,23 @@ class TestMolecularGradientDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
         den_mat = np.load(npyfile)
-        
+
         # load weighted density matrix
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.energy.weighted.density.npy')
         wden_mat = np.load(npyfile)
-        
+
         grad_drv = MolecularGradientDriver()
-        mol_grad = grad_drv.comp_electronic_grad(mol_h2o, bas_sto3g, den_mat, wden_mat, 0.0, 0.0)
-        
+        mol_grad = grad_drv.comp_electronic_grad(mol_h2o, bas_sto3g, den_mat,
+                                                 wden_mat, 0.0, 0.0)
+
         # electronic gradient contribution
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.sto3g.electronic.gradient.npy')
         ref_grad = np.load(npyfile)
-        
+
         assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)
-        
+
     def test_h2o_dimer_svpd_comp_electronic_grad(self):
 
         mol_h2o_dimer, bas_svpd = self.get_data_h2o_dimer()
@@ -106,21 +108,20 @@ class TestMolecularGradientDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.density.npy')
         den_mat = np.load(npyfile)
-        
+
         # load weighted density matrix (need replacement)
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'h2o.dimer.svpd.energy.weighted.density.npy')
+        npyfile = str(here / 'data' /
+                      'h2o.dimer.svpd.energy.weighted.density.npy')
         wden_mat = np.load(npyfile)
-        
+
         grad_drv = MolecularGradientDriver()
-        mol_grad = grad_drv.comp_electronic_grad(mol_h2o_dimer, bas_svpd, den_mat, wden_mat, 0.0, 0.0)
-        
+        mol_grad = grad_drv.comp_electronic_grad(mol_h2o_dimer, bas_svpd,
+                                                 den_mat, wden_mat, 0.0, 0.0)
+
         # electronic gradient contribution
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'h2o.dimer.svpd.electronic.gradient.npy')
         ref_grad = np.load(npyfile)
-    
-        assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)
 
-        
-        
+        assert np.allclose(ref_grad, mol_grad, 1.0e-12, 1.0e-12, False)

@@ -144,6 +144,10 @@ class CMatrix
     /// @brief Gets constant pointer to matrix.
     /// @return The constant pointer to matrix.
     auto pointer() const -> const CMatrix *;
+    
+    /// @brief Gets flatened values of matrix elements into vector.
+    /// @return The constant pointer to matrix.
+    auto flat_values() const -> std::vector<double>;
 
    private:
     /// @brief The map of submatrices.

@@ -24,7 +24,7 @@ class TestT4CScreener:
         bas = MolecularBasis.read(mol, 'sto-3g')
 
         return mol, bas
-        
+
     def test_pickle(self):
 
         mol_h2o, bas_sto3g = self.get_data_h2o()
@@ -66,13 +66,13 @@ class TestT4CScreener:
         ]
         assert agp_pair_blocks[2] == BlockedGtoPairBlock(
             b_pair_blocks[2], tints_pp)
-            
+
     def test_mpi_bcast(self):
-    
+
         comm = MPI.COMM_WORLD
-        
+
         mol_h2o, bas_sto3g = self.get_data_h2o()
-        
+
         t4c_drv_a = None
         if comm.Get_rank() == 0:
             t4c_drv_a = T4CScreener()

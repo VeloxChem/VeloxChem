@@ -220,6 +220,7 @@ export_math(py::module &m) -> void
             "full_matrix",
             [](const CMatrix &self) -> std::shared_ptr<CSubMatrix> { return std::make_shared<CSubMatrix>(self.full_matrix()); },
             "Creates full matrix representation of matrix.")
+        .def("flat_values", &CMatrix::flat_values, "Gets flatened vector of matrix elements.")
         .def("__add__", [](const CMatrix &self, const CMatrix &other) { return self + other; })
         .def("__eq__", [](const CMatrix &self, const CMatrix &other) { return self == other; })
         .def("__ne__", [](const CMatrix &self, const CMatrix &other) { return self != other; })
