@@ -1167,15 +1167,14 @@ class LinearResponseEigenSolver(LinearSolver):
         """
         Plot the UV spectrum from the response calculation.
 
+        :param rpa_results:
+            The dictionary containing RPA results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
             The broadening value in eV.
         :param ax:
             The matplotlib axis to plot on.
-
-        :return:
-            The matplotlib axis.
         """
 
         assert_msg_critical('matplotlib' in sys.modules,
@@ -1260,8 +1259,6 @@ class LinearResponseEigenSolver(LinearSolver):
         ax2.set_ylabel("Oscillator strength")
         ax.set_xlim(ev_x_nm / (xmax * au2ev), ev_x_nm / (xmin * au2ev))
 
-        return ax
-
     def plot_ecd(self,
                  rpa_results,
                  broadening_type="lorentzian",
@@ -1271,15 +1268,14 @@ class LinearResponseEigenSolver(LinearSolver):
         """
         Plot the ECD spectrum from the response calculation.
 
+        :param rpa_results:
+            The dictionary containing RPA results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
             The broadening value in eV.
         :param ax:
             The matplotlib axis to plot on.
-
-        :return:
-            The matplotlib axis.
         """
 
         assert_msg_critical('matplotlib' in sys.modules,
@@ -1287,9 +1283,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
         ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
         au2ev = hartree_in_ev()
+
         # initialize the plot
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
+
         ax.set_xlabel("Wavelength [nm]")
         ax.set_title("ECD Spectrum")
         ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
@@ -1361,8 +1359,6 @@ class LinearResponseEigenSolver(LinearSolver):
                   loc='center left',
                   bbox_to_anchor=(1.15, 0.5))
 
-        return ax
-
     @staticmethod
     def lorentzian_uv_vis(x, y, xmin, xmax, xstep, gamma):
         xi = np.arange(xmin, xmax, xstep)
@@ -1415,6 +1411,8 @@ class LinearResponseEigenSolver(LinearSolver):
         """
         Plot the UV or ECD spectrum from the response calculation.
 
+        :param rpa_results:
+            The dictionary containing RPA results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:

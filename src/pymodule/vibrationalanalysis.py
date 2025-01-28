@@ -1071,21 +1071,20 @@ class VibrationalAnalysis:
                 vib_results,
                 broadening_type='lorentzian',
                 broadening_value=20,
-                ax=None,
-                scaling_factor=1.0):
+                scaling_factor=1.0,
+                ax=None):
         """
-        Plot a IR spectrum.
+        Plot IR spectrum.
 
+        :param vib_results:
+            The dictionary containing vibrational analysis results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
             The broadening value to use in cm^-1.
-        :param ax:
-            A Matplotlib axis object.
         :param scaling_factor:
             A scaling factor for the frequencies.
-
-        :return:
+        :param ax:
             A Matplotlib axis object.
         """
 
@@ -1094,8 +1093,6 @@ class VibrationalAnalysis:
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
-        # IR unit km/mol
-        # raman unit   A**4/amu
 
         ax.set_xlabel('Wavenumber [cm$^{-1}$]')
         ax.set_ylabel('IR intensity [km/mol]')
@@ -1160,27 +1157,24 @@ class VibrationalAnalysis:
 
         ax.set_ylim(bottom=0)
 
-        return ax
-
     def plot_raman(self,
                    vib_results,
                    broadening_type='lorentzian',
                    broadening_value=20,
-                   ax=None,
-                   scaling_factor=1.0):
+                   scaling_factor=1.0,
+                   ax=None):
         """
-        Plot a raman spectrum.
+        Plot Raman spectrum.
 
+        :param vib_results:
+            The dictionary containing vibrational analysis results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
             The broadening value to use in cm^-1.
-        :param ax:
-            A Matplotlib axis object.
         :param scaling_factor:
             A scaling factor for the frequencies.
-
-        :return:
+        :param ax:
             A Matplotlib axis object.
         """
 
@@ -1250,8 +1244,6 @@ class VibrationalAnalysis:
 
         ax.set_ylim(bottom=0)
 
-        return ax
-
     def plot(self,
              vib_results,
              broadening_type='lorentzian',
@@ -1262,7 +1254,7 @@ class VibrationalAnalysis:
         Plot vibrational analysis results.
 
         :param vib_results:
-            The vibrational results.
+            The dictionary containing vibrational analysis results.
         :param broadening_type:
             The type of broadening to use. Either 'lorentzian' or 'gaussian'.
         :param broadening_value:
@@ -1295,13 +1287,13 @@ class VibrationalAnalysis:
             self.plot_ir(vib_results,
                          broadening_type=broadening_type,
                          broadening_value=broadening_value,
-                         ax=axs[0],
-                         scaling_factor=scaling_factor)
+                         scaling_factor=scaling_factor,
+                         ax=axs[0])
             self.plot_raman(vib_results,
                             broadening_type=broadening_type,
                             broadening_value=broadening_value,
-                            ax=axs[1],
-                            scaling_factor=scaling_factor)
+                            scaling_factor=scaling_factor,
+                            ax=axs[1])
 
         else:
             assert_msg_critical(False, 'Invalid plot type')
@@ -1343,7 +1335,7 @@ class VibrationalAnalysis:
                 assert_msg_critical(False, "No Raman activities available")
 
             print("3 modes with the highest Raman activity:")
-            print("Mode  Frequency [cm^-1]  Intensity [A^4/amu]")
+            print("Mode  Frequency [cm^-1]  Activity [A^4/amu]")
 
             # sort the intensities
             sorted_indices = np.argsort(vib_results['raman_activities'][0])
@@ -1373,7 +1365,7 @@ class VibrationalAnalysis:
             print()
 
             print("3 modes with the highest Raman activity:")
-            print("Mode  Frequency [cm^-1]  Intensity [A^4/amu]")
+            print("Mode  Frequency [cm^-1]  Activity [A^4/amu]")
 
             # sort the intensities
             sorted_indices = np.argsort(vib_results['raman_activities'][0])
