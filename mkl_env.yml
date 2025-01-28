@@ -24,7 +24,6 @@ dependencies:
   - openmm
   - scipy
   - rdkit
-  - xtb
   - geometric
   - libxc
   - clang-format

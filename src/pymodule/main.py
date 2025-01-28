@@ -56,9 +56,6 @@ from .vibrationalanalysis import VibrationalAnalysis
 #from .cphfsolver import CphfSolver
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
-from .xtbdriver import XtbDriver
-from .xtbgradientdriver import XtbGradientDriver
-from .xtbhessiandriver import XtbHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
 
@@ -240,8 +237,6 @@ def main():
     method_dict['pe_options'] = (dict(task.input_dict['pe'])
                                  if 'pe' in task.input_dict else {})
 
-    use_xtb = ('xtb' in method_dict)
-
     # Exciton model
 
     if task_type == 'exciton':
@@ -306,32 +301,21 @@ def main():
         scf_dict['program_end_time'] = program_end_time
         scf_dict['filename'] = task.input_dict['filename']
 
-        if use_xtb:
-            if 'potfile' in method_dict:
-                errmsg = 'XtbDriver: The \'potfile\' keyword is not supported '
-                errmsg += 'in XTB calculation.'
-                if task.mpi_rank == mpi_master():
-                    assert_msg_critical(False, errmsg)
-            xtb_drv = XtbDriver(task.mpi_comm, task.ostream)
-            xtb_drv.set_method(method_dict['xtb'].lower())
-            xtb_drv.xtb_verbose = True
-            xtb_results = xtb_drv.compute(task.molecule)
-        else:
-            scf_drv = select_scf_driver(task, scf_type)
-            scf_drv.update_settings(scf_dict, method_dict)
-            scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                          task.min_basis)
+        scf_drv = select_scf_driver(task, scf_type)
+        scf_drv.update_settings(scf_dict, method_dict)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-            mol_orbs = scf_drv.molecular_orbitals
-            density = scf_drv.density
+        mol_orbs = scf_drv.molecular_orbitals
+        density = scf_drv.density
 
-            if not scf_drv.is_converged:
-                return
+        if not scf_drv.is_converged:
+            return
 
-            if (scf_drv.electric_field is not None and
-                    task.molecule.get_charge() != 0):
-                task.finish()
-                return
+        if (scf_drv.electric_field is not None and
+                task.molecule.get_charge() != 0):
+            task.finish()
+            return
 
     # Gradient
 
@@ -347,15 +331,9 @@ def main():
 
         if run_ground_state_gradient:
 
-            if use_xtb:
-                grad_drv = XtbGradientDriver(xtb_drv)
-                grad_drv.update_settings(grad_dict, method_dict)
-                grad_drv.compute(task.molecule)
-
-            else:
-                grad_drv = ScfGradientDriver(scf_drv)
-                grad_drv.update_settings(grad_dict, method_dict)
-                grad_drv.compute(task.molecule, task.ao_basis, scf_results)
+            grad_drv = ScfGradientDriver(scf_drv)
+            grad_drv.update_settings(grad_dict, method_dict)
+            grad_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         elif run_excited_state_gradient:
 
@@ -388,15 +366,9 @@ def main():
         orbrsp_dict['program_end_time'] = program_end_time
         orbrsp_dict['filename'] = task.input_dict['filename']
 
-        if use_xtb:
-            hessian_drv = XtbHessianDriver(xtb_drv)
-            hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule)
-
-        else:
-            hessian_drv = ScfHessianDriver(scf_drv)
-            hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
-            hessian_drv.compute(task.molecule, task.ao_basis)
+        hessian_drv = ScfHessianDriver(scf_drv)
+        hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
+        hessian_drv.compute(task.molecule, task.ao_basis)
 
     # Geometry optimization
 
@@ -417,19 +389,11 @@ def main():
 
         if run_ground_state_gradient:
 
-            if use_xtb:
-                grad_drv = XtbGradientDriver(xtb_drv)
-                opt_drv = OptimizationDriver(grad_drv)
-                opt_drv.keep_files = True
-                opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule)
-
-            else:
-                grad_drv = ScfGradientDriver(scf_drv)
-                opt_drv = OptimizationDriver(grad_drv)
-                opt_drv.keep_files = True
-                opt_drv.update_settings(opt_dict)
-                opt_results = opt_drv.compute(task.molecule, task.ao_basis,
+            grad_drv = ScfGradientDriver(scf_drv)
+            opt_drv = OptimizationDriver(grad_drv)
+            opt_drv.keep_files = True
+            opt_drv.update_settings(opt_dict)
+            opt_results = opt_drv.compute(task.molecule, task.ao_basis,
                                               scf_results)
 
         elif run_excited_state_gradient:
@@ -483,23 +447,13 @@ def main():
                     if 'response' in task.input_dict else {})
         rsp_dict['filename'] = task.input_dict['filename']
 
-        if use_xtb:
-            vibrational_drv = VibrationalAnalysis(xtb_drv)
-            vibrational_drv.update_settings(method_dict,
-                                            vib_dict,
-                                            hessian_dict=hessian_dict,
-                                            cphf_dict=orbrsp_dict,
-                                            rsp_dict=rsp_dict,
-                                            polgrad_dict=polgrad_dict)
-
-        else:
-            vibrational_drv = VibrationalAnalysis(scf_drv)
-            vibrational_drv.update_settings(method_dict,
-                                            vib_dict,
-                                            hessian_dict=hessian_dict,
-                                            cphf_dict=orbrsp_dict,
-                                            rsp_dict=rsp_dict,
-                                            polgrad_dict=polgrad_dict)
+        vibrational_drv = VibrationalAnalysis(scf_drv)
+        vibrational_drv.update_settings(method_dict,
+                                        vib_dict,
+                                        hessian_dict=hessian_dict,
+                                        cphf_dict=orbrsp_dict,
+                                        rsp_dict=rsp_dict,
+                                        polgrad_dict=polgrad_dict)
 
         vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 

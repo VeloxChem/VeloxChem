@@ -59,7 +59,6 @@ jobs:
           CXX=g++ python -m pip install \
             git+https://gitlab.com/FraME-projects/PyFraME.git@35188b620c84f74a73e2c28d737abee4386a503a
           echo "=== VeloxChem build ==="
-          export XTBHOME=/usr/local
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
           SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++" \
             python -m pip install -v .[test,qmmm]

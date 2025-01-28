@@ -45,9 +45,6 @@ from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input, get_random_string_parallel
 from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
-from .xtbdriver import XtbDriver
-from .xtbgradientdriver import XtbGradientDriver
-from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
 
 
@@ -2215,40 +2212,6 @@ class ForceFieldGenerator:
             # TODO: generate Hessian using VeloxChem
             assert_msg_critical(
                 False, 'ForceFieldGenerator.reparametrize: expecting Hessian')
-
-        elif isinstance(hessian, str):
-            assert_msg_critical(
-                hessian.lower() == 'xtb',
-                'ForceFieldGenerator.reparametrize: invalid Hessian option')
-
-            # XTB optimization
-            self.ostream.print_info('Optimizing molecule using XTB...')
-            self.ostream.flush()
-
-            xtb_drv = XtbDriver(self.comm, self.ostream)
-            xtb_grad_drv = XtbGradientDriver(xtb_drv)
-            xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
-            # Mute all drivers
-            xtb_drv.ostream.mute()
-            xtb_grad_drv.ostream.mute()
-            xtb_opt_drv.ostream.mute()
-            xtb_opt_drv.filename = self.molecule_name
-            xtb_opt_results = xtb_opt_drv.compute(self.molecule)
-            self.molecule = Molecule.read_xyz_string(
-                xtb_opt_results['final_geometry'])
-
-            # XTB Hessian
-            self.ostream.print_info('Computing Hessian using XTB...')
-            self.ostream.flush()
-
-            xtb_hessian_drv = XtbHessianDriver(xtb_drv)
-            xtb_hessian_drv.compute(self.molecule)
-            hessian = np.copy(xtb_hessian_drv.hessian)
-
-            self.ostream.print_reference('Reference:')
-            self.ostream.print_reference(xtb_drv.get_reference())
-            self.ostream.print_blank()
-            self.ostream.flush()
 
         elif isinstance(hessian, np.ndarray):
             natoms = self.molecule.number_of_atoms()

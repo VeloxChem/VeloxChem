@@ -38,7 +38,6 @@ from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .forcefieldgenerator import ForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
-from .xtbdriver import XtbDriver
 from .scfdriver import ScfDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
@@ -89,7 +88,7 @@ class OpenMMDynamics:
         - molecule: The VeloxChem molecule object.
         - unique_residues: The list of unique residues in the system.
         - unique_molecules: The list of unique molecules in the system.
-        - qm_driver: The VeloxChem driver object. Options are XtbDriver or an ScfDriver.
+        - qm_driver: The VeloxChem driver object.
         - basis: The basis set for the QM region if an SCF driver is used.
         - grad_driver: The VeloxChem gradient driver object.
         - qm_atoms: The list of atom indices for the QM region.
@@ -860,17 +859,15 @@ class OpenMMDynamics:
 
         if qm_driver:
             # Use qm_miniization to minimize the energy of the conformations
-            # Name flag based on if is instance of the XtbDriver or ScfDriver
-            if isinstance(qm_driver, XtbDriver):
-                drv_name = 'XTB Driver'
-            elif isinstance(qm_driver, ScfRestrictedDriver):
+            # Name flag based on the type of the driver
+            if isinstance(qm_driver, ScfRestrictedDriver):
                 drv_name = 'RSCF Driver'
             elif isinstance(qm_driver, ScfUnrestrictedDriver):
                 drv_name = 'USCF Driver'
             elif isinstance(qm_driver, ScfRestrictedOpenDriver):
                 drv_name = 'ROSCF Driver'
 
-            if drv_name != 'XTB Driver' and basis is None:
+            if basis is None:
                 raise ValueError('Basis set is required for the SCF driver.')
 
             msg = f'Requested QM minimization with {drv_name}'
@@ -1131,9 +1128,7 @@ class OpenMMDynamics:
         self.qm_driver.ostream.mute()
 
         # Driver flag 
-        if isinstance(self.qm_driver, XtbDriver):
-            self.driver_flag = 'XTb Driver'
-        elif isinstance(self.qm_driver, ScfRestrictedDriver):
+        if isinstance(self.qm_driver, ScfRestrictedDriver):
             self.driver_flag = 'RSCF Driver'
         elif isinstance(self.qm_driver, ScfUnrestrictedDriver):
             self.driver_flag = 'USCF Driver'
