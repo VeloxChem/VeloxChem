@@ -28,10 +28,6 @@ from io import StringIO
 import numpy as np
 import time as tm
 import tempfile
-import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
-import py3Dmol as p3d
-import ipywidgets
 
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol
 from .molecule import Molecule
@@ -796,47 +792,80 @@ class OptimizationDriver:
 
         return 'L.-P. Wang and C.C. Song, J. Chem. Phys. 2016, 144, 214108'
 
-# Mathieu add confergence function for optimization
-    def convergence(self, opt_results, atom_indices=False):
+    def show_convergence(self, opt_results, atom_indices=False):
         """
-        plot the convergence of the optimization
+        Plot the convergence of the optimization
 
         :param opt_results:
             The dictionary of optimize results.
-
-        :return:
-            A Plot of the convergence of the optimization
         """
+
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+
         energies = opt_results['opt_energies']
         geometries = opt_results['opt_geometries']
-        total_steps = len(energies)-1
-        ipywidgets.interact(self.show_iteration, energies=ipywidgets.fixed(energies), geometries=ipywidgets.fixed(geometries),
-                    step=ipywidgets.IntSlider(min=0, max=total_steps, step=1, value=total_steps), atom_indices=ipywidgets.fixed(atom_indices))
-
+        total_steps = len(energies) - 1
+        ipywidgets.interact(self.show_iteration,
+                            energies=ipywidgets.fixed(energies),
+                            geometries=ipywidgets.fixed(geometries),
+                            step=ipywidgets.IntSlider(min=0,
+                                                      max=total_steps,
+                                                      step=1,
+                                                      value=total_steps),
+                            atom_indices=ipywidgets.fixed(atom_indices))
 
     def show_iteration(self, energies, geometries, step=0, atom_indices=False):
         """
-        show the geometry at a specific iteration
-
+        Show the geometry at a specific iteration.
         """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('matplotlib is required for this functionality.')
+
+        min_energy = np.min(energies)
+        rel_energies = energies - min_energy
+        rel_energies_kcal = rel_energies * hartree_in_kcalpermol()
+
         xyz_data_i = geometries[step]
-        steps= range(len(energies))
-        total_steps = len(energies)-1
+        steps = range(len(rel_energies_kcal))
+        total_steps = len(rel_energies_kcal) - 1
         x = np.linspace(0, total_steps, 100)
-        y = np.interp(x, steps, energies)
-        plt.figure(figsize=(8,5))
-        plt.plot(x, y, color='black', alpha= 0.9, linewidth=2.5, ls='-', zorder = 0)
-        plt.scatter(steps,energies, color='black', alpha= 0.7, s=120, facecolors="none", edgecolor="darkcyan", zorder = 1)
-        plt.scatter(step, energies[step], marker='o', color='darkcyan', alpha=1.0, s=120, zorder = 2)
+        y = np.interp(x, steps, rel_energies_kcal)
+        plt.figure(figsize=(8, 5))
+        plt.plot(x,
+                 y,
+                 color='black',
+                 alpha=0.9,
+                 linewidth=2.5,
+                 ls='-',
+                 zorder=0)
+        plt.scatter(steps,
+                    rel_energies_kcal,
+                    color='black',
+                    alpha=0.7,
+                    s=120,
+                    facecolors="none",
+                    edgecolor="darkcyan",
+                    zorder=1)
+        plt.scatter(step,
+                    rel_energies_kcal[step],
+                    marker='o',
+                    color='darkcyan',
+                    alpha=1.0,
+                    s=120,
+                    zorder=2)
         plt.xlabel('Iteration')
-        plt.ylabel('Energy (Hartree)')
-        plt.title("Structure optimization")
-        plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))  # Ensure x-axis displays as integers
-        plt.tight_layout(); plt.show()
+        plt.ylabel('Relative energy [kcal/mol]')
+        plt.title("Geometry optimization")
+        # Ensure x-axis displays as integers
+        plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))
+        plt.tight_layout()
+        plt.show()
 
         mol = Molecule.read_xyz_string(xyz_data_i)
-        mol.show(atom_indices=atom_indices, width=800, height=400)
-
-
-
-
+        mol.show(atom_indices=atom_indices, width=790, height=400)
