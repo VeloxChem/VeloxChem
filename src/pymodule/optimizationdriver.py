@@ -831,6 +831,7 @@ class OptimizationDriver:
         plt.xlabel('Iteration')
         plt.ylabel('Energy (Hartree)')
         plt.title("Optimization step")
+        plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))  # Ensure x-axis displays as integers
         plt.tight_layout(); plt.show()
 
         viewer = p3d.view(width=600, height=300)
