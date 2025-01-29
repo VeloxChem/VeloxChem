@@ -836,7 +836,7 @@ class OptimizationDriver:
         total_steps = len(rel_energies_kcal) - 1
         x = np.linspace(0, total_steps, 100)
         y = np.interp(x, steps, rel_energies_kcal)
-        plt.figure(figsize=(8, 5))
+        plt.figure(figsize=(6.5, 4))
         plt.plot(x,
                  y,
                  color='black',
@@ -868,4 +868,4 @@ class OptimizationDriver:
         plt.show()
 
         mol = Molecule.read_xyz_string(xyz_data_i)
-        mol.show(atom_indices=atom_indices, width=790, height=400)
+        mol.show(atom_indices=atom_indices, width=640, height=360)
