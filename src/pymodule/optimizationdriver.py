@@ -28,6 +28,7 @@ from io import StringIO
 import numpy as np
 import time as tm
 import tempfile
+import math
 
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol
 from .molecule import Molecule
@@ -848,7 +849,7 @@ class OptimizationDriver:
                     rel_energies_kcal,
                     color='black',
                     alpha=0.7,
-                    s=120,
+                    s=120 / math.log(total_steps, 10),
                     facecolors="none",
                     edgecolor="darkcyan",
                     zorder=1)
@@ -857,7 +858,7 @@ class OptimizationDriver:
                     marker='o',
                     color='darkcyan',
                     alpha=1.0,
-                    s=120,
+                    s=120 / math.log(total_steps, 10),
                     zorder=2)
         plt.xlabel('Iteration')
         plt.ylabel('Relative energy [kcal/mol]')
