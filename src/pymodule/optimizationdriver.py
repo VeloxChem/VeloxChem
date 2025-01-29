@@ -457,19 +457,19 @@ class OptimizationDriver:
         opt_flags = []
         if self.conv_energy is not None:
             opt_flags.append('energy')
-            opt_flags.append(self.conv_energy)
+            opt_flags.append(str(self.conv_energy))
         if self.conv_grms is not None:
             opt_flags.append('grms')
-            opt_flags.append(self.conv_grms)
+            opt_flags.append(str(self.conv_grms))
         if self.conv_gmax is not None:
             opt_flags.append('gmax')
-            opt_flags.append(self.conv_gmax)
+            opt_flags.append(str(self.conv_gmax))
         if self.conv_drms is not None:
             opt_flags.append('drms')
-            opt_flags.append(self.conv_drms)
+            opt_flags.append(str(self.conv_drms))
         if self.conv_dmax is not None:
             opt_flags.append('dmax')
-            opt_flags.append(self.conv_dmax)
+            opt_flags.append(str(self.conv_dmax))
         return opt_flags
 
     @staticmethod
