@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "SubMatrix.hpp"
 #include "Matrix.hpp"
 #include "T3FlatBuffer.hpp"
 #include "Molecule.hpp"
@@ -18,12 +19,12 @@ class CRIFockDriver
     
     /// Creates a Fock matrices  driver.
     /// @param j_metric The metric matrix for J fitting.
-    CRIFockDriver(const CMatrix& j_metric);
+    CRIFockDriver(const CSubMatrix& j_metric);
     
     /// Creates a Fock matrices  driver.
     /// @param j_metric The metric matrix for J fitting.
     /// @param k_metric The metric matrix for K fitting.
-    CRIFockDriver(const CMatrix& j_metric, const CMatrix& k_metric);
+    CRIFockDriver(const CSubMatrix& j_metric, const CSubMatrix& k_metric);
 
     /// @brief The default copy constructor.
     /// @param other The Fock matrices driver to be copied.
@@ -78,12 +79,22 @@ class CRIFockDriver
     /// @return The Gamma vector.
     auto comp_gamma_vector(const CMatrix &density) const -> std::vector<double>;
     
+    /// @brief Transforms Gamma vector  with J metric.
+    /// @param gvector The Gamma vector.
+    /// @return The transformed Gamma vector.
+    auto trafo_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>;
+    
+    /// @brief Computes J vector  for given transformed Gamma vector.
+    /// @param gvector The transformed Gamma vector.
+    /// @return The computed J vector.
+    auto comp_j_vector(const std::vector<double>& gvector) const -> std::vector<double>;
+    
     private:
     /// @brief Pointer to metric matrix for J fitting.
-    CMatrix* _j_metric;
+    CSubMatrix* _j_metric;
     
     /// @brief Pointer to metric matrix for K fitting.
-    CMatrix* _k_metric;
+    CSubMatrix* _k_metric;
     
     /// @brief Three center electron repulsion integrals buffer.
     CT3FlatBuffer<double> _eri_buffer;

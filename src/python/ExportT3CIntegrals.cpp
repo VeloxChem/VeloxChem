@@ -27,10 +27,14 @@ export_t3cintegrals(py::module& m)
     // CRIFockDriver class
     PyClass<CRIFockDriver>(m, "RIFockDriver")
         .def(py::init<>())
-        .def(py::init<const CMatrix&>())
-        .def(py::init<const CMatrix&, const CMatrix&>())
+        .def(py::init<const CSubMatrix&>())
+        .def(py::init<const CSubMatrix&, const CSubMatrix&>())
         .def("prepare_buffers", &CRIFockDriver::prepare_buffers, "Computes three center electron repulsion integral buffers.")
-        .def("comp_gamma_vector", &CRIFockDriver::comp_gamma_vector, "Computes Gamma vector required for J fitting.");
+        .def("comp_gamma_vector", &CRIFockDriver::comp_gamma_vector, "Computes Gamma vector required for J fitting.")
+        .def("trafo_gamma_vector", &CRIFockDriver::trafo_gamma_vector, "Transforms Gamma vector with J metric.")
+        .def("comp_j_vector", &CRIFockDriver::comp_j_vector, "Computes effective flatened J vector.")
+        .def("compute", &CRIFockDriver::compute, "Computes Fock matrix for given density."); 
+    
 }
 
 }  // namespace vlx_t2cintegrals

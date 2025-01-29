@@ -185,6 +185,22 @@ class CSubMatrix
     {
         return _dimensions[2] == _dimensions[3];
     }
+    
+    /// @brief Gets constant pointer to raw submatrix data.
+    /// @return The constant pointer to raw submatrix data.
+    inline auto
+    data() const -> const double*
+    {
+        return _values.data();
+    }
+    
+    /// @brief Gets pointer to raw submatrix data.
+    /// @return The pointer to raw submatrix data.
+    inline auto
+    data()  -> double*
+    {
+        return _values.data();
+    }
 
    private:
     /// @brief The dimensions of submatrix: row and column offsets and

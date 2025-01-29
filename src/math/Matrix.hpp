@@ -90,6 +90,10 @@ class CMatrix
 
     /// @brief Set matrix values to zero.
     auto zero() -> void;
+    
+    /// @brief Assigns flat vector of values to matrix.
+    /// @param values The flat vector of values.
+    auto assign_flat_values(const std::vector<double>& values) -> void;
 
     /// @brief Scales matrix values by factor.
     /// @param factor The factor to scale matrix values.
