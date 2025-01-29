@@ -9,7 +9,7 @@
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
 
-/// Class CRIFockDriver provides methods for computing Fock matrices
+/// Class CRIFockDriver provides methods for computing Coulomb Fock matrices
 /// using three center electron repulsion integrals.
 class CRIFockDriver
 {
@@ -20,11 +20,6 @@ class CRIFockDriver
     /// Creates a Fock matrices  driver.
     /// @param j_metric The metric matrix for J fitting.
     CRIFockDriver(const CSubMatrix& j_metric);
-    
-    /// Creates a Fock matrices  driver.
-    /// @param j_metric The metric matrix for J fitting.
-    /// @param k_metric The metric matrix for K fitting.
-    CRIFockDriver(const CSubMatrix& j_metric, const CSubMatrix& k_metric);
 
     /// @brief The default copy constructor.
     /// @param other The Fock matrices driver to be copied.
@@ -71,36 +66,29 @@ class CRIFockDriver
     /// @param exchange_factor The exchange-correlation factors.
     /// @return The Fock matrix.
     auto compute(const CMatrix     &density,
-                 const std::string &label,
-                 const double      exchange_factor) const -> CMatrix;
-    
-    /// @brief Computes Gamma vector  for given density.
-    /// @param density The density matrix to construct Fock matrix.
-    /// @return The Gamma vector.
-    auto comp_gamma_vector(const CMatrix &density) const -> std::vector<double>;
-    
-    /// @brief Transforms Gamma vector  with J metric.
-    /// @param gvector The Gamma vector.
-    /// @return The transformed Gamma vector.
-    auto trafo_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>;
-    
-    /// @brief Computes J vector  for given transformed Gamma vector.
-    /// @param gvector The transformed Gamma vector.
-    /// @return The computed J vector.
-    auto comp_j_vector(const std::vector<double>& gvector) const -> std::vector<double>;
+                 const std::string &label) const -> CMatrix;
     
     private:
     /// @brief Pointer to metric matrix for J fitting.
     CSubMatrix* _j_metric;
     
-    /// @brief Pointer to metric matrix for K fitting.
-    CSubMatrix* _k_metric;
-    
     /// @brief Three center electron repulsion integrals buffer.
     CT3FlatBuffer<double> _eri_buffer;
     
-    /// @brief Three transformed center electron repulsion integrals buffer.
-    CT3FlatBuffer<double> _eri_trafo_buffer;
+    /// @brief Computes Gamma vector  for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @return The Gamma vector.
+    auto _comp_gamma_vector(const CMatrix &density) const -> std::vector<double>;
+    
+    /// @brief Transforms Gamma vector  with J metric.
+    /// @param gvector The Gamma vector.
+    /// @return The transformed Gamma vector.
+    auto _trafo_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>;
+    
+    /// @brief Computes J vector  for given transformed Gamma vector.
+    /// @param gvector The transformed Gamma vector.
+    /// @return The computed J vector.
+    auto _comp_j_vector(const std::vector<double>& gvector) const -> std::vector<double>;
 };
 
 #endif /* RIFockDriver_hpp */

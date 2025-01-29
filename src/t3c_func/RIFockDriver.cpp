@@ -6,11 +6,7 @@ CRIFockDriver::CRIFockDriver()
 
     : _j_metric(nullptr)
 
-    , _k_metric(nullptr)
-
     , _eri_buffer(CT3FlatBuffer<double>())
-
-    , _eri_trafo_buffer(CT3FlatBuffer<double>())
 {
     
 }
@@ -19,24 +15,7 @@ CRIFockDriver::CRIFockDriver(const CSubMatrix& j_metric)
 
     : _j_metric(new CSubMatrix(j_metric))
 
-    , _k_metric(nullptr)
-
     , _eri_buffer(CT3FlatBuffer<double>())
-
-    , _eri_trafo_buffer(CT3FlatBuffer<double>())
-{
-    
-}
-
-CRIFockDriver::CRIFockDriver(const CSubMatrix& j_metric, const CSubMatrix& k_metric)
-
-    : _j_metric(new CSubMatrix(j_metric))
-
-    , _k_metric(new CSubMatrix(k_metric))
-
-    , _eri_buffer(CT3FlatBuffer<double>())
-
-    , _eri_trafo_buffer(CT3FlatBuffer<double>())
 {
     
 }
@@ -46,11 +25,6 @@ CRIFockDriver::~CRIFockDriver()
     if (_j_metric != nullptr)
     {
         delete _j_metric;
-    }
-    
-    if (_k_metric != nullptr)
-    {
-        delete _k_metric;
     }
 }
 
@@ -62,17 +36,11 @@ CRIFockDriver::prepare_buffers(const CMolecule       &molecule,
     CThreeCenterElectronRepulsionDriver eri_drv;
     
     _eri_buffer = eri_drv.compute(basis, aux_basis, molecule);
-    
-    if (_k_metric != nullptr)
-    {
-        // FIX ME: Add transformation of integrals required for K fitting.
-    }
 }
 
 auto
 CRIFockDriver::compute(const CMatrix     &density,
-                       const std::string &label,
-                       const double      exchange_factor) const -> CMatrix
+                       const std::string &label) const -> CMatrix
 {
     CMatrix fmat(density);
     
@@ -80,9 +48,9 @@ CRIFockDriver::compute(const CMatrix     &density,
     
     if ((label == "2jk") || (label == "2jkx") || (label == "j") || (label == "j_rs"))
     {
-        auto t_vec = trafo_gamma_vector(comp_gamma_vector(density));
+        auto t_vec = _trafo_gamma_vector(_comp_gamma_vector(density));
         
-        fmat.assign_flat_values(comp_j_vector(t_vec));
+        fmat.assign_flat_values(_comp_j_vector(t_vec));
         
         if ((label == "2jk") || (label == "2jkx"))
         {
@@ -90,18 +58,11 @@ CRIFockDriver::compute(const CMatrix     &density,
         }
     }
     
-    // compute exchange contribution to Fock matrix
-    
-    if ((label == "2jk") || (label == "2jkx") || (label == "k") || (label == "kx") || (label == "k_rs") || (label == "kx_rs"))
-    {
-        
-    }
-    
     return fmat;
 }
 
 auto
-CRIFockDriver::comp_gamma_vector(const CMatrix &density) const -> std::vector<double>
+CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<double>
 {
     const auto ndim = _eri_buffer.aux_width();
     
@@ -136,7 +97,7 @@ CRIFockDriver::comp_gamma_vector(const CMatrix &density) const -> std::vector<do
 }
 
 auto
-CRIFockDriver::trafo_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>
+CRIFockDriver::_trafo_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>
 {
     const auto ndim = _eri_buffer.aux_width();
     
@@ -167,7 +128,7 @@ CRIFockDriver::trafo_gamma_vector(const std::vector<double>& gvector) const -> s
 }
 
 auto
-CRIFockDriver::comp_j_vector(const std::vector<double>& gvector) const -> std::vector<double>
+CRIFockDriver::_comp_j_vector(const std::vector<double>& gvector) const -> std::vector<double>
 {
     const auto ndim = _eri_buffer.aux_width();
     
@@ -198,3 +159,4 @@ CRIFockDriver::comp_j_vector(const std::vector<double>& gvector) const -> std::v
     
     return jvec;
 }
+
