@@ -24,10 +24,11 @@
 
 from contextlib import redirect_stderr
 from io import StringIO
+from pathlib import Path
 import numpy as np
 import sys
 import h5py
-from pathlib import Path
+import tempfile
 
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -42,7 +43,7 @@ from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input
+from .inputparser import parse_input, get_random_string_serial
 from .sanitychecks import raman_sanity_check
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -183,6 +184,9 @@ class VibrationalAnalysis:
         self.temperature = 298.15
         self.pressure = 1.0
 
+        self.gibbs_free_energy = None
+        self.free_energy_summary = None
+
         self._input_keywords = {
             'vibrational': {
                 'numerical_hessian': ('bool', 'do numerical hessian'),
@@ -307,7 +311,9 @@ class VibrationalAnalysis:
             vib_results['molecule_xyz_string'] = molecule.get_xyz_string()
 
             # get vibrational frequencies and normal modes
-            self.frequency_analysis(molecule, filename=None)
+            self.frequency_analysis(molecule)
+            vib_results['gibbs_free_energy'] = self.gibbs_free_energy
+            vib_results['free_energy_summary'] = self.free_energy_summary
             vib_results['vib_frequencies'] = self.vib_frequencies
             # FIXME: normalized or not? What should the user get?
             vib_results['normal_modes'] = self.normal_modes
@@ -352,7 +358,7 @@ class VibrationalAnalysis:
         else:
             return None
 
-    def frequency_analysis(self, molecule, filename=None):
+    def frequency_analysis(self, molecule):
         """
         Runs the frequency analysis from geomeTRIC to obtain vibrational
         frequencies and normal modes.
@@ -374,7 +380,16 @@ class VibrationalAnalysis:
         elem = molecule.get_labels()
         coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
-        self.vib_frequencies, self.normal_modes, gibbs_energy = (
+        try:
+            temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        except TypeError:
+            temp_dir = tempfile.TemporaryDirectory()
+        temp_path = Path(temp_dir.name)
+
+        fname = 'vlx_' + get_random_string_serial() + '.vdata'
+        vdata_file = Path(temp_path, fname)
+
+        self.vib_frequencies, self.normal_modes, self.gibbs_free_energy = (
             geometric.normal_modes.frequency_analysis(
                 coords,
                 self.hessian,
@@ -382,8 +397,46 @@ class VibrationalAnalysis:
                 energy=self.elec_energy,
                 temperature=self.temperature,
                 pressure=self.pressure,
-                outfnm=filename,
+                outfnm=vdata_file.as_posix(),
                 normalized=False))
+
+        assert_msg_critical(
+            vdata_file.is_file(),
+            'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
+            f'{str(vdata_file)}')
+
+        title = 'Free Energy Analysis'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        text = []
+        with vdata_file.open() as fh:
+            for line in fh:
+                if line[:2] == '# ':
+                    text.append(line[2:].strip())
+
+        # remove first empty line
+        if not text[0]:
+            text.pop(0)
+
+        # remove the "== Summary" line
+        if text[0].startswith('== Summary'):
+            text.pop(0)
+
+        maxlen = max([len(line) for line in text])
+        for line in text:
+            self.ostream.print_header(line.ljust(maxlen))
+
+        self.free_energy_summary = '\n'.join(text)
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        try:
+            temp_dir.cleanup()
+        except (NotADirectoryError, PermissionError):
+            pass
 
     def calculate_raman_activity(self, normal_modes):
         """
@@ -687,11 +740,6 @@ class VibrationalAnalysis:
                                             axis=1)[:, np.newaxis]
         self.normed_normal_modes = self.normal_modes / np.linalg.norm(
             self.normal_modes, axis=1)[:, np.newaxis]
-
-        title = 'Vibrational Analysis'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
 
         width = 52
         for k in idx_lst:
@@ -1308,7 +1356,7 @@ class VibrationalAnalysis:
 
         plt.show()
 
-    def print_info(self, vib_results, info_type='ir'):
+    def print_info(self, vib_results, info_type='free_energy'):
         """
         Print information about the vibrational analysis.
 
@@ -1323,7 +1371,10 @@ class VibrationalAnalysis:
               str(len(vib_results['normal_modes'])))
         print()
 
-        if info_type.lower() == 'ir':
+        if info_type.lower() == 'free_energy':
+            print(self.free_energy_summary)
+
+        elif info_type.lower() == 'ir':
             if vib_results['ir_intensities'] is None:
                 assert_msg_critical(False, "No IR intensities available")
 
@@ -1359,6 +1410,8 @@ class VibrationalAnalysis:
 
             if vib_results['raman_activities'] is None:
                 assert_msg_critical(False, "No Raman activities available")
+
+            print(self.free_energy_summary)
 
             print("3 modes with the highest IR intensity:")
             print("Mode  Frequency [cm^-1]  Intensity [km/mol]")
