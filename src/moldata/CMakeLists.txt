@@ -1,28 +1,41 @@
 # TODO: move dftd4 search function to cmake/custom/
 message(STATUS "Searching for DFTD4...")
 
+set(_dftd4_search_paths)
+if(DEFINED ENV{DFTD4_HOME} OR DEFINED ENV{DFTD4_INCLUDE_DIR})
+    list(APPEND _dftd4_search_paths PATHS)
+    if(DEFINED ENV{DFTD4_HOME})
+        list(APPEND _dftd4_search_paths $ENV{DFTD4_HOME}/include)
+    endif()
+    if(DEFINED ENV{DFTD4_INCLUDE_DIR})
+        list(APPEND _dftd4_search_paths $ENV{DFTD4_INCLUDE_DIR})
+    endif()
+endif()
+
 find_path(_dftd4_include_dirs
-  NAMES
-    dftd4.h
-  PATHS
-    $ENV{DFTD4_INCLUDE_DIR}
-    $ENV{DFTD4_HOME}/include
-  HINTS
-    ${CMAKE_PREFIX_PATH}/include
-  )
+    NAMES dftd4.h
+    ${_dftd4_search_paths}
+    HINTS ${CMAKE_PREFIX_PATH}/include
+)
 
-if(_eigen_include_dirs)
-  find_library(_dftd4_libraries
-    NAMES
-      "dftd4"
-    PATHS
-      $ENV{DFTD4_LIB_DIR}
-      $ENV{DFTD4_HOME}/lib
-    HINTS
-      ${CMAKE_PREFIX_PATH}/lib
-    )
+set(_dftd4_search_paths)
+if(DEFINED ENV{DFTD4_HOME} OR DEFINED ENV{DFTD4_LIB_DIR})
+    list(APPEND _dftd4_search_paths PATHS)
+    if(DEFINED ENV{DFTD4_HOME})
+        list(APPEND _dftd4_search_paths $ENV{DFTD4_HOME}/lib)
+    endif()
+    if(DEFINED ENV{DFTD4_LIB_DIR})
+        list(APPEND _dftd4_search_paths $ENV{DFTD4_LIB_DIR})
+    endif()
+endif()
 
-  if(_dftd4_libraries)
+find_library(_dftd4_libraries
+    NAMES "dftd4"
+    ${_dftd4_search_paths}
+    HINTS ${CMAKE_PREFIX_PATH}/lib
+)
+
+if(_dftd4_include_dirs AND _dftd4_libraries)
     message(STATUS "Found DFTD4: ${_dftd4_libraries}")
     target_compile_definitions(vlxobjs
       PUBLIC
@@ -37,11 +50,8 @@ if(_eigen_include_dirs)
       PUBLIC
         ${_dftd4_libraries}
       )
-  endif()
-endif()
-
-if (NOT _dftd4_libraries)
-  message(STATUS "Could not find DFTD4.")
+else()
+    message(STATUS "Could not find DFTD4.")
 endif()
 
 target_sources(vlxobjs
