@@ -32,6 +32,7 @@
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "DispersionModel.hpp"
+#include "NewDispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
@@ -305,6 +306,16 @@ export_moldata(py::module &m)
              "xcLabel"_a)
         .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
         .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
+
+    PyClass<CNewDispersionModel>(m, "NewDispersionModel")
+        .def(py::init<>())
+        .def("compute",
+             &CNewDispersionModel::compute,
+             "Computes dispersion energy and gradient for a given molecule and a given density functional.",
+             "molecule"_a,
+             "xcLabel"_a)
+        .def("get_energy", &CNewDispersionModel::getEnergy, "Gets dispersion energy.")
+        .def("get_gradient", &CNewDispersionModel::getGradient, "Gets dispersion gradient.");
 }
 
 }  // namespace vlx_moldata

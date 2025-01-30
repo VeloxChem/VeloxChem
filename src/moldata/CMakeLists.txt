@@ -54,6 +54,7 @@ target_sources(vlxobjs
     DispersionModel.cpp
     DispersionParameters.cpp
     Molecule.cpp
+    NewDispersionModel.cpp
     PartialCharges.cpp
   )
 

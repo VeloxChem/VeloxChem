@@ -36,7 +36,7 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
-from .veloxchemlib import DispersionModel
+from .veloxchemlib import NewDispersionModel
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
 from .veloxchemlib import xcfun
@@ -563,7 +563,7 @@ class ScfDriver:
         # D4 dispersion correction
         if self.dispersion:
             if self.rank == mpi_master():
-                disp = DispersionModel()
+                disp = NewDispersionModel()
                 xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
                 disp.compute(molecule, xc_label)
                 self._d4_energy = disp.get_energy()
