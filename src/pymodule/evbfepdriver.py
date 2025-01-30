@@ -33,17 +33,21 @@ class FepDriver():
             else:
                 ostream = OutputStream(None)
 
-        self.platform: mm.Platform = None
+        # output stream
+        self.ostream = ostream
+
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
         self.systems: dict
         self.topology: mmapp.Topology
         self.Lambda: list
 
         self.constrain_H: bool = True
-        # self.run_folder = run_folder
-        # self.data_folder = data_folder
-        # self.system_builder: System_builder = system_builder
-        # Lambda = system_builder.Lambda
-        # self.platform = platform
+        
+        
 
     def run_FEP(
         self,
@@ -57,37 +61,37 @@ class FepDriver():
         Lambda,
         configuration
     ):
+        systems = configuration["systems"]
+        topology = configuration["topology"]
+        temperature = configuration["temperature"]
+        initial_positions = configuration["initial_positions"]
+        run_folder = configuration["run_folder"]
+        data_folder = configuration["data_folder"]
+
         self.run_folder = run_folder
         self.data_folder = data_folder
         self.Lambda = Lambda
         self.systems = systems
         self.topology = topology
 
-        systems=configuration["systems"]
-        topology=configuration["topology"]
-        temperature=configuration["temperature"]
-        initial_positions=configuration["initial_positions"]
-        run_folder=configuration["run_folder"]
-        data_folder=configuration["data_folder"]
-
         assert (total_sample_steps % write_step == 0), "write_step must be a factor of total_sample_steps"
         assert (total_sample_steps >= 2 * write_step), "total_sample_steps must be at least 2*write_step"
 
         self.total_snapshots = total_sample_steps / write_step * len(self.Lambda)
-        print("Lambda: ", self.Lambda)
-        print("Total lambda points: ", len(self.Lambda))
-        print("Snapshots per lambda: ", total_sample_steps / write_step)
-        print(
+        self.ostream.print_info("Lambda: ", self.Lambda)
+        self.ostream.print_info("Total lambda points: ", len(self.Lambda))
+        self.ostream.print_info("Snapshots per lambda: ", total_sample_steps / write_step)
+        self.ostream.print_info(
             "Snapshots to be recorded: ",
             self.total_snapshots,
         )
-        print(
+        self.ostream.print_info(
             "Total simulation steps: ",
             (total_sample_steps + equilliberation_steps) * len(self.Lambda) + lambda_0_equilliberation_steps,
         )
-        print("System time per snapshot: ", step_size * write_step, " ps")
-        print("System time per frame: ", step_size * total_sample_steps, " ps")
-        print(
+        self.ostream.print_info("System time per snapshot: ", step_size * write_step, " ps")
+        self.ostream.print_info("System time per frame: ", step_size * total_sample_steps, " ps")
+        self.ostream.print_info(
             "Total system time: ",
             step_size * total_sample_steps * len(self.Lambda),
             " ps",
@@ -118,11 +122,11 @@ class FepDriver():
             else:
                 time_estimate_str = ""
 
-            print(f"lambda = {l}" + time_estimate_str)
+            self.ostream.print_info(f"lambda = {l}" + time_estimate_str)
             constrained_H_bonds = []
             if self.constrain_H:
                 harm_bond_forces = [
-                    force for force in system.getForces() if force.__class__.__name__ == "HarmonicBondForce" #todo type(), minimze __ stuff
+                    force for force in system.getForces() if isinstance(force, mm.HarmonicBondForce)
                 ]
 
                 count = 0
@@ -138,7 +142,7 @@ class FepDriver():
                                 constrained_H_bonds.append(H_bond)
                                 system.addConstraint(particle1, particle2, length)
                                 count += 1
-                print(f"Constrained {count} bonds involving H atoms ")
+                self.ostream.print_info(f"Constrained {count} bonds involving H atoms ")
                 # with open("constrained_.xml", mode="w", encoding="utf-8") as output:
                 #     output.write(mm.XmlSerializer.serialize(system))
 
@@ -146,7 +150,6 @@ class FepDriver():
                 topology,
                 system,
                 integrator,
-                self.platform,
             )
 
             simulation.context.setPositions(initial_positions)
@@ -156,7 +159,7 @@ class FepDriver():
                 write_step,
             ))
 
-            print("Minimizing energy")
+            self.ostream.print_info("Minimizing energy")
             simulation.minimizeEnergy()
 
             # if "graphene_fc_factor" in p.keys():
@@ -164,7 +167,7 @@ class FepDriver():
 
             if l == 0:
                 simulation.integrator.setStepSize(initial_equil_step_size * mmunit.picoseconds)
-                print(f"Running initial equilliberation with step size {simulation.integrator.getStepSize()}")
+                self.ostream.print_info(f"Running initial equilliberation with step size {simulation.integrator.getStepSize()}")
                 simulation.step(lambda_0_equilliberation_steps)
                 timer.start()
 
@@ -172,13 +175,13 @@ class FepDriver():
             # todo write these reporters on my own
             # todo add lambda value to the reporter
             simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
-            print(f"Running equilliberation with step size {simulation.integrator.getStepSize()}")
+            self.ostream.print_info(f"Running equilliberation with step size {simulation.integrator.getStepSize()}")
             simulation.step(equilliberation_steps)
 
             equil_positions = simulation.context.getState(getPositions=True).getPositions()
 
             if self.constrain_H:
-                print("Removing constraints")
+                self.ostream.print_info("Removing constraints")
                 for i in range(system.getNumConstraints()):
                     #Removing a constraint will change the indexing of the constraints, so always remove the first one until there are none left
                     system.removeConstraint(0)
@@ -195,7 +198,6 @@ class FepDriver():
                 topology,
                 system,
                 integrator,
-                self.platform,
             )
             runsimulation.context.setPositions(equil_positions)
 
@@ -218,23 +220,23 @@ class FepDriver():
                     density=True,
                 ))
 
-            print(f"Running sampling with step size {runsimulation.integrator.getStepSize()}")
+            self.ostream.print_info(f"Running sampling with step size {runsimulation.integrator.getStepSize()}")
             
                 
             runsimulation.step(total_sample_steps)
             state = runsimulation.context.getState(getPositions=True)
             positions = state.getPositions()
             if np.any(np.array(positions.value_in_unit(mmunit.nanometer)) > 100):
-                print("Warning: Some positions are larger than 100 nm, system is probably unstable")
+                self.ostream.print_info("Warning: Some positions are larger than 100 nm, system is probably unstable")
             estimated_time_remaining = timer.stop_and_calculate(i + 1)
 
-        print("Merging output files")
+        self.ostream.print_info("Merging output files")
         self.merge_traj_pdb()
         self.merge_state()
 
     # Utility functions for merging output
     def merge_state(self):
-        print("merging data files")
+        self.ostream.print_info("merging data files")
 
         data = np.array([]).reshape(0, 5)
         np.savetxt(
@@ -258,20 +260,20 @@ class FepDriver():
                 np.savetxt(f, data)
 
     def merge_traj_pdb(self):
-        print("merging pdb files")
+        self.ostream.print_info("merging pdb files")
         output = ""
         with open(f"{self.data_folder}/traj_combined.pdb", "w", encoding="utf-8") as file:
             file.write(output)
         frame = 1
         crystline = None
         for l in self.Lambda:
-            print("Lambda = ", l)
+            self.ostream.print_info("Lambda = ", l)
             filename = f"{self.run_folder}/traj{l:.3f}.pdb"
 
             with open(filename, "r", encoding="utf-8") as file:
                 file_contents = file.read()
 
-            # print(file_contents)
+            # self.ostream.print_info(file_contents)
             for line in file_contents.split("\n"):
                 parts = line.split()
                 if len(parts) == 0:
@@ -313,25 +315,21 @@ class FepDriver():
             self.topology,
             self.systems["reactant"],
             mm.VerletIntegrator(integrator_step_size),
-            self.platform,
         )
         simulation_product_reference = mmapp.Simulation(
             self.topology,
             self.systems["product"],
             mm.VerletIntegrator(integrator_step_size),
-            self.platform,
         )
         simulation_reactant_run = mmapp.Simulation(
             self.topology,
             self.systems[0],
             mm.VerletIntegrator(integrator_step_size),
-            self.platform,
         )
         simulation_product_run = mmapp.Simulation(
             self.topology,
             self.systems[1],
             mm.VerletIntegrator(integrator_step_size),
-            self.platform,
         )
 
         lsims = []
@@ -343,7 +341,6 @@ class FepDriver():
                         self.topology,
                         self.systems[lam],
                         mm.VerletIntegrator(integrator_step_size),
-                        self.platform,
                     ))
 
         # loop over lambda instead
@@ -387,7 +384,7 @@ class FepDriver():
             else:
                 time_estimate_str = ""
 
-            print(f"Recalculating Lambda {lam}" + time_estimate_str)
+            self.ostream.print_info(f"Recalculating Lambda {lam}" + time_estimate_str)
             samples = mmapp.PDBFile(f"{self.run_folder}/traj{lam:.3f}.pdb")
             for i in range(samples.getNumFrames()):
                 positions = samples.getPositions(True, i)

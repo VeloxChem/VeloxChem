@@ -54,14 +54,13 @@ class EvbDataProcessing:
         self.get_FEP_and_EVB()
         return results
 
-
     def fit_EVB_parameters(self):
         reference_key = list(self.results.keys())[0]
         Lambda = self.results[reference_key]["Lambda"]
         Lambda_frame = self.results[reference_key]["Lambda_frame"]
         E1_ref = self.results[reference_key]["E1_ref"]
         E2_ref = self.results[reference_key]["E2_ref"]
-        Temp = self.results[reference_key]["Temp_step"]
+        Temp_set = self.results[reference_key]["Temp_set"]
         Lambda_indices = self.results[reference_key]["Lambda_indices"]
 
         def get_barrier_and_free_energy_difference(x):
@@ -74,15 +73,15 @@ class EvbDataProcessing:
                 H12,
                 Lambda_frame,
             )
-            dGfep, _, _, _ = self.calculate_dGfep(
+            dGfep = self.calculate_dGfep(
                 dE,
-                Temp,
+                Temp_set,
                 Lambda,
                 Lambda_indices,
             )  
             xi = np.linspace(-10000, 10000, 20000)
-            dGevb_ana,_,_ = self.calculate_dGevb_analytical(dGfep, Lambda, H12, xi)
-            _, barrier, free_energy = self.calculate_free_energies(dGevb_ana, smooth=False)
+            dGevb_ana, shiftxi, fepxi = self.calculate_dGevb_analytical(dGfep, Lambda, H12, xi)
+            dGevb_smooth, barrier, free_energy = self.calculate_free_energies(dGevb_ana, smooth=False)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
             # print(f"Barrier: {barrier}, difference: {barrier_dif}, Free energy: {free_energy}, difference: {free_energy_dif}")
@@ -99,54 +98,26 @@ class EvbDataProcessing:
         Eg = 0.5 * ((E1 + E2_shifted) - np.sqrt((E1 - E2_shifted)**2 + 4 * H12**2))
         return E2_shifted, V, dE, Eg
 
-    def calculate_dGfep(self, dE, Temp, Lambda, Lambda_indices):
+    def calculate_dGfep(self, dE, Temp_set, Lambda, Lambda_indices):
         de_lambda = self.bin(dE, Lambda_indices)
-        T_lambda = self.bin(Temp, Lambda_indices)
-        dG_middle, dG_forward, dG_backward, dG_bar = [0.0], [0.0], [0.0], [0.0]
+        # dG_middle, dG_forward, dG_backward, dG_bar = [0.0], [0.0], [0.0], [0.0]
+        dG_bar = [0.0]
         for i, l in enumerate(Lambda[:-1]):
             delta_lambda = Lambda[i + 1] - l
 
-            # if remove_correlation:
-            #     fw, t0fw = timeseries_analysis(de_l[i])
-            #     bw, t0bw = timeseries_analysis(de_l[i + 1])
-            #     print(
-            #         f"{t0fw} {len(fw)-len(de_l[i])}     {t0bw} {len(bw)-len(de_l[i+1])}"
-            #     )
-            #     fw = beta * dl * fw
-            #     bw = beta * dl * bw
-            # else:
-            forward_energy = self.beta(T_lambda[i]) * delta_lambda * de_lambda[i]
-            forward_avg_temp = np.average(T_lambda[i])
-            backward_energy = self.beta(T_lambda[i + 1]) * delta_lambda * de_lambda[i + 1]
-            backward_avg_temp = np.average(T_lambda[i + 1])
-            avg_temp = (forward_avg_temp + backward_avg_temp) / 2
+            forward_energy = self.beta(Temp_set) * delta_lambda * de_lambda[i]
+            backward_energy = self.beta(Temp_set) * delta_lambda * de_lambda[i + 1]
+            
             try:
-                average_forward = np.average(np.exp(forward_energy / 2))
-                average_backward = np.average(np.exp(-backward_energy / 2))
-
-                dg_middle = -1 / self.beta(avg_temp) * math.log(average_forward / average_backward)
-                dg_forward = -1 / self.beta(forward_avg_temp) * math.log(np.average(np.exp(forward_energy)))
-                dg_backward = 1 / self.beta(backward_avg_temp) * math.log(np.average(np.exp(-backward_energy)))
-            except ValueError:
-                print(
-                    f"ValueError encountered during FEP calculation, setting all dG for middle forward and backward to 0 for lambda {l}"
-                )
-                dg_middle = 0
-                dg_forward = 0
-                dg_backward = 0
-            try:
-                dg_bar = (-1 / self.beta(avg_temp) *
-                            pymbar.other_estimators.bar(forward_energy, -backward_energy, False)["Delta_f"])
+                dF = pymbar.other_estimators.bar(forward_energy, -backward_energy, False)["Delta_f"]
+                dg_bar = -1 / self.beta(Temp_set) * dF
             except Exception as e:
                 print(f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}")
                 dg_bar = 0
-            dG_middle.append(dG_middle[-1] + dg_middle)
-            dG_forward.append(dG_forward[-1] + dg_forward)
-            dG_backward.append(dG_backward[-1] + dg_backward)
+
             dG_bar.append(dG_bar[-1] + dg_bar)
-            # dG = dGfep_all[-1, :] + [middle, manfw, manbw, bar]
-            # dGfep_all = np.row_stack((dGfep_all, dG))
-        return dG_bar, dG_middle, dG_forward, dG_backward
+            
+        return dG_bar
 
     def bin(self, data, lam_i):
         binned_data = [[] for _ in range(np.max(lam_i) + 1)]
@@ -254,24 +225,22 @@ class EvbDataProcessing:
             Lambda_indices = result["Lambda_indices"]
             E1_ref = result["E1_ref"]
             E2_ref = result["E2_ref"]
-            _, V, dE, Eg = self.calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12, Lambda_frame)
+            E2_shifted, V, dE, Eg = self.calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12, Lambda_frame)
 
-            E1_avg = np.average(self.bin(E1_ref,Lambda_indices),axis =1)
-            E2_avg = np.average(self.bin(E2_ref,Lambda_indices),axis =1)
-            Eg_avg = np.average(self.bin(Eg,Lambda_indices),axis =1)
-            V_avg = np.average(self.bin(V,Lambda_indices),axis =1)
-            dE_avg = np.average(self.bin(dE,Lambda_indices),axis =1)
+            E1_avg = np.average(self.bin(E1_ref,Lambda_indices), axis =1)
+            E2_avg = np.average(self.bin(E2_ref,Lambda_indices), axis =1)
+            Eg_avg = np.average(self.bin(Eg,Lambda_indices), axis =1)
+            V_avg = np.average(self.bin(V,Lambda_indices), axis =1)
+            dE_avg = np.average(self.bin(dE,Lambda_indices), axis =1)
             result.update({
                 "dE": dE,
                 "Eg": Eg,
                 "V": V,
-                "Lambda": Lambda,
                 "E1_avg": E1_avg,
                 "E2_avg": E2_avg,
                 "Eg_avg": Eg_avg,
                 "V_avg": V_avg,
                 "dE_avg": dE_avg,
-                "Temp": Temp,
             })
 
         dE_min = 0
@@ -313,21 +282,20 @@ class EvbDataProcessing:
             if dE_max_new > dE_max:
                 dE_max = dE_max_new
         
-
         coordinate_bins = np.arange(dE_min,dE_max,self.bin_size)
         self.coordinate_bins = coordinate_bins
 
         for result in self.results.values():
             dE = result["dE"]
-            Temp = result["Temp"]
+            Temp_set = result["Temp_set"]
             Lambda = result["Lambda"]
             Lambda_indices = result["Lambda_indices"]
 
-            dGfep, _, _, _ = self.calculate_dGfep(dE, Temp, Lambda, Lambda_indices) 
+            dGfep = self.calculate_dGfep(dE, Temp_set, Lambda, Lambda_indices) 
 
             result.update({"dGfep": dGfep})
             if self.calculate_discrete:
-                dGevb_discrete, pns, dGcor= self.calculate_dGevb_discretised(
+                dGevb_discrete, pns, dGcor = self.calculate_dGevb_discretised(
                     dGfep,
                     result["Eg"],
                     result["V"],
@@ -436,20 +404,19 @@ class EvbDataProcessing:
             ax[j,0].set_ylabel(r"$\lambda$")
             ax[j,0].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
             ax[j,0].set_ylim(0,1)
-            ax[j,0].set_xlim(min(dE)*1.1,max(dE)*1.1)
-
+            ax[j,0].set_xlim(min(dE) * 1.1,max(dE) * 1.1)
 
             min_label = min(dE)
-            min_label = min_label -min_label%200 + 200
+            min_label = min_label - min_label % 200 + 200
             max_label = max(dE)
-            max_label = max_label -max_label%200 + 200
+            max_label = max_label - max_label % 200 + 200
             xlabels = np.arange(min_label,max_label,200)
             ylabels = np.arange(0,1.1,0.2)
 
             min_tick = min(dE)
-            min_tick = min_tick -min_tick%100 + 100
+            min_tick = min_tick - min_tick % 100 + 100
             max_tick = max(dE)
-            max_tick = max_tick -max_tick%100 + 100
+            max_tick = max_tick - max_tick % 100 + 100
 
             minor_xticks = np.arange(min_tick,max_tick,100)
             minor_yticks = np.arange(0,1.1,0.1)
@@ -461,7 +428,6 @@ class EvbDataProcessing:
             ax[j,0].set_yticks(minor_yticks, minor=True)
             ax[j,0].grid(True,linestyle='-', which='major')
             ax[j,0].grid(True,linestyle=':', which='minor')
-            
 
             middle = len(dens_max) // 2
             start = np.where(dens_max[:middle] ==0)[0][-1]
@@ -501,8 +467,6 @@ class EvbDataProcessing:
         for i, (name, result) in enumerate(self.results.items()):
 
             #Shift both averages by the same amount so that their relative differences stay the same
-            E1_plot = result["E1_avg"] - np.min(result["E1_avg"])
-            E2_plot = result["E2_avg"] - np.min(result["E1_avg"])
             ax[0].plot(result["Lambda"], result["dGfep"], label=name)
             if plot_discrete:
                 if "discrete" in result.keys():
@@ -566,9 +530,9 @@ class EvbDataProcessing:
             pns = result['discrete']['pns']
             dGcor = result['discrete']['dGcor']
 
-            pnsfep = pns@dGfep
-            pnscor = np.sum(pns*dGcor.transpose(),axis=1)
-            dGevb_disc = pnsfep+pnscor
+            pnsfep = pns @ dGfep
+            pnscor = np.sum(pns * dGcor.transpose(),axis=1)
+            dGevb_disc = pnsfep + pnscor
 
             ax[i].plot(self.coordinate_bins, pnsfep[:-1], colors['tab:blue'], linestyle="--")
             ax[i].plot(self.coordinate_bins, pnscor[:-1], colors['tab:blue'], linestyle=":")
@@ -577,7 +541,7 @@ class EvbDataProcessing:
             #analytical curves
             shift = result['analytical']['shift']
             fepxi = result['analytical']['fep']
-            dGevb_ana = shift+fepxi
+            dGevb_ana = shift + fepxi
 
             ax[i].plot(self.coordinate_bins, shift, colors['tab:orange'], linestyle=":")
             ax[i].plot(self.coordinate_bins, fepxi, colors['tab:orange'], linestyle="--")

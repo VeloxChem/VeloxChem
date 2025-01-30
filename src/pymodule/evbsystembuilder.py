@@ -352,8 +352,8 @@ class EvbSystemBuilder():
                     improper["barrier"],
                 )
 
-            for i, _ in enumerate(carbon_atoms):
-                for j, _ in enumerate(carbon_atoms):
+            for i in range(len(carbon_atoms)):
+                for j in range(len(carbon_atoms)):
                     if j > i:
                         nb_force.addException(carbon_atoms[i].index, carbon_atoms[j].index, 0, 1, 0)
 
@@ -764,7 +764,7 @@ class EvbSystemBuilder():
         if not no_reactant:
             for i, atom in enumerate(reactant.atoms.values()):
                 #Make sure the solute does not interact with itself through, as there will be another nonbonded force to take care of this
-                for j, _ in enumerate(reactant.atoms.values()):
+                for j in range(len(reactant.atoms.values())):
                     if j > i:
                         nb_force.addException(
                             reaction_atoms[i].index,  #todo rewrite loop to reaction_atoms 

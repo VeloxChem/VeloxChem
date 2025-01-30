@@ -28,7 +28,6 @@ class EvbDriver():
         '''
         Initialize the EVB driver class.
         '''
-
         if comm is None:
             comm = MPI.COMM_WORLD
 
@@ -38,10 +37,14 @@ class EvbDriver():
             else:
                 ostream = OutputStream(None)
 
-        # MPI information
+        # output stream
+        self.ostream = ostream
+
+        # mpi information
         self.comm = comm
-        self.rank = comm.Get_rank()
-        self.size = comm.Get_size()
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
         self.temperature: float = 300
         self.Lambda: list[float]
 
@@ -73,7 +76,7 @@ class EvbDriver():
         if not self.debug:
             self.compute_energy_profiles(barrier, free_energy)
         else:
-            print("Debugging option enabled. Skipping energy profile calculation because recalculation is necessary.")
+            self.ostream.print_info("Debugging option enabled. Skipping energy profile calculation because recalculation is necessary.")
 
     def build_forcefields(
         self,
@@ -123,22 +126,22 @@ class EvbDriver():
         combined_product_path = f"{self.input_folder}/{combined_product_name}_ff_data.json"
         combined_product_exists = os.path.exists(combined_product_path)
         if rea_input["forcefield"] is not None and combined_product_exists:
-            print(f"Loading combined forcefield data from {combined_product_path}")
-            print("Found both reactant and product forcefield data. Not generating new forcefields")
+            self.ostream.print_info(f"Loading combined forcefield data from {combined_product_path}")
+            self.ostream.print_info("Found both reactant and product forcefield data. Not generating new forcefields")
             self.reactant = rea_input["forcefield"]
             self.product = self.load_forcefield_from_json(combined_product_path)
         else:
             if not combined_product_exists:
-                print(f"Could not find combined forcefield data file {combined_product_path}. Generating new forcefields")
+                self.ostream.print_info(f"Could not find combined forcefield data file {combined_product_path}. Generating new forcefields")
 
             self.reactant, self.product = ffbuilder.build_forcefields(
                 rea_input, 
                 pro_input,
+                reactant_charge,
+                product_charge,
+                reactant_multiplicity,
+                product_multiplicity,
                 ordered_input,
-                reactant_charge=reactant_charge,
-                product_charge=product_charge,
-                reactant_multiplicity=reactant_multiplicity,
-                product_multiplicity=product_multiplicity,
             )
             self.save_forcefield(self.reactant, reactant_path)
             self.save_forcefield(self.product, combined_product_path)
@@ -148,11 +151,11 @@ class EvbDriver():
         # Build a molecule from a (possibly optimised) geometry
         optimise = True
         if os.path.exists(f"{self.input_folder}/{filename}_xtb_opt.xyz"):
-            print(f"Loading optimised geometry from {self.input_folder}/{filename}_xtb_opt.xyz")
+            self.ostream.print_info(f"Loading optimised geometry from {self.input_folder}/{filename}_xtb_opt.xyz")
             molecule = Molecule.read_xyz_file(f"{self.input_folder}/{filename}_xtb_opt.xyz")
             optimise = False
         else:
-            print(f"Loading (possibly unoptimised) geometry from {self.input_folder}/{filename}.xyz")
+            self.ostream.print_info(f"Loading (possibly unoptimised) geometry from {self.input_folder}/{filename}.xyz")
             molecule = Molecule.read_xyz_file(f"{self.input_folder}/{filename}.xyz")
 
         json_path = f"{self.input_folder}/{filename}_ff_data.json"
@@ -161,27 +164,27 @@ class EvbDriver():
         if os.path.exists(f"{self.input_folder}/{filename}_charges.txt"):
             with open(f"{self.input_folder}/{filename}_charges.txt", "r", encoding="utf-8") as file:
                 charges = self._load_charges(f"{self.input_folder}/{filename}_charges.txt")
-            print(
+            self.ostream.print_info(
                 f"Loading charges from {self.input_folder}/{filename}_charges.txt file, total charge = {charges}"
             )
 
         forcefield = None
         if os.path.exists(json_path):
-            print(f"Loading force field data from {json_path}")
+            self.ostream.print_info(f"Loading force field data from {json_path}")
             forcefield = self.load_forcefield_from_json(json_path)
             forcefield.molecule = molecule
             if charges is not None:
                 forcefield.partial_charges = charges
         else:
-            print(f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json.")
+            self.ostream.print_info(f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json.")
 
         hessian = None
         if os.path.exists(f"{self.input_folder}/{filename}_hess.np"):
-            print(
+            self.ostream.print_info(
                 f"Found hessian file at {self.input_folder}/{filename}_hess.np, using it to reparameterise.")
             hessian = np.loadtxt(f"{self.input_folder}/{filename}_hess.np")
         else:
-            print(
+            self.ostream.print_info(
                 f"Could not find hessian file at {self.input_folder}/{filename}_hess.np, calculating hessian with xtb and saving it"
             )
 
@@ -251,7 +254,7 @@ class EvbDriver():
                 try:
                     charges.append(float(line))
                 except ValueError:
-                    print(rf"Could not read line {line} from {filename}_charges.txt. Continuing")
+                    self.ostream.print_info(rf"Could not read line {line} from {filename}_charges.txt. Continuing")
         return charges
 
     # def _save_charges(self, charges: list, filename: str):
@@ -338,7 +341,7 @@ class EvbDriver():
             conf["data_folder"] = data_folder
             run_folder = f"{data_folder}/run"
             conf["run_folder"] = run_folder
-            print(f"Saving files to {data_folder}")
+            self.ostream.print_info(f"Saving files to {data_folder}")
 
             if not os.path.exists(data_folder):
                 os.makedirs(data_folder)
@@ -354,7 +357,7 @@ class EvbDriver():
                         elif os.path.isdir(file_path):
                             shutil.rmtree(file_path)
                     except Exception as e:
-                        print("Failed to delete %s. Reason: %s" % (file_path, e))
+                        self.ostream.print_info("Failed to delete %s. Reason: %s" % (file_path, e))
 
             if not os.path.exists(run_folder):
                 os.makedirs(run_folder)
@@ -370,7 +373,7 @@ class EvbDriver():
                         elif os.path.isdir(file_path):
                             shutil.rmtree(file_path)
                     except Exception as e:
-                        print("Failed to delete %s. Reason: %s" % (file_path, e))
+                        self.ostream.print_info("Failed to delete %s. Reason: %s" % (file_path, e))
 
             # build the system
             system_builder = EvbSystemBuilder()
@@ -489,11 +492,11 @@ class EvbDriver():
 
     #     self.systems = self.load_systems_from_xml(self.run_folder)
 
-    #     print(f"Loaded systems, topology, initial positions, temperatue and Lambda from {data_folder}")
+    #     self.ostream.print_info(f"Loaded systems, topology, initial positions, temperatue and Lambda from {data_folder}")
 
     def save_systems_as_xml(self, systems: dict, folder: str):
         path = Path().cwd() / folder
-        print(f"Saving systems to {path}")
+        self.ostream.print_info(f"Saving systems to {path}")
         for lam in self.Lambda:
             file_path = str(path / f"{lam:.3f}_sys.xml")
             with open(file_path, mode="w", encoding="utf-8") as output:
@@ -530,7 +533,7 @@ class EvbDriver():
     ):
 
         if self.debug:
-            print("Debugging enabled, using low number of steps. Do not use for production")
+            self.ostream.print_info("Debugging enabled, using low number of steps. Do not use for production")
             equil_steps = 100
             total_sample_steps = 500
             write_step = 1
@@ -540,7 +543,7 @@ class EvbDriver():
             initial_equil_step_size = 0.001
 
         for conf in self.system_confs:
-            print(f"Running FEP for {conf['name']}")
+            self.ostream.print_info(f"Running FEP for {conf['name']}")
             FEP = FepDriver()
             # FEP.constrain_H = False
             FEP.run_FEP(
@@ -556,7 +559,7 @@ class EvbDriver():
             )
 
             if self.debug:
-                print("Debugging option enabled.Skipping recalculation.")
+                self.ostream.print_info("Debugging option enabled.Skipping recalculation.")
             else:
                 FEP.recalculate(interpolated_potential=True, force_contributions=True)
 
@@ -636,13 +639,12 @@ class EvbDriver():
                     result[key] = value
         return result
 
-    @staticmethod
-    def save_results(results):
+    def save_results(self, results):
         cwd = Path.cwd()
         for name, result in results.items():
             file_path = str(cwd / f"{name}.h5")
             with h5py.File(file_path, "w") as file:
-                print(f"Saving results to {file_path}")
+                self.ostream.print_info(f"Saving results to {file_path}")
                 for key, value in result.items():
                     if isinstance(value, np.ndarray) or isinstance(value, list):
                         file.create_dataset(key, data=value)
