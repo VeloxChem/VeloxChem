@@ -7,8 +7,6 @@ class ReactionMatcher:
 
     @staticmethod
     def _match_reaction_graphs(rea_graph: nx.Graph, pro_graph: nx.Graph):
-        total_mapping = {}
-        
         # while rea_graph.number_of_nodes() > 0:
         #     # if find largest subgraph
         #     mapping = ReactionMatcher._find_largest_subgraph(rea_graph, pro_graph)
@@ -25,11 +23,15 @@ class ReactionMatcher:
         #     # add mapping to total mapping
 
         # Seperate all molecules into seperate graphs
-        A = ReactionMatcher._split_graphs(pro_graph)
-        B = ReactionMatcher._split_graphs(rea_graph)
-        print(f"{len(A)} reactant molecule(s) and {len(B)} product molecule(s)")
+        product_graphs = ReactionMatcher._split_graphs(pro_graph)
+        reactant_graphs = ReactionMatcher._split_graphs(rea_graph)
+        print(f"{len(reactant_graphs)} reactant molecule(s) and {len(product_graphs)} product molecule(s)")
+
+        A = reactant_graphs
+        B = product_graphs
 
         swapped = False
+        total_mapping = {}
 
         while len(A) > 0 and len(B) > 0:
             # Sort the molecules by size
