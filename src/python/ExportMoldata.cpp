@@ -31,12 +31,10 @@
 #include "AtomicPartialChargesModel.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
-#include "DispersionModel.hpp"
 #include "NewDispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
-#include "PartialCharges.hpp"
 #include "Point.hpp"
 #include "StringFormat.hpp"
 
@@ -235,10 +233,6 @@ export_moldata(py::module &m)
             "Gets nuclear charges for molecule.")
         .def(
             "get_partial_charges",
-            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
-            "Gets partial charges for molecule.")
-        .def(
-            "get_partial_charges_new",
             [](const CMolecule& self, const double net_charge) -> std::vector<double> { return atmparchg::getPartialCharges(self, net_charge); },
             "Gets partial charges for molecule.")
         .def(
@@ -296,16 +290,6 @@ export_moldata(py::module &m)
         .def("__deepcopy__", [](const CMolecule &self, py::dict) { return CMolecule(self); });
 
     // CDispersionModel class
-
-    PyClass<CDispersionModel>(m, "DispersionModel")
-        .def(py::init<>())
-        .def("compute",
-             &CDispersionModel::compute,
-             "Computes dispersion energy and gradient for a given molecule and a given density functional.",
-             "molecule"_a,
-             "xcLabel"_a)
-        .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
-        .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
 
     PyClass<CNewDispersionModel>(m, "NewDispersionModel")
         .def(py::init<>())

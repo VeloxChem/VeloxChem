@@ -51,7 +51,7 @@ from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
-from .veloxchemlib import DispersionModel
+from .veloxchemlib import NewDispersionModel
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import SubMatrix
 

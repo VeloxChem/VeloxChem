@@ -32,7 +32,7 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
-from .veloxchemlib import DispersionModel
+from .veloxchemlib import NewDispersionModel
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
@@ -450,7 +450,7 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += self.grad_nuc_contrib(molecule)
 
             if self.dispersion:
-                disp = DispersionModel()
+                disp = NewDispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient().to_numpy()
 
@@ -759,7 +759,7 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += self.grad_nuc_contrib(molecule)
 
             if self.dispersion:
-                disp = DispersionModel()
+                disp = NewDispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient().to_numpy()
 
