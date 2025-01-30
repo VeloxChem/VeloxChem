@@ -82,6 +82,8 @@ class OptimizationDriver:
         self.rank = grad_drv.comm.Get_rank()
         self.ostream = grad_drv.ostream
 
+        self.grad_drv = grad_drv
+
         self.coordsys = 'tric'
         self.constraints = None
         self.check_interval = 0
@@ -103,7 +105,6 @@ class OptimizationDriver:
         self.keep_files = False
 
         self.filename = None
-        self.grad_drv = grad_drv
 
         self._debug = False
 
@@ -176,11 +177,12 @@ class OptimizationDriver:
 
     def _pick_driver(self, drv):
         """
-        Chooses the gradient driver
+        Chooses the gradient driver.
 
         :param drv:
             The energy or gradient driver.
         """
+
         if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
                             ScfRestrictedOpenDriver)):
             grad_drv = ScfGradientDriver(drv)
@@ -204,6 +206,7 @@ class OptimizationDriver:
             assert_msg_critical(
                 False,
                 'OptimizationDriver: Invalid argument for initialization')
+
         return grad_drv
 
     def compute(self, molecule, *args):
