@@ -31,7 +31,7 @@
 #include "AtomicPartialChargesModel.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
-#include "NewDispersionModel.hpp"
+#include "DispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
@@ -291,15 +291,15 @@ export_moldata(py::module &m)
 
     // CDispersionModel class
 
-    PyClass<CNewDispersionModel>(m, "NewDispersionModel")
+    PyClass<CDispersionModel>(m, "DispersionModel")
         .def(py::init<>())
         .def("compute",
-             &CNewDispersionModel::compute,
+             &CDispersionModel::compute,
              "Computes dispersion energy and gradient for a given molecule and a given density functional.",
              "molecule"_a,
              "xcLabel"_a)
-        .def("get_energy", &CNewDispersionModel::getEnergy, "Gets dispersion energy.")
-        .def("get_gradient", &CNewDispersionModel::getGradient, "Gets dispersion gradient.");
+        .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
+        .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
 }
 
 }  // namespace vlx_moldata

@@ -22,8 +22,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef NewDispersionModel_hpp
-#define NewDispersionModel_hpp
+#ifndef DispersionModel_hpp
+#define DispersionModel_hpp
 
 #include <string>
 
@@ -31,9 +31,9 @@
 #include "Molecule.hpp"
 
 /**
- Class CNewDispersionModel computes dispersion energy and gradient using dftd4.
+ Class CDispersionModel computes dispersion energy and gradient using dftd4.
  */
-class CNewDispersionModel
+class CDispersionModel
 {
     /**
      The dispersion energy.
@@ -49,12 +49,12 @@ class CNewDispersionModel
     /**
      Creates a dispersion model object.
      */
-    CNewDispersionModel();
+    CDispersionModel();
 
     /**
      Destroys a dispersion model object.
      */
-    ~CNewDispersionModel();
+    ~CDispersionModel();
 
     /**
      Computes dispersion energy and gradient for a given molecule and a given
@@ -82,4 +82,4 @@ class CNewDispersionModel
     CDenseMatrix getGradient() const;
 };
 
-#endif /* NewDispersionModel_hpp */
+#endif /* DispersionModel_hpp */

@@ -22,7 +22,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "NewDispersionModel.hpp"
+#include "DispersionModel.hpp"
 
 #include <vector>
 
@@ -31,16 +31,16 @@
 #include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
-CNewDispersionModel::CNewDispersionModel()
+CDispersionModel::CDispersionModel()
 {
 }
 
-CNewDispersionModel::~CNewDispersionModel()
+CDispersionModel::~CDispersionModel()
 {
 }
 
 void
-CNewDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
+CDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
 {
     auto net_charge = molecule.get_charge();
 
@@ -94,19 +94,19 @@ CNewDispersionModel::compute(const CMolecule& molecule, const std::string& xcLab
 }
 
 void
-CNewDispersionModel::check_error_code(const int error_code, const std::string& msg)
+CDispersionModel::check_error_code(const int error_code, const std::string& msg)
 {
     errors::assertMsgCritical(error_code == 0, std::string("DFTD4 dispersion model error in ") + msg);
 }
 
 double
-CNewDispersionModel::getEnergy() const
+CDispersionModel::getEnergy() const
 {
     return _energy;
 }
 
 CDenseMatrix
-CNewDispersionModel::getGradient() const
+CDispersionModel::getGradient() const
 {
     return _gradient;
 }

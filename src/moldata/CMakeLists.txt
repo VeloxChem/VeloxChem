@@ -49,8 +49,8 @@ target_sources(vlxobjs
     AtomicPartialChargesModel.cpp
     AtomicRadii.cpp
     ChemicalElement.cpp
+    DispersionModel.cpp
     Molecule.cpp
-    NewDispersionModel.cpp
   )
 
 target_include_directories(vlxobjs
