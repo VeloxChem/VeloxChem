@@ -21,6 +21,7 @@
 #include "OverlapGeomX0YDriver.hpp"
 #include "ThreeCenterOverlapDriver.hpp"
 #include "TwoCenterElectronRepulsionDriver.hpp"
+#include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -352,6 +353,16 @@ export_t2cintegrals(py::module& m)
                 return std::make_shared<CMatrix>(eri_drv.compute(basis, molecule));
             },
             "Computes electron repulsion matrix for given molecule and basis.");
+    
+    
+    // COverlapGeom100Driver class
+    PyClass<CTwoCenterElectronRepulsionGeomX00Driver<1>>(m, "TwoCenterElectronRepulsionGeom100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CTwoCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
+                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+            "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
 }
 
 }  // namespace vlx_t2cintegrals

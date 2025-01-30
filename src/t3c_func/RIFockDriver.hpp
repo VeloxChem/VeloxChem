@@ -63,7 +63,6 @@ class CRIFockDriver
     /// @brief Computes Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.
-    /// @param exchange_factor The exchange-correlation factors.
     /// @return The Fock matrix.
     auto compute(const CMatrix     &density,
                  const std::string &label) const -> CMatrix;
