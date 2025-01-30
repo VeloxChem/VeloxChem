@@ -2,6 +2,8 @@
 // This file contains derivative work of multicharge 0.3.0,
 // which is licensed under the Apache License, Version 2.0.
 //
+// SPDX-License-Identifier: Apache-2.0
+//
 // Copyright 2021 Sebastian Ehlert
 //
 // Modifications made by VeloxChem developer, 2024, for use in C++.
