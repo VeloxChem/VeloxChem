@@ -41,20 +41,10 @@ CDispersionModel::~CDispersionModel()
 {
 }
 
-bool
-CDispersionModel::is_available() const
-{
-#ifdef ENABLE_DFTD4
-    return true;
-#else
-    return false;
-#endif
-}
-
 void
 CDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
 {
-    std::string errmsg(std::string("DispersionModel: DFTD4 not available. Please install DFTD4, set ") +
+    std::string errmsg(std::string("DispersionModel: dftd4 not available. Please install dftd4, set ") +
                        std::string("the DFTD4_HOME environment variable, and reinstall VeloxChem."));
 
     errors::assertMsgCritical(is_available(), errmsg);
@@ -119,13 +109,13 @@ CDispersionModel::check_error_code(const int error_code, const std::string& msg)
 }
 
 double
-CDispersionModel::getEnergy() const
+CDispersionModel::get_energy() const
 {
     return _energy;
 }
 
 CDenseMatrix
-CDispersionModel::getGradient() const
+CDispersionModel::get_gradient() const
 {
     return _gradient;
 }

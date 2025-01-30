@@ -56,7 +56,19 @@ class CDispersionModel
      */
     ~CDispersionModel();
 
-    bool is_available() const;
+    /**
+     Checks if dftd4 is available.
+
+     @return true if dftd4 is available, false otherwise.
+     */
+    static constexpr bool is_available()
+    {
+#ifdef ENABLE_DFTD4
+        return true;
+#else
+        return false;
+#endif
+    }
 
     /**
      Computes dispersion energy and gradient for a given molecule and a given
@@ -67,6 +79,12 @@ class CDispersionModel
      */
     void compute(const CMolecule& molecule, const std::string& xcLabel);
 
+    /**
+     Checks error code.
+
+     @param error_code the error code.
+     @param msg the error message.
+     */
     void check_error_code(const int error_code, const std::string& msg) const;
 
     /**
@@ -74,14 +92,14 @@ class CDispersionModel
 
      @return the dispersion energy.
      */
-    double getEnergy() const;
+    double get_energy() const;
 
     /**
      Gets dispersion gradient.
 
      @return the dispersion gradient.
      */
-    CDenseMatrix getGradient() const;
+    CDenseMatrix get_gradient() const;
 };
 
 #endif /* DispersionModel_hpp */

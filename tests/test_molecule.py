@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pickle
 import math
+import pytest
 
 from veloxchem.veloxchemlib import DispersionModel, Point
 from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
@@ -529,6 +530,8 @@ class TestMolecule:
             elem_id = chemical_element_identifier(elem.upper())
             assert abs(radius - vdw_data[elem_id]) < 1.0e-10
 
+    @pytest.mark.skipif(not DispersionModel.is_available(),
+                        reason='dftd4 not available')
     def test_dispersion_model(self):
 
         ref_energies = {

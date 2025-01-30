@@ -293,13 +293,14 @@ export_moldata(py::module &m)
 
     PyClass<CDispersionModel>(m, "DispersionModel")
         .def(py::init<>())
+        .def_static("is_available", &CDispersionModel::is_available, "Checks if dftd4 is available.")
         .def("compute",
              &CDispersionModel::compute,
              "Computes dispersion energy and gradient for a given molecule and a given density functional.",
              "molecule"_a,
              "xcLabel"_a)
-        .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
-        .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
+        .def("get_energy", &CDispersionModel::get_energy, "Gets dispersion energy.")
+        .def("get_gradient", &CDispersionModel::get_gradient, "Gets dispersion gradient.");
 }
 
 }  // namespace vlx_moldata

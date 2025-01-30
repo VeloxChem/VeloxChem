@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from veloxchem.veloxchemlib import DispersionModel
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -247,6 +248,8 @@ class TestGrad:
 
         self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, 1.0e-4)
 
+    @pytest.mark.skipif(not DispersionModel.is_available(),
+                        reason='dftd4 not available')
     def test_dimer_def2svp_d4(self):
 
         molstr_au = """
