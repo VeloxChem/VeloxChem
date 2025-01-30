@@ -26,7 +26,9 @@
 
 #include <vector>
 
+#ifdef ENABLE_DFTD4
 #include "dftd4.h"
+#endif
 
 #include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
@@ -39,9 +41,25 @@ CDispersionModel::~CDispersionModel()
 {
 }
 
+bool
+CDispersionModel::is_available() const
+{
+#ifdef ENABLE_DFTD4
+    return true;
+#else
+    return false;
+#endif
+}
+
 void
 CDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
 {
+    std::string errmsg(std::string("DispersionModel: DFTD4 not available. Please install DFTD4, set ") +
+                       std::string("the DFTD4_HOME environment variable, and reinstall VeloxChem."));
+
+    errors::assertMsgCritical(is_available(), errmsg);
+
+#ifdef ENABLE_DFTD4
     auto net_charge = molecule.get_charge();
 
     auto natoms = molecule.number_of_atoms();
@@ -91,10 +109,11 @@ CDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
     dftd4_delete_model(&disp_model);
     dftd4_delete_structure(&disp_mol);
     dftd4_delete_error(&error_handler);
+#endif
 }
 
 void
-CDispersionModel::check_error_code(const int error_code, const std::string& msg)
+CDispersionModel::check_error_code(const int error_code, const std::string& msg) const
 {
     errors::assertMsgCritical(error_code == 0, std::string("DFTD4 dispersion model error in ") + msg);
 }

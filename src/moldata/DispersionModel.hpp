@@ -56,6 +56,8 @@ class CDispersionModel
      */
     ~CDispersionModel();
 
+    bool is_available() const;
+
     /**
      Computes dispersion energy and gradient for a given molecule and a given
      density functional.
@@ -65,7 +67,7 @@ class CDispersionModel
      */
     void compute(const CMolecule& molecule, const std::string& xcLabel);
 
-    void check_error_code(const int error_code, const std::string& msg);
+    void check_error_code(const int error_code, const std::string& msg) const;
 
     /**
      Gets dispersion energy.
