@@ -187,34 +187,38 @@ class EvbForceFieldBuilder():
     #Match the indices of the reactant and product forcefield generators
     @staticmethod
     def _match_reactant_and_product(
-        reactant: ForceFieldGenerator,
-        product: ForceFieldGenerator,
+        reactant_ff: ForceFieldGenerator,
+        rea_elems: list,
+        product_ff: ForceFieldGenerator,
+        pro_elems: list,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ) -> ForceFieldGenerator:
-        assert len(reactant.atoms) == len(product.atoms), "The number of atoms in the reactant and product do not match"
+        assert len(reactant_ff.atoms) == len(product_ff.atoms), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
         rea_graph = nx.Graph()
-        reactant_bonds = list(reactant.bonds.keys())
+        reactant_bonds = list(reactant_ff.bonds.keys())
         # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
         if breaking_bonds is not None:
             reactant_bonds = [bond for bond in reactant_bonds if bond not in breaking_bonds]
 
-        rea_graph.add_nodes_from(reactant.atoms.keys())
-        rea_graph.add_edges_from(reactant.bonds.keys())
+        rea_graph.add_nodes_from(reactant_ff.atoms.keys())
+        rea_graph.add_edges_from(reactant_ff.bonds.keys())
 
-        for atom in reactant.atoms.items():
-            rea_graph.nodes[atom[0]]["mass"] = atom[1]["mass"]
+        for i, elem in enumerate(rea_elems):
+            rea_graph.nodes[i]['elem'] = elem
 
         pro_graph = nx.Graph()
-        pro_graph.add_nodes_from(product.atoms.keys())
-        pro_graph.add_edges_from(list(product.bonds.keys()))
-        for atom in product.atoms.items():
-            pro_graph.nodes[atom[0]]["mass"] = atom[1]["mass"]
+        pro_graph.add_nodes_from(product_ff.atoms.keys())
+        pro_graph.add_edges_from(list(product_ff.bonds.keys()))
+        for i, elem in enumerate(pro_elems):
+            pro_graph.nodes[i]['elem'] = elem
+            
 
         total_mapping = ReactionMatcher._match_reaction_graphs(rea_graph, pro_graph)
+        total_mapping = {v: k for k, v in total_mapping.items()}
         print(f"Mapping: {total_mapping}")
-        EvbForceFieldBuilder._apply_mapping_to_forcefield(product, total_mapping)
-        return product
+        EvbForceFieldBuilder._apply_mapping_to_forcefield(product_ff, total_mapping)
+        return product_ff
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
     @staticmethod
