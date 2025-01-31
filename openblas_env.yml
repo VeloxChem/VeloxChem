@@ -23,7 +23,7 @@ dependencies:
   - openmm
   - scipy
   - rdkit
-  - dftd4
+  - dftd4-python
   - geometric
   - libxc
   - clang-format

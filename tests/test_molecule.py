@@ -5,12 +5,13 @@ import pickle
 import math
 import pytest
 
-from veloxchem.veloxchemlib import DispersionModel, Point
+from veloxchem.veloxchemlib import Point
 from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
 from veloxchem.veloxchemlib import get_vdw_radii_data_in_bohr
 from veloxchem.veloxchemlib import chemical_element_identifier
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.inputparser import get_random_string_serial
 
@@ -593,7 +594,7 @@ class TestMolecule:
             e_ref = sum(ref_energies[xc_label])
             assert abs(e_disp - e_ref) < 1.0e-11
 
-            g_disp = disp.get_gradient().to_numpy()
+            g_disp = disp.get_gradient()
             g_ref = ref_gradient[xc_label]
             max_diff = np.max(np.abs(g_disp - g_ref))
             assert max_diff < 1.0e-10
