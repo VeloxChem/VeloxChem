@@ -560,20 +560,6 @@ class ScfDriver:
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
 
-        # D4 dispersion correction
-        if self.dispersion:
-            if self.rank == mpi_master():
-                disp = DispersionModel()
-                xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
-                disp.compute(molecule, xc_label)
-                self._d4_energy = disp.get_energy()
-            else:
-                self._d4_energy = 0.0
-            self._d4_energy = self.comm.bcast(self._d4_energy,
-                                              root=mpi_master())
-        else:
-            self._d4_energy = 0.0
-
         # generate integration grid
         if self._dft:
             print_libxc_reference(self.xcfun, self.ostream)
@@ -591,6 +577,30 @@ class ScfDriver:
                 format(n_grid_points,
                        tm.time() - grid_t0))
             self.ostream.print_blank()
+
+        # D4 dispersion correction
+        if self.dispersion:
+            if self.rank == mpi_master():
+                disp = DispersionModel()
+                xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
+                disp.compute(molecule, xc_label)
+                self._d4_energy = disp.get_energy()
+
+                dftd4_info = 'Using D4 dispersion correction.'
+                self.ostream.print_info(dftd4_info)
+                self.ostream.print_blank()
+                for dftd4_ref in disp.get_references():
+                    self.ostream.print_reference(dftd4_ref)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            else:
+                self._d4_energy = 0.0
+
+            self._d4_energy = self.comm.bcast(self._d4_energy,
+                                              root=mpi_master())
+        else:
+            self._d4_energy = 0.0
 
         # set up polarizable continuum model
         if self._cpcm:
@@ -2863,15 +2873,6 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
-
-        if self.dispersion:
-            valstr = '*** Reference for D4 dispersion correction: '
-            self.ostream.print_header(valstr.ljust(92))
-            valstr = 'E. Caldeweyher, S. Ehlert, A. Hansen, H. Neugebauer, '
-            valstr += 'S. Spicher, C. Bannwarth'
-            self.ostream.print_header(valstr.ljust(92))
-            valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
-            self.ostream.print_header(valstr.ljust(92))
 
     def _write_final_hdf5(self, molecule, ao_basis):
         """

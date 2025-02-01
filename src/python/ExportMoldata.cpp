@@ -290,8 +290,9 @@ export_moldata(py::module &m)
         .def("__deepcopy__", [](const CMolecule &self, py::dict) { return CMolecule(self); });
 
     // CDispersionModel class
+    // Note: DispersionModel is prefixed by an underscore and will be used in dispersionmodel.py
 
-    PyClass<CDispersionModel>(m, "DispersionModel")
+    PyClass<CDispersionModel>(m, "_DispersionModel")
         .def(py::init<>())
         .def_static("is_available", &CDispersionModel::is_available, "Checks if dftd4 is available.")
         .def("compute",
@@ -300,7 +301,13 @@ export_moldata(py::module &m)
              "molecule"_a,
              "xcLabel"_a)
         .def("get_energy", &CDispersionModel::get_energy, "Gets dispersion energy.")
-        .def("get_gradient", &CDispersionModel::get_gradient, "Gets dispersion gradient.");
+        .def(
+            "get_gradient",
+            [](const CDispersionModel& self) -> py::array_t<double> {
+                auto grad = self.get_gradient();
+                return vlx_general::pointer_to_numpy(grad.values(), {grad.getNumberOfRows(), grad.getNumberOfColumns()});
+            },
+            "Gets dispersion gradient.");
 }
 
 }  // namespace vlx_moldata

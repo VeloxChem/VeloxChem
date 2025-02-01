@@ -25,6 +25,9 @@
 import numpy as np
 import sys
 
+from .veloxchemlib import _DispersionModel as DispModel
+from .errorhandler import assert_msg_critical
+
 try:
     from dftd4.interface import DampingParam as D4Param
     from dftd4.interface import DispersionModel as D4Model
@@ -58,7 +61,14 @@ class DispersionModel:
             True if dftd4-python is available, False otherwise.
         """
 
-        return ('dftd4' in sys.modules)
+        if 'dftd4' in sys.modules:
+            return True
+
+        elif DispModel.is_available():
+            return True
+
+        else:
+            return False
 
     @staticmethod
     def _xc_label_to_dftd4(xc_label):
@@ -92,21 +102,44 @@ class DispersionModel:
             The label of XC functional.
         """
 
-        identifiers_np = np.array(molecule.get_identifiers())
-        coords_in_au = molecule.get_coordinates_in_bohr()
-        net_charge = molecule.get_charge()
+        assert_msg_critical(
+            self.is_available(), 'DispersionModel: dftd4 is not available. ' +
+            'Please install dftd4-python.\n' +
+            'Alternatively, you can install dftd4, ' +
+            'set the DFTD4_HOME environment variable, ' +
+            'and reinstall VeloxChem.')
 
-        disp_model = D4Model(numbers=identifiers_np,
-                             positions=coords_in_au,
-                             charge=net_charge,
-                             model='d4')
+        if 'dftd4' in sys.modules:
 
-        disp_xc_label = self._xc_label_to_dftd4(xc_label)
-        disp_res = disp_model.get_dispersion(D4Param(method=disp_xc_label),
-                                             grad=True)
+            # use dftd4 Python-API
 
-        self._energy = disp_res.get("energy")
-        self._gradient = disp_res.get("gradient")
+            identifiers_np = np.array(molecule.get_identifiers())
+            coords_in_au = molecule.get_coordinates_in_bohr()
+            net_charge = molecule.get_charge()
+
+            disp_model = D4Model(numbers=identifiers_np,
+                                 positions=coords_in_au,
+                                 charge=net_charge,
+                                 model='d4')
+
+            disp_xc_label = self._xc_label_to_dftd4(xc_label)
+            disp_res = disp_model.get_dispersion(D4Param(method=disp_xc_label),
+                                                 grad=True)
+
+            self._energy = disp_res.get("energy")
+            self._gradient = disp_res.get("gradient")
+
+        elif DispModel.is_available():
+
+            # use dftd4 C-API
+
+            disp = DispModel()
+
+            disp_xc_label = self._xc_label_to_dftd4(xc_label)
+            disp.compute(molecule, disp_xc_label)
+
+            self._energy = disp.get_energy()
+            self._gradient = disp.get_gradient()
 
     def get_energy(self):
         """
@@ -126,4 +159,21 @@ class DispersionModel:
             The dispersion correction to gradient.
         """
 
-        return self._gradient
+        return np.copy(self._gradient)
+
+    def get_references(self):
+        """
+        Gets references.
+
+        :return:
+            The references.
+        """
+
+        dftd4_ref_1 = 'E. Caldeweyher, C. Bannwarth, S. Grimme,'
+        dftd4_ref_1 += ' J. Chem. Phys., 2017, 147, 034112.'
+
+        dftd4_ref_2 = 'E. Caldeweyher, S. Ehlert, A. Hansen, H. Neugebauer,'
+        dftd4_ref_2 += ' S. Spicher, C. Bannwarth, S. Grimme,'
+        dftd4_ref_2 += ' J. Chem Phys, 2019, 150, 154122.'
+
+        return (dftd4_ref_1, dftd4_ref_2)

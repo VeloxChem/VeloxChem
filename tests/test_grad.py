@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import DispersionModel
+from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
