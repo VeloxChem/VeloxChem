@@ -1288,7 +1288,8 @@ class ForceFieldGenerator:
 
         if use_gaff:
             if gaff_version is not None:
-                self.ostream.print_info(f'Using GAFF {gaff_version} parameters.')
+                self.ostream.print_info(
+                    f'Using GAFF (v{gaff_version}) parameters.')
             else:
                 self.ostream.print_info('Using GAFF parameters.')
             gaff_ref = 'J. Wang, R. M. Wolf, J. W. Caldwell, P. A. Kollman,'
