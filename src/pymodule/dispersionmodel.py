@@ -60,6 +60,28 @@ class DispersionModel:
 
         return ('dftd4' in sys.modules)
 
+    @staticmethod
+    def _xc_label_to_dftd4(xc_label):
+        """
+        Determines dftd4 functional name from vlx functional name.
+
+        :param xc_label:
+            The vlx functional name.
+
+        :return:
+            The dftd4 functional name.
+        """
+
+        known_aliases = {
+            'lrc-wpbeh': 'lc-wpbeh',
+            'm06-l': 'm06l',
+        }
+
+        if xc_label.lower() in known_aliases:
+            return known_aliases[xc_label.lower()]
+        else:
+            return xc_label.lower()
+
     def compute(self, molecule, xc_label):
         """
         Uses the dftd4-python interface to compute dispersion correction.
@@ -79,7 +101,8 @@ class DispersionModel:
                              charge=net_charge,
                              model='d4')
 
-        disp_res = disp_model.get_dispersion(D4Param(method=xc_label),
+        disp_xc_label = self._xc_label_to_dftd4(xc_label)
+        disp_res = disp_model.get_dispersion(D4Param(method=disp_xc_label),
                                              grad=True)
 
         self._energy = disp_res.get("energy")
