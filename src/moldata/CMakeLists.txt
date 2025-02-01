@@ -1,6 +1,4 @@
 # TODO: move dftd4 search function to cmake/custom/
-message(STATUS "Searching for DFTD4...")
-
 set(_dftd4_search_paths)
 if(DEFINED ENV{DFTD4_HOME} OR DEFINED ENV{DFTD4_INCLUDE_DIR})
     list(APPEND _dftd4_search_paths PATHS)
@@ -12,11 +10,15 @@ if(DEFINED ENV{DFTD4_HOME} OR DEFINED ENV{DFTD4_INCLUDE_DIR})
     endif()
 endif()
 
-find_path(_dftd4_include_dirs
-    NAMES dftd4.h
-    ${_dftd4_search_paths}
-    HINTS ${CMAKE_PREFIX_PATH}/include
-)
+# Note: only search for dftd4 when DFTD4_HOME or DFTD4_INCLUDE_DIR is defined
+if(_dftd4_search_paths)
+    message(STATUS "Searching for DFTD4...")
+    find_path(_dftd4_include_dirs
+        NAMES dftd4.h
+        ${_dftd4_search_paths}
+        HINTS ${CMAKE_PREFIX_PATH}/include
+    )
+endif()
 
 set(_dftd4_search_paths)
 if(DEFINED ENV{DFTD4_HOME} OR DEFINED ENV{DFTD4_LIB_DIR})
@@ -29,11 +31,14 @@ if(DEFINED ENV{DFTD4_HOME} OR DEFINED ENV{DFTD4_LIB_DIR})
     endif()
 endif()
 
-find_library(_dftd4_libraries
-    NAMES "dftd4"
-    ${_dftd4_search_paths}
-    HINTS ${CMAKE_PREFIX_PATH}/lib
-)
+# Note: only search for dftd4 when DFTD4_HOME or DFTD4_LIB_DIR is defined
+if(_dftd4_search_paths)
+    find_library(_dftd4_libraries
+        NAMES "dftd4"
+        ${_dftd4_search_paths}
+        HINTS ${CMAKE_PREFIX_PATH}/lib
+    )
+endif()
 
 if(_dftd4_include_dirs AND _dftd4_libraries)
     message(STATUS "Found DFTD4: ${_dftd4_libraries}")
