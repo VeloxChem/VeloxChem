@@ -6,7 +6,8 @@
 //
 // Copyright 2021 Sebastian Ehlert
 //
-// Modifications made by VeloxChem developer, 2024, for use in C++.
+// Modifications made by VeloxChem developers, 2024, for generating
+// atomic partial charges for VeloxChem's Molecule object.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.

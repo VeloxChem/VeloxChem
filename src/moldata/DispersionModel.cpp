@@ -72,13 +72,7 @@ CDispersionModel::compute(const CMolecule& molecule, const std::string& xcLabel)
 
     auto identifiers = molecule.identifiers();
 
-    std::string input_xc_label = std::string(xcLabel);
-
-    if (format::lower_case(xcLabel) == std::string("lrc-wpbeh")) input_xc_label = std::string("lc-wpbeh");
-
-    if (format::lower_case(xcLabel) == std::string("m06-l")) input_xc_label = std::string("m06l");
-
-    std::vector<char> xc_label_char_vec(input_xc_label.begin(), input_xc_label.end());
+    std::vector<char> xc_label_char_vec(xcLabel.begin(), xcLabel.end());
     xc_label_char_vec.push_back('\0');
 
     dftd4_error error_handler = dftd4_new_error();
