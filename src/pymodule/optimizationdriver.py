@@ -417,6 +417,11 @@ class OptimizationDriver:
                     ]
 
                     opt_results['scan_geometries'] = []
+                    opt_results['scan_params'] = []
+                    # write scan parameters in the form of a list of strings
+                    for line in self.constraints:
+                        opt_results['scan_params'].append(line.strip())
+   
                     labels = molecule.get_labels()
                     for opt_coords_au in all_coords_au:
                         mol = Molecule(labels, opt_coords_au[-1], 'au',
@@ -830,7 +835,7 @@ class OptimizationDriver:
                                                       step=1,
                                                       value=total_steps),
                             atom_indices=ipywidgets.fixed(atom_indices))
-
+     
     def show_iteration(self, energies, geometries, step=0, atom_indices=False):
         """
         Show the geometry at a specific iteration.
@@ -878,6 +883,121 @@ class OptimizationDriver:
         plt.title("Geometry optimization")
         # Ensure x-axis displays as integers
         plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))
+        plt.tight_layout()
+        plt.show()
+
+        mol = Molecule.read_xyz_string(xyz_data_i)
+        mol.show(atom_indices=atom_indices, width=640, height=360)
+
+    def show_scan(self, opt_results, atom_indices=False):
+        """
+        Plot the scan result 
+
+        :param opt_results:
+            The dictionary of optimize results.
+        """
+
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+
+        energies = opt_results['scan_energies']
+        geometries = opt_results['scan_geometries']
+        params = opt_results['scan_params']
+  
+        total_steps = len(energies) - 1
+        ipywidgets.interact(self.show_iteration_scan,
+                            energies=ipywidgets.fixed(energies),
+                            geometries=ipywidgets.fixed(geometries),
+                            params=ipywidgets.fixed(params),
+                            step=ipywidgets.IntSlider(min=0,
+                                                      max=total_steps,
+                                                      step=1,
+                                                      value=total_steps),
+                            atom_indices=ipywidgets.fixed(atom_indices))
+    
+
+    def show_iteration_scan(self, energies, geometries, params, step=0, atom_indices=False):
+        """
+        Show the geometry at a specific iteration.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('matplotlib is required for this functionality.')
+
+        min_energy = np.min(energies)
+        rel_energies = energies - min_energy
+        rel_energies_kcal = rel_energies * hartree_in_kcalpermol()
+        params = params[0].split()
+
+        if params[1] == 'distance':
+            atoms= [int(params[2]), int(params[3])]
+            start = float(params[4])
+            end = float(params[5])
+            stp = float(params[6])
+        elif params[1] == 'angle':
+            atoms= [int(params[2]), int(params[3]), int(params[4])]
+            start = float(params[5])
+            end = float(params[6])
+            stp = float(params[7])
+        elif params[1] == 'dihedral':
+            atoms= [int(params[2]), int(params[3]), int(params[4]), int(params[5])]
+            start = float(params[6])
+            end = float(params[7])
+            stp = float(params[8])
+
+        xyz_data_i = geometries[step]
+        steps = range(len(rel_energies_kcal))
+        total_steps = len(rel_energies_kcal) - 1
+        if stp == 1:
+            interval = end-start
+        else:
+            interval = (end-start)/(stp-1)
+            
+        x = np.linspace(0, total_steps, 100)
+        y = np.interp(x, steps, rel_energies_kcal)
+        plt.figure(figsize=(6.5, 4))
+        plt.plot(x,
+                 y,
+                 color='black',
+                 alpha=0.9,
+                 linewidth=2.5,
+                 ls='-',
+                 zorder=0)
+        plt.scatter(steps,
+                    rel_energies_kcal,
+                    color='black',
+                    alpha=0.7,
+                    s=120 / math.log(total_steps, 10),
+                    facecolors="none",
+                    edgecolor="darkcyan",
+                    zorder=1)
+        plt.scatter(step,
+                    rel_energies_kcal[step],
+                    marker='o',
+                    color='darkcyan',
+                    alpha=1.0,
+                    s=120 / math.log(total_steps, 10),
+                    zorder=2)
+        plt.xlabel('Step')
+        plt.ylabel('Relative energy [kcal/mol]')
+        if params[1] == 'distance':
+            plt.title(' Scan of %s %s from %.2f to %.2f Å in %.0f steps' % (params[1], atoms, start, end, stp))
+        else:
+            plt.title(' Scan of %s %s from %.2f to %.2f degrees in %.0f steps' % (params[1], atoms, start, end, stp))
+
+        plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))
+        secax = plt.gca().secondary_xaxis('top')
+        secax.set_xticks(np.linspace(0, total_steps, num=len(np.arange(start, end, (end-start)/stp))))
+        ticks = []
+        for i in range(int(stp)):
+            ticks.append(start+interval*i)
+        tick_labels = [f'{tick:.2f}' for tick in ticks]
+
+        secax.set_xticklabels(tick_labels, rotation=45.0)
         plt.tight_layout()
         plt.show()
 
