@@ -985,9 +985,9 @@ class OptimizationDriver:
         plt.xlabel('Step')
         plt.ylabel('Relative energy [kcal/mol]')
         if params[1] == 'distance':
-            plt.title(' Scan of %s %s from %.2f to %.2f Å in %.0f steps' % (params[1], atoms, start, end, stp))
+            plt.title(' Scan of %s %s in Å' % (params[1], atoms))
         else:
-            plt.title(' Scan of %s %s from %.2f to %.2f degrees in %.0f steps' % (params[1], atoms, start, end, stp))
+            plt.title(' Scan of %s %s in deg' % (params[1], atoms))
 
         plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))
         secax = plt.gca().secondary_xaxis('top')
