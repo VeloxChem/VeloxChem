@@ -1,3 +1,4 @@
+#
 #                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
@@ -37,6 +38,8 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .cphfsolver import CphfSolver
 from .errorhandler import assert_msg_critical
+from .dftutils import get_default_grid_level
+from .batchsize import get_batch_size
 
 
 class HessianOrbitalResponse(CphfSolver):
@@ -61,6 +64,8 @@ class HessianOrbitalResponse(CphfSolver):
         """
 
         super().__init__(comm, ostream)
+
+        self.orbrsp_type = 'hessian'
 
     def update_settings(self, cphf_dict, method_dict=None):
         """
@@ -107,14 +112,20 @@ class HessianOrbitalResponse(CphfSolver):
             density = scf_tensors['D_alpha']
             eocc = scf_tensors['E_alpha'][:nocc]
             mo = scf_tensors['C_alpha']
+            point_charges = scf_tensors.get('point_charges', None)
+            qm_vdw_params = scf_tensors.get('qm_vdw_params', None)
         else:
             density = None
             eocc = None
             mo = None
+            point_charges = None
+            qm_vdw_params = None
 
         density = self.comm.bcast(density, root=mpi_master())
         eocc = self.comm.bcast(eocc, root=mpi_master())
         mo = self.comm.bcast(mo, root=mpi_master())
+        point_charges = self.comm.bcast(point_charges, root=mpi_master())
+        qm_vdw_params = self.comm.bcast(qm_vdw_params, root=mpi_master())
 
         # TODO: double check dft_dict['gs_density']
         mol_grid = dft_dict['molgrid']
@@ -194,7 +205,9 @@ class HessianOrbitalResponse(CphfSolver):
         for iatom in local_atoms:
 
             fock_deriv_ao_i = self._compute_fmat_deriv(molecule, basis, density,
-                                                       iatom, eri_dict)
+                                                       iatom, eri_dict,
+                                                       point_charges,
+                                                       qm_vdw_params)
 
             fock_deriv_ao_dict[(iatom, 0)] = fock_deriv_ao_i[0]
             fock_deriv_ao_dict[(iatom, 1)] = fock_deriv_ao_i[1]
@@ -225,19 +238,39 @@ class HessianOrbitalResponse(CphfSolver):
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
-            for iatom, root_rank in all_atom_idx_rank:
-                vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
+            naos = basis.get_dimensions_of_basis()
+
+            batch_size = get_batch_size(None, natm * 3, naos, self.comm)
+            batch_size = batch_size // 3
+
+            num_batches = natm // batch_size
+            if natm % batch_size != 0:
+                num_batches += 1
+
+            for batch_ind in range(num_batches):
+
+                batch_start = batch_ind * batch_size
+                batch_end = min(batch_start + batch_size, natm)
+
+                atom_list = list(range(batch_start, batch_end))
+
+                vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
                     molecule, basis, gs_density, mol_grid,
-                    self.xcfun.get_func_label(), iatom)
+                    self.xcfun.get_func_label(), atom_list)
 
-                for x in range(3):
-                    vxc_deriv_ix = self.comm.reduce(vxc_deriv_i[x])
+                for vecind, (iatom, root_rank) in enumerate(
+                        all_atom_idx_rank[batch_start:batch_end]):
 
-                    dist_vxc_deriv_ix = DistributedArray(
-                        vxc_deriv_ix, self.comm)
+                    for x in range(3):
+                        vxc_deriv_ix = self.comm.reduce(
+                            vxc_deriv_batch[vecind * 3 + x])
 
-                    key_ix = (iatom, x)
-                    dist_fock_deriv_ao[key_ix].data += dist_vxc_deriv_ix.data
+                        dist_vxc_deriv_ix = DistributedArray(
+                            vxc_deriv_ix, self.comm)
+
+                        key_ix = (iatom, x)
+                        dist_fock_deriv_ao[
+                            key_ix].data += dist_vxc_deriv_ix.data
 
         profiler.stop_timer('dXC')
 
@@ -458,7 +491,14 @@ class HessianOrbitalResponse(CphfSolver):
             'hessian_eri_overlap': hessian_eri_overlap,
         }
 
-    def _compute_fmat_deriv(self, molecule, basis, density, i, eri_dict):
+    def _compute_fmat_deriv(self,
+                            molecule,
+                            basis,
+                            density,
+                            i,
+                            eri_dict,
+                            point_charges=None,
+                            qm_vdw_params=None):
         """
         Computes the derivative of the Fock matrix with respect
         to the coordinates of atom i.
@@ -509,6 +549,27 @@ class HessianOrbitalResponse(CphfSolver):
 
         gmats_npot_100 = Matrices()
         gmats_npot_010 = Matrices()
+
+        # point charges contribution
+        if point_charges is not None:
+            npoints = point_charges.shape[1]
+
+            mm_coords = []
+            mm_charges = []
+            for p in range(npoints):
+                xyz_p = point_charges[:3, p]
+                chg_p = point_charges[3, p]
+                mm_coords.append(xyz_p.copy())
+                mm_charges.append(chg_p)
+
+            gmats_100 = npot_grad_100_drv.compute(molecule, basis, i, mm_coords,
+                                                  mm_charges)
+
+            for x, label in enumerate(['X', 'Y', 'Z']):
+                gmat_100 = gmats_100.matrix_to_numpy(label)
+                fmat_deriv[x] -= gmat_100 + gmat_100.T
+
+            gmats_100 = Matrices()
 
         if self._dft:
             if self.xcfun.is_hybrid():
@@ -584,6 +645,15 @@ class HessianOrbitalResponse(CphfSolver):
         cur_str = 'Convergence Threshold           : {:.1e}'.format(
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()

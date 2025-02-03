@@ -42,7 +42,7 @@ class TestScfHessianDriver:
             ref_hessian = np.array(hf.get('hessian'))
             ref_frequencies = np.array(hf.get('frequencies'))
             ref_ir_intensities = np.array(hf.get('ir'))
-            ref_raman_intensities = np.array(hf.get('raman'))
+            ref_raman_activities = np.array(hf.get('raman'))
             hf.close()
 
             diff_hessian = np.max(np.abs(vibanalysis_drv.hessian - ref_hessian))
@@ -52,8 +52,8 @@ class TestScfHessianDriver:
                 np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
             rel_diff_raman = np.max(
-                np.abs(vibanalysis_drv.raman_intensities[0.0] /
-                       ref_raman_intensities - 1.0))
+                np.abs(vibanalysis_drv.raman_activities[0.0] /
+                       ref_raman_activities - 1.0))
 
             assert diff_hessian < 1.0e-5
             assert rel_diff_freq < 1.0e-3
@@ -62,34 +62,9 @@ class TestScfHessianDriver:
 
         task.finish()
 
-    def disabled_test_analytical_scf_hessian_pople(self):
-        here = Path(__file__).parent
-        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_analytical_hessian_scf.h5')
-
-        task = MpiTask([inpfile, None])
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-
-        method_settings = {}
-        cphf_settings = {'conv_thresh': 1e-8}
-        hess_settings = {'do_pople_hessian': 'yes', 'numerical': 'no'}
-        hessian_drv = ScfHessianDriver(scf_drv)
-        hessian_drv.update_settings(method_settings,
-                                    hess_dict=hess_settings,
-                                    cphf_dict=cphf_settings)
-        hessian_drv.compute(task.molecule, task.ao_basis)
-
-        if task.mpi_rank == mpi_master():
-            hf = h5py.File(h5file)
-            ref_hessian = np.array(hf.get('hessian'))
-            hf.close()
-            diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
-            assert diff_hessian < 1e-6
-
     @pytest.mark.solvers
-    def test_analytical_scf_hessian_furche(self):
+    def test_analytical_scf_hessian(self):
+
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
         h5file = str(here / 'data' / 'water_analytical_hessian_scf.h5')
@@ -101,7 +76,7 @@ class TestScfHessianDriver:
 
         method_settings = {}
         cphf_settings = {'conv_thresh': 1e-8}
-        hess_settings = {'do_pople_hessian': 'no', 'numerical': 'no'}
+        hess_settings = {'numerical': 'no'}
         hessian_drv = ScfHessianDriver(scf_drv)
         hessian_drv.update_settings(method_settings,
                                     hess_dict=hess_settings,
@@ -125,36 +100,9 @@ class TestScfHessianDriver:
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
 
-    def disabled_test_analytical_pbe_hessian_pople(self):
-        here = Path(__file__).parent
-        inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_analytical_hessian_pbe.h5')
-
-        task = MpiTask([inpfile, None])
-
-        method_settings = {'xcfun': 'pbe', 'grid_level': 7}
-        scf_settings = {}
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-
-        cphf_settings = {'conv_thresh': 1e-8}
-        hess_settings = {'do_pople_hessian': 'yes', 'numerical': 'no'}
-        hessian_drv = ScfHessianDriver(scf_drv)
-        hessian_drv.update_settings(method_settings,
-                                    hess_dict=hess_settings,
-                                    cphf_dict=cphf_settings)
-        hessian_drv.compute(task.molecule, task.ao_basis)
-
-        if task.mpi_rank == mpi_master():
-            hf = h5py.File(h5file)
-            ref_hessian = np.array(hf.get('hessian'))
-            hf.close()
-            diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
-            assert diff_hessian < 1e-6
-
     @pytest.mark.solvers
-    def test_analytical_pbe_hessian_furche(self):
+    def test_analytical_pbe_hessian(self):
+
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
         h5file = str(here / 'data' / 'water_analytical_hessian_pbe.h5')
@@ -168,7 +116,7 @@ class TestScfHessianDriver:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         cphf_settings = {'conv_thresh': 1e-8}
-        hess_settings = {'do_pople_hessian': 'no', 'numerical': 'no'}
+        hess_settings = {'numerical': 'no'}
 
         hessian_drv = ScfHessianDriver(scf_drv)
         hessian_drv.update_settings(method_settings,

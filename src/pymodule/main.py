@@ -359,9 +359,6 @@ def main():
 
         elif run_excited_state_gradient:
 
-            # TODO: enable excited state gradient
-            assert False
-
             rsp_dict = dict(task.input_dict['response'])
             rsp_dict['program_end_time'] = program_end_time
             rsp_dict['filename'] = task.input_dict['filename']
@@ -388,13 +385,15 @@ def main():
 
         orbrsp_dict = (task.input_dict['orbital_response']
                        if 'orbital_response' in task.input_dict else {})
+        orbrsp_dict['program_end_time'] = program_end_time
+        orbrsp_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
             hessian_drv = XtbHessianDriver(xtb_drv)
             hessian_drv.update_settings(method_dict, hessian_dict)
             hessian_drv.compute(task.molecule)
 
-        elif scf_drv.scf_type == 'restricted':
+        else:
             hessian_drv = ScfHessianDriver(scf_drv)
             hessian_drv.update_settings(method_dict, hessian_dict, orbrsp_dict)
             hessian_drv.compute(task.molecule, task.ao_basis)
@@ -435,9 +434,6 @@ def main():
 
         elif run_excited_state_gradient:
 
-            # TODO: enable excited state optimization
-            assert False
-
             grad_dict = (task.input_dict['gradient']
                          if 'gradient' in task.input_dict else {})
 
@@ -470,16 +466,22 @@ def main():
 
         vib_dict = (task.input_dict['vibrational']
                     if 'vibrational' in task.input_dict else {})
+        vib_dict['filename'] = task.input_dict['filename']
+
         hessian_dict = (task.input_dict['hessian']
                         if 'hessian' in task.input_dict else {})
+
         polgrad_dict = (task.input_dict['polarizability_gradient']
                         if 'polarizability_gradient' in task.input_dict else {})
+
         orbrsp_dict = (task.input_dict['orbital_response']
                        if 'orbital_response' in task.input_dict else {})
+        orbrsp_dict['program_end_time'] = program_end_time
+        orbrsp_dict['filename'] = task.input_dict['filename']
+
         rsp_dict = (task.input_dict['response']
                     if 'response' in task.input_dict else {})
         rsp_dict['filename'] = task.input_dict['filename']
-        vib_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
             vibrational_drv = VibrationalAnalysis(xtb_drv)
@@ -489,7 +491,8 @@ def main():
                                             cphf_dict=orbrsp_dict,
                                             rsp_dict=rsp_dict,
                                             polgrad_dict=polgrad_dict)
-        elif scf_drv.scf_type == 'restricted':
+
+        else:
             vibrational_drv = VibrationalAnalysis(scf_drv)
             vibrational_drv.update_settings(method_dict,
                                             vib_dict,
@@ -498,7 +501,7 @@ def main():
                                             rsp_dict=rsp_dict,
                                             polgrad_dict=polgrad_dict)
 
-        vibrational_drv.compute(task.molecule, task.ao_basis)
+        vib_results = vibrational_drv.compute(task.molecule, task.ao_basis)
 
     # Polarizability gradient
 

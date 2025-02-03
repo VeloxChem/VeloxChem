@@ -2,6 +2,7 @@
 #define ElectronRepulsionGeom1000Func_hpp
 
 #include <cstddef>
+#include <cstdlib>
 #include <iostream>
 #include <utility>
 
@@ -1181,6 +1182,8 @@ compute_geom_1000(T&                               distributor,
     }
     
     std::cout << " *** Integral not found in call tree :" << bra_angmoms.first << " , " << bra_angmoms.second << " , " << ket_angmoms.first << " , " << ket_angmoms.second << std::endl;
+
+    std::abort();
 }
 
 }  // namespace erifunc

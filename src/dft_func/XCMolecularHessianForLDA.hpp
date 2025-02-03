@@ -64,7 +64,7 @@ auto integrateExcHessianForLDA(const CMolecule&                  molecule,
  @param molecularGrid the molecular grid.
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
- @param atomIdx the index of the atom with respect to which gradient is
+ @param atomIdxVec the indices of the atoms with respect to which gradient is
  computed.
  @return the Vxc gradient.
  */
@@ -74,16 +74,7 @@ auto integrateVxcFockGradientForLDA(const CMolecule&                  molecule,
                                     const CMolecularGrid&             molecularGrid,
                                     const double                      screeningThresholdForGTOValues,
                                     const CXCFunctional&              xcFunctional,
-                                    const int32_t                     atomIdx) -> std::vector<CDenseMatrix>;
-
-/**
- Computes AO-to-atom mapping.
-
- @param ao_to_atom_ids the vector for storing the mapping.
- @param molecule the molecule.
- @param basis the molecular basis.
- */
-auto computeAOtoAtomMapping(std::vector<int>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) -> void;
+                                    const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
 
 }  // namespace xchesslda
 

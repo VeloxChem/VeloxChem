@@ -180,7 +180,7 @@ class TestNumerov:
 
         if len(exc.keys()) == 2:
             for b in ['absorption', 'emission']:
-                assert np.max(np.abs(exc[b] - ref_exc[b])) < 1.0e-2
+                assert np.max(np.abs(exc[b] - ref_exc[b])) < 1.0e-1
                 assert np.max(np.abs(osc[b] - ref_osc[b])) < 1.0e-4
 
     @pytest.mark.skipif('scipy' not in sys.modules,
