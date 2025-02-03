@@ -4,6 +4,7 @@ target_sources(vlxobjs
     BoysFuncTable.cpp
     ElectricFieldIntegrals.cpp
     ElectricFieldValues.cpp
+    ElectricFieldGradients.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
     NuclearPotentialValues.cpp

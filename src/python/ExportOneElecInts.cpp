@@ -32,6 +32,7 @@
 #include "AngularMomentumIntegrals.hpp"
 #include "ElectricFieldIntegrals.hpp"
 #include "ElectricFieldValues.hpp"
+#include "ElectricFieldGradients.hpp"
 #include "ExportGeneral.hpp"
 #include "ErrorHandler.hpp"
 #include "LinearMomentumIntegrals.hpp"
@@ -189,6 +190,33 @@ export_oneeints(py::module& m)
              "molecule"_a,
              "basis"_a,
              "dipole_coords"_a,
+             "D"_a);
+
+    m.def("compute_electric_field_gradient",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& dipole_coords,
+               const py::array_t<double>& dipole_moments,
+               const py::array_t<double>& D) -> py::array_t<double> {
+                std::string errstyle("compute_electric_field_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                std::string errsize("compute_electric_field_gradient: Inconsistent dimension of dipole coordinates/moments");
+                errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);
+                std::string errshape("compute_electric_field_gradient: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto ndipoles = static_cast<int>(dipole_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto ef_grad = onee::computeElectricFieldGradients(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles, D.data(), naos);
+                return vlx_general::pointer_to_numpy(ef_grad.values(), {ef_grad.getNumberOfRows(), ef_grad.getNumberOfColumns()});
+            },
+            "Computes electric field integrals contribution to molecular gradient.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "dipole_moments"_a,
              "D"_a);
 
     m.def("compute_nuclear_potential_values",
