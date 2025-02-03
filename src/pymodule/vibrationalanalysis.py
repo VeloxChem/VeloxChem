@@ -271,11 +271,13 @@ class VibrationalAnalysis:
 
         if self.rank == mpi_master():
             # get vibrational frequencies and normal modes
+            print('I am doing frequency analysis')
             self.frequency_analysis(molecule, filename=None)
 
             # calculate force constants
             self.reduced_masses, self.force_constants = self.calculate_force_constant()
-
+            
+            print('Normal modes:', self.normal_modes)
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
                 self.ir_intensities = self.calculate_ir_intensity(self.normal_modes)
@@ -475,6 +477,7 @@ class VibrationalAnalysis:
         hessian_drv.update_settings(self.method_dict, self.hessian_dict, cphf_dict=self.cphf_dict)
 
         # Transfer settings for vibrational task to Hessian driver
+        print('Hessian is here', self.is_scf, self.numerical_hessian)
         if self.is_scf:
             # only pass numerical option to ScfHessianDriver
             # since XtbHessianDriver will always be numerical

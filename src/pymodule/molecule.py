@@ -25,12 +25,17 @@
 from pathlib import Path
 import numpy as np
 import math
+from contextlib import redirect_stderr
+from io import StringIO
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import bohr_in_angstrom
 from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
+
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
 
 
 @staticmethod
@@ -432,6 +437,37 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3):
                 connectivity_matrix[j, i] = 1
 
     return connectivity_matrix
+
+def _Molecule_get_z_matrix(self):
+    """
+    Creates the z-matrix of redundant internal coordinates based on the
+    topology from geomeTRIC.
+
+    :return:
+        a list of 2-tuples, 3-tuples, and 4-tuples corresponding to all bonds,
+        bond agles, and respectively dihedral angles in the molecule.
+    """
+
+    g_molecule = geometric.molecule.Molecule()
+    g_molecule.elem = self.get_labels()
+    g_molecule.xyzs = [self.get_coordinates_in_bohr() * geometric.nifty.bohr2ang]
+
+    g_molecule.build_topology()
+    g_molecule.build_bonds()
+
+    bonds = g_molecule.Data['bonds']
+    angles = g_molecule.find_angles()
+    dihedrals = g_molecule.find_dihedrals()
+
+    z_matrix = []
+    for bond in bonds:
+        z_matrix.append(bond)
+    for angle in angles:
+        z_matrix.append(angle)
+    for dihedral in dihedrals:
+        z_matrix.append(dihedral)
+
+    return z_matrix
 
 
 def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
@@ -1161,6 +1197,7 @@ Molecule.more_info = _Molecule_more_info
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
 Molecule.get_distance_matrix_in_angstrom = _Molecule_get_distance_matrix_in_angstrom
+Molecule.get_z_matrix = _Molecule_get_z_matrix
 Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz_file = _Molecule_write_xyz_file
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia

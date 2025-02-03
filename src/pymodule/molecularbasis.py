@@ -270,7 +270,7 @@ def _MolecularBasis_read(molecule,
     for bas_label, bas_elem in molecule.get_atom_basis_labels():
         atom_basis_labels.append(bas_label)
         atom_basis_elements.append(bas_elem)
-
+    
     # read atom basis sets defined in molecule
     for atom_bas_label in set(atom_basis_labels):
         if atom_bas_label != '':
@@ -282,8 +282,9 @@ def _MolecularBasis_read(molecule,
         basis_dict[basis_name.upper()] = _read_basis_file(
             basis_name, basis_path, ostream)
 
-    mol_basis = MolecularBasis()
 
+    mol_basis = MolecularBasis()
+    
     for idx, elem_id in enumerate(molecule.get_identifiers()):
         if basis_name.upper() == 'AO-START-GUESS':
             atom_bas_label = basis_name.upper()
