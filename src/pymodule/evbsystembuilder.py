@@ -34,6 +34,9 @@ class EvbSystemBuilder():
                 ostream = OutputStream(sys.stdout)
             else:
                 ostream = OutputStream(None)
+        
+        # output stream
+        self.ostream = ostream
 
         # MPI information
         self.comm = comm
@@ -135,12 +138,11 @@ class EvbSystemBuilder():
             Y = N * y_disp  # A
 
             # system_mol.set_coordinates_in_angstrom(positions)
-            # print(f"New positions: {positions}")
             R = Y / (2 * np.pi)
             if Graphene:
-                print(f"Building graphene sheet with X: {X/10:.3f}nm, Y: {Y/10:.3f}nm")
+                self.ostream.print_info(f"Building graphene sheet with X: {X/10:.3f}nm, Y: {Y/10:.3f}nm")
             if CNT:
-                print(f"Building CNT with X: {X/10:.3f}nm, R: {R/10.:3f}nm")
+                self.ostream.print_info(f"Building CNT with X: {X/10:.3f}nm, R: {R/10.:3f}nm")
 
             graphene_cell = Molecule.read_xyz_file("input_files/Graphene_cell.xyz")
 
@@ -370,7 +372,7 @@ class EvbSystemBuilder():
             box_y = 2 * padding
             box_z = 2 * padding
         box: list[float] = [box_x, box_y, box_z]  # nm
-        print(f"Building system in box with dimensions {box_x:.3f} x {box_y:.3f} x {box_z:.3f} nm")
+        self.ostream.print_info(f"Building system in box with dimensions {box_x:.3f} x {box_y:.3f} x {box_z:.3f} nm")
 
         if solvent is None:
             self.positions = np.array(positions) * 0.1
@@ -389,7 +391,7 @@ class EvbSystemBuilder():
 
             charge = reactant.molecule.get_charge()
             charge_quantities = [0, 0]
-            print(f"Charge of the system: {charge}")
+            self.ostream.print_info(f"Charge of the system: {charge}")
             if charge > 0:
                 charge_quantities = [ion_count, ion_count + charge]
             elif charge < 0:
@@ -403,7 +405,7 @@ class EvbSystemBuilder():
             Na_fac = Na_volume / solvent_volume
             Cl_volume = (4.0 / 3.0) * np.pi * 0.440104**3
             Cl_fac = Cl_volume / solvent_volume
-            print(f"Na+ factor: {Na_fac}, Cl- factor: {Cl_fac}")
+            self.ostream.print_info(f"Na+ factor: {Na_fac}, Cl- factor: {Cl_fac}")
             quantities = [
                 int(solvent_volume * solvent_mols_per_nm3 - charge_quantities[0] * Na_fac -
                     charge_quantities[1] * Cl_fac), charge_quantities[0], charge_quantities[1]
@@ -413,15 +415,15 @@ class EvbSystemBuilder():
                     charge_quantities[1] * Cl_fac), charge_quantities[0], charge_quantities[1]
             ]
             solvents: list[Molecule] = [solvent_molecule, na_mol, cl_mol]
-            print(
+            self.ostream.print_info(
                 f"Solute volume: {solute_volume:.3f} nm^3, box valume: {box_volume:.3f} nm^3, solvent volume: {solvent_volume:.3f} nm^3"
             )
 
-            print(
+            self.ostream.print_info(
                 f"Adding {quantities[0]} molecules of {solvent} with density {solvent_mols_per_nm3} mol/nm^3 to the system"
             )
             if charge != 0:
-                print(f"Adding {quantities[1]} Na+ and {quantities[2]} Cl- ions to the system to neutralize the charge")
+                self.ostream.print_info(f"Adding {quantities[1]} Na+ and {quantities[2]} Cl- ions to the system to neutralize the charge")
 
             vlxsysbuilder.custom_solvate(
                 system_mol,
@@ -443,19 +445,19 @@ class EvbSystemBuilder():
                 elif vlx_solvent_molecule == cl_mol:
                     mol_index = 2
                 else:
-                    print("Could not find molecule")
+                    self.ostream.print_warning("Could not find molecule")
                 # num_solvent_molecules = vlxsysbuilder.added_solvent_counts[0]
                 # num_solvent_atoms_per_molecule = vlxsysbuilder.solvents[0].number_of_atoms()
                 # solvent_molecule = vlxsysbuilder.solvents[0]
                 num_solvent_atoms_per_molecule = vlx_solvent_molecule.number_of_atoms()
                 elements = vlx_solvent_molecule.get_labels()
 
-                print("Generating solvent forcefield")
+                self.ostream.print_info("Generating solvent forcefield")
                 solvent_ff = ForceFieldGenerator()
                 if mol_index == 0:
                     if solvent == 'spce':
                         #todo maybe don't hardcode this
-                        print('Using SPCE from amber03 FF')
+                        self.ostream.print_info('Using SPCE from amber03 FF')
                         solvent_ff.bonds = {
                             (0, 1): {
                                 'type': 'harmonic',
@@ -510,7 +512,7 @@ class EvbSystemBuilder():
                         solvent_ff.dihedrals = {}
                         solvent_ff.impropers = {}
                     elif solvent == 'tip3p':
-                        print('Using TIP3 from amber03 FF')
+                        self.ostream.print_info('Using TIP3 from amber03 FF')
                         solvent_ff.bonds = {
                             (0, 1): {
                                 'type': 'harmonic',
@@ -619,7 +621,7 @@ class EvbSystemBuilder():
                 system.addForce(fourier_imp_force)
 
                 # Loop over all solvent molecules
-                print(f"Adding {num_solvent_molecules} molecules of {solvent} to the system")
+                self.ostream.print_info(f"Adding {num_solvent_molecules} molecules of {solvent} to the system")
                 solvent_nb_atom_count = 0
                 solvent_system_atom_count = 0
                 for i in range(num_solvent_molecules):
@@ -724,7 +726,7 @@ class EvbSystemBuilder():
                                         sigma,
                                         epsilon,
                                     )
-                print(
+                self.ostream.print_info(
                     f"Added {solvent_nb_atom_count} atoms to the nonbonded force and {solvent_system_atom_count} atoms to the system"
                 )
 
@@ -739,7 +741,7 @@ class EvbSystemBuilder():
                      0.4)  # nm, 0.4 factor to accomodate for shrinkage of the box in NPT simulations
         nb_force.setCutoffDistance(cutoff)
         nb_force.setUseSwitchingFunction(True)
-        print(f"Setting nonbonded cutoff to {cutoff:.3f} nm")
+        self.ostream.print_info(f"Setting nonbonded cutoff to {cutoff:.3f} nm")
         nb_force.setSwitchingDistance(0.9 * cutoff)
         system.addForce(nb_force)
 
@@ -783,9 +785,6 @@ class EvbSystemBuilder():
         for lam in Lambda:
             total_charge = 0
             for i, (reactant_atom, product_atom) in enumerate(zip(reactant.atoms.values(), product.atoms.values())):
-                # print(
-                #     f"l = {l}, atom = {i}, rea q: {reactant_atom['charge']}, pro q: {product_atom['charge']}, comb q: {(1-l)*reactant_atom['charge'] + l*product_atom['charge']}"
-                # )
                 charge = (1 - lam) * reactant_atom["charge"] + lam * product_atom["charge"]
                 total_charge += charge
                 sigma = (1 - lam) * reactant_atom["sigma"] + lam * product_atom["sigma"]
@@ -796,14 +795,13 @@ class EvbSystemBuilder():
                     else:
                         raise ValueError("Sigma is 0 while epsilon is not, which will cause division by 0")
                 nb_force.setParticleParameters(i, charge, sigma, epsilon)
-                # print(f"Setting charge {charge}, sigma {sigma}, epsilon {epsilon} for atom {i} in lambda {lam}")
 
             for i in range(system.getNumParticles()):
                 charge = nb_force.getParticleParameters(i)[0]
                 E_field_force.setParticleParameters(i, i, [charge])
 
             if not round(total_charge, 5).is_integer():
-                print(f"Warning: total charge for lambda {lam} is {total_charge} and is not a whole number")
+                self.ostream.print_warning(f"Warning: total charge for lambda {lam} is {total_charge} and is not a whole number")
 
             self.systems[lam] = copy.deepcopy(system)
             if lam == 0.0:
@@ -919,7 +917,7 @@ class EvbSystemBuilder():
                     else:
                         r = self.restraint_r_default
                         if self.verbose:
-                            print(f"INFO: No product geometry given, defaulting position restraint to {r} nm")
+                            self.ostream.print_info(f"No product geometry given, defaulting position restraint to {r} nm")
                 elif key in formed_bond_keys:
                     scale = lam
                     bond = self.product.bonds[key]
@@ -933,8 +931,8 @@ class EvbSystemBuilder():
                 if "D" not in bond.keys():
                     D = self.morse_D_default
                     if self.verbose:
-                        print(
-                            f"INFO: no D value associated with bond {key[0]} {key[1]}. Setting to default value {self.morse_D_default}"
+                        self.ostream.print_info(
+                            f"No D value associated with bond {key[0]} {key[1]}. Setting to default value {self.morse_D_default}"
                         )
                 else:
                     D = bond["D"]
@@ -951,8 +949,8 @@ class EvbSystemBuilder():
                 if "D" not in bond.keys():
                     D = self.morse_D_default
                     if self.verbose:
-                        print(
-                            f"INFO: no D value associated with bond {key[0]} {key[1]}. Setting to default value {self.morse_D_default}"
+                        self.ostream.print_info(
+                            f"No D value associated with bond {key[0]} {key[1]}. Setting to default value {self.morse_D_default}"
                         )
                 else:
                     D = bond["D"]
@@ -974,8 +972,8 @@ class EvbSystemBuilder():
                         [rmax, (1 - scale) * k],
                     )
                     if self.verbose:
-                        print(
-                            f"INFO: Adding maximum distance {rmax} with k {(1-scale)*k} to atoms {key[0]} and {key[1]} of for lambda {lam}"
+                        self.ostream.print_info(
+                            f"Adding maximum distance {rmax} with k {(1-scale)*k} to atoms {key[0]} and {key[1]} of for lambda {lam}"
                         )
         return [harmonic_force, morse_force, max_distance]
 
@@ -1310,9 +1308,9 @@ class EvbSystemBuilder():
         torsion_constraint.addPerTorsionParameter("theta0")
         torsion_constraint.addPerTorsionParameter("k")
         if len(self.constraints) == 0:
-            print(f"No constraints found")
+            self.ostream.print_info(f"No constraints found")
         else:
-            print(f"Adding constraints: {self.constraints}")
+            self.ostream.print_info(f"Adding constraints: {self.constraints}")
         if (
                 not reference_state
         ):  # Return the reference state forces empty so that we have the same number of forces in the reference state and run state

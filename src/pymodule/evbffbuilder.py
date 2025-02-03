@@ -1,7 +1,6 @@
 import os
 
 import shutil
-
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
@@ -18,10 +17,32 @@ import networkx as nx
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 
+import sys
+from mpi4py import MPI
+from .outputstream import OutputStream
+from .veloxchemlib import mpi_master
+
 
 class EvbForceFieldBuilder():
 
-    def __init__(self):
+    def __init__(self, comm=None, ostream=None):
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
+        # output stream
+        self.ostream = ostream
+
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
         self.optimise: bool = False
         self.reparameterise: bool = True
 
@@ -65,6 +86,14 @@ class EvbForceFieldBuilder():
                     self.optimise,
                 ))
 
+
+        rea_elems = self.reactant.molecule.get_element_ids()
+        pro_elems = [
+            element_id
+            for pro_ff in self.products
+            for element_id in pro_ff.molecule.get_element_ids()
+        ]
+
         #todo all this stuff should get removed, at least moved to a higher class, don't want to be managing files here
         # Get all files and directories in the current directory
         # items = os.listdir(".")
@@ -85,7 +114,7 @@ class EvbForceFieldBuilder():
         self.product= self._create_combined_forcefield(products)
         
         if not ordered_input:
-            self.product = self._match_reactant_and_product(self.reactant, self.product, breaking_bonds)
+            self.product = self._match_reactant_and_product(self.reactant, rea_elems,self.product, pro_elems, breaking_bonds)
         self.product.ostream.flush()
         self._summarise_reaction(self.reactant, self.product)
         
@@ -113,7 +142,7 @@ class EvbForceFieldBuilder():
             forcefield.molecule = molecule
         else:
             if input["optimise"] and optimise:
-                print("Optimising the geometry with xtb.")
+                self.ostream.print_info("Optimising the geometry with xtb.")
                 scf_drv = XtbDriver()
                 opt_drv = OptimizationDriver(scf_drv)
                 opt_drv.hessian = "last"
@@ -128,12 +157,12 @@ class EvbForceFieldBuilder():
             
             if input["charges"] is not None:
                 forcefield.partial_charges = input["charges"]
-                print("Creating topology")
+                self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule)
             else:
                 if max(molecule.get_masses()) > 84:
                     basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
-                    print(
+                    self.ostream.print_info(
                         f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
                     )
                 else:
@@ -147,9 +176,9 @@ class EvbForceFieldBuilder():
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges on compound {filename} did not converge, aborting"
 
                 resp_drv = RespChargesDriver()
-                print("Calculating RESP charges")
+                self.ostream.print_info("Calculating RESP charges")
                 forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
-                print("Creating topology")
+                self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule, basis, scf_result=scf_results)
 
             # The atomtypeidentifier returns water with no lj on the hydrogens, this leads to unstable simulations
@@ -172,7 +201,7 @@ class EvbForceFieldBuilder():
 
             #Reparameterise the forcefield if necessary and requested
             if reparameterise:
-                print("Reparameterising force field.")
+                self.ostream.print_info("Reparameterising force field.")
 
                 if input["hessian"] is not None:
                     hessian = input["hessian"]
@@ -195,6 +224,7 @@ class EvbForceFieldBuilder():
     ) -> ForceFieldGenerator:
         assert len(reactant_ff.atoms) == len(product_ff.atoms), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
+        #todo should this be moved to the forcefieldgenerator class? 
         rea_graph = nx.Graph()
         reactant_bonds = list(reactant_ff.bonds.keys())
         # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
@@ -216,7 +246,7 @@ class EvbForceFieldBuilder():
 
         total_mapping = ReactionMatcher._match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
-        print(f"Mapping: {total_mapping}")
+        self.ostream.print_info(f"Mapping: {total_mapping}")
         EvbForceFieldBuilder._apply_mapping_to_forcefield(product_ff, total_mapping)
         return product_ff
 
@@ -289,9 +319,9 @@ class EvbForceFieldBuilder():
         product_bonds = set(product.bonds)
         formed_bonds = product_bonds - reactant_bonds
         broken_bonds = reactant_bonds - product_bonds
-        print(f"{len(broken_bonds)} breaking bonds:")
+        self.ostream.print_info(f"{len(broken_bonds)} breaking bonds:")
         if len(broken_bonds) > 0:
-            print("ReaType, ProType, ID - ReaType, ProType, ID")
+            self.ostream.print_info("ReaType, ProType, ID - ReaType, ProType, ID")
         for bond_key in broken_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -299,11 +329,11 @@ class EvbForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1]
-            print(f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
+            self.ostream.print_info(f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
 
-        print(f"{len(formed_bonds)} forming bonds:")
+        self.ostream.print_info(f"{len(formed_bonds)} forming bonds:")
         if len(formed_bonds) > 0:
-            print("ReaType, ProType, ID\t - ReaType, ProType, ID")
+            self.ostream.print_info("ReaType, ProType, ID\t - ReaType, ProType, ID")
         for bond_key in formed_bonds:
             reactant_type0 = reactant.atoms[bond_key[0]]["type"]
             product_type0 = product.atoms[bond_key[0]]["type"]
@@ -311,7 +341,7 @@ class EvbForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1]
-            print(f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
+            self.ostream.print_info(f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
 
         return formed_bonds, broken_bonds
         

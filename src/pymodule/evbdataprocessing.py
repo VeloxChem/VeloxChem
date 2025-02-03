@@ -5,10 +5,32 @@ import numpy as np
 import scipy
 import h5py
 
+import sys
+from mpi4py import MPI
+from .veloxchem import mpi_master
+from .outputstream import OutputStream
+
 
 class EvbDataProcessing:
 
-    def __init__(self):
+    def __init__(self, comm=None, ostream=None):
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
+        # output stream
+        self.ostream = ostream
+
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
         self.results: dict = {}# Dictionary of dictionaries with all data
 
         self.barrier: float
@@ -40,17 +62,17 @@ class EvbDataProcessing:
         return 1 / (self.kb * T)
 
     def compute(self, results, barrier, free_energy):
-        print("Starting data processing")
+        self.ostream.print_info("Starting data processing")
         # if isinstance(target_folders, str):
         #     target_folders = [target_folders]
 
         self.barrier = barrier
         self.free_energy = free_energy
-        print("Loading files")
+        self.ostream.print_info("Loading files")
         self.results = results
-        print("Fitting H12 and alpha")
+        self.ostream.print_info("Fitting H12 and alpha")
         self.alpha, self.H12 = self.fit_EVB_parameters()
-        print("Calculating FEP and EVB curves")
+        self.ostream.print_info("Calculating FEP and EVB curves")
         self.get_FEP_and_EVB()
         return results
 
@@ -84,11 +106,11 @@ class EvbDataProcessing:
             dGevb_smooth, barrier, free_energy = self.calculate_free_energies(dGevb_ana, smooth=False)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
-            # print(f"Barrier: {barrier}, difference: {barrier_dif}, Free energy: {free_energy}, difference: {free_energy_dif}")
+            
             return barrier_dif, free_energy_dif
 
         alpha, H12 = scipy.optimize.fsolve(get_barrier_and_free_energy_difference, [self.alpha_guess, self.H12_guess])
-        print(f"Fitted alpha: {alpha}, H12: {H12}")
+        self.ostream.print_info(f"Fitted alpha: {alpha}, H12: {H12}")
         return alpha, H12
 
     def calculate_Eg_V_dE(self, E1, E2, alpha, H12, lambda_frame):
@@ -112,7 +134,7 @@ class EvbDataProcessing:
                 dF = pymbar.other_estimators.bar(forward_energy, -backward_energy, False)["Delta_f"]
                 dg_bar = -1 / self.beta(Temp_set) * dF
             except Exception as e:
-                print(f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}")
+                self.ostream.print_warning(f"Error {e} encountered during BAR calculation, setting dG_bar to 0 for lambda {l}")
                 dg_bar = 0
 
             dG_bar.append(dG_bar[-1] + dg_bar)
@@ -347,16 +369,16 @@ class EvbDataProcessing:
                 })
 
     def print_results(self):
-        print(f"{'Discrete':<30}\t Barrier \t\t Free Energy")
+        self.ostream.print_info(f"{'Discrete':<30}\t Barrier \t\t Free Energy")
         for name, result in self.results.items():
             if "discrete" in result.keys():
-                print(f"{name:<30} \t {result['discrete']['barrier']} \t {result['discrete']['free_energy']}")
+                self.ostream.print_info(f"{name:<30} \t {result['discrete']['barrier']} \t {result['discrete']['free_energy']}")
 
-        print("\n")
-        print("Analytical\t Barrier \t\t Free Energy")
+        self.ostream.print_info("\n")
+        self.ostream.print_info("Analytical\t Barrier \t\t Free Energy")
         for name, result in self.results.items():
             if "analytical" in result.keys():
-                print(f"{name:<30} \t {result['analytical']['barrier']} \t {result['analytical']['free_energy']}")
+                self.ostream.print_info(f"{name:<30} \t {result['analytical']['barrier']} \t {result['analytical']['free_energy']}")
 
     @staticmethod
     def import_matplotlib():
@@ -395,9 +417,6 @@ class EvbDataProcessing:
                     dens_max = np.append(dens_max, 0)
             dens_max = scipy.signal.savgol_filter(dens_max, 5, 3) #todo maybe get rid of this?
 
-            # print(np.shape(L))
-            # print(np.shape(dE))
-            # print(np.shape(dens))
             ax[j,0].scatter(dE,L_values,c=dens,s=5)
             ax[j,0].plot([dE_min,dE_min],[0,0.3])
             ax[j,0].plot([dE_max,dE_max],[0.7,1])

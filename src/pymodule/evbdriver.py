@@ -11,7 +11,6 @@ import openmm.unit as mmunit
 
 from mpi4py import MPI
 
-from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .forcefieldgenerator import ForceFieldGenerator
 
@@ -19,7 +18,8 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import FepDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .veloxchemlib import Molecule
+import molecule
+from .veloxchemlib import mpi_master, Molecule
 
 
 class EvbDriver():
