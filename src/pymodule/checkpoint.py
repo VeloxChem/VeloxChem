@@ -115,6 +115,9 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
             if key in scf_results:
                 scf_group.create_dataset(key, data=scf_results[key])
 
+        # write dipole moment
+        scf_group.create_dataset('dipole_moment', data=scf_results['dipole_moment'])
+
         # write SCF energy
         scf_group.create_dataset('scf_type',
                           data=np.bytes_([scf_results['scf_type']]))
