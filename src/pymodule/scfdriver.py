@@ -2888,7 +2888,7 @@ class ScfDriver:
 
 		# replace the suffix .h5 from the checkpoint_file name by _results.h5
         final_h5_fname = str(
-            Path(self.checkpoint_file))[:-3] + '_results.h5'
+            Path(self.checkpoint_file))[:-3] + '.h5'
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()

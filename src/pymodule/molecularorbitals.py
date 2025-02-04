@@ -22,6 +22,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from pathlib import Path
 from enum import Enum
 import numpy as np
 import h5py
@@ -469,6 +470,40 @@ class MolecularOrbitals:
             hf.create_dataset('basis_set', data=np.bytes_([basis_set]))
 
         hf.close()
+
+    def write_orbital_to_hdf5(self, fname, label, nuclear_charges=None, basis_set=None):
+        """
+        Writes orbitals to a pre-existing hdf5 file.
+
+        :param fname:
+            The name of the hdf5 file.
+        :param label:
+            The orbital label.
+        :param nuclear_charges:
+            The nuclear charges.
+        :param basis_set:
+            Name of the basis set.
+        """
+
+        valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+        if valid_checkpoint:
+            hf = h5py.File(fname, 'a')
+    
+            hf.create_dataset(label + '_alpha_orbitals', data=self.alpha_to_numpy())
+            hf.create_dataset(label + '_alpha_energies', data=self.ea_to_numpy())
+            hf.create_dataset(label + '_alpha_occupations', data=self.occa_to_numpy())
+    
+            if self._orbitals_type == molorb.unrest:
+                hf.create_dataset(label + '_beta_orbitals', data=self.beta_to_numpy())
+                hf.create_dataset(label + '_beta_energies', data=self.eb_to_numpy())
+                hf.create_dataset(label + '_beta_occupations', data=self.occb_to_numpy())
+    
+            elif self._orbitals_type == molorb.restopen:
+                hf.create_dataset(label + '_beta_occupations', data=self.occb_to_numpy())
+    
+            hf.close()
 
     @staticmethod
     def read_hdf5(fname):

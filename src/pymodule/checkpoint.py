@@ -103,6 +103,8 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
 
         hf = h5py.File(fname, 'a')
 
+        scf_group = hf.create_group('scf_results')      
+
         # write SCF tensors
         keys = ['S'] + [
             f'{x}_{y}' for x in ['C', 'E', 'occ', 'D', 'F']
@@ -111,19 +113,19 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         for key in keys:
             # TODO: remove this if statement since all keys should be available
             if key in scf_results:
-                hf.create_dataset(key, data=scf_results[key])
+                scf_group.create_dataset(key, data=scf_results[key])
 
         # write SCF energy
-        hf.create_dataset('scf_type',
+        scf_group.create_dataset('scf_type',
                           data=np.bytes_([scf_results['scf_type']]))
-        hf.create_dataset('scf_energy',
+        scf_group.create_dataset('scf_energy',
                           data=np.array([scf_results['scf_energy']]))
 
         # write SCF history
         keys = list(scf_history[0].keys())
         for key in keys:
             data = np.array([step[key] for step in scf_history])
-            hf.create_dataset(f'scf_history_{key}', data=data)
+            scf_group.create_dataset(f'scf_history_{key}', data=data)
 
         hf.close()
 

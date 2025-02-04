@@ -376,6 +376,14 @@ class TdaEigenSolver(LinearSolver):
                 trans_dipoles['velocity'] * trans_dipoles['magnetic'],
                 axis=1) * rotatory_strength_in_cgs()
 
+            # Write HDF5 file
+            self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
+                                   pe_dict['potfile_text'], eigvecs)
+            if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                final_h5_fname = str(
+                    Path(self.checkpoint_file))[:-3] + '_results.h5'
+
         # natural transition orbitals and detachment/attachment densities
 
         nto_lambdas = []
@@ -422,9 +430,16 @@ class TdaEigenSolver(LinearSolver):
                     lam_end = lam_start + min(mo_occ.shape[1], mo_vir.shape[1])
                     nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                    nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
-                    nto_mo.write_hdf5(nto_h5_fname)
-                    nto_h5_files.append(nto_h5_fname)
+                    # TODO: remove commented out code
+                    # TODO: save solutions no matter what?
+                    nto_label = f'S{s + 1}_NTO'
+                    print("\n\n!!!! ", nto_label, final_h5_fname, "\n!!!\n\n")
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        nto_mo.write_orbital_to_hdf5(final_h5_fname, nto_label)
+                    #nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
+                    #nto_mo.write_hdf5(nto_h5_fname)
+                    #nto_h5_files.append(nto_h5_fname)
                 else:
                     nto_mo = MolecularOrbitals()
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -482,9 +497,6 @@ class TdaEigenSolver(LinearSolver):
 
             if self.detach_attach:
                 ret_dict['density_cubes'] = dens_cube_files
-
-            self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
-                                   pe_dict['potfile_text'], eigvecs)
 
             if (self.save_solutions and
                             self.checkpoint_file is not None):
