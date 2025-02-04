@@ -376,14 +376,6 @@ class TdaEigenSolver(LinearSolver):
                 trans_dipoles['velocity'] * trans_dipoles['magnetic'],
                 axis=1) * rotatory_strength_in_cgs()
 
-            # Write HDF5 file
-            self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
-                                   pe_dict['potfile_text'], eigvecs)
-            if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                final_h5_fname = str(
-                    Path(self.checkpoint_file))[:-3] + '_results.h5'
-
         # natural transition orbitals and detachment/attachment densities
 
         nto_lambdas = []
@@ -430,16 +422,9 @@ class TdaEigenSolver(LinearSolver):
                     lam_end = lam_start + min(mo_occ.shape[1], mo_vir.shape[1])
                     nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                    # TODO: remove commented out code
-                    # TODO: save solutions no matter what?
-                    nto_label = f'S{s + 1}_NTO'
-                    print("\n\n!!!! ", nto_label, final_h5_fname, "\n!!!\n\n")
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                        nto_mo.write_orbital_to_hdf5(final_h5_fname, nto_label)
-                    #nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
-                    #nto_mo.write_hdf5(nto_h5_fname)
-                    #nto_h5_files.append(nto_h5_fname)
+                    nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
+                    nto_mo.write_hdf5(nto_h5_fname)
+                    nto_h5_files.append(nto_h5_fname)
                 else:
                     nto_mo = MolecularOrbitals()
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -498,12 +483,15 @@ class TdaEigenSolver(LinearSolver):
             if self.detach_attach:
                 ret_dict['density_cubes'] = dens_cube_files
 
+            self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
+                                   pe_dict['potfile_text'], eigvecs)
+
             if (self.save_solutions and
                             self.checkpoint_file is not None):
                 # Add response results to the final checkpoint file
-                # replace the suffix .h5 of the checkpoint_file name by _results.h5
+                # replace the suffix _rsp.h5 of the checkpoint_file name by .h5
                 final_h5_fname = str(
-                    Path(self.checkpoint_file))[:-3] + '_results.h5'
+                    Path(self.checkpoint_file))[:-7] + '.h5'
                 write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
             self._print_results(ret_dict)
@@ -818,12 +806,9 @@ class TdaEigenSolver(LinearSolver):
         if (not self.save_solutions) or (self.checkpoint_file is None):
             return
 
-        # replace the suffix .h5 in the checkpoint file name by '_results.h5'
+        # replace the suffix _rsp.h5 in the checkpoint file name by '_results.h5'
         final_h5_fname = str(
-            Path(self.checkpoint_file))[:-3] + '_results.h5'
-
-        create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
-                    potfile_text)
+            Path(self.checkpoint_file))[:-7] + '.h5'
 
         for s in range(eigvecs.shape[1]):
             write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),

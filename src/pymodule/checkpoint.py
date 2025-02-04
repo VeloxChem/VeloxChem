@@ -190,15 +190,16 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
 
         hf = h5py.File(fname, 'a')
 
-        # write SCF tensors
         keys = rsp_results.keys()
+
+        rsp_group = hf.create_group('rsp_results')
 
         for key in keys:
             # Do not write the eigenvectors, file names and excitation details
             if "vector" in key or "cube" in key or "file" in key or "details" in key:
                 continue
             else:
-                hf.create_dataset(key, data=rsp_results[key])
+                rsp_group.create_dataset(key, data=rsp_results[key])
 
         hf.close()
 

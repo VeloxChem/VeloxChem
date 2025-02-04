@@ -48,7 +48,7 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
 from .inputparser import get_random_string_parallel
-from .checkpoint import (check_rsp_hdf5, create_hdf5, write_rsp_solution,
+from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
                          write_rsp_hdf5, write_lr_rsp_results_to_hdf5)
 
 try:
@@ -538,10 +538,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 if (self.save_solutions and self.checkpoint_file is not None):
                     # replace .h5 in the checkpoint_file name by _results.h5
                     final_h5_fname = str(
-                        Path(self.checkpoint_file))[:-3] + '_results.h5'
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
+                        Path(self.checkpoint_file))[:-7] + '.h5'
 
             nto_lambdas = []
             nto_h5_files = []
