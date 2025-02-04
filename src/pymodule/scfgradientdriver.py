@@ -454,6 +454,19 @@ class ScfGradientDriver(GradientDriver):
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient().to_numpy()
 
+            # Embedding contribution to the gradient
+            if self.scf_driver._pe:
+                from .embedding import PolarizableEmbeddingGrad
+
+                # pass along emb object from scf, or make a new one? -> for ind dipoles.
+                self._embedding_drv = PolarizableEmbeddingGrad(
+                    molecule=molecule,
+                    ao_basis=basis,
+                    options=self.embedding_options,
+                    comm=self.comm)
+
+                self.gradient += self._embedding_drv.compute_pe_contributions(density_matrix=2.0 * D)
+
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
             if self.scf_driver._cpcm:
@@ -762,6 +775,19 @@ class ScfGradientDriver(GradientDriver):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient().to_numpy()
+
+            # Embedding contribution to the gradient
+            if self.scf_driver._pe:
+                from .embedding import PolarizableEmbeddingGrad
+
+                # pass along emb object from scf, or make a new one? -> for ind dipoles.
+                self._embedding_drv = PolarizableEmbeddingGrad(
+                    molecule=molecule,
+                    ao_basis=basis,
+                    options=self.embedding_options,
+                    comm=self.comm)
+
+                self.gradient += self._embedding_drv.compute_pe_contributions(density_matrix=Da + Db)
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI

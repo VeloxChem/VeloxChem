@@ -121,7 +121,6 @@ class EmbeddingIntegralDriver:
         return compute_electric_field_integrals(self.molecule, self.basis,
                                                 coordinates, induced_dipoles)
 
-
 class PolarizableEmbedding:
     """
     Implements the fragment-based polarizable embedding (PE) method.
@@ -398,3 +397,70 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
             integral_driver=self._integral_driver)
 
         return -1.0 * f_elec_induction
+
+class PolarizableEmbeddingGrad(PolarizableEmbedding):
+    """
+    Subclass for Gradient (Grad) calculations utilizing polarizable embedding.
+    """
+
+    def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+        super().__init__(molecule, ao_basis, options, comm, log_level)
+        # TODO read in from options gradient specific options?
+        self._e_es_nuc_grad = electrostatic_interactions.compute_electrostatic_nuclear_gradients(
+            quantum_subsystem=self.quantum_subsystem,
+            classical_subsystem=self.classical_subsystem)
+        self._f_elec_es_grad =electrostatic_interactions.es_fock_matrix_gradient_contributions(
+            classical_subsystem=self.classical_subsystem,
+            integral_driver=self._integral_driver
+            )
+        self._nuc_field_grad = self.quantum_subsystem.compute_nuclear_field_gradients(
+            coordinates=self.classical_subsystem.coordinates)
+        vdw_options = self.options['settings'].get('vdw', {})
+        self.vdw_method = vdw_options.get('method', 'LJ')
+        self.vdw_combination_rule = vdw_options.get('combination_rule',
+                                                    'Lorentz-Berthelot')
+
+        if 'vdw' in self.options['settings']:
+            self._e_vdw_grad = repulsion_interactions.compute_repulsion_interactions_gradient(
+                quantum_subsystem=self.quantum_subsystem,
+                classical_subsystem=self.classical_subsystem,
+                method=self.vdw_method,
+                combination_rule=self.vdw_combination_rule)
+
+            self._e_vdw_grad += dispersion_interactions.compute_dispersion_interactions_gradient(
+                quantum_subsystem=self.quantum_subsystem,
+                classical_subsystem=self.classical_subsystem,
+                method=self.vdw_method,
+                combination_rule=self.vdw_combination_rule)
+        else:
+            self._e_vdw = 0.0
+
+    def compute_pe_contributions(self, density_matrix):
+        # FIXME -> ind dipoles only necessary if not passed from scf results
+        if np.all(self.classical_subsystem.induced_dipoles.induced_dipoles == 0):
+            el_fields = self.quantum_subsystem.compute_electronic_fields(
+                coordinates=self.classical_subsystem.coordinates,
+                density_matrix=density_matrix,
+                integral_driver=self._integral_driver)
+
+            nuc_fields = self.quantum_subsystem.compute_nuclear_fields(
+                self.classical_subsystem.coordinates)
+
+            self.classical_subsystem.solve_induced_dipoles(
+                external_fields=(el_fields + nuc_fields),
+                threshold=self._threshold,
+                max_iterations=self._max_iterations,
+                solver=self._solver,
+                mic=self._mic,
+                box=self.simulation_box.box)
+        e_elec_es_grad = np.sum(self._f_elec_es_grad * density_matrix)
+        el_field_grad = self.quantum_subsystem.compute_electronic_field_gradients(
+            coordinates=self.classical_subsystem.coordinates,
+            density_matrix=density_matrix,
+            integral_driver=self._integral_driver
+            )
+        e_ind_grad = induction_interactions.compute_induction_energy_gradient(
+            induced_dipoles=self.classical_subsystem.induced_dipoles.induced_dipoles,
+            total_field_gradients=self._nuc_field_grad + el_field_grad)
+
+        return self._e_es_nuc_grad + e_elec_es_grad + e_ind_grad + self._e_vdw
