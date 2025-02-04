@@ -43,6 +43,9 @@
 #include "OverlapDriver.hpp"
 #include "OverlapGeomX00Driver.hpp"
 #include "OverlapGeomX0YDriver.hpp"
+#include "ThreeCenterOverlapDriver.hpp"
+#include "TwoCenterElectronRepulsionDriver.hpp"
+#include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
 
 namespace vlx_t2cintegrals {
 
@@ -394,6 +397,45 @@ export_t2cintegrals(py::module& m)
                 return dip_drv.compute(basis, molecule, TPoint<double>(origin), iatom);
             },
             "Computes the electric dipole momentum derivatives matrices for a given molecule, basis and selected atom.");
+    
+    
+    // CThreeCenterOverlapDriver class
+    PyClass<CThreeCenterOverlapDriver>(m, "ThreeCenterOverlapDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+             [](const CThreeCenterOverlapDriver&         t3ovl_drv,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                exponents,
+               const std::vector<double>&                factors,
+               const std::vector<std::array<double, 3>>& coords) -> std::shared_ptr<CMatrix> {
+                auto points = std::vector<TPoint<double>>();
+                points.reserve(coords.size());
+                std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+                   return std::make_shared<CMatrix>(t3ovl_drv.compute(exponents, factors, points, basis, molecule));
+            },
+            "Computes overlap matrix for given molecule, basis and vector of external scaled Gaussians.");
+    
+    // CTwoCenterElectronRepulsionDriver class
+    PyClass<CTwoCenterElectronRepulsionDriver>(m, "TwoCenterElectronRepulsionDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CTwoCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
+                return std::make_shared<CMatrix>(eri_drv.compute(basis, molecule));
+            },
+            "Computes electron repulsion matrix for given molecule and basis.");
+    
+    
+    // COverlapGeom100Driver class
+    PyClass<CTwoCenterElectronRepulsionGeomX00Driver<1>>(m, "TwoCenterElectronRepulsionGeom100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CTwoCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
+                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+            "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
 }
 
 }  // namespace vlx_t2cintegrals

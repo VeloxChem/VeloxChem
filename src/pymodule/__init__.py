@@ -25,6 +25,10 @@
 # C++ classes
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
+from .veloxchemlib import GtoBlock
+from .veloxchemlib import GtoPairBlock
+from .veloxchemlib import BlockedGtoPairBlock
+from .veloxchemlib import T3FlatBuffer
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
@@ -44,11 +48,16 @@ from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+from .veloxchemlib import ThreeCenterOverlapDriver
+from .veloxchemlib import ThreeCenterElectronRepulsionDriver
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
+from .veloxchemlib import RIFockDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
