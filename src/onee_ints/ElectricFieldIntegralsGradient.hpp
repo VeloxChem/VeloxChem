@@ -22,8 +22,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef ElectricFieldGradients_hpp
-#define ElectricFieldGradients_hpp
+#ifndef ElectricFieldIntegralsGradient_hpp
+#define ElectricFieldIntegralsGradient_hpp
 
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
@@ -31,8 +31,8 @@
 
 namespace onee {  // onee namespace
 
-auto computeElectricFieldGradients(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const double* dipole_moments, const int ndipoles, const double* D, const int naos) -> CDenseMatrix;
+auto computeElectricFieldIntegralsGradient(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const double* dipole_moments, const int ndipoles, const double* D, const int naos) -> CDenseMatrix;
 
 }  // namespace onee
 
-#endif /* ElectricFieldGradients_hpp */
+#endif /* ElectricFieldIntegralsGradient_hpp */

@@ -3,6 +3,7 @@ import numpy as np
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.veloxchemlib import compute_electric_field_integrals
+from veloxchem.veloxchemlib import compute_electric_field_integrals_gradient
 from veloxchem.veloxchemlib import compute_electric_field_values
 
 
@@ -529,6 +530,15 @@ class TestOneElecIntsElectricField:
         ref_ef_ints = self.get_ref_efield_ints()
 
         assert np.max(np.abs(ef_ints - ref_ef_ints)) < 1.0e-9
+
+        D = self.get_density_matrix()
+        ref_ef_ints_grad = np.array([[-0.01095448, 0.02786098, 0.05138568],
+                                     [-0.00363478, -0.00041103, 0.00387827],
+                                     [-0.00075801, 0.00065281, 0.00201409]])
+
+        ef_ints_grad = compute_electric_field_integrals_gradient(
+            mol, bas, dipole_coords, dipole_moments, D)
+        assert np.max(np.abs(ef_ints_grad - ref_ef_ints_grad)) < 1.0e-8
 
     def test_electric_field_values(self):
 

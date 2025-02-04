@@ -3,8 +3,8 @@ target_sources(vlxobjs
     AngularMomentumIntegrals.cpp
     BoysFuncTable.cpp
     ElectricFieldIntegrals.cpp
+    ElectricFieldIntegralsGradient.cpp
     ElectricFieldValues.cpp
-    ElectricFieldGradients.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
     NuclearPotentialValues.cpp

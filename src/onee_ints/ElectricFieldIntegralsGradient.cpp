@@ -22,7 +22,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "ElectricFieldGradients.hpp"
+#include "ElectricFieldIntegralsGradient.hpp"
 
 #include <omp.h>
 
@@ -45,13 +45,13 @@
 namespace onee {  // onee namespace
 
 auto
-computeElectricFieldGradients(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const double* dipole_moments, const int ndipoles, const double* D, const int naos) -> CDenseMatrix
+computeElectricFieldIntegralsGradient(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const double* dipole_moments, const int ndipoles, const double* D, const int naos) -> CDenseMatrix
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computeElectricFieldGradients: Inconsistent number of AOs"));
+            std::string("computeElectricFieldIntegralsGradient: Inconsistent number of AOs"));
 
     auto natoms = molecule.number_of_atoms();
 
@@ -131,7 +131,7 @@ computeElectricFieldGradients(const CMolecule& molecule, const CMolecularBasis& 
         }
         else
         {
-            std::string errangmom("computeElectricFieldGradients: Only implemented up to f-orbitals");
+            std::string errangmom("computeElectricFieldIntegralsGradient: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
