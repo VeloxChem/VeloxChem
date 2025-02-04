@@ -3,7 +3,8 @@ from contextlib import redirect_stdout
 import numpy as np
 
 from .veloxchemlib import (compute_electric_field_integrals,
-                           compute_electric_field_values)
+                           compute_electric_field_values,
+                           compute_electric_field_integrals_gradient)
 from .oneeints import compute_nuclear_potential_integrals
 from .errorhandler import assert_msg_critical
 
@@ -96,6 +97,30 @@ class EmbeddingIntegralDriver:
 
         return compute_electric_field_values(self.molecule, self.basis,
                                                     coordinates, density_matrix)
+
+    def electronic_induction_energy_gradient(self,
+                                             induced_dipoles:np.ndarray,
+                                             coordinates: np.ndarray,
+                                             density_matrix: np.ndarray) -> np.ndarray:
+        """Calculate the electronic induction energy gradients.
+
+        Args:
+            induced_dipoles: Induced dipoles
+                Shape (number of induced dipoles, 3)
+                Dtype: np.float64
+            coordinates: Coordinates on which the fields are to be evaluated.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64
+            density_matrix: Density Matrix that is the source of the electronic field.
+                Shape: (number of ao functions, number of ao functions)
+                Dtype: np.float64
+
+        Returns:
+            Electronic energy gradients. Shape: (number of nuclei, 3) Dtype: np.float64.
+        """
+
+        return compute_electric_field_integrals_gradient(
+            self.molecule, self.basis, coordinates, induced_dipoles, density_matrix)
 
     def induced_dipoles_potential_integrals(
             self, induced_dipoles: np.ndarray,
@@ -330,13 +355,13 @@ class PolarizableEmbeddingSCF(PolarizableEmbedding):
             total_fields=el_fields + nuc_fields +
             self.classical_subsystem.multipole_fields)
 
-        f_elec_induction = induction_interactions.ind_fock_matrix_contributions(
+        f_elec_ind = induction_interactions.ind_fock_matrix_contributions(
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver)
 
         e_emb = self._e_induction + self._e_nuc_es + e_elec_es + self._e_vdw
 
-        V_emb = self._f_elec_es - f_elec_induction
+        V_emb = self._f_elec_es - f_elec_ind
 
         self.pe_summary = []
 
@@ -392,11 +417,11 @@ class PolarizableEmbeddingLRS(PolarizableEmbedding):
             mic=self._mic,
             box=self.simulation_box.box)
 
-        f_elec_induction = induction_interactions.ind_fock_matrix_contributions(
+        f_elec_ind = induction_interactions.ind_fock_matrix_contributions(
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver)
 
-        return -1.0 * f_elec_induction
+        return -1.0 * f_elec_ind
 
 class PolarizableEmbeddingGrad(PolarizableEmbedding):
     """
@@ -437,6 +462,7 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
 
     def compute_pe_contributions(self, density_matrix):
         # FIXME -> ind dipoles only necessary if not passed from scf results
+        # usecase call gradients several times? -> yes different geometries though
         if np.all(self.classical_subsystem.induced_dipoles.induced_dipoles == 0):
             el_fields = self.quantum_subsystem.compute_electronic_fields(
                 coordinates=self.classical_subsystem.coordinates,
@@ -453,14 +479,13 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
                 solver=self._solver,
                 mic=self._mic,
                 box=self.simulation_box.box)
-        e_elec_es_grad = np.sum(self._f_elec_es_grad * density_matrix)
-        el_field_grad = self.quantum_subsystem.compute_electronic_field_gradients(
-            coordinates=self.classical_subsystem.coordinates,
+        # e_elec_es_grad = np.sum(self._f_elec_es_grad * density_matrix)
+        e_ind_el_grad = induction_interactions.compute_electronic_induction_energy_gradient(
             density_matrix=density_matrix,
-            integral_driver=self._integral_driver
-            )
-        e_ind_grad = induction_interactions.compute_induction_energy_gradient(
+            classical_subsystem=self.classical_subsystem,
+            integral_driver=self._integral_driver)
+        e_ind_nuc_grad = induction_interactions.compute_induction_energy_gradient(
             induced_dipoles=self.classical_subsystem.induced_dipoles.induced_dipoles,
-            total_field_gradients=self._nuc_field_grad + el_field_grad)
+            total_field_gradients=self._nuc_field_grad)
 
-        return self._e_es_nuc_grad + e_elec_es_grad + e_ind_grad + self._e_vdw
+        return self._e_es_nuc_grad + e_elec_es_grad + e_ind_nuc_grad + e_ind_el_grad + self._e_vdw
