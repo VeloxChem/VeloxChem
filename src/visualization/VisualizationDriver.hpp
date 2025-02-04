@@ -119,7 +119,6 @@ class CVisualizationDriver
      @param nmo the number of MOs.
      @param mocoefs the pointer to molecular orbitals coefficients.
      @param moidx the index of the molecular orbital (0-based).
-     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
     void compute_local_grid(CCubicGrid&               localgrid,
                             const CMolecule&          molecule,
@@ -127,8 +126,7 @@ class CVisualizationDriver
                             const int                 nao,
                             const int                 nmo,
                             const double*             mocoefs,
-                            const int                 moidx,
-                            const std::string&        mospin) const;
+                            const int                 moidx) const;
 
     /**
      Computes density values at local cubic grid point.
@@ -157,7 +155,6 @@ class CVisualizationDriver
      @param nmo the number of MOs.
      @param mocoefs the pointer to molecular orbitals coefficients.
      @param moidx the index of the molecular orbital (0-based).
-     @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
     std::vector<double> getMO(const std::vector<std::vector<double>>& coords,
                               const CMolecule&                        molecule,
@@ -165,8 +162,7 @@ class CVisualizationDriver
                               const int                               nao,
                               const int                               nmo,
                               const double*                           mocoefs,
-                              const int                               moidx,
-                              const std::string&                      mospin) const;
+                              const int                               moidx) const;
 
     /**
      Computes densities at given coordinates.

@@ -262,8 +262,7 @@ class VisualizationDriver:
                 cube_value = cube_value.replace('lumo', str(nelec + 1))
                 orb_id = eval(cube_value) - 1
 
-                self.compute(cubic_grid, molecule, basis, mo_coefs, orb_id,
-                             spin)
+                self.compute(cubic_grid, molecule, basis, mo_coefs, orb_id)
 
                 if self.rank == mpi_master():
                     self.write_data(fname, cubic_grid, molecule, 'mo', orb_id,
