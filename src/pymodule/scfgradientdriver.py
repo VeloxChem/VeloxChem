@@ -462,7 +462,7 @@ class ScfGradientDriver(GradientDriver):
                 self._embedding_drv = PolarizableEmbeddingGrad(
                     molecule=molecule,
                     ao_basis=basis,
-                    options=self.embedding_options,
+                    options=self.scf_driver.embedding_options,
                     comm=self.comm)
 
                 self.gradient += self._embedding_drv.compute_pe_contributions(density_matrix=2.0 * D)
@@ -784,7 +784,7 @@ class ScfGradientDriver(GradientDriver):
                 self._embedding_drv = PolarizableEmbeddingGrad(
                     molecule=molecule,
                     ao_basis=basis,
-                    options=self.embedding_options,
+                    options=self.scf_driver.embedding_options,
                     comm=self.comm)
 
                 self.gradient += self._embedding_drv.compute_pe_contributions(density_matrix=Da + Db)

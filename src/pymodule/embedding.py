@@ -5,7 +5,8 @@ import numpy as np
 from .veloxchemlib import (compute_electric_field_integrals,
                            compute_electric_field_values,
                            compute_electric_field_integrals_gradient)
-from .oneeints import compute_nuclear_potential_integrals
+from .oneeints import (compute_nuclear_potential_integrals,
+                       compute_nuclear_potential_gradient_bfs)
 from .errorhandler import assert_msg_critical
 
 try:
@@ -92,13 +93,58 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64
 
         Returns:
-            Electronic fields. Shape: (number of atoms, 3) Dtype: np.float64.
+            Electronic fields.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64.
         """
 
         return compute_electric_field_values(self.molecule, self.basis,
                                                     coordinates, density_matrix)
 
-    def electronic_induction_energy_gradient(self,
+
+    def electronic_electrostatic_energy_gradients(self,
+            multipole_coordinates: np.ndarray,
+            multipole_orders: np.ndarray,
+            multipoles: list[np.ndarray],
+            density_matrix: np.ndarray) -> np.ndarray:
+        """Calculate the electronic electrostatic energy gradients.
+
+        Args:
+            multipole_coordinates: Coordinates of the Multipoles.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64
+            multipole_orders: Multipole orders of all multipoles.
+                Shape: (number of atoms)
+                Dtype: np.int64
+            multipoles: Multipoles multiplied with degeneracy coefficients and
+                        taylor coefficients.
+                Shape: (number of atoms, number of multipole elements)
+                Dtype: np.float64
+            density_matrix: Density Matrix that is the source of the electronic field.
+                Shape: (number of ao functions, number of ao functions)
+                Dtype: np.float64
+
+        Returns:
+            Electronic electrostatic energy gradients.
+                Shape: (number of nuclei, 3)
+                Dtype: np.float64
+        """
+        op = 0
+        # 0 order
+        idx = np.where(multipole_orders >= 0)[0]
+        charge_coordinates = multipole_coordinates[idx]
+        charges = np.array([multipoles[i][0] for i in idx])
+
+        op += compute_nuclear_potential_gradient_bfs(
+            molecule=self.molecule,
+            basis=self.basis,
+            coordinates=charge_coordinates,
+            charges=charges,
+            density_matrix=density_matrix)
+        return op
+
+
+    def electronic_induction_energy_gradients(self,
                                              induced_dipoles:np.ndarray,
                                              coordinates: np.ndarray,
                                              density_matrix: np.ndarray) -> np.ndarray:
@@ -116,7 +162,9 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64
 
         Returns:
-            Electronic energy gradients. Shape: (number of nuclei, 3) Dtype: np.float64.
+            Electronic induction energy gradients.
+                Shape: (number of nuclei, 3)
+                Dtype: np.float64.
         """
 
         return compute_electric_field_integrals_gradient(
@@ -434,10 +482,10 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
         self._e_es_nuc_grad = electrostatic_interactions.compute_electrostatic_nuclear_gradients(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem=self.classical_subsystem)
-        self._f_elec_es_grad =electrostatic_interactions.es_fock_matrix_gradient_contributions(
-            classical_subsystem=self.classical_subsystem,
-            integral_driver=self._integral_driver
-            )
+        # self._f_elec_es_grad =electrostatic_interactions.es_fock_matrix_gradient_contributions(
+        #     classical_subsystem=self.classical_subsystem,
+        #     integral_driver=self._integral_driver
+        #     )
         self._nuc_field_grad = self.quantum_subsystem.compute_nuclear_field_gradients(
             coordinates=self.classical_subsystem.coordinates)
         vdw_options = self.options['settings'].get('vdw', {})
@@ -479,8 +527,11 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
                 solver=self._solver,
                 mic=self._mic,
                 box=self.simulation_box.box)
-        # e_elec_es_grad = np.sum(self._f_elec_es_grad * density_matrix)
-        e_ind_el_grad = induction_interactions.compute_electronic_induction_energy_gradient(
+        e_elec_es_grad = electrostatic_interactions.compute_electronic_electrostatic_energy_gradients(
+            density_matrix=density_matrix,
+            classical_subsystem=self.classical_subsystem,
+            integral_driver=self._integral_driver)
+        e_ind_el_grad = induction_interactions.compute_electronic_induction_energy_gradients(
             density_matrix=density_matrix,
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver)
@@ -488,4 +539,4 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
             induced_dipoles=self.classical_subsystem.induced_dipoles.induced_dipoles,
             total_field_gradients=self._nuc_field_grad)
 
-        return self._e_es_nuc_grad + e_ind_nuc_grad + e_ind_el_grad + self._e_vdw # + e_elec_es_grad
+        return self._e_es_nuc_grad + e_ind_nuc_grad + e_ind_el_grad + self._e_vdw + e_elec_es_grad
