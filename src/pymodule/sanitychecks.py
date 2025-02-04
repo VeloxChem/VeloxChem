@@ -38,8 +38,12 @@ def molecule_sanity_check(mol):
         The molecule.
     """
 
-    mol.check_multiplicity()
-    mol.check_proximity(0.1)
+    assert_msg_critical(
+        mol.check_multiplicity(),
+        'Molecule: Incompatible multiplicity and number of electrons')
+    assert_msg_critical(
+        mol.check_proximity(0.1),
+        'Molecule: Corrupted geometry with closely located atoms')
 
 
 def scf_results_sanity_check(obj, scf_results):
@@ -143,21 +147,6 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
             obj.ostream.print_warning(warn_msg)
         obj.ostream.flush()
 
-    # check grid level for Hessian calculation
-    if obj._dft and response_flag.lower() == 'hessian':
-        hessian_grid_level = max(6, get_default_grid_level(obj.xcfun))
-        if obj.grid_level is None:
-            dft_grid_level = get_default_grid_level(obj.xcfun)
-        else:
-            dft_grid_level = obj.grid_level
-        if dft_grid_level < hessian_grid_level:
-            warn_msg = 'DFT grid level for Hessian calculation is below the '
-            warn_msg += f'recommended value ({hessian_grid_level}). '
-            warn_msg += 'Please double check.'
-            obj.ostream.print_warning(warn_msg)
-            obj.ostream.print_blank()
-            obj.ostream.flush()
-
     # check if SCAN family of functional is used in nonliear response
     if obj._dft and response_flag.lower() == 'nonlinear':
         err_msg_scan = f'{type(obj).__name__}: Nonlinear response with '
@@ -224,7 +213,7 @@ def raman_sanity_check(obj):
                 obj.do_resonance_raman = False
             else:
                 obj.frequencies.pop(idx0)
-                warn_msg += 'It has been removed from the list.'
+                warn_msg += 'It has been removed from the list.\n'
                 warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
                 warn_msg += str(obj.frequencies)
             obj.ostream.print_warning(warn_msg)
@@ -382,3 +371,32 @@ def embedding_options_sanity_check(options):
         raise KeyError(
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
+
+
+def solvation_model_sanity_check(obj):
+    """
+    Checks solvation model and updates relevant attributes.
+    """
+
+    if obj.solvation_model is not None:
+        assert_msg_critical(
+            not obj._pe,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'polarizable embedding')
+
+        assert_msg_critical(
+            obj.point_charges is None,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'point charges')
+
+        assert_msg_critical(
+            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+            type(obj).__name__ +
+            ': Only the C-PCM solvation model is implemented.')
+
+        obj._cpcm = True
+
+    else:
+        obj._cpcm = False

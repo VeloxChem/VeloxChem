@@ -42,15 +42,17 @@ from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import make_matrix, mat_t
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
+from .griddriver import GridDriver
 from .scfgradientdriver import ScfGradientDriver
 from .hessiandriver import HessianDriver
 from .firstorderprop import FirstOrderProperties
 from .hessianorbitalresponse import HessianOrbitalResponse
 from .profiler import Profiler
 from .matrices import Matrices
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
@@ -95,6 +97,11 @@ class ScfHessianDriver(HessianDriver):
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
 
         self.use_subcomms = False
+
+        # option dictionaries from input
+        # TODO: cleanup
+        self.method_dict = {}
+        self.cphf_dict = {}
 
         self._input_keywords['hessian'].update({
             'orbrsp_only':
@@ -179,7 +186,6 @@ class ScfHessianDriver(HessianDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    # TODO: check if compute numerical works with MPI
     def compute_numerical(self, molecule, ao_basis):
         """
         Performs the calculation of a numerical Hessian based only
@@ -193,8 +199,11 @@ class ScfHessianDriver(HessianDriver):
 
         self.ostream.mute()
 
-        # atom labels
+        # atom labels and atom basis labels
         labels = molecule.get_labels()
+        atom_basis_labels = molecule.get_atom_basis_labels()
+
+        # main basis label
         basis_label = ao_basis.get_label()
 
         # number of atoms
@@ -219,10 +228,16 @@ class ScfHessianDriver(HessianDriver):
         grad_drv = ScfGradientDriver(self.scf_driver)
 
         for i in range(natm):
+
+            self.ostream.unmute()
+            self.ostream.print_info(f'Processing atom {i + 1}/{natm}...')
+            self.ostream.flush()
+            self.ostream.mute()
+
             for x in range(3):
 
                 coords[i, x] += self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 new_bas = MolecularBasis.read(new_mol, basis_label)
@@ -235,7 +250,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_plus = prop.get_property('dipole moment')
 
                 coords[i, x] -= 2.0 * self.delta_h
-                new_mol = Molecule(labels, coords, units='au')
+                new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
                 new_mol.set_charge(charge)
                 new_mol.set_multiplicity(multiplicity)
                 new_bas = MolecularBasis.read(new_mol, basis_label)
@@ -258,7 +273,7 @@ class ScfHessianDriver(HessianDriver):
                                                    (2.0 * self.delta_h))
 
         # reshaped Hessian as member variable
-        self.hessian = hessian.reshape(3 * natm, 3 * natm)
+        self.hessian = hessian.reshape(natm * 3, natm * 3)
 
         # restore scf_drv to initial state
         scf_results = self.scf_driver.compute(molecule, ao_basis)
@@ -278,10 +293,19 @@ class ScfHessianDriver(HessianDriver):
             The profiler.
         """
 
+        assert_msg_critical(
+            self.scf_driver.scf_type == 'restricted',
+            'ScfHessianDriver: Analytical gradient only implemented ' +
+            'for restricted case')
+
+        assert_msg_critical(
+            self.scf_driver.solvation_model is None,
+            'ScfHessianDriver: Solvation model not implemented')
+
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_tensors)
-        dft_sanity_check(self, 'compute', 'hessian')
+        dft_sanity_check(self, 'compute')
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
@@ -315,6 +339,7 @@ class ScfHessianDriver(HessianDriver):
         # CPHF equations
 
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # TODO: double check propagation of cphf settings
         profiler_keywords = {
@@ -424,6 +449,19 @@ class ScfHessianDriver(HessianDriver):
 
         thresh_int = int(-math.log10(self.scf_driver.eri_thresh))
 
+        if self.scf_driver.point_charges is not None:
+            mm_coords = []
+            mm_charges = []
+            npoints = self.scf_driver.point_charges.shape[1]
+            for p in range(npoints):
+                xyz_p = self.scf_driver.point_charges[:3, p]
+                chg_p = self.scf_driver.point_charges[3, p]
+                mm_coords.append(xyz_p.copy())
+                mm_charges.append(chg_p)
+        else:
+            mm_coords = None
+            mm_charges = None
+
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
@@ -474,6 +512,20 @@ class ScfHessianDriver(HessianDriver):
 
             npot_hess_200_mats = Matrices()
             npot_hess_020_mats = Matrices()
+
+            if self.scf_driver.point_charges is not None:
+                hmats_200 = npot_hess_200_drv.compute(molecule, ao_basis, i,
+                                                      mm_coords, mm_charges)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        npot_label = label_x + label_y if x <= y else label_y + label_x
+                        npot_200_iixy = hmats_200.matrix_to_numpy(npot_label)
+                        # TODO: move minus sign into function call (such as in oneints)
+                        hessian_2nd_order_derivatives[i, i, x, y] += -2.0 * (
+                            np.sum(density * (npot_200_iixy + npot_200_iixy.T)))
+
+                hmats_200 = Matrices()
 
             screener_atom_i = T4CScreener()
             screener_atom_i.partition_atom(ao_basis, molecule, 'eri', i)
@@ -551,6 +603,20 @@ class ScfHessianDriver(HessianDriver):
             npot_hess_110_mats_ji = Matrices()
             npot_hess_101_mats = Matrices()
 
+            if self.scf_driver.point_charges is not None:
+                hmats_101 = npot_hess_101_drv.compute(molecule, ao_basis, i, j,
+                                                      mm_coords, mm_charges)
+
+                for x, label_x in enumerate('XYZ'):
+                    for y, label_y in enumerate('XYZ'):
+                        npot_xy_label = f'{label_x}_{label_y}'
+                        npot_101_ijxy = hmats_101.matrix_to_numpy(npot_xy_label)
+                        # TODO: move minus sign into function call (such as in oneints)
+                        hessian_2nd_order_derivatives[i, j, x, y] += -2.0 * (
+                            np.sum(density * (npot_101_ijxy + npot_101_ijxy.T)))
+
+                hmats_101 = Matrices()
+
             screener_atom_pair = T4CScreener()
             screener_atom_pair.partition_atom_pair(ao_basis, molecule, 'eri', i,
                                                    j)
@@ -589,11 +655,93 @@ class ScfHessianDriver(HessianDriver):
 
         # DFT:
         if self._dft:
+            grid_drv = GridDriver(self.comm)
+            grid_level = (get_default_grid_level(self.scf_driver.xcfun)
+                          if self.scf_driver.grid_level is None else
+                          self.scf_driver.grid_level)
+            # make sure to use high grid level for DFT Hessian
+            if molecule.get_charge() == 0:
+                grid_level = max(6, grid_level)
+            else:
+                grid_level = max(7, grid_level)
+            grid_drv.set_level(grid_level)
+            mol_grid = grid_drv.generate(molecule)
+
             xc_mol_hess = XCMolecularHessian()
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(
-                molecule, ao_basis, [density], self.scf_driver._mol_grid,
+                molecule, ao_basis, [density], mol_grid,
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
+
+        # nuclei-point charges contribution
+        if self.scf_driver.point_charges is not None:
+
+            hessian_point_charges = np.zeros((natm, natm, 3, 3))
+
+            qm_coords = molecule.get_coordinates_in_bohr()
+            nuclear_charges = molecule.get_element_ids()
+
+            for i in range(self.rank, natm, self.nodes):
+                q_i = nuclear_charges[i]
+                xyz_i = qm_coords[i]
+
+                for j in range(len(mm_charges)):
+                    q_j = mm_charges[j]
+                    xyz_j = mm_coords[j]
+
+                    vec_ij = xyz_j - xyz_i
+                    rij = np.linalg.norm(vec_ij)
+
+                    hess_ii = q_i * q_j * (3.0 * np.outer(vec_ij, vec_ij) /
+                                           rij**5 - np.eye(3) / rij**3)
+
+                    hessian_point_charges[i, i, :, :] += hess_ii
+
+            if self.scf_driver.qm_vdw_params is not None:
+
+                for i in range(self.rank, natm, self.nodes):
+                    xyz_i = qm_coords[i]
+                    sigma_i = self.scf_driver.qm_vdw_params[i, 0]
+                    epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
+
+                    for j in range(len(mm_charges)):
+                        xyz_j = self.scf_driver.point_charges[:3, j]
+                        sigma_j = self.scf_driver.point_charges[4, j]
+                        epsilon_j = self.scf_driver.point_charges[5, j]
+
+                        vec_ij = xyz_j - xyz_i
+
+                        # convert vector to nm
+                        vec_ij *= bohr_in_angstrom() * 0.1
+
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
+
+                        if epsilon_ij == 0.0:
+                            continue
+
+                        rij = np.linalg.norm(vec_ij)
+                        inv_r2 = 1.0 / rij**2
+                        inv_r4 = inv_r2**2
+
+                        sigma_r_6 = (sigma_ij / rij)**6
+                        sigma_r_12 = sigma_r_6**2
+
+                        coef_rr = (28.0 * sigma_r_12 - 8.0 * sigma_r_6) * inv_r4
+                        coef_I = (2.0 * sigma_r_12 - sigma_r_6) * inv_r2
+
+                        hess_ii = 24.0 * epsilon_ij * (
+                            coef_rr * np.outer(vec_ij, vec_ij) -
+                            coef_I * np.eye(3))
+
+                        # convert hessian to atomic unit
+                        hess_ii /= (4.184 * hartree_in_kcalpermol() *
+                                    (10.0 / bohr_in_angstrom())**2)
+
+                        hessian_point_charges[i, i, :, :] += hess_ii
+
+            hessian_point_charges = self.comm.reduce(hessian_point_charges,
+                                                     root=mpi_master())
 
         if self.rank == mpi_master():
 
@@ -605,6 +753,9 @@ class ScfHessianDriver(HessianDriver):
                 hessian_first_order_derivatives +
                 hessian_2nd_order_derivatives.transpose(0, 2, 1, 3) +
                 hessian_nuclear_nuclear.transpose(0, 2, 1, 3))
+
+            if self.scf_driver.point_charges is not None:
+                self.hessian += hessian_point_charges.transpose(0, 2, 1, 3)
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 

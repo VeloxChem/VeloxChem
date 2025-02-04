@@ -75,6 +75,8 @@ monkey:cmake_build:
         numpy
         pybind11[global]
     - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
+    - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
+    - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
     - cmake
         -S.
         -Bbuild

@@ -328,7 +328,11 @@ class ExcitonModelDriver:
 
             mol = molecule.slice(atomlist)
             mol.set_charge(self.charges[ind])
-            mol.check_multiplicity()
+
+            assert_msg_critical(
+                mol.check_multiplicity(),
+                'Molecule: Incompatible multiplicity and number of electrons')
+
             monomer_molecules.append(mol)
 
             bas = basis.slice(atomlist)
@@ -509,7 +513,10 @@ class ExcitonModelDriver:
 
                 # dimer molecule
                 dimer = Molecule(monomer_a, monomer_b)
-                dimer.check_multiplicity()
+
+                assert_msg_critical(
+                    dimer.check_multiplicity(),
+                    'Molecule: Incompatible multiplicity and number of electrons')
 
                 dimer_bas = basis.slice(monomer_atomlists[ind_A] +
                                         monomer_atomlists[ind_B])

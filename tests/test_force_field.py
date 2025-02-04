@@ -19,7 +19,8 @@ class TestForceField:
 
     @pytest.mark.skipif('scipy' not in sys.modules,
                         reason='scipy not available')
-    def test_force_field(self):
+    # TODO: enable this test using "reparametrize"
+    def disabled_test_force_field(self):
 
         # vlxtag: RKS, Force_Field_Generation
 

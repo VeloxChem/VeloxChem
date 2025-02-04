@@ -8,6 +8,7 @@ dependencies:
   - cxx-compiler
   - mpich
   - openblas=*=*openmp*
+  - eigen
   - mpi4py
   - numpy
   - h5py
@@ -21,11 +22,12 @@ dependencies:
   - mdanalysis
   - openmm
   - scipy
-  - openbabel
+  - rdkit
   - xtb
   - geometric
-  - libxc<7
+  - libxc
   - clang-format
   - yapf
   - toml
   - flake8
+  - pymbar

@@ -73,6 +73,15 @@ class CAOKohnShamMatrix
     CAOKohnShamMatrix(const int nRows, const int nColumns, const bool xcRestricted);
 
     /**
+    Creates a AO Kohn-Sham matrix object.
+
+    @param nRows the number of rows in exchange-correlation matrices.
+    @param nColumns the numner of columns in exchange-correlation matrices.
+    @param flag the string flag indicating restricted on unrestricted form of Kohn-Sham matrix.
+    */
+    CAOKohnShamMatrix(const int nRows, const int nColumns, const std::string& flag);
+
+    /**
      Creates a AO Kohn-Sham matrix object by copying other AO Kohn-Sham matrix object.
 
      @param source the AO Kohn-Sham matrix object.

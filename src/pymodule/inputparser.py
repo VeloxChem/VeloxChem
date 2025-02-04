@@ -154,7 +154,9 @@ class InputParser:
 
             for line in input_groups[group]:
                 if ':' in line:
-                    key, value = line.split(':')
+                    content = line.split(':')
+                    key = content[0]
+                    value = ':'.join(content[1:])
                     key = '_'.join(key.strip().lower().split())
                     value = value.strip()
                     if value:
@@ -513,7 +515,9 @@ def get_random_string_serial():
     """
 
     datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
-    datetime_string = datetime_string.replace(':', '.')
+    datetime_string = datetime_string.replace('-', '')
+    datetime_string = datetime_string.replace('T', '_')
+    datetime_string = datetime_string.replace(':', '')
 
     random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
 

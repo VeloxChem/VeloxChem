@@ -32,11 +32,13 @@
 #include <algorithm>
 #include <vector>
 
+#include "DenseMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
+#include "LebedevLaikovQuadrature.hpp"
 #include "MolecularGrid.hpp"
 #include "XCComponent.hpp"
 #include "XCFunctional.hpp"
@@ -280,7 +282,7 @@ CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
 
     // Create output tensors
 
-    CAOKohnShamMatrix matrixVxc(naos, naos, true);
+    CAOKohnShamMatrix matrixVxc(naos, naos, std::string("closedshell"));
     matrixVxc.zero();
 
     CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
@@ -294,7 +296,7 @@ CXCIntegrator_integrate_vxc_pdft(const CXCIntegrator&       self,
     return returnList;
 }
 
-auto
+static auto
 CXCMolecularGradient_integrate_vxc_gradient(CXCMolecularGradient&                   self,
                                             const CMolecule&                        molecule,
                                             const CMolecularBasis&                  basis,
@@ -319,7 +321,7 @@ CXCMolecularGradient_integrate_vxc_gradient(CXCMolecularGradient&               
     return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
 }
 
-auto
+static auto
 CXCMolecularGradient_integrate_fxc_gradient(CXCMolecularGradient&                   self,
                                             const CMolecule&                        molecule,
                                             const CMolecularBasis&                  basis,
@@ -348,7 +350,7 @@ CXCMolecularGradient_integrate_fxc_gradient(CXCMolecularGradient&               
     return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
 }
 
-auto
+static auto
 CXCMolecularGradient_integrate_kxc_gradient(CXCMolecularGradient&                   self,
                                             const CMolecule&                        molecule,
                                             const CMolecularBasis&                  basis,
@@ -377,7 +379,7 @@ CXCMolecularGradient_integrate_kxc_gradient(CXCMolecularGradient&               
     return vlx_general::pointer_to_numpy(molgrad.values(), {molgrad.getNumberOfRows(), molgrad.getNumberOfColumns()});
 }
 
-auto
+static auto
 CXCMolecularHessian_integrate_exc_hessian(CXCMolecularHessian&       self,
                                           const CMolecule&           molecule,
                                           const CMolecularBasis&     basis,
@@ -397,14 +399,14 @@ CXCMolecularHessian_integrate_exc_hessian(CXCMolecularHessian&       self,
     return vlx_general::pointer_to_numpy(molhess.values(), {molhess.getNumberOfRows(), molhess.getNumberOfColumns()});
 }
 
-auto
+static auto
 CXCMolecularHessian_integrate_vxc_fock_gradient(CXCMolecularHessian&       self,
                                                 const CMolecule&           molecule,
                                                 const CMolecularBasis&     basis,
                                                 const std::vector<py::array_t<double>>& gsDensityArrays,
                                                 const CMolecularGrid&      molecularGrid,
                                                 const std::string&         xcFuncLabel,
-                                                const int                  atomIdx) -> py::array_t<double>
+                                                const std::vector<int>&    atomIdxVec) -> py::array_t<double>
 {
     auto        num_gs_dens = static_cast<int>(gsDensityArrays.size());
     std::string errnum("integrate_vxc_fock_gradient: Inconsistent number of numpy arrays");
@@ -414,16 +416,19 @@ CXCMolecularHessian_integrate_vxc_fock_gradient(CXCMolecularHessian&       self,
     check_arrays("integrate_vxc_fock_gradient", gsDensityArrays, nao);
 
     auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
-    auto vxcgrad          = self.integrateVxcFockGradient(molecule, basis, gs_dens_pointers, molecularGrid, xcFuncLabel, atomIdx);
+    auto vxcgrad          = self.integrateVxcFockGradient(molecule, basis, gs_dens_pointers, molecularGrid, xcFuncLabel, atomIdxVec);
 
     py::list ret;
-    ret.append(vlx_general::pointer_to_numpy(vxcgrad[0].values(), {nao, nao}));
-    ret.append(vlx_general::pointer_to_numpy(vxcgrad[1].values(), {nao, nao}));
-    ret.append(vlx_general::pointer_to_numpy(vxcgrad[2].values(), {nao, nao}));
+    for (int vecind = 0; vecind < static_cast<int>(atomIdxVec.size()); vecind++)
+    {
+        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 0].values(), {nao, nao}));
+        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 1].values(), {nao, nao}));
+        ret.append(vlx_general::pointer_to_numpy(vxcgrad[vecind * 3 + 2].values(), {nao, nao}));
+    }
     return ret;
 }
 
-auto
+static auto
 CXCIntegrator_integrate_vxc_pdft_gradient(CXCMolecularGradient&       self,
                    const CMolecule&           molecule,
                    const CMolecularBasis&     basis,
@@ -514,6 +519,7 @@ export_dft(py::module& m)
     PyClass<CAOKohnShamMatrix>(m, "AOKohnShamMatrix")
         .def(py::init<>())
         .def(py::init<int, int, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
+        .def(py::init<int, int, std::string&>(), "nrows"_a, "ncols"_a, "flag"_a)
         .def(
             "alpha_to_numpy",
             [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
@@ -816,8 +822,8 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const std::string&                      xcFuncLabel,
-               const int                               atomIdx) -> py::array_t<double> {
-                return CXCMolecularHessian_integrate_vxc_fock_gradient(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel, atomIdx);
+               const std::vector<int>&                 atomIdxVec) -> py::array_t<double> {
+                return CXCMolecularHessian_integrate_vxc_fock_gradient(self, molecule, basis, gsDensityArrays, molecularGrid, xcFuncLabel, atomIdxVec);
             },
             "Integrates exchange-correlation contribution to Vxc gradient.",
             "molecule"_a,
@@ -825,7 +831,7 @@ export_dft(py::module& m)
             "gsDensityArrays"_a,
             "molecularGrid"_a,
             "xcFuncLabel"_a,
-            "atomIdx"_a);
+            "atomIdxVec"_a);
 
     // XCComponent class
     PyClass<CXCComponent>(m, "XCComponent")
@@ -880,6 +886,29 @@ export_dft(py::module& m)
           &vxcfuncs::getExchangeCorrelationFunctional,
           "Converts exchange-correlation functional label to exchange-correlation functional object.",
           "xcLabel"_a);
+
+    m.def(
+        "gen_lebedev_grid",
+        [](const int napoints) -> py::array_t<double> {
+            CLebedevLaikovQuadrature aquad(napoints);
+            auto                     apoints = aquad.generate();
+            auto                     rax     = apoints.row(0);
+            auto                     ray     = apoints.row(1);
+            auto                     raz     = apoints.row(2);
+            auto                     raw     = apoints.row(3);
+            std::vector<double>      grid(napoints * 4);
+            for (int g = 0; g < napoints; g++)
+            {
+                grid[g * 4 + 0] = rax[g];
+                grid[g * 4 + 1] = ray[g];
+                grid[g * 4 + 2] = raz[g];
+                grid[g * 4 + 3] = raw[g];
+            }
+            return vlx_general::pointer_to_numpy(grid.data(), {napoints, 4});
+        },
+        "Generates Lebedev grid points.",
+        "napoints"_a);
+
 }
 
 }  // namespace vlx_dft
