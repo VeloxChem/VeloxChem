@@ -29,6 +29,7 @@ import numpy as np
 import time as tm
 import tempfile
 import math
+import h5py
 
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol
 from .molecule import Molecule
@@ -417,12 +418,14 @@ class OptimizationDriver:
                     ]
 
                     opt_results['scan_geometries'] = []
+                    opt_results['scan_coordinates_au'] = []
                     labels = molecule.get_labels()
                     for opt_coords_au in all_coords_au:
                         mol = Molecule(labels, opt_coords_au[-1], 'au',
                                        atom_basis_labels)
                         opt_results['scan_geometries'].append(
                             mol.get_xyz_string())
+                        opt_results['scan_coordinates_au'].append(opt_coords_au[-1])
 
                 else:
                     self.print_opt_result(m)
@@ -430,12 +433,14 @@ class OptimizationDriver:
                     opt_results['opt_energies'] = list(m.qm_energies)
 
                     opt_results['opt_geometries'] = []
+                    opt_results['opt_coordinates_au'] = []
                     labels = molecule.get_labels()
                     for xyz in m.xyzs:
                         mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
                                        'au', atom_basis_labels)
                         opt_results['opt_geometries'].append(
                             mol.get_xyz_string())
+                        opt_results['opt_coordinates_au'].append(xyz / geometric.nifty.bohr2ang) 
 
                     if self.ref_xyz:
                         self.print_ic_rmsd(final_mol, self.ref_xyz)
@@ -450,6 +455,10 @@ class OptimizationDriver:
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
+
+                # Write opt results to checkpoint file
+                final_checkpoint_file_name = filename + "_opt_results.h5"
+                self._write_final_hdf5(final_checkpoint_file_name, final_mol, opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
 
@@ -883,3 +892,59 @@ class OptimizationDriver:
 
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
+
+    def _write_final_hdf5(self, fname, molecule, opt_results):
+        """
+        Creats a HDF5 file and saves the optimization results.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param molecule:
+            The molecule.
+        :param opt_results:
+            The dictionary of optimzation results.
+        """
+
+        valid_checkpoint = (fname and isinstance(fname, str))
+
+        if valid_checkpoint:
+            hf = h5py.File(fname, 'w')
+
+            # Save molecule data -- final geometry:
+            hf.create_dataset('nuclear_charges', data=molecule.get_element_ids())
+
+            hf.create_dataset("atom_coordinates", data=molecule.get_coordinates_in_bohr())
+
+            hf.create_dataset("number_of_atoms", data=np.array(molecule.number_of_atoms()))
+
+            hf.create_dataset('number_of_alpha_electrons',
+                              data=np.array([molecule.number_of_alpha_electrons()]))
+
+            hf.create_dataset('number_of_beta_electrons',
+                              data=np.array([molecule.number_of_beta_electrons()]))
+
+            hf.create_dataset('molecular_charge',
+                              data=np.array([molecule.get_charge()]))
+
+            hf.create_dataset('spin_multiplicity',
+                          data=np.array([molecule.get_multiplicity()]))
+
+            # Check if it is a scan job or not
+            if 'scan_energies' in opt_results.keys():
+                hf.create_dataset("scan_energies", data=opt_results["scan_energies"])
+
+                hf.create_dataset("scan_coordinates_au",
+                                  data=np.array(opt_results["scan_coordinates_au"]))
+            else:
+                hf.create_dataset("opt_energies", data=opt_results["opt_energies"])
+
+                hf.create_dataset("opt_coordinates_au",
+                                  data=np.array(opt_results["opt_coordinates_au"]))
+
+            valstr = 'Optimization results written to file: '
+            valstr += fname
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            hf.close()
