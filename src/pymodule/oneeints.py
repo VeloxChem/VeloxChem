@@ -22,12 +22,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+import numpy as np
+
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
+from .veloxchemlib import NuclearPotentialGeom100Driver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
+from .matrices import Matrices
 
 
 def compute_overlap_integrals(molecule, basis):
@@ -117,3 +121,43 @@ def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):
         -1.0 * dip_mats.matrix_to_numpy('Y'),
         -1.0 * dip_mats.matrix_to_numpy('Z'),
     ])
+
+
+def compute_nuclear_potential_gradient_bfs(molecule, basis, charges,
+                                           coordinates, D):
+    """
+    Computes nuclear potential integrals contribution from point charges to
+    molecular gradient.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The molecular basis set.
+    :param charges:
+        The point charges.
+    :param coordinates:
+        The coordinates of point charges.
+
+    :return:
+        The nuclear potential integral contribution to molecular gradient.
+    """
+
+    natoms = molecule.number_of_atoms()
+
+    grad = np.zeros((natoms, 3))
+
+    npot_grad_100_drv = NuclearPotentialGeom100Driver()
+
+    for iatom in range(natoms):
+        gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                              coordinates, charges)
+
+        for i, label in enumerate(['X', 'Y', 'Z']):
+            gmat_100 = gmats_100.matrix_to_numpy(label)
+
+            grad[iatom, i] += np.sum((gmat_100 + gmat_100.T) * D)
+
+        gmats_100 = Matrices()
+
+    # Note: factor -1.0 for electron charge
+    return -1.0 * grad
