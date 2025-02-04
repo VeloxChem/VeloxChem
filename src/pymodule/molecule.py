@@ -903,7 +903,7 @@ def _Molecule_show(self,
                 if atom_labels:
                     text += f'{labels[i]}'
                 if atom_indices:
-                    text += f'{i + 1}'
+                    text += f'{i}'
                 viewer.addLabel(
                     text, {
                         'position': {

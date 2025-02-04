@@ -48,8 +48,8 @@ class EvbForceFieldBuilder():
 
         self.input_folder: str = "input_files"
 
-        self.reactant: ForceFieldGenerator
-        self.products: list[ForceFieldGenerator]
+        self.reactant: ForceFieldGenerator = None
+        self.products: list[ForceFieldGenerator] = None
         self.gaff_path = None
         pass
 
@@ -86,32 +86,15 @@ class EvbForceFieldBuilder():
                     self.optimise,
                 ))
 
-
         rea_elems = self.reactant.molecule.get_element_ids()
         pro_elems = [
             element_id
-            for pro_ff in self.products
+            for pro_ff in products
             for element_id in pro_ff.molecule.get_element_ids()
         ]
 
-        #todo all this stuff should get removed, at least moved to a higher class, don't want to be managing files here
-        # Get all files and directories in the current directory
-        # items = os.listdir(".")
-
-        # for item in items:
-        #     # If the item starts with 'vlx_'
-        #     if item.startswith("vlx_"):
-        #         # Construct full item path
-        #         item_path = os.path.join(".", item)
-        #         # If it's a file, remove it
-        #         if os.path.isfile(item_path):
-        #             os.remove(item_path)
-        #         # If it's a directory, remove it including all its content
-        #         elif os.path.isdir(item_path):
-        #             shutil.rmtree(item_path)
-
         # Never merge the reactant forcefield generators, for these we actually need positions
-        self.product= self._create_combined_forcefield(products)
+        self.product = self._create_combined_forcefield(products)
         
         if not ordered_input:
             self.product = self._match_reactant_and_product(self.reactant, rea_elems,self.product, pro_elems, breaking_bonds)
@@ -214,8 +197,8 @@ class EvbForceFieldBuilder():
         return forcefield
 
     #Match the indices of the reactant and product forcefield generators
-    @staticmethod
     def _match_reactant_and_product(
+        self,
         reactant_ff: ForceFieldGenerator,
         rea_elems: list,
         product_ff: ForceFieldGenerator,
@@ -244,7 +227,7 @@ class EvbForceFieldBuilder():
             pro_graph.nodes[i]['elem'] = elem
             
 
-        total_mapping = ReactionMatcher._match_reaction_graphs(rea_graph, pro_graph)
+        total_mapping = ReactionMatcher.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
         EvbForceFieldBuilder._apply_mapping_to_forcefield(product_ff, total_mapping)

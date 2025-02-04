@@ -1,5 +1,5 @@
 import sys
-
+from pathlib import Path
 # from EVB.timer import Timer
 # from EVB.system_builder import System_builder
 
@@ -41,13 +41,11 @@ class FepDriver():
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.systems: dict
-        self.topology: mmapp.Topology
-        self.Lambda: list
+        self.systems: dict = None
+        self.topology: mmapp.Topology = None
+        self.Lambda: list = None
 
         self.constrain_H: bool = True
-        
-        
 
     def run_FEP(
         self,
@@ -78,24 +76,14 @@ class FepDriver():
         assert (total_sample_steps >= 2 * write_step), "total_sample_steps must be at least 2*write_step"
 
         self.total_snapshots = total_sample_steps / write_step * len(self.Lambda)
-        self.ostream.print_info("Lambda: ", self.Lambda)
-        self.ostream.print_info("Total lambda points: ", len(self.Lambda))
-        self.ostream.print_info("Snapshots per lambda: ", total_sample_steps / write_step)
-        self.ostream.print_info(
-            "Snapshots to be recorded: ",
-            self.total_snapshots,
-        )
-        self.ostream.print_info(
-            "Total simulation steps: ",
-            (total_sample_steps + equilliberation_steps) * len(self.Lambda) + lambda_0_equilliberation_steps,
-        )
-        self.ostream.print_info("System time per snapshot: ", step_size * write_step, " ps")
-        self.ostream.print_info("System time per frame: ", step_size * total_sample_steps, " ps")
-        self.ostream.print_info(
-            "Total system time: ",
-            step_size * total_sample_steps * len(self.Lambda),
-            " ps",
-        )
+        self.ostream.print_info(f"Lambda: {self.Lambda}")
+        self.ostream.print_info(f"Total lambda points: {len(self.Lambda)}")
+        self.ostream.print_info(f"Snapshots per lambda: {total_sample_steps / write_step}")
+        self.ostream.print_info(f"Snapshots to be recorded: {self.total_snapshots}")
+        self.ostream.print_info(f"Total simulation steps: {(total_sample_steps + equilliberation_steps) * len(self.Lambda) + lambda_0_equilliberation_steps}")
+        self.ostream.print_info(f"System time per snapshot: {step_size * write_step} ps")
+        self.ostream.print_info(f"System time per frame: {step_size * total_sample_steps} ps")
+        self.ostream.print_info(f"Total system time: {step_size * total_sample_steps * len(self.Lambda)} ps",)
         integrator_temperature = temperature * mmunit.kelvin  #type: ignore
         integrator_friction_coeff = 1 / mmunit.picosecond
         # integrator_step_size = 0.001 * unit.picoseconds
@@ -168,6 +156,7 @@ class FepDriver():
             if l == 0:
                 simulation.integrator.setStepSize(initial_equil_step_size * mmunit.picoseconds)
                 self.ostream.print_info(f"Running initial equilliberation with step size {simulation.integrator.getStepSize()}")
+                self.ostream.flush()
                 simulation.step(lambda_0_equilliberation_steps)
                 timer.start()
 
@@ -176,6 +165,7 @@ class FepDriver():
             # todo add lambda value to the reporter
             simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
             self.ostream.print_info(f"Running equilliberation with step size {simulation.integrator.getStepSize()}")
+            self.ostream.flush()
             simulation.step(equilliberation_steps)
 
             equil_positions = simulation.context.getState(getPositions=True).getPositions()
@@ -222,7 +212,7 @@ class FepDriver():
 
             self.ostream.print_info(f"Running sampling with step size {runsimulation.integrator.getStepSize()}")
             
-                
+            self.ostream.flush()    
             runsimulation.step(total_sample_steps)
             state = runsimulation.context.getState(getPositions=True)
             positions = state.getPositions()
@@ -239,8 +229,9 @@ class FepDriver():
         self.ostream.print_info("merging data files")
 
         data = np.array([]).reshape(0, 5)
+        data_folder_path = Path().cwd() / self.data_folder
         np.savetxt(
-            f"{self.data_folder}/Data_combined.dat",
+            data_folder_path / "Data_combined.dat",
             data,
             header=
             """Step, Potential Energy (kJ/mole), Kinetic Energy (kJ/mole), Temperature (K), Box Volume (nm^3), Density (g/mL), Lambda"""
@@ -255,19 +246,20 @@ class FepDriver():
             data[:, 0] += step
             step = data[-1, 0]
             data = np.column_stack((data, np.full(data.shape[0], l)))
-
-            with open(f"{self.data_folder}/Data_combined.dat", "ab") as f:
+            data_path = data_folder_path / "Data_combined.dat"
+            with open(data_path, "ab") as f:
                 np.savetxt(f, data)
 
     def merge_traj_pdb(self):
         self.ostream.print_info("merging pdb files")
         output = ""
-        with open(f"{self.data_folder}/traj_combined.pdb", "w", encoding="utf-8") as file:
+        traj_path = Path().cwd() / self.data_folder / "traj_combined.pdb"
+        with open(traj_path, "w", encoding="utf-8") as file:
             file.write(output)
         frame = 1
         crystline = None
         for l in self.Lambda:
-            self.ostream.print_info("Lambda = ", l)
+            self.ostream.print_info(f"Lambda = {l}")
             filename = f"{self.run_folder}/traj{l:.3f}.pdb"
 
             with open(filename, "r", encoding="utf-8") as file:
@@ -293,13 +285,13 @@ class FepDriver():
 
                 output += line + "\n"
             # Write every frame seperately already to the file and empty the output string, otherwise the output string will become too large to handle nicely
-            with open(f"{self.data_folder}/traj_combined.pdb", "a", encoding="utf-8") as file:
+            with open(traj_path, "a", encoding="utf-8") as file:
                 file.write(output)
             output = ""
         if crystline:
             output += crystline + "\n"
         output += "END"
-        with open(f"{self.data_folder}/traj_combined.pdb", "a", encoding="utf-8") as file:
+        with open(traj_path, "a", encoding="utf-8") as file:
             file.write(output)
 
     # The variable names need documentation and/or renaming
@@ -361,17 +353,19 @@ class FepDriver():
         E1f_run = []
         E2f_run = []
         Efm = []
-        np.savetxt(f"{self.data_folder}/E1f_ref.dat", E1f_ref, header=",".join(force_names))
-        np.savetxt(f"{self.data_folder}/E2f_ref.dat", E2f_ref, header=",".join(force_names))
-        np.savetxt(f"{self.data_folder}/E1f_run.dat", E1f_run, header=",".join(force_names))
-        np.savetxt(f"{self.data_folder}/E2f_run.dat", E2f_run, header=",".join(force_names))
+
+        data_folder_path = Path().cwd() / self.data_folder
+        np.savetxt(data_folder_path / "E1f_ref.dat", E1f_ref, header=",".join(force_names))
+        np.savetxt(data_folder_path / "E2f_ref.dat", E2f_ref, header=",".join(force_names))
+        np.savetxt(data_folder_path / "E1f_run.dat", E1f_run, header=",".join(force_names))
+        np.savetxt(data_folder_path / "E2f_run.dat", E2f_run, header=",".join(force_names))
         if interpolated_potential:
-            np.savetxt(f"{self.data_folder}/Efm.dat", Efm)
+            np.savetxt(data_folder_path / "Efm.dat", Efm)
             header = "E1_ref,E2_ref,E1_run,E2_run,E_m"
         else:
             header = "E1_ref,E2_ref,E1_run,E2_run"
         np.savetxt(
-            f"{self.data_folder}/Energies.dat",
+            data_folder_path / "Energies.dat",
             Energies,
             header=header,
         )
@@ -418,19 +412,20 @@ class FepDriver():
                     if interpolated_potential:
                         Efm.append(efm)
 
-            with open(f"{self.data_folder}/Energies.dat", "ab") as f:
+            data_folder_path = Path().cwd() / self.data_folder
+            with open(data_folder_path / "Energies.dat", "ab") as f:
                 np.savetxt(f, Energies)
             if force_contributions:
-                with open(f"{self.data_folder}/E1f_ref.dat", "ab") as f:
+                with open(data_folder_path / "E1f_ref.dat", "ab") as f:
                     np.savetxt(f, E1f_ref)
-                with open(f"{self.data_folder}/E2f_ref.dat", "ab") as f:
+                with open(data_folder_path / "E2f_ref.dat", "ab") as f:
                     np.savetxt(f, E2f_ref)
-                with open(f"{self.data_folder}/E1f_run.dat", "ab") as f:
+                with open(data_folder_path / "E1f_run.dat", "ab") as f:
                     np.savetxt(f, E1f_run)
-                with open(f"{self.data_folder}/E2f_run.dat", "ab") as f:
+                with open(data_folder_path / "E2f_run.dat", "ab") as f:
                     np.savetxt(f, E2f_run)
                 if interpolated_potential:
-                    with open(f"{self.data_folder}/Efm.dat", "ab") as f:
+                    with open(data_folder_path / "Efm.dat", "ab") as f:
                         np.savetxt(f, Efm)
             Energies = []
             E1f_ref = []

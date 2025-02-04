@@ -1,5 +1,5 @@
 import sys
-import os
+import time
 import json
 import h5py
 from pathlib import Path
@@ -18,7 +18,6 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import FepDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-import molecule
 from .veloxchemlib import mpi_master, Molecule
 
 
@@ -46,20 +45,19 @@ class EvbDriver():
         self.nodes = self.comm.Get_size()
 
         self.temperature: float = 300
-        self.Lambda: list[float]
+        self.Lambda: list[float] = None
 
         self.input_folder: str
 
-        self.reactant: ForceFieldGenerator
-        self.product: ForceFieldGenerator
-        self.products: list[ForceFieldGenerator]
-        self.input_folder: str = "./input_files"
+        self.reactant: ForceFieldGenerator = None
+        self.product: ForceFieldGenerator = None
+        self.input_folder: str = "input_files"
 
-        self.name: str
+        self.name: str = None
         self.system_confs: list[dict] = []
         self.debug = False
 
-    def build_and_run_default_water_EVB(self, reactant: str, product: str | list[str], barrier, free_energy, ordered_input=False):
+    def build_and_run_default_water_EVB(self, reactant: str | Molecule, product: str | list[str] | Molecule | list[Molecule], barrier, free_energy, ordered_input=False):
 
         if not self.debug:
             Lambda = np.linspace(0,0.1,11)
@@ -68,20 +66,29 @@ class EvbDriver():
             Lambda = np.round(Lambda,3)
         else:
             Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+        self.ostream.print_info("Building forcefields")
 
         self.build_forcefields(reactant, product, ordered_input=ordered_input,optimise=True)
+        self.ostream.print_blank()
+        self.ostream.print_info("Building systems")
         self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
 
+        self.ostream.print_blank()
+        self.ostream.print_info("Running FEP")
         self.run_FEP()
         if not self.debug:
+            self.ostream.print_blank()
+            self.ostream.print_info("Computing energy profiles")
             self.compute_energy_profiles(barrier, free_energy)
         else:
             self.ostream.print_info("Debugging option enabled. Skipping energy profile calculation because recalculation is necessary.")
 
+        self.ostream.flush()
+
     def build_forcefields(
         self,
-        reactant_file: str,
-        product_file: str | list[str],
+        reactant: str | Molecule,
+        product: str | list[str] | Molecule | list[Molecule],
         product_charge: int | list[int] | None = None,  # type: ignore
         reactant_multiplicity=1,
         product_multiplicity: int | list[int] | None = None,
@@ -90,11 +97,27 @@ class EvbDriver():
         ordered_input: bool = False,
     ):
 
-        if isinstance(product_file, str):
-            product_file = [product_file]
+
+        if isinstance(reactant, Molecule) and (isinstance(product, Molecule) or isinstance(product, list)):
+            #What names do we go for
+            reactant_name = "reactant"
+            load_inputs = False
+            combined_product_name = "product"
+        elif isinstance(reactant, str) and (isinstance(product, str) or isinstance(product, list)):
+            reactant_name = reactant
+            product_names = product
+            combined_product_name = "_".join(product)
+            load_inputs = True
+        else:
+            raise ValueError("Reactant and product must be either a both string or a Molecule object")
+
+        self.name = reactant_name
+
+        if not isinstance(product, list):
+            product = [product]
 
         if product_charge is None:
-            product_charge = [0] * len(product_file)
+            product_charge = [0] * len(product)
             reactant_charge = 0
 
         elif isinstance(product_charge, int):
@@ -106,36 +129,38 @@ class EvbDriver():
         if isinstance(product_multiplicity, int):
             product_multiplicity = [product_multiplicity]
         if product_multiplicity is None:
-            product_multiplicity = [1] * len(product_file)
+            product_multiplicity = [1] * len(product)
 
-        assert len(product_file) == len(product_charge), "Number of products and charges must match"
-        assert len(product_file) == len(product_multiplicity), "Number of products and multiplicities must match"
-        self.name = reactant_file
+        assert len(product) == len(product_charge), "Number of products and charges must match"
+        assert len(product) == len(product_multiplicity), "Number of products and multiplicities must match"
+        
         
         ffbuilder = EvbForceFieldBuilder()
 
         ffbuilder.reparameterise = reparameterise
         ffbuilder.optimise = optimise
+        if load_inputs:
+            rea_input = self._get_input_files(reactant_name)
+            pro_input = [self._get_input_files(file) for file in product_names]
 
-        rea_input = self._get_input_files(reactant_file)
-        pro_input = [self._get_input_files(file) for file in product_file]
+        else:
+            rea_input = {"molecule": reactant, "optimise": None, "forcefield": None, "hessian": None, "charges": None}
+            pro_input = [{"molecule": pro, "optimise": None, "forcefield": None, "hessian": None, "charges": None} for pro in product]
 
-        reactant_path = f"{self.input_folder}/{reactant_file}_ff_data.json"
+        cwd = Path().cwd()
+        reactant_path = cwd / self.input_folder / f"{reactant_name}_ff_data.json"
 
-        combined_product_name = "_".join(product_file)
-        combined_product_path = f"{self.input_folder}/{combined_product_name}_ff_data.json"
-        combined_product_exists = os.path.exists(combined_product_path)
+        combined_product_path = cwd / self.input_folder / f"{combined_product_name}_ff_data.json"
+        combined_product_exists = combined_product_path.exists()
+            
         if rea_input["forcefield"] is not None and combined_product_exists:
             self.ostream.print_info(f"Loading combined forcefield data from {combined_product_path}")
             self.ostream.print_info("Found both reactant and product forcefield data. Not generating new forcefields")
             self.reactant = rea_input["forcefield"]
-            self.product = self.load_forcefield_from_json(combined_product_path)
+            self.product = self.load_forcefield_from_json(str(combined_product_path))
         else:
-            if not combined_product_exists:
-                self.ostream.print_info(f"Could not find combined forcefield data file {combined_product_path}. Generating new forcefields")
-
             self.reactant, self.product = ffbuilder.build_forcefields(
-                rea_input, 
+                rea_input,
                 pro_input,
                 reactant_charge,
                 product_charge,
@@ -143,35 +168,44 @@ class EvbDriver():
                 product_multiplicity,
                 ordered_input,
             )
-            self.save_forcefield(self.reactant, reactant_path)
-            self.save_forcefield(self.product, combined_product_path)
-        
+        self.save_forcefield(self.reactant, str(reactant_path))
+        self.save_forcefield(self.product, str(combined_product_path))
 
-    def _get_input_files(self, filename):
+    def _get_input_files(self, filename: str):
         # Build a molecule from a (possibly optimised) geometry
         optimise = True
-        if os.path.exists(f"{self.input_folder}/{filename}_xtb_opt.xyz"):
-            self.ostream.print_info(f"Loading optimised geometry from {self.input_folder}/{filename}_xtb_opt.xyz")
-            molecule = Molecule.read_xyz_file(f"{self.input_folder}/{filename}_xtb_opt.xyz")
+        cwd = Path().cwd()
+
+        opt_path = cwd / self.input_folder / f"{filename}_xtb_opt.xyz"
+        if opt_path.exists():
+            self.ostream.print_info(f"Loading optimised geometry from {opt_path}")
+            molecule = Molecule.read_xyz_file(str(opt_path))
             optimise = False
         else:
-            self.ostream.print_info(f"Loading (possibly unoptimised) geometry from {self.input_folder}/{filename}.xyz")
-            molecule = Molecule.read_xyz_file(f"{self.input_folder}/{filename}.xyz")
-
-        json_path = f"{self.input_folder}/{filename}_ff_data.json"
+            struct_path = cwd / self.input_folder / f"{filename}.xyz"
+            self.ostream.print_info(f"Loading (possibly unoptimised) geometry from {struct_path}")
+            molecule = Molecule.read_xyz_file(str(struct_path))
 
         charges = None
-        if os.path.exists(f"{self.input_folder}/{filename}_charges.txt"):
-            with open(f"{self.input_folder}/{filename}_charges.txt", "r", encoding="utf-8") as file:
-                charges = self._load_charges(f"{self.input_folder}/{filename}_charges.txt")
+        charge_path = cwd / self.input_folder / f"{filename}_charges.txt"
+        if charge_path.exists():
+            with open(charge_path, "r", encoding="utf-8") as file:
+                charges = []
+                for line in file:
+                    try:
+                        charges.append(float(line))
+                    except ValueError:
+                        self.ostream.print_info(f"Could not read line {line} from {charge_path}. Continuing")
+            print_charge = [round(charge, 3) for charge in charges]
             self.ostream.print_info(
-                f"Loading charges from {self.input_folder}/{filename}_charges.txt file, total charge = {charges}"
+                f"Loading charges from {charge_path} file, total charge = {print_charge}"
             )
 
         forcefield = None
-        if os.path.exists(json_path):
+        json_path = cwd / self.input_folder / f"{filename}_ff_data.json"
+        if json_path.exists():
             self.ostream.print_info(f"Loading force field data from {json_path}")
-            forcefield = self.load_forcefield_from_json(json_path)
+            forcefield = self.load_forcefield_from_json(str(json_path))
             forcefield.molecule = molecule
             if charges is not None:
                 forcefield.partial_charges = charges
@@ -179,13 +213,14 @@ class EvbDriver():
             self.ostream.print_info(f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json.")
 
         hessian = None
-        if os.path.exists(f"{self.input_folder}/{filename}_hess.np"):
+        hessian_path = cwd / self.input_folder / f"{filename}_hess.np"
+        if hessian_path.exists():
             self.ostream.print_info(
-                f"Found hessian file at {self.input_folder}/{filename}_hess.np, using it to reparameterise.")
-            hessian = np.loadtxt(f"{self.input_folder}/{filename}_hess.np")
+                f"Found hessian file at {hessian_path}, using it to reparameterise.")
+            hessian = np.loadtxt(hessian_path)
         else:
             self.ostream.print_info(
-                f"Could not find hessian file at {self.input_folder}/{filename}_hess.np, calculating hessian with xtb and saving it"
+                f"Could not find hessian file at {hessian_path}, calculating hessian with xtb and saving it"
             )
 
         return {"molecule": molecule, "optimise": optimise, "forcefield": forcefield, "hessian": hessian, "charges": charges}
@@ -237,25 +272,7 @@ class EvbDriver():
         with open(path, "w", encoding="utf-8") as file:
             json.dump(ff_data, file, indent=4)
 
-    @staticmethod
-    def _load_charges(path: str) -> list:
-        """
-        Load a list of charges from a file.
-
-        Args:
-            filename (str): The name of the file to load charges from.
-
-        Returns:
-            list: A list of charges read from the file.
-        """
-        with open(path, "r", encoding="utf-8") as file:
-            charges = []
-            for line in file:
-                try:
-                    charges.append(float(line))
-                except ValueError:
-                    self.ostream.print_info(rf"Could not read line {line} from {filename}_charges.txt. Continuing")
-        return charges
+    
 
     # def _save_charges(self, charges: list, filename: str):
     #     """
@@ -336,44 +353,20 @@ class EvbDriver():
 
         #Per configuration
         for conf in configurations:
+            t = int(time.time())
             #create folders,
-            data_folder = f"EVB_{self.name}_{conf["name"]}_data"
+            
+            data_folder = f"EVB_{self.name}_{conf["name"]}_data_{t}"
             conf["data_folder"] = data_folder
             run_folder = f"{data_folder}/run"
             conf["run_folder"] = run_folder
-            self.ostream.print_info(f"Saving files to {data_folder}")
+            cwd = Path().cwd()
+            data_folder_path = cwd / data_folder
+            run_folder_path = cwd / run_folder
+            self.ostream.print_info(f"Saving files to {data_folder_path} and {run_folder_path}")
 
-            if not os.path.exists(data_folder):
-                os.makedirs(data_folder)
-            else:
-                import shutil
-
-                folder = f"./{data_folder}"
-                for filename in os.listdir(folder):
-                    file_path = os.path.join(folder, filename)
-                    try:
-                        if os.path.isfile(file_path) or os.path.islink(file_path):
-                            os.unlink(file_path)
-                        elif os.path.isdir(file_path):
-                            shutil.rmtree(file_path)
-                    except Exception as e:
-                        self.ostream.print_info("Failed to delete %s. Reason: %s" % (file_path, e))
-
-            if not os.path.exists(run_folder):
-                os.makedirs(run_folder)
-            else:
-                import shutil
-
-                folder = f"./{run_folder}"
-                for filename in os.listdir(folder):
-                    file_path = os.path.join(folder, filename)
-                    try:
-                        if os.path.isfile(file_path) or os.path.islink(file_path):
-                            os.unlink(file_path)
-                        elif os.path.isdir(file_path):
-                            shutil.rmtree(file_path)
-                    except Exception as e:
-                        self.ostream.print_info("Failed to delete %s. Reason: %s" % (file_path, e))
+            data_folder_path.mkdir(parents=True, exist_ok=True)
+            run_folder_path.mkdir(parents=True, exist_ok=True)
 
             # build the system
             system_builder = EvbSystemBuilder()
@@ -388,13 +381,15 @@ class EvbDriver():
 
             self.save_systems_as_xml(systems, conf["run_folder"])
 
+            top_path = cwd / data_folder / "topology.pdb"
             mmapp.PDBFile.writeFile(
                 topology,
                 initial_positions * 10,  # positions are handled in nanometers, but pdb's should be in angstroms
-                open(f"{data_folder}/topology.pdb", "w"),
+                open(top_path, "w"),
             )
 
-            with open(f"{data_folder}/options.json", "w") as file:
+            options_path = cwd / data_folder / "options.json"
+            with open(options_path, "w") as file:
                 json.dump(
                     {
                         "temperature": conf.get("temperature", self.temperature),
@@ -512,12 +507,13 @@ class EvbDriver():
 
     def load_systems_from_xml(self, folder: str):
         systems = {}
+        path = Path().cwd() / folder
         for lam in self.Lambda:
-            with open(f"{folder}/{lam:.3f}_sys.xml", mode="r", encoding="utf-8") as input:
+            with open(path / f"{lam:.3f}_sys.xml", mode="r", encoding="utf-8") as input:
                 systems[lam] = mm.XmlSerializer.deserialize(input.read())
-        with open(f"{folder}/reactant.xml", mode="r", encoding="utf-8") as input:
+        with open(path / "reactant.xml", mode="r", encoding="utf-8") as input:
             systems["reactant"] = mm.XmlSerializer.deserialize(input.read())
-        with open(f"{folder}/product.xml", mode="r", encoding="utf-8") as input:
+        with open(path / "product.xml", mode="r", encoding="utf-8") as input:
             systems["product"] = mm.XmlSerializer.deserialize(input.read())
         return systems
 
@@ -659,27 +655,28 @@ class EvbDriver():
 
         pass
 
-    @staticmethod
-    def show_snapshots(folder):
-        import py3Dmol
-        # Read the pdb file and split it into models
-        with open(f"{folder}/traj_combined.pdb", "r") as file:
-            models = file.read().split("ENDMDL")
+    # @staticmethod
+    # def show_snapshots(folder):
+    #     import py3Dmol
+    #     # Read the pdb file and split it into models
 
-        # Extract the first and last model
-        first_model = models[0] + "ENDMDL"
-        last_model = models[-2] + "ENDMDL"  # -2 because the last element is an empty string
+    #     with open(f"{folder}/traj_combined.pdb", "r") as file:
+    #         models = file.read().split("ENDMDL")
 
-        # Display the first model
-        view = py3Dmol.view(width=400, height=300)
-        view.addModel(first_model, "pdb", {"keepH": True})
-        view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
-        view.zoomTo()
-        view.show()
+    #     # Extract the first and last model
+    #     first_model = models[0] + "ENDMDL"
+    #     last_model = models[-2] + "ENDMDL"  # -2 because the last element is an empty string
 
-        # Display the last model
-        view = py3Dmol.view(width=400, height=300)
-        view.addModel(last_model, "pdb", {"keepH": True})
-        view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
-        view.zoomTo()
-        view.show()
+    #     # Display the first model
+    #     view = py3Dmol.view(width=400, height=300)
+    #     view.addModel(first_model, "pdb", {"keepH": True})
+    #     view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
+    #     view.zoomTo()
+    #     view.show()
+
+    #     # Display the last model
+    #     view = py3Dmol.view(width=400, height=300)
+    #     view.addModel(last_model, "pdb", {"keepH": True})
+    #     view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
+    #     view.zoomTo()
+    #     view.show()

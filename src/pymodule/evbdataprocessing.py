@@ -7,7 +7,7 @@ import h5py
 
 import sys
 from mpi4py import MPI
-from .veloxchem import mpi_master
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 
 
@@ -31,13 +31,13 @@ class EvbDataProcessing:
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.results: dict = {}# Dictionary of dictionaries with all data
+        self.results: dict = {} # Dictionary of dictionaries with all data
 
-        self.barrier: float
-        self.free_energy: float
+        self.barrier: float = None
+        self.free_energy: float = None
 
-        self.alpha: float
-        self.H12: float
+        self.alpha: float = None
+        self.H12: float = None
 
         self.max_iter: int = 100
         self.fitting_slowness: float = .5

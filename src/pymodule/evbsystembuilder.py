@@ -229,7 +229,6 @@ class EvbSystemBuilder():
                         carbon_atoms.append(atom)
                         CC_atoms.append(atom)
                         system.addParticle(mm_element.mass)
-                        #todo placeholder values from gaff ca
 
                         nb_force.addParticle(0, sigma, epsilon)
 
@@ -1307,9 +1306,7 @@ class EvbSystemBuilder():
         torsion_constraint.setName("Harmonic torsion constraint")
         torsion_constraint.addPerTorsionParameter("theta0")
         torsion_constraint.addPerTorsionParameter("k")
-        if len(self.constraints) == 0:
-            self.ostream.print_info(f"No constraints found")
-        else:
+        if len(self.constraints) > 0:
             self.ostream.print_info(f"Adding constraints: {self.constraints}")
         if (
                 not reference_state

@@ -10,7 +10,24 @@ from collections import Counter
 class ReactionMatcher:
 
     @staticmethod
-    def _match_reaction_graphs(A: nx.Graph, B: nx.Graph):
+    def match_reaction_graphs(A: nx.Graph, B: nx.Graph):
+        # figure out how many bonds need to change -> difficult to impossible with multiple graphs right?
+        
+        breaking_bonds = 0
+        #make all graphs with one bond broken in A, Am1, and one bond broken in B, Bm1
+        # Am1 = []
+        # for edge in A.edges:
+        #     temp = nx.Graph(A)
+        #     temp.remove_edge(*edge)
+        #     Am1.append(temp)
+        # Bm1 = []
+        # for edge in B.edges:
+        #     temp = nx.Graph(B)
+        #     temp.remove_edge(*edge)
+        #     Bm1.append(temp)
+        #check if from any in Am1 there's a subgraph isomorphism to B, or from Bm1 to A, 
+        #pick the one with the minimal residue = unconnected leftover parts
+        #then from Am1 to Bm1, again pick the one with 
         total_mapping = {}
         while A.number_of_nodes() > 0:
             # if find largest subgraph
@@ -78,10 +95,10 @@ class ReactionMatcher:
     def _sort_graph_by_size(graphs: list[nx.Graph]) -> list[nx.Graph]:
         return sorted(graphs, key=lambda graph: len(graph.nodes), reverse=True)
 
-    # Loops through B and finds the largest subgraph isomorphism in A that leaves the least scattered atoms
-    # Returns the mapping and the index of the subgraph in B
     @staticmethod
     def _find_next_subgraph(a: nx.Graph, B: list[nx.Graph]):
+        # Loops through B and finds the largest subgraph isomorphism in A that leaves the least scattered atoms
+        # Returns the mapping and the index of the subgraph in B
         B = sorted(B, key=lambda graph: len(graph.nodes), reverse=True)
 
         for b in B:
@@ -172,8 +189,8 @@ class ReactionMatcher:
                 groups.update({
                     id: {
                         "element": elem,
-                        "connected_elements": filtered_elements,
-                        "neighbour_ids": filtered_ids
+                        "connected_elements": list(filtered_elements),
+                        "neighbour_ids": list(filtered_ids)
                     }
                 })
 
