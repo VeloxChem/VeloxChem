@@ -488,4 +488,4 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
             induced_dipoles=self.classical_subsystem.induced_dipoles.induced_dipoles,
             total_field_gradients=self._nuc_field_grad)
 
-        return self._e_es_nuc_grad + e_elec_es_grad + e_ind_nuc_grad + e_ind_el_grad + self._e_vdw
+        return self._e_es_nuc_grad + e_ind_nuc_grad + e_ind_el_grad + self._e_vdw # + e_elec_es_grad
