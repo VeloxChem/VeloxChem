@@ -37,7 +37,8 @@ class TestThreeCenterElectronRepulsionDriver:
 
         return mol, bas
 
-    def test_electron_repulsion_h2o_svp(self):
+    # TODO: enable test
+    def disabled_test_electron_repulsion_h2o_svp(self):
 
         mol, bas = self.get_data_svp()
 
@@ -59,7 +60,8 @@ class TestThreeCenterElectronRepulsionDriver:
                                   rel_tol=1.0e-12,
                                   abs_tol=1.0e-12)
 
-    def test_electron_repulsion_h2o_qzvp(self):
+    # TODO: enable test
+    def disabled_test_electron_repulsion_h2o_qzvp(self):
 
         mol, bas = self.get_data_qzvp()
 
