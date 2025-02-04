@@ -180,7 +180,7 @@ export_t2cintegrals(py::module& m)
                 -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
     
-    // CNuclearPotentialGeom010Driver class
+    // CNuclearPotentialErfGeom010Driver class
     PyClass<CNuclearPotentialErfGeom0X0Driver<1>>(m, "NuclearPotentialErfGeom010Driver")
         .def(py::init<>())
         .def(
@@ -190,18 +190,18 @@ export_t2cintegrals(py::module& m)
                const CMolecularBasis&                    basis,
                const std::vector<double>&                dipoles,
                const std::vector<std::array<double, 3>>& coords,
-               const std::vector<double>&                omegas) -> std::shared_ptr<CMatrices> {
+               const std::vector<double>&                omegas) -> CMatrices {
                 auto points = std::vector<TPoint<double>>();
                 points.reserve(coords.size());
                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                return std::make_shared<CMatrices>(geom_drv.compute(dipoles, points, omegas, basis, molecule));
+                return geom_drv.compute(dipoles, points, omegas, basis, molecule);
             },
             "Computes nuclear potential derivatives matrices for given molecule, basis and vector of external "
             "dipoles.")
         .def(
             "compute",
             [](const CNuclearPotentialErfGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const double omega, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, omega, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, omega, iatom); },
             "Computes nuclear potential derivatives matrices for given molecule, basis and selected atom.");
 
     // CNuclearPotentialGeom020Driver class
@@ -409,11 +409,11 @@ export_t2cintegrals(py::module& m)
                const CMolecularBasis&                    basis,
                const std::vector<double>&                exponents,
                const std::vector<double>&                factors,
-               const std::vector<std::array<double, 3>>& coords) -> std::shared_ptr<CMatrix> {
+               const std::vector<std::array<double, 3>>& coords) -> CMatrix {
                 auto points = std::vector<TPoint<double>>();
                 points.reserve(coords.size());
                 std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
-                   return std::make_shared<CMatrix>(t3ovl_drv.compute(exponents, factors, points, basis, molecule));
+                   return t3ovl_drv.compute(exponents, factors, points, basis, molecule);
             },
             "Computes overlap matrix for given molecule, basis and vector of external scaled Gaussians.");
     
@@ -422,8 +422,8 @@ export_t2cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CTwoCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
-                return std::make_shared<CMatrix>(eri_drv.compute(basis, molecule));
+            [](const CTwoCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> CMatrix {
+                return eri_drv.compute(basis, molecule);
             },
             "Computes electron repulsion matrix for given molecule and basis.");
     
@@ -434,7 +434,7 @@ export_t2cintegrals(py::module& m)
         .def(
             "compute",
             [](const CTwoCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, const int iatom)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(geom_drv.compute(basis, molecule, iatom)); },
+                -> CMatrices { return geom_drv.compute(basis, molecule, iatom); },
             "Computes overlap first derivatives matrices for given molecule, basis and selected atom.");
 }
 

@@ -19,8 +19,8 @@ export_t3cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CThreeCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularBasis& aux_basis) -> std::shared_ptr<CT3FlatBuffer<double>> {
-                return std::make_shared<CT3FlatBuffer<double>>(eri_drv.compute(basis, aux_basis, molecule));
+            [](const CThreeCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularBasis& aux_basis) -> CT3FlatBuffer<double> {
+                return eri_drv.compute(basis, aux_basis, molecule);
             },
             "Computes electron repulsion integrals for given molecule, basis and auxilary basis.");
     
