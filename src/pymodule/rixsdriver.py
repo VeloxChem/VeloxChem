@@ -310,7 +310,7 @@ class RixsDriver:
                 largest_core = max(largest_core, core_index)
         return largest_core
 
-    def resonant_rixs_xsection(self, eigenvals_core, dipole_ints, gamma_ng_ao, theta):
+    def elastic_rixs_xsection(self, eigenvals_core, dipole_ints, gamma_ng_ao, theta):
         sigma = np.zeros((self.nr_ce), dtype=np.complex128)
         # excitation energies
         e_n = np.array([(1 / (en - eigenvals_core - self.gamma_n*1j)) for en in eigenvals_core]) # denominator
@@ -397,7 +397,7 @@ class RixsDriver:
         T_fn = self.transition_dipole_mom(tdm_fn, dipole_ints)
         self.oscillator_strength  = self.osc_str(T_fn, emission_ene) 
 
-        self.resonant_rixs = self.resonant_rixs_xsection(omega_n, dipole_ints, tdm_ng, self.theta).real
+        self.elastic_rixs = self.elastic_rixs_xsection(omega_n, dipole_ints, tdm_ng, self.theta).real
 
     def write_hdf5(self, fname):
         """
