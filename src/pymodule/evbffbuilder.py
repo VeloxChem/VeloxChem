@@ -1,6 +1,3 @@
-import os
-
-import shutil
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
