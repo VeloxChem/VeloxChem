@@ -103,7 +103,7 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
 
         hf = h5py.File(fname, 'a')
 
-        scf_group = hf.create_group('scf_results')      
+        scf_group = hf.create_group('scf')      
 
         # write SCF tensors
         keys = ['S'] + [
@@ -150,7 +150,7 @@ def write_rsp_solution(fname, key, vec):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'a')
-        rsp_group = 'rsp_results/'
+        rsp_group = 'rsp/'
         hf.create_dataset(rsp_group + key, data=vec)
         hf.close()
 
@@ -172,7 +172,7 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'a')
-        rsp_group = 'rsp_results/'
+        rsp_group = 'rsp/'
         dset = hf.create_dataset(rsp_group + keys[0], data=vec)
         for key in keys[1:]:
             hf[key] = dset
@@ -197,7 +197,7 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
 
         keys = rsp_results.keys()
 
-        rsp_group = 'rsp_results/'
+        rsp_group = 'rsp/'
 
         for key in keys:
             # Do not write the eigenvectors, file names and excitation details
