@@ -164,6 +164,7 @@ from .symmetryanalyzer import SymmetryAnalyzer
 from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
+from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
