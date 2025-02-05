@@ -103,7 +103,7 @@ class TestEvb:
     @staticmethod
     def _compare_dict(dict1, dict2, float_tol=1e-2):
         if len(dict1.keys()) != len(dict2.keys()):
-            print(f"Key number mismatch: {len(dict1.keys())} != {len(dict2.keys())}")
+            print(f"Key count mismatch: {len(dict1.keys())} != {len(dict2.keys())}")
             return False
 
         for (key, val1) in dict1.items():
@@ -232,8 +232,9 @@ class TestEvb:
         result_water_comp = comp_results[list(results.keys())[1]]
 
         # compare with final results
-        result_vac_ref = EVB.load_result("EVB_RuVbdaO_Br_2_vacuum_data_26.h5")
-        result_water_ref = EVB.load_result("EVB_RuVbdaO_Br_2_water_data_26.h5")
+        data_path = Path(__file__).parent / 'data'
+        result_vac_ref = EVB.load_result(data_path / "evb_RuVbdaO_Br_2_vacuum_data_26.h5")
+        result_water_ref = EVB.load_result(data_path / "evb_RuVbdaO_Br_2_water_data_26.h5")
 
         assert TestEvb._compare_dict(result_vac_comp, result_vac_ref)
         assert TestEvb._compare_dict(result_water_comp, result_water_ref)

@@ -71,14 +71,17 @@ class EvbDriver():
         self.build_forcefields(reactant, product, ordered_input=ordered_input,optimise=True)
         self.ostream.print_blank()
         self.ostream.print_info("Building systems")
+        self.ostream.flush()
         self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
 
         self.ostream.print_blank()
         self.ostream.print_info("Running FEP")
+        self.ostream.flush()
         self.run_FEP()
         if not self.debug:
             self.ostream.print_blank()
             self.ostream.print_info("Computing energy profiles")
+            self.ostream.flush()
             self.compute_energy_profiles(barrier, free_energy)
         else:
             self.ostream.print_info("Debugging option enabled. Skipping energy profile calculation because recalculation is necessary.")
@@ -650,9 +653,7 @@ class EvbDriver():
                             group.create_dataset(k, data=v)
                     else:
                         file[key] = value
-
                 pass
-
         pass
 
     # @staticmethod
