@@ -33,6 +33,8 @@ import re
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import RIFockDriver, SubMatrix
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
@@ -202,6 +204,10 @@ class ScfDriver:
         # for open-shell system: unpaired electrons for initial guess
         self.guess_unpaired_electrons = ''
 
+        # RI-J
+        self.ri_coulomb = False
+        self._ri_drv = None
+
         # dft
         self.xcfun = None
         self.grid_level = None
@@ -262,6 +268,7 @@ class ScfDriver:
         # input keywords
         self._input_keywords = {
             'scf': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
@@ -1339,6 +1346,24 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
+        if self.ri_coulomb:
+            assert_msg_critical(
+                ao_basis.get_label().lower().startswith('def2-'),
+                'SCF Driver: Invalid basis set for RI-J')
+
+            basis_ri_j = MolecularBasis.read(molecule, 'def2-universal-jkfit')
+
+            t2c_drv = TwoCenterElectronRepulsionDriver()
+            mat_j = t2c_drv.compute(molecule, basis_ri_j)
+            inv_mat_j_np = np.linalg.inv(mat_j.to_numpy())
+
+            inv_mat_j = SubMatrix(
+                [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
+            inv_mat_j.set_values(inv_mat_j_np)
+
+            self._ri_drv = RIFockDriver(inv_mat_j)
+            self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j)
+
         e_grad = None
 
         if self.rank == mpi_master():
@@ -1952,9 +1977,14 @@ class ScfDriver:
         if self.scf_type == 'restricted':
             # restricted SCF
             self._print_debug_info('before rest Fock build')
-            fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
-                                        exchange_scaling_factor, 0.0,
-                                        thresh_int)
+
+            if self.ri_coulomb and fock_type == 'j':
+                fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
+            else:
+                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
+
             self._print_debug_info('after  rest Fock build')
 
             fock_mat_np = fock_mat.to_numpy()
