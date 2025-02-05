@@ -14,31 +14,17 @@ class ReactionMatcher:
         # figure out how many bonds need to change -> difficult to impossible with multiple graphs right?
         
         breaking_bonds = 0
-        #make all graphs with one bond broken in A, Am1, and one bond broken in B, Bm1
-        # Am1 = []
-        # for edge in A.edges:
-        #     temp = nx.Graph(A)
-        #     temp.remove_edge(*edge)
-        #     Am1.append(temp)
-        # Bm1 = []
-        # for edge in B.edges:
-        #     temp = nx.Graph(B)
-        #     temp.remove_edge(*edge)
-        #     Bm1.append(temp)
+        # make all graphs with one bond broken in A, Am1, and one bond broken in B, Bm1
         #check if from any in Am1 there's a subgraph isomorphism to B, or from Bm1 to A, 
         #pick the one with the minimal residue = unconnected leftover parts
         #then from Am1 to Bm1, again pick the one with 
         total_mapping = {}
         while A.number_of_nodes() > 0:
             # if find largest subgraph
-            mapping = ReactionMatcher._find_largest_subgraph(A, B)
+            mapping, res, size = ReactionMatcher._find_largest_subgraph(A, B)
 
-            # elif find unique groups
-            if mapping is None:
-                mapping = ReactionMatcher._map_unique_groups(A, B)
-            # else find largest matching chain
-            if mapping is None:
-                mapping = ReactionMatcher._find_largest_matching_chain(A, B)
+
+            #then try subgraph isomorphism from Am1 to Bm1
             if mapping is None:
                 raise Exception("No mapping found. You broke the algorithm. Please send an e-mail with your input structures to bvh@kth.se")
             # remove mapping from both graphs
@@ -51,6 +37,47 @@ class ReactionMatcher:
         
         return total_mapping
 
+    @staticmethod
+    def _find_subgraph_broken_bonds(A: nx.Graph, B: nx.Graph):
+        #todo only loop over bonds that are different, if there is the same amount of C-C bonds in both the reactant and the product, don't include them
+        Am1 = []
+        for edge in A.edges:
+            temp = nx.Graph(A)
+            temp.remove_edge(*edge)
+            Am1.append(temp)
+        Bm1 = []
+        for edge in B.edges:
+            temp = nx.Graph(B)
+            temp.remove_edge(*edge)
+            Bm1.append(temp)
+        #try subgraph isomorphism from Am1 to B and from Bm1 to A
+
+        #todo can figure out beforehand if am1 or bm1 is going to give me largest size, and only loop over one
+        #todo can figure out beforehand what bonds in am1 are going to give largest size, and only loop over those
+        Am1_mappings = {}
+        for am1 in Am1:
+            temp_mapping, res, size = ReactionMatcher._find_largest_subgraph(am1, B)
+            if temp_mapping is not None:
+                Am1_mappings.update({temp_mapping: {"res": res, "size": -size}}) 
+        for bm1 in Bm1:
+            temp_mapping, res, size = ReactionMatcher._find_largest_subgraph(A, bm1)
+            if temp_mapping is not None:
+                Am1_mappings.update({temp_mapping: {"res": res, "size": -size}})
+
+        #take one with largest fitting graph size, and then least amount of fragments left res
+        Am1_mappings = sorted(Am1_mappings.values(), key=lambda x: (-x["size"], x["res"]))
+        Bm1_mappings = sorted(Bm1_mappings.values(), key=lambda x: (-x["size"], x["res"]))
+        
+        if Am1_mappings and Bm1_mappings:
+            A_mapping = Am1_mappings[0]
+            B_mapping = Bm1_mappings[0]
+            mapping = A_mapping if A_mapping["size"] > B_mapping["size"] else B_mapping
+        elif Am1_mappings:
+            mapping = Am1_mappings[0]
+        elif Bm1_mappings:
+            mapping = Bm1_mappings[0]
+        
+        
 
     @staticmethod
     def _find_largest_subgraph(a: nx.Graph, b: nx.Graph):
@@ -68,7 +95,7 @@ class ReactionMatcher:
 
         # Find the next largest subgraph isomorphism of the elements of B in A[0]
         # move swapping into here
-        mapping = ReactionMatcher._find_next_subgraph(A[0], B)
+        mapping, res = ReactionMatcher._find_next_subgraph(A[0], B)
 
         # Save the obtained mapping
         # If the reactant is being treated as the product, the mapping needs to be inverted before saving
@@ -77,8 +104,11 @@ class ReactionMatcher:
                 mapping = {v: k for k, v in mapping.items()}
 
             print(f"Found mapping through largest subgraph: {mapping}")
+            size = len(mapping)
+        else:
+            size = None
 
-        return mapping
+        return mapping, res, size
 
     # Split a graph into a list of connected graphs
     @staticmethod
@@ -121,8 +151,8 @@ class ReactionMatcher:
                         best_res = res
                         best_mapping = mapping
 
-                return best_mapping
-        return None
+                return best_mapping, best_res
+        return None, None
 
     @staticmethod
     def _map_unique_groups(A: nx.Graph, B: nx.Graph):
