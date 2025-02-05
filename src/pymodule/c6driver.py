@@ -617,10 +617,7 @@ class C6Driver(LinearSolver):
                 # create h5 file for response solutions
                 if (self.save_solutions and self.checkpoint_file is not None):
                     final_h5_fname = str(
-                        Path(self.checkpoint_file))[:-3] + '_solutions.h5'
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
+                        Path(self.checkpoint_file))[:-7] + '.h5'
 
             for bop, iw in solutions:
                 x = self.get_full_solution_vector(solutions[(bop, iw)])

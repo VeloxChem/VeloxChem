@@ -172,7 +172,8 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'a')
-        dset = hf.create_dataset(keys[0], data=vec)
+        rsp_group = 'rsp_results/'
+        dset = hf.create_dataset(rsp_group + keys[0], data=vec)
         for key in keys[1:]:
             hf[key] = dset
         hf.close()
