@@ -23,21 +23,30 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
+from io import StringIO
+from contextlib import redirect_stderr
+import numpy as np
 import os, sys, csv, argparse
 import time
-import numpy as np
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
-from pymbar import MBAR, timeseries
-from mpi4py import MPI
 import h5py
 
-from .solvationbuilder import SolvationBuilder
 from .veloxchemlib import mpi_master
+from .solvationbuilder import SolvationBuilder
 from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
 
-class SolvationFEPDriver:
+with redirect_stderr(StringIO()) as fg_err:
+    try:
+        from pymbar import MBAR, timeseries
+        import openmm as mm
+        import openmm.app as app
+        import openmm.unit as unit
+    except ImportError:
+        pass
+
+
+class SolvationFepDriver:
     """
     Computes the solvation free energy using OpenMM.
 
@@ -76,6 +85,11 @@ class SolvationFEPDriver:
         """
         Initialize the OpenMMSolvator class.
         """
+
+        assert_msg_critical(
+            'pymbar' in sys.modules and 'openmm' in sys.modules,
+            'pymbar and OpenMM are required for SolvationFepDriver.')
+
         if comm is None:
             comm = MPI.COMM_WORLD
 

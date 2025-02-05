@@ -221,7 +221,7 @@ export_moldata(py::module &m)
         .def("number_of_electrons", &CMolecule::number_of_electrons, "Gets a number of electrons in molecule.")
         .def("get_identifiers", &CMolecule::identifiers, "Gets a vector of elemental identidiers in molecule.")
         .def("get_atom_basis_labels", &CMolecule::atom_basis_labels, "Gets a vector of atom basis set labels.")
-        .def("get_coordinates", &CMolecule::coordinates, py::arg("units") = "au", "Gets coordinates of atoms in molecules")
+        .def("_get_coordinates", &CMolecule::coordinates, py::arg("units") = "au", "(Internal method) Gets coordinates of atoms in molecules.")
         .def("get_charges", &CMolecule::charges, "Gets a vector of atomic charges in molecule.")
         .def(
             "get_element_ids",
@@ -266,7 +266,15 @@ export_moldata(py::module &m)
         .def("get_masses", &CMolecule::masses, "Gets a vector of atomic masses in molecule.")
         .def("get_labels", &CMolecule::labels, "Gets a vector of atomic labels in molecule.")
         .def("get_label", &CMolecule::label, "Gets an atomic labels of specific atom in molecule.")
-        .def("get_atom_coordinates", &CMolecule::atom_coordinates, "Gets coordinates [x,y,z] of atom.")
+        .def(
+            "get_atom_coordinates",
+            [](const CMolecule& self, const int iatom, const std::string& unit) -> std::array<double, 3> {
+                const auto atom_coords = self.atom_coordinates(iatom, unit);
+                return atom_coords.coordinates();
+            },
+            "Gets coordinates of a given atom.",
+             "iatom"_a,
+             "unit"_a = std::string("au"))
         .def("set_atom_coordinates", &CMolecule::set_atom_coordinates, "Sets coordinates (x,y,z) of atom.", "iatom"_a, "xyz"_a)
         .def("atom_indices", &CMolecule::atom_indices, "Gets indices of atoms with requested atomic label.")
         .def("nuclear_repulsion_energy",

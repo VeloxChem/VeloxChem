@@ -24,17 +24,16 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from pathlib import Path
 import numpy as np
 import sys
-from scipy.spatial import cKDTree
-from scipy.spatial.transform import Rotation as R
-from pathlib import Path
 import time
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .forcefieldgenerator import ForceFieldGenerator
 from .molecule import Molecule
 from .outputstream import OutputStream
+
 
 class SolvationBuilder:
     """
@@ -159,6 +158,8 @@ class SolvationBuilder:
         :param equilibrate:
             If True, perform an equilibration of the system.
         """
+
+        from scipy.spatial import cKDTree
 
         # Save the solvent name
         self.solvent_name = solvent
@@ -417,6 +418,8 @@ class SolvationBuilder:
         :param box:
             The array with the dimensions of the box (x, y, z)
         '''
+
+        from scipy.spatial import cKDTree
 
         # Add the solute to the system
         self._load_solute_molecule(solute)
@@ -846,6 +849,9 @@ class SolvationBuilder:
         """
         Insert a molecule with a random rotation without rebuilding the KDTree each time.
         """
+
+        from scipy.spatial.transform import Rotation
+
         new_molecule_xyz = new_molecule.get_coordinates_in_angstrom()
         new_molecule_labels = new_molecule.get_labels()
 
@@ -855,7 +861,7 @@ class SolvationBuilder:
             
             if self.random_rotation:
                 # Generate a random rotation
-                rotation_matrix = R.random().as_matrix()
+                rotation_matrix = Rotation.random().as_matrix()
                 # Rotate the molecule coordinates
                 rotated_coords = new_molecule_xyz @ rotation_matrix.T
 

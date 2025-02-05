@@ -16,20 +16,24 @@ Development lead
 Contributors
 ------------
 
-* Roberto Di Remigio
-* Karan Ahmadazdeh
-* Mickael Delcey
-* Olav Vahtras
-* Manuel Brand
-* Juan de Gracia
+* Josefine H. Andersen
 * Iulia E. Brumboiu
+* Roberto Di Remigio
+* Manuel Hodecker
+* Mickael Delcey
+* Karan Ahmadazdeh
+* Olav Vahtras
+* Juan de Gracia
+* Manuel Brand
 * Nanna H. List
+* Erik Vitols
 * Xiaoyu Chen
 * Lukas Lampe
-* Manuel Hodecker
 * Noah Deveaux
 * Magnus Ringholm
 * Thomas Fransson
+* Mathieu Linares
+* Jonas Vester
 * Bastiaan van Hoorn
 * Gabriel L. S. Rodrigues
 * Mikael T. Scott
@@ -38,4 +42,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2024-10-11 by ``git shortlog -sn``
+The list of contributors was obtained 2025-01-25 by ``git shortlog -sn``

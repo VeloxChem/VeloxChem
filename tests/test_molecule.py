@@ -6,6 +6,8 @@ import math
 
 from veloxchem.veloxchemlib import DispersionModel, Point
 from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
+from veloxchem.veloxchemlib import get_vdw_radii_data_in_bohr
+from veloxchem.veloxchemlib import chemical_element_identifier
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
 from veloxchem.optimizationdriver import OptimizationDriver
@@ -222,18 +224,18 @@ class TestMolecule:
 
         coords = self.nh3_coords()
 
-        coords_a = mol.get_coordinates()
+        coords_a = mol._get_coordinates()
         for r_a, r_b in zip(coords, coords_a):
             assert r_a == r_b
 
-        coords_a = mol.get_coordinates('au')
+        coords_a = mol._get_coordinates('au')
         for r_a, r_b in zip(coords, coords_a):
             assert r_a == r_b
 
         f = bohr_in_angstrom()
         for r in coords:
             r.scale(f)
-        coords_a = mol.get_coordinates('angstrom')
+        coords_a = mol._get_coordinates('angstrom')
         for r_a, r_b in zip(coords, coords_a):
             assert r_a == r_b
 
@@ -275,20 +277,20 @@ class TestMolecule:
 
         # check nitrogen atom coordinates in au
         coords = mol.get_atom_coordinates(0, 'au')
-        assert coords == Point([-3.710, 3.019, -0.037])
+        assert coords == [-3.710, 3.019, -0.037]
 
         # check last hydrogen atom coordinates in au
         coords = mol.get_atom_coordinates(3, 'au')
-        assert coords == Point([-4.780, 2.569, -1.573])
+        assert coords == [-4.780, 2.569, -1.573]
 
         # check nitrogen atom coordinates in angstrom
         f = bohr_in_angstrom()
         coords = mol.get_atom_coordinates(0, 'angstrom')
-        assert coords == Point([-3.710 * f, 3.019 * f, -0.037 * f])
+        assert coords == [-3.710 * f, 3.019 * f, -0.037 * f]
 
         # check last hydrogen atom coordinates in au
         coords = mol.get_atom_coordinates(3, 'angstrom')
-        assert coords == Point([-4.780 * f, 2.569 * f, -1.573 * f])
+        assert coords == [-4.780 * f, 2.569 * f, -1.573 * f]
 
     def test_atom_indices(self):
 
@@ -506,37 +508,26 @@ class TestMolecule:
 
     def test_vdw_radii_and_elem_ids(self):
 
-        # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
+        ref_labels = [
+            'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg',
+            'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca', 'Ga', 'Ge', 'As', 'Se',
+            'Br', 'Kr', 'Rb', 'Sr', 'In', 'Sn', 'Sb', 'Te', 'I', 'Xe', 'Cs',
+            'Ba', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra'
+        ]
+        ref_radii = [
+            1.1, 1.4, 1.81, 1.53, 1.92, 1.7, 1.55, 1.52, 1.47, 1.54, 2.27, 1.73,
+            1.84, 2.1, 1.8, 1.8, 1.75, 1.88, 2.75, 2.31, 1.87, 2.11, 1.85, 1.9,
+            1.83, 2.02, 3.03, 2.49, 1.93, 2.17, 2.06, 2.06, 1.98, 2.16, 3.43,
+            2.68, 1.96, 2.02, 2.07, 1.97, 2.02, 2.2, 3.48, 2.83
+        ]
 
-        mol = Molecule.read_molecule_string("""H    0.0   0.0   0.0
-                                               Li   0.0   0.0   1.0
-                                               C    0.0   0.0   2.0
-                                               N    0.0   0.0   3.0
-                                               O    0.0   0.0   4.0
-                                               S    0.0   0.0   5.0
-                                               Cu   0.0   0.0   6.0
-                                               Zn   0.0   0.0   7.0
-                                               Br   0.0   0.0   8.0
-                                               Ag   0.0   0.0   9.0
-                                               Au   0.0   0.0  10.0
-                                               Hg   0.0   0.0  11.0""")
+        vdw_data = np.array(get_vdw_radii_data_in_bohr()) * bohr_in_angstrom()
 
-        atom_radii = mol.vdw_radii_to_numpy()
-
-        ref_radii = np.array([
-            1.09, 1.82, 1.70, 1.55, 1.52, 1.80, 1.40, 1.39, 1.85, 1.72, 1.66,
-            1.55
-        ])
-
-        ref_radii /= bohr_in_angstrom()
-
-        assert (atom_radii == ref_radii).all()
-
-        elem_ids = mol.get_identifiers()
-
-        ref_ids = np.array([1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80])
-
-        assert (elem_ids == ref_ids).all()
+        for elem, radius in zip(ref_labels, ref_radii):
+            if elem in ['Fr', 'Ra']:
+                continue
+            elem_id = chemical_element_identifier(elem.upper())
+            assert abs(radius - vdw_data[elem_id]) < 1.0e-10
 
     def test_dispersion_model(self):
 

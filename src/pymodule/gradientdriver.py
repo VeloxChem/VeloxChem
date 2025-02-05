@@ -26,14 +26,14 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-#from .veloxchemlib import XCMolecularGradient
+from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
 from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .dftutils import get_default_grid_level
-from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
+from .sanitychecks import dft_sanity_check
 
 
 class GradientDriver:
@@ -79,15 +79,29 @@ class GradientDriver:
         self.gradient = None
         self.flag = None
 
-        # TODO: double check self.numerical
-
         self.numerical = False
         self.do_four_point = False
         self.delta_h = 0.001
 
-        self.dft = False
+        self._dft = False
         self.grid_level = None
         self.xcfun = None
+
+        self.checkpoint_file = None
+
+        self._input_keywords = {
+            'gradient': {
+                'numerical': ('bool', 'do numerical integration'),
+                'do_four_point':
+                    ('bool', 'do four-point numerical integration'),
+                'delta_h': ('float', 'the displacement for finite difference'),
+            },
+            'method_settings': {
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+                'dispersion': ('bool', 'do dft-d4 dispersion correction'),
+            }
+        }
 
     def update_settings(self, grad_dict, method_dict):
         """
@@ -99,39 +113,28 @@ class GradientDriver:
             The input dicitonary of method settings group.
         """
 
-        if 'do_four_point' in grad_dict:
-            key = grad_dict['do_four_point'].lower()
-            self.do_four_point = (key in ['yes', 'y'])
-            if self.do_four_point:
-                self.numerical = True
+        grad_keywords = {
+            key: val[0] for key, val in self._input_keywords['gradient'].items()
+        }
 
-        if 'numerical' in grad_dict:
-            key = grad_dict['numerical'].lower()
-            self.numerical = (key in ['yes', 'y'])
+        parse_input(self, grad_keywords, grad_dict)
 
-        # TODO: use parse_input and _dft_sanity_check
+        # sanity check
+        if (self.do_four_point and not self.numerical):
+            self.numerical = True
 
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = (key in ['yes', 'y'])
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Gradient driver: Undefined XC functional')
-        if 'dispersion' in method_dict:
-            key = method_dict['dispersion'].lower()
-            self.dispersion = (key in ['yes', 'y'])
+        method_keywords = {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
 
-        if 'delta_h' in grad_dict:
-            self.delta_h = float(grad_dict['delta_h'])
+        parse_input(self, method_keywords, method_dict)
+
+        dft_sanity_check(self, 'update_settings')
 
     def compute(self, molecule, *args):
         """
-        Performs calculation of numerical gradient.
+        Performs calculation of nuclear gradient.
 
         :param molecule:
             The molecule.
@@ -165,7 +168,15 @@ class GradientDriver:
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
 
-        for i in range(molecule.number_of_atoms()):
+        natoms = molecule.number_of_atoms()
+
+        for i in range(natoms):
+
+            self.ostream.unmute()
+            self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            self.ostream.flush()
+            self.ostream.mute()
+
             for d in range(3):
                 coords[i, d] += self.delta_h
                 new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
@@ -222,7 +233,8 @@ class GradientDriver:
     def grad_vxc_contrib(self, molecule, ao_basis, rhow_density, gs_density,
                          xcfun_label):
         """
-        Calculates the vxc exchange-correlation contribution to the gradient.
+        Calculates the vxc = (d exc / d rho) exchange-correlation contribution
+        to the gradient.
 
         :param molecule:
             The molecule.
@@ -239,13 +251,15 @@ class GradientDriver:
             The vxc exchange-correlation contribution to the gradient.
         """
 
+        # TODO: take mol_grid from arguments
+
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient()
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_density, gs_density, mol_grid, xcfun_label)
         vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
@@ -274,13 +288,15 @@ class GradientDriver:
             The 2nd-order exchange-correlation contribution to the gradient.
         """
 
+        # TODO: take mol_grid from arguments
+
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient()
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)
@@ -312,13 +328,15 @@ class GradientDriver:
             The 3rd-order exchange-correlation contribution to the gradient.
         """
 
+        # TODO: take mol_grid from arguments
+
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient()
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)
@@ -329,7 +347,7 @@ class GradientDriver:
     def grad_tddft_xc_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
                               gs_density, xcfun_label):
         """
-        Calculates exchange-correlation contribution to tddft gradient.
+        Calculates exchange-correlation contribution to TDDFT gradient.
 
         :param molecule:
             The molecule.
@@ -345,8 +363,10 @@ class GradientDriver:
             The label of the xc functional.
 
         :return:
-            The exchange-correlation contribution to tddft gradient.
+            The exchange-correlation contribution to TDDFT gradient.
         """
+
+        # TODO: take mol_grid from arguments
 
         grid_drv = GridDriver(self.comm)
         grid_level = (get_default_grid_level(self.xcfun)
@@ -354,7 +374,7 @@ class GradientDriver:
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xcgrad_drv = XCMolecularGradient(self.comm)
+        xcgrad_drv = XCMolecularGradient()
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
         tddft_xcgrad += xcgrad_drv.integrate_fxc_gradient(
@@ -428,7 +448,7 @@ class GradientDriver:
 
         self.ostream.print_block(molecule.get_string())
 
-    def print_gradient(self, molecule):
+    def print_gradient(self, molecule, state_deriv_index=None):
         """
         Prints the gradient.
 
@@ -448,19 +468,41 @@ class GradientDriver:
         self.ostream.print_header('-' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = '  Atom '
-        valstr += '{:>20s}  '.format('Gradient X')
-        valstr += '{:>20s}  '.format('Gradient Y')
-        valstr += '{:>20s}  '.format('Gradient Z')
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-
-        for i in range(molecule.number_of_atoms()):
-            valstr = '  {:<4s}'.format(labels[i])
-            for d in range(3):
-                valstr += '{:22.12f}'.format(self.gradient[i, d])
+        if (state_deriv_index is None):
+            valstr = '  Atom '
+            valstr += '{:>20s}  '.format('Gradient X')
+            valstr += '{:>20s}  '.format('Gradient Y')
+            valstr += '{:>20s}  '.format('Gradient Z')
             self.ostream.print_header(valstr)
-
+            self.ostream.print_blank()
+            for i in range(molecule.number_of_atoms()):
+                valstr = '  {:<4s}'.format(labels[i])
+                for d in range(3):
+                    valstr += '{:22.12f}'.format(self.gradient[i, d])
+                self.ostream.print_header(valstr)
+        else:
+            gradient_shape = self.gradient.shape
+            for index, s in enumerate(state_deriv_index):
+                self.ostream.print_blank()
+                state = 'Excited State %d' % s
+                self.ostream.print_header(state)
+                self.ostream.print_blank()
+                valstr = '  Atom '
+                valstr += '{:>20s}  '.format('Gradient X')
+                valstr += '{:>20s}  '.format('Gradient Y')
+                valstr += '{:>20s}  '.format('Gradient Z')
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                for i in range(molecule.number_of_atoms()):
+                    valstr = '  {:<4s}'.format(labels[i])
+                    if len(gradient_shape) == 2:
+                        for d in range(3):
+                            valstr += '{:22.12f}'.format(self.gradient[i, d])
+                    else:
+                        for d in range(3):
+                            valstr += '{:22.12f}'.format(self.gradient[index, i,
+                                                                       d])
+                    self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -469,37 +511,57 @@ class GradientDriver:
         Prints gradient calculation setup details to output stream.
         """
 
-        str_width = 60
+        str_width = 70
 
         self.ostream.print_blank()
         self.ostream.print_header(self.flag)
         self.ostream.print_header((len(self.flag) + 2) * '=')
         self.ostream.flush()
 
-        cur_str = 'Gradient Type               : '
+        cur_str = 'Gradient Type                   : '
 
         if self.numerical:
             cur_str += 'Numerical'
-            cur_str2 = 'Numerical Method            : '
+            cur_str2 = 'Numerical Method                : '
             if self.do_four_point:
                 cur_str2 += 'Five-Point Stencil'
             else:
                 cur_str2 += 'Symmetric Difference Quotient'
-            cur_str3 = 'Finite Difference Step Size : '
+            cur_str3 = 'Finite Difference Step Size     : '
             cur_str3 += str(self.delta_h) + ' a.u.'
         else:
             cur_str += 'Analytical'
 
-        if self.numerical or state_deriv_index is not None:
-            self.ostream.print_blank()
-            self.ostream.print_header(cur_str.ljust(str_width))
+        self.ostream.print_blank()
+        self.ostream.print_header(cur_str.ljust(str_width))
         if self.numerical:
             self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
 
-        if state_deriv_index is not None:
-            cur_str = 'Excited State of Interest   : S' + str(state_deriv_index)
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        if state_deriv_index is not None:
+            if isinstance(state_deriv_index, int):
+                cur_str = ('Excited State of Interest       : ' +
+                           str(state_deriv_index + 1))
+                self.ostream.print_header(cur_str.ljust(str_width))
+            elif isinstance(state_deriv_index, tuple):
+                states_txt = ""
+                for i in range(len(state_deriv_index)):
+                    s = state_deriv_index[i]
+                    if i == len(state_deriv_index) - 1:
+                        states_txt += "%d." % s
+                    else:
+                        states_txt += "%d, " % s
+                cur_str = 'Excited States of Interest      : ' + states_txt
+                self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()

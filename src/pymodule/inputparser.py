@@ -116,7 +116,8 @@ class InputParser:
                     continue
 
                 # skip first line if reading basis set
-                if (not self.is_basis_set) and (line[:10] == '@BASIS_SET'):
+                if (not self.is_basis_set) and (line.startswith('@BASIS_SET') or
+                                                line.startswith('@ECP_SET')):
                     self.is_basis_set = True
                     self.basis_set_name = line[10:].strip()
                     continue
@@ -153,7 +154,9 @@ class InputParser:
 
             for line in input_groups[group]:
                 if ':' in line:
-                    key, value = line.split(':')
+                    content = line.split(':')
+                    key = content[0]
+                    value = ':'.join(content[1:])
                     key = '_'.join(key.strip().lower().split())
                     value = value.strip()
                     if value:
@@ -512,7 +515,9 @@ def get_random_string_serial():
     """
 
     datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
-    datetime_string = datetime_string.replace(':', '.')
+    datetime_string = datetime_string.replace('-', '')
+    datetime_string = datetime_string.replace('T', '_')
+    datetime_string = datetime_string.replace(':', '')
 
     random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
 

@@ -50,25 +50,25 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
 
     try:
-        from openbabel import pybel as pb
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
 
-        mol = pb.readstring('smiles', smiles_str)
-        mol.make3D()
+        mol_bare = Chem.MolFromSmiles(smiles_str)
+        mol_full = Chem.AddHs(mol_bare)
+
+        use_random_coords = (mol_full.GetNumConformers() == 0)
+        AllChem.EmbedMolecule(mol_full, useRandomCoords=use_random_coords)
 
         if optimize:
-            # TODO: Double check if UFF is needed
-            mol.localopt(forcefield="mmff94", steps=300)
+            AllChem.UFFOptimizeMolecule(mol_full)
 
-        if not hydrogen:
-            # remove hydrogens
-            mol.removeh()
-            return mol.write(format="xyz")
-
+        if hydrogen:
+            return Chem.MolToXYZBlock(mol_full)
         else:
-            return mol.write(format="xyz")
+            return Chem.RemoveHs(mol_full)
 
     except ImportError:
-        raise ImportError('Unable to import openbabel')
+        raise ImportError('Unable to import rdkit.')
 
 
 @staticmethod
@@ -318,6 +318,9 @@ def _Molecule_read_xyz_file(xyzfile):
     :return:
         The molecule.
     """
+
+    assert_msg_critical(
+        Path(xyzfile).is_file(), f'Molecule: xyzfile {xyzfile} does not exist')
 
     with Path(xyzfile).open('r') as fh:
         xyzstr = fh.read()
@@ -783,7 +786,7 @@ def _Molecule_get_coordinates_in_bohr(self):
     """
 
     coords = []
-    for r in self.get_coordinates():
+    for r in self._get_coordinates():
         coords.append(r.coordinates())
 
     return np.array(coords)
@@ -798,7 +801,7 @@ def _Molecule_get_coordinates_in_angstrom(self):
     """
 
     coords = []
-    for r in self.get_coordinates('angstrom'):
+    for r in self._get_coordinates('angstrom'):
         coords.append(r.coordinates())
 
     return np.array(coords)
@@ -923,35 +926,36 @@ def _Molecule_show(self,
         raise ImportError('Unable to import py3Dmol')
 
 
-def _Molecule_draw_2d(self, width=400, height=300):
+@staticmethod
+def _Molecule_draw_2d(smiles_str, width=400, height=300):
     """
-    Generates 2D representation of the molecule.
+    Draw 2D representation for SMILES string.
 
+    :param smiles_str:
+        The SMILES string.
     :param width:
-        The width.
+        The width of the drawing area.
     :param height:
-        The height.
+        The height of the drawing area.
     """
 
     try:
-        from openbabel import pybel as pb
-        from IPython.display import SVG, display
+        from rdkit import Chem
+        from IPython.display import SVG
+        from IPython.display import display
 
-        molecule = self.get_xyz_string()
+        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
+                                                 optimize=True,
+                                                 hydrogen=False)
 
-        mol = pb.readstring('xyz', molecule)
+        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
+        drawer.DrawMolecule(mol_no_hydrogen)
+        drawer.FinishDrawing()
 
-        mol.make2D()
-        mol.removeh()
-
-        # Convert to SVG using pybel's drawing method
-        svg_string = mol.write(format='svg', opt={'w': width, 'h': height})
-
-        # Display SVG
-        display(SVG(svg_string))
+        display(SVG(drawer.GetDrawingText()))
 
     except ImportError:
-        raise ImportError('Unable to import openbabel and/or IPython.display.')
+        raise ImportError('Unable to import rdkit.Chem and/or IPython.display.')
 
 
 def _Molecule_moments_of_inertia(self, principal_axes=False):
@@ -1156,6 +1160,7 @@ Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees
 Molecule.set_dihedral_in_degrees = _Molecule_set_dihedral_in_degrees
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
 Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
+Molecule.get_string = _Molecule_get_string
 Molecule.more_info = _Molecule_more_info
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
@@ -1171,7 +1176,6 @@ Molecule.print_keywords = _Molecule_print_keywords
 Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
-Molecule.get_string = _Molecule_get_string
 
 # aliases for backward compatibility
 Molecule.read_xyz = _Molecule_read_xyz_file

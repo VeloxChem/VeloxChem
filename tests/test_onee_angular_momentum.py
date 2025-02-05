@@ -3,7 +3,7 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.veloxchemlib import compute_angular_momentum_integrals
+from veloxchem.oneeints import compute_angular_momentum_integrals
 
 
 class TestOneElecIntsAngularMomentum:

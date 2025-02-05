@@ -38,8 +38,12 @@ def molecule_sanity_check(mol):
         The molecule.
     """
 
-    mol.check_multiplicity()
-    mol.check_proximity(0.1)
+    assert_msg_critical(
+        mol.check_multiplicity(),
+        'Molecule: Incompatible multiplicity and number of electrons')
+    assert_msg_critical(
+        mol.check_proximity(0.1),
+        'Molecule: Corrupted geometry with closely located atoms')
 
 
 def scf_results_sanity_check(obj, scf_results):
@@ -149,6 +153,72 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
         err_msg_scan += 'SCAN family of functional is not supported'
         assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
                             err_msg_scan)
+
+
+def polgrad_sanity_check(obj, method_flag, lr_results):
+    """
+    Checks settings for polarizability gradient and polarizability
+    orbital response against linear response results.
+
+    :param obj:
+        The object (polarizability gradient or orbital response driver).
+    :param method_flag:
+        The flag indicating the method in which the sanity check is
+        called.
+    :param lr_results:
+        A dictionary containing linear response results.
+    """
+
+    response_results = lr_results.get('solutions', None)
+    for frequency in obj.frequencies:
+        if (obj.vector_components[0], frequency) not in response_results.keys():
+            error_msg = 'Frequency {:2.3f} in '.format(frequency)
+            error_msg += method_flag + ' not found in linear response results '
+            error_msg += 'for vector compontent ' + obj.vector_components[0]
+            raise ValueError(error_msg)
+
+
+def raman_sanity_check(obj):
+    """
+    Checks whether both normal and resonance Raman has been requested.
+    Print warning message and set normal Raman flag to False.
+    The driver will continue with resonance Raman.
+
+    Checks if zero frequency has been input to resonance Raman. If so,
+    the value is removed from frequency list.
+
+    :param obj:
+        The object (vibrational analysis driver)
+    """
+
+    if (obj.do_raman and obj.do_resonance_raman):
+        warn_msg = 'Both normal and resonance Raman have been requested, '
+        warn_msg += 'but only one can run at a time.\n'
+        obj.ostream.print_warning(warn_msg)
+        info_msg = 'Will continue with resonance Raman.'
+        obj.ostream.print_warning(info_msg)
+        obj.ostream.flush()
+        obj.do_raman = False
+
+    # This check is due to convergence/singulaity issues in the cphf
+    # subspace solver for some molecules.
+    if obj.do_resonance_raman:
+        try:
+            idx0 = obj.frequencies.index(0.0)
+            warn_msg = 'Zero in frequency list for resonance Raman!\n'
+            if len(obj.frequencies) == 1:
+                warn_msg += 'No other frequencies requested.'
+                warn_msg += 'Will continue with normal Raman.'
+                obj.do_raman = True
+                obj.do_resonance_raman = False
+            else:
+                obj.frequencies.pop(idx0)
+                warn_msg += 'It has been removed from the list.\n'
+                warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
+                warn_msg += str(obj.frequencies)
+            obj.ostream.print_warning(warn_msg)
+        except ValueError:
+            pass
 
 
 def pe_sanity_check(obj, method_dict=None):
@@ -301,3 +371,32 @@ def embedding_options_sanity_check(options):
         raise KeyError(
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
+
+
+def solvation_model_sanity_check(obj):
+    """
+    Checks solvation model and updates relevant attributes.
+    """
+
+    if obj.solvation_model is not None:
+        assert_msg_critical(
+            not obj._pe,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'polarizable embedding')
+
+        assert_msg_critical(
+            obj.point_charges is None,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'point charges')
+
+        assert_msg_critical(
+            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+            type(obj).__name__ +
+            ': Only the C-PCM solvation model is implemented.')
+
+        obj._cpcm = True
+
+    else:
+        obj._cpcm = False

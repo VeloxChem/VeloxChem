@@ -25,10 +25,11 @@
 from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
+import math
 import sys
 
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -236,6 +237,32 @@ class ScfRestrictedDriver(ScfDriver):
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size)
+
+            if self.pfon and (self.pfon_temperature > 0):
+
+                self.ostream.print_info(
+                    f'Applying pseudo-FON (T={self.pfon_temperature:.0f}K)')
+
+                kT = boltzmann_in_hartreeperkelvin() * self.pfon_temperature
+                inv_kT = 1.0 / kT
+
+                nocc_a = molecule.number_of_alpha_electrons()
+                e_fermi_a = 0.5 * (eigs[nocc_a - 1] + eigs[nocc_a])
+                idx_start_a = max(0, nocc_a - self.pfon_nocc)
+                idx_end_a = min(eigs.size, nocc_a + self.pfon_nvir)
+                pfon_a = {}
+                sum_pfon_a = 0.0
+                for idx in range(idx_start_a, idx_end_a):
+                    try:
+                        exp_ene_kT = math.exp((eigs[idx] - e_fermi_a) * inv_kT)
+                    except OverflowError:
+                        exp_ene_kT = float('inf')
+                    pfon_a[idx] = 1.0 / (1.0 + exp_ene_kT)
+                    sum_pfon_a += pfon_a[idx]
+                pfon_scale_a = self.pfon_nocc / sum_pfon_a
+                for idx in range(idx_start_a, idx_end_a):
+                    pfon_a[idx] *= pfon_scale_a
+                    occa[idx] = pfon_a[idx]
 
             return MolecularOrbitals([orb_coefs], [eigs], [occa], molorb.rest)
 

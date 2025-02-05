@@ -25,7 +25,6 @@
 import numpy as np
 import math
 
-from .veloxchemlib import bohr_in_angstrom
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
@@ -70,6 +69,10 @@ class OrbitalViewer:
 
         # flag for using interpolation when computing orbitals
         self.interpolate = False
+
+        self.orbital_color_scheme = 'default'
+        self.orbital_isovalue = 0.05
+        self.orbital_opacity = 0.7
 
         # To focus the grid around only specific atoms (for large systems)
         self.atom_centers = None
@@ -287,48 +290,53 @@ class OrbitalViewer:
                 t_floor = np.floor(t)
                 alpha = t - t_floor
 
+                interp_atom_orb = np.zeros(atom_orb.shape + np.array([1, 1, 1]))
+
                 for i, j, k in ijk_inds:
                     # coefficient for trilinear interpolation
                     x_coef = (1.0 - alpha[0]) if i == 0 else alpha[0]
                     y_coef = (1.0 - alpha[1]) if j == 0 else alpha[1]
                     z_coef = (1.0 - alpha[2]) if k == 0 else alpha[2]
-                    xyz_coef = x_coef * y_coef * z_coef
 
-                    # t1: starting index in molecule grid
-                    # p1: starting index in atom grid
-                    # ncopy: number of grid points to copy from atom grid to
-                    #        molecule grid
-                    t1 = t_floor.astype('int') + np.array([i, j, k])
-                    ncopy = [nx, ny, nz]
-                    p1 = [0, 0, 0]
+                    interp_atom_orb[i:i + nx, j:j + ny,
+                                    k:k + nz] += (x_coef * y_coef * z_coef *
+                                                  atom_orb[:, :, :])
 
-                    discard = False
-                    for i in range(3):
-                        if t[i] >= self.npoints[i]:
-                            discard = True
-                            break
-                        if t[i] + ncopy[i] < 0:
-                            discard = True
-                            break
-                        # match lower bound
-                        if t1[i] < 0:
-                            p1[i] = -t1[i]
-                            t1[i] = 0
-                            ncopy[i] -= p1[i]
-                        # match upper bound
-                        if t1[i] + ncopy[i] > self.npoints[i]:
-                            ncopy[i] = self.npoints[i] - t1[i]
-                    if discard:
-                        continue
-                    np_orb[
-                        t1[0]:t1[0] + ncopy[0],
-                        t1[1]:t1[1] + ncopy[1],
-                        t1[2]:t1[2] + ncopy[2],
-                    ] += xyz_coef * orb_coef * atom_orb[
-                        p1[0]:p1[0] + ncopy[0],
-                        p1[1]:p1[1] + ncopy[1],
-                        p1[2]:p1[2] + ncopy[2],
-                    ]
+                # t1: starting index in molecule grid
+                # p1: starting index in interpolated atom grid
+                # ncopy: number of grid points to copy from interpolated atom
+                #        grid to molecule grid
+                t1 = t_floor.astype('int')
+                ncopy = [nx + 1, ny + 1, nz + 1]
+                p1 = [0, 0, 0]
+
+                discard = False
+                for i in range(3):
+                    if t[i] >= self.npoints[i]:
+                        discard = True
+                        break
+                    if t[i] + ncopy[i] < 0:
+                        discard = True
+                        break
+                    # match lower bound
+                    if t1[i] < 0:
+                        p1[i] = -t1[i]
+                        t1[i] = 0
+                        ncopy[i] -= p1[i]
+                    # match upper bound
+                    if t1[i] + ncopy[i] > self.npoints[i]:
+                        ncopy[i] = self.npoints[i] - t1[i]
+                if discard:
+                    continue
+                np_orb[
+                    t1[0]:t1[0] + ncopy[0],
+                    t1[1]:t1[1] + ncopy[1],
+                    t1[2]:t1[2] + ncopy[2],
+                ] += orb_coef * interp_atom_orb[
+                    p1[0]:p1[0] + ncopy[0],
+                    p1[1]:p1[1] + ncopy[1],
+                    p1[2]:p1[2] + ncopy[2],
+                ]
 
         return np_orb
 
@@ -392,6 +400,9 @@ class OrbitalViewer:
         self._this_plot += self._plt_iso_two
         self._this_plot.display()
 
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
         orb_occ = mo_object.occa_to_numpy()
@@ -406,6 +417,14 @@ class OrbitalViewer:
         for i in range(len(orb_ene)):
             orb_label = f'{i + 1:3d} occ={orb_occ[i]:.3f} '
             orb_label += f'ene={orb_ene[i]:.3f}'
+            if i < nalpha - 1:
+                orb_label += f'  (alpha HOMO-{nalpha - 1 - i})'
+            elif i == nalpha - 1:
+                orb_label += '  (alpha HOMO)'
+            elif i == nalpha:
+                orb_label += '  (alpha LUMO)'
+            elif i > nalpha:
+                orb_label += f'  (alpha LUMO+{i - nalpha})'
             orblist.append((orb_label, i))
 
         # Also do for beta if UHF
@@ -415,6 +434,14 @@ class OrbitalViewer:
             for i in range(len(orb_ene_beta)):
                 orb_label = f'{i + 1:3d} occ={orb_occ_beta[i]:.3f} '
                 orb_label += f'ene={orb_ene_beta[i]:.3f}'
+                if i < nbeta - 1:
+                    orb_label += f'  (beta HOMO-{nbeta - 1 - i})'
+                elif i == nbeta - 1:
+                    orb_label += '  (beta HOMO)'
+                elif i == nbeta:
+                    orb_label += '  (beta LUMO)'
+                elif i > nbeta:
+                    orb_label += f'  (beta LUMO+{i - nbeta})'
                 orblist_beta.append((orb_label, i))
 
             # Add empty space
@@ -531,32 +558,18 @@ class OrbitalViewer:
             dtype='uint32',
         )
 
-        atomradius = [
-            0.53, 0.31, 1.67, 1.12, 0.87, 0.67, 0.56, 0.48, 0.42, 0.38, 1.90,
-            1.45, 1.18, 1.11, 0.98, 0.88, 0.79, 0.71, 2.43, 1.94, 1.84, 1.76,
-            1.71, 1.66, 1.61, 1.56, 1.52, 1.49, 1.45, 1.42, 1.36, 1.25, 1.14,
-            1.03, 0.94, 0.88, 2.65, 2.19, 2.12, 2.06, 1.98, 1.90, 1.83, 1.78,
-            1.73, 1.69, 1.65, 1.61, 1.56, 1.45, 1.33, 1.23, 1.15, 1.08, 2.98,
-            2.53, 1.95, 1.85, 2.47, 2.06, 2.05, 2.38, 2.31, 2.33, 2.25, 2.28,
-            2.26, 2.26, 2.22, 2.22, 2.17, 2.08, 2.00, 1.93, 1.88, 1.85, 1.80,
-            1.77, 1.74, 1.71, 1.56, 1.54, 1.43, 1.35, 1.27, 1.20
-        ]
+        connectivity_matrix = molecule.get_connectivity_matrix()
 
         natoms = molecule.number_of_atoms()
         coords = molecule.get_coordinates_in_bohr().astype('float32')
 
-        # Create a list of colors and radii
+        # Create a list of colors
         colors = []
-        radii = []
         for nr in self._atomnr:
             if nr < len(atomcolor):
                 colors.append(atomcolor[nr])
             else:
                 colors.append(atomcolor[-1])
-            if nr < len(atomradius):
-                radii.append(atomradius[nr])
-            else:
-                radii.append(2.0)
 
         # Balls
         plt_atoms = k3d.points(positions=coords,
@@ -583,8 +596,7 @@ class OrbitalViewer:
         for i in range(natoms):
             for j in range(i + 1, natoms):
                 # Check if there is a bond
-                bond = (radii[i] + radii[j]) / bohr_in_angstrom()
-                if np.linalg.norm(coords[i, :] - coords[j, :]) > 1.25 * bond:
+                if connectivity_matrix[i, j] != 1:
                     continue
                 # If single atom type, just record it
                 if self._atomnr[i] == self._atomnr[j]:
@@ -618,8 +630,6 @@ class OrbitalViewer:
 
         :param orbital:
             The molecular orbital on the grid.
-        :param isovalue:
-            The isovalue for isosurfaces.
 
         :return:
             A tuple with the k3d positive and negative isosurfaces.
@@ -644,10 +654,14 @@ class OrbitalViewer:
         bounds = [xmin, xmax, ymin, ymax, zmin, zmax]
 
         # Default settings
-        isovalue = 0.05
-        opacity = 0.7
+        isovalue = self.orbital_isovalue
+        opacity = self.orbital_opacity
         wireframe = False
-        color = 0x0000ff
+
+        if self.orbital_color_scheme == 'default':
+            color = 0x0000ff
+        elif self.orbital_color_scheme == 'alternative':
+            color = 0x62a0ea
 
         # Find if the user changed the defaults
         if self._plt_iso_one:
@@ -669,7 +683,12 @@ class OrbitalViewer:
 
         # Find if the user changed the defaults
         isovalue = -isovalue
-        color = 0xff0000
+
+        if self.orbital_color_scheme == 'default':
+            color = 0xff0000
+        elif self.orbital_color_scheme == 'alternative':
+            color = 0xe5a50a
+
         if self._plt_iso_two:
             isovalue = self._plt_iso_two.level
             opacity = self._plt_iso_two.opacity

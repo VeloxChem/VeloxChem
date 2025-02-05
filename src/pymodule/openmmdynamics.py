@@ -24,34 +24,35 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-import numpy as np
 from pathlib import Path
-from sys import stdout
 from time import time
-import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import xml.etree.ElementTree as ET
+import numpy as np
+import sys
 
-# Required OpenMM imports
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
-
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
 from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
 from .forcefieldgenerator import ForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
-
-# Drivers
 from .xtbdriver import XtbDriver
 from .scfdriver import ScfDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
+from .errorhandler import assert_msg_critical
+
+try:
+    import openmm as mm
+    import openmm.app as app
+    import openmm.unit as unit
+except ImportError:
+    pass
+
 
 class OpenMMDynamics:
     """
@@ -105,13 +106,17 @@ class OpenMMDynamics:
         Initializes the class with default simulation parameters.
         """
 
+        assert_msg_critical(
+            'openmm' in sys.modules,
+            'OpenMM is required for OpenMMDynamics.')
+
         # MPI and output stream
         if comm is None:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
             if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(stdout)
+                ostream = OutputStream(sys.stdout)
             else:
                 ostream = OutputStream(None)
 

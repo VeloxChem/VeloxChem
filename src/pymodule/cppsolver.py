@@ -285,7 +285,7 @@ class ComplexResponse(LinearSolver):
 
         :return:
             A dictionary containing response functions, solutions and a
-            dictionarry containing solutions and kappa values when called from
+            dictionary containing solutions and kappa values when called from
             a non-linear response module.
         """
 
@@ -314,6 +314,12 @@ class ComplexResponse(LinearSolver):
 
         # check pe setup
         pe_sanity_check(self)
+
+        # check solvation model setup
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                'solvation_model' not in scf_tensors,
+                type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -448,8 +454,10 @@ class ComplexResponse(LinearSolver):
         else:
             bger, bung = self._setup_trials(dist_rhs, precond)
 
+            profiler.set_timing_key('Preparation')
+
             self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict)
+                                eri_dict, dft_dict, pe_dict, profiler)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1090,6 +1098,7 @@ class ComplexResponse(LinearSolver):
                         ops_label, rsp_func_val.real, rsp_func_val.imag)
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
+        ostream.flush()
 
     def _print_absorption_results(self, rsp_results, ostream=None):
         """

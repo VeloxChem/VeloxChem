@@ -51,6 +51,7 @@ class XtbHessianDriver(HessianDriver):
 
         self.xtb_driver = xtb_drv
         self.flag = 'XTB Hessian Driver'
+        self.numerical = True
 
     def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):
         """

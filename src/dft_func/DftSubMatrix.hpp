@@ -72,6 +72,11 @@ auto getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vec
  */
 auto distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseMatrix& subMatrix, const std::vector<int>& aoIndices) -> void;
 
+auto distributeSubMatrixToKohnSham(CAOKohnShamMatrix&      aoKohnShamMatrix,
+                                   const CDenseMatrix&     subMatrix_a,
+                                   const CDenseMatrix&     subMatrix_b,
+                                   const std::vector<int>& aoIndices) -> void;
+
 /**
  Distributes partial matrices to AO Kohn-Sham matrix.
 
@@ -97,6 +102,11 @@ auto distributeSubMatrixToFock(const std::vector<double*>& aoFockPointers,
                                const CDenseMatrix&         subMatrix,
                                const std::vector<int>&     aoIndices,
                                const int                   naos) -> void;
+
+void distributeSubMatrixToDenseMatrix(CDenseMatrix&           matrix,
+                                      const CDenseMatrix&     subMatrix,
+                                      const std::vector<int>& aoIndices,
+                                      const int               naos);
 
 /**
  Distributes partial Wxc tensor (pair functional) to full Wxc tensor.

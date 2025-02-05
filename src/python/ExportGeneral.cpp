@@ -29,6 +29,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "AtomicRadii.hpp"
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
 #include "OpenMPFunc.hpp"
@@ -128,6 +129,9 @@ export_general(py::module &m) -> void
           &units::getExtinctionCoefficientFromBeta,
           "Gets factor needed for the calculation of the extinction coefficent from the electric-dipole magnetic-dipole polarizability beta.");
     m.def("fine_structure_constant", &units::getFineStructureConstant, "Gets fine-structure constant.");
+
+    // exposing functions from AtomicRadii.hpp
+    m.def("get_vdw_radii_data_in_bohr", &atomicradii::buildVdwRadii, "Gets VDW radii data in atomic unit.");
 
     // exposing functions from TensorLabels.hpp
     m.def("tensor_cartesian_labels", &tensor::cartesian_labels, "Gets all Cartesian component labels of tensor.");

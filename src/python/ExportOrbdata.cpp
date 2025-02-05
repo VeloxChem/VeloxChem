@@ -259,13 +259,23 @@ export_orbdata(py::module &m)
              py::overload_cast<const std::vector<int> &, const int>(&CMolecularBasis::contraction_depths, py::const_),
              "Gets contraction depths of GTOs with specific angular momentum "
              "from molecular basis for list of specific atoms.")
+        .def("get_dimension_of_basis",
+             py::overload_cast<>(&CMolecularBasis::dimensions_of_basis, py::const_),
+             "Gets full dimensions of basis of molecular basis.")
         .def("get_dimensions_of_basis",
              py::overload_cast<>(&CMolecularBasis::dimensions_of_basis, py::const_),
              "Gets full dimensions of basis of molecular basis.")
+        .def("get_dimension_of_basis",
+             py::overload_cast<const int>(&CMolecularBasis::dimensions_of_basis, py::const_),
+             "Gets partial dimensions of basis of molecular basis up to specific "
+             "angular momentum.")
         .def("get_dimensions_of_basis",
              py::overload_cast<const int>(&CMolecularBasis::dimensions_of_basis, py::const_),
              "Gets partial dimensions of basis of molecular basis up to specific "
              "angular momentum.")
+        .def("get_dimension_of_primitive_basis",
+             py::overload_cast<>(&CMolecularBasis::dimensions_of_primitive_basis, py::const_),
+             "Gets full dimensions of primitive basis of molecular basis.")
         .def("get_dimensions_of_primitive_basis",
              py::overload_cast<>(&CMolecularBasis::dimensions_of_primitive_basis, py::const_),
              "Gets full dimensions of primitive basis of molecular basis.")

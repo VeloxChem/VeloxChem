@@ -28,18 +28,35 @@ from .veloxchemlib import BasisFunction
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
+from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import ElectricDipoleMomentDriver
 from .veloxchemlib import OverlapGeom100Driver
+from .veloxchemlib import OverlapGeom200Driver
+from .veloxchemlib import OverlapGeom101Driver
 from .veloxchemlib import KineticEnergyGeom100Driver
+from .veloxchemlib import KineticEnergyGeom200Driver
+from .veloxchemlib import KineticEnergyGeom101Driver
 from .veloxchemlib import NuclearPotentialGeom010Driver
 from .veloxchemlib import NuclearPotentialGeom100Driver
+from .veloxchemlib import NuclearPotentialGeom200Driver
+from .veloxchemlib import NuclearPotentialGeom110Driver
+from .veloxchemlib import NuclearPotentialGeom101Driver
+from .veloxchemlib import NuclearPotentialErfGeom100Driver
+from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
+from .veloxchemlib import FockGeom2000Driver
+from .veloxchemlib import FockGeom1100Driver
+from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import XCMolecularGradient
+from .veloxchemlib import SubMatrix
+
+# for backward compatibility only
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 
 # C++ functions
 from .veloxchemlib import is_chemical_element
@@ -93,7 +110,9 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
+from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
+from .cpcmdriver import CpcmDriver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
@@ -123,17 +142,27 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
+from .tddftorbitalresponse import TddftOrbitalResponse
+from .tddftgradientdriver import TddftGradientDriver
+from .hessiandriver import HessianDriver
+from .scfhessiandriver import ScfHessianDriver
+from .cphfsolver import CphfSolver
+from .hessianorbitalresponse import HessianOrbitalResponse
+from .tdhfhessiandriver import TdhfHessianDriver
+from .polorbitalresponse import PolOrbitalResponse
+from .polarizabilitygradient import PolarizabilityGradient
+from .vibrationalanalysis import VibrationalAnalysis
 from .forcefieldgenerator import ForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
+from .densityviewer import DensityViewer
 from .numerovdriver import NumerovDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .symmetryanalyzer import SymmetryAnalyzer
-# Additional classes for MD branch
 from .solvationbuilder import SolvationBuilder
-from .solvationfepdriver import SolvationFEPDriver
+from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .evbdriver import EvbDriver
 from .evbffbuilder import EvbForceFieldBuilder
@@ -145,6 +174,12 @@ from .evbdataprocessing import EvbDataProcessing
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
+from .oneeints import compute_overlap_integrals
+from .oneeints import compute_kinetic_energy_integrals
+from .oneeints import compute_nuclear_potential_integrals
+from .oneeints import compute_electric_dipole_integrals
+from .oneeints import compute_linear_momentum_integrals
+from .oneeints import compute_angular_momentum_integrals
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
 from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,

@@ -145,6 +145,20 @@ CDenseMatrix::transpose() const -> CDenseMatrix
 }
 
 auto
+CDenseMatrix::scale(const double factor) -> void
+{
+    for (int i = 0; i < _nRows; i++)
+    {
+        auto ptr_i = row(i);
+
+        for (int j = 0; j < _nColumns; j++)
+        {
+            ptr_i[j] *= factor;
+        }
+    }
+}
+
+auto
 CDenseMatrix::symmetrize() -> void
 {
     auto fmat = _values.data();

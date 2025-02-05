@@ -51,10 +51,12 @@ from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
+from .cpcmdriver import CpcmDriver
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_libxc_reference
-from .sanitychecks import molecule_sanity_check, dft_sanity_check, pe_sanity_check
+from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
+                           pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
@@ -132,6 +134,19 @@ class ScfDriver:
         self.max_iter = 50
         self._first_step = False
 
+        # pseudo fractional occupation number (pFON)
+        # J. Chem. Phys. 110, 695-700 (1999)
+        self.pfon = False
+        self.pfon_temperature = 1250
+        self.pfon_delta_temperature = 50
+        self.pfon_nocc = 5
+        self.pfon_nvir = 5
+
+        # level-shifting
+        # Int. J. Quantum Chem. 7, 699-705 (1973).
+        self.level_shifting = 0.0
+        self.level_shifting_delta = 0.01
+
         # thresholds
         self.conv_thresh = 1.0e-6
         self.ovl_thresh = 1.0e-6
@@ -200,9 +215,17 @@ class ScfDriver:
         self.embedding_options = None
         self._embedding_drv = None
 
+        # solvation model
+        self.solvation_model = None
+        self._cpcm = False
+        self.cpcm_drv = None
+        self.cpcm_epsilon = 78.39
+        self.cpcm_grid_per_sphere = 194
+        self.cpcm_x = 0
+
         # point charges (in case we want a simple MM environment without PE)
-        self._point_charges = None
-        self._qm_vdw_params = None
+        self.point_charges = None
+        self.qm_vdw_params = None
         self._nuc_mm_energy = 0.0
         self._V_es = None
 
@@ -242,6 +265,15 @@ class ScfDriver:
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
+                'max_err_vecs': ('int', 'maximum number of DIIS error vectors'),
+                'pfon': ('bool', 'use pFON to accelerate convergence'),
+                'pfon_temperature': ('float', 'pFON temperature'),
+                'pfon_delta_temperature': ('float', 'pFON delta temperature'),
+                'pfon_nocc':
+                    ('int', 'number of occupied orbitals used in pFON'),
+                'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
+                'level_shifting': ('float', 'level shifting parameter'),
+                'level_shifting_delta': ('float', 'level shifting delta'),
                 'conv_thresh': ('float', 'SCF convergence threshold'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
@@ -254,8 +286,8 @@ class ScfDriver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
                     ('str', 'unpaired electrons for initila guess'),
-                '_point_charges': ('str', 'potential file for point charges'),
-                '_qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
+                'point_charges': ('str', 'potential file for point charges'),
+                'qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
@@ -265,6 +297,12 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'solvation_model': ('str', 'solvation model'),
+                'cpcm_grid_per_sphere':
+                    ('int', 'number of grid points per sphere (C-PCM)'),
+                'cpcm_epsilon':
+                    ('float', 'dielectric constant of solvent (C-PCM)'),
+                'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -445,15 +483,12 @@ class ScfDriver:
             # field
             self.restart = False
 
-        if self._point_charges is not None:
+        if self.point_charges is not None:
             assert_msg_critical(
                 not self._pe,
-                'SCF driver: The \'_point_charges\' option is incompatible ' +
+                'SCF driver: The \'point_charges\' option is incompatible ' +
                 'with polarizable embedding')
-            # disable restart of calculation with point charges since
-            # checkpoint file does not contain information about the point
-            # charges
-            self.restart = False
+            # Note: we allow restarting SCF with point charges
 
     def compute(self, molecule, ao_basis, min_basis=None):
         """
@@ -487,6 +522,16 @@ class ScfDriver:
 
         # check pe setup
         pe_sanity_check(self)
+
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+        if self._cpcm:
+            self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
+            self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
+            self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.x = self.cpcm_x
+        else:
+            self.cpcm_drv = None
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -547,6 +592,26 @@ class ScfDriver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+        # set up polarizable continuum model
+        if self._cpcm:
+            cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
+            self.ostream.print_info(cpcm_info)
+            self.ostream.print_blank()
+            iswig_ref = 'A. W. Lange, J. M. Herbert,'
+            iswig_ref += ' J. Chem. Phys. 2010, 133, 244111.'
+            self.ostream.print_reference(iswig_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            (self._cpcm_grid,
+             self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
+            self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
+                self._cpcm_grid, self._cpcm_sw_func)
+            self._cpcm_Bmat = self.cpcm_drv.form_matrix_B(
+                self._cpcm_grid, molecule)
+            self._cpcm_Bzvec = np.dot(self._cpcm_Bmat,
+                                      molecule.get_element_ids())
+
         # set up polarizable embedding
         if self._pe:
 
@@ -594,10 +659,10 @@ class ScfDriver:
             self.ostream.print_blank()
 
         # set up point charges without PE
-        elif self._point_charges is not None:
+        elif self.point_charges is not None:
 
-            if isinstance(self._point_charges, str):
-                potfile = self._point_charges
+            if isinstance(self.point_charges, str):
+                potfile = self.point_charges
 
                 pot_info = 'Reading point charges: {}'.format(potfile)
                 self.ostream.print_info(pot_info)
@@ -614,25 +679,30 @@ class ScfDriver:
                         assert_msg_critical(
                             npoints == len(lines[2:]),
                             'potfile: Inconsistent number of points')
-                        self._point_charges = np.zeros((6, npoints))
+                        self.point_charges = np.zeros((6, npoints))
                         for idx, line in enumerate(lines[2:]):
-                            label, x, y, z, q, sigma, epsilon = line.split()
-                            self._point_charges[0, idx] = (float(x) /
-                                                           bohr_in_angstrom())
-                            self._point_charges[1, idx] = (float(y) /
-                                                           bohr_in_angstrom())
-                            self._point_charges[2, idx] = (float(z) /
-                                                           bohr_in_angstrom())
-                            self._point_charges[3, idx] = float(q)
-                            self._point_charges[4, idx] = float(sigma)
-                            self._point_charges[5, idx] = float(epsilon)
+                            content = line.split()
+                            label, x, y, z, q = content[:5]
+                            self.point_charges[0, idx] = (float(x) /
+                                                          bohr_in_angstrom())
+                            self.point_charges[1, idx] = (float(y) /
+                                                          bohr_in_angstrom())
+                            self.point_charges[2, idx] = (float(z) /
+                                                          bohr_in_angstrom())
+                            self.point_charges[3, idx] = float(q)
+                            if self.qm_vdw_params is not None:
+                                # Note: read MM vdw parameters only when QM vdw
+                                # parameters are present
+                                sigma, epsilon = content[5:7]
+                                self.point_charges[4, idx] = float(sigma)
+                                self.point_charges[5, idx] = float(epsilon)
                 else:
-                    self._point_charges = None
-                self._point_charges = self.comm.bcast(self._point_charges,
-                                                      root=mpi_master())
+                    self.point_charges = None
+                self.point_charges = self.comm.bcast(self.point_charges,
+                                                     root=mpi_master())
 
-            if isinstance(self._qm_vdw_params, str):
-                vdw_param_file = self._qm_vdw_params
+            if isinstance(self.qm_vdw_params, str):
+                vdw_param_file = self.qm_vdw_params
 
                 vdw_info = 'Reading vdw parameters for QM atoms: {}'.format(
                     vdw_param_file)
@@ -641,16 +711,16 @@ class ScfDriver:
 
                 if self.rank == mpi_master():
                     natoms = molecule.number_of_atoms()
-                    self._qm_vdw_params = np.zeros((natoms, 2))
+                    self.qm_vdw_params = np.zeros((natoms, 2))
                     with Path(vdw_param_file).open('r') as fh:
                         for a in range(natoms):
                             sigma, epsilon = fh.readline().split()
-                            self._qm_vdw_params[a, 0] = float(sigma)
-                            self._qm_vdw_params[a, 1] = float(epsilon)
+                            self.qm_vdw_params[a, 0] = float(sigma)
+                            self.qm_vdw_params[a, 1] = float(epsilon)
                 else:
-                    self._qm_vdw_params = None
-                self._qm_vdw_params = self.comm.bcast(self._qm_vdw_params,
-                                                      root=mpi_master())
+                    self.qm_vdw_params = None
+                self.qm_vdw_params = self.comm.bcast(self.qm_vdw_params,
+                                                     root=mpi_master())
 
             # nuclei - point charges interaction
             self._nuc_mm_energy = 0.0
@@ -658,47 +728,48 @@ class ScfDriver:
             natoms = molecule.number_of_atoms()
             coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.get_element_ids()
-            npoints = self._point_charges.shape[1]
+            npoints = self.point_charges.shape[1]
 
             for a in range(self.rank, natoms, self.nodes):
                 xyz_a = coords[a]
                 chg_a = nuclear_charges[a]
 
                 for p in range(npoints):
-                    xyz_p = self._point_charges[:3, p]
-                    chg_p = self._point_charges[3, p]
+                    xyz_p = self.point_charges[:3, p]
+                    chg_p = self.point_charges[3, p]
                     r_ap = np.linalg.norm(xyz_a - xyz_p)
 
                     self._nuc_mm_energy += chg_a * chg_p / r_ap
 
-            vdw_ene = 0.0
+            if self.qm_vdw_params is not None:
+                vdw_ene = 0.0
 
-            for a in range(self.rank, natoms, self.nodes):
-                xyz_i = coords[a]
-                sigma_i = self._qm_vdw_params[a, 0]
-                epsilon_i = self._qm_vdw_params[a, 1]
+                for a in range(self.rank, natoms, self.nodes):
+                    xyz_i = coords[a]
+                    sigma_i = self.qm_vdw_params[a, 0]
+                    epsilon_i = self.qm_vdw_params[a, 1]
 
-                for p in range(npoints):
-                    xyz_j = self._point_charges[:3, p]
-                    sigma_j = self._point_charges[4, p]
-                    epsilon_j = self._point_charges[5, p]
+                    for p in range(npoints):
+                        xyz_j = self.point_charges[:3, p]
+                        sigma_j = self.point_charges[4, p]
+                        epsilon_j = self.point_charges[5, p]
 
-                    distance_ij = np.linalg.norm(xyz_i - xyz_j)
-                    # bohr to nm
-                    distance_ij *= bohr_in_angstrom() * 0.1
+                        distance_ij = np.linalg.norm(xyz_i - xyz_j)
+                        # bohr to nm
+                        distance_ij *= bohr_in_angstrom() * 0.1
 
-                    epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
-                    sigma_ij = 0.5 * (sigma_i + sigma_j)
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
 
-                    sigma_r_6 = (sigma_ij / distance_ij)**6
-                    sigma_r_12 = sigma_r_6**2
+                        sigma_r_6 = (sigma_ij / distance_ij)**6
+                        sigma_r_12 = sigma_r_6**2
 
-                    vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
+                        vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
 
-            # kJ/mol to Hartree
-            vdw_ene /= (4.184 * hartree_in_kcalpermol())
+                # kJ/mol to Hartree
+                vdw_ene /= (4.184 * hartree_in_kcalpermol())
 
-            self._nuc_mm_energy += vdw_ene
+                self._nuc_mm_energy += vdw_ene
 
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
 
@@ -1074,7 +1145,7 @@ class ScfDriver:
             err_mo = 'ScfDriver.set_start_orbitals: inconsistent number of MOs'
             err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
 
-            n_ao = basis.get_dimension_of_basis(molecule)
+            n_ao = basis.get_dimensions_of_basis()
 
             assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
             assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
@@ -1118,7 +1189,8 @@ class ScfDriver:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
             self.checkpoint_file = f'{base_fname}.scf.h5'
-        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
+
         self.comm.barrier()
 
     def write_checkpoint(self, nuclear_charges, basis_set):
@@ -1183,17 +1255,17 @@ class ScfDriver:
         if self.rank == mpi_master() and self.electric_field is not None:
             dipole_ints = dipole_mats
 
-        if self._point_charges is not None and not self._first_step:
-            t0_point_charges = tm.time()
+        if self.point_charges is not None and not self._first_step:
+            t0point_charges = tm.time()
 
-            ave, res = divmod(self._point_charges.shape[1], self.nodes)
+            ave, res = divmod(self.point_charges.shape[1], self.nodes)
             counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
 
             start = sum(counts[:self.rank])
             end = sum(counts[:self.rank + 1])
 
-            charges = self._point_charges[3, :].copy()[start:end]
-            coords = self._point_charges[:3, :].T.copy()[start:end, :]
+            charges = self.point_charges[3, :].copy()[start:end]
+            coords = self.point_charges[:3, :].T.copy()[start:end, :]
 
             V_es = compute_nuclear_potential_integrals(molecule, ao_basis,
                                                        charges, coords)
@@ -1204,7 +1276,7 @@ class ScfDriver:
 
             self.ostream.print_info(
                 'Point charges one-electron integral computed in' +
-                ' {:.2f} sec.'.format(tm.time() - t0_point_charges))
+                ' {:.2f} sec.'.format(tm.time() - t0point_charges))
             self.ostream.print_blank()
 
         linear_dependency = False
@@ -1295,6 +1367,67 @@ class ScfDriver:
 
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
+            if self._cpcm:
+                if self.scf_type == 'restricted':
+                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
+                                                       self._cpcm_grid,
+                                                       den_mat[0] * 2.0)
+                else:
+                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
+                                                       self._cpcm_grid,
+                                                       den_mat[0] + den_mat[1])
+
+                if self.rank == mpi_master():
+                    scale_f = -(self.cpcm_drv.epsilon - 1) / (
+                        self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                    rhs = scale_f * (self._cpcm_Bzvec + Cvec)
+                    self._cpcm_q = np.linalg.solve(self._cpcm_Amat, rhs)
+
+                    e_sol = self.cpcm_drv.compute_solv_energy(
+                        self._cpcm_Bzvec, Cvec, self._cpcm_q)
+                    e_el += e_sol
+                    self.cpcm_epol = e_sol
+                else:
+                    self._cpcm_q = None
+                    self.cpcm_epol = None
+                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+
+                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
+                    molecule, ao_basis, self._cpcm_grid, self._cpcm_q)
+
+                if self.rank == mpi_master():
+                    fock_mat[0] += Fock_sol
+                    if self.scf_type != 'restricted':
+                        fock_mat[1] += Fock_sol
+
+            if (self.rank == mpi_master() and i > 0 and
+                    self.level_shifting > 0.0):
+
+                self.ostream.print_info(
+                    f'Applying level-shifting ({self.level_shifting:.2f}au)')
+
+                C_alpha = self.molecular_orbitals.alpha_to_numpy()
+                nocc_a = molecule.number_of_alpha_electrons()
+                fmo_a = np.linalg.multi_dot([C_alpha.T, fock_mat[0], C_alpha])
+                for idx in range(nocc_a, fmo_a.shape[0]):
+                    fmo_a[idx, idx] += self.level_shifting
+                fock_mat[0] = np.linalg.multi_dot(
+                    [S, C_alpha, fmo_a, C_alpha.T, S])
+
+                if self.scf_type != 'restricted':
+
+                    C_beta = self.molecular_orbitals.beta_to_numpy()
+                    nocc_b = molecule.number_of_beta_electrons()
+                    fmo_b = np.linalg.multi_dot([C_beta.T, fock_mat[1], C_beta])
+                    for idx in range(nocc_b, fmo_b.shape[0]):
+                        fmo_b[idx, idx] += self.level_shifting
+                    fock_mat[1] = np.linalg.multi_dot(
+                        [S, C_beta, fmo_b, C_beta.T, S])
+
+                self.level_shifting -= self.level_shifting_delta
+                if self.level_shifting < 0.0:
+                    self.level_shifting = 0.0
+
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
                     -1.0 * ef * mat
@@ -1320,6 +1453,13 @@ class ScfDriver:
 
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
+
+            # threshold for deactivating pseudo-FON and level-shifting
+            if e_grad < 1.0e-4:
+                if self.pfon:
+                    self.pfon_temperature = 0
+                if self.level_shifting > 0.0:
+                    self.level_shifting = 0.0
 
             # compute density change and energy change
 
@@ -1363,19 +1503,32 @@ class ScfDriver:
 
             # compute new Fock matrix, molecular orbitals and density
 
-            profiler.start_timer('FockDiag')
+            profiler.start_timer('EffFock')
 
             self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
+            profiler.stop_timer('EffFock')
+
+            profiler.start_timer('NewMO')
+
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
+
+            if self.pfon:
+                self.pfon_temperature -= self.pfon_delta_temperature
+                if self.pfon_temperature < 0:
+                    self.pfon_temperature = 0
 
             if self._mom is not None:
                 self._apply_mom(molecule, ovl_mat)
 
             self._update_mol_orbs_phase()
+
+            profiler.stop_timer('NewMO')
+
+            profiler.start_timer('NewDens')
 
             if self.rank == mpi_master():
                 den_mat = self.molecular_orbitals.get_density(molecule)
@@ -1383,7 +1536,7 @@ class ScfDriver:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
 
-            profiler.stop_timer('FockDiag')
+            profiler.stop_timer('NewDens')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self._num_iter))
@@ -1448,6 +1601,9 @@ class ScfDriver:
                     'F_beta': F_beta,
                 }
 
+                # for backward compatibility only
+                self._scf_tensors['F'] = (F_alpha, F_beta)
+
                 if self._dft:
                     # dft info
                     self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
@@ -1459,6 +1615,16 @@ class ScfDriver:
                     self._scf_tensors['potfile'] = self.potfile
                     self._scf_tensors['E_emb'] = e_emb
                     self._scf_tensors['F_emb'] = V_emb
+
+                if self.point_charges is not None:
+                    self._scf_tensors['point_charges'] = self.point_charges
+                if self.qm_vdw_params is not None:
+                    self._scf_tensors['qm_vdw_params'] = self.qm_vdw_params
+
+                if self.solvation_model is not None:
+                    self._scf_tensors['solvation_model'] = self.solvation_model
+                    self._scf_tensors[
+                        'dielectric_constant'] = self.cpcm_drv.epsilon
 
             else:
                 self._scf_tensors = None
@@ -1515,7 +1681,7 @@ class ScfDriver:
         self.ostream.print_info('Preparing for a graceful termination...')
         self.ostream.flush()
 
-        self.write_checkpoint(molecule.elem_ids_to_numpy(), basis.get_label())
+        self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
 
         self.ostream.print_blank()
         self.ostream.print_info('...done.')
@@ -1578,7 +1744,7 @@ class ScfDriver:
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
                 coords = molecule.get_coordinates_in_bohr()
-                nuclear_charges = molecule.elem_ids_to_numpy()
+                nuclear_charges = molecule.get_element_ids()
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)
             else:
@@ -1931,7 +2097,7 @@ class ScfDriver:
                 'ScfDriver: Inconsistent embedding driver for SCF')
             e_emb, V_emb = self._embedding_drv.compute_pe_contributions(
                 density_matrix=density_matrix)
-        elif self._point_charges is not None and not self._first_step:
+        elif self.point_charges is not None and not self._first_step:
             if self.scf_type == 'restricted':
                 density_matrix = 2.0 * den_mat[0]
             else:
@@ -1994,7 +2160,7 @@ class ScfDriver:
 
             if self._pe and not self._first_step:
                 e_ee += e_emb
-            elif self._point_charges is not None and not self._first_step:
+            elif self.point_charges is not None and not self._first_step:
                 e_ee += e_emb
 
             e_sum = e_ee + e_kin + e_en
@@ -2046,7 +2212,7 @@ class ScfDriver:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
-            elif self._point_charges is not None and not self._first_step:
+            elif self.point_charges is not None and not self._first_step:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
@@ -2398,6 +2564,17 @@ class ScfDriver:
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self._cpcm:
+            cur_str = 'Solvation Model                 : '
+            cur_str += 'C-PCM with ISWIG Discretization'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Dielectric Constant       : '
+            cur_str += f'{self.cpcm_drv.epsilon}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per Atomic Sphere  : '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self.electric_field is not None:
             cur_str = 'Static Electric Field           : '
             cur_str += str(self.electric_field)
@@ -2648,6 +2825,8 @@ class ScfDriver:
         etot = self._iter_data['energy']
 
         e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
+        if self._cpcm:
+            e_el -= self.cpcm_epol
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
@@ -2655,10 +2834,15 @@ class ScfDriver:
         valstr = f'Electronic Energy                  :{e_el:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
+        if self._cpcm:
+            valstr = 'Electrostatic Solvation Energy     :'
+            valstr += f'{self.cpcm_epol:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
+
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
-        if self._point_charges is not None:
+        if self.point_charges is not None:
             valstr = f'Nuclei-Point Charges Energy        :{enuc_mm:20.10f} a.u.'
             self.ostream.print_header(valstr.ljust(92))
 
