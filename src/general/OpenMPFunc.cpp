@@ -101,7 +101,7 @@ make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> std::
 
             if (bsize < simd::width<double>()) bsize = simd::width<double>();
 
-            if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize;
+            //if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize;
 
             const auto bblocks = batch::number_of_batches(gp_size, bsize);
 
