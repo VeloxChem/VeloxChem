@@ -6,6 +6,7 @@ on:
       - master
       - simd_master_test
       - multipsi_newcore
+      - ri-test
 
 jobs:
   vlx_ci:
