@@ -482,10 +482,6 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
         self._e_es_nuc_grad = electrostatic_interactions.compute_electrostatic_nuclear_gradients(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem=self.classical_subsystem)
-        # self._f_elec_es_grad =electrostatic_interactions.es_fock_matrix_gradient_contributions(
-        #     classical_subsystem=self.classical_subsystem,
-        #     integral_driver=self._integral_driver
-        #     )
         self._nuc_field_grad = self.quantum_subsystem.compute_nuclear_field_gradients(
             coordinates=self.classical_subsystem.coordinates)
         vdw_options = self.options['settings'].get('vdw', {})
