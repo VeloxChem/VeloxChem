@@ -95,7 +95,7 @@ CFockDriver::compute_eri(const CT4CScreener& screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group_bsfac(gto_pair_blocks, ithreshold, bsfac);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, bsfac);
 
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
@@ -148,7 +148,7 @@ CFockDriver::compute(const CT4CScreener& screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group_bsfac(gto_pair_blocks, ithreshold, bsfac);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, bsfac);
 
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
@@ -180,6 +180,8 @@ CFockDriver::compute_mixpre(const CT4CScreener &screener,
                             const double        omega,
                             const int           ithreshold) const -> CMatrix
 {
+    auto bsfac = _determine_block_size_factor(_get_nao(density));
+
     // set up Fock matrix
 
     auto fock_mat = CMatrix(density);
@@ -206,7 +208,7 @@ CFockDriver::compute_mixpre(const CT4CScreener &screener,
 
             // double precision block
             
-            auto work_tasks = omp::make_work_group(gto_pair_blocks, min_thresh);
+            auto work_tasks = omp::make_work_group(gto_pair_blocks, min_thresh, bsfac);
             
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
@@ -225,7 +227,7 @@ CFockDriver::compute_mixpre(const CT4CScreener &screener,
             
             // single precision block
             
-            work_tasks = omp::make_work_group(gto_pair_blocks, min_thresh, ithreshold);
+            work_tasks = omp::make_work_group(gto_pair_blocks, min_thresh, ithreshold, bsfac);
             
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
@@ -284,7 +286,7 @@ CFockDriver::compute(const CT4CScreener&             screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group_bsfac(gto_pair_blocks, ithreshold, bsfac);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, bsfac);
 
             std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
                 const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
@@ -342,7 +344,7 @@ CFockDriver::compute(const CT4CScreener& screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group_bsfac(gto_pair_blocks, ithreshold, bsfac);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, bsfac);
 
             const auto red_tasks = omp::partition_tasks(work_tasks, rank, nodes);
 
@@ -404,7 +406,7 @@ CFockDriver::compute(const CT4CScreener&             screener,
         {
             auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
 
-            const auto work_tasks = omp::make_work_group_bsfac(gto_pair_blocks, ithreshold, bsfac);
+            const auto work_tasks = omp::make_work_group(gto_pair_blocks, ithreshold, bsfac);
 
             const auto red_tasks = omp::partition_tasks(work_tasks, rank, nodes);
 

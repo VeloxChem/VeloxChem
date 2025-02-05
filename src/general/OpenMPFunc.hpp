@@ -66,22 +66,29 @@ auto make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> 
 /// @param gto_pair_blocks The vector of basis functions pair blocks.
 /// @param ithreshold The screening threshold of integrals.
 /// @return The vector of work tasks.
-auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int ithreshold) -> std::vector<std::array<size_t, 8>>;
+auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
+                     const int                                ithreshold,
+                     const int                                block_size_factor) -> std::vector<std::array<size_t, 8>>;
 
 /// @brief Generates work groups for OMP tasks manager.
 /// @param gto_pair_blocks The vector of basis functions pair blocks.
 /// @param min_threshold The minimal screening threshold of integrals.
 /// @param max_threshold The maximum screening threshold of integrals.
 /// @return The vector of work tasks.
-auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int min_threshold, const int max_threshold) -> std::vector<std::array<size_t, 8>>;
+auto make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
+                     const int                                min_threshold,
+                     const int                                max_threshold,
+                     const int                                block_size_factor) -> std::vector<std::array<size_t, 8>>;
 
 /// @brief Generates auxilary work groups for OMP tasks manager.
 /// @param gto_blocks The vector of basis functions blocks.
 /// @return The vector of work tasks.
 auto make_aux_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<std::array<size_t, 3>>;
 
-auto make_work_group_bsfac(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int ithreshold, const int block_size_factor) -> std::vector<std::array<size_t, 8>>;
-
+/// @brief Generates work groups for OMP tasks manager.
+/// @param bra_gto_pair_blocks The vector of bra basis functions pair blocks.
+/// @param ket_gto_pair_blocks The vector of ket basis functions pair blocks.
+/// @return The vector of work tasks.
 auto make_bra_ket_work_group(const std::vector<CBlockedGtoPairBlock>& bra_gto_pair_blocks,
                              const std::vector<CBlockedGtoPairBlock>& ket_gto_pair_blocks,
                              const int                                ithreshold,
