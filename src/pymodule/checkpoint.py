@@ -150,7 +150,8 @@ def write_rsp_solution(fname, key, vec):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'a')
-        hf.create_dataset(key, data=vec)
+        rsp_group = 'rsp_results/'
+        hf.create_dataset(rsp_group + key, data=vec)
         hf.close()
 
 
@@ -195,14 +196,14 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
 
         keys = rsp_results.keys()
 
-        rsp_group = hf.create_group('rsp_results')
+        rsp_group = 'rsp_results/'
 
         for key in keys:
             # Do not write the eigenvectors, file names and excitation details
             if "vector" in key or "cube" in key or "file" in key or "details" in key:
                 continue
             else:
-                rsp_group.create_dataset(key, data=rsp_results[key])
+                hf.create_dataset(rsp_group + key, data=rsp_results[key])
 
         hf.close()
 

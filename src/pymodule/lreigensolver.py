@@ -595,9 +595,9 @@ class LinearResponseEigenSolver(LinearSolver):
                                                   mo_vir.shape[1])
                         nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                        nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
-                        nto_mo.write_hdf5(nto_h5_fname)
-                        nto_h5_files.append(nto_h5_fname)
+                        # Add the NTO to the final checkpoint file.
+                        nto_label = f'NTO_S{s + 1}'
+                        nto_mo.write_orbital_to_hdf5(final_h5_fname, nto_label, group="rsp_results")
                     else:
                         nto_mo = MolecularOrbitals()
                     nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())

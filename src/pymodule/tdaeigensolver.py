@@ -342,6 +342,10 @@ class TdaEigenSolver(LinearSolver):
         # converged?
         if self.rank == mpi_master():
             self._print_convergence('{:d} excited states'.format(self.nstates))
+            # Final checkpoint file to save response results, solution vectors, NTOs, etc.
+            # replace the suffix _rsp.h5 of the checkpoint_file name by .h5
+            final_h5_fname = str(
+                    Path(self.checkpoint_file))[:-7] + '.h5'
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -379,7 +383,6 @@ class TdaEigenSolver(LinearSolver):
         # natural transition orbitals and detachment/attachment densities
 
         nto_lambdas = []
-        nto_h5_files = []
         nto_cube_files = []
         dens_cube_files = []
 
@@ -422,9 +425,9 @@ class TdaEigenSolver(LinearSolver):
                     lam_end = lam_start + min(mo_occ.shape[1], mo_vir.shape[1])
                     nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                    nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
-                    nto_mo.write_hdf5(nto_h5_fname)
-                    nto_h5_files.append(nto_h5_fname)
+                    # Add the NTO to the final checkpoint file.
+                    nto_label = f'NTO_S{s + 1}'
+                    nto_mo.write_orbital_to_hdf5(final_h5_fname, nto_label, group="rsp_results")
                 else:
                     nto_mo = MolecularOrbitals()
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -476,7 +479,6 @@ class TdaEigenSolver(LinearSolver):
 
             if self.nto:
                 ret_dict['nto_lambdas'] = nto_lambdas
-                ret_dict['nto_h5_files'] = nto_h5_files
                 if self.nto_cubes:
                     ret_dict['nto_cubes'] = nto_cube_files
 
@@ -488,10 +490,7 @@ class TdaEigenSolver(LinearSolver):
 
             if (self.save_solutions and
                             self.checkpoint_file is not None):
-                # Add response results to the final checkpoint file
-                # replace the suffix _rsp.h5 of the checkpoint_file name by .h5
-                final_h5_fname = str(
-                    Path(self.checkpoint_file))[:-7] + '.h5'
+                # Write response results to final checkpoint file.
                 write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
             self._print_results(ret_dict)
