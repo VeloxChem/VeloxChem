@@ -659,6 +659,7 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver
             )
-        return e_es_elec_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
-
-
+        e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
+            quantum_subsystem=self.quantum_subsystem,
+            classical_subsystem= self.classical_subsystem)
+        return e_es_elec_hess + e_es_nuc_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
