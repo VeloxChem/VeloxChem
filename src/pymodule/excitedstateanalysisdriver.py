@@ -28,11 +28,9 @@ import py3Dmol as p3d
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import Molecule
 from .veloxchemlib import MolecularBasis
-from matplotlib import colormaps as cmaps
-from matplotlib import pyplot as plt
 from .errorhandler import assert_msg_critical
-from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check)
 from .visualizationdriver import VisualizationDriver
+
 
 class ExcitedStateAnalysisDriver:
     """
@@ -43,11 +41,28 @@ class ExcitedStateAnalysisDriver:
         """
         Initialize excited state analysis driver.
         """
-        pass
+        self.fragment_dict = None
 
-    def compute(self, fragment_dict, nstate, molecule=None, basis=None, scf_tensors=None, 
-                rsp_tensors=None, scf_checkpoint_file = None,
-                rsp_checkpoint_file=None):
+        self.include_transition_density_matrix = False
+        self.include_particle_hole_density_matrices = False
+        self.include_ct_matrix = False
+        self.include_participation_ratios = False
+        self.include_average_particle_hole_position = False
+        self.include_relative_ct_length = False
+
+    def update_settings(self, fragment_dict=None):
+        """
+        Update fragment dictionary and descriptor settings.
+
+        :param fragment_dict:
+            The dictionary containing the indices of atoms in each fragment.
+        """
+
+        if fragment_dict is not None:
+            self.fragment_dict = fragment_dict
+
+    def compute(self, fragment_dict, state_index, molecule, basis, scf_tensors,
+                rsp_tensors):
         """
         Computes dictionary containing excited state descriptors for
         excited state nstate.
@@ -57,85 +72,77 @@ class ExcitedStateAnalysisDriver:
         :param nstate:
             The excited state for which the descriptors are computed.
         :param molecule:
-            The Molecule object
+            The molecule
         :param basis:
-            The Basis object
+            The AO basis set.
         :param scf_tensors:
-            The dictionary containing the scf tensors.
+            The dictionary of tensors from converged SCF wavefunction.
         :param rsp_tensors:
             The dictionary containing the rsp tensors.
         :param scf_checkpoint_file:
-            The checkpoint file for the scf calculation.
+            The checkpoint file from the converged SCF calculation.
         :param rsp_checkpoint_file:
             The checkpoint file for the rsp calculation.
-        
+
         :return:
-            The dictionary containing the descriptors.
+            A dictionary containing the transition, hole and particle density matrices
+            in MO and AO basis, the charge transfer matrix,
+            the hole/particle/average participation ratios,
+            the average hole/particle position and their difference vector,
+            and the relative charge transfer length.
         """
-        
-        if scf_checkpoint_file is not None and rsp_checkpoint_file is not None:
-            checkpoint_files = True
-            assert_msg_critical(molecule is None and basis is None and
-                                scf_tensors is None and rsp_tensors is None,
-                                'molecule/basis/scf_tensors/rsp_tensors not '+
-                                'from checkpoint file found')
-            
-        elif scf_checkpoint_file is None and rsp_checkpoint_file is None:
-            checkpoint_files = False
-            assert_msg_critical(molecule is not None and basis is not None and
-                                scf_tensors is not None and rsp_tensors is not None,
-                                'molecule/basis/scf_tensors/rsp_tensors not found')
 
-        if checkpoint_files == True:
-            scf_tensors = self.read_scf_checkpoint_file(scf_checkpoint_file)
-            rsp_tensors = self.read_rsp_checkpoint_file(rsp_checkpoint_file)
-            molecule, basis = self.create_molecule_basis(scf_tensors)
+        assert_msg_critical(self.fragment_dict is not None,
+                            'fragment_dict not defined ')
 
+        num_exc_states = sum([1 for key in rsp_tensors if key.startswith('S')])
 
-        T_MO, T_AO = self.compute_T(molecule, scf_tensors, rsp_tensors, nstate)
+        assert_msg_critical(state_index <= num_exc_states,
+                            'excited state not included in rsp calculation')
+        ret_dict = {}
 
-        T_hole_MO, T_hole_AO = self.compute_T_hole(molecule, scf_tensors,
-                                                        rsp_tensors, nstate)
-
-        T_particle_MO, T_particle_AO = self.compute_T_particle(molecule, scf_tensors, 
-                                                               rsp_tensors, nstate)
-
+        # necessary objects for some descriptor calculations
+        trans_dens_mo, trans_dens_ao = self.compute_transition_density_matrix(
+            molecule, scf_tensors, rsp_tensors, state_index)
         ct_matrix = self.compute_ct_matrix(molecule, basis, scf_tensors,
-                                                       T_AO, fragment_dict)
+                                           trans_dens_ao, fragment_dict)
 
-        hole_participation_ratio, particle_participation_ratio, average_participation_ratio = self.compute_participation_ratios(ct_matrix)
+        if self.include_transition_density_matrix is True:
+            ret_dict['Transition_density_matrix_MO'] = trans_dens_mo
+            ret_dict['Transition_density_matrix_AO'] = trans_dens_ao
 
-        average_particle_position, average_hole_position, average_difference_vector = self.compute_avg_position(molecule, basis, ct_matrix,
-                                                                                                                    fragment_dict)
-        relative_ct_length = self.compute_relative_ct_length(molecule, average_difference_vector)
+        if self.include_particle_hole_density_matrices is True:
+            ret_dict['Hole_density_matrix_MO'], ret_dict[
+                'hole_density_matrix_AO'] = self.compute_hole_density_matrix(
+                    molecule, scf_tensors, rsp_tensors, state_index)
+            ret_dict['Particle_density_matrix_MO'], ret_dict[
+                'Particle_density_matrix_AO'] = self.compute_particle_density_matrix(
+                    molecule, scf_tensors, rsp_tensors, state_index)
 
-        ret_dict = {
-                    'T_MO': T_MO,
-                    'T_AO': T_AO,
-                    'T_hole_MO': T_hole_MO,
-                    'T_hole_AO': T_hole_AO,
-                    'T_particle_MO': T_particle_MO,
-                    'T_particle_AO': T_particle_AO,
-                    'CT_matrix': ct_matrix,
-                    'Hole_participation_ratio': hole_participation_ratio,
-                    'Particle_participation_ratio': particle_participation_ratio,
-                    'Average_participation_ratio': average_participation_ratio,
-                    'Average_hole_position': average_hole_position,
-                    'Average_particle_position': average_particle_position,
-                    'Average_difference_vector': average_difference_vector,
-                    'Relative_ct_length': relative_ct_length,
-                    }
-        
+        if self.include_ct_matrix is True:
+            ret_dict['CT_matrix'] = ct_matrix
+
+        if self.include_participation_ratios is True:
+            ret_dict['Hole_participation_ratio'], ret_dict[
+                'Particle_participation_ratio'], ret_dict[
+                    'Average_participation_ratio'] = self.compute_participation_ratios(
+                        ct_matrix)
+
+        if self.include_average_particle_hole_position is True:
+            ret_dict['Average_particle_position'], ret_dict[
+                'Average_hole_position'], ret_dict[
+                    'Average_difference_vector'] = self.compute_avg_position(
+                        molecule, basis, ct_matrix, fragment_dict)
+            ret_dict['Relative_CT_length'] = self.compute_relative_ct_length(
+                molecule, ret_dict['Average_difference_vector'])
+
         return ret_dict
-            
 
-
-            
     def read_scf_checkpoint_file(self, fname):
         """
-        Reads data from hdf5 scf checkpoint file 
+        Reads data from hdf5 scf checkpoint file
         and returns it as a dictionary.
-        
+
         :param filename:
             The name of the scf checkpoint file.
 
@@ -150,34 +157,39 @@ class ExcitedStateAnalysisDriver:
             data = np.array(h5f.get(key))
             dict[key] = data
         h5f.close()
-        
-        assert_msg_critical('atom_coordinates' in dict, 
-                            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: '
-                            + 'atom_coordinates not found')
-        
-        assert_msg_critical('nuclear_charges' in dict, 
-                            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: '
-                            + 'nuclear_charges not found')
-        
-        assert_msg_critical('basis_set' in dict, 
-                            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: '
-                            + 'basis_set not found')
-        
-        assert_msg_critical('C_alpha' in dict, 
-                            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: '
-                            + 'C_alpha not found')
-        
-        assert_msg_critical('S' in dict, 
-                            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: '
-                            + 'S not found')
+
+        assert_msg_critical(
+            'atom_coordinates' in dict,
+            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
+            'atom_coordinates not found')
+
+        assert_msg_critical(
+            'nuclear_charges' in dict,
+            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
+            'nuclear_charges not found')
+
+        assert_msg_critical(
+            'basis_set' in dict,
+            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
+            'basis_set not found')
+
+        assert_msg_critical(
+            'C_alpha' in dict,
+            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
+            'C_alpha not found')
+
+        assert_msg_critical(
+            'S' in dict,
+            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
+            'S not found')
 
         return dict
-    
+
     def read_rsp_checkpoint_file(self, fname):
         """
-        Read data from hdf5 rsp checkpoint file 
+        Read data from hdf5 rsp checkpoint file
         and return it as a dictionary.
-        
+
         :param filename:
             The name of the rsp checkpoint file.
 
@@ -198,7 +210,7 @@ class ExcitedStateAnalysisDriver:
     def create_molecule_basis(self, scf_tensors):
         """
         Creates molecule and basis objects from scf dictionary.
-            
+
         :param scf_tensors:
             The dictionary containing the scf tensors.
 
@@ -214,11 +226,12 @@ class ExcitedStateAnalysisDriver:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         return molecule, basis
-    
-    def compute_T(self, molecule, scf_tensors, rsp_tensors, nstate):
+
+    def compute_transition_density_matrix(self, molecule, scf_tensors,
+                                          rsp_tensors, state_index):
         """
-        Computes the transition density matrix (TDM) for state 
-        nstate in MO and AO basis. 
+        Computes the transition density matrix (TDM) for state
+        nstate in MO and AO basis.
 
         :param molecule:
             The Molecule object
@@ -233,27 +246,30 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the TDM in MO and AO basis.
         """
 
-        C = scf_tensors["C_alpha"]
         nocc = molecule.number_of_alpha_electrons()
-        norb = C.shape[1]
-        nvirt = norb-nocc
-    
-        excstate = "S"+str(nstate)
-        Xf = rsp_tensors[excstate]
+        norb = scf_tensors["C_alpha"].shape[1]
+        nvirt = norb - nocc
+
+        excstate = "S" + str(state_index)
+        x_f = rsp_tensors[excstate]
 
         nexc = nocc * nvirt
-        Zf = Xf[:nexc]
-        if Xf.shape[0] == nexc:
-            T_MO = np.reshape(Zf, (nocc, nvirt))
+        z_f = x_f[:nexc]
+        if x_f.shape[0] == nexc:
+            trans_dens_mo = np.reshape(z_f, (nocc, nvirt))
         else:
-            Yf = Xf[nexc:]
-            T_MO = np.reshape(Zf - Yf, (nocc, nvirt))
+            y_f = x_f[nexc:]
+            trans_dens_mo = np.reshape(z_f - y_f, (nocc, nvirt))
 
-        T_AO = np.linalg.multi_dot([C[:, :nocc], T_MO, C[:, nocc:].T])
+        trans_dens_ao = np.linalg.multi_dot([
+            scf_tensors["C_alpha"][:, :nocc], trans_dens_mo,
+            scf_tensors["C_alpha"][:, nocc:].T
+        ])
 
-        return T_MO, T_AO
-    
-    def compute_T_hole(self, molecule, scf_tensors, rsp_tensors, nstate):
+        return trans_dens_mo, trans_dens_ao
+
+    def compute_hole_density_matrix(self, molecule, scf_tensors, rsp_tensors,
+                                    state_index):
         """
         Computes the hole density matrix for state nstate in MO and AO basis.
 
@@ -270,30 +286,33 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the hole density matrix in MO and AO basis.
         """
 
-        C = scf_tensors["C_alpha"]
         nocc = molecule.number_of_alpha_electrons()
-        norb = C.shape[1]
-        nvirt = norb-nocc
-    
-        excstate = "S"+str(nstate)
-        Xf = rsp_tensors[excstate]
+        norb = scf_tensors["C_alpha"].shape[1]
+        nvirt = norb - nocc
+
+        excstate = "S" + str(state_index)
+        x_f = rsp_tensors[excstate]
 
         nexc = nocc * nvirt
-        Zf = Xf[:nexc]
-        if Xf.shape[0] == nexc:
-            T_MO = np.reshape(Zf, (nocc, nvirt))
+        z_f = x_f[:nexc]
+        if x_f.shape[0] == nexc:
+            trans_dens_mo = np.reshape(z_f, (nocc, nvirt))
         else:
-            Yf = Xf[nexc:]
-            T_MO = np.reshape(Zf - Yf, (nocc, nvirt))
+            y_f = x_f[nexc:]
+            trans_dens_mo = np.reshape(z_f - y_f, (nocc, nvirt))
 
-        T_hole_MO = np.matmul(T_MO, T_MO.T)
-        T_hole_AO = np.linalg.multi_dot([C[:, :nocc], T_hole_MO, C[:, :nocc].T])
+        hole_dens_mo = np.matmul(trans_dens_mo, trans_dens_mo.T)
+        hole_dens_ao = np.linalg.multi_dot([
+            scf_tensors["C_alpha"][:, :nocc], hole_dens_mo,
+            scf_tensors["C_alpha"][:, :nocc].T
+        ])
 
-        return T_hole_MO, T_hole_AO
+        return hole_dens_mo, hole_dens_ao
 
-    def compute_T_particle(self, molecule, scf_tensors, rsp_tensors, nstate):
+    def compute_particle_density_matrix(self, molecule, scf_tensors,
+                                        rsp_tensors, state_index):
         """
-        Computes the particle density matrix for state nstate in MO and 
+        Computes the particle density matrix for state nstate in MO and
         AO basis.
 
         :param molecule:
@@ -303,43 +322,45 @@ class ExcitedStateAnalysisDriver:
         :param rsp_tensors:
             The dictionary containing the rsp tensors.
         :param nstate:
-            The excited state for which the particle density matrix is 
+            The excited state for which the particle density matrix is
             computed.
 
         :return:
             A tuple containing the particle density matrix in MO and AO basis.
         """
 
-        C = scf_tensors["C_alpha"]
         nocc = molecule.number_of_alpha_electrons()
-        norb = C.shape[1]
-        nvirt = norb-nocc
-    
-        excstate = "S"+str(nstate)
-        Xf = rsp_tensors[excstate]
+        norb = scf_tensors["C_alpha"].shape[1]
+        nvirt = norb - nocc
+
+        excstate = "S" + str(state_index)
+        x_f = rsp_tensors[excstate]
 
         nexc = nocc * nvirt
-        Zf = Xf[:nexc]
-        if Xf.shape[0] == nexc:
-            T_MO = np.reshape(Zf, (nocc, nvirt))
+        z_f = x_f[:nexc]
+        if x_f.shape[0] == nexc:
+            trans_dens_mo = np.reshape(z_f, (nocc, nvirt))
         else:
-            Yf = Xf[nexc:]
-            T_MO = np.reshape(Zf - Yf, (nocc, nvirt))
+            y_f = x_f[nexc:]
+            trans_dens_mo = np.reshape(z_f - y_f, (nocc, nvirt))
 
-        T_particle_MO = np.matmul(T_MO.T, T_MO)
-        T_particle_AO = np.linalg.multi_dot([C[:, nocc:], T_particle_MO, C[:, nocc:].T])
+        part_dens_mo = np.matmul(trans_dens_mo.T, trans_dens_mo)
+        part_dens_ao = np.linalg.multi_dot([
+            scf_tensors["C_alpha"][:, nocc:], part_dens_mo,
+            scf_tensors["C_alpha"][:, nocc:].T
+        ])
 
-        return T_particle_MO, T_particle_AO
-    
+        return part_dens_mo, part_dens_ao
+
     def map_fragments_to_atomic_orbitals(self, molecule, basis, fragment_dict):
         """
         Maps the atom indices in the fragment dictionary to indices of atomic
         orbitals centered on the corresponding atom.
 
         :param molecule:
-            The Molecule object.
+            The molecule.
         :param basis:
-            The Basis object.
+            The AO basis set.
         :param fragment_dict:
             The dictionary containing indices of atoms in each fragment.
 
@@ -355,21 +376,22 @@ class ExcitedStateAnalysisDriver:
         for fragment in fragment_dict:
             ao_map_fragments[fragment] = []
             for i in fragment_dict[fragment]:
-                ao_map_fragments[fragment] += ao_list[i - 1]  # i is 1-based index
+                ao_map_fragments[fragment] += ao_list[i -
+                                                      1]  # i is 1-based index
         return ao_map_fragments
-    
+
     def compute_ct_matrix(self, molecule, basis, scf_tensors, T, fragment_dict):
         """
-        Computes the charge transfer (CT) matrix from the 
+        Computes the charge transfer (CT) matrix from the
         transition density matrix (TDM).
 
         :param molecule:
-            The Molecule object.
+            The molecule.
         :param basis:
-            The Basis object.
+            The AO basis set.
         :param scf_tensors:
-            The dictionary containing the scf tensors.
-        :param T: 
+            The dictionary of tensors from converged SCF wavefunction.
+        :param T:
             The TDM in AO basis.
         :param fragment_dict:
             The dictionary containing the indices of atoms in each fragment.
@@ -378,7 +400,8 @@ class ExcitedStateAnalysisDriver:
             The CT matrix.
         """
 
-        ao_map_fragments = self.map_fragments_to_atomic_orbitals(molecule, basis, fragment_dict)
+        ao_map_fragments = self.map_fragments_to_atomic_orbitals(
+            molecule, basis, fragment_dict)
         S = scf_tensors["S"]
 
         TS = np.matmul(T, S)
@@ -397,7 +420,7 @@ class ExcitedStateAnalysisDriver:
                 ct_matrix[a, b] = np.einsum("mn->", TSST_AB + T_STS_AB)
 
         return (1 / 2) * ct_matrix
-    
+
     def compute_participation_ratios(self, ct_matrix):
         """
         Computes the particle, hole, and average participation ratios
@@ -410,21 +433,22 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the hole, particle, and average participation ratios.
         """
 
-        Omega = np.sum(ct_matrix)
-        hole_weight = np.sum(ct_matrix, axis=1) / Omega
-        particle_weight = np.sum(ct_matrix, axis=0) / Omega
-        hole_PR = 1 / np.sum(hole_weight ** 2)
-        particle_PR = 1 / np.sum(particle_weight ** 2)
-        avg_PR = (hole_PR + particle_PR) / 2
+        omega = np.sum(ct_matrix)
+        hole_weight = np.sum(ct_matrix, axis=1) / omega
+        particle_weight = np.sum(ct_matrix, axis=0) / omega
+        hole_participation_ratio = 1 / np.sum(hole_weight**2)
+        particle_participation_ratio = 1 / np.sum(particle_weight**2)
+        avg_participation_ratio = (hole_participation_ratio +
+                                   particle_participation_ratio) / 2
 
-        return hole_PR, particle_PR, avg_PR
-    
+        return hole_participation_ratio, particle_participation_ratio, avg_participation_ratio
+
     def compute_fragment_coordinates(self, molecule, fragment_dict):
         """
         Computes average coordinates of fragments in fragment_dict.
 
         :param molecule:
-            The Molecule object.
+            The molecule.
         :param fragment_dict:
             The dictionary containing the indices of atoms in each fragment.
 
@@ -436,16 +460,17 @@ class ExcitedStateAnalysisDriver:
         avg_coord_list = []
         for i, A in enumerate(fragment_dict):
             coord_array = coordinates[np.array(fragment_dict[A]) - 1, :]
-            avg_coord_list.append(np.sum(coord_array, axis=0) / coord_array.shape[0])
+            avg_coord_list.append(
+                np.sum(coord_array, axis=0) / coord_array.shape[0])
         return avg_coord_list
-    
+
     def max_dist_from_mol_center(self, molecule):
         """
-        Computes the maximum distance from an atom in the molecule to the 
+        Computes the maximum distance from an atom in the molecule to the
         center of the molecule.
 
         :param molecule:
-            The Molecule object.
+            The molecule.
 
         :return:
             The maximum distance from an atom in the molecule to the
@@ -453,60 +478,55 @@ class ExcitedStateAnalysisDriver:
         """
 
         coordinates = molecule.get_coordinates_in_angstrom()
-        center = np.sum(coordinates,axis=0)/coordinates.shape[0]
+        center = np.sum(coordinates, axis=0) / coordinates.shape[0]
         print(center)
         atom_center_distance = []
         for i in range(coordinates.shape[0]):
-            atom_center_distance.append(np.linalg.norm(coordinates[i]-center))
+            atom_center_distance.append(np.linalg.norm(coordinates[i] - center))
         return np.max(np.array(atom_center_distance))
-    
+
     def compute_avg_position(self, molecule, ct_matrix, fragment_dict):
         """
-        Computes the average particle position, average hole position, and the 
+        Computes the average particle position, average hole position, and the
         the difference vector between them.
 
         :param molecule:
-            The Molecule object.
+            The molecule.
         :param ct_matrix:
             The charge transfer matrix.
         :param fragment_dict:
             The dictionary containing the indices of atoms in each fragment.
 
         :return:
-            A tuple containing the average particle position, 
-            average hole position, and the difference vector 
+            A tuple containing the average particle position,
+            average hole position, and the difference vector
             from average hole to average particle.
         """
 
-        avg_coord_list = self.compute_fragment_coordinates(molecule, fragment_dict)
-    
-        Omega = np.sum(ct_matrix)
-        hole_weight = np.sum(ct_matrix, axis=1) / Omega
-        particle_weight = np.sum(ct_matrix, axis=0) / Omega
-    
-        avg_hole_pos = [0, 0, 0]
-        avg_particle_pos = [0, 0, 0]
-    
+        avg_coord_list = self.compute_fragment_coordinates(
+            molecule, fragment_dict)
+
+        omega = np.sum(ct_matrix)
+        hole_weight = np.sum(ct_matrix, axis=1) / omega
+        particle_weight = np.sum(ct_matrix, axis=0) / omega
+
+        avg_hole_position = [0, 0, 0]
+        avg_particle_position = [0, 0, 0]
+
         for j in range(len(avg_coord_list)):
-            avg_hole_pos += (
-                avg_coord_list[j]
-                * hole_weight[j]
-                * bohr_in_angstrom()
-            )
-            avg_particle_pos += (
-                avg_coord_list[j]
-                * particle_weight[j]
-                * bohr_in_angstrom()
-            )
-        ET_net = avg_particle_pos - avg_hole_pos
-        return avg_particle_pos, avg_hole_pos, ET_net
-    
-    def compute_relative_ct_length(self, molecule, ET_net):
+            avg_hole_position += (avg_coord_list[j] * hole_weight[j] *
+                                  bohr_in_angstrom())
+            avg_particle_position += (avg_coord_list[j] * particle_weight[j] *
+                                      bohr_in_angstrom())
+        avg_diff_vec = avg_particle_position - avg_hole_position
+        return avg_particle_position, avg_hole_position, avg_diff_vec
+
+    def compute_relative_ct_length(self, molecule, avg_diff_vec):
         """
         Compute the relative charge transfer (CT) length.
 
         :param molecule:
-            The Molecule object.
+            The molecule.
         :param ET_net:
             The difference vector from average position of hole to average
             position of particle.
@@ -514,14 +534,20 @@ class ExcitedStateAnalysisDriver:
         :return:
             The relative charge transfer length.
         """
-        return np.linalg.norm(ET_net)/self.max_dist_from_mol_center(molecule)
-    
-    def compute_avg_ph_viewer(self, molecule, avg_hole_pos, avg_particle_pos, width=400, height=300):
+        return np.linalg.norm(avg_diff_vec) / self.max_dist_from_mol_center(
+            molecule)
+
+    def show_avg_ph_position(self,
+                             molecule,
+                             avg_hole_position,
+                             avg_particle_position,
+                             width=400,
+                             height=300):
         """
         Displays the molecule and the average positions of the particle and hole.
 
         :param molecule:
-            The Molecule object.
+            The molecule.
         :param avg_hole_pos:
             The average position of the hole.
         :param avg_particle_pos:
@@ -531,25 +557,41 @@ class ExcitedStateAnalysisDriver:
         :param height:
             The height of the plot.
         """
-        r_H = avg_hole_pos
-        r_E = avg_particle_pos
+        r_H = avg_hole_position
+        r_E = avg_particle_position
         viewer = p3d.view(width=width, height=height)
         viewer.addModel(molecule.get_xyz_string(), "xyz")
         viewer.setStyle({"line": {}, "sphere": {"scale": 0.05}})
         viewer.addArrow({
-                'start': {'x': r_H[0], 'y': r_H[1], 'z': r_H[2]},
-                'end': {'x': r_E[0], 'y': r_E[1], 'z': r_E[2]},
-                'radius': 0.06,
-                'color': 'green',
-            })
+            'start': {
+                'x': r_H[0],
+                'y': r_H[1],
+                'z': r_H[2]
+            },
+            'end': {
+                'x': r_E[0],
+                'y': r_E[1],
+                'z': r_E[2]
+            },
+            'radius': 0.06,
+            'color': 'green',
+        })
         viewer.addSphere({
-            'center': {'x': r_H[0], 'y': r_H[1], 'z': r_H[2]},
+            'center': {
+                'x': r_H[0],
+                'y': r_H[1],
+                'z': r_H[2]
+            },
             'radius': 0.12,
             'color': 'blue',
-            })
+        })
         viewer.addSphere({
-            'center': {'x': r_E[0], 'y': r_E[1], 'z': r_E[2]},
+            'center': {
+                'x': r_E[0],
+                'y': r_E[1],
+                'z': r_E[2]
+            },
             'radius': 0.12,
             'color': 'red',
-            })
+        })
         viewer.show()
