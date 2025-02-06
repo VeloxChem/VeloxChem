@@ -340,6 +340,13 @@ class ScfHessianDriver(HessianDriver):
 
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+        if self.scf_driver._pe:
+            from .embedding import PolarizableEmbeddingHess
+            cphf_solver._embedding_drv =  PolarizableEmbeddingHess(
+                molecule=molecule,
+                ao_basis=ao_basis,
+                options=self.scf_driver.embedding_options,
+                comm=self.comm)
 
         # TODO: double check propagation of cphf settings
         profiler_keywords = {

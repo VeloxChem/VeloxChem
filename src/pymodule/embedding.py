@@ -7,7 +7,8 @@ from .veloxchemlib import (compute_electric_field_integrals,
                            compute_electric_field_integrals_gradient)
 from .oneeints import (compute_nuclear_potential_integrals,
                        compute_nuclear_potential_gradient_bfs,
-                       compute_electrostatic_potential_hessian)
+                       compute_electrostatic_potential_hessian,
+                       compute_electrostatic_integrals_gradient)
 from .errorhandler import assert_msg_critical
 
 try:
@@ -244,6 +245,27 @@ class EmbeddingIntegralDriver:
                                                       qm_atom_index_i=nuc_i,
                                                       qm_atom_index_j=nuc_j)
         return op
+
+    def electronic_electrostatic_fock_gradient(self,
+                                                multipole_coordinates: np.ndarray,
+                                                multipole_orders: np.ndarray,
+                                                multipoles: list[np.ndarray],
+                                                i: int):
+        """
+
+        """
+        op = 0
+        # 0 order
+        idx = np.where(multipole_orders >= 0)[0]
+        charge_coordinates = multipole_coordinates[idx]
+        charges = np.array([multipoles[i][0] for i in idx])
+        op += compute_electrostatic_integrals_gradient(molecule=self.molecule,
+                                                       basis=self.basis,
+                                                       mm_charges=charges,
+                                                       mm_coordinates=charge_coordinates,
+                                                       qm_atom_index_i=i)
+        return op
+
 
 class PolarizableEmbedding:
     """
@@ -623,17 +645,20 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         else:
             self._e_vdw_hess = 0.0
 
-    def compute_pe_fock_contributions(self, density_matrix):
-        pass
+    def compute_pe_fock_gradient_contributions(self, i):
+        return electrostatic_interactions.compute_electronic_electrostatic_fock_gradient(
+            i=i,
+            classical_subsystem=self.classical_subsystem,
+            integral_driver=self._integral_driver) # missing induction fock gradient
 
     def compute_pe_energy_hess_contributions(self, density_matrix):
         nuc_list = np.arange(self.quantum_subsystem.num_nuclei, dtype=np.int64)
-        e_es_nuc_hess = electrostatic_interactions.compute_electronic_electrostatic_energy_hessian(
+        e_es_elec_hess = electrostatic_interactions.compute_electronic_electrostatic_energy_hessian(
             nuc_list=nuc_list,
             density_matrix=density_matrix,
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver
             )
-        return e_es_nuc_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
+        return e_es_elec_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
 
 
