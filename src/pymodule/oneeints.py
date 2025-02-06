@@ -205,3 +205,25 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
 
     # Note: factor -1.0 for electron charge
     return -1.0 * hess
+
+
+def compute_electrostatic_integrals_gradient(molecule, basis, mm_charges,
+                                             mm_coordinates, qm_atom_index_i):
+
+    ints_grad = []
+
+    i = qm_atom_index_i
+
+    npot_grad_100_drv = NuclearPotentialGeom100Driver()
+
+    gmats_100 = npot_grad_100_drv.compute(molecule, basis, i, mm_coordinates,
+                                          mm_charges)
+
+    for x, label in enumerate(['X', 'Y', 'Z']):
+        gmat_100 = gmats_100.matrix_to_numpy(label)
+        # Note: factor -1.0 for electron charge
+        ints_grad.append(-1.0 * (gmat_100 + gmat_100.T))
+
+    gmats_100 = Matrices()
+
+    return ints_grad
