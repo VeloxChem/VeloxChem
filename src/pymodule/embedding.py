@@ -140,7 +140,7 @@ class EmbeddingIntegralDriver:
             basis=self.basis,
             coordinates=charge_coordinates,
             charges=charges,
-            density_matrix=density_matrix)
+            D=density_matrix)
         return op
 
 
@@ -267,6 +267,8 @@ class PolarizableEmbedding:
             'max_iterations', 100)
         self._solver = induced_dipoles_options.get('solver', 'jidiis')
         self._mic = induced_dipoles_options.get('mic', True)
+        # FIXME temporary update coords
+        self.quantum_subsystem.coordinates = molecule.get_coordinates_in_bohr()
 
     def _create_pyframe_objects(self):
         def categorize_subsystems(reader_output):
@@ -502,7 +504,7 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
                 method=self.vdw_method,
                 combination_rule=self.vdw_combination_rule)
         else:
-            self._e_vdw = 0.0
+            self._e_vdw_grad = 0.0
 
     def compute_pe_contributions(self, density_matrix):
         # FIXME -> ind dipoles only necessary if not passed from scf results
@@ -523,7 +525,7 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
                 solver=self._solver,
                 mic=self._mic,
                 box=self.simulation_box.box)
-        e_elec_es_grad = electrostatic_interactions.compute_electronic_electrostatic_energy_gradients(
+        e_es_elec_grad = electrostatic_interactions.compute_electronic_electrostatic_energy_gradients(
             density_matrix=density_matrix,
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver)
@@ -535,4 +537,46 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
             induced_dipoles=self.classical_subsystem.induced_dipoles.induced_dipoles,
             total_field_gradients=self._nuc_field_grad)
 
-        return self._e_es_nuc_grad + e_ind_nuc_grad + e_ind_el_grad + self._e_vdw + e_elec_es_grad
+        return self._e_es_nuc_grad + e_ind_nuc_grad + e_ind_el_grad + self._e_vdw_grad + e_es_elec_grad
+
+
+class PolarizableEmbeddingHess(PolarizableEmbedding):
+    """
+    Subclass for Hessian (Hess) calculations utilizing polarizable embedding.
+    """
+
+    def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+        super().__init__(molecule, ao_basis, options, comm, log_level)
+        self._e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
+            quantum_subsystem=self.quantum_subsystem,
+            classical_subsystem=self.classical_subsystem)
+        self._nuc_field_hess = self.quantum_subsystem.compute_nuclear_field_gradients(
+            coordinates=self.classical_subsystem.coordinates)
+        vdw_options = self.options['settings'].get('vdw', {})
+        self.vdw_method = vdw_options.get('method', 'LJ')
+        self.vdw_combination_rule = vdw_options.get('combination_rule',
+                                                    'Lorentz-Berthelot')
+
+        if 'vdw' in self.options['settings']:
+            self._e_vdw_hess = repulsion_interactions.compute_repulsion_interactions_gradient(
+                quantum_subsystem=self.quantum_vsubsystem,
+                classical_subsystem=self.classical_subsystem,
+                method=self.vdw_method,
+                combination_rule=self.vdw_combination_rule)
+
+            self._e_vdw_hess += dispersion_interactions.compute_dispersion_interactions_gradient(
+                quantum_subsystem=self.quantum_subsystem,
+                classical_subsystem=self.classical_subsystem,
+                method=self.vdw_method,
+                combination_rule=self.vdw_combination_rule)
+        else:
+            self._e_vdw_hess = 0.0
+
+    def compute_pe_fock_contributions(self, density_matrix):
+        pass
+
+    def compute_pe_energy_hess_contributions(self, density_matrix):
+
+        return self._e_es_nuc_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
+
+

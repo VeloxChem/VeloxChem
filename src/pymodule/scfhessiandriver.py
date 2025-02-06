@@ -756,7 +756,7 @@ class ScfHessianDriver(HessianDriver):
 
             if self.scf_driver.point_charges is not None:
                 self.hessian += hessian_point_charges.transpose(0, 2, 1, 3)
-
+            # add pe contr to hessian
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 
             if self._dft:
