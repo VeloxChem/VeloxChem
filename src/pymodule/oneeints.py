@@ -29,6 +29,8 @@ from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
 from .veloxchemlib import NuclearPotentialGeom100Driver
 from .veloxchemlib import ElectricDipoleMomentDriver
+from .veloxchemlib import NuclearPotentialGeom200Driver
+from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
 from .matrices import Matrices
@@ -161,3 +163,45 @@ def compute_nuclear_potential_gradient_bfs(molecule, basis, charges,
 
     # Note: factor -1.0 for electron charge
     return -1.0 * grad
+
+
+def compute_elestrostatic_potential_hessian(molecule, basis, mm_charges,
+                                            mm_coordinates, density,
+                                            qm_atom_index_i, qm_atom_index_j):
+
+    hess = np.zeros((3, 3))
+
+    i, j = qm_atom_index_i, qm_atom_index_j
+
+    if i == j:
+        npot_hess_200_drv = NuclearPotentialGeom200Driver()
+
+        hmats_200 = npot_hess_200_drv.compute(molecule, basis, i,
+                                              mm_coordinates, mm_charges)
+
+        for x, label_x in enumerate('XYZ'):
+            for y, label_y in enumerate('XYZ'):
+                npot_label = label_x + label_y if x <= y else label_y + label_x
+                npot_200_iixy = hmats_200.matrix_to_numpy(npot_label)
+                hess[x, y] += 2.0 * (np.sum(density *
+                                            (npot_200_iixy + npot_200_iixy.T)))
+
+        hmats_200 = Matrices()
+
+    else:
+        npot_hess_101_drv = NuclearPotentialGeom101Driver()
+
+        hmats_101 = npot_hess_101_drv.compute(molecule, basis, i, j,
+                                              mm_coordinates, mm_charges)
+
+        for x, label_x in enumerate('XYZ'):
+            for y, label_y in enumerate('XYZ'):
+                npot_xy_label = f'{label_x}_{label_y}'
+                npot_101_ijxy = hmats_101.matrix_to_numpy(npot_xy_label)
+                hess[x, y] += 2.0 * (np.sum(density *
+                                            (npot_101_ijxy + npot_101_ijxy.T)))
+
+        hmats_101 = Matrices()
+
+    # Note: factor -1.0 for electron charge
+    return -1.0 * hess
