@@ -58,7 +58,15 @@ class EvbDriver():
         self.debug = False
 
     def build_and_run_default_water_EVB(self, reactant: str | Molecule, product: str | list[str] | Molecule | list[Molecule], barrier, free_energy, ordered_input=False):
+        """Automatically perform an EVB calculation using a vacuum system as reference and a system solvated in water as target system.
 
+        Args:
+            reactant (str | Molecule): The reactant. If a string is given, the corresponding xyz file must be present in the input_files folder.
+            product (str | list[str] | Molecule | list[Molecule]): A list of products. If a (list of) string(s) is given, the corresponding xyz file(s) must be present in the input_files folder.
+            barrier (float): the reaction barrier in kcal/mol of the vacuum system
+            free_energy (float): the reaction free energy in kcal/mol of the vacuum system
+            ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
+        """
         if not self.debug:
             Lambda = np.linspace(0,0.1,11)
             Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,41))
@@ -92,76 +100,99 @@ class EvbDriver():
         self,
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
-        product_charge: int | list[int] | None = None,  # type: ignore
-        reactant_multiplicity=1,
-        product_multiplicity: int | list[int] | None = None,
+        product_charge: int | list[int] = 0,  # type: ignore
+        reactant_multiplicity: int = 1,
+        product_multiplicity: int | list[int] = 1,
         reparameterise: bool = True,
         optimise: bool = False,
         ordered_input: bool = False,
     ):
+        """Build forcefields for the reactant and products, and set self.reactant and self.product to the respective forcefields as well as saving them as json to the input files folder. 
+        Will calculate RESP charges and use an xtb Hessian for any necessary reparameterisation. If these files are already present in the input_files folder, they will be loaded instead of recalculated.
 
+        Args:
+            reactant (str | Molecule): The reactant. If a string is given, the corresponding xyz file must be present in the input_files folder.
+            product (str | list[str] | Molecule | list[Molecule]): A list of products. If a (list of) string(s) is given, the corresponding xyz file(s) must be present in the input_files folder.
+            product_charge (int | list[int], optional): The nominal charge of each provided product. List should have the same length as the amount of products provided. 
+                The reactant will be assigned the sum of the product charges. Defaults to 0.
+            reactant_multiplicity (int, optional): The multiplicity of the reactant. Defaults to 1.
+            product_multiplicity (int | list[int], optional): The multiplicity of each provided product. List should have the same length as the amount of products provided. Defaults to 1.
+            reparameterise (bool, optional): If unknown parameters in the forcefield should be reparameterised. Defaults to True.
+            optimise (bool, optional): If the provided structure should be optimised before the forcefield is generated. Defaults to False.
+            ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
 
-        if isinstance(reactant, Molecule) and (isinstance(product, Molecule) or isinstance(product, list)):
-            #What names do we go for
+        Raises:
+            ValueError: If the reactant and product are not given both as a molecule or both as a file.
+        """
+        loaded_forcefield = False
+        if isinstance(reactant, Molecule):
+            assert isinstance(product, Molecule) or all(isinstance(pro, Molecule) for pro in product), "All products must be Molecule objects if the reactant is a Molecule object"
+            if not isinstance(product, list):
+                product = [product]
+
             reactant_name = "reactant"
-            load_inputs = False
-            combined_product_name = "product"
-        elif isinstance(reactant, str) and (isinstance(product, str) or isinstance(product, list)):
-            reactant_name = reactant
-            product_names = product
-            combined_product_name = "_".join(product)
-            load_inputs = True
-        else:
-            raise ValueError("Reactant and product must be either a both string or a Molecule object")
+            combined_product_name = "psroduct"
 
-        self.name = reactant_name
+            reactant_charge = reactant.get_charge()
+            reactant_multiplicity = reactant.get_multiplicity()
+            if isinstance(product, list):
+                product_charge = [pro.get_charge() for pro in product]
+                assert reactant_charge == sum(product_charge), "Total charge of reactant and products must match"
 
-        if not isinstance(product, list):
-            product = [product]
+                product_multiplicity = [pro.get_multiplicity() for pro in product]
+            else:
+                product_charge = product.get_charge()
+                assert reactant_charge == product_charge, "Total charge of reactant and products must match"
+                product_multiplicity = product.get_multiplicity()
 
-        if product_charge is None:
-            product_charge = [0] * len(product)
-            reactant_charge = 0
-
-        elif isinstance(product_charge, int):
-            product_charge: list[int] = [product_charge]
-            reactant_charge: int = product_charge[0]  # type: ignore
-        else:
-            reactant_charge = sum(product_charge)
-
-        if isinstance(product_multiplicity, int):
-            product_multiplicity = [product_multiplicity]
-        if product_multiplicity is None:
-            product_multiplicity = [1] * len(product)
-
-        assert len(product) == len(product_charge), "Number of products and charges must match"
-        assert len(product) == len(product_multiplicity), "Number of products and multiplicities must match"
-        
-        
-        ffbuilder = EvbForceFieldBuilder()
-
-        ffbuilder.reparameterise = reparameterise
-        ffbuilder.optimise = optimise
-        if load_inputs:
-            rea_input = self._get_input_files(reactant_name)
-            pro_input = [self._get_input_files(file) for file in product_names]
-
-        else:
             rea_input = {"molecule": reactant, "optimise": None, "forcefield": None, "hessian": None, "charges": None}
             pro_input = [{"molecule": pro, "optimise": None, "forcefield": None, "hessian": None, "charges": None} for pro in product]
 
+        elif isinstance(reactant, str):
+            assert isinstance(product, str) or all(isinstance(pro, str) for pro in product), "All products must be strings if the reactant is a string"
+            if not isinstance(product, list):
+                product = [product]
+
+            reactant_name = reactant
+            product_names = product
+            combined_product_name = "_".join(product)
+            rea_input = self._get_input_files(reactant_name)
+            pro_input = [self._get_input_files(file) for file in product_names]
+
+            if isinstance(product_charge, int):
+                product_charge: list[int] = [product_charge]
+                reactant_charge: int = product_charge[0]  # type: ignore
+            else:
+                reactant_charge = sum(product_charge)
+
+            if isinstance(product_multiplicity, int):
+                product_multiplicity = [product_multiplicity] * len(product)
+            
+            assert len(product) == len(product_charge), "Number of products and charges must match"
+            assert len(product) == len(product_multiplicity), "Number of products and multiplicities must match"
+
+        else:
+            raise ValueError("Reactant and product must be either a both string or a Molecule object")
+
         cwd = Path().cwd()
         reactant_path = cwd / self.input_folder / f"{reactant_name}_ff_data.json"
-
         combined_product_path = cwd / self.input_folder / f"{combined_product_name}_ff_data.json"
-        combined_product_exists = combined_product_path.exists()
-            
-        if rea_input["forcefield"] is not None and combined_product_exists:
+
+        rea_atoms = rea_input['molecule'].number_of_atoms()
+        pro_atoms = [pro['molecule'].number_of_atoms() for pro in pro_input]
+        assert rea_atoms == sum(pro_atoms), f"Number of atoms in reactant ({rea_atoms}) and products ({pro_atoms}, sum={sum(pro_atoms)}) must match"
+        self.name = reactant_name
+
+        if rea_input["forcefield"] is not None and combined_product_path.exists():
             self.ostream.print_info(f"Loading combined forcefield data from {combined_product_path}")
             self.ostream.print_info("Found both reactant and product forcefield data. Not generating new forcefields")
             self.reactant = rea_input["forcefield"]
             self.product = self.load_forcefield_from_json(str(combined_product_path))
         else:
+            ffbuilder = EvbForceFieldBuilder()
+            ffbuilder.reparameterise = reparameterise
+            ffbuilder.optimise = optimise
+
             self.reactant, self.product = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
@@ -235,8 +266,7 @@ class EvbDriver():
         Load forcefield data from a JSON file.
 
         Args:
-            forcefield (ForceFieldGenerator): The forcefield object to load the data into.
-            filename (str): The name of the JSON file, without _ff_data.json.
+            Path (str): The path to the JSON file containing the forcefield data.
 
         Returns:
             ForceFieldGenerator: The updated forcefield object with the loaded data.
@@ -275,22 +305,6 @@ class EvbDriver():
         with open(path, "w", encoding="utf-8") as file:
             json.dump(ff_data, file, indent=4)
 
-    
-
-    # def _save_charges(self, charges: list, filename: str):
-    #     """
-    #     Save the given list of charges to a text file.
-
-    #     Args:
-    #         charges (list): A list of charges to be saved.
-    #         filename (str): The name of the file to save the charges to.
-
-    #     Returns:
-    #         None
-    #     """
-    #     with open(f"{self.input_folder}/{filename}_charges.txt", "w", encoding="utf-8") as file:
-    #         for charge in charges:
-    #             file.write(f"{charge}\n")
 
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:
@@ -337,7 +351,14 @@ class EvbDriver():
         configurations: list[str] | list[dict],  # type: ignore
         constraints: dict | list[dict] | None = None,
     ):
+        """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
+        Args:
+            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing.
+            configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration. 
+                If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
+            constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
+        """
         assert (Lambda[0] == 0 and Lambda[-1] == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(np.diff(Lambda) > 0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
         Lambda = [round(lam, 3) for lam in Lambda]
@@ -407,7 +428,12 @@ class EvbDriver():
 
         self.system_confs = configurations
 
-    def default_system_configurations(self, name):
+    def default_system_configurations(self, name: str) -> dict:
+        """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
+
+        Args:
+            name (string): The name of the configuration to be used. Options are "vacuum", "water", "CNT", "graphene", "E_field", "no_reactant"
+        """
         if name == "vacuum":
             conf = {
                 "name": "vacuum",
@@ -493,6 +519,12 @@ class EvbDriver():
     #     self.ostream.print_info(f"Loaded systems, topology, initial positions, temperatue and Lambda from {data_folder}")
 
     def save_systems_as_xml(self, systems: dict, folder: str):
+        """Save the systems as xml files to the given folder.
+
+        Args:
+            systems (dict): The systems to save
+            folder (str): The folder relative to the current working directory to save the systems to.
+        """
         path = Path().cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
         for lam in self.Lambda:
@@ -509,6 +541,13 @@ class EvbDriver():
             output.write(mm.XmlSerializer.serialize(systems["product"]))
 
     def load_systems_from_xml(self, folder: str):
+        """Load the systems from xml files in the given folder.
+
+        Args:
+            folder (str): The folder relative to the current working directory to load the systems from.
+        Returns:
+            dict: The loaded systems
+        """
         systems = {}
         path = Path().cwd() / folder
         for lam in self.Lambda:
@@ -523,18 +562,28 @@ class EvbDriver():
     def run_FEP(
         self,
         equil_steps=5000,
-        total_sample_steps=100000,
+        sample_steps=100000,
         write_step=1000,
         initial_equil_steps=5000,
         step_size=0.001,
         equil_step_size=0.002,
         initial_equil_step_size=0.002,
     ):
+        """Run the the FEP calculations for all configurations in self.system_confs.
 
+        Args:
+            equil_steps (int, optional): The amount of timesteps to equiliberate at the beginning af each Lambda frame. Equiliberation is done with frozen H-bonds. Defaults to 5000.
+            sample_steps (int, optional): The amount of steps to sample. Defaults to 100000.
+            write_step (int, optional): Per how many steps to take a sample and save its data as well as the trajectory point. Defaults to 1000.
+            initial_equil_steps (int, optional): The amount of timesteps to add to the equiliberation at the first Lambda frame. Defaults to 5000.
+            step_size (float, optional): The step size during the sampling in picoseconds. Defaults to 0.001.
+            equil_step_size (float, optional): The step size during the equiliberation in picoseconds. Is typically larger then step_size as equilliberation is done with frozen H-bonds. Defaults to 0.002.
+            initial_equil_step_size (float, optional): The step size during initial equiliberation in picoseconds. Defaults to 0.002.
+        """
         if self.debug:
             self.ostream.print_info("Debugging enabled, using low number of steps. Do not use for production")
             equil_steps = 100
-            total_sample_steps = 500
+            sample_steps = 500
             write_step = 1
             initial_equil_steps = 100
             step_size = 0.001
@@ -547,7 +596,7 @@ class EvbDriver():
             # FEP.constrain_H = False
             FEP.run_FEP(
                 equilliberation_steps=equil_steps,
-                total_sample_steps=total_sample_steps,
+                total_sample_steps=sample_steps,
                 write_step=write_step,
                 lambda_0_equilliberation_steps=initial_equil_steps,
                 step_size=step_size,
@@ -563,6 +612,12 @@ class EvbDriver():
                 FEP.recalculate(interpolated_potential=True, force_contributions=True)
 
     def compute_energy_profiles(self, barrier, free_energy):
+        """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
+
+        Args:
+            barrier (float): the reaction barrier in kcal/mol of the reference system
+            free_energy (float): the reaction free energy in kcal/mol of the reference system
+        """
         reference_folder = self.system_confs[0]["data_folder"]
         target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
         dp = EvbDataProcessing()
@@ -571,7 +626,16 @@ class EvbDriver():
         self.save_results(dp.results)
         dp.print_results()
 
-    def load_output_from_folders(self, reference_folder, target_folders):
+    def load_output_from_folders(self, reference_folder, target_folders) -> dict:
+        """Load results from the output of the FEP calculations, and return a dictionary. Looks for Energies.dat, Data_combined.dat and options.json in each folder.
+
+        Args:
+            reference_folder (str): The folder containing the output files of the reference system.
+            target_folders (str): A list of folders containing the output files of the target systems.
+
+        Returns:
+            dict: A dictionary containing the results of the FEP calculations for the reference and target systems.
+        """
         reference = reference_folder.split("/")[-1]
         targets = []
         for target in target_folders:
@@ -579,16 +643,27 @@ class EvbDriver():
 
         folders = [reference_folder] + target_folders
         results = {}
+        cwd = Path().cwd()
         for name, folder in zip([reference] + targets, folders):
-            E_file = f"{folder}/Energies.dat"
-            data_file = f"{folder}/Data_combined.dat"
-            options_file = f"{folder}/options.json"
+            E_file = str(cwd / folder / "Energies.dat")
+            data_file = str(cwd / folder / "Data_combined.dat")
+            options_file = str(cwd / folder / "options.json")
             result = self.load_output_files(E_file, data_file, options_file)
             results.update({name: result})
         return results
 
     @staticmethod
     def load_output_files(E_file, data_file, options_file):
+        """Load the output from one FEP calculation
+
+        Args:
+            E_file (path): The location of the energies file
+            data_file (path): The location of the data file
+            options_file (path): The location of the options json file.
+
+        Returns:
+            dict: A dictionary containing the results of the FEP calculation
+        """
         E = np.loadtxt(E_file)
         joule_to_cal = 1 / 4.184
         E *= joule_to_cal
@@ -624,6 +699,14 @@ class EvbDriver():
 
     @staticmethod
     def load_result(file):
+        """Load results from an h5 file
+
+        Args:
+            file (path): The file to load the results from.
+
+        Returns:
+            dict: Dictionary with the results
+        """
         with h5py.File(file, "r") as f:
             result = {}
             for key, value in f.items():
@@ -638,7 +721,12 @@ class EvbDriver():
                     result[key] = value
         return result
 
-    def save_results(self, results):
+    def save_results(self, results: dict[str, dict]):
+        """Save the results to seperate h5 files
+
+        Args:
+            results (dict[str, dict]): Dictionary of dictionaries containing the results to save. The key string will be used as filename
+        """
         cwd = Path.cwd()
         for name, result in results.items():
             file_path = str(cwd / f"{name}.h5")
@@ -655,29 +743,3 @@ class EvbDriver():
                         file[key] = value
                 pass
         pass
-
-    # @staticmethod
-    # def show_snapshots(folder):
-    #     import py3Dmol
-    #     # Read the pdb file and split it into models
-
-    #     with open(f"{folder}/traj_combined.pdb", "r") as file:
-    #         models = file.read().split("ENDMDL")
-
-    #     # Extract the first and last model
-    #     first_model = models[0] + "ENDMDL"
-    #     last_model = models[-2] + "ENDMDL"  # -2 because the last element is an empty string
-
-    #     # Display the first model
-    #     view = py3Dmol.view(width=400, height=300)
-    #     view.addModel(first_model, "pdb", {"keepH": True})
-    #     view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
-    #     view.zoomTo()
-    #     view.show()
-
-    #     # Display the last model
-    #     view = py3Dmol.view(width=400, height=300)
-    #     view.addModel(last_model, "pdb", {"keepH": True})
-    #     view.setStyle({}, {"stick": {}, "sphere": {"scale": 0.25}})
-    #     view.zoomTo()
-    #     view.show()

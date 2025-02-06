@@ -11,8 +11,6 @@ from .reaction_matcher import ReactionMatcher
 
 import numpy as np
 import networkx as nx
-from networkx.algorithms.isomorphism import GraphMatcher
-from networkx.algorithms.isomorphism import categorical_node_match
 
 import sys
 from mpi4py import MPI
@@ -182,7 +180,8 @@ class EvbForceFieldBuilder():
             #Reparameterise the forcefield if necessary and requested
             if reparameterise:
                 self.ostream.print_info("Reparameterising force field.")
-
+                
+                #todo should 
                 if input["hessian"] is not None:
                     hessian = input["hessian"]
                 else:
