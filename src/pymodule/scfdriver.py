@@ -62,6 +62,11 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
+
 
 class ScfDriver:
     """
@@ -1351,11 +1356,24 @@ class ScfDriver:
                 ao_basis.get_label().lower().startswith('def2-'),
                 'SCF Driver: Invalid basis set for RI-J')
 
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            ri_prep_t0 = tm.time()
+
             basis_ri_j = MolecularBasis.read(molecule, 'def2-universal-jkfit')
 
             t2c_drv = TwoCenterElectronRepulsionDriver()
             mat_j = t2c_drv.compute(molecule, basis_ri_j)
-            inv_mat_j_np = np.linalg.inv(mat_j.to_numpy())
+            mat_j_np = mat_j.to_numpy()
+
+            if 'scipy' in sys.modules:
+                lu, piv = lu_factor(mat_j_np)
+                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            else:
+                inv_mat_j_np = np.linalg.inv(mat_j_np)
 
             inv_mat_j = SubMatrix(
                 [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
@@ -1363,6 +1381,12 @@ class ScfDriver:
 
             self._ri_drv = RIFockDriver(inv_mat_j)
             self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j)
+
+            self.ostream.print_info(
+                f'Pre-computation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         e_grad = None
 
@@ -1978,6 +2002,11 @@ class ScfDriver:
             # restricted SCF
             self._print_debug_info('before rest Fock build')
 
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'SCF driver: RI is only applicable to pure DFT functional')
+
             if self.ri_coulomb and fock_type == 'j':
                 fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
             else:
@@ -2016,12 +2045,23 @@ class ScfDriver:
 
         else:
             # unrestricted SCF or restricted open-shell SCF
+
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'SCF driver: RI is only applicable to pure DFT functional')
+
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_Jab is D_total
                 self._print_debug_info('before unrest Fock J build')
-                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
-                                            0.0, thresh_int)
+
+                if self.ri_coulomb:
+                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+                else:
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                                0.0, 0.0, thresh_int)
+
                 self._print_debug_info('after  unrest Fock J build')
 
                 J_ab_np = fock_mat.to_numpy()
