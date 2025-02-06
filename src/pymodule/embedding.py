@@ -6,7 +6,8 @@ from .veloxchemlib import (compute_electric_field_integrals,
                            compute_electric_field_values,
                            compute_electric_field_integrals_gradient)
 from .oneeints import (compute_nuclear_potential_integrals,
-                       compute_nuclear_potential_gradient_bfs)
+                       compute_nuclear_potential_gradient_bfs,
+                       compute_electrostatic_potential_hessian)
 from .errorhandler import assert_msg_critical
 
 try:
@@ -140,7 +141,7 @@ class EmbeddingIntegralDriver:
             basis=self.basis,
             coordinates=charge_coordinates,
             charges=charges,
-            D=density_matrix)
+            density=density_matrix)
         return op
 
 
@@ -170,9 +171,9 @@ class EmbeddingIntegralDriver:
         return compute_electric_field_integrals_gradient(
             self.molecule, self.basis, coordinates, induced_dipoles, density_matrix)
 
-    def induced_dipoles_potential_integrals(
-            self, induced_dipoles: np.ndarray,
-            coordinates: np.ndarray) -> np.ndarray:
+    def induced_dipoles_potential_integrals(self,
+                                            induced_dipoles: np.ndarray,
+                                            coordinates: np.ndarray) -> np.ndarray:
         """Calculate the electronic potential integrals and contract with the
         induced dipoles of Atoms.
 
@@ -193,6 +194,56 @@ class EmbeddingIntegralDriver:
 
         return compute_electric_field_integrals(self.molecule, self.basis,
                                                 coordinates, induced_dipoles)
+
+    def electronic_electrostatic_energy_hessian(self,
+                                                   multipole_coordinates: np.ndarray,
+                                                   multipole_orders: np.ndarray,
+                                                   multipoles: list[np.ndarray],
+                                                   density_matrix: np.ndarray,
+                                                   nuc_i: int,
+                                                   nuc_j: int
+                                                   ):
+        """Calculate the electronic electrostatic energy Hessian.
+
+        Args:
+            multipole_coordinates: Coordinates of the Multipoles.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64
+            multipole_orders: Multipole orders of all multipoles.
+                Shape: (number of atoms)
+                Dtype: np.int64
+            multipoles: Multipoles multiplied with degeneracy coefficients and
+                        taylor coefficients.
+                Shape: (number of atoms, number of multipole elements)
+                Dtype: np.float64
+            density_matrix: Density Matrix that is the source of the electronic field.
+                Shape: (number of ao functions, number of ao functions)
+                Dtype: np.float64
+            nuc_i: Index of Nucleus "i" corresponding to the Hessian indexing H_ij.
+                Shape: (1)
+                Dtype: np.int64
+            nuc_j: Index of Nucleus "j" corresponding to the Hessian indexing H_ij.
+                Shape: (1)
+                Dtype: np.int64
+        Returns:
+            Electronic electrostatic energy Hessian.
+                Shape: (3,3)
+                Dtype: np.float64
+        """
+        op = 0
+        # 0 order
+        idx = np.where(multipole_orders >= 0)[0]
+        charge_coordinates = multipole_coordinates[idx]
+        charges = np.array([multipoles[i][0] for i in idx])
+
+        op += compute_electrostatic_potential_hessian(molecule=self.molecule,
+                                                      basis=self.basis,
+                                                      mm_coordinates=charge_coordinates,
+                                                      mm_charges=charges,
+                                                      density=density_matrix,
+                                                      qm_atom_index_i=nuc_i,
+                                                      qm_atom_index_j=nuc_j)
+        return op
 
 class PolarizableEmbedding:
     """
@@ -576,7 +627,13 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         pass
 
     def compute_pe_energy_hess_contributions(self, density_matrix):
-
-        return self._e_es_nuc_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
+        nuc_list = np.arange(self.quantum_subsystem.num_nuclei, dtype=np.int64)
+        e_es_nuc_hess = electrostatic_interactions.compute_electronic_electrostatic_energy_hessian(
+            nuc_list=nuc_list,
+            density_matrix=density_matrix,
+            classical_subsystem=self.classical_subsystem,
+            integral_driver=self._integral_driver
+            )
+        return e_es_nuc_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
 
 
