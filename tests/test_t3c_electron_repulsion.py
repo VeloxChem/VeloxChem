@@ -1,8 +1,6 @@
 from pathlib import Path
 import numpy as np
 import math as mt
-import pytest
-import os
 
 from veloxchem import ThreeCenterElectronRepulsionDriver
 from veloxchem import MolecularBasis
@@ -39,8 +37,6 @@ class TestThreeCenterElectronRepulsionDriver:
 
         return mol, bas
 
-    # TODO: enable test with multi-threads
-    @pytest.mark.skipif(os.environ.get('OMP_NUM_THREADS', None) != str(1), reason='multi-threads not supported')
     def test_electron_repulsion_h2o_svp(self):
 
         mol, bas = self.get_data_svp()
@@ -63,8 +59,6 @@ class TestThreeCenterElectronRepulsionDriver:
                                   rel_tol=1.0e-12,
                                   abs_tol=1.0e-12)
 
-    # TODO: enable test with multi-threads
-    @pytest.mark.skipif(os.environ.get('OMP_NUM_THREADS', None) != str(1), reason='multi-threads not supported')
     def test_electron_repulsion_h2o_qzvp(self):
 
         mol, bas = self.get_data_qzvp()
