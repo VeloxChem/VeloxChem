@@ -165,7 +165,7 @@ def compute_nuclear_potential_gradient_bfs(molecule, basis, charges,
     return -1.0 * grad
 
 
-def compute_elestrostatic_potential_hessian(molecule, basis, mm_charges,
+def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
                                             mm_coordinates, density,
                                             qm_atom_index_i, qm_atom_index_j):
 
