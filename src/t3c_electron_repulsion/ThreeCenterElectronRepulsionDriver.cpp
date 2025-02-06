@@ -50,8 +50,8 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
             std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
                 ///std::cout << "Task : " << task[0] << " , " << task[1] << " , " << task[2] << std::endl;
                 auto aux_gtos    = ptr_aux_gto_blocks[task[0]];
-                auto aux_indices = std::pair<size_t, size_t>{task[1], task[2]};
-#pragma omp task firstprivate(aux_gtos, aux_indices) shared(ptr_gto_pair_blocks)
+                auto aux_range = std::pair<size_t, size_t>{task[1], task[2]};
+#pragma omp task firstprivate(aux_gtos, aux_range) shared(ptr_gto_pair_blocks)
                 {
                     if (const auto nblocks = ptr_gto_pair_blocks->size(); nblocks > 0)
                     {
@@ -61,7 +61,7 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
                             
                             CT3CDistributor distributor(ptr_buffer);
                             
-                            t3cerifunc::compute(distributor, aux_gtos, gp_pairs, aux_indices);
+                            t3cerifunc::compute(distributor, aux_gtos, gp_pairs, aux_range);
                         }
                     }
                 }
