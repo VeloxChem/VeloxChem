@@ -210,7 +210,9 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
 def compute_electrostatic_integrals_gradient(molecule, basis, mm_charges,
                                              mm_coordinates, qm_atom_index_i):
 
-    ints_grad = []
+    naos = basis.get_dimensions_of_basis()
+
+    ints_grad = np.zeros((3, naos, naos))
 
     i = qm_atom_index_i
 
@@ -222,7 +224,7 @@ def compute_electrostatic_integrals_gradient(molecule, basis, mm_charges,
     for x, label in enumerate(['X', 'Y', 'Z']):
         gmat_100 = gmats_100.matrix_to_numpy(label)
         # Note: factor -1.0 for electron charge
-        ints_grad.append(-1.0 * (gmat_100 + gmat_100.T))
+        ints_grad[x] -= gmat_100 + gmat_100.T
 
     gmats_100 = Matrices()
 
