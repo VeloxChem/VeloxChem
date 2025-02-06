@@ -526,6 +526,12 @@ class ScfDriver:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
+        # check RI-J
+        # for now, force DIIS for RI-J
+        # TODO: double check
+        if self.ri_coulomb:
+            self.acc_type = 'DIIS'
+
         # check molecule
         molecule_sanity_check(molecule)
 
@@ -2019,6 +2025,12 @@ class ScfDriver:
             fock_mat_np = fock_mat.to_numpy()
             fock_mat = Matrix()
 
+            if self.ri_coulomb and fock_type == 'j':
+                # for now, RI-J is not parallelized over MPI
+                # TODO: parallelize RI-J over MPI
+                if self.rank != mpi_master():
+                    fock_mat_np = np.zeros(fock_mat_np.shape)
+
             if fock_type == 'j':
                 # for pure functional
                 fock_mat_np *= 2.0
@@ -2125,6 +2137,13 @@ class ScfDriver:
             den_mat_for_Ka = Matrix()
             den_mat_for_Kb = Matrix()
             den_mat_for_Jab = Matrix()
+
+            if self.ri_coulomb and fock_type == 'j':
+                # for now, RI-J is not parallelized over MPI
+                # TODO: parallelize RI-J over MPI
+                if self.rank != mpi_master():
+                    fock_mat_a_np = np.zeros(fock_mat_a_np.shape)
+                    fock_mat_b_np = np.zeros(fock_mat_b_np.shape)
 
             if self.rank == mpi_master():
                 # Note: make fock_mat a list

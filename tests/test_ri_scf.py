@@ -6,6 +6,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
+@pytest.mark.solvers
 class TestScfRestrictedDriverWithRI:
 
     def run_scf_rest(self, xcfun_label, ref_scf_energy, tol):
