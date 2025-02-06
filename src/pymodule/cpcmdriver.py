@@ -86,6 +86,9 @@ class CpcmDriver:
         self.epsilon         = 78.39 
         self.grid_per_sphere = 194
         self.x               = 0
+        self.scale_radii     = 1.2
+
+        self.alt_vdw_radii   = None
         
         # input keywords
         self.input_keywords = {
@@ -175,8 +178,13 @@ class CpcmDriver:
         zeta = self.get_zeta_dict()[self.grid_per_sphere]
 
         # increase radii by 20%
-        atom_radii = molecule.vdw_radii_to_numpy() * 1.2
+        atom_radii = molecule.vdw_radii_to_numpy() * self.scale_radii
         atom_coords = molecule.get_coordinates_in_bohr()
+
+        if self.alt_vdw_radii is not None:
+            if not isinstance(self.alt_vdw_radii, np.ndarray):
+                self.alt_vdw_radii = np.array(self.alt_vdw_radii)
+            atom_radii = self.alt_vdw_radii * self.scale_radii
 
         cpcm_grid_raw = np.zeros((0, 6))
 
