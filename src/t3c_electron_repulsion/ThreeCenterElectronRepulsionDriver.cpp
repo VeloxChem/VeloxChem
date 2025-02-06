@@ -23,6 +23,8 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
 
     const auto gto_pair_blocks = gtofunc::make_gto_pair_blocks(basis, molecule);
     
+    const auto aux_gto_blocks = gtofunc::make_gto_blocks(aux_basis, molecule);
+    
     // prepare pointers for OMP parallel region
 
     auto ptr_aux_basis = &aux_basis;
@@ -31,23 +33,23 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
     
     auto ptr_gto_pair_blocks = &gto_pair_blocks;
     
+    auto ptr_aux_gto_blocks = aux_gto_blocks.data();
+    
     auto ptr_buffer = &buffer;
     
     // execute OMP tasks with static scheduling
 
     omp::set_static_scheduler();
 
-#pragma omp parallel shared(ptr_aux_basis, ptr_molecule, ptr_gto_pair_blocks, ptr_buffer)
+#pragma omp parallel shared(ptr_aux_basis, ptr_molecule, ptr_gto_pair_blocks, ptr_aux_gto_blocks, ptr_buffer)
     {
 #pragma omp single nowait
         {
-            const auto aux_gto_blocks = gtofunc::make_gto_blocks(*ptr_aux_basis, *ptr_molecule);
-
             const auto tasks = omp::make_aux_work_tasks(aux_gto_blocks);
 
             std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
                 ///std::cout << "Task : " << task[0] << " , " << task[1] << " , " << task[2] << std::endl;
-                auto aux_gtos    = aux_gto_blocks[task[0]];
+                auto aux_gtos    = ptr_aux_gto_blocks[task[0]];
                 auto aux_indices = std::pair<size_t, size_t>{task[1], task[2]};
 #pragma omp task firstprivate(aux_gtos, aux_indices) shared(ptr_gto_pair_blocks)
                 {
