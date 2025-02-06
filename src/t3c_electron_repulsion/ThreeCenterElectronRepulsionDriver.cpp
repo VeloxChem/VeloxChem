@@ -33,7 +33,7 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
     
     auto ptr_gto_pair_blocks = &gto_pair_blocks;
     
-    auto ptr_aux_gto_blocks = aux_gto_blocks.data();
+    auto ptr_aux_gto_blocks = &aux_gto_blocks;
     
     auto ptr_buffer = &buffer;
     
@@ -45,14 +45,15 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
     {
 #pragma omp single nowait
         {
-            const auto tasks = omp::make_aux_work_tasks(aux_gto_blocks);
+            const auto tasks = omp::make_aux_work_tasks(*ptr_aux_gto_blocks);
 
             std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
-                ///std::cout << "Task : " << task[0] << " , " << task[1] << " , " << task[2] << std::endl;
-                auto aux_gtos    = ptr_aux_gto_blocks[task[0]];
-                auto aux_range = std::pair<size_t, size_t>{task[1], task[2]};
-#pragma omp task firstprivate(aux_gtos, aux_range) shared(ptr_gto_pair_blocks)
+                auto aux_idx = task[0];
+                auto ket_range = std::pair<size_t, size_t>{task[1], task[2]};
+#pragma omp task firstprivate(aux_idx, ket_range)
                 {
+                    auto aux_gtos = ptr_aux_gto_blocks->at(aux_idx);
+                    
                     if (const auto nblocks = ptr_gto_pair_blocks->size(); nblocks > 0)
                     {
                         for (size_t i = 0; i < nblocks; i++)
@@ -61,7 +62,7 @@ CThreeCenterElectronRepulsionDriver::compute(const CMolecularBasis &basis, const
                             
                             CT3CDistributor distributor(ptr_buffer);
                             
-                            t3cerifunc::compute(distributor, aux_gtos, gp_pairs, aux_range);
+                            t3cerifunc::compute(distributor, aux_gtos, gp_pairs, ket_range);
                         }
                     }
                 }
