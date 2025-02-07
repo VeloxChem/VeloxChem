@@ -169,6 +169,7 @@ from .evbffbuilder import EvbForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import FepDriver
 from .evbdataprocessing import EvbDataProcessing
+from .evbreporter import EvbReporter
 
 
 # Python functions

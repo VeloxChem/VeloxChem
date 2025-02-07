@@ -124,7 +124,7 @@ class EvbDriver():
         Raises:
             ValueError: If the reactant and product are not given both as a molecule or both as a file.
         """
-        loaded_forcefield = False
+        
         if isinstance(reactant, Molecule):
             assert isinstance(product, Molecule) or all(isinstance(pro, Molecule) for pro in product), "All products must be Molecule objects if the reactant is a Molecule object"
             if not isinstance(product, list):
@@ -204,6 +204,7 @@ class EvbDriver():
             )
         self.save_forcefield(self.reactant, str(reactant_path))
         self.save_forcefield(self.product, str(combined_product_path))
+        self.ostream.flush()
 
     def _get_input_files(self, filename: str):
         # Build a molecule from a (possibly optimised) geometry
@@ -427,6 +428,7 @@ class EvbDriver():
             conf["initial_positions"] = initial_positions
 
         self.system_confs = configurations
+        self.ostream.flush()
 
     def default_system_configurations(self, name: str) -> dict:
         """Return a dictionary with a default configuration. Options not given in the dictionary will be set to default values in the build_systems function.
@@ -582,8 +584,9 @@ class EvbDriver():
         """
         if self.debug:
             self.ostream.print_info("Debugging enabled, using low number of steps. Do not use for production")
+            self.ostream.flush()
             equil_steps = 100
-            sample_steps = 500
+            sample_steps = 200
             write_step = 1
             initial_equil_steps = 100
             step_size = 0.001
@@ -606,10 +609,11 @@ class EvbDriver():
                 configuration=conf
             )
 
-            if self.debug:
-                self.ostream.print_info("Debugging option enabled.Skipping recalculation.")
-            else:
-                FEP.recalculate(interpolated_potential=True, force_contributions=True)
+            # if self.debug:
+            #     self.ostream.print_info("Debugging option enabled.Skipping recalculation.")
+            # else:
+            #     FEP.recalculate(interpolated_potential=True, force_contributions=True)
+            self.ostream.flush()
 
     def compute_energy_profiles(self, barrier, free_energy):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
@@ -625,6 +629,7 @@ class EvbDriver():
         dp.compute(results, barrier, free_energy)
         self.save_results(dp.results)
         dp.print_results()
+        self.ostream.flush()
 
     def load_output_from_folders(self, reference_folder, target_folders) -> dict:
         """Load results from the output of the FEP calculations, and return a dictionary. Looks for Energies.dat, Data_combined.dat and options.json in each folder.
@@ -664,13 +669,10 @@ class EvbDriver():
         Returns:
             dict: A dictionary containing the results of the FEP calculation
         """
-        E = np.loadtxt(E_file)
-        joule_to_cal = 1 / 4.184
-        E *= joule_to_cal
-        E1_ref, E2_ref, E1_run, E2_run, E_m = E.T
+        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = np.loadtxt(E_file,skiprows=1,delimiter=',').T
 
-        Data = np.loadtxt(data_file)
-        step, Ep, Ek, Temp, Vol, Dens, Lambda_frame = Data.T
+        Data = np.loadtxt(data_file,skiprows=1,delimiter=',')
+        step, Ep, Ek, Temp, Vol, Dens = Data.T
 
         with open(options_file, "r") as file:
             options = json.load(file)

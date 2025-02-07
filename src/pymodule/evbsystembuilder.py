@@ -672,15 +672,9 @@ class EvbSystemBuilder():
             harmonic_angle_force.setName(f"Solvent {i} harmonic angle")
             fourier_force = mm.PeriodicTorsionForce()
             fourier_force.setName(f"Solvent {i} proper fourier torsion")
-            RB_force = mm.RBTorsionForce()
-            RB_force.setName(f"Solvent {i} proper RB torsion")
+            
             fourier_imp_force = mm.PeriodicTorsionForce()
             fourier_imp_force.setName(f"Solvent {i} improper fourier torsion")
-            system.addForce(harmonic_bond_force)
-            system.addForce(harmonic_angle_force)
-            system.addForce(fourier_force)
-            system.addForce(RB_force)
-            system.addForce(fourier_imp_force)
 
             # Loop over all solvent molecules
             self.ostream.print_info(f"Adding {num_solvent_molecules} molecules of {solvent} to the system")
@@ -746,6 +740,15 @@ class EvbSystemBuilder():
                                     sigma,
                                     epsilon,
                                 )
+
+            if harmonic_bond_force.getNumBonds() > 0:
+                system.addForce(harmonic_bond_force)
+            if harmonic_angle_force.getNumAngles() > 0:
+                system.addForce(harmonic_angle_force)
+            if fourier_force.getNumTorsions() > 0:
+                system.addForce(fourier_force)
+            if fourier_imp_force.getNumTorsions() > 0:
+                system.addForce(fourier_imp_force)
             self.ostream.print_info(
                 f"Added {solvent_nb_atom_count} atoms to the nonbonded force and {solvent_system_atom_count} atoms to the system"
             )
