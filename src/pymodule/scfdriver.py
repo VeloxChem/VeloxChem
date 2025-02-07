@@ -1357,7 +1357,7 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
-        if self.ri_coulomb:
+        if self.ri_coulomb and self.rank == mpi_master():
             assert_msg_critical(
                 ao_basis.get_label().lower().startswith('def2-'),
                 'SCF Driver: Invalid basis set for RI-J')
@@ -1367,19 +1367,33 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            ri_prep_t0 = tm.time()
-
             basis_ri_j = MolecularBasis.read(molecule, 'def2-universal-jkfit')
+
+            ri_prep_t0 = tm.time()
 
             t2c_drv = TwoCenterElectronRepulsionDriver()
             mat_j = t2c_drv.compute(molecule, basis_ri_j)
             mat_j_np = mat_j.to_numpy()
+
+            self.ostream.print_info(
+                f'Two-center integrals for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
 
             if 'scipy' in sys.modules:
                 lu, piv = lu_factor(mat_j_np)
                 inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
             else:
                 inv_mat_j_np = np.linalg.inv(mat_j_np)
+
+            self.ostream.print_info(
+                f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
 
             inv_mat_j = SubMatrix(
                 [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
@@ -1389,7 +1403,7 @@ class ScfDriver:
             self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j)
 
             self.ostream.print_info(
-                f'Pre-computation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+                f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
             )
             self.ostream.print_blank()
             self.ostream.flush()
@@ -2014,22 +2028,20 @@ class ScfDriver:
                     'SCF driver: RI is only applicable to pure DFT functional')
 
             if self.ri_coulomb and fock_type == 'j':
-                fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
+                if self.rank == mpi_master():
+                    fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
+                    fock_mat_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
+                else:
+                    fock_mat_np = np.zeros(den_mat[0].shape)
             else:
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock,
                                             fock_type, exchange_scaling_factor,
                                             0.0, thresh_int)
+                fock_mat_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             self._print_debug_info('after  rest Fock build')
-
-            fock_mat_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
-
-            if self.ri_coulomb and fock_type == 'j':
-                # for now, RI-J is not parallelized over MPI
-                # TODO: parallelize RI-J over MPI
-                if self.rank != mpi_master():
-                    fock_mat_np = np.zeros(fock_mat_np.shape)
 
             if fock_type == 'j':
                 # for pure functional
@@ -2069,15 +2081,19 @@ class ScfDriver:
                 self._print_debug_info('before unrest Fock J build')
 
                 if self.ri_coulomb:
-                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+                    if self.rank == mpi_master():
+                        fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+                        J_ab_np = fock_mat.to_numpy()
+                        fock_mat = Matrix()
+                    else:
+                        J_ab_np = np.zeros(den_mat[0].shape)
                 else:
                     fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                                 0.0, 0.0, thresh_int)
+                    J_ab_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
 
                 self._print_debug_info('after  unrest Fock J build')
-
-                J_ab_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
 
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
@@ -2137,13 +2153,6 @@ class ScfDriver:
             den_mat_for_Ka = Matrix()
             den_mat_for_Kb = Matrix()
             den_mat_for_Jab = Matrix()
-
-            if self.ri_coulomb and fock_type == 'j':
-                # for now, RI-J is not parallelized over MPI
-                # TODO: parallelize RI-J over MPI
-                if self.rank != mpi_master():
-                    fock_mat_a_np = np.zeros(fock_mat_a_np.shape)
-                    fock_mat_b_np = np.zeros(fock_mat_b_np.shape)
 
             if self.rank == mpi_master():
                 # Note: make fock_mat a list
