@@ -48,7 +48,6 @@ class ExcitedStateAnalysisDriver:
         self.include_ct_matrix = False
         self.include_participation_ratios = False
         self.include_average_particle_hole_position = False
-        self.include_relative_ct_length = False
 
     def update_settings(self, fragment_dict=None):
         """
@@ -61,8 +60,7 @@ class ExcitedStateAnalysisDriver:
         if fragment_dict is not None:
             self.fragment_dict = fragment_dict
 
-    def compute(self, fragment_dict, state_index, molecule, basis, scf_tensors,
-                rsp_tensors):
+    def compute(self, state_index, molecule, basis, scf_tensors, rsp_tensors):
         """
         Computes dictionary containing excited state descriptors for
         excited state nstate.
@@ -105,7 +103,7 @@ class ExcitedStateAnalysisDriver:
         trans_dens_mo, trans_dens_ao = self.compute_transition_density_matrix(
             molecule, scf_tensors, rsp_tensors, state_index)
         ct_matrix = self.compute_ct_matrix(molecule, basis, scf_tensors,
-                                           trans_dens_ao, fragment_dict)
+                                           trans_dens_ao, self.fragment_dict)
 
         if self.include_transition_density_matrix is True:
             ret_dict['Transition_density_matrix_MO'] = trans_dens_mo
@@ -132,7 +130,7 @@ class ExcitedStateAnalysisDriver:
             ret_dict['Average_particle_position'], ret_dict[
                 'Average_hole_position'], ret_dict[
                     'Average_difference_vector'] = self.compute_avg_position(
-                        molecule, basis, ct_matrix, fragment_dict)
+                        molecule, ct_matrix, self.fragment_dict)
             ret_dict['Relative_CT_length'] = self.compute_relative_ct_length(
                 molecule, ret_dict['Average_difference_vector'])
 
