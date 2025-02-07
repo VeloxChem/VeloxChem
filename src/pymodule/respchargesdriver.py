@@ -527,7 +527,8 @@ class RespChargesDriver:
         self.print_header(n_conf, n_points)
 
         constr_1, constr_2 = self.generate_constraints(molecules[0])
-
+        self.atom_eq_map_1 = constr_1
+        self.atom_eq_map_2 = constr_2
         # first stage of resp fit
         self.print_resp_stage_header('first')
         q0 = np.zeros(molecules[0].number_of_atoms())

@@ -124,6 +124,7 @@ class ForceFieldGenerator:
         self.force_field_data = None
         self.force_field_data_extension = None
         self.topology_update_flag = False
+        self.eq_atoms = None
 
         # number of rounds for fitting dihedral potentials
         self.n_rounds = 3
@@ -1109,6 +1110,9 @@ class ForceFieldGenerator:
 
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
                                                         'resp')
+
+                self.eq_atoms = [resp_drv.atom_eq_map_1, resp_drv.atom_eq_map_2]
+
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 
