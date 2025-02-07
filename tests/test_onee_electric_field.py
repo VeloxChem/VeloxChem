@@ -555,7 +555,7 @@ class TestOneElecIntsElectricField:
             for d in range(3):
                 ef_grad = 0.0
                 for c in range(ndipoles):
-                    ef_grad += np.dot(ef_grad_for_mm[d, c, :],
+                    ef_grad -= np.dot(ef_grad_for_mm[d, c, :],
                                       dipole_moments[c])
                 assert abs(ef_grad - ef_ints_grad[i, d]) < 1.0e-10
 

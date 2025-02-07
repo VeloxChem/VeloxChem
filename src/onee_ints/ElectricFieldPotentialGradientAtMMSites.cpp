@@ -476,9 +476,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F2_t[1] * (
 
@@ -502,9 +500,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F2_t[1] * (
 
@@ -634,9 +630,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F3_t[1] * (
 
@@ -683,9 +677,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F3_t[1] * (
 
@@ -845,9 +837,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F4_t[1] * (
 
@@ -931,9 +921,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F4_t[1] * (
 
@@ -1142,9 +1130,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F5_t[1] * (
 
@@ -1296,9 +1282,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F5_t[1] * (
 
@@ -1597,9 +1581,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F4_t[1] * (
 
@@ -1695,9 +1677,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F4_t[1] * (
 
@@ -1905,9 +1885,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F5_t[1] * (
 
@@ -2089,9 +2067,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F5_t[1] * (
 
@@ -2392,9 +2368,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F6_t[1] * (
 
@@ -2733,9 +2707,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F6_t[1] * (
 
@@ -3208,9 +3180,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F6_t[1] * (
 
@@ -3562,9 +3532,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F6_t[1] * (
 
@@ -4032,9 +4000,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F7_t[1] * (
 
@@ -4719,9 +4685,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F7_t[1] * (
 
@@ -5541,9 +5505,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
             for (int m = 0; m < 3; m++)
             {
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_i = (-1.0) * V_const * (
+                double V_grad_i = V_const * (
 
                     F8_t[1] * (
 
@@ -6952,9 +6914,7 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 
                 );
 
-                // Note: minus sign from electric field - electric dipole interaction
-
-                double V_grad_j = (-1.0) * V_const * (
+                double V_grad_j = V_const * (
 
                     F8_t[1] * (
 
@@ -8423,3 +8383,4 @@ computeElectricFieldPotentialGradientAtMMSites(const CMolecule& molecule, const 
 }
 
 }  // namespace onee
+
