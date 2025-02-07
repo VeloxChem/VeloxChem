@@ -10,7 +10,7 @@ import openmm.unit as mmunit
 
 from mpi4py import MPI
 
-from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, Point
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .forcefieldgenerator import ForceFieldGenerator
@@ -84,18 +84,18 @@ class EvbSystemBuilder():
         constraints: list = []
     ):
 
-        self.temperature=configuration.get("temperature", self.temperature)
-        NPT=configuration.get("NPT", False)
-        pressure=configuration.get("pressure", 1)
-        solvent=configuration.get("solvent", None)
-        padding=configuration.get("padding", 1.2)
-        CNT=configuration.get("CNT", False)
-        Graphene=configuration.get("graphene", False)
-        M=configuration.get("M", 5)
-        N=configuration.get("N", 9)
-        ion_count=configuration.get("ion_count", 0)
-        no_reactant=configuration.get("no_reactant", False)
-        E_field=configuration.get("E_field", [0, 0, 0])
+        self.temperature = configuration.get("temperature", self.temperature)
+        NPT = configuration.get("NPT", False)
+        pressure = configuration.get("pressure", 1)
+        solvent = configuration.get("solvent", None)
+        padding = configuration.get("padding", 1.2)
+        CNT = configuration.get("CNT", False)
+        Graphene = configuration.get("graphene", False)
+        M = configuration.get("M", 5)
+        N = configuration.get("N", 9)
+        ion_count = configuration.get("ion_count", 0)
+        no_reactant = configuration.get("no_reactant", False)
+        E_field = configuration.get("E_field", [0, 0, 0])
 
         self.constraints = constraints
         
@@ -120,7 +120,7 @@ class EvbSystemBuilder():
 
         if not no_reactant:
             system_mol = Molecule(reactant.molecule)
-            positions = list(system_mol.get_coordinates_in_angstrom())  #A
+            positions = list(system_mol.get_coordinates_in_angstrom()) 
         else:
             system_mol = Molecule()
             positions = []
@@ -140,7 +140,7 @@ class EvbSystemBuilder():
         if solvent is None:
             self.positions = np.array(positions) * 0.1
         else:
-            self._add_solvent(system, system_mol, solvent, box_x, box_y, box_z, box, reactant, ion_count, topology, reaction_chain, nb_force)
+            self._add_solvent(system, system_mol, solvent, box_x, box_y, box_z, box, reactant, ion_count, topology, nb_force)
 
         cmm_remover = mm.CMMotionRemover()
         cmm_remover.setName("CMM remover")
@@ -219,8 +219,6 @@ class EvbSystemBuilder():
 
         self.reaction_atoms = reaction_atoms  #Used in _add_reaction_forces
         self.topology: mmapp.Topology = topology
-        # self.Lambda = Lambda
-        # self.temperature = temperature
         self.system_mol = system_mol
 
         if not no_reactant:
@@ -230,16 +228,16 @@ class EvbSystemBuilder():
             self._add_reaction_forces(self.systems["reactant"], 0, reference_state=True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
             self._add_reaction_forces(self.systems["product"], 1, reference_state=True, lj_soft_core=self.soft_core_lj_ref, coul_soft_core=self.soft_core_coulomb_ref)
         #Give all forces a unique forcegroup so that they can be recalculated separately later on
-        for system in self.systems.values():
-            for i, force in enumerate(system.getForces()):
-                force.setForceGroup(i)
+        # for system in self.systems.values():
+        #     for i, force in enumerate(system.getForces()):
+        #         force.setForceGroup(i)
 
         return self.systems, self.topology, self.positions
 
     def _add_CNT_graphene(self, system, CNT: bool, Graphene: bool, nb_force, topology, M, N, system_mol, positions):
-        
         if CNT and Graphene:
             raise ValueError("CNT and Graphene cannot be used simultaneously, pick one please")
+
         cc_eq = 0.14080860183951827  # nm
         cc_eq = 0.1418
         x_disp = 3 * cc_eq * 10  # A
@@ -262,11 +260,12 @@ class EvbSystemBuilder():
 
         # https://pubs.acs.org/doi/10.1021/jp011344u
         graphene_bond: dict = {
-            'type': 'morse',
+            'type': 'harmonic',
             'force_constant': 4579.87 * 100,
             'equilibrium': cc_eq,
             'comment': 'Graphene bond, cg-cg GAFF parameters'
         }
+
         graphene_angle: dict = {
             'type': 'harmonic',
             'force_constant': 504.75776,
@@ -305,8 +304,8 @@ class EvbSystemBuilder():
         index = 0
         for m in range(0, M):
             for n in range(0, N):
-                for i, (element_label, coord) in enumerate(
-                        zip(graphene_cell.get_labels(), graphene_cell.get_coordinates_in_angstrom())):
+                for i, (atomic_number, coord) in enumerate(
+                        zip(graphene_cell.get_element_ids(), graphene_cell.get_coordinates_in_angstrom())):
 
                     #todo make sure the molecule and the added CNT do not clip
                     if CNT:
@@ -330,14 +329,14 @@ class EvbSystemBuilder():
                     else:
                         new_coord = new_coord_graphene
 
-                    mm_element = mmapp.Element.getBySymbol(element_label)
+                    mm_element = mmapp.Element.getByAtomicNumber(atomic_number)
                     name = index
                     index += 1
                     atom = topology.addAtom(f"{name}", mm_element, C_residue)
                     carbon_atoms.append(atom)
                     CC_atoms.append(atom)
 
-                    system_mol.add_atom(element_label, *(new_coord / bohr_in_angstrom()))  # Bohr
+                    system_mol.add_atom(int(atomic_number), Point(new_coord), 'angstrom')  # Bohr
                     positions.append(new_coord)
                     system.addParticle(mm_element.mass)
                     nb_force.addParticle(0, sigma, epsilon)
@@ -406,56 +405,34 @@ class EvbSystemBuilder():
                 impropers.update({(center + 1, center + 2, down + 3, center + 3): graphene_dih_180})
                 impropers.update({(center + 2, center + 3, right + 0, up + 2): graphene_dih_180})
 
-        carbon_harmonic_bond_force = mm.CustomBondForce("0.5*graphene_fc_factor*k*(r-r0)^2")
+        
+        carbon_harmonic_bond_force = mm.HarmonicBondForce()
         carbon_harmonic_bond_force.setName("Carbon harmonic bond")
-        carbon_harmonic_bond_force.addPerBondParameter("r0")
-        carbon_harmonic_bond_force.addPerBondParameter("k")
-        carbon_harmonic_bond_force.addGlobalParameter("graphene_fc_factor", 1)
         carbon_harmonic_bond_force.setUsesPeriodicBoundaryConditions(True)
-
-        for key, bond in bonds.items():
-            carbon_harmonic_bond_force.addBond(
-                CC_atoms[key[0]].index,
-                CC_atoms[key[1]].index,
-                [bond["equilibrium"], bond["force_constant"]],
-            )
 
         carbon_harmonic_angle_force = mm.HarmonicAngleForce()
         carbon_harmonic_angle_force.setName("Carbon harmonic angle")
         carbon_harmonic_angle_force.setUsesPeriodicBoundaryConditions(True)
-        for key, angle in angles.items():
-            carbon_harmonic_angle_force.addAngle(
-                CC_atoms[key[0]].index,
-                CC_atoms[key[1]].index,
-                CC_atoms[key[2]].index,
-                angle["equilibrium"] * np.pi / 180,
-                angle["force_constant"],
-            )
 
         carbon_fourier_dihedral_force = mm.PeriodicTorsionForce()
         carbon_fourier_dihedral_force.setName("Carbon improper fourier torsion")
         carbon_fourier_dihedral_force.setUsesPeriodicBoundaryConditions(True)
 
+        for key, bond in bonds.items():
+            atom_ids = self._key_to_id(key, CC_atoms)
+            self._add_harm_bond(carbon_harmonic_bond_force, bond,atom_ids)
+
+        for key, angle in angles.items():
+            atom_ids = self._key_to_id(key, CC_atoms)
+            self._add_angle(carbon_harmonic_angle_force, angle, atom_ids)
+
         for key, dihedral in dihedrals.items():
-            carbon_fourier_dihedral_force.addTorsion(
-                CC_atoms[key[0]].index,
-                CC_atoms[key[1]].index,
-                CC_atoms[key[2]].index,
-                CC_atoms[key[3]].index,
-                dihedral["periodicity"],
-                dihedral["phase"],
-                dihedral["barrier"],
-            )
+            atom_ids = self._key_to_id(key, CC_atoms)
+            self._add_torsion(carbon_fourier_dihedral_force, dihedral, atom_ids)
+
         for key, improper in impropers.items():
-            carbon_fourier_dihedral_force.addTorsion(
-                CC_atoms[key[0]].index,
-                CC_atoms[key[1]].index,
-                CC_atoms[key[2]].index,
-                CC_atoms[key[3]].index,
-                improper["periodicity"],
-                improper["phase"],
-                improper["barrier"],
-            )
+            atom_ids = self._key_to_id(key, CC_atoms)
+            self._add_torsion(carbon_fourier_dihedral_force, improper, atom_ids)
 
         for i in range(len(carbon_atoms)):
             for j in range(len(carbon_atoms)):
@@ -468,7 +445,7 @@ class EvbSystemBuilder():
 
         return X, Y
 
-    def _add_solvent(self, system, system_mol, solvent, box_x, box_y, box_z, box, reactant, ion_count, topology, reaction_chain, nb_force):
+    def _add_solvent(self, system, system_mol, solvent, box_x, box_y, box_z, box, reactant, ion_count, topology, nb_force):
         vlxsysbuilder = SystemBuilder()
         # vlxsysbuilder.solvate(reactant.molecule, solvent, padding)
 
@@ -525,26 +502,15 @@ class EvbSystemBuilder():
         # box: list[float] = [elem * 0.1 for elem in vlxsysbuilder.box]
         for i, (num_solvent_molecules,
                 vlx_solvent_molecule) in enumerate(zip(vlxsysbuilder.added_solvent_counts, vlxsysbuilder.solvents)):
-
-            mol_index = -1
-            if vlx_solvent_molecule == solvent_molecule:
-                mol_index = 0
-            elif vlx_solvent_molecule == na_mol:
-                mol_index = 1
-            elif vlx_solvent_molecule == cl_mol:
-                mol_index = 2
-            else:
-                self.ostream.print_warning("Could not find molecule")
-            # num_solvent_molecules = vlxsysbuilder.added_solvent_counts[0]
-            # num_solvent_atoms_per_molecule = vlxsysbuilder.solvents[0].number_of_atoms()
-            # solvent_molecule = vlxsysbuilder.solvents[0]
+                
             num_solvent_atoms_per_molecule = vlx_solvent_molecule.number_of_atoms()
             elements = vlx_solvent_molecule.get_labels()
 
             self.ostream.print_info("Generating solvent forcefield")
             solvent_ff = ForceFieldGenerator()
-            if mol_index == 0:
+            if vlx_solvent_molecule == solvent_molecule:
                 if solvent == 'spce':
+                    resname = "HOH"
                     #todo maybe don't hardcode this
                     self.ostream.print_info('Using SPCE from amber03 FF')
                     solvent_ff.bonds = {
@@ -601,6 +567,7 @@ class EvbSystemBuilder():
                     solvent_ff.dihedrals = {}
                     solvent_ff.impropers = {}
                 elif solvent == 'tip3p':
+                    resname = "HOH"
                     self.ostream.print_info('Using TIP3 from amber03 FF')
                     solvent_ff.bonds = {
                         (0, 1): {
@@ -656,9 +623,11 @@ class EvbSystemBuilder():
                     solvent_ff.dihedrals = {}
                     solvent_ff.impropers = {}
                 else:
+                    resname = "SOL"
                     solvent_ff = ForceFieldGenerator()
                     solvent_ff.create_topology(vlx_solvent_molecule)
-            elif mol_index == 1:
+            elif vlx_solvent_molecule == na_mol:
+                resname = "ION"
                 # https://github.com/gromacs/gromacs/blob/main/share/top/amber03.ff/ffnonbonded.itp
                 # solvent_ff.partial_charges = [1]
                 solvent_ff.atoms = {
@@ -675,7 +644,8 @@ class EvbSystemBuilder():
                 solvent_ff.angles = {}
                 solvent_ff.dihedrals = {}
                 solvent_ff.impropers = {}
-            elif mol_index == 2:
+            elif vlx_solvent_molecule == cl_mol:
+                resname = "ION"
                 # https://github.com/gromacs/gromacs/blob/main/share/top/amber03.ff/ffnonbonded.itp
                 # solvent_ff.partial_charges = [1]
                 solvent_ff.atoms = {
@@ -692,6 +662,9 @@ class EvbSystemBuilder():
                 solvent_ff.angles = {}
                 solvent_ff.dihedrals = {}
                 solvent_ff.impropers = {}
+            else:
+                resname = "SOL"
+                self.ostream.print_warning("Could not find molecule")
 
             harmonic_bond_force = mm.HarmonicBondForce()
             harmonic_bond_force.setName(f"Solvent {i} harmonic bond")
@@ -713,18 +686,10 @@ class EvbSystemBuilder():
             self.ostream.print_info(f"Adding {num_solvent_molecules} molecules of {solvent} to the system")
             solvent_nb_atom_count = 0
             solvent_system_atom_count = 0
+            solvent_chain = topology.addChain()
             for i in range(num_solvent_molecules):
 
-                # Create a new residue and add it to the topology
-                resname = "SOL"
-                if mol_index == 0:
-                    if solvent == 'spce' or solvent == 'tip3p':
-                        resname = "HOH"
-                    else:
-                        resname = "SOL"
-                else:
-                    resname = "ION"
-                solvent_residue = topology.addResidue(name=resname, chain=reaction_chain)
+                solvent_residue = topology.addResidue(name=resname, chain=solvent_chain)
                 solvent_atoms = []
                 # Loop over all atoms in the solvent molecule
                 for j in range(num_solvent_atoms_per_molecule):
@@ -740,50 +705,19 @@ class EvbSystemBuilder():
                     # Add this atom to the nonbonded force
 
                 # add all bonded interactions in this molecule
-                #todo can this be merged with _add_reaction_forces?
                 for key, bond in solvent_ff.bonds.items():
-                    harmonic_bond_force.addBond(solvent_atoms[key[0]].index, solvent_atoms[key[1]].index, bond["equilibrium"], bond["force_constant"])
+                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    self._add_harm_bond(harmonic_bond_force, bond, atom_ids)
                 for key, angle in solvent_ff.angles.items():
-                    harmonic_angle_force.addAngle(solvent_atoms[key[0]].index, solvent_atoms[key[1]].index, solvent_atoms[key[2]].index, angle["equilibrium"] * self.deg_to_rad, angle["force_constant"])
+                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    self._add_angle(harmonic_angle_force,angle, atom_ids)
                 for key, dihedral in solvent_ff.dihedrals.items():
-                    if dihedral["type"] == "RB":
-                        RB_force.addTorsion(
-                            solvent_atoms[key[0]].index,
-                            solvent_atoms[key[1]].index,
-                            solvent_atoms[key[2]].index,
-                            solvent_atoms[key[3]].index,
-                            dihedral["RB_coefficients"][0],
-                            dihedral["RB_coefficients"][1],
-                            dihedral["RB_coefficients"][2],
-                            dihedral["RB_coefficients"][3],
-                            dihedral["RB_coefficients"][4],
-                            dihedral["RB_coefficients"][5],
-                        )
-                    elif dihedral["type"] == "Fourier":
-                        fourier_force.addTorsion(
-                            solvent_atoms[key[0]].index,
-                            solvent_atoms[key[1]].index,
-                            solvent_atoms[key[2]].index,
-                            solvent_atoms[key[3]].index,
-                            dihedral["periodicity"],
-                            dihedral["phase"] * self.deg_to_rad,
-                            dihedral["barrier"],
-                        )
-                    else:
-                        assert False, "Unknown dihedral type"
+                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    self._add_torsion(fourier_force, dihedral, atom_ids)
                 for key, dihedral in solvent_ff.impropers.items():
-                    if dihedral["type"] == "Fourier":
-                        fourier_imp_force.addTorsion(
-                            solvent_atoms[key[0]].index,
-                            solvent_atoms[key[1]].index,
-                            solvent_atoms[key[2]].index,
-                            solvent_atoms[key[3]].index,
-                            dihedral["periodicity"],
-                            dihedral["phase"] * self.deg_to_rad,
-                            dihedral["barrier"],
-                        )
-                    else:
-                        assert False, "Unknown dihedral type"
+                    atom_ids = self._key_to_id(key, solvent_atoms)
+                    self._add_torsion(fourier_imp_force, dihedral, atom_ids)
+
                 exceptions = self._create_exceptions_from_bonds(solvent_ff)
                 for key, atom in solvent_ff.atoms.items():
 
@@ -867,34 +801,12 @@ class EvbSystemBuilder():
         formed_bond_keys = list(set(self.product.bonds) - set(self.reactant.bonds))
 
         for key in bond_keys:
-            # mm_top.addBond(mm_atoms[key[0]], mm_atoms[key[1]])
-            # if in a and b: interpolate harmonic
-
+            atom_ids = self._key_to_id(key, self.reaction_atoms)
             if key in static_bond_keys:
-
                 bondA = self.reactant.bonds[key]
                 bondB = self.product.bonds[key]
-
-                if round(bondA["equilibrium"], 3) == round(bondB["equilibrium"], 3):
-                    harmonic_force.addBond(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        bondA["equilibrium"],
-                        (1 - lam) * bondA["force_constant"] + lam * bondB["force_constant"],
-                    )
-                else:
-                    harmonic_force.addBond(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        bondA["equilibrium"],
-                        (1 - lam) * bondA["force_constant"],
-                    )
-                    harmonic_force.addBond(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        bondB["equilibrium"],
-                        lam * bondB["force_constant"],
-                    )
+                self._add_harm_bond(harmonic_force, bondA, atom_ids, 1 - lam)
+                self._add_harm_bond(harmonic_force, bondB, atom_ids, lam)
             # if in a or b:
             else:
                 if key in broken_bond_keys:
@@ -928,8 +840,8 @@ class EvbSystemBuilder():
                 a = math.sqrt(bond["force_constant"] / (2 * D))
                 re = bond["equilibrium"]
                 morse_force.addBond(
-                    self._reaction_to_total_atomid(key[0]),
-                    self._reaction_to_total_atomid(key[1]),
+                    atom_ids[0],
+                    atom_ids[1],
                     [scale * D, a, re],
                 )
                     
@@ -946,18 +858,17 @@ class EvbSystemBuilder():
                 a = math.sqrt(bond["force_constant"] / (2 * D))
                 re = bond["equilibrium"]
                 morse_force.addBond(
-                    self._reaction_to_total_atomid(key[0]),
-                    self._reaction_to_total_atomid(key[1]),
+                    atom_ids[0],
+                    atom_ids[1],
                     [scale * D, a, re],
                 )
-                    
 
                 if not reference_state:
                     k = self.restraint_k
                     rmax = r + self.restraint_r_offset
                     max_distance.addBond(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
+                        atom_ids[0],
+                        atom_ids[1],
                         [rmax, (1 - scale) * k],
                     )
                     if self.verbose:
@@ -971,32 +882,12 @@ class EvbSystemBuilder():
         harmonic_force.setName("Reaction harmonic angle")
         angle_keys = list(set(self.reactant.angles) | set(self.product.angles))
         for key in angle_keys:
+            atom_ids = self._key_to_id(key, self.reaction_atoms)
             if key in self.reactant.angles.keys() and key in self.product.angles.keys():
                 angleA = self.reactant.angles[key]
                 angleB = self.product.angles[key]
-                if round(angleA["equilibrium"], 3) == round(angleB["equilibrium"], 3):
-                    harmonic_force.addAngle(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        self._reaction_to_total_atomid(key[2]),
-                        angleA["equilibrium"] * self.deg_to_rad,
-                        (1 - lam) * angleA["force_constant"] + lam * angleB["force_constant"],
-                    )
-                else:
-                    harmonic_force.addAngle(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        self._reaction_to_total_atomid(key[2]),
-                        angleA["equilibrium"] * self.deg_to_rad,
-                        (1 - lam) * angleA["force_constant"],
-                    )
-                    harmonic_force.addAngle(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        self._reaction_to_total_atomid(key[2]),
-                        angleB["equilibrium"] * self.deg_to_rad,
-                        lam * angleB["force_constant"],
-                    )
+                self._add_angle(harmonic_force, angleA, atom_ids, 1 - lam)
+                self._add_angle(harmonic_force, angleB, atom_ids, lam)
             else:
                 if key in self.reactant.angles.keys():
                     scale = 1 - lam
@@ -1005,13 +896,7 @@ class EvbSystemBuilder():
                     scale = lam
                     angle = self.product.angles[key]
                 if scale > 0:
-                    harmonic_force.addAngle(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        self._reaction_to_total_atomid(key[2]),
-                        angle["equilibrium"] * self.deg_to_rad,
-                        scale * angle["force_constant"],
-                    )
+                    self._add_angle(harmonic_force, angle, atom_ids, scale)
         return [harmonic_force]
 
     def _create_proper_torsion_forces(self, lam) -> typing.List[mm.Force]:
@@ -1022,12 +907,12 @@ class EvbSystemBuilder():
 
         dihedral_keys = list(set(self.reactant.dihedrals) | set(self.product.dihedrals))
         for key in dihedral_keys:
-            total_atom_id = [self._reaction_to_total_atomid(reaction_atomid) for reaction_atomid in key]
+            atom_ids = self._key_to_id(key, self.reaction_atoms)
             if (key in self.reactant.dihedrals.keys() and key in self.product.dihedrals.keys()):
                 dihedA = self.reactant.dihedrals[key]
                 dihedB = self.product.dihedrals[key]
-                self._add_torsion(fourier_force, dihedA, total_atom_id, 1 - lam)
-                self._add_torsion(fourier_force, dihedB, total_atom_id, lam)
+                self._add_torsion(fourier_force, dihedA, atom_ids, 1 - lam)
+                self._add_torsion(fourier_force, dihedB, atom_ids, lam)
             else:
                 if key in self.reactant.dihedrals.keys():
                     scale = 1 - lam
@@ -1036,7 +921,7 @@ class EvbSystemBuilder():
                     scale = lam
                     dihed = self.product.dihedrals[key]
                 if scale > 0:
-                    self._add_torsion(fourier_force, dihed, total_atom_id, scale)
+                    self._add_torsion(fourier_force, dihed, atom_ids, scale)
         return [fourier_force, RB_force]
 
     def _create_improper_torsion_forces(self, lam) -> typing.List[mm.Force]:
@@ -1046,12 +931,12 @@ class EvbSystemBuilder():
 
         dihedral_keys = list(set(self.reactant.impropers) | set(self.product.impropers))
         for key in dihedral_keys:
-            total_atom_id = [self._reaction_to_total_atomid(reaction_atomid) for reaction_atomid in key]
+            atom_ids = self._key_to_id(key, self.reaction_atoms)
             if (key in self.reactant.impropers.keys() and key in self.product.impropers.keys()):
                 dihedA = self.reactant.impropers[key]
-                self._add_torsion(fourier_force, dihedA, total_atom_id, 1 - lam)
+                self._add_torsion(fourier_force, dihedA, atom_ids, 1 - lam)
                 dihedB = self.product.impropers[key]
-                self._add_torsion(fourier_force, dihedB, total_atom_id, lam)
+                self._add_torsion(fourier_force, dihedB, atom_ids, lam)
             else:
                 if key in self.reactant.impropers.keys():
                     scale = 1 - lam
@@ -1060,34 +945,52 @@ class EvbSystemBuilder():
                     scale = lam
                     dihed = self.product.impropers[key]
                 if scale > 0:
-                    self._add_torsion(fourier_force, dihed, total_atom_id, scale)
+                    self._add_torsion(fourier_force, dihed, atom_ids, scale)
         return [fourier_force]
 
-    def _add_torsion(self, fourier_force, torsion_dict, total_atom_id, barrier_scaling):
-        if torsion_dict["type"] == "Fourier":
-            if torsion_dict.get("multiple", False):
-                for periodicity, phase, barrier in zip(torsion_dict["periodicity"], torsion_dict["phase"], torsion_dict["barrier"]):
-                    fourier_force.addTorsion(
-                        total_atom_id[0],
-                        total_atom_id[1],
-                        total_atom_id[2],
-                        total_atom_id[3],
-                        abs(periodicity),
-                        phase * self.deg_to_rad,
-                        barrier_scaling * barrier,
-                    )
-            else:
+    def _add_harm_bond(self, bond_force, bond_dict, atom_id, barrier_scaling=1.):
+        assert bond_dict["type"] == "harmonic", "Unknown bond type"
+        bond_force.addBond(
+            atom_id[0],
+            atom_id[1],
+            bond_dict["equilibrium"],
+            barrier_scaling * bond_dict["force_constant"],
+        )
+
+    def _add_angle(self, angle_force, angle_dict, atom_id, barrier_scaling=1.):
+        assert angle_dict["type"] == "harmonic", "Unknown angle type"
+        angle_force.addAngle(
+            atom_id[0],
+            atom_id[1],
+            atom_id[2],
+            angle_dict["equilibrium"] * self.deg_to_rad,
+            barrier_scaling * angle_dict["force_constant"],
+        )
+
+    def _add_torsion(self, fourier_force, torsion_dict, atom_id, barrier_scaling=1.):
+        assert torsion_dict["type"] == "Fourier", "Unknown dihedral type"
+        if torsion_dict.get("multiple", False):
+            for periodicity, phase, barrier in zip(torsion_dict["periodicity"], torsion_dict["phase"], torsion_dict["barrier"]):
                 fourier_force.addTorsion(
-                    total_atom_id[0],
-                    total_atom_id[1],
-                    total_atom_id[2],
-                    total_atom_id[3],
-                    torsion_dict["periodicity"],
-                    torsion_dict["phase"] * self.deg_to_rad,
-                    barrier_scaling * torsion_dict["barrier"],
+                    atom_id[0],
+                    atom_id[1],
+                    atom_id[2],
+                    atom_id[3],
+                    abs(periodicity),
+                    phase * self.deg_to_rad,
+                    barrier_scaling * barrier,
                 )
         else:
-            assert False, "Unknown dihedral type"
+            fourier_force.addTorsion(
+                atom_id[0],
+                atom_id[1],
+                atom_id[2],
+                atom_id[3],
+                torsion_dict["periodicity"],
+                torsion_dict["phase"] * self.deg_to_rad,
+                barrier_scaling * torsion_dict["barrier"],
+            )
+        
 
     def _get_couloumb_expression(self, soft_core: bool):
         soft_core_expression = (
@@ -1182,8 +1085,6 @@ class EvbSystemBuilder():
         lj_force.addPerBondParameter("epsilonB")
         lj_force.addGlobalParameter("l", lam)
 
-        
-
         reactant_exceptions = self._create_exceptions_from_bonds(self.reactant)
         product_exceptions = self._create_exceptions_from_bonds(self.product)
 
@@ -1221,16 +1122,17 @@ class EvbSystemBuilder():
                         sigmaA = sigmaB
                     elif sigmaB == 1.0:
                         sigmaB = sigmaA
+                    atom_ids = self._key_to_id(key, self.reaction_atoms)
                     if not (qqA == 0.0 and qqB == 0.0):
                         coulomb_force.addBond(
-                            self._reaction_to_total_atomid(key[0]),
-                            self._reaction_to_total_atomid(key[1]),
+                            atom_ids[0],
+                            atom_ids[1],
                             [qqA, qqB],
                         )
                     if not (epsilonA == 0.0 and epsilonB == 0.0):
                         lj_force.addBond(
-                            self._reaction_to_total_atomid(key[0]),
-                            self._reaction_to_total_atomid(key[1]),
+                            atom_ids[0],
+                            atom_ids[1],
                             [sigmaA, sigmaB, epsilonA, epsilonB],
                         )
 
@@ -1313,27 +1215,17 @@ class EvbSystemBuilder():
                 else:
                     scale = 1
 
+                atomids = self._key_to_id(key, self.reaction_atoms)
                 if len(key) == 2:
-                    bond_constraint.addBond(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        constraint[key]["equilibrium"],
-                        constraint[key]["force_constant"] * scale,
-                    )
+                    self._add_harm_bond(bond_constraint, constraint[key], atomids, scale)
                 if len(key) == 3:
-                    angle_constraint.addAngle(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        self._reaction_to_total_atomid(key[2]),
-                        constraint[key]["equilibrium"] * self.deg_to_rad,
-                        constraint[key]["force_constant"] * scale,
-                    )
+                    self._add_angle(angle_constraint, constraint[key], atomids, scale)
                 if len(key) == 4:
                     torsion_constraint.addTorsion(
-                        self._reaction_to_total_atomid(key[0]),
-                        self._reaction_to_total_atomid(key[1]),
-                        self._reaction_to_total_atomid(key[2]),
-                        self._reaction_to_total_atomid(key[3]),
+                        atomids[0],
+                        atomids[1],
+                        atomids[2],
+                        atomids[3],
                         [
                             constraint[key]["equilibrium"] * self.deg_to_rad,
                             constraint[key]["force_constant"] * scale,
@@ -1341,5 +1233,5 @@ class EvbSystemBuilder():
                     )
         return [bond_constraint, angle_constraint, torsion_constraint]
 
-    def _reaction_to_total_atomid(self, reaction_atom_id: int) -> int:
-        return self.reaction_atoms[reaction_atom_id].index
+    def _key_to_id(self, key: tuple[int, ...], atom_list: list) -> list[int]:
+        return [atom_list[key[i]].index for i in range(len(key))]
