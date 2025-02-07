@@ -766,6 +766,15 @@ class ScfHessianDriver(HessianDriver):
             # add pe contr to hessian
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 
+            if self.scf_driver._pe:
+                from .embedding import PolarizableEmbeddingHess
+                embedding_drv = PolarizableEmbeddingHess(
+                    molecule=molecule,
+                    ao_basis=ao_basis,
+                    options=self.scf_driver.embedding_options,
+                    comm=self.comm)
+                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(density_matrix=density)
+
             if self._dft:
                 self.hessian += hessian_dft_xc
 
