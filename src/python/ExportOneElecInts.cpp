@@ -30,6 +30,7 @@
 #include <pybind11/stl.h>
 
 #include "AngularMomentumIntegrals.hpp"
+#include "ElectricFieldFockGradient.hpp"
 #include "ElectricFieldIntegrals.hpp"
 #include "ElectricFieldIntegralsGradient.hpp"
 #include "ElectricFieldValues.hpp"
@@ -218,6 +219,33 @@ export_oneeints(py::module& m)
              "dipole_coords"_a,
              "dipole_moments"_a,
              "D"_a);
+
+    m.def("compute_electric_field_fock_gradient",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& dipole_coords,
+               const py::array_t<double>& dipole_moments,
+               const int                  qm_atom_index) -> py::array_t<double> {
+                std::string errstyle("compute_electric_field_fock_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                std::string errsize("compute_electric_field_fock_gradient: Inconsistent dimension of dipole coordinates/moments");
+                errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);
+                auto ndipoles = static_cast<int>(dipole_coords.shape(0));
+                auto ef_fock_grad = onee::computeElectricFieldFockGradient(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles, qm_atom_index);
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                CDenseMatrix ret(3, naos * naos);
+                for (int n = 0; n < 3; n++) std::memcpy(ret.row(n), ef_fock_grad[n].values(), naos * naos * sizeof(double));
+                return vlx_general::pointer_to_numpy(ret.values(), {3, naos, naos});
+            },
+            "Computes electric field integrals contribution to fock gradient.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "dipole_moments"_a,
+             "qm_atom_index"_a);
 
     m.def("compute_nuclear_potential_values",
             [](const CMolecule&           molecule,
