@@ -188,20 +188,19 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
 
         hmats_200 = Matrices()
 
-    else:
-        npot_hess_101_drv = NuclearPotentialGeom101Driver()
+    npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
-        hmats_101 = npot_hess_101_drv.compute(molecule, basis, i, j,
-                                              mm_coordinates, mm_charges)
+    hmats_101 = npot_hess_101_drv.compute(molecule, basis, i, j,
+                                          mm_coordinates, mm_charges)
 
-        for x, label_x in enumerate('XYZ'):
-            for y, label_y in enumerate('XYZ'):
-                npot_xy_label = f'{label_x}_{label_y}'
-                npot_101_ijxy = hmats_101.matrix_to_numpy(npot_xy_label)
-                hess[x, y] += 2.0 * (np.sum(density *
-                                            (npot_101_ijxy + npot_101_ijxy.T)))
+    for x, label_x in enumerate('XYZ'):
+        for y, label_y in enumerate('XYZ'):
+            npot_xy_label = f'{label_x}_{label_y}'
+            npot_101_ijxy = hmats_101.matrix_to_numpy(npot_xy_label)
+            hess[x, y] += 2.0 * (np.sum(density *
+                                        (npot_101_ijxy + npot_101_ijxy.T)))
 
-        hmats_101 = Matrices()
+    hmats_101 = Matrices()
 
     # Note: factor -1.0 for electron charge
     return -1.0 * hess
