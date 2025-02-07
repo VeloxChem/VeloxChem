@@ -661,6 +661,10 @@ class ScfDriver:
         # set up point charges without PE
         elif self.point_charges is not None:
 
+            pot_info = 'Preparing for QM/MM calculation.'
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
+
             if isinstance(self.point_charges, str):
                 potfile = self.point_charges
 
