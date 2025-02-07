@@ -720,6 +720,7 @@ class LinearResponseEigenSolver(LinearSolver):
                                                axis=1) * eigvals
                     rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
                                      axis=1) * rotatory_strength_in_cgs()
+                    number_of_states = self.nstates
 
                     ret_dict = {
                         'eigenvalues': eigvals,
@@ -730,6 +731,7 @@ class LinearResponseEigenSolver(LinearSolver):
                         'oscillator_strengths': osc,
                         'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
+                        'number_of_states': number_of_states,
                     }
 
                     if self.nto:

@@ -466,6 +466,7 @@ class TdaEigenSolver(LinearSolver):
         # results
 
         if self.rank == mpi_master() and self._is_converged:
+            number_of_states = self.nstates
             ret_dict = {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
@@ -475,6 +476,7 @@ class TdaEigenSolver(LinearSolver):
                 'oscillator_strengths': oscillator_strengths,
                 'rotatory_strengths': rotatory_strengths,
                 'excitation_details': excitation_details,
+                'number_of_states': number_of_states,
             }
 
             if self.nto:
