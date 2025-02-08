@@ -74,29 +74,13 @@ class OptimizationDriver:
         Initializes optimization driver.
         """
 
-        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
-                            ScfRestrictedOpenDriver)):
-            grad_drv = ScfGradientDriver(drv)
-
-        elif isinstance(drv, OpenMMDriver):
-            grad_drv = OpenMMGradientDriver(drv)
-
-        elif isinstance(drv, MMDriver):
-            grad_drv = MMGradientDriver(drv)
-
-        elif (isinstance(drv, ScfGradientDriver) or
-              isinstance(drv, OpenMMGradientDriver) or
-              isinstance(drv, MMGradientDriver)):
-            grad_drv = drv
-
-        else:
-            assert_msg_critical(
-                False,
-                'OptimizationDriver: Invalid argument for initialization')
+        grad_drv = self._pick_driver(drv)
 
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
         self.ostream = grad_drv.ostream
+
+        self.grad_drv = grad_drv
 
         self.coordsys = 'tric'
         self.constraints = None
@@ -119,7 +103,6 @@ class OptimizationDriver:
         self.keep_files = False
 
         self.filename = None
-        self.grad_drv = grad_drv
 
         self._debug = False
 
@@ -189,6 +172,36 @@ class OptimizationDriver:
         # update hessian option for transition state search
         if ('hessian' not in opt_dict) and self.transition:
             self.hessian = 'first'
+
+    def _pick_driver(self, drv):
+        """
+        Chooses the gradient driver.
+
+        :param drv:
+            The energy or gradient driver.
+        """
+
+        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                            ScfRestrictedOpenDriver)):
+            grad_drv = ScfGradientDriver(drv)
+
+        elif isinstance(drv, OpenMMDriver):
+            grad_drv = OpenMMGradientDriver(drv)
+
+        elif isinstance(drv, MMDriver):
+            grad_drv = MMGradientDriver(drv)
+
+        elif (isinstance(drv, ScfGradientDriver) or
+              isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, MMGradientDriver)):
+            grad_drv = drv
+
+        else:
+            assert_msg_critical(
+                False,
+                'OptimizationDriver: Invalid argument for initialization')
+
+        return grad_drv
 
     def compute(self, molecule, *args):
         """

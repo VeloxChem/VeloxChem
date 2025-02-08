@@ -467,8 +467,7 @@ CVisualizationDriver::compute_local_grid(CCubicGrid&               grid,
                                          const int                 nao,
                                          const int                 nmo,
                                          const double*             mocoefs,
-                                         const int                 moidx,
-                                         const std::string&        mospin) const
+                                         const int                 moidx) const
 {
     // grid information
 
@@ -482,8 +481,6 @@ CVisualizationDriver::compute_local_grid(CCubicGrid&               grid,
 
     std::string erridx("VisualizationDriver.compute: Invalid index of MO");
 
-    std::string errspin("VisualizationDriver.compute: Invalid spin of MO");
-
     std::string errnao("VisualizationDriver.compute: Inconsistent number of AOs");
 
     auto morows = nao;
@@ -491,12 +488,6 @@ CVisualizationDriver::compute_local_grid(CCubicGrid&               grid,
     auto mocols = nmo;
 
     errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
-
-    bool alphaspin = (format::upper_case(mospin) == std::string("ALPHA"));
-
-    bool betaspin = (format::upper_case(mospin) == std::string("BETA"));
-
-    errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
     auto phi0 = _compPhiAtomicOrbitals(molecule, basis, origin[0], origin[1], origin[2]);
 
@@ -662,18 +653,9 @@ CVisualizationDriver::getMO(const std::vector<std::vector<double>>& coords,
                             const int                               nao,
                             const int                               nmo,
                             const double*                           mocoefs,
-                            const int                               moidx,
-                            const std::string&                      mospin) const
+                            const int                               moidx) const
 {
     // sanity check
-
-    std::string errspin("VisualizationDriver.get_mo: invalid spin");
-
-    bool alphaspin = (format::upper_case(mospin) == std::string("ALPHA"));
-
-    bool betaspin = (format::upper_case(mospin) == std::string("BETA"));
-
-    errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
     std::string erridx("VisualizationDriver.get_mo: invalid MO index");
 

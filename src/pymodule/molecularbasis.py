@@ -200,6 +200,10 @@ def _read_basis_file(basis_name, basis_path, ostream):
     if not basis_file.is_file() and 'VLXBASISPATH' in environ:
         basis_file = Path(environ['VLXBASISPATH'], fname)
 
+    assert_msg_critical(
+        basis_file.is_file(),
+        f'MolecularBasis: Could not find basis set file {fname}')
+
     basis_info = 'Reading basis set from file: ' + str(basis_file)
     ostream.print_info(basis_info)
     ostream.print_blank()

@@ -319,6 +319,9 @@ def _Molecule_read_xyz_file(xyzfile):
         The molecule.
     """
 
+    assert_msg_critical(
+        Path(xyzfile).is_file(), f'Molecule: xyzfile {xyzfile} does not exist')
+
     with Path(xyzfile).open('r') as fh:
         xyzstr = fh.read()
 
