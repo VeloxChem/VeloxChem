@@ -35,19 +35,29 @@ from .visualizationdriver import VisualizationDriver
 class ExcitedStateAnalysisDriver:
     """
     Implements excited state descriptors at TDDFT level of theory.
+
+    Instance variables
+        - fragment_dict: dictionary of indices for atoms in each fragment.
+        - include_particle_hole_density_matrices: The flag for particle and
+          hole density matrices.
+        - include_participation_ratios: The flag for participation ratios.
+        - include_avg_particle_hole_position: The flag for average particle.
+          and hole positions.
+        - include_relative_ct_length: The flag for relative CT length.
+        - _tda: The flag for the Tamm-Dankoff Approximation.
     """
 
     def __init__(self):
         """
-        Initialize excited state analysis driver.
+        Initialize excited state analysis driver to default setup.
         """
         self.fragment_dict = None
 
-        self.include_transition_density_matrix = False
         self.include_particle_hole_density_matrices = False
-        self.include_ct_matrix = False
         self.include_participation_ratios = False
-        self.include_average_particle_hole_position = False
+        self.include_avg_particle_hole_position = False
+        self.include_relative_ct_length = False
+        self._tda = False
 
     def update_settings(self, fragment_dict=None):
         """
@@ -65,9 +75,7 @@ class ExcitedStateAnalysisDriver:
         Computes dictionary containing excited state descriptors for
         excited state nstate.
 
-        :param fragment_dict:
-            The dictionary containing the indices of atoms in each fragment.
-        :param nstate:
+        :param state_index:
             The excited state for which the descriptors are computed.
         :param molecule:
             The molecule
@@ -77,10 +85,6 @@ class ExcitedStateAnalysisDriver:
             The dictionary of tensors from converged SCF wavefunction.
         :param rsp_tensors:
             The dictionary containing the rsp tensors.
-        :param scf_checkpoint_file:
-            The checkpoint file from the converged SCF calculation.
-        :param rsp_checkpoint_file:
-            The checkpoint file for the rsp calculation.
 
         :return:
             A dictionary containing the transition, hole and particle density matrices
@@ -92,47 +96,47 @@ class ExcitedStateAnalysisDriver:
 
         assert_msg_critical(self.fragment_dict is not None,
                             'fragment_dict not defined ')
-
-        num_exc_states = sum([1 for key in rsp_tensors if key.startswith('S')])
+        if self._tda:
+            num_exc_states = len([rsp_tensors['eigenvalues']]) + 1
+        else:
+            num_exc_states = sum([1 for key in rsp_tensors if key.startswith('S')])
 
         assert_msg_critical(state_index <= num_exc_states,
                             'excited state not included in rsp calculation')
         ret_dict = {}
 
         # necessary objects for some descriptor calculations
-        trans_dens_mo, trans_dens_ao = self.compute_transition_density_matrix(
+        tdens_mo, tdens_ao = self.compute_transition_density_matrix(
             molecule, scf_tensors, rsp_tensors, state_index)
         ct_matrix = self.compute_ct_matrix(molecule, basis, scf_tensors,
-                                           trans_dens_ao, self.fragment_dict)
+                                           tdens_ao, self.fragment_dict)
 
-        if self.include_transition_density_matrix is True:
-            ret_dict['Transition_density_matrix_MO'] = trans_dens_mo
-            ret_dict['Transition_density_matrix_AO'] = trans_dens_ao
+        ret_dict['transition_density_matrix_MO'] = tdens_mo
+        ret_dict['transition_density_matrix_AO'] = tdens_ao
 
-        if self.include_particle_hole_density_matrices is True:
-            ret_dict['Hole_density_matrix_MO'], ret_dict[
+        ret_dict['ct_matrix'] = ct_matrix
+
+        if self.include_particle_hole_density_matrices:
+            ret_dict['hole_density_matrix_MO'], ret_dict[
                 'hole_density_matrix_AO'] = self.compute_hole_density_matrix(
                     molecule, scf_tensors, rsp_tensors, state_index)
-            ret_dict['Particle_density_matrix_MO'], ret_dict[
-                'Particle_density_matrix_AO'] = self.compute_particle_density_matrix(
+            ret_dict['particle_density_matrix_MO'], ret_dict[
+                'particle_density_matrix_AO'] = self.compute_particle_density_matrix(
                     molecule, scf_tensors, rsp_tensors, state_index)
 
-        if self.include_ct_matrix is True:
-            ret_dict['CT_matrix'] = ct_matrix
-
-        if self.include_participation_ratios is True:
-            ret_dict['Hole_participation_ratio'], ret_dict[
-                'Particle_participation_ratio'], ret_dict[
-                    'Average_participation_ratio'] = self.compute_participation_ratios(
+        if self.include_participation_ratios:
+            ret_dict['hole_participation_ratio'], ret_dict[
+                'particle_participation_ratio'], ret_dict[
+                    'avg_participation_ratio'] = self.compute_participation_ratios(
                         ct_matrix)
 
-        if self.include_average_particle_hole_position is True:
-            ret_dict['Average_particle_position'], ret_dict[
-                'Average_hole_position'], ret_dict[
-                    'Average_difference_vector'] = self.compute_avg_position(
+        if self.include_avg_particle_hole_position or self.include_relative_ct_length:
+            ret_dict['avg_particle_position'], ret_dict[
+                'avg_hole_position'], ret_dict[
+                    'avg_difference_vector'] = self.compute_avg_position(
                         molecule, ct_matrix, self.fragment_dict)
-            ret_dict['Relative_CT_length'] = self.compute_relative_ct_length(
-                molecule, ret_dict['Average_difference_vector'])
+            ret_dict['relative_ct_length'] = self.compute_relative_ct_length(
+                molecule, ret_dict['avg_difference_vector'])
 
         return ret_dict
 
@@ -237,7 +241,7 @@ class ExcitedStateAnalysisDriver:
             The dictionary containing the scf tensors.
         :param rsp_tensors:
             The dictionary containing the rsp tensors.
-        :param nstate:
+        :param state_index:
             The excited state for which the TDM is computed.
 
         :return:
@@ -248,23 +252,26 @@ class ExcitedStateAnalysisDriver:
         norb = scf_tensors["C_alpha"].shape[1]
         nvirt = norb - nocc
 
-        excstate = "S" + str(state_index)
-        x_f = rsp_tensors[excstate]
+        if self._tda:
+            eigvec = rsp_tensors['eigenvectors'][:,state_index-1]
+        else:
+            excstate = "S" + str(state_index)
+            eigvec = rsp_tensors[excstate]
 
         nexc = nocc * nvirt
-        z_f = x_f[:nexc]
-        if x_f.shape[0] == nexc:
-            trans_dens_mo = np.reshape(z_f, (nocc, nvirt))
+        z_mat = eigvec[:nexc]
+        if eigvec.shape[0] == nexc:
+            tdens_mo = np.reshape(z_mat, (nocc, nvirt))
         else:
-            y_f = x_f[nexc:]
-            trans_dens_mo = np.reshape(z_f - y_f, (nocc, nvirt))
+            y_mat = eigvec[nexc:]
+            tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvirt))
 
-        trans_dens_ao = np.linalg.multi_dot([
-            scf_tensors["C_alpha"][:, :nocc], trans_dens_mo,
+        tdens_ao = np.linalg.multi_dot([
+            scf_tensors["C_alpha"][:, :nocc], tdens_mo,
             scf_tensors["C_alpha"][:, nocc:].T
         ])
 
-        return trans_dens_mo, trans_dens_ao
+        return tdens_mo, tdens_ao
 
     def compute_hole_density_matrix(self, molecule, scf_tensors, rsp_tensors,
                                     state_index):
@@ -277,7 +284,7 @@ class ExcitedStateAnalysisDriver:
             The dictionary containing the scf tensors.
         :param rsp_tensors:
             The dictionary containing the rsp tensors.
-        :param nstate:
+        :param state_index:
             The excited state for which the hole density matrix is computed.
 
         :return:
@@ -285,21 +292,11 @@ class ExcitedStateAnalysisDriver:
         """
 
         nocc = molecule.number_of_alpha_electrons()
-        norb = scf_tensors["C_alpha"].shape[1]
-        nvirt = norb - nocc
 
-        excstate = "S" + str(state_index)
-        x_f = rsp_tensors[excstate]
+        tdens_mo, tdens_ao = self.compute_transition_density_matrix(
+            molecule, scf_tensors, rsp_tensors, state_index)
 
-        nexc = nocc * nvirt
-        z_f = x_f[:nexc]
-        if x_f.shape[0] == nexc:
-            trans_dens_mo = np.reshape(z_f, (nocc, nvirt))
-        else:
-            y_f = x_f[nexc:]
-            trans_dens_mo = np.reshape(z_f - y_f, (nocc, nvirt))
-
-        hole_dens_mo = np.matmul(trans_dens_mo, trans_dens_mo.T)
+        hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
         hole_dens_ao = np.linalg.multi_dot([
             scf_tensors["C_alpha"][:, :nocc], hole_dens_mo,
             scf_tensors["C_alpha"][:, :nocc].T
@@ -319,7 +316,7 @@ class ExcitedStateAnalysisDriver:
             The dictionary containing the scf tensors.
         :param rsp_tensors:
             The dictionary containing the rsp tensors.
-        :param nstate:
+        :param state_index:
             The excited state for which the particle density matrix is
             computed.
 
@@ -328,21 +325,11 @@ class ExcitedStateAnalysisDriver:
         """
 
         nocc = molecule.number_of_alpha_electrons()
-        norb = scf_tensors["C_alpha"].shape[1]
-        nvirt = norb - nocc
 
-        excstate = "S" + str(state_index)
-        x_f = rsp_tensors[excstate]
+        tdens_mo, tdens_ao = self.compute_transition_density_matrix(
+            molecule, scf_tensors, rsp_tensors, state_index)
 
-        nexc = nocc * nvirt
-        z_f = x_f[:nexc]
-        if x_f.shape[0] == nexc:
-            trans_dens_mo = np.reshape(z_f, (nocc, nvirt))
-        else:
-            y_f = x_f[nexc:]
-            trans_dens_mo = np.reshape(z_f - y_f, (nocc, nvirt))
-
-        part_dens_mo = np.matmul(trans_dens_mo.T, trans_dens_mo)
+        part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
         part_dens_ao = np.linalg.multi_dot([
             scf_tensors["C_alpha"][:, nocc:], part_dens_mo,
             scf_tensors["C_alpha"][:, nocc:].T
@@ -434,12 +421,11 @@ class ExcitedStateAnalysisDriver:
         omega = np.sum(ct_matrix)
         hole_weight = np.sum(ct_matrix, axis=1) / omega
         particle_weight = np.sum(ct_matrix, axis=0) / omega
-        hole_participation_ratio = 1 / np.sum(hole_weight**2)
-        particle_participation_ratio = 1 / np.sum(particle_weight**2)
-        avg_participation_ratio = (hole_participation_ratio +
-                                   particle_participation_ratio) / 2
+        hole_pr = 1 / np.sum(hole_weight**2)
+        particle_pr = 1 / np.sum(particle_weight**2)
+        avg_pr = (hole_pr + particle_pr) / 2
 
-        return hole_participation_ratio, particle_participation_ratio, avg_participation_ratio
+        return hole_pr, particle_pr, avg_pr
 
     def compute_fragment_coordinates(self, molecule, fragment_dict):
         """
@@ -477,7 +463,6 @@ class ExcitedStateAnalysisDriver:
 
         coordinates = molecule.get_coordinates_in_angstrom()
         center = np.sum(coordinates, axis=0) / coordinates.shape[0]
-        print(center)
         atom_center_distance = []
         for i in range(coordinates.shape[0]):
             atom_center_distance.append(np.linalg.norm(coordinates[i] - center))
@@ -525,7 +510,7 @@ class ExcitedStateAnalysisDriver:
 
         :param molecule:
             The molecule.
-        :param ET_net:
+        :param avg_diff_vec:
             The difference vector from average position of hole to average
             position of particle.
 
@@ -537,8 +522,7 @@ class ExcitedStateAnalysisDriver:
 
     def show_avg_ph_position(self,
                              molecule,
-                             avg_hole_position,
-                             avg_particle_position,
+                             descriptor_dict,
                              width=400,
                              height=300):
         """
@@ -546,48 +530,48 @@ class ExcitedStateAnalysisDriver:
 
         :param molecule:
             The molecule.
-        :param avg_hole_pos:
-            The average position of the hole.
-        :param avg_particle_pos:
-            The average positions of the particle.
+        :param descriptor_dict:
+            The dictionary containing the excited state descriptors.
         :param width:
             The width of the plot.
         :param height:
             The height of the plot.
         """
-        r_H = avg_hole_position
-        r_E = avg_particle_position
+
+        avg_hole_position = descriptor_dict['avg_hole_position']
+        avg_particle_position = descriptor_dict['avg_particle_position']
+
         viewer = p3d.view(width=width, height=height)
         viewer.addModel(molecule.get_xyz_string(), "xyz")
         viewer.setStyle({"line": {}, "sphere": {"scale": 0.05}})
         viewer.addArrow({
             'start': {
-                'x': r_H[0],
-                'y': r_H[1],
-                'z': r_H[2]
+                'x': avg_hole_position[0],
+                'y': avg_hole_position[1],
+                'z': avg_hole_position[2]
             },
             'end': {
-                'x': r_E[0],
-                'y': r_E[1],
-                'z': r_E[2]
+                'x': avg_particle_position[0],
+                'y': avg_particle_position[1],
+                'z': avg_particle_position[2]
             },
             'radius': 0.06,
             'color': 'green',
         })
         viewer.addSphere({
             'center': {
-                'x': r_H[0],
-                'y': r_H[1],
-                'z': r_H[2]
+                'x': avg_hole_position[0],
+                'y': avg_hole_position[1],
+                'z': avg_hole_position[2]
             },
             'radius': 0.12,
             'color': 'blue',
         })
         viewer.addSphere({
             'center': {
-                'x': r_E[0],
-                'y': r_E[1],
-                'z': r_E[2]
+                'x': avg_particle_position[0],
+                'y': avg_particle_position[1],
+                'z': avg_particle_position[2]
             },
             'radius': 0.12,
             'color': 'red',
