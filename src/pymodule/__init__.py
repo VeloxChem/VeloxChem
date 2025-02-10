@@ -136,7 +136,7 @@ from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
-from .loprop import LoPropDriver
+from .peforcefieldgenerator import PEForceFieldGenerator
 from .firstorderprop import FirstOrderProperties
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver

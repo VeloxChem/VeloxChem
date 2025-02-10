@@ -35,9 +35,9 @@ from .aoindices import get_basis_function_indices_of_atoms
 from .oneeints import compute_electric_dipole_integrals
 
 
-class LoPropDriver:
+class PEForceFieldGenerator:
     """
-    Implements the LoProp driver.
+    Implements the PE force field generator.
 
     :param comm:
         The MPI communicator.
@@ -47,7 +47,7 @@ class LoPropDriver:
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initializes the LoProp driver.
+        Initializes the PE force field generator.
         """
 
         if comm is None:
@@ -405,8 +405,9 @@ class LoPropDriver:
             1.5, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0
         ]) / bohr_in_angstrom()
 
-        assert_msg_critical(za <= 18 and zb <= 18,
-                            'LoPropDriver: we currently support up to Ar')
+        assert_msg_critical(
+            za <= 18 and zb <= 18,
+            'PEForceFieldGenerator: we currently support up to Ar')
 
         ra = RBS[za]
         rb = RBS[zb]
@@ -487,8 +488,9 @@ class LoPropDriver:
 
             # Note: This function supports up to Ar but is limited by the RBS
             # radius list in penalty_fc
-            assert_msg_critical(element_id <= 18,
-                                'LoPropDriver: we currently support up to Ar')
+            assert_msg_critical(
+                element_id <= 18,
+                'PEForceFieldGenerator: we currently support up to Ar')
 
             # H and He: 1s
             ao_occ.append(iterr)
@@ -549,6 +551,8 @@ class LoPropDriver:
 
         element_names = molecule.get_labels()
 
+        self.ostream.print_blank()
+
         title = 'Local Properties (LoProp) Calculations'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
@@ -564,7 +568,7 @@ class LoPropDriver:
         self.ostream.print_blank()
 
         # print localized chagres
-        title = 'LoProp Charges (a.u.)'
+        title = 'Atomic Partial Charges (a.u.)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 
@@ -574,7 +578,7 @@ class LoPropDriver:
             self.ostream.print_header(output_iter)
         self.ostream.print_blank()
 
-        title = 'LoProp Polarizabilities (a.u.)'
+        title = 'Atomic Polarizabilities (a.u.)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * len(title))
 
