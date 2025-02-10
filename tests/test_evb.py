@@ -198,15 +198,16 @@ class TestEvb:
             ref_string = input.read()
             sys_lines = sys_string.splitlines()
             ref_lines = ref_string.splitlines()
+            result = True
             if len(sys_lines) != len(ref_lines):
-                print(f"Line number mismatch: {len(sys_lines)} != {len(ref_lines)}")
-                return False
-            for sys_line, ref_line in zip(sys_lines, ref_lines):
+                print(f"The amount of lines in the test and reference system mismatch: {len(sys_lines)} != {len(ref_lines)}")
+                result = False
+            min_len = min(len(sys_lines), len(ref_lines))
+            for i, (sys_line, ref_line) in enumerate(zip(sys_lines[:min_len], ref_lines[:min_len])):
                 if sys_line != ref_line:
-                    print(f"Line mismatch: {sys_line} != {ref_line}")
-                    return False
-            
-            return ref_string == sys_string
+                    print(f"Line mismatch on line {i}: {sys_line} != {ref_line}")
+                    result = False
+            return result
         return False
 
     def test_data_processing(self):

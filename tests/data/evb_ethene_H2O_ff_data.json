@@ -5,7 +5,7 @@
             "name": "C1",
             "mass": 12.0,
             "charge": -0.337857,
-            "sigma": 0.331521230994383,
+            "sigma": 0.3315212309943831,
             "epsilon": 0.4133792,
             "equivalent_atom": "c2_00"
         },
@@ -14,7 +14,7 @@
             "name": "C2",
             "mass": 12.0,
             "charge": -0.3485849999999999,
-            "sigma": 0.331521230994383,
+            "sigma": 0.3315212309943831,
             "epsilon": 0.4133792,
             "equivalent_atom": "c2_00"
         },
@@ -88,45 +88,45 @@
     "bonds": {
         "(0, 1)": {
             "type": "harmonic",
-            "force_constant": 403170.24,
+            "force_constant": 403170.23999999993,
             "equilibrium": 0.13337567181836424,
-            "comment": "c2-c2  "
+            "comment": "c2-c2"
         },
         "(0, 2)": {
             "type": "harmonic",
-            "force_constant": 328192.96,
+            "force_constant": 328192.9599999999,
             "equilibrium": 0.10850414528408164,
-            "comment": "c2-ha  "
+            "comment": "c2-ha"
         },
         "(0, 3)": {
             "type": "harmonic",
-            "force_constant": 328192.96,
+            "force_constant": 328192.9599999999,
             "equilibrium": 0.10850414528408164,
-            "comment": "c2-ha  "
+            "comment": "c2-ha"
         },
         "(1, 4)": {
             "type": "harmonic",
-            "force_constant": 328192.96,
+            "force_constant": 328192.9599999999,
             "equilibrium": 0.10850414528408164,
-            "comment": "c2-ha  "
+            "comment": "c2-ha"
         },
         "(1, 5)": {
             "type": "harmonic",
-            "force_constant": 328192.96,
+            "force_constant": 328192.9599999999,
             "equilibrium": 0.10850414528408164,
-            "comment": "c2-ha  "
+            "comment": "c2-ha"
         },
         "(6, 8)": {
             "type": "harmonic",
-            "force_constant": 462750.39999999997,
+            "force_constant": 462750.3999999999,
             "equilibrium": 0.09699989466483408,
-            "comment": "ow-hw  "
+            "comment": "ow-hw"
         },
         "(6, 7)": {
             "type": "harmonic",
-            "force_constant": 462750.39999999997,
+            "force_constant": 462750.3999999999,
             "equilibrium": 0.09699989466483408,
-            "comment": "ow-hw  "
+            "comment": "ow-hw"
         }
     },
     "angles": {
@@ -134,43 +134,43 @@
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.49799730796282,
-            "comment": "c2-c2-ha "
+            "comment": "c2-c2-ha"
         },
         "(0, 1, 5)": {
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.49799730796282,
-            "comment": "c2-c2-ha "
+            "comment": "c2-c2-ha"
         },
         "(1, 0, 2)": {
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.49799730796282,
-            "comment": "c2-c2-ha "
+            "comment": "c2-c2-ha"
         },
         "(1, 0, 3)": {
             "type": "harmonic",
             "force_constant": 421.7472,
             "equilibrium": 120.49799730796282,
-            "comment": "c2-c2-ha "
+            "comment": "c2-c2-ha"
         },
         "(2, 0, 3)": {
             "type": "harmonic",
             "force_constant": 315.47360000000003,
             "equilibrium": 119.00400538260389,
-            "comment": "ha-c2-ha "
+            "comment": "ha-c2-ha"
         },
         "(4, 1, 5)": {
             "type": "harmonic",
             "force_constant": 315.47360000000003,
             "equilibrium": 119.00400538260389,
-            "comment": "ha-c2-ha "
+            "comment": "ha-c2-ha"
         },
         "(7, 6, 8)": {
             "type": "harmonic",
             "force_constant": 836.8000000000001,
             "equilibrium": 109.47105579356159,
-            "comment": "hw-ow-hw "
+            "comment": "hw-ow-hw"
         }
     },
     "dihedrals": {
@@ -180,7 +180,7 @@
             "barrier": 27.823600000000003,
             "phase": 180.0,
             "periodicity": 2,
-            "comment": "X -c2-c2-X  "
+            "comment": "X-c2-c2-X"
         },
         "(2, 0, 1, 5)": {
             "type": "Fourier",
@@ -188,7 +188,7 @@
             "barrier": 27.823600000000003,
             "phase": 180.0,
             "periodicity": 2,
-            "comment": "X -c2-c2-X  "
+            "comment": "X-c2-c2-X"
         },
         "(3, 0, 1, 4)": {
             "type": "Fourier",
@@ -196,7 +196,7 @@
             "barrier": 27.823600000000003,
             "phase": 180.0,
             "periodicity": 2,
-            "comment": "X -c2-c2-X  "
+            "comment": "X-c2-c2-X"
         },
         "(3, 0, 1, 5)": {
             "type": "Fourier",
@@ -204,7 +204,7 @@
             "barrier": 27.823600000000003,
             "phase": 180.0,
             "periodicity": 2,
-            "comment": "X -c2-c2-X  "
+            "comment": "X-c2-c2-X"
         }
     },
     "impropers": {

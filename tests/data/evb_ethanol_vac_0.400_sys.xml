@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<System openmmVersion="8.1.2" type="System" version="1">
+<System openmmVersion="8.2" type="System" version="1">
 	<PeriodicBoxVectors>
 		<A x="2.4" y="0" z="0"/>
 		<B x="0" y="2.4" z="0"/>
@@ -19,13 +19,13 @@
 	<Constraints/>
 	<Forces>
 		<Force forceGroup="0" frequency="1" name="CMM remover" type="CMMotionRemover" version="1"/>
-		<Force alpha="0" cutoff=".96" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="1" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="4" name="General nonbonded force" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance=".864" type="NonbondedForce" useSwitchingFunction="1" version="4">
+		<Force alpha="0" cutoff=".96" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="0" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="4" name="General nonbonded force" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance=".864" type="NonbondedForce" useSwitchingFunction="1" version="4">
 			<GlobalParameters/>
 			<ParticleOffsets/>
 			<ExceptionOffsets/>
 			<Particles>
-				<Particle eps=".4359728" q="-.18109560000000002" sig=".3364710642723707"/>
-				<Particle eps=".4359728" q=".10245480000000001" sig=".3364710642723707"/>
+				<Particle eps=".4359728" q="-.18109560000000002" sig=".33647106427237083"/>
+				<Particle eps=".4359728" q=".10245480000000001" sig=".33647106427237083"/>
 				<Particle eps=".07916128" q=".0812844" sig=".26102976082024687"/>
 				<Particle eps=".07916128" q=".08122560000000001" sig=".26102976082024687"/>
 				<Particle eps=".07916128" q=".031941000000000004" sig=".2503389762025628"/>
@@ -73,7 +73,7 @@
 				<Exception eps="0" p1="7" p2="8" q="0" sig="1"/>
 			</Exceptions>
 		</Force>
-		<Force energy="-q*(Ex*x+Ey*y+Ez*z)" forceGroup="2" name="Electric field" type="CustomExternalForce" version="1">
+		<Force energy="-q*(Ex*x+Ey*y+Ez*z)" forceGroup="0" name="Electric field" type="CustomExternalForce" version="1">
 			<PerParticleParameters>
 				<Parameter name="q"/>
 			</PerParticleParameters>
@@ -94,23 +94,23 @@
 				<Particle index="8" param1=".3972292"/>
 			</Particles>
 		</Force>
-		<Force forceGroup="3" name="Reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
+		<Force forceGroup="0" name="Reaction harmonic bond" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds>
-				<Bond d=".15298653999290268" k="116733.60000000002" p1="0" p2="1"/>
-				<Bond d=".13337567181836424" k="161268.09600000002" p1="0" p2="1"/>
-				<Bond d=".11006275595922416" k="188731.872" p1="1" p2="5"/>
-				<Bond d=".10850414528408164" k="131277.184" p1="1" p2="5"/>
-				<Bond d=".1005819540573755" k="282922.08" p1="6" p2="8"/>
-				<Bond d=".09699989466483408" k="185100.16" p1="6" p2="8"/>
-				<Bond d=".10982670346323288" k="188731.872" p1="0" p2="3"/>
-				<Bond d=".10850414528408164" k="131277.184" p1="0" p2="3"/>
-				<Bond d=".11006275595922416" k="188731.872" p1="1" p2="4"/>
-				<Bond d=".10850414528408164" k="131277.184" p1="1" p2="4"/>
-				<Bond d=".10982670346323288" k="188731.872" p1="0" p2="2"/>
-				<Bond d=".10850414528408164" k="131277.184" p1="0" p2="2"/>
+				<Bond d=".15298653999290268" k="116733.59999999998" p1="0" p2="1"/>
+				<Bond d=".13337567181836424" k="161268.096" p1="0" p2="1"/>
+				<Bond d=".11006275595922416" k="188731.87199999994" p1="1" p2="5"/>
+				<Bond d=".10850414528408164" k="131277.18399999998" p1="1" p2="5"/>
+				<Bond d=".1005819540573755" k="282922.07999999996" p1="6" p2="8"/>
+				<Bond d=".09699989466483408" k="185100.15999999997" p1="6" p2="8"/>
+				<Bond d=".10982670346323288" k="188731.87199999994" p1="0" p2="3"/>
+				<Bond d=".10850414528408164" k="131277.18399999998" p1="0" p2="3"/>
+				<Bond d=".11006275595922416" k="188731.87199999994" p1="1" p2="4"/>
+				<Bond d=".10850414528408164" k="131277.18399999998" p1="1" p2="4"/>
+				<Bond d=".10982670346323288" k="188731.87199999994" p1="0" p2="2"/>
+				<Bond d=".10850414528408164" k="131277.18399999998" p1="0" p2="2"/>
 			</Bonds>
 		</Force>
-		<Force energy="D*(1-exp(-a*(r-re)))^2;" forceGroup="4" name="Reaction morse bond" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy="D*(1-exp(-a*(r-re)))^2;" forceGroup="0" name="Reaction morse bond" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="D"/>
 				<Parameter name="a"/>
@@ -119,15 +119,15 @@
 			<GlobalParameters/>
 			<EnergyParameterDerivatives/>
 			<Bonds>
-				<Bond p1="0" p2="7" param1="300" param2="17.735645463303555" param3=".10982670346323288"/>
-				<Bond p1="0" p2="7" param1="300" param2="17.735645463303555" param3=".10982670346323288"/>
+				<Bond p1="0" p2="7" param1="300" param2="17.735645463303552" param3=".10982670346323288"/>
+				<Bond p1="0" p2="7" param1="300" param2="17.735645463303552" param3=".10982670346323288"/>
 				<Bond p1="6" p2="7" param1="200" param2="21.511634061595597" param3=".09699989466483408"/>
 				<Bond p1="6" p2="7" param1="200" param2="21.511634061595597" param3=".09699989466483408"/>
 				<Bond p1="1" p2="6" param1="300" param2="15.66898592762148" param3=".13986909567878103"/>
 				<Bond p1="1" p2="6" param1="300" param2="15.66898592762148" param3=".13986909567878103"/>
 			</Bonds>
 		</Force>
-		<Force energy="k*step(r-rmax)*(r-rmax)^2" forceGroup="5" name="Reaction distance restraint" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy="k*step(r-rmax)*(r-rmax)^2" forceGroup="0" name="Reaction distance restraint" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="rmax"/>
 				<Parameter name="k"/>
@@ -140,7 +140,7 @@
 				<Bond p1="1" p2="6" param1=".6" param2="400"/>
 			</Bonds>
 		</Force>
-		<Force forceGroup="6" name="Reaction harmonic angle" type="HarmonicAngleForce" usesPeriodic="0" version="2">
+		<Force forceGroup="0" name="Reaction harmonic angle" type="HarmonicAngleForce" usesPeriodic="0" version="2">
 			<Angles>
 				<Angle a="1.91520408861706" k="313.8" p1="5" p2="1" p3="6"/>
 				<Angle a="1.9013583556850933" k="195.8112" p1="3" p2="0" p3="7"/>
@@ -164,7 +164,7 @@
 				<Angle a="2.1030867950832146" k="168.69888000000003" p1="1" p2="0" p3="2"/>
 			</Angles>
 		</Force>
-		<Force forceGroup="7" name="Reaction proper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
+		<Force forceGroup="0" name="Reaction proper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
 			<Torsions>
 				<Torsion k=".451872" p1="2" p2="0" p3="1" p4="6" periodicity="3" phase="0"/>
 				<Torsion k="1.280304" p1="2" p2="0" p3="1" p4="6" periodicity="1" phase="0"/>
@@ -187,16 +187,16 @@
 				<Torsion k=".2836752" p1="4" p2="1" p3="6" p4="8" periodicity="3" phase="0"/>
 			</Torsions>
 		</Force>
-		<Force forceGroup="8" name="Reaction proper RB torsion" type="RBTorsionForce" usesPeriodic="0" version="2">
+		<Force forceGroup="0" name="Reaction proper RB torsion" type="RBTorsionForce" usesPeriodic="0" version="2">
 			<Torsions/>
 		</Force>
-		<Force forceGroup="9" name="Reaction improper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
+		<Force forceGroup="0" name="Reaction improper fourier torsion" type="PeriodicTorsionForce" usesPeriodic="0" version="2">
 			<Torsions>
 				<Torsion k="1.8409600000000002" p1="0" p2="1" p3="4" p4="5" periodicity="2" phase="3.141592653589793"/>
 				<Torsion k="1.8409600000000002" p1="1" p2="0" p3="2" p4="3" periodicity="2" phase="3.141592653589793"/>
 			</Torsions>
 		</Force>
-		<Force energy=" (1-l) * LjtotA   + l  * LjtotB; LjtotA     = A12 / r^12 - A6 / r^6;LjtotB     = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; " forceGroup="10" name="Reaction internal lennard-jones" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy=" (1-l) * LjtotA   + l  * LjtotB; LjtotA     = A12 / r^12 - A6 / r^6;LjtotB     = B12 / r^12 - B6 / r^6;A12        = 4 * epsilonA * sigmaA ^ 12; B12        = 4 * epsilonB * sigmaB ^ 12; A6         = 4 * epsilonA * sigmaA ^ 6; B6         = 4 * epsilonB * sigmaB ^ 6; " forceGroup="0" name="Reaction internal lennard-jones" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="sigmaA"/>
 				<Parameter name="sigmaB"/>
@@ -209,11 +209,11 @@
 			<EnergyParameterDerivatives/>
 			<Bonds>
 				<Bond p1="0" p2="6" param1=".3279041821987333" param2=".3279041821987333" param3="0" param4=".40106209902008944"/>
-				<Bond p1="0" p2="7" param1=".19265684779784836" param2=".19265684779784836" param3="0" param4=".09016107415154281"/>
-				<Bond p1="0" p2="8" param1=".19678170886283813" param2=".19265684779784836" param3=".04708905658685466" param4=".09016107415154281"/>
+				<Bond p1="0" p2="7" param1=".1926568477978484" param2=".1926568477978484" param3="0" param4=".09016107415154281"/>
+				<Bond p1="0" p2="8" param1=".19678170886283816" param2=".1926568477978484" param3=".04708905658685466" param4=".09016107415154281"/>
 				<Bond p1="1" p2="6" param1=".3279041821987333" param2=".3279041821987333" param3="0" param4=".40106209902008944"/>
-				<Bond p1="1" p2="7" param1=".19265684779784836" param2=".19265684779784836" param3="0" param4=".09016107415154281"/>
-				<Bond p1="1" p2="8" param1=".19265684779784836" param2=".19265684779784836" param3="0" param4=".09016107415154281"/>
+				<Bond p1="1" p2="7" param1=".1926568477978484" param2=".1926568477978484" param3="0" param4=".09016107415154281"/>
+				<Bond p1="1" p2="8" param1=".1926568477978484" param2=".1926568477978484" param3="0" param4=".09016107415154281"/>
 				<Bond p1="2" p2="4" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
 				<Bond p1="2" p2="5" param1=".25110871269503604" param2=".262547852235958" param3=".0435136" param4=".0336812"/>
 				<Bond p1="2" p2="6" param1=".29215241663976144" param2=".2934174928195208" param3=".09200995577436172" param4=".161899716456824"/>
@@ -226,15 +226,15 @@
 				<Bond p1="3" p2="8" param1=".15690508223887656" param2=".15817015841863585" param3=".04136873798606866" param4=".03639599048686545"/>
 				<Bond p1="4" p2="6" param1=".2934174928195208" param2=".2934174928195208" param3="0" param4=".161899716456824"/>
 				<Bond p1="4" p2="7" param1=".25110871269503604" param2=".15817015841863585" param3=".0435136" param4=".03639599048686545"/>
-				<Bond p1="4" p2="8" param1=".14799609505747316" param2=".15817015841863585" param3=".02068436899303433" param4=".03639599048686545"/>
+				<Bond p1="4" p2="8" param1=".1479960950574732" param2=".15817015841863585" param3=".02068436899303433" param4=".03639599048686545"/>
 				<Bond p1="5" p2="6" param1=".2934174928195208" param2=".2934174928195208" param3="0" param4=".161899716456824"/>
 				<Bond p1="5" p2="7" param1=".25110871269503604" param2=".15817015841863585" param3=".0435136" param4=".03639599048686545"/>
-				<Bond p1="5" p2="8" param1=".14799609505747316" param2=".15817015841863585" param3=".02068436899303433" param4=".03639599048686545"/>
+				<Bond p1="5" p2="8" param1=".1479960950574732" param2=".15817015841863585" param3=".02068436899303433" param4=".03639599048686545"/>
 				<Bond p1="6" p2="7" param1=".29215241663976144" param2=".29215241663976144" param3=".09200995577436172" param4="0"/>
 				<Bond p1="7" p2="8" param1=".15690508223887656" param2=".15690508223887656" param3=".04136873798606866" param4="0"/>
 			</Bonds>
 		</Force>
-		<Force energy=" (1-l) * k*qqA/r + l * k*qqB/r; k         = 138.93545764466424;" forceGroup="11" name="Reaction internal coulomb" type="CustomBondForce" usesPeriodic="0" version="3">
+		<Force energy=" (1-l) * k*qqA/r + l * k*qqB/r; k         = 138.93545764466424;" forceGroup="0" name="Reaction internal coulomb" type="CustomBondForce" usesPeriodic="0" version="3">
 			<PerBondParameters>
 				<Parameter name="qqA"/>
 				<Parameter name="qqB"/>
@@ -270,13 +270,13 @@
 				<Bond p1="7" p2="8" param1=".008556972316" param2="0"/>
 			</Bonds>
 		</Force>
-		<Force forceGroup="12" name="Bond constraint" type="HarmonicBondForce" usesPeriodic="0" version="2">
+		<Force forceGroup="0" name="Bond constraint" type="HarmonicBondForce" usesPeriodic="0" version="2">
 			<Bonds/>
 		</Force>
-		<Force forceGroup="13" name="Angle constraint" type="HarmonicAngleForce" usesPeriodic="0" version="2">
+		<Force forceGroup="0" name="Angle constraint" type="HarmonicAngleForce" usesPeriodic="0" version="2">
 			<Angles/>
 		</Force>
-		<Force energy="0.5*k*(theta-theta0)^2" forceGroup="14" name="Harmonic torsion constraint" type="CustomTorsionForce" usesPeriodic="0" version="3">
+		<Force energy="0.5*k*(theta-theta0)^2" forceGroup="0" name="Harmonic torsion constraint" type="CustomTorsionForce" usesPeriodic="0" version="3">
 			<PerTorsionParameters>
 				<Parameter name="theta0"/>
 				<Parameter name="k"/>
