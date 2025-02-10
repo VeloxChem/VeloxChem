@@ -209,7 +209,7 @@ class EvbForceFieldBuilder():
             reactant_bonds = [bond for bond in reactant_bonds if bond not in breaking_bonds]
 
         rea_graph.add_nodes_from(reactant_ff.atoms.keys())
-        rea_graph.add_edges_from(reactant_ff.bonds.keys())
+        rea_graph.add_edges_from(reactant_bonds)
 
         for i, elem in enumerate(rea_elems):
             rea_graph.nodes[i]['elem'] = elem

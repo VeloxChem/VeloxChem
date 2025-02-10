@@ -77,8 +77,6 @@ class ReactionMatcher:
         elif Bm1_mappings:
             mapping = Bm1_mappings[0]
         
-        
-
     @staticmethod
     def _find_largest_subgraph(a: nx.Graph, b: nx.Graph):
         swapped = False

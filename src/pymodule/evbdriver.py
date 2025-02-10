@@ -106,7 +106,7 @@ class EvbDriver():
         reparameterise: bool = True,
         optimise: bool = False,
         ordered_input: bool = False,
-        breaking_bonds: list[tuple[int, int]] = None,
+        breaking_bonds: tuple[int,int] | list[tuple[int, int]] = None,
     ):
         """Build forcefields for the reactant and products, and set self.reactant and self.product to the respective forcefields as well as saving them as json to the input files folder. 
         Will calculate RESP charges and use an xtb Hessian for any necessary reparameterisation. If these files are already present in the input_files folder, they will be loaded instead of recalculated.
@@ -122,7 +122,7 @@ class EvbDriver():
             optimise (bool, optional): If the provided structure should be optimised before the forcefield is generated. Defaults to False.
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
             breaking_bonds (list[tuple[int, int]], optional): A list of tuples of atom-indices of breaking bonds. 
-                The atom indices are with respect to the reactant structure, and not all breaking bonds have to be provided. Defaults to None.
+                The atom indices are 0-indexed with respect to the reactant structure, and not all breaking bonds have to be provided. Defaults to None.
 
         Raises:
             ValueError: If the reactant and product are not given both as a molecule or both as a file.
@@ -196,6 +196,8 @@ class EvbDriver():
             ffbuilder.reparameterise = reparameterise
             ffbuilder.optimise = optimise
 
+            if isinstance(breaking_bonds, tuple):
+                breaking_bonds = [breaking_bonds]
             self.reactant, self.product = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
@@ -204,6 +206,7 @@ class EvbDriver():
                 reactant_multiplicity,
                 product_multiplicity,
                 ordered_input,
+                breaking_bonds,
             )
         self.save_forcefield(self.reactant, str(reactant_path))
         self.save_forcefield(self.product, str(combined_product_path))
@@ -506,22 +509,29 @@ class EvbDriver():
 
         return conf
 
-    # def load_initialisation(self, data_folder: str):
-    #     self.data_folder = data_folder
-    #     self.run_folder = f"{data_folder}/run"
+    def load_initialisation(self, data_folder: str, name: str):
+        
+        pdb = mmapp.PDBFile(f"{data_folder}/topology.pdb")
+        systems = self.load_systems_from_xml(f"{data_folder}/run")
+        with open(f"{data_folder}/options.json", "r") as file:
+            options = json.load(file)
+            temperature = options["temperature"]
+            Lambda = options["Lambda"]
+        conf = {
+            "name": name,
+            "data_folder": data_folder,
+            "run_folder": f"{data_folder}/run",
+            "topology": pdb.getTopology(),
+            "initial_positions": pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers),
+            "temperature": temperature,
+            "Lambda": Lambda,
+            "systems": systems,
+        }
 
-    #     pdb = mmapp.PDBFile(f"{data_folder}/topology.pdb")
-    #     self.topology = pdb.getTopology()
-    #     self.initial_positions = pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers)
-
-    #     with open(f"{data_folder}/options.json", "r") as file:
-    #         options = json.load(file)
-    #         self.temperature = options["temperature"]
-    #         self.Lambda = options["Lambda"]
-
-    #     self.systems = self.load_systems_from_xml(self.run_folder)
-
-    #     self.ostream.print_info(f"Loaded systems, topology, initial positions, temperatue and Lambda from {data_folder}")
+        self.system_confs.append(conf)
+        self.ostream.print_info(f"Initialised configuration with {len(systems)} systems, topology, initial positions, temperatue {temperature} and Lambda vector {Lambda} from {data_folder}")
+        self.ostream.print_info(f"Current configurations: {[conf['name'] for conf in self.system_confs]}")
+        
 
     def save_systems_as_xml(self, systems: dict, folder: str):
         """Save the systems as xml files to the given folder.
