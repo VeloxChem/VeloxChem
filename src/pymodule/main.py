@@ -30,7 +30,7 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .numerovdriver import NumerovDriver
@@ -260,7 +260,7 @@ def main():
                      if 'resp_charges' in task.input_dict else {})
         resp_dict['filename'] = task.input_dict['filename']
 
-        force_field_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
+        force_field_drv = MMForceFieldGenerator(task.mpi_comm, task.ostream)
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
 

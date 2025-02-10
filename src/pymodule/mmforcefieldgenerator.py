@@ -48,7 +48,7 @@ from .seminario import Seminario
 from .uffparameters import get_uff_parameters
 
 
-class ForceFieldGenerator:
+class MMForceFieldGenerator:
     """
     Parameterizes general Amber force field and creates Gromacs topologies.
 
@@ -193,7 +193,7 @@ class ForceFieldGenerator:
                 self.force_field_data = str(force_field_file)
                 assert_msg_critical(
                     'gaff' in Path(self.force_field_data).name.lower(),
-                    'ForceFieldGenerator: unrecognized force field ' +
+                    'MMForceFieldGenerator: unrecognized force field ' +
                     f'{self.force_field_data}. Only GAFF is supported.')
                 if self.force_field_data_extension is None:
                     ff_file = Path(self.force_field_data)
@@ -222,15 +222,15 @@ class ForceFieldGenerator:
 
         assert_msg_critical(
             self.scan_xyz_files is not None,
-            'ForceFieldGenerator.compute: scan_xyz_files not defined ')
+            'MMForceFieldGenerator.compute: scan_xyz_files not defined ')
 
         assert_msg_critical(
             self.atom_types is not None,
-            'ForceFieldGenerator.compute: atom_types not defined ')
+            'MMForceFieldGenerator.compute: atom_types not defined ')
 
         assert_msg_critical(
             len(self.atom_types) == molecule.number_of_atoms(),
-            'ForceFieldGenerator.compute: inconsistent number of atom_types')
+            'MMForceFieldGenerator.compute: inconsistent number of atom_types')
 
         # read QM scan
 
@@ -842,7 +842,7 @@ class ForceFieldGenerator:
 
                 assert_msg_critical(
                     int(xyz_lines[i_start].split()[0]) == n_atoms,
-                    'ForceFieldGenerator.read_qm_scan_xyz_files: ' +
+                    'MMForceFieldGenerator.read_qm_scan_xyz_files: ' +
                     'inconsistent number of atoms')
 
                 mol_str = ''.join(xyz_lines[i_start + 2:i_end])
@@ -1147,7 +1147,7 @@ class ForceFieldGenerator:
 
         assert_msg_critical(
             len(self.atom_types) == n_atoms,
-            'ForceFieldGenerator: inconsistent atom_types')
+            'MMForceFieldGenerator: inconsistent atom_types')
 
         for i in range(n_atoms):
             self.atom_types[i] = f'{self.atom_types[i].strip():<2s}'
@@ -1260,7 +1260,7 @@ class ForceFieldGenerator:
                     sigma, epsilon, comment = 0.0, 0.0, 'HW'
                 # Case for atoms in UFF but not in GAFF
                 elif element in self.uff_parameters:
-                    uffmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
+                    uffmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
                     uffmsg += ' Taking sigma and epsilon from UFF.'
                     self.ostream.print_info(uffmsg)
                     sigma = self.uff_parameters[element]['sigma']
@@ -1270,7 +1270,7 @@ class ForceFieldGenerator:
                 else:
                     assert_msg_critical(
                         False,
-                        f'ForceFieldGenerator: atom type {at} not found in GAFF or UFF.'
+                        f'MMForceFieldGenerator: atom type {at} not found in GAFF or UFF.'
                     )
 
             atom_type_params[at] = {
@@ -1624,7 +1624,7 @@ class ForceFieldGenerator:
                                     break
 
             if not dihedral_found:
-                warnmsg = f'ForceFieldGenerator: dihedral {at_1}-{at_2}-{at_3}-{at_4}'
+                warnmsg = f'MMForceFieldGenerator: dihedral {at_1}-{at_2}-{at_3}-{at_4}'
                 warnmsg += ' is not available.'
                 self.ostream.print_warning(warnmsg)
                 # Default value for dihedrals
@@ -1882,11 +1882,11 @@ class ForceFieldGenerator:
 
                 assert_msg_critical(
                     phase == 180.0,
-                    'ForceFieldGenerator: invalid improper dihedral phase')
+                    'MMForceFieldGenerator: invalid improper dihedral phase')
 
                 assert_msg_critical(
                     periodicity == 2,
-                    'ForceFieldGenerator: invalid improper dihedral periodicity'
+                    'MMForceFieldGenerator: invalid improper dihedral periodicity'
                 )
 
                 self.impropers[(i, j, k, l)] = {
@@ -2208,18 +2208,18 @@ class ForceFieldGenerator:
         if hessian is None:
             # TODO: generate Hessian using VeloxChem
             assert_msg_critical(
-                False, 'ForceFieldGenerator.reparametrize: expecting Hessian')
+                False, 'MMForceFieldGenerator.reparametrize: expecting Hessian')
 
         elif isinstance(hessian, np.ndarray):
             natoms = self.molecule.number_of_atoms()
             assert_msg_critical(
                 hessian.shape == (natoms * 3, natoms * 3),
-                'ForceFieldGenerator.reparametrize: invalid Hessian matrix')
+                'MMForceFieldGenerator.reparametrize: invalid Hessian matrix')
 
         else:
             assert_msg_critical(
                 False,
-                'ForceFieldGenerator.reparametrize: invalid Hessian option')
+                'MMForceFieldGenerator.reparametrize: invalid Hessian option')
 
         angstrom_to_nm = 0.1  # 1 angstrom is 0.1 nm
         bohr_to_nm = bohr_in_angstrom() * angstrom_to_nm
@@ -2387,7 +2387,7 @@ class ForceFieldGenerator:
             if amber_ff is not None:
                 assert_msg_critical(
                     amber_ff.startswith('amber'),
-                    'ForceFieldGenerator.write_top: Invalid amber force field name'
+                    'MMForceFieldGenerator.write_top: Invalid amber force field name'
                 )
                 ff_include = str(PurePath(f'{amber_ff}.ff') / 'forcefield.itp')
                 f_top.write(f'\n#include "{ff_include}"\n')
@@ -2410,9 +2410,9 @@ class ForceFieldGenerator:
                 assert_msg_critical(
                     water_model.startswith('tip') or
                     water_model.startswith('spc'),
-                    'ForceFieldGenerator.write_top: Invalid water model name')
+                    'MMForceFieldGenerator.write_top: Invalid water model name')
                 assert_msg_critical(
-                    amber_ff is not None, 'ForceFieldGenerator.write_top: ' +
+                    amber_ff is not None, 'MMForceFieldGenerator.write_top: ' +
                     'amber_ff is required for water_model')
                 water_include = str(
                     PurePath(f'{amber_ff}.ff') / f'{water_model}.itp')
@@ -3190,7 +3190,7 @@ class ForceFieldGenerator:
 
         assert_msg_critical(
             itp_file is not None,
-            'ForceFieldGenerator.get_included_file: could not find ' +
+            'MMForceFieldGenerator.get_included_file: could not find ' +
             'included file')
 
         return str(itp_file)

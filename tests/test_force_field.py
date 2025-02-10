@@ -10,7 +10,7 @@ except ImportError:
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
-from veloxchem.forcefieldgenerator import ForceFieldGenerator
+from veloxchem.mmforcefieldgenerator import MMForceFieldGenerator
 
 
 @pytest.mark.filterwarnings(
@@ -37,7 +37,7 @@ class TestForceField:
         ff_dict['filename'] = task.input_dict['filename']
         resp_dict['filename'] = task.input_dict['filename']
 
-        ff_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
+        ff_drv = MMForceFieldGenerator(task.mpi_comm, task.ostream)
         ff_drv.update_settings(ff_dict, resp_dict)
         ff_drv.ostream.mute()
         ff_drv.compute(task.molecule, task.ao_basis)
