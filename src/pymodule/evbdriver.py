@@ -106,6 +106,7 @@ class EvbDriver():
         reparameterise: bool = True,
         optimise: bool = False,
         ordered_input: bool = False,
+        breaking_bonds: list[tuple[int, int]] = None,
     ):
         """Build forcefields for the reactant and products, and set self.reactant and self.product to the respective forcefields as well as saving them as json to the input files folder. 
         Will calculate RESP charges and use an xtb Hessian for any necessary reparameterisation. If these files are already present in the input_files folder, they will be loaded instead of recalculated.
@@ -120,6 +121,8 @@ class EvbDriver():
             reparameterise (bool, optional): If unknown parameters in the forcefield should be reparameterised. Defaults to True.
             optimise (bool, optional): If the provided structure should be optimised before the forcefield is generated. Defaults to False.
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
+            breaking_bonds (list[tuple[int, int]], optional): A list of tuples of atom-indices of breaking bonds. 
+                The atom indices are with respect to the reactant structure, and not all breaking bonds have to be provided. Defaults to None.
 
         Raises:
             ValueError: If the reactant and product are not given both as a molecule or both as a file.

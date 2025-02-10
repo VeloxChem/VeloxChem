@@ -804,10 +804,17 @@ class ForceFieldGenerator:
             The list of xyz files from QM scan.
         """
 
-        self.scan_dih_angles = []
-        self.scan_energies = []
-        self.scan_geometries = []
-        self.target_dihedrals = []
+        if self.scan_dih_angles is None:
+            self.scan_dih_angles = []
+
+        if self.scan_energies is None:
+            self.scan_energies = []
+
+        if self.scan_geometries is None:
+            self.scan_geometries = []
+
+        if self.target_dihedrals is None:
+            self.target_dihedrals = []
 
         # reading QM data
 

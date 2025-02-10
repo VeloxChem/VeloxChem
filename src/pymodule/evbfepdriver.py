@@ -87,14 +87,13 @@ class EvbFepDriver():
         integrator_friction_coeff = 1 / mmunit.picosecond
 
         timer = Timer(len(self.Lambda))
-        estimated_time_remaining = None
 
         traj_roporter = mmapp.XTCReporter(
             str(self.data_folder / "trajectory.xtc"),
             write_step,
         )
+        timer.start()
         for i, l in enumerate(self.Lambda):
-            timer.start()
             system = systems[l]
             integrator = mm.LangevinMiddleIntegrator(
                 integrator_temperature,
@@ -102,12 +101,13 @@ class EvbFepDriver():
                 equil_step_size * mmunit.picoseconds,
             )
 
-            if estimated_time_remaining:
+            if l>0:
+                estimated_time_remaining = timer.calculate_remaining(i)
                 time_estimate_str = ", " + timer.get_time_str(estimated_time_remaining)
+                self.ostream.print_info(f"lambda = {l}" + time_estimate_str)
             else:
-                time_estimate_str = ""
-
-            self.ostream.print_info(f"lambda = {l}" + time_estimate_str)
+                self.ostream.print_info(f"lambda = {l}")
+            
             constrained_H_bonds = []
             if self.constrain_H:
                 harm_bond_forces = [
@@ -213,7 +213,6 @@ class EvbFepDriver():
             positions = state.getPositions()
             if np.any(np.array(positions.value_in_unit(mmunit.nanometer)) > 100):
                 self.ostream.print_info("Warning: Some positions are larger than 100 nm, system is probably unstable")
-            estimated_time_remaining = timer.stop_and_calculate(i + 1)
 
         self.ostream.print_info("Merging output files")
         self.ostream.flush()
@@ -229,15 +228,22 @@ class Timer:
     def start(self):
         self.start_time = time.time()
 
-    def stop_and_calculate(self, iteration):
+    def calculate_remaining(self, iteration):
         end_time = time.time()
         elapsed_time = end_time - self.start_time
+
         self.times.append(elapsed_time)
 
         avg_time_per_iteration = sum(self.times) / len(self.times)
         remaining_iterations = self.total_iterations - iteration
         estimated_time_remaining = avg_time_per_iteration * remaining_iterations
 
+        # print(f"Iteration: {iteration}")
+        # print(f"Elapsed time: {elapsed_time}")
+        # print(f"Avg time per iteration: {avg_time_per_iteration}")
+        # print(f"Remaining iterations: {remaining_iterations}")
+        # print(f"Estimated time remaining: {estimated_time_remaining}")
+        # print(f"Times list: {self.times}")
         self.start_time = time.time()  # reset start time for next iteration
         return estimated_time_remaining
 
@@ -250,15 +256,6 @@ class Timer:
             time_str += "{} minute(s), ".format(minutes)
         time_str += "{} second(s)".format(seconds)
         return time_str
-
-    def print_progress(self, iteration, message):
-        progress = iteration / self.total_iterations
-        bar_length = 20
-        block = int(round(bar_length * progress))
-        text = "\rProgress: [{0}] {1}% {2}".format("#" * block + "-" * (bar_length - block), round(progress * 100, 2),
-                                                   message)
-        sys.stdout.write(text)
-        sys.stdout.flush()
 
     @staticmethod
     def convert_seconds(seconds):
