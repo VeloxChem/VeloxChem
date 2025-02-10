@@ -8,6 +8,9 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "Point.hpp"
+#include "TensorComponents.hpp"
+
+#include <iostream>
 
 /// @brief Class  CThreeCenterElectronRepulsionGeomX00Driver provides methods for computing arbitrary order three-center
 /// electron repulsion integral derivatives with respect bra side.
@@ -82,12 +85,18 @@ CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis &ba
     
     for (const auto& bra_gto_block : bra_gto_blocks)
     {
+        auto bra_mom = bra_gto_block.angular_momentum();
+        
         for (const auto& gto_pair_block : gto_pair_blocks)
         {
             
         }
         
-        // std::cout << "Task : " << task[0] << " , " << task[1] << " , " << task[2] << std::endl;
+        auto bra_idx = bra_gto_block.orbital_indices();
+        
+        std::cout << " Ang. Mom.  : " <<  bra_mom << " : block : " << block_start << " size :" << bra_idx.size() << " -> " <<  bra_idx[0]  << " , " << bra_idx[1] << std::endl;
+        
+        block_start += bra_gto_block.number_of_basis_functions() * tensor::number_of_spherical_components(std::array<int, 1>({bra_gto_block.angular_momentum(),}));
     }
 
 //    // prepare pointers for OMP parallel region
