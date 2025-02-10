@@ -441,7 +441,7 @@ class EvbSystemBuilder():
                     
         system.addForce(carbon_harmonic_bond_force)
         system.addForce(carbon_harmonic_angle_force)
-        system.addForce(carbon_fourier_dihedral_force)
+        # system.addForce(carbon_fourier_dihedral_force)
 
         return X, Y
 

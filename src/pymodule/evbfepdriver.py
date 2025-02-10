@@ -94,6 +94,10 @@ class FepDriver():
         timer = Timer(len(self.Lambda))
         estimated_time_remaining = None
 
+        traj_roporter = mmapp.XTCReporter(
+            f"{self.data_folder}/trajectory.xtc",
+            write_step,
+        )
         for i, l in enumerate(self.Lambda):
             timer.start()
             system = systems[l]
@@ -129,8 +133,6 @@ class FepDriver():
                                 system.addConstraint(particle1, particle2, length)
                                 count += 1
                 self.ostream.print_info(f"Constrained {count} bonds involving H atoms ")
-                # with open("constrained_.xml", mode="w", encoding="utf-8") as output:
-                #     output.write(mm.XmlSerializer.serialize(system))
 
 
             # platform = mm.Platform.getPlatformByName("CUDA")
@@ -173,10 +175,7 @@ class FepDriver():
             if self.constrain_H:
                 self.ostream.print_info("Removing constraints")
                 for i in range(system.getNumConstraints()):
-                    #Removing a constraint will change the indexing of the constraints, so always remove the first one until there are none left
                     system.removeConstraint(0)
-                # with open("unconstrained_.xml", mode="w", encoding="utf-8") as output:
-                #     output.write(mm.XmlSerializer.serialize(system))
 
             # Updating the system requires recreating the simulation, and integrators can only be bound to one context
             integrator = mm.LangevinMiddleIntegrator(
@@ -191,23 +190,12 @@ class FepDriver():
             )
             runsimulation.context.setPositions(equil_positions)
 
+            runsimulation.reporters.append(traj_roporter)
+
             if l == 0:
                 append = False
             else:
                 append = True
-
-            # Append option gives precision mismatch error, investigate or file bug report
-            runsimulation.reporters.append(mmapp.XTCReporter(
-                f"{self.run_folder}/traj{l:.3f}.xtc",
-                write_step,
-            ))
-
-            # runsimulation.reporters.append(mmapp.XTCReporter(
-            #     f"{self.data_folder}/trajectory.xtc",
-            #     write_step,
-            #     append=append,
-            # ))
-
             runsimulation.reporters.append(EvbReporter(
                 f"{self.data_folder}/Energies.dat",
                 write_step,
@@ -247,51 +235,7 @@ class FepDriver():
         # self.merge_traj_pdb()
         # self.merge_state()
         self.ostream.flush()
-
-    def merge_traj_pdb(self):
-        self.ostream.print_info("merging pdb files")
-        output = ""
-        traj_path = Path().cwd() / self.data_folder / "traj_combined.pdb"
-        with open(traj_path, "w", encoding="utf-8") as file:
-            file.write(output)
-        frame = 1
-        crystline = None
-        for l in self.Lambda:
-            self.ostream.print_info(f"Lambda = {l}")
-            filename = f"{self.run_folder}/traj{l:.3f}.pdb"
-
-            with open(filename, "r", encoding="utf-8") as file:
-                file_contents = file.read()
-
-            # self.ostream.print_info(file_contents)
-            for line in file_contents.split("\n"):
-                parts = line.split()
-                if len(parts) == 0:
-                    continue
-                if parts[0] == "REMARK":
-                    continue
-                if parts[0] == "MODEL":
-                    line = f"MODEL{frame: >9}\n"
-                    frame += 1
-                if parts[0] == "CONECT":
-                    continue
-                if parts[0] == "END":
-                    continue
-                if parts[0] == "CRYST1":
-                    crystline = line
-                    continue
-
-                output += line + "\n"
-            # Write every frame seperately already to the file and empty the output string, otherwise the output string will become too large to handle nicely
-            with open(traj_path, "a", encoding="utf-8") as file:
-                file.write(output)
-            output = ""
-        if crystline:
-            output += crystline + "\n"
-        output += "END"
-        with open(traj_path, "a", encoding="utf-8") as file:
-            file.write(output)
-
+        
 #?Utility class for predicting approximate runtime of the simulation, do we already have dependencies for this so that this can be scrapped?
 class Timer:
 
