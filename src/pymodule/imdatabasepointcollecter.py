@@ -70,8 +70,8 @@ from .xtbhessiandriver import XtbHessianDriver
 # from .externalqmdriver import ExternalQMDriver
 # from .externalqmgradientdriver import ExternalQMGradientDriver
 # from .externalqmhessiandriver import ExternalQMHessianDriver
-from .impesdriver import ImpesDriver
-from .impescoordinates import ImpesCoordinates
+from .interpolationdriver import InterpolationDriver
+from .interpolationdatapoint import InterpolationDatapoint
 
 
 
@@ -110,7 +110,7 @@ class IMDatabasePointCollecter:
         - molecule: The VeloxChem molecule object.
         - unique_residues: The list of unique residues in the system.
         - unique_molecules: The list of unique molecules in the system.
-        - qm_driver: The VeloxChem driver object. Options are XtbDriver and ImpesDriver.
+        - qm_driver: The VeloxChem driver object. Options are XtbDriver and InterpolationDriver.
         - grad_driver: The VeloxChem gradient driver object.
         - qm_atoms: The list of atom indices for the QM region.
         - mm_subregion: The list of atom indices for the MM subregion (part of a molecule).
@@ -211,6 +211,7 @@ class IMDatabasePointCollecter:
         self.core_structure = None
         self.non_core_structure = None
         self.non_core_symmetry_groups = None
+        self.qm_datafile = None
 
         self.ff_datafile = None
         self.starting_temperature = None
@@ -1375,8 +1376,8 @@ class IMDatabasePointCollecter:
 
         #################################### DATABASE construciton inputs #############################
 
-        if 'checkpoint_file_name' in impes_dict:
-            self.qm_datafile = impes_dict['checkpoint_file_name']
+        if 'imforcefield_file' in impes_dict:
+            self.qm_datafile = impes_dict['imforcefield_file']
 
         # The desired density around a given starting structure/datapoint
         if 'desired_datapoint_density' in dynamics_settings:
@@ -1451,7 +1452,7 @@ class IMDatabasePointCollecter:
         if 'symmetry_groups' in impes_dict:
             self.non_core_symmetry_groups = impes_dict['symmetry_groups']
 
-        if 'checkpoint_file_name' not in impes_dict:
+        if self.qm_datafile is None:
 
             #positions_ang = self.molecule.get_coordinates()
             #atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
@@ -1464,11 +1465,10 @@ class IMDatabasePointCollecter:
             
             self.im_labels = []
             self.qm_energies = []
-            basename = impes_dict['basename']
-            self.qm_datafile = f'{basename}.h5'
-            label_list = [f'point_{i}' for i in range(self.roots)]
+            self.qm_datafile = 'IMDatabase.h5'
+            label_list = f'point_{0}'
             self.add_point(new_molecule, label_list, qm_energy, self.qm_datafile, self.basis, scf_results=scf_tensors)
-            impes_dict['checkpoint_file_name'] = self.qm_datafile
+
 
     
     
@@ -1512,7 +1512,7 @@ class IMDatabasePointCollecter:
         # Driver flag 
         if isinstance(self.qm_driver, XtbDriver):
             self.driver_flag = 'XTb Driver'
-        elif isinstance(self.qm_driver, ImpesDriver):
+        elif isinstance(self.qm_driver, InterpolationDriver):
             self.driver_flag = 'Impes Driver'
 
         self.qm_potentials = []
@@ -1574,7 +1574,7 @@ class IMDatabasePointCollecter:
         print('=' * 60)
 
         # load datafile if there is one
-        impes_driver = ImpesDriver(self.z_matrix)
+        impes_driver = InterpolationDriver(self.z_matrix)
         impes_driver.update_settings(self.impes_dict)
         self.im_labels = impes_driver.read_labels()
         print('beginning labels', self.im_labels)
@@ -1582,7 +1582,7 @@ class IMDatabasePointCollecter:
            self.qm_data_points = []
            self.qm_energies = []
            for label in self.im_labels:
-               qm_data_point = ImpesCoordinates(self.z_matrix)
+               qm_data_point = InterpolationDatapoint(self.z_matrix)
                qm_data_point.read_hdf5(self.qm_datafile, label)
                self.qm_energies.append(qm_data_point.energy)
                self.qm_data_points.append(qm_data_point)
@@ -1602,36 +1602,14 @@ class IMDatabasePointCollecter:
         self.velocities_np.append(self.simulation.context.getState(getVelocities=True).getVelocities(True))
         # if excited states higher roots, gradient, energy and the current IM-Driver for excited states is initialized
         self.impes_drivers = []
-        if self.roots > 1:
+        self.current_state = 0
+        driver_object = InterpolationDriver(self.z_matrix)
+        driver_object.non_core_symmetry_group = self.non_core_symmetry_groups
+        driver_object.non_core_structure = self.non_core_symmetry_groups
 
-            for root in range(self.roots):
-                # Dynamically create an attribute name
-                attribute_name = f'impes_driver_{root}'
-
-                # Initialize the object
-                driver_object = ImpesDriver(self.z_matrix)
-
-                driver_object.update_settings(self.impes_dict)
-                # Set the object as an attribute of the instance
-                setattr(self, attribute_name, driver_object)
-
-                # Append the object to the list
-                self.impes_drivers.append(driver_object)
-
-
-            self.current_im_choice = self.impes_drivers[1]
-            self.current_state = 1
-            self.current_gradient = 0
-            self.current_energy = 0
-        else:
-            self.current_state = 0
-            driver_object = ImpesDriver(self.z_matrix)
-            driver_object.non_core_symmetry_group = self.non_core_symmetry_groups
-            driver_object.non_core_structure = self.non_core_symmetry_groups
-
-            driver_object.update_settings(self.impes_dict)
-            self.impes_drivers.append(driver_object)
-            self.current_im_choice = self.impes_drivers[-1]
+        driver_object.update_settings(self.impes_dict)
+        self.impes_drivers.append(driver_object)
+        self.current_im_choice = self.impes_drivers[-1]
     
         self.FFlabels, self.qm_data_points = self.sort_points_with_association(self.im_labels, self.qm_data_points)
 
@@ -2384,7 +2362,7 @@ class IMDatabasePointCollecter:
            Besides the distance, it also returns the weight gradient,
            which requires the distance vector to be computed.
            :param data_point:
-                ImpesCoordinates object
+                InterpolationDatapoint object
         """
         # First, translate the cartesian coordinates to zero
         target_coordinates, center_target = self.calculate_translation_coordinates(coordinate_1)
@@ -2515,67 +2493,15 @@ class IMDatabasePointCollecter:
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
             self.unique_molecules.append(new_molecule)
         
-        for root in range(self.roots):
-            self.impes_drivers[root].compute(new_molecule, self.qm_data_points[root::self.roots], None, self.im_labels[root::self.roots], self.calc_NAC)
-            # qm_energy, scf_tensors = self.compute_energy(new_molecule, self.basis)
-            # print('\n\n ENergy difference ', qm_energy[0], self.impes_drivers[root].impes_coordinate.energy, abs(qm_energy[0] - self.impes_drivers[root].impes_coordinate.energy) * hartree_in_kcalpermol(), '\n\n')
+        self.impes_drivers[-1].compute(new_molecule, self.qm_data_points, None, self.im_labels)
 
-        # determine the energy difference between difference states and if NAC determine non-adiabatic coupling matrix
-        transitions = []
-        if self.roots > 1:
-            for root_1 in range(0, self.roots - 1):
-                for root_2 in range(root_1 + 1, self.roots):
 
-                    potential_kjmol = self.impes_drivers[root_1].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
-                    potential_kjmol_2 = self.impes_drivers[root_2].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
-                    transitions.append((root_1, root_2, potential_kjmol - potential_kjmol_2))
-                    print(f'compare the energies between roots: {root_1} -> {root_2}', potential_kjmol - potential_kjmol_2)
-
-                    if self.calc_NAC == True and np.linalg.norm(self.velocities_np[-1]) > 0.0:
-                        current_NAC = self.impes_drivers[root_1].impes_coordinate.NAC.flatten()
-                        current_velocitites = self.velocities_np[-1].flatten() * 4.566180e-4
-
-                        hopping_potential = np.exp(-abs((np.pi/(4)) * (( self.impes_drivers[root_2].impes_coordinate.energy - self.impes_drivers[root_1].impes_coordinate.energy ) / np.linalg.multi_dot([current_NAC, current_velocitites]))))
-                        print('#######################', '\n\n', hopping_potential, potential_kjmol_2 - potential_kjmol, '\n\n', '#######################')
-
-                    if abs(potential_kjmol_2 - potential_kjmol) < 20:
-                        # Choose a random integer between 0 and 1
-                        random_integer = random.randint(0, 1)
-                        if random_integer == 1 and self.current_im_choice == self.impes_drivers[root_1]:
-                            self.current_im_choice = self.impes_drivers[root_2]
-                            self.current_gradient = self.impes_drivers[root_2].impes_coordinate.gradient
-                            self.current_energy = potential_kjmol_2
-                            self.current_state = root_2
-                        elif random_integer == 1 and self.current_im_choice == self.impes_drivers[root_2]:
-                            self.current_im_choice = self.impes_drivers[root_1]
-                            self.current_gradient = self.impes_drivers[root_1].impes_coordinate.gradient
-                            self.current_energy = potential_kjmol
-                            self.current_state = root_1
-                        break
-
-                    elif self.current_im_choice == self.impes_drivers[root_1]:
-                        self.current_gradient = self.impes_drivers[root_1].impes_coordinate.gradient
-                        self.current_energy = potential_kjmol
-
-                    elif self.current_im_choice == self.impes_drivers[root_2]:
-                        self.current_gradient = self.impes_drivers[root_2].impes_coordinate.gradient
-                        self.current_energy = potential_kjmol_2
-
-        else:
-            potential_kjmol = self.impes_drivers[-1].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
-            self.current_gradient = self.impes_drivers[-1].impes_coordinate.gradient
-            self.current_energy = potential_kjmol
+        potential_kjmol = self.impes_drivers[-1].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
+        self.current_gradient = self.impes_drivers[-1].impes_coordinate.gradient
+        self.current_energy = potential_kjmol
                         
             # Potential energy is in Hartree, convert to kJ/mol
             
-        for initial_state, final_state, energy_gap in transitions:
-            self.energy_gabs[self.step] = ((initial_state, final_state), energy_gap)
-        print('Following the current state:', self.current_energy)
-        if self.step == self.excitation_step and self.roots > 1 and self.current_im_choice == self.impes_drivers[0]:
-            self.current_im_choice = self.impes_drivers[1]
-            self.current_gradient = self.impes_drivers[1].impes_coordinate.gradient
-            self.current_energy = self.impes_drivers[1].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
-            print('the Interpolation driver has been switched')
 
         return self.current_gradient, potential_kjmol
 
@@ -2622,7 +2548,8 @@ class IMDatabasePointCollecter:
         #################### Correlation Check #####################
         ############################################################
         allowed = True 
-        self.add_a_point = False    
+        self.add_a_point = False
+        
         if self.density_around_data_point[1] is not None:
             current_dihedral = new_molecule.get_dihedral_in_degrees(self.density_around_data_point[1])
             lower, upper = self.allowed_molecule_deviation
@@ -2635,34 +2562,25 @@ class IMDatabasePointCollecter:
                 allowed = current_dihedral >= lower or current_dihedral <= upper
         
         if allowed:
-            if self.skipping_value == 0:
-                min_sum_of_sqaures = np.inf
-                for i, dp in enumerate(self.qm_data_points):
-                        
-                    _, _, distance_core_vector = self.calculate_distance_to_ref(new_molecule.get_coordinates_in_bohr(), dp.cartesian_coordinates)
-                    sum_of_sqaures = 0.0
-                    modes = dp.normal_modes_in_cartesian
-                    for k, mode in enumerate(modes):
-                        coeffcicent = np.dot(mode.ravel(), distance_core_vector.ravel())
-                        weight = 1.0 / np.sqrt(abs(dp.normal_mode_frequencies[k])) * np.sqrt(abs(dp.normal_mode_frequencies[0]))
-                        ratio = (coeffcicent / dp.normal_mode_displacement_coefficients[k]) * weight
-                            
-                        sum_of_sqaures += ratio**2
-                        print('coeffcicent: ', k, sum_of_sqaures, min_sum_of_sqaures, weight)
-                        
-                    if abs(sum_of_sqaures) < min_sum_of_sqaures:
-                        min_sum_of_sqaures = abs(sum_of_sqaures)
-                
-                if min_sum_of_sqaures > 1.0:
-                    self.add_a_point = True
-            
-            else:
-                self.skipping_value -= 1
-            
             openmm_coordinate = context.getState(getPositions=True).getPositions()
             self.coordinates.append(openmm_coordinate)
             self.velocities.append(context.getState(getVelocities=True).getVelocities())
             self.gradients.append(gradient)
+            if self.skipping_value == 0:
+                for qm_data_point in self.qm_data_points:
+                    length_vectors = (self.current_im_choice.impes_coordinate.cartesian_distance_vector(qm_data_point))
+                        #print('here si the length ve vector', np.linalg.norm(length_vectors))
+                        #TODO: Check if this is 1 Angstrom
+                    print('distance in correlation', np.linalg.norm(length_vectors))
+                    if np.linalg.norm(length_vectors) < 1.0:
+                        self.add_a_point = False
+                        break
+                    
+                self.add_a_point = True
+            
+            else:
+                self.skipping_value -= 1
+            
             self.point_checker += 1 
 
             if self.add_a_point == True and self.step > self.collect_qm_points or self.check_a_point == True and self.step > self.collect_qm_points:
@@ -2677,9 +2595,6 @@ class IMDatabasePointCollecter:
                 context.setVelocities(self.velocities[0])
                 self.velocities = self.velocities[:1]
                 
-                if self.roots > 1:
-                    self.current_im_choice = self.impes_drivers[1]
-
                 new_positions = context.getState(getPositions=True).getPositions()
                 qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
                 positions_ang = (qm_positions) * 10
@@ -2759,59 +2674,32 @@ class IMDatabasePointCollecter:
 
         # Check energies and conformations and determine if a point should
         # be added or if a QM energy calculation should be performed
-        if not(self.add_a_point):
-            # Atom labels for the QM region
-            for root in range(self.roots):
-                    energy_diff_list = [abs(self.qm_energies[root::self.roots]
-                        - self.current_im_choice.impes_coordinate.energy)]
-
-                    if any(np.any(energy_diff * hartree_in_kcalpermol() < self.energy_threshold) for energy_diff in energy_diff_list):
-
-                        for qm_data_point in self.qm_data_points[root::self.roots]:
-                            length_vectors = (
-                                self.current_im_choice.impes_coordinate.cartesian_distance_vector(
-                            qm_data_point))
-                        #print('here si the length ve vector', np.linalg.norm(length_vectors))
-                        #TODO: Check if this is 1 Angstrom
-                        if np.linalg.norm(length_vectors) < 1.0:
-                            self.add_a_point = False
-                            break
-                        else:
-                            print('######## the structure is to far away from the references ###########')
-                            self.add_a_point = True
-                    else:
-                        print('############ The Energy difference is to big #############')
-                        self.add_a_point = True
         # TODO: this is actually always True... because it is a condition for
         # calling this routine -> no because self.add_a_point can be True and then turn False.
         qm_energy = 0
-        if self.add_a_point:
-            print('############# Energy is QM claculated ############')
-            qm_energy, scf_tensors = self.compute_energy(molecule, basis)
-            energy_difference_list = []
-            for root in range(self.roots):
-                energy_difference_list.append(abs(qm_energy[root] - self.impes_drivers[root].impes_coordinate.energy))
-                print('energy differences', energy_difference_list[-1] * hartree_in_kcalpermol())
-                self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference_list[-1] * hartree_in_kcalpermol())**2)), 10)
-                print('skipping value is here ', self.skipping_value) 
+        print('############# Energy is QM claculated ############')
+        qm_energy, scf_tensors = self.compute_energy(molecule, basis)
 
-            if any(energy_difference * hartree_in_kcalpermol() > self.energy_threshold for energy_difference in energy_difference_list):
-                self.add_a_point = True
-            else:
-                self.allowed_molecules.append(molecule.get_coordinates_in_bohr())
-                self.add_a_point = False
+        energy_difference = (abs(qm_energy[0] - self.impes_drivers[-1].impes_coordinate.energy))
+        print('energy differences', energy_difference * hartree_in_kcalpermol())
+        self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 10)
+
+        if energy_difference * hartree_in_kcalpermol() > self.energy_threshold:
+            self.add_a_point = True
+        else:
+            self.allowed_molecules.append(molecule.get_coordinates_in_bohr())
+            self.add_a_point = False
         if self.add_a_point:
             print('✨ A point is added! ✨', self.point_checker)
-            labels = []
-            for root in range(self.roots):
-                labels.append("point_{0}".format((len(self.im_labels) + root)))
-            self.add_point(molecule, labels, qm_energy, self.qm_datafile, basis, scf_results=scf_tensors)
+            print(molecule.get_xyz_string())
+            label = f"point_{len(self.im_labels) +1}"
+            self.add_point(molecule, label, qm_energy, self.qm_datafile, basis, scf_results=scf_tensors)
             self.last_point_added = self.point_checker - 1
             self.point_checker = 0
-            self.point_adding_molecule[self.step] = (molecule, qm_energy, labels)
+            self.point_adding_molecule[self.step] = (molecule, qm_energy, label)
 
 
-    def add_point(self, molecule, labels, energy, filename, basis=None, scf_results=None):
+    def add_point(self, molecule, label, energy, filename, basis=None, scf_results=None):
         """ Adds a new point to the database.
 
             :param molecule:
@@ -2837,462 +2725,36 @@ class IMDatabasePointCollecter:
         gradient = self.compute_gradient(molecule, basis, scf_results)
         hessian = self.compute_hessian(molecule, basis)
 
-        impes_coordinate = ImpesCoordinates(self.z_matrix)
+        impes_coordinate = InterpolationDatapoint(self.z_matrix)
 
         impes_coordinate.update_settings(self.impes_dict)
         
         qm_points_list = []
-        for root in range(self.roots):
-            impes_coordinate = ImpesCoordinates(self.z_matrix)
-            impes_coordinate.update_settings(self.impes_dict)
-            impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
 
-            impes_coordinate.energy = energy[root]
-            impes_coordinate.gradient = gradient[root]
-            impes_coordinate.hessian = hessian[root]
-            impes_coordinate.transform_gradient_and_hessian()
-            # impes_coordinate.normal_modes = normal_modes_relevant
-            # impes_coordinate.coefficient_displacement_thresholds = 
+        impes_coordinate = InterpolationDatapoint(self.z_matrix)
+        impes_coordinate.update_settings(self.impes_dict)
+        impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
+        impes_coordinate.energy = energy[0]
+        impes_coordinate.gradient = gradient[0]
+        impes_coordinate.hessian = hessian[0]
+        impes_coordinate.transform_gradient_and_hessian()
+        # impes_coordinate.normal_modes = normal_modes_relevant
+        # impes_coordinate.coefficient_displacement_thresholds = 
+        if self.impes_drivers is not None:
+            self.impes_drivers[0].impes_coordinate.gradient = gradient[0]
 
-            if self.impes_drivers is not None:
-                self.impes_drivers[root].impes_coordinate.gradient = gradient[root]
-
-                if self.impes_drivers[root] == self.current_im_choice:
-                    self.current_im_choice.impes_coordinate.gradient = gradient[root]
-
-            qm_points_list.append(impes_coordinate)
+        qm_points_list.append(impes_coordinate)
         
-
-        ############################ Implement the Mode analysis for each data_point #########################################
-        
-        natoms = molecule.number_of_atoms()
-        elem = molecule.get_labels()
-        coords = molecule.get_coordinates_in_bohr().reshape(natoms * 3)
-        
-
-        vib_frequencies, normal_modes_vec, gibbs_energy = (
-            geometric.normal_modes.frequency_analysis(
-                coords,
-                hessian[0],
-                elem,
-                energy=energy[0],
-                temperature=self.starting_temperature,
-                pressure=self.pressure,
-                outfnm=f'vibrational_point_{energy[0]}',
-                normalized=False))
-        print('normal modes', normal_modes_vec[0], vib_frequencies)        
-        
-        # eigen_val, eigen_vec = np.linalg.eigh(internal_hessians)
-        # reciprocal_sqrt_mass_vector = 1 / np.sqrt(mass_vector)
-
-        # # Create a diagonal matrix with the reciprocal values
-        # reciprocal_sqrt_mass_diagonal = np.diag(reciprocal_sqrt_mass_vector)
-        
-        # # matrix = np.zeros_like(internal_B_matrix.T)
-        # # for i in range(internal_B_matrix.shape[1]):
-        # #     for j in range(eigen_vec.shape[1]):
-        # #         for n in range(internal_B_matrix.shape[0]):
-                
-        # #           matrix[i, j] += reciprocal_sqrt_mass_vector[i] * internal_B_matrix.T[i, n] * eigen_vec[n, j]
-
-        # l_cart = np.linalg.multi_dot([reciprocal_sqrt_mass_diagonal, internal_B_matrix.T, eigen_vec])
-        
-        # print('shapes', internal_B_matrix.shape, eigen_val.shape, l_cart.shape, labels)
-        
-        # # l_cart = l_cart.reshape(-1, 3)
-        # print('\n\n', l_cart, l_cart[:, 0])
-        # exit()
-        # frequencies_cm1 = 130.3 * np.sqrt(eigen_val)
-
-        # print('frequencies', frequencies_cm1, self.non_core_symmetry_groups)
-        original_coordinates = molecule.get_coordinates_in_bohr().copy()
-
-        # Now 'mask' tells you which combos of (qi, qj) keep the energy diff <= 0.7
-        # You might visualize it or store it.
-        
-        normal_modes_relevant = [(freq, normal_modes_vec[i]) for i, freq in enumerate(vib_frequencies) if abs(freq) <= 1000]
-        normal_modes_h5_format = [normal_modes_vec[i] for i, freq in enumerate(vib_frequencies) if abs(freq) <= 1000]
-        relevant_freqs = vib_frequencies[:len(normal_modes_relevant)]
-        if len(normal_modes_relevant) == 0:
-            normal_modes_relevant = [(vib_frequencies[0], normal_modes_vec[0])]
-            normal_modes_h5_format = [normal_modes_vec[0]]
-        self.normal_modes_vec[labels[0]] = normal_modes_relevant
-        self.distplacement_threshold[labels[0]] = []
-        self.distance_threshold_dict[labels[0]] = 0
-        single_amplitude_threshold = []
-
-        sign_swapp = [1.0, -1.0]
-        for i, (freq, normal_mode) in enumerate(normal_modes_relevant):
-            amplitudes_sign = []
-            for sign in sign_swapp:
-                print(f'\n Normal Mode {i} with Current frequency {freq} \n\n')
-                current_energy_diff = 0
-                displaced_coordinates = original_coordinates.copy()
-                displaced_molecules = []
-                step = sign * 0.05
-                amplitude = 0.0
-                max_threshold = 1.0
-                while True:
-
-                    displcement_matrix = normal_mode
-                    amplitude += step
-                    displaced_coordinates = (
-                        original_coordinates.reshape(-1)
-                        + amplitude * displcement_matrix.ravel()
-                    )
-                    current_displaced_coordinates_diff = displaced_coordinates - original_coordinates.reshape(natoms * 3)
-
-                    coefficicent = np.dot(normal_mode.ravel(), current_displaced_coordinates_diff.ravel())
-
-                    displaced_molecule = Molecule(molecule.get_labels(), displaced_coordinates.reshape(-1, 3), units='bohr')
-
-                    displaced_molecules.append(displaced_molecule)
-                    impes_driver = ImpesDriver(self.z_matrix)
-                    impes_driver.update_settings(self.impes_dict)
-
-                    impes_driver.distance_thrsh = 1.0
-                    impes_driver.compute(displaced_molecule, qm_points_list, None, [labels[0]])
-                    qm_energy, _ = self.compute_energy(displaced_molecule, basis)
-                    
-                    current_energy_diff = abs(qm_energy[0] - impes_driver.impes_coordinate.energy) * 627.509474
-
-                    print('Here is the energy_diff', current_energy_diff, amplitude)
-
-                    if current_energy_diff >= max_threshold:
-                        # we overshot, so backtrack by one step
-                        amplitude -= step
-                        # reduce step
-                        step *= 0.5
-                        if abs(step) < 1e-4:
-                            # we can't refine any further
-                            break
-                    else:
-                        # if we are well below the threshold, maybe we let the step grow a bit
-                        if current_energy_diff < 0.5 * max_threshold:
-                            step = min(step * 1.2, 0.2)  # don't exceed some maximum step
-
-                amplitudes_sign.append(coefficicent)
-            print("Amplitude for mode i is about", amplitudes_sign, current_energy_diff)
-
-            self.distplacement_threshold[labels[0]].append(min(amplitudes_sign))
-            single_amplitude_threshold.append(min(amplitudes_sign))
-        print('DISPLACEMENT Threshold', self.distplacement_threshold, single_amplitude_threshold)
-        old_single_amplitude_thrsh = single_amplitude_threshold.copy()
-        print('Here is the old thresholds', old_single_amplitude_thrsh)
-
-        if len(normal_modes_relevant) != 1:
-            def two_mode_scan(molecule, original_coordinates, normal_modes_vec, 
-                    i, j, qi_range, qj_range, qm_datapoints, labels):
-                """
-                Scans in a 2D grid along mode i and j. Returns a 2D array of energy diffs
-                and a boolean mask of which points are <= threshold.
-                """
-
-                def boundary_to_middle_order(range_values):
-                    """Generate indices starting from both ends and moving towards the center."""
-                    n = len(range_values)
-                    left, right = 0, n - 1
-                    ordered_indices = []
-
-                    while left <= right:
-                        if left != right:
-                            ordered_indices.extend([left, right])
-                        else:
-                            ordered_indices.append(left)
-                        left += 1
-                        right -= 1
-
-                    return ordered_indices
-
-                def compute_skip(diff, threshold, default_step=1, max_skip=10):
-                    """
-                    Compute a skip factor based on the difference between the computed energy diff and the threshold.
-                    """
-                    if diff <= threshold:
-                        return default_step  # already acceptable; just move one step
-                    # The further diff is above the threshold, the larger the skip.
-                    skip = int((diff - threshold) * 3.0)
-
-                    print('compute skipping function:', min(max(default_step, skip), max_skip))
-                    return min(max(default_step, skip), max_skip)
-                
-                def check_boundary(molecule, original_coordinates, mode_i, mode_j, qi, qj, qm_datapoints, labels, threshold=0.7):
-                    """
-                    Compute the energy difference for the displacement defined by qi_range[idx_i]
-                    and qj_range[idx_j] and return a tuple:
-                    (satisfied, energy_diff)
-                    where satisfied is True if the difference is below the threshold.
-                    """
-
-                    # Build the combined displacement:
-                    combined_displacement = qi * mode_i + qj * mode_j
-                    displaced_coords = original_coordinates.ravel() + combined_displacement
-                    # Create a new molecule with the displaced coordinates
-                    displaced_molecule = Molecule(
-                        molecule.get_labels(), 
-                        displaced_coords.reshape(-1, 3), 
-                        units='bohr'
-                    )
-
-                    impes_driver = ImpesDriver(self.z_matrix)
-                    impes_driver.update_settings(self.impes_dict)
-                    impes_driver.distance_thrsh = 1.0
-                    # Compute energies (using your driver and energy function)
-                    impes_driver.compute(displaced_molecule, qm_datapoints, None, [labels[0]])
-                    qm_energy, scf_tensors = self.compute_energy(displaced_molecule, basis)
-                    current_energy_diff = abs(qm_energy[0] - impes_driver.impes_coordinate.energy) * 627.509474
-                    # Store the energy difference
-                    energy_diffs[idx_i, idx_j] = current_energy_diff
-                    # Return True if within threshold, else False
-                    print('Check of energy diff', current_energy_diff < threshold)
-                    return current_energy_diff < threshold, current_energy_diff
-                
-                
-                # Prepare storage
-                energy_diffs = np.zeros((len(qi_range), len(qj_range)))
-                within_threshold = np.ones((len(qi_range), len(qj_range)), dtype=bool)
-
-                mode_i = normal_modes_vec[i][1].ravel()
-                mode_j = normal_modes_vec[j][1].ravel()
-
-
-                qi_indices = boundary_to_middle_order(qi_range)
-                qj_indices = boundary_to_middle_order(qj_range)
-
-                # --- First, try the outer boundaries. ---
-                #
-                # Our idea is to test the “edge” values:
-                # for qi, try the first and last element; for qj, try the first and last element.
-                # If one edge (say, qi = first element) yields a value below threshold for one of the qj edges,
-                # then we “accept” that edge. Then we check the opposite edge (qi = last element).
-                #
-                # If both opposite edges (for some qj choice) are within the threshold,
-                # we can break out early and skip the full grid evaluation.
-
-                # --- If the outer boundaries did not both pass, try “inward” boundaries. ---
-                #
-                # For example, if one of the outer qi values failed, you might want to try the next candidate.
-                # In the code below, we iterate over all qi_indices and qj_indices,
-                # but we “skip” calculations if we have already found that the boundaries (on both ends)
-                # are OK. (You can modify this logic to “start” at the outer edge and move inward.)
-                
-                number_of_iterations = 0
-
-                for idx_i in range(len(qi_indices) - 1):
-                    print(idx_i, qi_indices[idx_i])
-                    qi = qi_range[qi_indices[idx_i]]
-                    qi_1 = qi_range[qi_indices[idx_i + 1]]
-                    number_of_iterations += 1
-                    
-                    idx_j = 0
-                    while idx_j < len(qj_indices):
-                        
-                        qj = qj_range[qj_indices[idx_j]]
-                        qj_1 = qj_range[qj_indices[idx_j + 1]]
-                        number_of_iterations += 1
-                        boundaries_satisfied = False
-
-                        # Define indices for the outer boundaries in qi and qj:
-                        qi_outer = [qi, qi_1]
-                        qj_outer = [qj, qj_1]
-                        
-                        print('Here is qi_outer and qj_outer', qi_outer, qj_outer)
-                        # We will store whether each qi boundary passes (for at least one of the two qj values)
-                        qi_boundary_ok = {}
-                        qj_boundary_ok = {}
-                        counter = 0
-                        diff_list = []
-                        for i, value_i in enumerate(qi_outer):
-                            # For this qi boundary, check the two outer qj values.
-                            qi_ok = False
-                            qj_ok_list = []
-                            for j, value_j in enumerate(qj_outer):
-                                qj_ok = False
-                                ok, diff = check_boundary(molecule, original_coordinates, mode_i, mode_j, value_i, value_j, qm_datapoints, labels, threshold=0.8)
-                                if ok:
-                                    # Once one boundary (for this qi) is within threshold, record it.
-                                    qi_ok = True
-                                    # Optionally, print or log:
-                                    print(f"Boundary at qi index {value_i} and qj index {value_j} is OK (energy diff = {diff:.3f}).")
-                                    print('Value of qi and qj',np.where(qi_range == value_i), np.where(qj_range == value_j))
-                                    qj_ok = True
-                                    qj_ok_list.append(qj_ok)
-
-                                else:
-                                    # Mark the cell as failing (if you use the within_threshold array):
-                                    print(f"Boundary at qi index {value_i} and qj index {value_j} is NOT OK (energy diff = {diff:.3f}).")
-                                    print('Value of qi and qj',np.where(qi_range == value_i), np.where(qj_range == value_j))
-                                    within_threshold[np.where(qi_range == value_i), np.where(qj_range == value_j)] = 0
-
-                                    qj_ok_list.append(qj_ok)
-                                diff_list.append(diff)
-                                qj_boundary_ok[counter] = qj_ok
-                                counter += 1
-                            qi_boundary_ok[i] = qi_ok
-                        
-
-                        if all(qi_boundary_ok.values()) and all(qj_boundary_ok.values()) and idx_i == idx_j:
-                            print('Number of iterations', number_of_iterations)
-                            return energy_diffs, within_threshold
-
-                        # If both outer qi boundaries are OK then we are done.
-                        if all(qi_boundary_ok.values()) and all(qj_boundary_ok.values()):
-                            boundaries_satisfied = True
-                        
-                        if all(qj_ok_list):
-                            boundaries_satisfied = True
-                        if boundaries_satisfied:
-                            print("Early termination: outer boundaries satisfied. Skipping full grid scan.")
-                            print('Number of iterations', number_of_iterations)
-                            break
-
-                        step = compute_skip(min(diff_list), threshold=0.8)
-                        step_pairs = step * 2
-                        # For all the indices that will be skipped, mark them as False.
-                        # (You may want to store a placeholder energy diff; here we simply use the current diff.)
-                        for skip_offset in range(2, step_pairs):
-                            print('HERE IS THE OFFSET:', idx_j + skip_offset)
-                            if idx_j + skip_offset < len(qj_indices):
-                                skipped_qj_pos = qj_indices[idx_j + skip_offset]
-                                within_threshold[idx_i, skipped_qj_pos] = False
-                                energy_diffs[idx_i, skipped_qj_pos] = diff  # or set to a flag value if desired
-                                print(f"Skipping qi={qi} and qj={qj_range[skipped_qj_pos]} (marked as False).")
-                        
-                        # Jump ahead by the computed step size.
-                        old_idx = idx_j
-                        idx_j = idx_j + step_pairs
-
-                        print('Here is step as is should be', step, idx_j, old_idx)
-                        
-                return energy_diffs, within_threshold
-
-                                
-            print('\n\n\n HERE THE CALCULATION SECTION IS STARTING \n\n\n')
-
-            # Example usage in your code:
+        for i, qm_datapoint in enumerate(qm_points_list):
             
-            def generate_dynamic_step_grid(max_range, min_step_fraction=0.5, boundary_fraction=0.5):
-                """
-                Generate an adaptive grid with step size based on the boundaries.
-
-                Args:
-                - max_range (float): Absolute boundary for the range.
-                - min_step_fraction (float): Minimum step size as a fraction of the boundary step.
-                - boundary_fraction (float): Region beyond which finer steps should apply.
-
-                Returns:
-                - np.array: Array of grid points.
-                """
-                base_step = 0.1 * max_range  # Base step proportional to the range size
-                boundary_region = boundary_fraction * max_range  # Define where finer steps should apply
-                min_step = min_step_fraction * base_step  # Minimum step size near boundaries
-
-                grid_points = []
-                x = -max_range
-
-                while x <= max_range:
-                    grid_points.append(x)
-
-                    # Adapt step size based on position
-                    if abs(x) < boundary_region:
-                        step_size = base_step  # Coarser steps in the central region
-                    else:
-                        step_size = min_step  # Finer steps near the boundary
-
-                    x += step_size
-
-                return np.array(grid_points)
-            
-            def select_threshold_from_grid(success_rates, grid, cutoff=0.6):
-                """
-                Given an array of success rates (one per row or column) and the corresponding grid,
-                select the grid value from the candidate index that:
-                (a) has a success rate above the cutoff, and 
-                (b) is as close as possible to the center of the grid.
-                
-                If no candidate exceeds the cutoff, return the middle value of the grid.
-                
-                Args:
-                success_rates (np.array): 1D array of success rates.
-                grid (np.array): 1D array of grid values.
-                cutoff (float): The minimum success rate required.
-                
-                Returns:
-                float: The selected grid value.
-                """
-                # Find indices where the success rate is at or above the cutoff
-                candidate_indices = np.where(success_rates >= cutoff)[0]
-                print('GRID IS HERE', grid, grid[-1], candidate_indices)
-                if candidate_indices.size == 0:
-                    # No candidate meets the criterion; return the grid’s midpoint.
-                    return grid[-1]
-                else:
-                    # Define the "middle" index of the grid.
-                    center_index = len(grid) // 2
-                    # Pick the candidate that is closest to this center.
-                    best_candidate = candidate_indices[np.argmax(np.abs(candidate_indices - center_index))]
-                    if best_candidate == grid.shape[0]:
-                        best_candidate -= 1
-
-                    return grid[best_candidate]
-                
-            for i in range(len(normal_modes_relevant)):
-                for j in range(len(normal_modes_relevant)):
-                    
-                    if j <= i:
-
-                        continue
-
-                    qi_range = generate_dynamic_step_grid(abs(self.distplacement_threshold[labels[0]][i])) # for instance
-                    qj_range = generate_dynamic_step_grid(abs(self.distplacement_threshold[labels[0]][j]))
-
-                    print('QI RANGE', qi_range, qj_range)
-
-                    energy_diffs, mask = two_mode_scan(
-                        molecule, 
-                        original_coordinates, 
-                        normal_modes_relevant, 
-                        i, j, 
-                        qi_range, 
-                        qj_range,
-                        qm_points_list,
-                        labels, 
-                    )
-                    
-                    print('MASK: \n\n', mask)
-                    row_success = mask.mean(axis=0)  # fraction of Trues in each row
-
-                    # Similarly, compute for each column (q_j candidates)
-                    col_success = mask.mean(axis=1)
-
-                    new_threshold_qi = select_threshold_from_grid(row_success, qi_range, cutoff=0.6)
-                    # And similarly for q_j:
-                    new_threshold_qj = select_threshold_from_grid(col_success, qj_range, cutoff=0.6)
-
-                    print(f'\n\n SHOW THRESHOLDS {new_threshold_qi, new_threshold_qj} \n\n {self.distplacement_threshold[labels[0]][i], self.distplacement_threshold[labels[0]][j]} \n\n {col_success, row_success} \n\n')
-                    
-                    if abs(new_threshold_qi) < abs(self.distplacement_threshold[labels[0]][i]):    
-                        self.distplacement_threshold[labels[0]][i] = new_threshold_qi
-                        single_amplitude_threshold[i] = new_threshold_qi
-                    if abs(new_threshold_qj) < abs(self.distplacement_threshold[labels[0]][j]):
-                        self.distplacement_threshold[labels[0]][j] = new_threshold_qj
-                        single_amplitude_threshold[j] = new_threshold_qj
-            
-            print(f'\n\n SHOW FINAL THRESHOLDS {new_threshold_qi, new_threshold_qj} \n\n {self.distplacement_threshold[labels[0]]}')
-
-        for root, qm_datapoint in enumerate(qm_points_list):
-            
-            qm_datapoint.normal_modes_in_cartesian = normal_modes_h5_format
-            qm_datapoint.normal_mode_displacement_coefficients = self.distplacement_threshold[labels[root]]
-            qm_datapoint.normal_mode_frequencies = relevant_freqs
-
-            qm_datapoint.write_hdf5(filename, labels[root])
-            self.im_labels.append(labels[root])
-            self.qm_energies.append(energy[root])
+            qm_datapoint.write_hdf5(filename, label)
+            self.im_labels.append(label)
             self.qm_energies.append(qm_datapoint.energy)
             self.qm_data_points.append(qm_datapoint)
 
-        self.density_around_data_point[0] += self.roots
+        self.density_around_data_point[0] += 1
+        
+
 
     def compute_energy(self, molecule, basis=None):
         """ Computes the QM energy using self.qm_driver.
@@ -3324,24 +2786,6 @@ class IMDatabasePointCollecter:
             scf_tensors = self.qm_driver.compute(molecule, basis)
             qm_energy = self.qm_driver.scf_energy
             qm_energy = np.array([qm_energy])
-            print('qm_energy', qm_energy)
-            self.qm_driver.ostream.unmute()
-
-        # TDDFT / TDHF
-        elif ( isinstance(self.qm_driver, TDAExciDriver) or
-             isinstance(self.qm_driver, LinearResponseEigenSolver)):
-            if self.grad_driver.scf_drv is None:
-                raise ValueError("No SCF driver defined.")
-            self.grad_driver = scf_drv.mute()
-            scf_tensors = self.grad_driver.scf_drv.compute(molecule, basis)
-            self.qm_driver.ostream.mute()
-            self.qm_driver._is_converged = False
-            self.rsp_results = self.qm_driver.compute(molecule, basis,
-                                                      scf_tensors)
-            qm_energy = ( self.grad_driver.scf_drv.scf_energy
-                   + self.rsp.results['eigenvalues'][self.excited_state_index] )
-
-            self.scf_drv.unmute()
             self.qm_driver.ostream.unmute()
 
         if qm_energy is None:
@@ -3378,19 +2822,11 @@ class IMDatabasePointCollecter:
             qm_gradient = np.array([qm_gradient])
             self.grad_driver.ostream.unmute()
 
-        elif isinstance(self.grad_driver, TddftGradientDriver):
-            self.grad_driver.ostream.mute()
-            self.grad_driver.compute(molecule, basis, self.qm_driver,
-                                         self.rsp_results)
-            qm_gradient = self.grad_driver.gradient[self.excited_state_index]
-            self.grad_driver.ostream.unmute()
-
         if qm_gradient is None:
             error_txt = "Could not compute the QM gradient. "
             error_txt += "Please define a QM gradient driver."
             raise ValueError(error_txt)
-        
-        print('Gradient', qm_gradient)
+
         return qm_gradient
 
     # TODO: mute outside to save time?
@@ -3421,100 +2857,14 @@ class IMDatabasePointCollecter:
             qm_hessian = np.array([qm_hessian])
             # self.hess_driver.ostream.unmute()
 
-        elif isinstance(self.hesian_driver, TddftHessianDriver):
-            self.hess_driver.ostream.mute()
-            self.hess_driver.compute(molecule, basis)
-            qm_hessian = self.hess_driver.hessian
-            self.hess_driver.ostream.unmute()
 
         if qm_hessian is None:
             error_txt = "Could not compute the QM Hessian. "
             error_txt += "Please define a QM Hessian driver."
             raise ValueError(error_txt)
 
-        print('hessina', qm_hessian)
         return qm_hessian
 
-    def adiabatic_transformation(self, energies, gradients, hessians, NACs, NACs_deriv, ADTmatrix):
-
-        # section for the energy in order to transform adiabatic energies into the diabatic basis
-
-        diabatic_energies = np.linalg.multi_dot([ADTmatrix.T, energies, ADTmatrix])
-
-        # section for the gradient in order to transform the adiabatic gradients into the dabatic basis
-        # NACs structure is a list probably F = list([0, 1], [0, 2], ..., [1, 0], [1, 2]) assuming that for the transition densities the NAC of [0, 1] == [1, 0]
-
-        nstates = len(energies)
-        natoms = len(NACs[0].shape[0])
-
-        adiabatic_Hamilton = np.diag(energies)
-        NAC_Matrix = np.empty(adiabatic_Hamilton.shape, dtype=object)
-        gradients_matrix = np.empty(adiabatic_Hamilton.shape, dtype=object)
-        diabatic_gradients = np.zeros((nstates, nstates, natoms, 3))
-        zero_matrix = np.zeros_like(NACs[0])
-
-        for root_1 in range(len(energies)):
-            for root_2 in range(len(energies)):
-                if root_1 != root_2:
-                    gradients_matrix[root_1, root_2] = zero_matrix
-                    NAC_Matrix[root_1, root_2] = NACs[root_1 * len(energies) + root_2]
-
-                else:
-                    gradients_matrix[root_1, root_2] = gradients[root_2]
-                    NAC_Matrix[root_1, root_2] = zero_matrix
-
-
-        for atom in range(len(self.molecule.get_labels())):
-            for direction in range(3):
-
-                diab_sub_gradient = gradients_matrix[:, :, atom, direction] + NAC_Matrix[:, :, atom, direction] * adiabatic_Hamilton - adiabatic_Hamilton * NACs[:, :, atom, direction]
-
-                diabatic_gradients[:, :, atom, direction] = np.linalg.multi_dot([ADTmatrix.T, diab_sub_gradient, ADTmatrix])
-
-
-        # TODO Hessian tranformation from adiabatic to diabatic basis oriented at the gradient implementatioin above
-
-        NAC_derivative_matrix = np.empty(adiabatic_Hamilton.shape, dtype=object)
-        hessians_matrix = np.empty(adiabatic_Hamilton.shape, dtype=object)
-        diabatic_hessians = np.zeros((nstates, nstates, natoms, 3, natoms, 3))
-        zero_matrix_hessian = zero_matrix = np.zeros_like(hessians[0])
-
-        for root_1 in range(len(energies)):
-            for root_2 in range(len(energies)):
-
-                if root_1 != root_2:
-                    hessians_matrix[root_1, root_2] = zero_matrix_hessian
-                    NAC_derivative_matrix[root_1, root_2] = NACs_deriv[root_1 * len(energies) + root_2]
-
-                else:
-                    hessians_matrix[root_1, root_2] = hessians[root_2]
-                    NAC_derivative_matrix[root_1, root_2] = zero_matrix_hessian
-
-        for atom_1 in range(len(self.molecule.get_labels())):
-            for direction_1 in range(3):
-                for atom_2 in range(len(self.molecule.get_labels())):
-                    for direction_2 in range(3):
-
-                        diab_sub_hessian = (0.5 * hessians_matrix[:, :, atom_1, direction_1, atom_2, direction_2] +
-                                            0.5 * hessians_matrix[:, :, atom_2, direction_2, atom_1, direction_1] +
-                                            NAC_Matrix[:, :, atom_1, direction_1] * gradients_matrix[:, :, atom_2, direction_2] +
-                                            NAC_Matrix[:, :, atom_2, direction_2] * gradients_matrix[:, :, atom_1, direction_1] -
-                                            gradients_matrix[:, :, atom_2, direction_2] * NAC_Matrix[:, :, atom_1, direction_1] -
-                                            gradients_matrix[:, :, atom_1, direction_1] * NAC_Matrix[:, :, atom_2, direction_2] -
-                                            NAC_Matrix[:, :, atom_1, direction_1] * adiabatic_Hamilton * NAC_Matrix[:, :, atom_2, direction_2] -
-                                            NAC_Matrix[:, :, atom_2, direction_2] * adiabatic_Hamilton * NAC_Matrix[:, :, atom_1, direction_1] +
-                                            0.5 * adiabatic_Hamilton * (NAC_Matrix[:, :, atom_1, direction_1] * NAC_Matrix[:, :, atom_2, direction_2] +
-                                                                        NAC_Matrix[:, :, atom_2, direction_2] * NAC_Matrix[:, :, atom_1, direction_1] -
-                                                                        NAC_derivative_matrix[:, :, atom_1, direction_1, atom_2, direction_2] -
-                                                                        NAC_derivative_matrix[:, :, atom_2, direction_2, atom_1, direction_1]) +
-                                            0.5 * (NAC_Matrix[:, :, atom_2, direction_2] * NAC_Matrix[:, :, atom_1, direction_1] +
-                                                                        NAC_Matrix[:, :, atom_1, direction_1] * NAC_Matrix[:, :, atom_2, direction_2] +
-                                                                        NAC_derivative_matrix[:, :, atom_1, direction_1, atom_2, direction_2] +
-                                                                        NAC_derivative_matrix[:, :, atom_2, direction_2, atom_1, direction_1]) * adiabatic_Hamilton)
-
-                        diabatic_hessians[:, :, atom_1, direction_1, atom_2, direction_2] = np.linalg.multi_dot([ADTmatrix.T, diab_sub_hessian, ADTmatrix])
-
-        return diabatic_energies, diabatic_gradients, diabatic_hessians
 
 
     def get_qm_potential_energy(self):
@@ -3588,7 +2938,7 @@ class IMDatabasePointCollecter:
            which requires the distance vector to be computed.
 
            :param data_point:
-                ImpesCoordinates object
+                InterpolationDatapoint object
         """
 
         # First, translate the cartesian coordinates to zero

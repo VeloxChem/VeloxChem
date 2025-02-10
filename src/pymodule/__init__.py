@@ -166,10 +166,10 @@ from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 
 # impes functionalities
-from .imdatabasedriver import ImDatabaseDriver
+from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
-from .impesdriver import ImpesDriver
-from .impescoordinates import ImpesCoordinates
+from .interpolationdriver import InterpolationDriver
+from .interpolationdatapoint import InterpolationDatapoint
 
 # Python functions
 from .errorhandler import assert_msg_critical
