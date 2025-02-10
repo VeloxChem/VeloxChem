@@ -17,7 +17,7 @@ from .evbreporter import EvbReporter
 import time
 
 
-class FepDriver():
+class EvbFepDriver():
 
     def __init__(self, comm=None, ostream=None):
         '''
@@ -63,11 +63,10 @@ class FepDriver():
         topology = configuration["topology"]
         temperature = configuration["temperature"]
         initial_positions = configuration["initial_positions"]
-        run_folder = configuration["run_folder"]
-        data_folder = configuration["data_folder"]
 
-        self.run_folder = run_folder
-        self.data_folder = data_folder
+        cwd = Path.cwd()
+        self.run_folder = cwd / configuration["run_folder"]
+        self.data_folder = cwd / configuration["data_folder"]
         self.Lambda = Lambda
         self.systems = systems
         self.topology = topology
@@ -86,16 +85,12 @@ class FepDriver():
         self.ostream.print_info(f"Total system time: {step_size * total_sample_steps * len(self.Lambda)} ps",)
         integrator_temperature = temperature * mmunit.kelvin  #type: ignore
         integrator_friction_coeff = 1 / mmunit.picosecond
-        # integrator_step_size = 0.001 * unit.picoseconds
-
-        # if self.init_positions == None:
-        #     self.init_positions = rea_ff_gen.molecule.get_coordinates_in_angstrom()*0.1
 
         timer = Timer(len(self.Lambda))
         estimated_time_remaining = None
 
         traj_roporter = mmapp.XTCReporter(
-            f"{self.data_folder}/trajectory.xtc",
+            str(self.data_folder / "trajectory.xtc"),
             write_step,
         )
         for i, l in enumerate(self.Lambda):
@@ -123,10 +118,8 @@ class FepDriver():
                 for harmbond in harm_bond_forces:
                     for i in range(harmbond.getNumBonds()):
                         particle1, particle2, length, k = harmbond.getBondParameters(i)
-
-                        if system.getParticleMass(particle1).value_in_unit(
-                                mmunit.dalton) == 1.007947 or system.getParticleMass(particle2).value_in_unit(
-                                    mmunit.dalton) == 1.007947: #todo more robust hydrogen check
+                        if (system.getParticleMass(particle1).value_in_unit(mmunit.dalton) - 1.007947 < 0.01 or
+                                system.getParticleMass(particle2).value_in_unit(mmunit.dalton) - 1.007947 < 0.01):
                             H_bond = sorted((particle1, particle2))
                             if H_bond not in constrained_H_bonds:
                                 constrained_H_bonds.append(H_bond)
@@ -134,21 +127,15 @@ class FepDriver():
                                 count += 1
                 self.ostream.print_info(f"Constrained {count} bonds involving H atoms ")
 
-
-            # platform = mm.Platform.getPlatformByName("CUDA")
-            # properties = {'Precision': 'single'}
             simulation = mmapp.Simulation(
                 topology,
                 system,
                 integrator,
-                # platform,
-                # properties,
             )
 
             simulation.context.setPositions(initial_positions)
-            # simulation.context.setParameter("lambda", l)
             simulation.reporters.append(mmapp.XTCReporter(
-                f"{self.run_folder}/minim_{l:.3f}.xtc",
+                str(self.run_folder / "minim_{l:.3f}.xtc"),
                 write_step,
             ))
 
@@ -163,8 +150,6 @@ class FepDriver():
                 timer.start()
 
             # Equiliberate
-            # todo write these reporters on my own
-            # todo add lambda value to the reporter
             simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
             self.ostream.print_info(f"Running equilliberation with step size {simulation.integrator.getStepSize()}")
             self.ostream.flush()
@@ -189,7 +174,6 @@ class FepDriver():
                 integrator,
             )
             runsimulation.context.setPositions(equil_positions)
-
             runsimulation.reporters.append(traj_roporter)
 
             if l == 0:
@@ -197,7 +181,7 @@ class FepDriver():
             else:
                 append = True
             runsimulation.reporters.append(EvbReporter(
-                f"{self.data_folder}/Energies.dat",
+                str(self.data_folder / "Energies.dat"),
                 write_step,
                 systems["reactant"],
                 systems["product"],
@@ -210,7 +194,7 @@ class FepDriver():
 
             runsimulation.reporters.append(
                 mmapp.StateDataReporter(
-                    f"{self.data_folder}/Data_combined.dat",
+                    str(self.data_folder / "Data_combined.dat"),
                     write_step,
                     step=True,
                     potentialEnergy=True,
@@ -232,10 +216,8 @@ class FepDriver():
             estimated_time_remaining = timer.stop_and_calculate(i + 1)
 
         self.ostream.print_info("Merging output files")
-        # self.merge_traj_pdb()
-        # self.merge_state()
         self.ostream.flush()
-        
+
 #?Utility class for predicting approximate runtime of the simulation, do we already have dependencies for this so that this can be scrapped?
 class Timer:
 

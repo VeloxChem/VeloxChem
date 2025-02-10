@@ -167,7 +167,7 @@ from .openmmdynamics import OpenMMDynamics
 from .evbdriver import EvbDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
-from .evbfepdriver import FepDriver
+from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
 

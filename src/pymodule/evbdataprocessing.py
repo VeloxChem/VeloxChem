@@ -46,7 +46,7 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
-        self.kb = 1.987204259e-3  # kcal/molK #todo use vlx
+        self.kb = 1.987204259e-3  # kcal/molK #todo use vlx, but where can I find it?
         self.joule_to_cal = 1 / 4.184
         self.verbose: bool = True
 
@@ -63,12 +63,8 @@ class EvbDataProcessing:
 
     def compute(self, results, barrier, free_energy):
         self.ostream.print_info("Starting data processing")
-        # if isinstance(target_folders, str):
-        #     target_folders = [target_folders]
-
         self.barrier = barrier
         self.free_energy = free_energy
-        self.ostream.print_info("Loading files")
         self.results = results
         self.ostream.print_info("Fitting H12 and alpha")
         self.alpha, self.H12 = self.fit_EVB_parameters()
@@ -122,7 +118,6 @@ class EvbDataProcessing:
 
     def calculate_dGfep(self, dE, Temp_set, Lambda, Lambda_indices):
         de_lambda = self.bin(dE, Lambda_indices)
-        # dG_middle, dG_forward, dG_backward, dG_bar = [0.0], [0.0], [0.0], [0.0]
         dG_bar = [0.0]
         for i, l in enumerate(Lambda[:-1]):
             delta_lambda = Lambda[i + 1] - l
@@ -151,7 +146,6 @@ class EvbDataProcessing:
 
     @staticmethod
     def calculate_dGevb_analytical(dGfep, Lambda, H12,xi):
-
         def R(de):
             return np.sqrt(de**2 + 4 * H12**2)
 
@@ -288,7 +282,7 @@ class EvbDataProcessing:
                 else:
                     dens_max = np.append(dens_max, 0)
             middle = len(dens_max) // 2
-            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3) #todo maybe get rid of this?
+            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3) 
             min_inds = np.where(dens_max[:middle] < self.dens_threshold)[0]
             max_inds = np.where(dens_max[middle:] < self.dens_threshold)[0]
 
@@ -350,7 +344,7 @@ class EvbDataProcessing:
                     result["Lambda"],
                     self.H12,
                     coordinate_bins,
-)
+                )
 
                 (
                     dGevb_analytical,

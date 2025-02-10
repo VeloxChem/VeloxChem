@@ -15,7 +15,7 @@ from .outputstream import OutputStream
 from .forcefieldgenerator import ForceFieldGenerator
 
 from .evbsystembuilder import EvbSystemBuilder
-from .evbfepdriver import FepDriver
+from .evbfepdriver import EvbFepDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
 from .veloxchemlib import mpi_master, Molecule
@@ -143,7 +143,7 @@ class EvbDriver():
             else:
                 product_charge = product.get_charge()
                 assert reactant_charge == product_charge, "Total charge of reactant and products must match"
-                product_multiplicity = product.get_multiplicity()
+                product_multiplicity = [product.get_multiplicity()]
 
             rea_input = {"molecule": reactant, "optimise": None, "forcefield": None, "hessian": None, "charges": None}
             pro_input = [{"molecule": pro, "optimise": None, "forcefield": None, "hessian": None, "charges": None} for pro in product]
@@ -491,7 +491,7 @@ class EvbDriver():
             conf = {
                 "name": "no_reactant",
                 "solvent": "spce",
-                "temperature": temperature,
+                "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
                 "padding": 1.5,
@@ -595,8 +595,7 @@ class EvbDriver():
 
         for conf in self.system_confs:
             self.ostream.print_info(f"Running FEP for {conf['name']}")
-            FEP = FepDriver()
-            # FEP.constrain_H = False
+            FEP = EvbFepDriver()
             FEP.run_FEP(
                 equilliberation_steps=equil_steps,
                 total_sample_steps=sample_steps,
@@ -609,10 +608,6 @@ class EvbDriver():
                 configuration=conf
             )
 
-            # if self.debug:
-            #     self.ostream.print_info("Debugging option enabled.Skipping recalculation.")
-            # else:
-            #     FEP.recalculate(interpolated_potential=True, force_contributions=True)
             self.ostream.flush()
 
     def compute_energy_profiles(self, barrier, free_energy):

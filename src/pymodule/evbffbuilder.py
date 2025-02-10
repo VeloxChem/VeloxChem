@@ -159,7 +159,7 @@ class EvbForceFieldBuilder():
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule, basis, scf_result=scf_results)
 
-            # The atomtypeidentifier returns water with no lj on the hydrogens, this leads to unstable simulations
+            # The atomtypeidentifier returns water with no Lennard-Jones on the hydrogens, which leads to unstable simulations
             for atom in forcefield.atoms.values():
                 if atom['type'] == 'ow':
                     sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
@@ -181,7 +181,6 @@ class EvbForceFieldBuilder():
             if reparameterise:
                 self.ostream.print_info("Reparameterising force field.")
                 
-                #todo should 
                 if input["hessian"] is not None:
                     hessian = input["hessian"]
                 else:
@@ -203,7 +202,6 @@ class EvbForceFieldBuilder():
     ) -> ForceFieldGenerator:
         assert len(reactant_ff.atoms) == len(product_ff.atoms), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
-        #todo should this be moved to the forcefieldgenerator class? 
         rea_graph = nx.Graph()
         reactant_bonds = list(reactant_ff.bonds.keys())
         # Remove the bonds that are being broken, so that these segments get treated as seperate reactants
@@ -242,7 +240,6 @@ class EvbForceFieldBuilder():
         
         for product_ffgen in forcefields:
             # Shift all atom keys by the current atom count so that every atom has a unique ID
-            # todo make this more robust, check if shifting is necessary
             shift = atom_count
             mapping = {atom_key: atom_key + shift for atom_key in product_ffgen.atoms}
             EvbForceFieldBuilder._apply_mapping_to_forcefield(product_ffgen, mapping)
