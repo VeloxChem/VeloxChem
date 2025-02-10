@@ -4,6 +4,7 @@
 #include <pybind11/stl.h>
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
+#include "ThreeCenterElectronRepulsionGeomX00Driver.hpp"
 #include "T3FlatBuffer.hpp"
 #include "RIFockDriver.hpp"
 
@@ -31,6 +32,14 @@ export_t3cintegrals(py::module& m)
         .def("prepare_buffers", &CRIFockDriver::prepare_buffers, "Computes three center electron repulsion integral buffers.")
         .def("compute", &CRIFockDriver::compute, "Computes Coulomb Fock matrix for given density.");
     
+    // ThreeCenterElectronRepulsionGeom100Driver class
+    PyClass<CThreeCenterElectronRepulsionGeomX00Driver<1>>(m, "ThreeCenterElectronRepulsionGeom100Driver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CThreeCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, CMolecularBasis& aux_basis, const int iatom)
+             -> TPoint<double> { return geom_drv.compute(basis, aux_basis, molecule, iatom); },
+            "Computes gradient contribution for given molecule, basis, auxilary basis and selected atom.");
 }
 
 }  // namespace vlx_t2cintegrals

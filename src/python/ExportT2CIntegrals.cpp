@@ -354,7 +354,6 @@ export_t2cintegrals(py::module& m)
             },
             "Computes electron repulsion matrix for given molecule and basis.");
     
-    
     // COverlapGeom100Driver class
     PyClass<CTwoCenterElectronRepulsionGeomX00Driver<1>>(m, "TwoCenterElectronRepulsionGeom100Driver")
         .def(py::init<>())
