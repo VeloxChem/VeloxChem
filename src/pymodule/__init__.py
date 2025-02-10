@@ -165,6 +165,12 @@ from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 
+# impes functionalities
+from .imdatabasedriver import ImDatabaseDriver
+from .imdatabasepointcollecter import IMDatabasePointCollecter
+from .impesdriver import ImpesDriver
+from .impescoordinates import ImpesCoordinates
+
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
