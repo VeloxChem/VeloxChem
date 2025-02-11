@@ -7,6 +7,7 @@ on:
       - simd_master_test
       - multipsi_newcore
       - dftd4-test
+      - xtb-test
       - c_pcm
 
 jobs:
@@ -18,7 +19,7 @@ jobs:
         shell: bash -l {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-33e7ce1
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-9e2983e
 
     env:
       VLX_NUM_BUILD_JOBS: 4
