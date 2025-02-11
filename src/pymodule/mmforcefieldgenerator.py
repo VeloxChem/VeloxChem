@@ -529,7 +529,7 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        gaff_dihedral = self.validate_force_field(0)
+        gaff_dihedral = self.validate_force_field(0, print_summary=True)
         if visualize:
             self.visualize(gaff_dihedral)
 
@@ -2986,12 +2986,12 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
         if print_summary:
-            # Summarize the fitting quality
-            self.ostream.print_info('Fitting summary')
-            self.ostream.print_info('---------------')
-            # Average difference
-            avg_diff = np.mean(mm_scan - qm_scan)
-            self.ostream.print_info(f'Average difference: {abs(avg_diff):.3f} kJ/mol')
+            # Summarize validation
+            self.ostream.print_info('Summary of validation')
+            self.ostream.print_info('---------------------')
+            # Maximum difference
+            max_diff = np.max(np.abs(mm_scan - qm_scan))
+            self.ostream.print_info(f'Maximum difference: {max_diff:.3f} kJ/mol')
             # Standard deviation
             std_diff = np.std(mm_scan - qm_scan)
             self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
