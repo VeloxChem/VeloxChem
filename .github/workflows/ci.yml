@@ -19,7 +19,7 @@ jobs:
         shell: bash -l {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-9e2983e
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-468ec9b
 
     env:
       VLX_NUM_BUILD_JOBS: 4
