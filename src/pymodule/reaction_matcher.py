@@ -3,7 +3,7 @@ import itertools
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
 import numpy as np
-
+import time
 from collections import Counter
 
 
@@ -12,21 +12,79 @@ class ReactionMatcher:
     @staticmethod
     def match_reaction_graphs(A: nx.Graph, B: nx.Graph):
         # figure out how many bonds need to change -> difficult to impossible with multiple graphs right?
+        largest_in_A = len(list(nx.connected_components(A))[0])
+        largest_in_B = len(list(nx.connected_components(B))[0])
+        swapped = False
+        if largest_in_A > largest_in_B:
+            A, B = B, A
+            swapped = True
         
-        breaking_bonds = 0
-        # make all graphs with one bond broken in A, Am1, and one bond broken in B, Bm1
-        #check if from any in Am1 there's a subgraph isomorphism to B, or from Bm1 to A, 
-        #pick the one with the minimal residue = unconnected leftover parts
-        #then from Am1 to Bm1, again pick the one with 
+        mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(A, B)
+        start_time = time.time()
+
+        if not mapping == {}:
+            spent_time = time.time() - start_time
+            print(f"Found mapping without removing bonds. Spent {spent_time} seconds.")
+        else:
+            # print("No mapping found without removing bonds, trying to remove one bond")
+            Am1_mappings = []
+            for edge in A.edges:
+                Am1 = nx.Graph(A)
+                Am1.remove_edge(*edge)
+                bond_elems = (A.nodes[edge[0]]["elem"], A.nodes[edge[1]]["elem"])
+                mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(Am1, B)
+                if mapping != {}:
+                    Am1_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
+            if len(Am1_mappings) > 0:
+                Am1_mappings = sorted(Am1_mappings, key=lambda x: x["forming_bonds"]+x["breaking_bonds"])
+                total_mappings = len(Am1_mappings)
+                least_changing_bonds = Am1_mappings[0]["forming_bonds"]+Am1_mappings[0]["breaking_bonds"]
+                best_mappnigs = [mapping for mapping in Am1_mappings if mapping["forming_bonds"]+mapping["breaking_bonds"] == least_changing_bonds]
+                spent_time = time.time() - start_time
+                print(f"Found {total_mappings} mappings with removing one bond, of which {len(best_mappnigs)} have {least_changing_bonds}+1 changing bonds which is the minimal amount. Spent {spent_time} seconds.")
+                mapping = Am1_mappings[0]["mapping"]
+                
+            else:
+                # print("No mapping found without removing bonds, trying to remove two bonds")
+                Am2_mappings = []
+                for edge1 in A.edges:
+                    Am1 = nx.Graph(A)
+                    Am1.remove_edge(*edge1)
+                    for edge2 in Am1.edges:
+                        Am2 = nx.Graph(Am1)
+                        Am2.remove_edge(*edge2)
+                        bond_elems1 = {A.nodes[edge1[0]]["elem"], A.nodes[edge1[1]]["elem"]}
+                        bond_elems2 = {A.nodes[edge2[0]]["elem"], A.nodes[edge2[1]]["elem"]}
+                        
+                        mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(Am2, B)
+                        if mapping != {}:
+                            Am2_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
+                if len(Am2_mappings) > 0:
+                    Am2_mappings = sorted(Am2_mappings, key=lambda x: x["forming_bonds"]+x["breaking_bonds"])
+                    total_mappings = len(Am2_mappings)
+                    least_changing_bonds = Am2_mappings[0]["forming_bonds"]+Am2_mappings[0]["breaking_bonds"]
+                    best_mappnigs = [mapping for mapping in Am2_mappings if mapping["forming_bonds"]+mapping["breaking_bonds"] == least_changing_bonds]
+                    spent_time = time.time() - start_time
+                    print(f"Found {total_mappings} mappings with removing 2 bonds, of which {len(best_mappnigs)} have {least_changing_bonds} changing bonds which is the minimal amount. Spent {spent_time} seconds.")
+                    mapping = Am2_mappings[0]["mapping"]
+        if mapping == {}:
+            print("No mapping found with removing two bonds, removing 3 bonds is not implemented. Try suggesting some broken bonds.")
+        if swapped:
+            mapping = {v: k for k, v in mapping.items()}
+        return mapping
+        
+    @staticmethod
+    def _match_subgraph(A, B):
+        A = nx.Graph(A)
+        B = nx.Graph(B)
+        A_copy = nx.Graph(A)
+        B_copy = nx.Graph(B)
         total_mapping = {}
         while A.number_of_nodes() > 0:
             # if find largest subgraph
             mapping, res, size = ReactionMatcher._find_largest_subgraph(A, B)
-
-
-            #then try subgraph isomorphism from Am1 to Bm1
             if mapping is None:
-                raise Exception("No mapping found. You broke the algorithm. Please send an e-mail with your input structures to bvh@kth.se")
+                return {}, -1, -1
             # remove mapping from both graphs
             
             for key, value in mapping.items():
@@ -34,48 +92,22 @@ class ReactionMatcher:
                 B.remove_node(value)
             
             total_mapping.update(mapping)
-        
-        return total_mapping
+    
+        forming_bonds, breaking_bonds = ReactionMatcher._count_changing_bonds(A_copy, B_copy, total_mapping)
+        return total_mapping, forming_bonds, breaking_bonds
 
     @staticmethod
-    def _find_subgraph_broken_bonds(A: nx.Graph, B: nx.Graph):
-        #todo only loop over bonds that are different, if there is the same amount of C-C bonds in both the reactant and the product, don't include them
-        Am1 = []
-        for edge in A.edges:
-            temp = nx.Graph(A)
-            temp.remove_edge(*edge)
-            Am1.append(temp)
-        Bm1 = []
-        for edge in B.edges:
-            temp = nx.Graph(B)
-            temp.remove_edge(*edge)
-            Bm1.append(temp)
-        #try subgraph isomorphism from Am1 to B and from Bm1 to A
-
-        #todo can figure out beforehand if am1 or bm1 is going to give me largest size, and only loop over one
-        #todo can figure out beforehand what bonds in am1 are going to give largest size, and only loop over those
-        Am1_mappings = {}
-        for am1 in Am1:
-            temp_mapping, res, size = ReactionMatcher._find_largest_subgraph(am1, B)
-            if temp_mapping is not None:
-                Am1_mappings.update({temp_mapping: {"res": res, "size": -size}}) 
-        for bm1 in Bm1:
-            temp_mapping, res, size = ReactionMatcher._find_largest_subgraph(A, bm1)
-            if temp_mapping is not None:
-                Am1_mappings.update({temp_mapping: {"res": res, "size": -size}})
-
-        #take one with largest fitting graph size, and then least amount of fragments left res
-        Am1_mappings = sorted(Am1_mappings.values(), key=lambda x: (-x["size"], x["res"]))
-        Bm1_mappings = sorted(Bm1_mappings.values(), key=lambda x: (-x["size"], x["res"]))
+    def _count_changing_bonds(A, B, mapping):
+        # apply mapping to B
+        B_mapped = nx.Graph(B)
+        mapping = {v: k for k, v in mapping.items()}
+        B_mapped = nx.relabel_nodes(B_mapped, mapping)
         
-        if Am1_mappings and Bm1_mappings:
-            A_mapping = Am1_mappings[0]
-            B_mapping = Bm1_mappings[0]
-            mapping = A_mapping if A_mapping["size"] > B_mapping["size"] else B_mapping
-        elif Am1_mappings:
-            mapping = Am1_mappings[0]
-        elif Bm1_mappings:
-            mapping = Bm1_mappings[0]
+        A_bonds = set(tuple(sorted(bond)) for bond in A.edges)
+        B_bonds = set(tuple(sorted(bond)) for bond in B_mapped.edges)
+        breaking_bonds = A_bonds - B_bonds
+        forming_bonds = B_bonds - A_bonds
+        return len(forming_bonds), len(breaking_bonds)
         
     @staticmethod
     def _find_largest_subgraph(a: nx.Graph, b: nx.Graph):
@@ -101,7 +133,7 @@ class ReactionMatcher:
             if swapped:
                 mapping = {v: k for k, v in mapping.items()}
 
-            print(f"Found mapping through largest subgraph: {mapping}")
+            # print(f"Found mapping through largest subgraph: {mapping}")
             size = len(mapping)
         else:
             size = None
@@ -151,86 +183,3 @@ class ReactionMatcher:
 
                 return best_mapping, best_res
         return None, None
-
-    @staticmethod
-    def _map_unique_groups(A: nx.Graph, B: nx.Graph):
-        filters = [None, [6] ,[6,1]]
-        mapping = {}
-        
-        for filter in filters:
-            # Make a list of all non-hydrogen node id's their own element and the connected elements for both A and B
-            
-            A_unique, A_all = ReactionMatcher._find_unique_groups(A, filter)
-            B_unique, B_all = ReactionMatcher._find_unique_groups(B, filter)
-            a_contradictions = []
-            b_contradictions = []
-            group_ids = []
-            pass
-            for ida, groupa in A_unique.items():
-                for idb, groupb in B_unique.items():
-                    if groupa['element'] == groupb['element'] and groupa['connected_elements'] == groupb['connected_elements']:
-                        
-                        a_ids = groupa["neighbour_ids"]+[ida]
-                        b_ids = groupb["neighbour_ids"]+[idb]
-                        for a, b in zip(a_ids,b_ids):
-                            if (a not in mapping.keys() and a not in a_contradictions and b not in mapping.values() and b not in b_contradictions):
-                                mapping.update({a: b})
-                            else:
-                                if a in mapping.keys():
-                                    mapping.pop(a)
-                                if b in mapping.values():
-                                    mapping = {k: v for k, v in mapping.items() if v != b}
-                                if a not in a_contradictions:
-                                    a_contradictions.append(a)
-                                if b not in b_contradictions:
-                                    b_contradictions.append(b)
-
-            if len(mapping) > 0:
-                print(f"Found mapping  {mapping} through unique groups with reactant ids {group_ids} and with filter {filter}")
-                return mapping
-        return None
-
-    @staticmethod
-    def _find_unique_groups(A: nx.Graph, filter):
-        groups = {}
-        for id in A.nodes:
-            elem = A.nodes[id]["elem"]
-            if elem != 1:
-
-                neighbour_ids = [n for n in A.neighbors(id)]
-                neighbour_elements = [A.nodes[n]["elem"] for n in neighbour_ids]
-
-                filtered_ids = []
-                filtered_elements = []
-                if filter is None:
-                    filtered_ids = neighbour_ids
-                    filtered_elements = neighbour_elements
-                else:
-                    for neigh_id, neigh_elem in zip(neighbour_ids, neighbour_elements):
-                        if neigh_elem not in filter:
-                            filtered_ids.append(neigh_id)
-                            filtered_elements.append(neigh_elem)
-
-                if len(filtered_elements) > 0:
-                    filtered_elements, filtered_ids = zip(*sorted(zip(filtered_elements, filtered_ids)))
-
-                groups.update({
-                    id: {
-                        "element": elem,
-                        "connected_elements": list(filtered_elements),
-                        "neighbour_ids": list(filtered_ids)
-                    }
-                })
-
-        unique = {}
-        #Loop htrough all 
-        for i, (id, groupi) in enumerate(groups.items()):
-            found_match = False
-            for j, groupj in enumerate(groups.values()):
-                if not found_match and i != j:
-                    if groupi['element'] == groupj['element'] and groupi['connected_elements'] == groupj['connected_elements']:
-                        found_match = True
-            if not found_match:
-                unique.update({id: groupi})
-        
-        return unique, groups
