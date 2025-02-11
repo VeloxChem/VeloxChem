@@ -642,17 +642,17 @@ class MMForceFieldGenerator:
         self.ostream.print_info('Optimizing dihedral via least squares fitting...')
         self.ostream.flush()
         result = least_squares(
-            fun = objective_function,
-            x0 = initial_guess,
-            jac = '3-point',
-            method='dogbox',
+            fun=objective_function,
+            x0=initial_guess,
+            jac='2-point',
+            method='trf',
             bounds=bounds,
             args=args,
             verbose=0,
-            xtol=1e-12,  
-            ftol=1e-12,  
-            gtol=1e-12,  
-            max_nfev=2000  
+            xtol=1e-8,
+            ftol=1e-8,
+            gtol=1e-8,
+            max_nfev=2000,
         )
 
         # Update the force field parameters with the optimized barriers
