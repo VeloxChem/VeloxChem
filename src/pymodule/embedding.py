@@ -581,7 +581,7 @@ class PolarizableEmbeddingGrad(PolarizableEmbedding):
 
     def compute_pe_contributions(self, density_matrix):
         # FIXME -> ind dipoles only necessary if not passed from scf results
-        # usecase call gradients several times? -> yes different geometries though
+        # usecase call gradients several times? -> yes different geometries though -> guess of recalculation of ind dipoles from previous set of ind dipoles -> DIIS scheme
         if np.all(self.classical_subsystem.induced_dipoles.induced_dipoles == 0):
             el_fields = self.quantum_subsystem.compute_electronic_fields(
                 coordinates=self.classical_subsystem.coordinates,
@@ -631,13 +631,13 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
                                                     'Lorentz-Berthelot')
 
         if 'vdw' in self.options['settings']:
-            self._e_vdw_hess = repulsion_interactions.compute_repulsion_interactions_gradient(
-                quantum_subsystem=self.quantum_vsubsystem,
+            self._e_vdw_hess = repulsion_interactions.compute_repulsion_interactions_hessian(
+                quantum_subsystem=self.quantum_subsystem,
                 classical_subsystem=self.classical_subsystem,
                 method=self.vdw_method,
                 combination_rule=self.vdw_combination_rule)
 
-            self._e_vdw_hess += dispersion_interactions.compute_dispersion_interactions_gradient(
+            self._e_vdw_hess += dispersion_interactions.compute_dispersion_interactions_hessian(
                 quantum_subsystem=self.quantum_subsystem,
                 classical_subsystem=self.classical_subsystem,
                 method=self.vdw_method,
@@ -662,4 +662,5 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem= self.classical_subsystem)
-        return e_es_elec_hess + e_es_nuc_hess # + e_ind_nuc_hess + e_ind_el_hess + self._e_vdw_hess + e_es_elec_hess
+        # TODO add vdw
+        return e_es_elec_hess + e_es_nuc_hess + self._e_vdw_hess # + e_ind_nuc_hess + e_ind_el_hess
