@@ -26,8 +26,9 @@
 from mpi4py import MPI
 from io import StringIO
 from contextlib import redirect_stderr
+from pathlib import Path
 import numpy as np
-import os, sys, csv, argparse, shutil
+import os, sys
 import time
 import h5py
 
@@ -76,6 +77,7 @@ class SolvationFepDriver:
         - lambdas_stage1: The lambdas for stage 1.
         - lambdas_stage2: The lambdas for stage 2.
         - lambdas_stage3: The lambdas for stage 3.
+        - lambdas_stage4: The lambdas for stage 4.
         - u_kln: The potential energies across stages.
         - stage: The current stage.
         - final_free_energy: The final free energy.
@@ -109,7 +111,8 @@ class SolvationFepDriver:
         self.ostream = ostream
         
         # Create directory for storing all generated data
-        self.output_folder = "output_data"
+        self.output_folder = Path("solvation_fep_output")
+        self.output_folder.mkdir(parents=True, exist_ok=True)
 
         # Options for the SolvationBuilder
         self.padding = 2.0
@@ -128,7 +131,7 @@ class SolvationFepDriver:
 
         # Other objects
         self.solute_ff = None
-        self.platform = "Reference"
+        self.platform = None
         self.save_trajectory_xtc = False
 
         # Alchemical parameters
@@ -174,41 +177,32 @@ class SolvationFepDriver:
         :return:
             A list containing the free energy calculations for each stage.
         """
-        # Create the output folder and change directory
-        original_dir = os.getcwd()
-        os.makedirs(self.output_folder,exist_ok=True)
-        os.chdir(self.output_folder)
+        sol_builder = SolvationBuilder()
 
-        try:
-            sol_builder = SolvationBuilder()
-
-            sol_builder.solvate(solute=molecule, 
-                                solvent=solvent,
-                                solvent_molecule=solvent_molecule, 
-                                padding=self.padding,
-                                target_density=target_density, 
-                                neutralize=False, 
-                                equilibrate=False)
-            
-            self.solvent_name = solvent
-            
-            # Note: GROMACS files will be used instead of OpenMM files.
-            # For some reason, the results are more consistent. (?)
-            sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
-
-            if not ff_gen_solute:
-                self.solute_ff = sol_builder.solute_ff
-            else:
-                self.solute_ff = ff_gen_solute
-
-            delta_f, final_free_energy = self._run_stages()
-
-            return delta_f, final_free_energy
+        sol_builder.solvate(solute=molecule, 
+                            solvent=solvent,
+                            solvent_molecule=solvent_molecule, 
+                            padding=self.padding,
+                            target_density=target_density, 
+                            neutralize=False, 
+                            equilibrate=False)
         
-        finally:
-            # Change back to the original directory
-            os.chdir(original_dir)
+        self.solvent_name = solvent
+        
+        # Note: GROMACS files will be used instead of OpenMM files.
+        # For some reason, the results are more consistent. (?)
+        sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
 
+        if not ff_gen_solute:
+            self.solute_ff = sol_builder.solute_ff
+        else:
+            self.solute_ff = ff_gen_solute
+
+        delta_f, final_free_energy = self._run_stages()
+        u_kln = self.u_kln_matrices
+
+        return delta_f, final_free_energy, u_kln
+        
     def compute_solvation_from_omm_files(self, system_pdb, solute_pdb, solute_xml, other_xml_files):
         """
         Run the solvation free energy calculation using OpenMM.
@@ -227,25 +221,16 @@ class SolvationFepDriver:
         # Special name for the solvent
         self.solvent_name = 'omm_files'
 
-        self.system_pdb = os.path.abspath(system_pdb)
-        self.solute_pdb = os.path.abspath(solute_pdb)
-        self.solute_xml = os.path.abspath(solute_xml)
-        self.other_xml_files = [self._resolve_xml_path(xml_file) for xml_file in other_xml_files]
+        self.system_pdb = system_pdb
+        self.solute_pdb = solute_pdb
+        self.solute_xml = solute_xml
+        self.other_xml_files = other_xml_files
 
-        # Create the output folder and change directory
-        original_dir = os.getcwd()
-        os.makedirs(self.output_folder,exist_ok=True)
-        os.chdir(self.output_folder)
+        delta_f, final_free_energy = self._run_stages()
+        u_kln = self.u_kln_matrices
 
-        try:
-            delta_f, final_free_energy = self._run_stages()
-
-            return delta_f, final_free_energy
+        return delta_f, final_free_energy, u_kln
         
-        finally:
-            # Change back to the original directory
-            os.chdir(original_dir)
-    
     def compute_solvation_from_gromacs_files(self, system_gro, system_top, solute_gro, solute_top):
         """
         Run the solvation free energy calculation using OpenMM.
@@ -265,25 +250,15 @@ class SolvationFepDriver:
         # Special name for the solvent
         self.solvent_name = 'gro_files'
 
-        self.system_gro = os.path.abspath(system_gro)
-        self.system_top = os.path.abspath(system_top)
-        self.solute_gro = os.path.abspath(solute_gro)
-        self.solute_top = os.path.abspath(solute_top)
+        self.system_gro = system_gro
+        self.system_top = system_top
+        self.solute_gro = solute_gro
+        self.solute_top = solute_top
 
-        # Create the output folder and change directory
-        original_dir = os.getcwd()
-        os.makedirs(self.output_folder,exist_ok=True) 
-        os.chdir(self.output_folder)
+        delta_f, final_free_energy = self._run_stages()
+        u_kln = self.u_kln_matrices
 
-        try:
-
-            delta_f, final_free_energy = self._run_stages()
-
-            return delta_f, final_free_energy
-        
-        finally:
-            # Change back to the original directory
-            os.chdir(original_dir)
+        return delta_f, final_free_energy, u_kln
 
     def _run_stages(self):
         """
@@ -610,35 +585,38 @@ class SolvationFepDriver:
         interval = self.num_steps // self.number_of_snapshots
         simulated_ns = self.num_steps * self.timestep / unit.nanoseconds  # Simulated time in ns
 
-        # Setup reporters  
+        # Setup reporters
+        output_folder = Path(self.output_folder)  
         # XTC reporter is optional because it affects performance!
         if self.save_trajectory_xtc:
-            simulation.reporters.append(app.XTCReporter(f'trajectory_{lambda_value}_stage{self.stage}.xtc', interval))
-            self.ostream.print_info(f"Trajectory will be saved in trajectory_{lambda_value}_stage{self.stage}.xtc")
+            trajectory_filename = output_folder / f'trajectory_{lambda_value}_stage{self.stage}.xtc'
+            simulation.reporters.append(app.XTCReporter(str(trajectory_filename), interval))
+            self.ostream.print_info(f"Trajectory will be saved in {str(trajectory_filename)}")
             self.ostream.flush()
         # State data reporter
-        simulation.reporters.append(app.StateDataReporter(f'energy_{lambda_value}_stage{self.stage}.txt', interval,
+        energy_filename = output_folder / f'energy_{lambda_value}_stage{self.stage}.txt'
+        simulation.reporters.append(app.StateDataReporter(str(energy_filename), interval,
                                                         step=True, potentialEnergy=True, temperature=True))
 
         # Write the system to a file
         if self.stage in [1, 2]:
-            system_filename = f'solvated_system_{lambda_value}_stage{self.stage}.xml'
+            system_filename = output_folder / f'solvated_system_{lambda_value}_stage{self.stage}.xml'
             with open(system_filename, 'w') as f:
                 f.write(mm.XmlSerializer.serialize(system))
             self.ostream.print_info(f"System XML written to {system_filename}")
             self.ostream.flush()
             # Name for the hdf5 file
-            hdf5_filename = f'positions_{lambda_value}_stage{self.stage}.h5'
+            hdf5_filename = output_folder / f'positions_{lambda_value}_stage{self.stage}.h5'
 
         
         elif self.stage in [3, 4]:
-            system_filename = f'vacuum_system_{lambda_value}_stage{self.stage}.xml'
+            system_filename = output_folder / f'vacuum_system_{lambda_value}_stage{self.stage}.xml'
             with open(system_filename, 'w') as f:
                 f.write(mm.XmlSerializer.serialize(system))
             self.ostream.print_info(f"System XML written to {system_filename}")
             
             # Name for the hdf5 file
-            hdf5_filename = f'positions_{lambda_value}_stage{self.stage}.h5'
+            hdf5_filename = output_folder / f'positions_{lambda_value}_stage{self.stage}.h5'
             
         # Start the production run
         time_start = time.time()
@@ -671,7 +649,6 @@ class SolvationFepDriver:
 
         return simulated_ns, elapsed_time
 
-
     def _fetch_files(self, lambdas, stage):
         """
         Fetch trajectories and forcefields generated during the simulation.
@@ -680,11 +657,15 @@ class SolvationFepDriver:
         forcefields = []
         for lam in lambdas:
             lam = round(lam, 2)
-            trajectories.append(f'positions_{lam}_stage{stage}.h5')
+            positions_path = self.output_folder / f'positions_{lam}_stage{stage}.h5'
+            trajectories.append(str(positions_path))
+
             if stage in [1, 2]:
-                forcefields.append(f'solvated_system_{lam}_stage{stage}.xml')
+                forcefield_path = self.output_folder / f'solvated_system_{lam}_stage{stage}.xml'
             elif stage in [3, 4]:
-                forcefields.append(f'vacuum_system_{lam}_stage{stage}.xml')
+                forcefield_path = self.output_folder / f'vacuum_system_{lam}_stage{stage}.xml'
+            
+            forcefields.append(str(forcefield_path))
 
         return trajectories, forcefields
 
@@ -708,8 +689,12 @@ class SolvationFepDriver:
                 self.ostream.print_info(f"Recalculating energies for forcefield {l}...") 
                 self.ostream.flush()
                 integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
-                platform = mm.Platform.getPlatformByName(self.platform)
-                simulation = app.Simulation(topology, forcefields[l], integrator, platform)
+
+                if self.platform:
+                    platform = mm.Platform.getPlatformByName(self.platform)
+                    simulation = app.Simulation(topology, forcefields[l], integrator, platform)
+                else:
+                    simulation = app.Simulation(topology, forcefields[l], integrator)
 
                 # n loop for U_kln
                 for n in range(self.number_of_snapshots):
@@ -730,10 +715,9 @@ class SolvationFepDriver:
             self.ostream.flush()
 
             # Delete the pdb file to save space
-            os.remove(trajectory)
+            Path.unlink(trajectory)
 
         return u_kln
-
 
     def _calculate_free_energy(self, u_kln):
         n_states = u_kln.shape[0]
@@ -773,17 +757,3 @@ class SolvationFepDriver:
                     chemical_region.append(atom.index)
         return alchemical_region, chemical_region
 
-    def _resolve_xml_path(self,xml_file):
-        """
-        Resolve the path to an XML file, checking first in the specified
-        location and then in the OpenMM data subdirectory.
-        """
-        if os.path.exists(xml_file):
-            return os.path.abspath(xml_file)
-        
-        # Check in OpenMM data subdirectory
-        omm_data_dir = os.path.join(os.path.dirname(mm.__file__), 'app','data')
-        full_path = os.path.join(omm_data_dir, xml_file)
-        
-        if os.path.exists(full_path):
-            return os.path.abspath(full_path)
