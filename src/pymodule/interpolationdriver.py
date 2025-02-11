@@ -420,8 +420,48 @@ class InterpolationDriver():
         
         return pes
 
-    
-    def compute_gradient(self, data_point):
+    ######
+    # Previous interpolation code from sowon
+    #####
+    # def compute_gradient(self, data_point):
+    #     """Calculates part of the cartesian gradient
+    #        for self.impes_coordinate based on the gradient
+    #        and Hessian of data_point.
+    #        J ( g_a + delta_a H_a )
+    #        eq. (4) JCTC 12, 5235-5246
+
+    #        :param data_point:
+    #             InterpolationDatapoint object.
+    #     """
+
+    #     natm = data_point.cartesian_coordinates.shape[0]
+    #     grad = data_point.internal_gradient.copy()
+    #     hessian = data_point.internal_hessian
+    #     im_b_matrix = self.impes_coordinate.b_matrix                
+    #     dist_org = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
+    #     dist_check_hessian = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
+        
+    #     for i, element in enumerate(self.impes_coordinate.z_matrix):
+            
+    #         if len(element) == 4:
+    #             dist_check_hessian[i] = np.sin(dist_check_hessian[i])
+
+    #     dist_hessian_cos = np.matmul(dist_check_hessian.T, hessian)
+
+    #     internal_gradient_hess_cos = grad + dist_hessian_cos
+        
+    #     for i, element in enumerate(self.impes_coordinate.z_matrix):
+    #         if len(element) == 4:
+    #             internal_gradient_hess_cos[i] *= np.cos(dist_org[i])
+    #         if len(element) == 2:
+    #             internal_gradient_hess_cos[i] *= -(self.impes_coordinate.internal_coordinates_values[i])**2
+    #         else:
+    #             internal_gradient_hess_cos[i] *= 1.0
+
+    #     gradient = (np.matmul(im_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
+    #     return gradient
+
+    def compute_gradient(self, data_point, swapped_indices_map=None):
         """Calculates part of the cartesian gradient
            for self.impes_coordinate based on the gradient
            and Hessian of data_point.
@@ -429,34 +469,32 @@ class InterpolationDriver():
            eq. (4) JCTC 12, 5235-5246
 
            :param data_point:
-                InterpolationDatapoint object.
+                ImpesCoordinates object.
         """
 
         natm = data_point.cartesian_coordinates.shape[0]
         grad = data_point.internal_gradient.copy()
         hessian = data_point.internal_hessian
         im_b_matrix = self.impes_coordinate.b_matrix                
+
+        dist_check = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
         dist_org = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
-        dist_check_hessian = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
-        
         for i, element in enumerate(self.impes_coordinate.z_matrix):
-            
-            if len(element) == 4:
-                dist_check_hessian[i] = np.sin(dist_check_hessian[i])
+            if len(element) == 4:    
+                dist_check[i] = np.sin(dist_check[i])
+                grad[i] *= np.cos(dist_check[i])
 
-        dist_hessian_cos = np.matmul(dist_check_hessian.T, hessian)
-
-        internal_gradient_hess_cos = grad + dist_hessian_cos
         
+        dist_hessian = np.matmul(dist_check.T, hessian)
+
+        internal_gradient_hess_cos = grad + dist_hessian
+
         for i, element in enumerate(self.impes_coordinate.z_matrix):
             if len(element) == 4:
                 internal_gradient_hess_cos[i] *= np.cos(dist_org[i])
-            if len(element) == 2:
-                internal_gradient_hess_cos[i] *= -(self.impes_coordinate.internal_coordinates_values[i])**2
-            else:
-                internal_gradient_hess_cos[i] *= 1.0
 
         gradient = (np.matmul(im_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
+
         return gradient
 
     def simple_weight_gradient(self, distance_vector, distance):

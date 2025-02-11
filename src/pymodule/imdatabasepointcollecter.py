@@ -25,7 +25,6 @@
 
 from mpi4py import MPI
 import numpy as np
-from scipy.optimize import linear_sum_assignment
 from pathlib import Path
 from sys import stdout
 import sys
@@ -33,9 +32,6 @@ from time import time
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import random
-from scipy.spatial import Delaunay
-from scipy.spatial import distance
-import alphashape
 import re
 
 from contextlib import redirect_stderr
@@ -52,18 +48,13 @@ from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .forcefieldgenerator import ForceFieldGenerator
-# from .systembuilder import SystemBuilder
-from .profiler import Profiler
-# from .interpolationmapping import InterpolationMapping
-# from .findbestcombination import FindBestCombination
-
+from .solvationbuilder import SolvationBuilder
 
 # Drivers
 from .scfrestdriver import ScfRestrictedDriver
 from .molecularbasis import MolecularBasis
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
-from .vibrationalanalysis import VibrationalAnalysis
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -146,19 +137,18 @@ class IMDatabasePointCollecter:
 
         # Instance variables
         # Simulation parameters
-        self.platform = 'reference'
-        self.ensemble = 'NVE'
-        self.temperature = 298.15 
-        self.friction = 1.0 
-        self.timestep = 2.0
-        self.nsteps = 1000
+        self.platform = None
+        self.ensemble = None
+        self.temperature = None
+        self.friction = None
+        self.timestep = None
+        self.nsteps = None
         self.parent_ff = 'amber03.xml'
         self.water_ff = 'spce.xml'
         self.box_size = 2.0 
         self.padding = 1.0
         self.cutoff = 1.0
         self.integrator = None
-        self.scaling_time = 5
 
         # OpenMM objects
         self.system = None
@@ -177,9 +167,7 @@ class IMDatabasePointCollecter:
         self.unique_residues = []
         self.unique_molecules = []
 
-        self.starting_state = 0
         self.current_im_choice = None
-        self.excitation_step = 10000
         
         # QM Region parameters
         self.qm_driver = None
@@ -194,8 +182,6 @@ class IMDatabasePointCollecter:
         self.velo_switch = False
 
         self.snapshots = None
-        self.calc_NAC = False
-        self.roots = 1
         self.load_system = None
         self.pressure = None
         self.output_file = None
@@ -206,17 +192,14 @@ class IMDatabasePointCollecter:
         self.qm_energies = None
         self.qm_data_points = None
         self.point_adding_molecule = {}
-        self.energy_threshold = 1.0
-        self.collect_qm_points = 0
-        self.core_structure = None
-        self.non_core_structure = None
-        self.non_core_symmetry_groups = None
+        self.energy_threshold = None
+        self.collect_qm_points = None
+
         self.qm_datafile = None
 
         self.ff_datafile = None
         self.starting_temperature = None
 
-        self.reference_calc_dict = None
         self.current_state = None
         self.current_im_choice = None
         self.current_gradient = 0
@@ -228,14 +211,7 @@ class IMDatabasePointCollecter:
         self.add_a_point = False
         self.check_a_point = False
         self.cluster_run = None
-        
-        self.normal_modes_vec = {}
-        self.distplacement_threshold = {}
-        self.distance_threshold_dict = {}
         self.skipping_value = 0
-
-
-
         self.basis = None
 
         # output_file variables that will be written into self.general_variable_output
@@ -251,192 +227,11 @@ class IMDatabasePointCollecter:
         with open(self.summary_output, 'w') as file:
             file.write("########## Summaray Ouput of Structures and Energies ##########\n\n")
         self.coordinates_xyz = None
-        
-        self.compare_current_points = []
-        self.compare_alligned_points = []
-        self.compare_nearest_rot_points = []
-        self.compare_nearest_points = []
-        self.compare_nearest_2_points = []
-        self.restoring_geometry = None
+
         self.velocities = []
 
-        self.determine_convex_hull = False
-        self.scaling_factor = 0.0
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
-        
-    # Loading methods
-    # TODO: Integrate the guess with the read_PDB_file in Molecule.
-    def load_system_PDB(self, filename):
-        """
-        Loads a system from a PDB file, extracting unique residues and their details.
-
-        :param filename: 
-            Path to the PDB file. Example: 'system.pdb'.
-        """
-        
-        pdb_path = Path(filename)
-        if not pdb_path.is_file():
-            raise FileNotFoundError(f"{filename} does not exist.")
-        
-        pdbstr = pdb_path.read_text()
-        residues = {}
-
-        # Formatting issues flags
-        label_guess_warning = False
-        conect_warning = True
-
-        self.unique_residues = []  # Initialize unique_residues earlier
-
-        for line in pdbstr.strip().splitlines():
-            # Skip the header lines
-            if line.startswith(('REMARK', 'HEADER', 'TITLE', 'COMPND', 'SOURCE')):
-                continue
-            # Skip the CRYST1 record it will be extracted from the System object
-            if line.startswith('CRYST1'):
-                continue
-            # Add the ATOM and HETATM records to the residues dictionary
-            if line.startswith(('ATOM', 'HETATM')):
-                atom_label = line[76:78].strip()
-                if not atom_label:
-                    label_guess_warning = True
-                    atom_name = line[12:16].strip()
-                    atom_label = atom_name[0]
-
-                residue = line[17:20].strip()
-                residue_number = int(line[22:26])
-                coordinates = [float(line[i:i+8]) for i in range(30, 54, 8)]
-
-                residue_identifier = (residue, residue_number)
-
-                if residue_identifier not in residues:
-                    residues[residue_identifier] = {
-                        'labels': [],
-                        'coordinates': []
-                    }
-                
-                residues[residue_identifier]['labels'].append(atom_label)
-                residues[residue_identifier]['coordinates'].append(coordinates)
-            
-            # If a line starts with TER, skip it
-            if line.startswith('TER'):
-                continue
-            # If any line starts with CONECT, set the conect_warning flag to False
-            if line.startswith('CONECT'):
-                conect_warning = False
-
-            # If a line starts with END, break the loop
-            if line.startswith('END'):
-                break
-            
-
-        # Overwrite the PDB file with the guessed atom labels in columns 77-78
-        # if the labels are missing
-        if label_guess_warning:
-            with open(filename, 'w') as f:
-                for line in pdbstr.strip().splitlines():
-                    if line.startswith(('ATOM', 'HETATM')):
-                        atom_name = line[12:16].strip()
-                        atom_label = atom_name[0]
-                        new_line = line[:76] + f"{atom_label:>2}" + line[78:] + '\n'
-                        f.write(new_line)
-                    else:
-                        f.write(line + '\n')
-            msg = 'Atom labels were guessed based on atom names (first character).'
-            msg += f'Please verify the atom labels in the {filename} PDB file.'
-            self.ostream.print_warning(msg)
-            self.ostream.flush()
-
-        if conect_warning:
-            msg = 'CONECT records not found in the PDB file.'
-            msg += 'The connectivity matrix will be used to determine the bonds.'
-            self.ostream.print_warning(msg)
-            self.ostream.flush()
-            # Create a molecule from the PDB file
-            molecule = Molecule.read_pdb_file(filename)
-            connectivity_matrix = molecule.get_connectivity_matrix()
-            # Determine all the bonds in the molecule
-            with open(filename, 'a') as f:
-                for i in range(connectivity_matrix.shape[0]):
-                    for j in range(i + 1, connectivity_matrix.shape[1]):
-                        if connectivity_matrix[i, j] == 1:
-                            # Convert indices to 1-based index for PDB format and ensure proper column alignment
-                            i_index = i + 1
-                            j_index = j + 1
-                            # Align to the right 
-                            con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
-                            f.write(con_string + '\n')
-
-        # Create VeloxChem Molecule objects for each unique residue
-
-        molecules = []
-        unq_residues = []
-
-        for (residue, number), data in residues.items():
-            coordinates_array = np.array(data['coordinates'])
-            mol = Molecule(data['labels'], coordinates_array, "angstrom")
-            molecules.append(mol)
-            unq_residues.append((residue, number))
-
-
-        # Initialize a set to track the first occurrence of each residue name
-        seen_residue_names = set()
-
-        # Lists to store the filtered residues and molecules
-        self.unique_residues = []
-        self.unique_molecules = []
-
-        for index, (residue_name, number) in enumerate(unq_residues):
-            if residue_name not in seen_residue_names:
-                seen_residue_names.add(residue_name)
-                self.unique_residues.append((residue_name, number))
-                self.unique_molecules.append(molecules[index])
-
-        # Print results
-        info_msg = f"Unique Residues: {self.unique_residues}, saved as molecules."
-        self.ostream.print_info(info_msg)
-        self.ostream.flush()
-    
-    def load_system_from_files(self, system_xml, system_pdb):
-        """
-        Loads a preexisting system from an XML file and a PDB file.
-
-        :param system_xml: 
-            XML file containing the system parameters.
-        :param system_pdb: 
-            PDB file containing the system coordinates.
-        """
-        self.pdb = app.PDBFile(system_pdb)
-
-        with open(system_xml, 'r') as file:
-            self.system = mm.XmlSerializer.deserialize(file.read())
-
-        self.phase = 'gas'
-        self.qm_atoms = []
-        self.qm_force_index = -1  # Initialize with an invalid index
-
-        # Iterate over all forces in the system to find the CustomExternalForce and detect QM atoms
-        for i, force in enumerate(self.system.getForces()):
-            if isinstance(force, mm.CustomExternalForce):
-                self.qm_force_index = i  # Set the index of the QM force
-                # Assuming that the particle indices are directly stored in the force
-                for j in range(force.getNumParticles()):
-                    # Get the actual particle index (usually force index and particle index are the same)
-                    index, parameters = force.getParticleParameters(j)
-                    self.qm_atoms.append(index)
-                msg = f"QM Atoms detected: {self.qm_atoms}"
-                self.ostream.print_info(msg)
-                self.ostream.flush()
-                break
-
-        if self.qm_force_index == -1:
-            msg = "No CustomExternalForce found, no QM atoms detected."
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        else:
-            msg = f"CustomExternalForce found at index {self.qm_force_index}."
-            self.ostream.print_info(msg)
-            self.ostream.flush()
             
     # Method to generate OpenMM system from VeloxChem objects
     def system_from_molecule(self,
@@ -517,7 +312,7 @@ class IMDatabasePointCollecter:
         if solvent != 'gas':
             # Solvate the molecule using the SystemBuilder
             phase = 'periodic'
-            sys_builder = SystemBuilder()
+            sys_builder = SolvationBuilder()
             sys_builder.solvate(solute=molecule, 
                                 solvent=solvent,
                                 padding=self.padding,
@@ -586,227 +381,6 @@ class IMDatabasePointCollecter:
         
         self.phase = phase
 
-    # Methods to build a custom system from a PDB file and custom XML files
-    def md_system_from_files(self, 
-                            pdb_file, 
-                            xml_file,
-                            filename='custom'):
-        """
-        Builds a system from a PDB file containing multiple residues and custom XML files.
-        
-        :param system_pdb:
-            PDB file containing the system or a list of PDB files.
-        :param xml_file:
-            XML file containing the forcefield parameters or a list of XML files.
-        :param filename:
-            Base filename for output and intermediate files. Default is 'custom_system'.
-        """
-        
-        # Load the PDB file and format it correctly
-        # This method already prints the unique residues info!
-        self.load_system_PDB(pdb_file)
-
-        # Load the generated QM region topology and system PDB
-        self.pdb = app.PDBFile(pdb_file)
-        # Check if the system is periodic from the PDB file
-        if self.pdb.topology.getUnitCellDimensions() is not None:
-            periodic = True
-            msg = 'PBC detected from the PDB file.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        # Combine XML files into a forcefield
-        xml_files = [xml_file] if isinstance(xml_file, str) else xml_file
-        msg = f'Added XML Files: {xml_files}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-
-        # Combine XML files into a forcefield
-        forcefield = app.ForceField(*xml_files, self.parent_ff, self.water_ff)
-
-        # Create the system with appropriate nonbonded settings
-        if periodic:
-            nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-            nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-            constraints = app.HBonds
-        else:
-            nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-            nonbondedCutoff = None
-            constraints = app.HBonds
-
-        # Check if nonbondedCutoff is defined before using it in createSystem
-        system_arguments = {
-            'nonbondedMethod': nonbondedMethod,
-            'constraints': constraints
-        }   
-        
-        if nonbondedCutoff is not None:
-            system_arguments['nonbondedCutoff'] = nonbondedCutoff
-
-        self.system = forcefield.createSystem(self.pdb.topology, 
-                                              **system_arguments)
-
-        # Save system to XML and PDB for inspection and reuse
-        with open(f'{filename}_system.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(self.system))
-            msg = f'System parameters written to {filename}_system.xml'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        with open(f'{filename}_system.pdb', 'w') as pdb_file:
-            app.PDBFile.writeFile(self.pdb.topology, 
-                                  self.pdb.positions, 
-                                  pdb_file)
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        self.phase = 'gas'
-
-    def qmmm_system_from_files(self, 
-                               pdb_file, 
-                               xml_file, 
-                               qm_residue, 
-                               ff_gen_qm=None,
-                               qm_atoms='all', 
-                               filename='qmmm'):
-        """
-        Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
-        
-        :param pdb_file: 
-            PDB file containing the system.
-        :param xml_file: 
-            XML file containing the forcefield parameters. Can be a list of XML files.
-        :param qm_residue: 
-            Tuple containing the name and number of the QM residue. (e.g. ('MOL', 1))
-        :param ff_gen_qm: 
-            Optional custom forcefield generator for the QM region. If None, a new one will be created.
-        :param qm_atoms:
-            Options: 'all' or a list of atom indices for QM region.
-        :param filename: 
-            Base filename for output and intermediate files.
-        """
-
-        # Load the PDB file and format it correctly
-        self.load_system_PDB(pdb_file)
-
-        # Extracting the residue name and number for clarity and correct usage
-        qm_residue_name, qm_residue_number = qm_residue
-        msg = f'Unique Residues: {self.unique_residues}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-        qm_residue_index = self.unique_residues.index((qm_residue_name, qm_residue_number))
-        msg = f'QM Residue: {qm_residue_name}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-
-        qm_molecule = self.unique_molecules[qm_residue_index]
-        self.z_matrix = qm_molecule.get_z_matrix()
-        # Generate or use an existing forcefield generator for the QM region
-        if ff_gen_qm is None:
-            ff_gen_qm = ForceFieldGenerator()
-            ff_gen_qm.force_field_data = 'gaff-2.11.dat'
-            ff_gen_qm.create_topology(qm_molecule)
-
-        # Determine qm_atoms based on the QM residue
-        if qm_atoms == 'all':
-            msg = 'Full molecule as QM region'
-            self.ostream.print_info(msg)
-            qm_atoms = list(range(qm_molecule.number_of_atoms()))
-            self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
-        elif isinstance(qm_atoms, list):
-            if qm_atoms == list(range(qm_molecule.number_of_atoms())): 
-                msg = 'Full molecule as QM region'
-                self.ostream.print_info(msg)
-                self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
-            msg = 'QM/MM partition inside the molecule'
-            self.ostream.print_info(msg)
-            qm_atoms = qm_atoms
-            self._create_QM_subregion(ff_gen_qm,
-                                      qm_atoms, 
-                                      qm_molecule, 
-                                      filename,
-                                      residue_name=qm_residue_name)
-        else:
-            raise ValueError('Invalid value for qm_atoms. Please use "all" or a list of atom indices.')
-
-        # Load the generated QM region topology and system PDB
-        self.pdb = app.PDBFile(pdb_file)
-        # Check if the system is periodic from the PDB file
-        if self.pdb.topology.getUnitCellDimensions() is not None:
-            periodic = True
-            msg = 'PBC detected from the PDB file.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        # Get self.positions from the topology
-        self.positions = self.pdb.positions
-
-        # Combine XML files into a forcefield
-        xml_files = [f'{filename}.xml'] + ([xml_file] if isinstance(xml_file, str) else xml_file)
-        msg = f'Added XML Files: {xml_files}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-
-        # Combine XML files into a forcefield
-        forcefield = app.ForceField(*xml_files)
-
-        # Create the system with appropriate nonbonded settings
-        if periodic:
-            nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-            nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-            constraints = app.HBonds
-        else:
-            nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-            nonbondedCutoff = None
-            constraints = app.HBonds
-
-        # Check if nonbondedCutoff is defined before using it in createSystem
-        system_arguments = {
-            'nonbondedMethod': nonbondedMethod,
-            'constraints': constraints
-        }   
-
-        if nonbondedCutoff is not None:
-            system_arguments['nonbondedCutoff'] = nonbondedCutoff
-
-        self.system = forcefield.createSystem(self.pdb.topology, **system_arguments)
-
-        # Set QM atoms based on the QM residue
-        #self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
-        self.qm_atoms = qm_atoms
-        msg = f'QM Atom indices: {self.qm_atoms}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-
-        # Setting QM/MM system
-        self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
-
-        # Adding the stabilizer force to the QM region
-        self.qm_stabilizer(ff_gen_qm)
-
-        # Save system to XML and PDB for inspection and reuse
-        with open(f'{filename}_system.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(self.system))
-            msg = f'System parameters written to {filename}_system.xml'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        with open(f'{filename}_system.pdb', 'w') as pdb_file:
-            app.PDBFile.writeFile(self.pdb.topology, self.pdb.positions, pdb_file)
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        # Correct phase setting
-        self.phase = 'gas'
-
     def add_bias_force(self, atoms, force_constant, target):
         """
         Method to add a biasing force to the system.
@@ -850,162 +424,6 @@ class IMDatabasePointCollecter:
             self.system.addForce(force)
         else:
             raise ValueError('Invalid number of atoms for the biasing force.')
-
-    # Simulation methods
-    def energy_minimization(self, max_iter=0, tol=10.0):
-        """
-        Minimizes the energy of the system using the specified parameters.
-
-        Args:
-            max_iter (int): Maximum number of iterations for the minimization. Default is 0 (no limit).
-            tol (float): Tolerance for the energy minimization, in kJ/mol. Default is 10.0.
-
-        Raises:
-            RuntimeError: If the system has not been created prior to the call.
-
-        Returns:
-            float: The minimized potential energy of the system.
-            str: XYZ format string of the relaxed coordinates.
-        """
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-
-        # Create an integrator and simulation object
-        self.integrator = self._create_integrator()
-
-        self.simulation = app.Simulation(self.modeller.topology if 
-                                         self.phase in ['water', 'custom', 'periodic'] else
-                                         self.pdb.topology,
-                                        self.system, self.integrator)
-        
-        self.simulation.context.setPositions(self.modeller.positions if 
-                                             self.phase in ['water', 'custom', 'periodic'] else
-                                             self.pdb.positions)
-
-        # Perform energy minimization
-        self.simulation.minimizeEnergy(tolerance=tol * unit.kilojoules_per_mole / unit.nanometer, maxIterations=max_iter)
-        
-        # Retrieve and process the final state of the system
-        state = self.simulation.context.getState(getEnergy=True, getPositions=True)
-        energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-        coordinates = np.array(state.getPositions().value_in_unit(unit.nanometer)) * 10  # Convert nm to Angstroms
-
-        # Construct XYZ format string for the coordinates
-        xyz = f"{len(self.labels)}\n\n"
-        xyz += "\n".join(f"{label} {x} {y} {z}" for label, (x, y, z) in zip(self.labels, coordinates))
-        
-        return energy, xyz
-    
-    def steepest_descent(self, max_iter=1000, learning_rate=0.0001, convergence_threshold=1.0e-2):
-        """
-        Performs a steepest descent minimization on the system.
-
-        :param max_iter: 
-            Maximum number of iterations. Default is 1000.
-        :param learning_rate:
-            Initial learning rate for the optimization. Default is 0.01.
-        :param convergence_threshold:
-            Convergence threshold for the optimization. Default is 1e-3.
-
-        :return:
-            Tuple containing the XYZ format string of the relaxed coordinates and the final energy.
-        """
-            
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-        
-        # Create an integrator and simulation object
-        self.integrator = mm.VerletIntegrator(0.002 * unit.picoseconds)
-
-        self.simulation = app.Simulation(self.modeller.topology if 
-                                         self.phase in ['water', 'custom', 'periodic'] else
-                                         self.pdb.topology,
-                                        self.system, self.integrator)
-        
-        # Get initial positions
-        positions = self.modeller.positions if self.phase in ['water', 'custom', 'periodic'] else self.pdb.positions
-        positions = np.array(positions.value_in_unit(unit.nanometer))
-
-        # Define the energy and gradient functions
-        def compute_energy_and_gradient(positions):
-
-            self.simulation.context.setPositions(positions)
-            state = self.simulation.context.getState(
-                getPositions=True,
-                getEnergy=True, 
-                getForces=True)
-            
-            energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-            gradient = -1.0 * state.getForces(asNumpy=True).value_in_unit(unit.kilojoules_per_mole / unit.nanometer)
-
-            return energy, gradient
-
-        for iteration in range(max_iter):
-            energy, gradients = compute_energy_and_gradient(positions)
-            print("Gradient norm:", np.linalg.norm(gradients))
-
-            # Optional: Normalize gradients
-            norm = np.linalg.norm(gradients)
-            if norm > 0:
-                gradients /= norm
-
-            # Update positions
-            new_positions = positions - learning_rate * gradients
-
-            # Adaptive learning rate adjustment
-            if iteration > 0 and energy > previous_energy:
-                learning_rate *= 0.5
-                print("Reducing learning rate to:", learning_rate)
-
-            previous_energy = energy
-
-            # Check for convergence
-            if np.linalg.norm(new_positions - positions) < convergence_threshold:
-                print(f"Convergence reached after {iteration+1} iterations.")
-                break
-
-            positions = new_positions
-            print(f"Iteration {iteration+1}: Energy = {energy}")
-
-        # Once converged, return the final energy and positions
-        # The positions shall be written in XYZ format in angstroms
-        final_positions = positions * 10
-        # Construct XYZ format string for the coordinates
-        xyz = f"{len(self.labels)}\n\n"
-        xyz += "\n".join(f"{label} {x} {y} {z}" for label, (x, y, z) in zip(self.labels, final_positions))
-
-        return energy, xyz
-    
-    def steepest_gradient(self):
-        """
-        Minimize the energy using the steepest descent algorithm.
-        Requires additional openmmtools package.
-        """
-
-        try:
-            from openmmtools.integrators import GradientDescentMinimizationIntegrator
-        except ImportError:
-            raise ImportError('The openmmtools package is required for this method.')
-        
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-
-        self.integrator = GradientDescentMinimizationIntegrator()
-        self.simulation = app.Simulation(self.modeller.topology if self.phase in ['water', 'custom', 'periodic'] else self.pdb.topology,
-                                         self.system, self.integrator)
-        self.simulation.context.setPositions(self.modeller.positions if self.phase in ['water', 'custom', 'periodic'] else self.pdb.positions)
-
-        self.simulation.minimizeEnergy()
-
-        state = self.simulation.context.getState(getEnergy=True, getPositions=True)
-
-        energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-        coordinates = np.array(state.getPositions().value_in_unit(unit.nanometer)) * 10  # Convert nm to Angstroms
-
-        xyz = f"{len(self.labels)}\n\n"
-        xyz += "\n".join(f"{label} {x} {y} {z}" for label, (x, y, z) in zip(self.labels, coordinates))
-
-        return energy, xyz
      
     def conformational_sampling(self, 
                                 ensemble='NVT', 
@@ -1095,174 +513,18 @@ class IMDatabasePointCollecter:
 
         return energies, opt_coordinates
 
-    def run_md(self, 
-               restart_file=None,
-               ensemble='NVE',
-               temperature=298.15, 
-               pressure=1.0, 
-               friction=1.0,
-               timestep=2.0, 
-               nsteps=1000, 
-               snapshots=100, 
-               traj_file='trajectory.pdb',
-               state_file='output.xml',
-               save_last_frame=True,
-               output_file='output'):
-        """
-        Runs an MD simulation using OpenMM, storing the trajectory and simulation data.
-
-        :param restart_file:
-            Last state of the simulation to restart from. Default is None.
-        :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVE'.
-        :param temperature:
-            Temperature of the system in Kelvin. Default is 298.15 K.
-        :param pressure:
-            Pressure of the system in atmospheres. Default is 1.0 atm.
-        :param friction:
-            Friction coefficient in 1/ps. Default is 1.0.
-        :param timestep:
-            Timestep of the simulation in femtoseconds. Default is 2.0 fs.
-        :param nsteps:
-            Number of steps in the simulation. Default is 1000.
-        :param snapshots:
-            Frequency of snapshots. Default is 100.
-        :param traj_file:
-            Output file name for the trajectory. Default is 'trajectory.pdb'.
-        :param state_file:
-            Output file name for the simulation state. Default is 'output.xml'.
-        """
-
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-
-        self.ensemble = ensemble
-        self.temperature = temperature * unit.kelvin
-        self.friction = friction / unit.picosecond
-        self.timestep = timestep * unit.femtoseconds
-        self.nsteps = nsteps
-
-        self.total_potentials = []
-        self.kinetic_energies = []
-        self.temperatures = []
-        self.total_energies = []
-
-
-        # Create or update the integrator
-        if self.integrator is None:
-            new_integrator = self._create_integrator()
-        else:
-            new_integrator = self.integrator
-
-        self.topology = self.pdb.topology
-
-        self.positions = self.pdb.positions
-        
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator)
-        self.simulation.context.setPositions(self.positions)
-        
-        # Load the state if a restart file is provided
-        if restart_file is not None:
-            self.simulation.loadState(restart_file)
-            msg = f'Restarting simulation from {restart_file}'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        
-        else:
-            self.simulation.context.setPositions(self.positions)
-
-            # Set initial velocities if the ensemble is NVT or NPT
-            if self.ensemble in ['NVT', 'NPT']:
-                self.simulation.context.setVelocitiesToTemperature(self.temperature)
-
-        # Minimize the energy before starting the simulation
-
-        # Set up reporting
-        save_freq = max(nsteps // snapshots, 1)
-        self.simulation.reporters.clear()  
-        self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
-
-        # Print header
-        print('MD Simulation parameters:')
-        print('=' * 50)
-        print('Ensemble:', ensemble)
-        if ensemble in ['NVT', 'NPT']:
-            print('Temperature:', temperature, 'K')
-            if ensemble == 'NPT':
-                print('Pressure:', pressure, 'atm')
-        print('Friction:', friction, '1/ps')
-        print('Timestep:', timestep, 'fs')
-        print('Total simulation time in ns:', nsteps * timestep / 1e6)
-        print('=' * 50)
-
-
-        start_time = time()
-        for step in range(nsteps):
-            self.simulation.step(1)
-            if step % save_freq == 0:
-                state = self.simulation.context.getState(getEnergy=True)
-                print(f"Step: {step} / {nsteps} Time: {round((step * timestep)/1000, 2)} ps")
-
-                # Potential energy
-                pot = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                print('Potential Energy', pot, 'kJ/mol')
-                self.total_potentials.append(pot)
-
-                # Kinetic energy
-                kin = state.getKineticEnergy().value_in_unit(unit.kilojoules_per_mole)
-                print('Kinetic Energy:', kin, 'kJ/mol')
-                self.kinetic_energies.append(kin)
-
-                # Temperature
-                R_kjmol = 0.00831446261815324
-                particles = self.system.getNumParticles() * 1.5
-                temp = kin / (particles * R_kjmol)
-                self.temperatures.append(temp)
-                print('Temperature:', temp, 'K')
-
-                # Total energy
-                total = pot + kin
-                self.total_energies.append(total)
-                print('Total Energy:', total, 'kJ/mol')
-                print('-' * 60)
-
-
-        end_time = time()
-        elapsed_time = end_time - start_time
-        elapsed_time_days = elapsed_time / (24 * 3600)
-        performance = (nsteps * timestep / 1e6) / elapsed_time_days
-
-        print('MD simulation completed!')
-        print(f'Number of steps: {nsteps}')
-        print(f'Trajectory saved as {traj_file}')
-        print('=' * 60)
-        print('Simulation Averages:')
-        print('=' * 60)
-        print('Total Potential Energy:', np.mean(self.total_potentials), '±', np.std(self.total_potentials), 'kJ/mol')
-        print('Kinetic Energy:', np.mean(self.kinetic_energies), '±', np.std(self.kinetic_energies), 'kJ/mol')
-        print('Temperature:', np.mean(self.temperatures), '±', np.std(self.temperatures), 'K')
-        print('Total Energy:', np.mean(self.total_energies), '±', np.std(self.total_energies), 'kJ/mol')
-        print('=' * 60)
-        print(f'Elapsed time: {int(elapsed_time // 60)} minutes, {int(elapsed_time % 60)} seconds')
-        print(f'Performance: {performance:.2f} ns/day')
-        print(f'Trajectory saved as {traj_file}')
-
-        # Save the state of the simulation
-        self.simulation.saveState(state_file)
-        print(f'Simulation state saved as {state_file}')
-
-        if save_last_frame:
-            # Save the last frame of the trajectory as last_frame.pdb
-            with open('last_frame.pdb', 'w') as f:
-                app.PDBFile.writeFile(self.simulation.topology, self.simulation.context.getState(getPositions=True).getPositions(), f)
-            print('Last frame saved as last_frame.pdb')
-
-        # Write the output to a file
-        self._save_output(output_file)
-        self.ostream.print_info(f'Simulation output saved as {output_file}')
-        self.ostream.flush()
-
     def sort_points_with_association(self, points, associated_list):
+        '''
+        This function is sorting the points from a given database
+        starting from the first entry to the last (point_0,..., point_n)
+
+        :param points:
+            list of database points
+        :param associated_list:
+            list of labels that are associated to the individual datapoints
+
+        '''
+        
         # Define a custom key function to extract the numerical part
         def extract_number(point):
             return int(point.split('_')[1])
@@ -1300,31 +562,6 @@ class IMDatabasePointCollecter:
         self.impes_dict = impes_dict
 
 
-        #if 'checkpoint_file_name' not in impes_dict:
-        
-        #    #positions_ang = self.molecule.get_coordinates()
-        #    #atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
-        #    #qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
-        #    #new_molecule = Molecule(qm_atom_labels, positions_ang, units="au")
-        #    self.roots = int(dynamics_settings['roots'])
-        #    new_molecule = self.molecule
-        #    if 'calc_NAC' in dynamics_settings:
-        #        self.calc_NAC = dynamics_settings['calc_NAC']
-        #    else:
-        #        self.calc_NAC = False
-        #    self.qm_data_points = []
-        #    potential_kjmol = self.compute_energy(new_molecule)
-        #    self.im_labels = []
-        #    self.qm_energies = []
-        #    basename = impes_dict['basename']
-        #    self.qm_datafile = f'{basename}.h5'
-        #    if self.roots > 1:
-        #        self.add_point(new_molecule, ['point_0', 'point_1'], potential_kjmol, self.qm_datafile)
-        #    else:
-        #        self.add_point(new_molecule, ['point_0'], potential_kjmol, self.qm_datafile)
-        #    impes_dict['checkpoint_file_name'] = self.qm_datafile
-
-
         if 'print_step' in dynamics_settings:
             self.print_step = int(dynamics_settings['print_step'])
 
@@ -1353,11 +590,6 @@ class IMDatabasePointCollecter:
         if 'snapshots' in dynamics_settings:
             self.snapshots = int(dynamics_settings['snapshots'])
 
-        if 'equilibrium_coordinate' in dynamics_settings:
-            coords = self.parse_coordinate(
-                            dynamics_settings['equilibrium_coordinate'])
-            self.define_equilibrium_coordinate(coords)
-
         # Start the simulation form a given state
         if 'load_system' in dynamics_settings:
             self.load_system = dynamics_settings['load_system']
@@ -1382,18 +614,10 @@ class IMDatabasePointCollecter:
         # The desired density around a given starting structure/datapoint
         if 'desired_datapoint_density' in dynamics_settings:
             self.desired_datpoint_density = int(dynamics_settings['desired_datapoint_density'])
-        else:
-            self.desired_datpoint_density = 30
 
         # The number of iteration cycles without database expansion after which the description around the reference point has converged
         if 'converged_cycle' in dynamics_settings:
             self.unadded_cycles = int(dynamics_settings['converged_cycle'])
-        else:
-            self.unadded_cycles = 3
-
-        # Dertermines the number of roots that should be calculated
-        if 'roots' in dynamics_settings:
-            self.roots = int(dynamics_settings['roots']) + 1
         
         if 'basis_set' in dynamics_settings:
             basis_label = dynamics_settings['basis_set']
@@ -1460,7 +684,6 @@ class IMDatabasePointCollecter:
             #new_molecule = Molecule(qm_atom_labels, positions_ang, units="au")
             new_molecule = self.molecule
             self.qm_data_points = []
-            print('roots', self.roots, self.basis)
             qm_energy, scf_tensors = self.compute_energy(new_molecule, basis=self.basis)
             
             self.im_labels = []
@@ -1469,38 +692,14 @@ class IMDatabasePointCollecter:
             label_list = f'point_{0}'
             self.add_point(new_molecule, label_list, qm_energy, self.qm_datafile, self.basis, scf_results=scf_tensors)
 
-
     
     
-    def run_qmmm(self, state_file='output.xml'):
+    def run_qmmm(self):
         """
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
-        :param qm_driver:
-            QM driver object from VeloxChem.
-        :param grad_driver:
-            Gradient driver object from VeloxChem.
-        :param restart_file:
-            Last state of the simulation to restart from. Default is None.
-        :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVE'.
-        :param temperature:
-            Temperature of the system in Kelvin. Default is 298.15 K.
-        :param pressure:
-            Pressure of the system in atmospheres. Default is 1.0 atm.
-        :param friction:
-            Friction coefficient in 1/ps. Default is 1.0.
-        :param timestep:
-            Timestep of the simulation in femtoseconds. Default is 0.5 fs.
-        :param nsteps:
-            Number of steps in the simulation. Default is 1000.
-        :param snapshots:
-            Frequency of snapshots. Default is 100.
-        :param traj_file:
-            Output file name for the trajectory. Default is 'trajectory.pdb'.
-        :param state_file:
-            Output file name for the simulation state. Default is 'output.xml'.
         """
+
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
@@ -1548,11 +747,6 @@ class IMDatabasePointCollecter:
             # Set initial velocities if the ensemble is NVT or NPT
             if self.ensemble in ['NVT', 'NPT']:
                 self.simulation.context.setVelocitiesToTemperature(self.temperature)
-            #else:
-                #self.simulation.context.setVelocitiesToTemperature(10 * unit.kelvin)
-
-        # There is no minimization step for QM/MM simulations
-        # It causes instabilities in the MM region!
         
         # Set up reporting
         self.simulation.reporters.clear()
@@ -1600,12 +794,10 @@ class IMDatabasePointCollecter:
         self.velocities = []
         self.velocities_np = []
         self.velocities_np.append(self.simulation.context.getState(getVelocities=True).getVelocities(True))
-        # if excited states higher roots, gradient, energy and the current IM-Driver for excited states is initialized
+
         self.impes_drivers = []
         self.current_state = 0
         driver_object = InterpolationDriver(self.z_matrix)
-        driver_object.non_core_symmetry_group = self.non_core_symmetry_groups
-        driver_object.non_core_structure = self.non_core_symmetry_groups
 
         driver_object.update_settings(self.impes_dict)
         self.impes_drivers.append(driver_object)
@@ -1667,7 +859,7 @@ class IMDatabasePointCollecter:
                 print('Temperature:', temp, 'K')
                 print('Total Energy:', total)
                 print('-' * 60)
-                print('Current Density', self.density_around_data_point[0] / self.roots, '-->', self.desired_datpoint_density, self.unadded_cycles)   
+                print('Current Density', self.density_around_data_point[0], '-->', self.desired_datpoint_density, self.unadded_cycles)   
 
             self.output_file_writer(self.summary_output)
             self.step += 1
@@ -1680,10 +872,10 @@ class IMDatabasePointCollecter:
                 #self.output_file_writer(self.summary_output)
                 #print('cooridnates', simulation.context.getState(getPositions=True).getPositions())
 
-            if step == self.nsteps and self.density_around_data_point[0] / self.roots != self.desired_datpoint_density:
+            if step == self.nsteps and self.density_around_data_point[0] != self.desired_datpoint_density:
                 step = 0
             
-            if self.density_around_data_point[0] / self.roots >= self.desired_datpoint_density:
+            if self.density_around_data_point[0] >= self.desired_datpoint_density:
                 step = self.nsteps
                 break
 
@@ -2663,26 +1855,23 @@ class IMDatabasePointCollecter:
     ####################################################################
 
     def point_correlation_check(self, molecule, basis=None):
-        """ Takes the current point on the PES and checks if a QM-calculation
-            is nessecary to perform in order to add a new point into the
-            QM-databse.
+        """ Takes the current point on the PES and checks with a QM-energy
+            calculation is necessary based on the current difference to the
+            interpolation. Based on the difference the step_size of the next
+            step is determined.
 
             :param molecule:
                 The molecule corresponding to the current conformation
                 in the IM dynamics.
         """
 
-        # Check energies and conformations and determine if a point should
-        # be added or if a QM energy calculation should be performed
-        # TODO: this is actually always True... because it is a condition for
-        # calling this routine -> no because self.add_a_point can be True and then turn False.
         qm_energy = 0
         print('############# Energy is QM claculated ############')
         qm_energy, scf_tensors = self.compute_energy(molecule, basis)
 
         energy_difference = (abs(qm_energy[0] - self.impes_drivers[-1].impes_coordinate.energy))
         print('energy differences', energy_difference * hartree_in_kcalpermol())
-        self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 10)
+        self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
         if energy_difference * hartree_in_kcalpermol() > self.energy_threshold:
             self.add_a_point = True
@@ -2706,8 +1895,12 @@ class IMDatabasePointCollecter:
                 the molecule.
             :param label:
                 the label for the new point to be added.
+            :param energy:
+                the energy of the previous QM calcualtion.
             :param basis:
-                the basis set (if required)
+                the basis set (if required).
+            :scf_result:
+                the scf_result of previous QM calculation (if required).
         """
 
         if self.qm_driver is None:
@@ -2914,13 +2107,6 @@ class IMDatabasePointCollecter:
             
             # Write the column headers
             file.write("STATE | ENERGY GAP\n\n")
-            
-            # Loop through the energy gaps and write each entry in the desired format
-            if self.roots > 1:
-                states, energy_gap = self.energy_gabs[self.step]
-                states = list(states)
-                    
-                file.write(f"{states[0]} --> {states[1]}     {energy_gap:.4f}\n")
 
 
     def calculate_translation_coordinates_analysis(self, given_coordinates):

@@ -278,6 +278,7 @@ class IMForceFieldGenerator:
         if self.qm_driver is None:
             assert_msg_critical(self.qm_driver is not None, 'ImForceFieldGenerator: No QM-Driver/ QM-Gradient-Driver / QM-Hessian-Driver were initialized!ß.')
         
+        print('MOlecule labels', molecule.get_labels())
         self.impes_dict = { 'interpolation_type':self.interpolation_type, 
                             'exponent_p':self.exponent_p,
                             'exponent_q':self.exponent_q, 

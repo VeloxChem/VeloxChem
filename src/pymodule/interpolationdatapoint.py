@@ -201,15 +201,15 @@ class InterpolationDatapoint:
             derivative = q.derivative(coords).reshape(-1)
 
             if len(z) == 2 and self.use_inverse_bond_length:
-                # r = q.value(coords)
-                # r_inv_2 = 1.0 / (r * r)
-                # self.b_matrix[i, :derivative.shape[0]] = r_inv_2 * derivative
+                r = q.value(coords)
+                r_inv_2 = 1.0 / (r * r)
+                self.b_matrix[i, :derivative.shape[0]] = -r_inv_2 * derivative
                 
                 self.original_b_matrix[i, :derivative.shape[0]] = derivative
-            # else:
-            #     self.b_matrix[i, :derivative.shape[0]] = derivative
+            else:
+                self.b_matrix[i, :derivative.shape[0]] = derivative
 
-            self.b_matrix[i] = derivative
+            # self.b_matrix[i] = derivative
             # self.original_b_matrix[i] = derivative
 
 
@@ -231,21 +231,21 @@ class InterpolationDatapoint:
             q = self.internal_coordinates[i]
             second_derivative = q.second_derivative(coords).reshape(-1, n_atoms * 3)
 
-            # if len(z) == 2 and self.use_inverse_bond_length:
-            #     r = q.value(coords)
-            #     r_inv_2 = 1.0 / (r * r)
-            #     r_inv_3 = r_inv_2 / r
-            #     self.b2_matrix[i] = -r_inv_2 * second_derivative
+            if len(z) == 2 and self.use_inverse_bond_length:
+                r = q.value(coords)
+                r_inv_2 = 1.0 / (r * r)
+                r_inv_3 = r_inv_2 / r
+                self.b2_matrix[i] = -r_inv_2 * second_derivative
 
-            #     for m in range(n_atoms):
-            #         for n in range(m, n_atoms):
-            #             self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
-            #     self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
+                for m in range(n_atoms):
+                    for n in range(m, n_atoms):
+                        self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
+                self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
 
-            # else:
-            #     self.b2_matrix[i] = second_derivative
+            else:
+                self.b2_matrix[i] = second_derivative
 
-            self.b2_matrix[i] = second_derivative
+            # self.b2_matrix[i] = second_derivative
                
     def transform_gradient_to_internal_coordinates(self, tol=1e-8):
         """
