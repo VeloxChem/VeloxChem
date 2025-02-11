@@ -187,7 +187,7 @@ class EmbeddingIntegralDriver:
             coordinates: Coordinates on which the fields are to be evaluated.
                 Shape: (number of atoms, 3)
                 Dtype: np.float64
-            i: Index of Nucleus "i".
+            i: Index of nucleus "i".
                 Shape: (1)
                 Dtype: np.int64
 
@@ -252,10 +252,10 @@ class EmbeddingIntegralDriver:
             density_matrix: Density Matrix that is the source of the electronic field.
                 Shape: (number of ao functions, number of ao functions)
                 Dtype: np.float64
-            nuc_i: Index of Nucleus "i" corresponding to the Hessian indexing H_ij.
+            nuc_i: Index of nucleus "i" corresponding to the Hessian indexing H_ij.
                 Shape: (1)
                 Dtype: np.int64
-            nuc_j: Index of Nucleus "j" corresponding to the Hessian indexing H_ij.
+            nuc_j: Index of nucleus "j" corresponding to the Hessian indexing H_ij.
                 Shape: (1)
                 Dtype: np.int64
         Returns:
@@ -296,7 +296,9 @@ class EmbeddingIntegralDriver:
                         taylor coefficients.
                 Shape: (number of atoms, number of multipole elements)
                 Dtype: np.float64
-            i: Index of Nucleus "i".
+            i: Index of nucleus "i".
+                Shape: (1)
+                Dtype: np.int64
 
         Returns:
             Electronic induction energy
@@ -313,6 +315,56 @@ class EmbeddingIntegralDriver:
                                                        qm_atom_index_i=i)
         return op
 
+    def compute_electronic_field_gradients(self,
+                                           coordinates: np.ndarray,
+                                           density_matrix: np.ndarray,
+                                           i: int):
+        """Calculate the electronic field gradients on coordinates.
+
+        Args:
+            coordinates: Coordinates on which the fields are to be evaluated.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64
+            density_matrix: Density Matrix that is the source of the electronic field.
+                Shape: (number of ao functions, number of ao functions)
+                Dtype: np.float64
+            i: Index of nucleus "i".
+                Shape: (1)
+                Dtype: np.int64
+
+        Returns:
+            Electronic field gradients.
+                Shape: (3, number of atoms, 3)
+                Dtype: np.float64.
+        """
+        return compute_electric_field_potential_gradient_for_mm(
+            molecule=self.molecule,
+            basis=self.basis,
+            dipole_coords=coordinates,
+            density=density_matrix,
+            qm_atom_index=i
+        )
+
+    def electronic_fields(self, coordinates: np.ndarray,
+                          density_matrix: np.ndarray) -> np.ndarray:
+        """Calculate the electronic fields on coordinates.
+
+        Args:
+            coordinates: Coordinates on which the fields are to be evaluated.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64
+            density_matrix: Density Matrix that is the source of the electronic field.
+                Shape: (number of ao functions, number of ao functions)
+                Dtype: np.float64
+
+        Returns:
+            Electronic fields.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64.
+        """
+
+        return compute_electric_field_values(self.molecule, self.basis,
+                                                    coordinates, density_matrix)
 
 class PolarizableEmbedding:
     """
@@ -718,4 +770,15 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem= self.classical_subsystem)
-        return e_es_elec_hess + e_es_nuc_hess + self._e_vdw_hess # + e_ind_nuc_hess + e_ind_el_hess
+        e_ind_hess = induction_interactions.compute_electronic_induction_energy_hessian(
+            density_matrix=density_matrix,
+            classical_subsystem=self.classical_subsystem,
+            quantum_subsystem=self.quantum_subsystem,
+            integral_driver=self._integral_driver,
+            threshold=self._threshold,
+            max_iterations=self._max_iterations,
+            mic=self._mic,
+            box=self.simulation_box.box,
+            solver=self._solver
+            )
+        return e_es_elec_hess + e_es_nuc_hess + e_ind_hess + self._e_vdw_hess
