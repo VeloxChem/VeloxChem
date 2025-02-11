@@ -8,7 +8,9 @@ from .veloxchemlib import (compute_electric_field_integrals,
 from .oneeints import (compute_nuclear_potential_integrals,
                        compute_nuclear_potential_gradient_bfs,
                        compute_electrostatic_potential_hessian,
-                       compute_electrostatic_integrals_gradient)
+                       compute_electrostatic_integrals_gradient,
+                       compute_electric_field_fock_gradient,
+                       compute_electric_field_potential_gradient_for_mm)
 from .errorhandler import assert_msg_critical
 
 try:
@@ -166,11 +168,39 @@ class EmbeddingIntegralDriver:
         Returns:
             Electronic induction energy gradients.
                 Shape: (number of nuclei, 3)
-                Dtype: np.float64.
+                Dtype: np.float64
         """
 
         return compute_electric_field_integrals_gradient(
             self.molecule, self.basis, coordinates, induced_dipoles, density_matrix)
+
+    def electronic_induction_fock_gradient(self,
+                                             induced_dipoles:np.ndarray,
+                                             coordinates: np.ndarray,
+                                             i: int) -> np.ndarray:
+        """Calculate the electronic induction energy hessian.
+
+        Args:
+            induced_dipoles: Induced dipoles
+                Shape (number of induced dipoles, 3)
+                Dtype: np.float64
+            coordinates: Coordinates on which the fields are to be evaluated.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64
+            i: Index of Nucleus "i".
+                Shape: (1)
+                Dtype: np.int64
+
+        Returns:
+            Electronic induction energy gradients.
+                Shape: (number of nuclei, 3)
+                Dtype: np.float64
+        """
+        return compute_electric_field_fock_gradient(molecule=self.molecule,
+                                                    basis=self.basis,
+                                                    dipole_coords=coordinates,
+                                                    dipole_moments=induced_dipoles,
+                                                    qm_atom_index=i)
 
     def induced_dipoles_potential_integrals(self,
                                             induced_dipoles: np.ndarray,
@@ -193,8 +223,10 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64
         """
 
-        return compute_electric_field_integrals(self.molecule, self.basis,
-                                                coordinates, induced_dipoles)
+        return compute_electric_field_integrals(self.molecule,
+                                                self.basis,
+                                                coordinates,
+                                                induced_dipoles)
 
     def electronic_electrostatic_energy_hessian(self,
                                                    multipole_coordinates: np.ndarray,
@@ -251,8 +283,23 @@ class EmbeddingIntegralDriver:
                                                 multipole_orders: np.ndarray,
                                                 multipoles: list[np.ndarray],
                                                 i: int):
-        """
+        """Calculate the electronic electrostatic fock gradient.
 
+        Args:
+            multipole_coordinates: Coordinates of the Multipoles.
+                Shape: (number of atoms, 3)
+                Dtype: np.float64
+            multipole_orders: Multipole orders of all multipoles.
+                Shape: (number of atoms)
+                Dtype: np.int64
+            multipoles: Multipoles multiplied with degeneracy coefficients and
+                        taylor coefficients.
+                Shape: (number of atoms, number of multipole elements)
+                Dtype: np.float64
+            i: Index of Nucleus "i".
+
+        Returns:
+            Electronic induction energy
         """
         op = 0
         # 0 order
@@ -646,10 +693,19 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
             self._e_vdw_hess = 0.0
 
     def compute_pe_fock_gradient_contributions(self, i):
-        return electrostatic_interactions.compute_electronic_electrostatic_fock_gradient(
+
+        es_fock_grad = electrostatic_interactions.compute_electronic_electrostatic_fock_gradient(
             i=i,
             classical_subsystem=self.classical_subsystem,
-            integral_driver=self._integral_driver) # missing induction fock gradient
+            integral_driver=self._integral_driver
+        )
+
+        ind_fock_grad = induction_interactions.compute_electronic_induction_fock_gradient(
+            i=i,
+            classical_subsystem=self.classical_subsystem,
+            integral_driver=self._integral_driver
+        )
+        return es_fock_grad + ind_fock_grad
 
     def compute_pe_energy_hess_contributions(self, density_matrix):
         nuc_list = np.arange(self.quantum_subsystem.num_nuclei, dtype=np.int64)
@@ -662,5 +718,4 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem= self.classical_subsystem)
-        # TODO add vdw
         return e_es_elec_hess + e_es_nuc_hess + self._e_vdw_hess # + e_ind_nuc_hess + e_ind_el_hess
