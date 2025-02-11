@@ -257,6 +257,38 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
 
     return True
 
+def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
+    """
+    Writes the detachment and attachment density matrices for a specific
+    excited state to the checkpoint file.
+
+    :param fname:
+        The checkpoint file name.
+    :param state_label:
+        The excited state label.
+    :param dens_detach:
+        The detachment density matrix.
+    :param dens_attach:
+        The attachment density matrix.
+    """
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+
+        hf = h5py.File(fname, 'a')
+
+        # Add the attachment and detachment densities to the
+        # rsp group.
+        rsp_group = 'rsp/'
+
+        detach_label = "detach_" + state_label
+        hf.create_dataset(rsp_group + detach_label, data=dens_detach)
+
+        attach_label = "attach_" + state_label
+        hf.create_dataset(rsp_group + attach_label, data=dens_attach)
+
+        hf.close()
 
 def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
     """

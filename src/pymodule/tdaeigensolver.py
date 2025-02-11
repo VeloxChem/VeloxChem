@@ -49,7 +49,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .inputparser import get_random_string_parallel
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
-                         write_rsp_solution, write_lr_rsp_results_to_hdf5)
+                         write_rsp_solution, write_lr_rsp_results_to_hdf5,
+                         write_detach_attach_to_hdf5)
 
 
 class TdaEigenSolver(LinearSolver):
@@ -107,6 +108,7 @@ class TdaEigenSolver(LinearSolver):
         self.nto_pairs = None
         self.nto_cubes = False
         self.detach_attach = False
+        self.detach_attach_cubes = False
         self.cube_origin = None
         self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
@@ -119,6 +121,7 @@ class TdaEigenSolver(LinearSolver):
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'nto_cubes': ('bool', 'write NTO cube files'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
+            'detach_attach_cubes': ('bool', 'write detachment/attachment density cube files'),
             'cube_origin': ('seq_fixed', 'origin of cubic grid points'),
             'cube_stepsize': ('seq_fixed', 'step size of cubic grid points'),
             'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
@@ -155,6 +158,11 @@ class TdaEigenSolver(LinearSolver):
             assert_msg_critical(
                 len(self.cube_points) == 3,
                 'TdaEigenSolver: cube points needs 3 integers')
+
+        # If the detachemnt and attachment cube files are requested,
+        # set the detach_attach flag to True to get the detachment and attachment densities.
+        if self.detach_attach_cubes:
+            self.detach_attach = True
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -448,16 +456,24 @@ class TdaEigenSolver(LinearSolver):
                 if self.rank == mpi_master():
                     dens_D, dens_A = self.get_detach_attach_densities(
                         t_mat, None, mo_occ, mo_vir)
-                    dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
-                else:
-                    dens_DA = AODensityMatrix()
-                dens_DA = dens_DA.broadcast(self.comm, root=mpi_master())
+                    # Add the detachment and attachment density matrices
+                    # to the checkpoint file
+                    state_label = f'S{s + 1}'
+                    write_detach_attach_to_hdf5(final_h5_fname, state_label, dens_D, dens_A)
 
-                dens_cube_fnames = self.write_detach_attach_cubes(
-                    cubic_grid, molecule, basis, s, dens_DA)
+                # Generate and save cube files
+                if self.detach_attach_cubes:
+                    if self.rank == mpi_master():
+                        dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
+                    else:
+                        dens_DA = AODensityMatrix()
+                    dens_DA = dens_DA.broadcast(self.comm, root=mpi_master())
 
-                if self.rank == mpi_master():
-                    dens_cube_files.append(dens_cube_fnames)
+                    dens_cube_fnames = self.write_detach_attach_cubes(
+                        cubic_grid, molecule, basis, s, dens_DA)
+
+                    if self.rank == mpi_master():
+                        dens_cube_files.append(dens_cube_fnames)
 
         if (self.nto or self.detach_attach) and self._is_converged:
             self.ostream.print_blank()
@@ -484,7 +500,7 @@ class TdaEigenSolver(LinearSolver):
                 if self.nto_cubes:
                     ret_dict['nto_cubes'] = nto_cube_files
 
-            if self.detach_attach:
+            if self.detach_attach_cubes:
                 ret_dict['density_cubes'] = dens_cube_files
 
             self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
