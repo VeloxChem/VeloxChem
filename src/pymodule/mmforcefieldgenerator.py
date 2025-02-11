@@ -79,7 +79,6 @@ class MMForceFieldGenerator:
         - scan_energies: The energies from QM scans (list of list).
         - scan_geometries: The optimized geometries from QM scan (list of list).
         - target_dihedrals: The target dihedral angles for parameterization.
-        - ffversion: The version of the force field.
         - workdir: The working directory.
     """
 
@@ -139,7 +138,6 @@ class MMForceFieldGenerator:
         self.scan_energies = None
         self.scan_geometries = None
         self.target_dihedrals = None
-        self.ffversion = 0
 
         self.workdir = None
 
@@ -237,6 +235,11 @@ class MMForceFieldGenerator:
 
         # read QM scan
 
+        # TODO: enable use of multiple scan files
+        assert_msg_critical(
+            len(self.scan_xyz_files) == 1,
+            'MMForceFieldGenerator.compute: only single scan file is supported for now')
+
         self.ostream.print_blank()
         title = 'Force Field Generator'
         self.ostream.print_header(title)
@@ -253,8 +256,6 @@ class MMForceFieldGenerator:
 
         mol_name = Path(self.molecule_name).stem
 
-        self.ffversion = 0
-
         use_temp_dir = (self.workdir is None)
 
         if use_temp_dir:
@@ -266,8 +267,7 @@ class MMForceFieldGenerator:
             self.workdir = Path(temp_dir.name)
 
         if self.original_top_file is None:
-            original_itp_file = self.workdir / (mol_name +
-                                                f'_{self.ffversion:02d}.itp')
+            original_itp_file = self.workdir / (mol_name + '.itp')
             original_top_file = original_itp_file.with_suffix('.top')
 
             if self.rank == mpi_master():
@@ -283,33 +283,25 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        # validate original force field
-
-        for i, dih in enumerate(self.target_dihedrals):
-            self.validate_force_field(i)
-
         # fit dihedral potentials
 
         n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
         for i_round in range(n_rounds):
             for i, dih in enumerate(self.target_dihedrals):
-                self.dihedral_correction(i)
+                dih_central_bond = [dih[1] + 1, dih[2] + 1]
+                scan_file = str(Path(inp_dir) / self.scan_xyz_files[i])
+                self.reparametrize_dihedrals(
+                    dih_central_bond, scan_file=scan_file, fit_extremes=False)
 
-        # validate final force field
-
-        for i, dih in enumerate(self.target_dihedrals):
-            self.validate_force_field(i)
-
-        # ave output files
+        # save output files
 
         if self.rank == mpi_master() and self.keep_files:
             out_dir = Path(self.molecule_name + '_files')
-            for ffver in range(self.ffversion + 1):
-                for ftype in ['itp', 'top']:
-                    fname = mol_name + f'_{ffver:02d}.{ftype}'
-                    self.copy_file(self.workdir / fname, out_dir / fname)
-                    valstr = f'Saving file: {str(out_dir / fname)}'
-                    self.ostream.print_info(valstr)
+            for ftype in ['itp', 'top']:
+                fname = mol_name + f'.{ftype}'
+                self.copy_file(self.workdir / fname, out_dir / fname)
+                valstr = f'Saving file: {str(out_dir / fname)}'
+                self.ostream.print_info(valstr)
 
             self.ostream.print_blank()
             self.ostream.flush()

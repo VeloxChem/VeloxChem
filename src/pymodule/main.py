@@ -256,7 +256,7 @@ def main():
 
     # Force field generator
 
-    if task_type == 'force field':
+    if task_type == 'mm force field':
         force_field_dict = (dict(task.input_dict['force_field'])
                             if 'force_field' in task.input_dict else {})
         force_field_dict['filename'] = task.input_dict['filename']

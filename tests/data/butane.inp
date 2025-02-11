@@ -1,5 +1,5 @@
 @jobs
-task: force field
+task: mm force field
 @end
 
 @method settings

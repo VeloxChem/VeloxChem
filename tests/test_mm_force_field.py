@@ -20,7 +20,7 @@ class TestForceField:
                         reason='scipy not available')
     def test_force_field(self):
 
-        # vlxtag: RKS, Force_Field_Generation
+        # vlxtag: RKS, MM_Force_Field_Generation
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'butane.inp')
