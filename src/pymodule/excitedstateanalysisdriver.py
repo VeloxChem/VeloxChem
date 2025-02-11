@@ -25,9 +25,13 @@
 import h5py
 import numpy as np
 import py3Dmol as p3d
+import sys
+import time as tm
+
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import Molecule
 from .veloxchemlib import MolecularBasis
+from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .visualizationdriver import VisualizationDriver
 
@@ -35,6 +39,9 @@ from .visualizationdriver import VisualizationDriver
 class ExcitedStateAnalysisDriver:
     """
     Implements excited state descriptors at TDDFT level of theory.
+
+    :param ostream:
+        The output stream.
 
     Instance variables
         - fragment_dict: dictionary of indices for atoms in each fragment.
@@ -47,10 +54,14 @@ class ExcitedStateAnalysisDriver:
         - _tda: The flag for the Tamm-Dankoff Approximation.
     """
 
-    def __init__(self):
+    def __init__(self, ostream=None):
         """
         Initialize excited state analysis driver to default setup.
         """
+
+        if ostream is None:
+            ostream = OutputStream(sys.stdout)
+
         self.fragment_dict = None
 
         self.include_particle_hole_density_matrices = False
@@ -58,6 +69,10 @@ class ExcitedStateAnalysisDriver:
         self.include_avg_particle_hole_position = False
         self.include_relative_ct_length = False
         self._tda = False
+        
+        # output stream
+        self.ostream = ostream
+
 
     def update_settings(self, fragment_dict=None):
         """
@@ -105,39 +120,83 @@ class ExcitedStateAnalysisDriver:
                             'excited state not included in rsp calculation')
         ret_dict = {}
 
+
+        self.print_header('Excited State Analysis.', state_index)
+
+        start_time = tm.time()
+
         # necessary objects for some descriptor calculations
         tdens_mo, tdens_ao = self.compute_transition_density_matrix(
             molecule, scf_tensors, rsp_tensors, state_index)
+        
+        self.ostream.print_info("Transition density matrix computed in "
+                                + "{:.3f} sec.".format(tm.time() - start_time))
+        self.ostream.print_blank()
+        
+        tmp_start_time = tm.time()
         ct_matrix = self.compute_ct_matrix(molecule, basis, scf_tensors,
                                            tdens_ao, self.fragment_dict)
-
+        self.ostream.print_info("Charge transfer matrix computed in "
+                                + "{:.3f} sec.".format(tm.time() - tmp_start_time))
+        self.ostream.print_blank()
+        
+        tmp_start_time = tm.time()
         ret_dict['transition_density_matrix_MO'] = tdens_mo
         ret_dict['transition_density_matrix_AO'] = tdens_ao
 
         ret_dict['ct_matrix'] = ct_matrix
 
+
         if self.include_particle_hole_density_matrices:
+            
+
             ret_dict['hole_density_matrix_MO'], ret_dict[
                 'hole_density_matrix_AO'] = self.compute_hole_density_matrix(
                     molecule, scf_tensors, rsp_tensors, state_index)
             ret_dict['particle_density_matrix_MO'], ret_dict[
                 'particle_density_matrix_AO'] = self.compute_particle_density_matrix(
                     molecule, scf_tensors, rsp_tensors, state_index)
+            self.ostream.print_info("Particle and hole density matrices computed in "
+                                + "{:.3f} sec.".format(tm.time() - tmp_start_time))
+            self.ostream.print_blank()
+            tmp_start_time = tm.time()
+    
 
         if self.include_participation_ratios:
+            
+
             ret_dict['hole_participation_ratio'], ret_dict[
                 'particle_participation_ratio'], ret_dict[
                     'avg_participation_ratio'] = self.compute_participation_ratios(
                         ct_matrix)
+            self.ostream.print_info("Participation ratios computed in "
+                                + "{:.3f} sec.".format(tm.time() - tmp_start_time))
+            self.ostream.print_blank()
+            tmp_start_time = tm.time()
+            
 
         if self.include_avg_particle_hole_position or self.include_relative_ct_length:
+            
             ret_dict['avg_particle_position'], ret_dict[
                 'avg_hole_position'], ret_dict[
                     'avg_difference_vector'] = self.compute_avg_position(
                         molecule, ct_matrix, self.fragment_dict)
             ret_dict['relative_ct_length'] = self.compute_relative_ct_length(
                 molecule, ret_dict['avg_difference_vector'])
+            self.ostream.print_info("Average positions and relative ct length computed in "
+                                + "{:.3f} sec.".format(tm.time() - tmp_start_time))
+            self.ostream.print_blank()
 
+        self.ostream.print_info("Total time spent performing excited state analysis: "
+                                + "{:.3f} sec.".format(tm.time() - start_time))    
+
+        self.ostream.print_blank()
+        self.ostream.print_blank()
+
+        self.print_results(ret_dict)
+
+        self.ostream.flush()
+            
         return ret_dict
 
     def read_scf_checkpoint_file(self, fname):
@@ -544,7 +603,7 @@ class ExcitedStateAnalysisDriver:
         viewer = p3d.view(width=width, height=height)
         viewer.addModel(molecule.get_xyz_string(), "xyz")
         viewer.setStyle({"line": {}, "sphere": {"scale": 0.05}})
-        viewer.addArrow({
+        viewer.addCylinder({
             'start': {
                 'x': avg_hole_position[0],
                 'y': avg_hole_position[1],
@@ -556,7 +615,7 @@ class ExcitedStateAnalysisDriver:
                 'z': avg_particle_position[2]
             },
             'radius': 0.06,
-            'color': 'green',
+            'color': 'darkcyan',
         })
         viewer.addSphere({
             'center': {
@@ -565,7 +624,7 @@ class ExcitedStateAnalysisDriver:
                 'z': avg_hole_position[2]
             },
             'radius': 0.12,
-            'color': 'blue',
+            'color': 'red',
         })
         viewer.addSphere({
             'center': {
@@ -574,6 +633,132 @@ class ExcitedStateAnalysisDriver:
                 'z': avg_particle_position[2]
             },
             'radius': 0.12,
-            'color': 'red',
+            'color': 'blue',
         })
         viewer.show()
+
+    def print_header(self, title, state_index):
+        """
+        Print header in output stream.
+        
+        :param title:
+            The name of the driver.
+        :param state_index:
+            The excited state index
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('{:s}'.format(title))
+        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_blank()
+
+        str_width = 60
+
+        
+        cur_str = 'Excited state index             : ' + str(state_index)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        for key in self.fragment_dict:
+            cur_str = 'Fragment ' + key + '                      : ' + str(self.fragment_dict[key])[1:-1]
+            self.ostream.print_header(cur_str.ljust(str_width))
+        
+        if self._tda:
+            cur_str = 'Tamm-Dancoff Approximation      : yes'
+            self.ostream.print_header(cur_str.ljust(str_width))
+        else:
+            cur_str = 'Tamm-Dancoff Approximation      : no'            
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def print_avg_particle_hole_positions(self, descriptor_dict):
+        """
+        Prints average particle and hole positions.
+
+        :param descriptor_dict:
+            The dictionary of descriptors.
+        """
+
+        r_p = descriptor_dict['avg_particle_position']
+        r_h = descriptor_dict['avg_hole_position']
+
+        valstr = "Average Particle and Hole Positions (Angstrom)"
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = '                     '
+        valstr += '{:>13s}{:>13s}{:>13s}'.format('X', 'Y', 'Z')
+        self.ostream.print_header(valstr.ljust(92))
+        
+        valstr = 'Particle:            '
+        valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r_p[0], r_p[1], r_p[2])
+        self.ostream.print_header(valstr.ljust(92))
+        
+        valstr = 'Hole:                '
+        valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r_h[0], r_h[1], r_h[2])
+        self.ostream.print_header(valstr.ljust(92))
+
+        self.ostream.print_blank()
+
+    def print_participation_ratios(self, descriptor_dict):
+        """
+        Prints participation ratios.
+
+        :param descriptor_dict:
+            The dictionary of descriptors.
+        """
+        pr = [None]*3
+
+        pr[0] = descriptor_dict['particle_participation_ratio']
+        pr[1] = descriptor_dict['hole_participation_ratio']
+        pr[2] = descriptor_dict['avg_participation_ratio']
+
+        valstr = "Participation Ratios"
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = '                     '
+        valstr += '{:>13s}{:>13s}{:>13s}'.format('Particle', 'Hole', 'Average')
+        self.ostream.print_header(valstr.ljust(92))
+        
+        valstr = '                    '
+        valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(pr[0], pr[1], pr[2])
+        self.ostream.print_header(valstr.ljust(92))
+
+        self.ostream.print_blank()
+    
+    def print_relative_charge_transfer_length(self, descriptor_dict):
+        """
+        Prints relative charge transfer length.
+        
+        :param descriptor_dict:
+            The dictionary of descriptors.
+        """
+        rel_ct_length = descriptor_dict['relative_ct_length']
+
+        valstr = "Relative Charge Transfer Length"
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = 'Distance:                 '
+        valstr += '{:.6f}'.format(rel_ct_length)
+        self.ostream.print_header(valstr.ljust(92))
+
+        self.ostream.print_blank()
+
+    def print_results(self, descriptor_dict):
+        """
+        Prints results of analysis.
+        
+        :param descriptor_dict:
+            The dictionary of descriptors.
+        """
+
+        if self.include_avg_particle_hole_position or self.include_relative_ct_length:
+            self.print_avg_particle_hole_positions(descriptor_dict)
+
+        if self.include_participation_ratios:
+            self.print_participation_ratios(descriptor_dict)
+
+        if self.include_avg_particle_hole_position or self.include_relative_ct_length:
+            self.print_relative_charge_transfer_length(descriptor_dict)
+
+
