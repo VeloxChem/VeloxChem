@@ -5,6 +5,8 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.veloxchemlib import compute_electric_field_integrals
 from veloxchem.veloxchemlib import compute_electric_field_integrals_gradient
 from veloxchem.veloxchemlib import compute_electric_field_values
+from veloxchem.oneeints import compute_electric_field_fock_gradient
+from veloxchem.oneeints import compute_electric_field_potential_gradient_for_mm
 
 
 class TestOneElecIntsElectricField:
@@ -539,6 +541,23 @@ class TestOneElecIntsElectricField:
         ef_ints_grad = compute_electric_field_integrals_gradient(
             mol, bas, dipole_coords, dipole_moments, D)
         assert np.max(np.abs(ef_ints_grad - ref_ef_ints_grad)) < 1.0e-8
+
+        for i in range(mol.number_of_atoms()):
+            ef_fock_grad = compute_electric_field_fock_gradient(
+                mol, bas, dipole_coords, dipole_moments, i)
+            for d in range(3):
+                assert abs(np.sum(ef_fock_grad[d] * D) -
+                           ef_ints_grad[i, d]) < 1.0e-10
+
+            ef_grad_for_mm = compute_electric_field_potential_gradient_for_mm(
+                mol, bas, dipole_coords, D, i)
+            ndipoles = ef_grad_for_mm.shape[1]
+            for d in range(3):
+                ef_grad = 0.0
+                for c in range(ndipoles):
+                    ef_grad -= np.dot(ef_grad_for_mm[d, c, :],
+                                      dipole_moments[c])
+                assert abs(ef_grad - ef_ints_grad[i, d]) < 1.0e-10
 
     def test_electric_field_values(self):
 

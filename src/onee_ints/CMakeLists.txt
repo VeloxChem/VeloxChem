@@ -2,8 +2,10 @@ target_sources(vlxobjs
   PRIVATE
     AngularMomentumIntegrals.cpp
     BoysFuncTable.cpp
+    ElectricFieldFockGradient.cpp
     ElectricFieldIntegrals.cpp
     ElectricFieldIntegralsGradient.cpp
+    ElectricFieldPotentialGradientAtMMSites.cpp
     ElectricFieldValues.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp

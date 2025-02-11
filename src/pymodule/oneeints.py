@@ -33,6 +33,8 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
+from .veloxchemlib import compute_electric_field_fock_gradient
+from .veloxchemlib import compute_electric_field_potential_gradient_for_mm
 from .matrices import Matrices
 
 
@@ -190,8 +192,8 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
 
     npot_hess_101_drv = NuclearPotentialGeom101Driver()
 
-    hmats_101 = npot_hess_101_drv.compute(molecule, basis, i, j,
-                                          mm_coordinates, mm_charges)
+    hmats_101 = npot_hess_101_drv.compute(molecule, basis, i, j, mm_coordinates,
+                                          mm_charges)
 
     for x, label_x in enumerate('XYZ'):
         for y, label_y in enumerate('XYZ'):
