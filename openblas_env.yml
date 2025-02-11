@@ -24,6 +24,7 @@ dependencies:
   - scipy
   - rdkit
   - dftd4-python
+  - xtb
   - geometric
   - libxc
   - clang-format

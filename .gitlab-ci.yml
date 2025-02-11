@@ -78,6 +78,7 @@ monkey:cmake_build:
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
     - export DFTD4_HOME=/usr/local
+    - export XTBHOME=/usr/local
     - cmake
         -S.
         -Bbuild
@@ -102,6 +103,7 @@ monkey:pip_install:
     - CXX=g++ python -m pip install
         git+https://gitlab.com/FraME-projects/PyFraME.git@35188b620c84f74a73e2c28d737abee4386a503a
     - export DFTD4_HOME=/usr/local
+    - export XTBHOME=/usr/local
     - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++"
         python -m pip install -v .[test,qmmm]
   artifacts:

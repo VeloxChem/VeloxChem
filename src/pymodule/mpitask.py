@@ -158,23 +158,25 @@ class MpiTask:
 
             # create basis set
 
-            basis_path = '.'
-            if 'basis_path' in self.input_dict['method_settings']:
-                basis_path = self.input_dict['method_settings']['basis_path']
+            if 'xtb' not in self.input_dict['method_settings']:
+                basis_path = '.'
+                if 'basis_path' in self.input_dict['method_settings']:
+                    basis_path = self.input_dict['method_settings'][
+                        'basis_path']
 
-            basis_name = self.input_dict['method_settings']['basis'].upper()
+                basis_name = self.input_dict['method_settings']['basis'].upper()
 
-            if ('molecule' in self.input_dict and
-                ('xyz' in self.input_dict['molecule'] or
-                 'xyzfile' in self.input_dict['molecule'])):
-                self.ao_basis = MolecularBasis.read(self.molecule,
-                                                    basis_name, basis_path,
-                                                    self.ostream)
+                if ('molecule' in self.input_dict and
+                    ('xyz' in self.input_dict['molecule'] or
+                     'xyzfile' in self.input_dict['molecule'])):
+                    self.ao_basis = MolecularBasis.read(self.molecule,
+                                                        basis_name, basis_path,
+                                                        self.ostream)
 
-                self.min_basis = MolecularBasis.read(self.molecule,
-                                                     'AO-START-GUESS',
-                                                     basis_path,
-                                                     ostream=None)
+                    self.min_basis = MolecularBasis.read(self.molecule,
+                                                         'AO-START-GUESS',
+                                                         basis_path,
+                                                         ostream=None)
 
         # broadcast input dictionary
 

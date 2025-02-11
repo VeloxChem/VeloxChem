@@ -34,6 +34,8 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfhessiandriver import ScfHessianDriver
+from .xtbdriver import XtbDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .lrsolver import LinearResponseSolver
 from .cppsolver import ComplexResponse
@@ -59,7 +61,7 @@ class VibrationalAnalysis:
     Implements the vibrational analysis driver.
 
     :param drv:
-        The SCF driver.
+        The SCF or XTB driver.
 
     Instance variables
         - hessian: The Hessian in Hartree per Bohr**2.
@@ -95,6 +97,7 @@ class VibrationalAnalysis:
         - rr_damping: Damping factor for complex polarizability gradient
           (resonance Raman).
         - is_scf: Whether the reference state is SCF.
+        - is_xtb: Whether the reference state is XTB.
         - filename: The filename.
         - checkpoint_file: The name of checkpoint file (h5 format).
         - result_file: The name of the vibrational analysis output file (txt format).
@@ -129,12 +132,16 @@ class VibrationalAnalysis:
 
         # Hessian driver etc
         self.is_scf = False
-
+        self.is_xtb = False
         if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
                             ScfRestrictedOpenDriver)):
             self.is_scf = True
             self.scf_driver = drv
             self.hessian_driver = ScfHessianDriver(drv)
+        elif isinstance(drv, XtbDriver):
+            self.is_xtb = True
+            self.scf_driver = None
+            self.hessian_driver = XtbHessianDriver(drv)
 
         self.hessian = None
         self.reduced_masses = None
@@ -331,6 +338,11 @@ class VibrationalAnalysis:
                 vib_results['raman_activities'] = self.raman_activities
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
+
+            elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
+                self.ostream.print_info('Raman not available for XTB.')
+                self.do_raman = False
+                self.do_resonance_raman = False
 
             # print the vibrational properties
             self.print_vibrational_analysis(molecule)
@@ -577,6 +589,7 @@ class VibrationalAnalysis:
         # Transfer settings for vibrational task to Hessian driver
         if self.is_scf:
             # only pass numerical option to ScfHessianDriver
+            # since XtbHessianDriver will always be numerical
             hessian_drv.numerical = self.numerical_hessian
         hessian_drv.do_four_point = self.do_four_point_hessian
         hessian_drv.do_dipole_gradient = self.do_ir
@@ -608,6 +621,7 @@ class VibrationalAnalysis:
         """
         Directs the calculation of the polarizability gradient
         needed for Raman activity.
+        OBS!!! Only for SCF/DFT (not XTB)
 
         :param molecule:
             The molecule.

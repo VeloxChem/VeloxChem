@@ -16,3 +16,4 @@ dependencies:
   - pytest
   - python>=3.9
   - requests
+  - xtb
