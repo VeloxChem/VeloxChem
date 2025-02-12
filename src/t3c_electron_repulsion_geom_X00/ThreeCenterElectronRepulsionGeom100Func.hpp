@@ -9,6 +9,9 @@
 #include "ThreeCenterElectronRepulsionGeom100RecSSS.hpp"
 #include "ThreeCenterElectronRepulsionGeom100RecSSP.hpp"
 #include "ThreeCenterElectronRepulsionGeom100RecSSD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecSPP.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecSPD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecSDD.hpp"
 
 namespace t3cerifunc {
 
@@ -45,6 +48,27 @@ compute_geom_100(T&                               distributor,
     if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({0, 2})))
     {
         t3ceri::comp_electron_repulsion_geom100_ssd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_spp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_spd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_sdd(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }

@@ -43,6 +43,8 @@ class TestThreeCenterElectronRepulsionGeom100Driver:
         
         bra_ids = eri_buf.indices()
         
+        print(bra_ids)
+        
         for i in [0, 1, 2]:
             for k, l in zip(indexes[0], indexes[1]):
                 print(i, k, l, " : ", ref_buf[2, k, l, bra_ids[i]], " : ", eri_buf.value(28 + i, k, l))

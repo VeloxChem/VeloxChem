@@ -65,6 +65,8 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
                 {
                     auto curr_buffer = buffer.data(offset + n * acomps * ccomps * dcomps + i * ccomps * dcomps + k * dcomps + l);
                     
+                    std::cout << " *** SBUFFER ID (g = " << n  << ") : " << offset + n * acomps * ccomps * dcomps + i * ccomps * dcomps + k * dcomps + l << std::endl;
+                    
                     for (auto m = ket_range.first; m < ket_range.second; m++)
                     {
                         // reference indexes on ket side
@@ -81,7 +83,7 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
                     
                         // assign integrals
                         
-                        std::cout << "g = " << n << " (a, r, s) = " << ibra_gto << "," << r << "," << s << " : " << curr_buffer[m - ket_range.first] << std::endl;
+                        std::cout << "g = " << n << " (p, r, s) = " << i * a_indices[0] + refp << "," << r << "," << s << " : " << curr_buffer[m - ket_range.first] << std::endl;
                     
                         if (r <= s)
                         {
