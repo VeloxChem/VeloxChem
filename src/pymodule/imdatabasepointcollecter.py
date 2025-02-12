@@ -148,6 +148,7 @@ class IMDatabasePointCollecter:
         self.box_size = 2.0 
         self.padding = 1.0
         self.cutoff = 1.0
+        self.scaling_factor = 0.0
         self.integrator = None
 
         # OpenMM objects
@@ -703,8 +704,12 @@ class IMDatabasePointCollecter:
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
+        temperature = self.temperature
         self.temperature = self.temperature * unit.kelvin
+        
+        friction = self.friction
         self.friction = self.friction / unit.picosecond
+        
         timestep = self.timestep
         self.timestep = timestep * unit.femtoseconds
 
@@ -1108,6 +1113,7 @@ class IMDatabasePointCollecter:
             OpenMM Integrator: Configured integrator for the simulation.
         """
         # Common parameters for Langevin integrators
+
         if self.ensemble in ['NVT', 'NPT']:
             integrator = mm.LangevinIntegrator(self.temperature, self.friction, self.timestep)
             integrator.setConstraintTolerance(1e-5)
@@ -1584,7 +1590,6 @@ class IMDatabasePointCollecter:
             ForceFieldGenerator object from VeloxChem.
         """
 
-        print('scaling factor', self.scaling_factor)
         # Harmonic bond contribution. Parameters are read from ff_gen_qm
         bonds = ff_gen_qm.bonds
         bond_force = mm.HarmonicBondForce()
@@ -1759,22 +1764,22 @@ class IMDatabasePointCollecter:
             self.velocities.append(context.getState(getVelocities=True).getVelocities())
             self.gradients.append(gradient)
             if self.skipping_value == 0:
-                for qm_data_point in self.qm_data_points:
+                for i, qm_data_point in enumerate(self.qm_data_points, start=1):
                     length_vectors = (self.current_im_choice.impes_coordinate.cartesian_distance_vector(qm_data_point))
-                        #print('here si the length ve vector', np.linalg.norm(length_vectors))
-                        #TODO: Check if this is 1 Angstrom
-                    print('distance in correlation', np.linalg.norm(length_vectors))
-                    if np.linalg.norm(length_vectors) < 1.0:
+
+                    print('distance in correlation', (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom(),
+                          (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom(), i, len(self.qm_data_points))
+                    if (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom() < 0.3:
                         self.add_a_point = False
-                        break
-                    
-                self.add_a_point = True
-            
+                        break          
+                        
+                    if i == len(self.qm_data_points):
+                        self.add_a_point = True
+
             else:
                 self.skipping_value -= 1
             
             self.point_checker += 1 
-
             if self.add_a_point == True and self.step > self.collect_qm_points or self.check_a_point == True and self.step > self.collect_qm_points:
                 print('no point correlation ')
                 self.point_correlation_check(new_molecule, self.basis)
@@ -1871,7 +1876,7 @@ class IMDatabasePointCollecter:
 
         energy_difference = (abs(qm_energy[0] - self.impes_drivers[-1].impes_coordinate.energy))
         print('energy differences', energy_difference * hartree_in_kcalpermol())
-        self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
+        self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20) - 1
 
         if energy_difference * hartree_in_kcalpermol() > self.energy_threshold:
             self.add_a_point = True
@@ -1927,6 +1932,11 @@ class IMDatabasePointCollecter:
         impes_coordinate = InterpolationDatapoint(self.z_matrix)
         impes_coordinate.update_settings(self.impes_dict)
         impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
+        # impes_coordinate.define_internal_coordinates()
+        # impes_coordinate.compute_internal_coordinates_values()
+        # print(impes_coordinate.internal_coordinates_values)
+        
+        # exit()
         impes_coordinate.energy = energy[0]
         impes_coordinate.gradient = gradient[0]
         impes_coordinate.hessian = hessian[0]
@@ -1947,8 +1957,6 @@ class IMDatabasePointCollecter:
 
         self.density_around_data_point[0] += 1
         
-
-
     def compute_energy(self, molecule, basis=None):
         """ Computes the QM energy using self.qm_driver.
 
@@ -2152,3 +2160,4 @@ class IMDatabasePointCollecter:
 
         return ref_structure_check, distance_core, distance_vector_core
         
+

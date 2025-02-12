@@ -171,12 +171,24 @@ class InterpolationDatapoint:
 
         assert_msg_critical(self.z_matrix is not None, 'InterpolationDatapoint: No Z-matrix defined.')
         self.internal_coordinates = []
+
         for z in self.z_matrix:
+            
             if len(z) == 2:
+                # z[0] -= 1
+                # z[1] -= 1
                 q = geometric.internal.Distance(*z)
             elif len(z) == 3:
+                # z[0] -= 1
+                # z[1] -= 1
+                # z[2] -= 1
                 q = geometric.internal.Angle(*z)
             elif len(z) == 4:
+                # z[0] -= 1
+                # z[1] -= 1
+                # z[2] -= 1
+                # z[3] -= 1
+
                 q = geometric.internal.Dihedral(*z)
             else:
                 assert_msg_critical(False, 'InterpolationDatapoint: Invalid entry size in Z-matrix.')
@@ -253,8 +265,7 @@ class InterpolationDatapoint:
 
         :param tol:
             Tolerance for the singular values of the B matrix.
-        :param alpha:
-            Tikhonov regularization parameter.
+.
         """
         
         dimension = self.gradient.shape[0] * 3 - 6
@@ -460,6 +471,7 @@ class InterpolationDatapoint:
 
         int_coords = []
 
+        print('Here are the internal coordinates before inversing \n\n')
         for q in self.internal_coordinates:
             if (isinstance(q, geometric.internal.Distance) and
                     self.use_inverse_bond_length):

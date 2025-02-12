@@ -199,6 +199,7 @@ class IMForceFieldGenerator:
         self.force_constant = 1.0
         self.ensemble = 'NVE'
         self.timestep = 0.5
+        self.friction = 1.0
         self.nsteps = 1000
         self.snapshots = self.nsteps
         self.trajectory_file = 'trajectory.pdb'
@@ -235,10 +236,10 @@ class IMForceFieldGenerator:
 
         self.qm_data_points = None
         self.molecule = molecule
+        # self.z_matrix = sorted(self.z_matrix, key=len)
 
         if self.z_matrix is None:
             self.z_matrix = self.define_z_matrix(molecule)
-        
         # Read the database to determine the  
         
         if self.imforcefieldfile is not None:
@@ -284,6 +285,7 @@ class IMForceFieldGenerator:
                             'exponent_q':self.exponent_q, 
                             'confidence_radius':self.confidence_radius,
                             'imforcefield_file':self.imforcefieldfile,
+                            'use_inverse_bond_length':True
                           }
 
         self.dynamics_settings = {  'qm_driver': self.qm_driver,
@@ -292,7 +294,7 @@ class IMForceFieldGenerator:
                                     'basis_set':self.basis_set_label,
                                     'duration':self.duration, 'temperature':self.temperature, 'solvent':self.solvent,
                                     'pressure':self.force_constant, 'force_constant': self.force_constant, 'ensemble':self.ensemble,
-                                    'timestep': self.timestep, 'nsteps': self.nsteps,
+                                    'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
                                     'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
                                     'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
                                     'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect,
@@ -490,3 +492,5 @@ class IMForceFieldGenerator:
         return z_matrix
 
  
+
+

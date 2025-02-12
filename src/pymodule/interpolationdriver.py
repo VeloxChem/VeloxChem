@@ -363,6 +363,7 @@ class InterpolationDriver():
                 potentials[i] * weight_gradients[i] / sum_weights -
                 potentials[i] * weights[i] * sum_weight_gradients / sum_weights)
         
+        # print('Energy, Gradient', self.impes_coordinate.energy, self.impes_coordinate.gradient)
         
     def read_qm_data_points(self):
         """ Reads the QM data points to be used for interpolation
@@ -482,16 +483,16 @@ class InterpolationDriver():
         for i, element in enumerate(self.impes_coordinate.z_matrix):
             if len(element) == 4:    
                 dist_check[i] = np.sin(dist_check[i])
-                grad[i] *= np.cos(dist_check[i])
+                grad[i] *= np.cos(dist_org[i])
 
         
         dist_hessian = np.matmul(dist_check.T, hessian)
 
-        internal_gradient_hess_cos = grad + dist_hessian
-
         for i, element in enumerate(self.impes_coordinate.z_matrix):
             if len(element) == 4:
-                internal_gradient_hess_cos[i] *= np.cos(dist_org[i])
+                dist_hessian[i] *= np.cos(dist_org[i])
+            
+        internal_gradient_hess_cos = grad + dist_hessian
 
         gradient = (np.matmul(im_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
 
@@ -603,3 +604,5 @@ class InterpolationDriver():
         """ Returns the gradient obtained by interpolation.
         """
         return self.impes_coordinate.gradient
+
+
