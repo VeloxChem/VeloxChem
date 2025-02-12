@@ -149,6 +149,9 @@ class MMForceFieldGenerator:
         # UFF parameters
         self.uff_parameters = get_uff_parameters()
 
+        # Summary of fitting
+        self.fitting_summary = None
+
     def update_settings(self, ffg_dict, resp_dict=None):
         """
         Updates settings in force field generator.
@@ -294,6 +297,10 @@ class MMForceFieldGenerator:
                     dih_central_bond, scan_file=scan_file, fit_extremes=False)
 
         # save output files
+
+        if self.rank == mpi_master():
+            self.write_gromacs_files(original_top_file)
+        self.comm.barrier()
 
         if self.rank == mpi_master() and self.keep_files:
             out_dir = Path(self.molecule_name + '_files')
@@ -585,7 +592,7 @@ class MMForceFieldGenerator:
             # Update the dihedral parameters in the force field
             dihedral_energies = dihedral_potential(
                 dihedral_angles_rad,
-                barriers_to_fit,
+                barriers_to_fit[:-1],
                 phases_array_rad,
                 periodicities_array
             )
@@ -611,6 +618,7 @@ class MMForceFieldGenerator:
             # Residuals
             # TODO: consider using weights
             residuals = (qm_energies_rel - mm_energies_fit_rel)
+            residuals += barriers_to_fit[-1]
 
             # Return the squared residuals for optimization
             return residuals**2
@@ -621,7 +629,10 @@ class MMForceFieldGenerator:
         self.ostream.flush()
 
         # Use the original barriers as the initial guess
-        initial_guess = original_barriers.copy()
+        # Note that we add an additional parameter for shifting QM and MM
+        # energies
+        initial_guess = np.zeros(original_barriers.size + 1)
+        initial_guess[:-1] = original_barriers[:]
         
         # Extract maxima for QM and MM energies
         if fit_extremes:
@@ -651,7 +662,8 @@ class MMForceFieldGenerator:
         )
 
         # Update the force field parameters with the optimized barriers
-        fitted_barriers = result.x
+        # The additional parameter for shifting energy is no longer needed
+        fitted_barriers = np.copy(result.x[:-1])
 
         # Get the final MM energy profile
         fitted_dihedral_energies = dihedral_potential(
@@ -2989,6 +3001,10 @@ class MMForceFieldGenerator:
             self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
             self.ostream.print_blank()
             self.ostream.flush()
+            self.fitting_summary = {'maximum_difference': max_diff,
+                                    'standard_deviation': std_diff}
+        else:
+            self.fitting_summary = None
 
         return {
             'dihedral_indices': list(dih),

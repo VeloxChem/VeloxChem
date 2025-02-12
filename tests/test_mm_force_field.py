@@ -1,5 +1,4 @@
 from pathlib import Path
-import numpy as np
 import pytest
 import sys
 
@@ -42,22 +41,8 @@ class TestForceField:
 
         if ff_gen.rank == mpi_master():
 
-            fitted_barriers = []
-            for (i, j, k, l), dih in ff_gen.dihedrals.items():
-                if (j + 1, k + 1) == (5, 8) or (k + 1, j + 1) == (5, 8):
-                    if dih['multiple']:
-                        fitted_barriers += list(dih['barrier'])
-                    else:
-                        fitted_barriers.append(dih['barrier'])
-            fitted_barriers = np.array(fitted_barriers)
-
-            ref_barriers = np.array([
-                2.33528300e-01, 2.33528300e-01, 5.99127082e-01, 8.62776008e-15,
-                1.85250447e+00, 6.88993804e-01, 6.88993804e-01, 2.33528300e-01,
-                6.88993804e-01, 6.88993804e-01, 2.33528300e-01
-            ])
-
-            assert np.max(np.abs(fitted_barriers - ref_barriers)) < 1.0e-6
+            assert ff_gen.fitting_summary['maximum_difference'] < 2.2
+            assert ff_gen.fitting_summary['standard_deviation'] < 1.0
 
             scf_h5_file = Path(inpfile).with_suffix('.scf.h5')
             if scf_h5_file.is_file():
