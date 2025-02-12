@@ -630,7 +630,7 @@ compute(T&                               distributor,
     }
 }
 
-}  // namespace t2cerifunc
+}  // namespace t3cerifunc
 
 
 #endif /* ThreeCenterElectronRepulsionFunc_hpp */

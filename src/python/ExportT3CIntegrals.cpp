@@ -37,9 +37,10 @@ export_t3cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CThreeCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis, CMolecularBasis& aux_basis, const int iatom)
-             -> TPoint<double> { return geom_drv.compute(basis, aux_basis, molecule, iatom); },
-            "Computes gradient contribution for given molecule, basis, auxilary basis and selected atom.");
+            [](const CThreeCenterElectronRepulsionGeomX00Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis,  CMolecularBasis& aux_basis, const int iatom) -> std::shared_ptr<CT3FlatBuffer<double>> {
+                return std::make_shared<CT3FlatBuffer<double>>(geom_drv.compute(basis, aux_basis, molecule, iatom));
+             },
+            "Computes gradient integrals for given molecule, basis, auxilary basis and selected atom.");
 }
 
 }  // namespace vlx_t2cintegrals

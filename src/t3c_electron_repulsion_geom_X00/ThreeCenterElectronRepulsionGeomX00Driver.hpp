@@ -2,6 +2,7 @@
 #define ThreeCenterElectronRepulsionGeomX00Driver_hpp
 
 #include <vector>
+#include <ranges>
 
 #include "GtoFunc.hpp"
 #include "GtoPairBlockFunc.hpp"
@@ -9,6 +10,9 @@
 #include "Molecule.hpp"
 #include "Point.hpp"
 #include "TensorComponents.hpp"
+#include "T3CUtils.hpp"
+#include "T3CGeomX00Distributor.hpp"
+#include "ThreeCenterElectronRepulsionGeom100Func.hpp"
 
 #include <iostream>
 
@@ -61,7 +65,7 @@ class CThreeCenterElectronRepulsionGeomX00Driver
     auto compute(const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
                  const CMolecule       &molecule,
-                 const int             iatom) const -> TPoint<double>;
+                 const int             iatom) const -> CT3FlatBuffer<double>;
 };
 
 template <int N>
@@ -69,76 +73,45 @@ auto
 CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis &basis,
                                                        const CMolecularBasis &aux_basis,
                                                        const CMolecule       &molecule,
-                                                       const int             iatom) const -> TPoint<double>
+                                                       const int             iatom) const -> CT3FlatBuffer<double>
 {
-    // set up gradient values
-
-    auto atom_grad = TPoint<double>({0.0, 0.0, 0.0});
-    
     // set up GTOs data
     
     const auto bra_gto_blocks = gtofunc::make_gto_blocks(aux_basis, molecule, {iatom, });
     
     const auto gto_pair_blocks = gtofunc::make_gto_pair_blocks(basis, molecule);
     
+    // set up composite flat tensor for integrals
+    
+    const auto red_indices = t3cfunc::unique_indices(bra_gto_blocks);
+    
+    CT3FlatBuffer<double> buffer(red_indices, basis.dimensions_of_basis(), 3);
+    
+    // set up distributor
+    
+    CT3CGeomX00Distributor distributor(&buffer);
+    
+    // main compute loop
+    
     size_t block_start = 0;
     
-    for (const auto& bra_gto_block : bra_gto_blocks)
-    {
-        auto bra_mom = bra_gto_block.angular_momentum();
-        
-        for (const auto& gto_pair_block : gto_pair_blocks)
-        {
-            
-        }
-        
-        auto bra_idx = bra_gto_block.orbital_indices();
-        
-        std::cout << " Ang. Mom.  : " <<  bra_mom << " : block : " << block_start << " size :" << bra_idx.size() << " -> " <<  bra_idx[0]  << " , " << bra_idx[1] << std::endl;
-        
-        block_start += bra_gto_block.number_of_basis_functions() * tensor::number_of_spherical_components(std::array<int, 1>({bra_gto_block.angular_momentum(),}));
-    }
-
-//    // prepare pointers for OMP parallel region
-//
-//    auto ptr_basis = &basis;
-//
-//    auto ptr_molecule = &molecule;
-//
-//    auto ptr_eri_mats = &eri_mats;
-//
-//    // execute OMP tasks with static scheduling
-//
-//    omp::set_static_scheduler();
-//
-//#pragma omp parallel shared(ptr_basis, ptr_molecule, ptr_eri_mats, iatom)
-//    {
-//#pragma omp single nowait
-//        {
-//            const auto bra_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule, {iatom, });
-//            
-//            const auto ket_gto_blocks = gtofunc::make_gto_blocks(*ptr_basis, *ptr_molecule);
-//
-//            const auto tasks = omp::make_work_tasks(bra_gto_blocks, ket_gto_blocks);
-//
-//            std::ranges::for_each(std::ranges::reverse_view(tasks), [&](const auto& task) {
-//                auto bra_gtos    = bra_gto_blocks[task[0]];
-//                auto ket_gtos    = ket_gto_blocks[task[1]];
-//                auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};
-//                auto ket_indices = std::pair<size_t, size_t>{task[4], task[5]};
-//#pragma omp task firstprivate(bra_gtos, ket_gtos, bra_indices, ket_indices)
-//                {
-//                    CT2CDistributor<CMatrices> distributor(ptr_eri_mats);
-//                    if constexpr (N == 1)
-//                    {
-//                        t2cerifunc::compute_geom_100(distributor, bra_gtos, ket_gtos, bra_indices, ket_indices, false);
-//                    }
-//                }
-//            });
-//        }
-//    }
-
-    return atom_grad;
+    std::ranges::for_each(bra_gto_blocks, [&](const auto& gblock) {
+        auto bra_mom = gblock.angular_momentum();
+        auto bra_idx = gblock.orbital_indices();
+        auto bra_bfs = gblock.number_of_basis_functions();
+        auto bra_range = std::pair<size_t, size_t>{size_t{0}, bra_bfs};
+        bra_bfs *= tensor::number_of_spherical_components(std::array<int, 1>({bra_mom, }));
+        std::ranges::for_each(gto_pair_blocks, [&](const auto& gp_pairs) {
+            if constexpr (N == 1)
+            {
+                t3cerifunc::compute_geom_100(distributor, gblock, gp_pairs, bra_range);
+            }
+        });
+        block_start += bra_bfs;
+        distributor.set_index(block_start); 
+    });
+    
+    return buffer;
 }
 
 #endif /* ThreeCenterElectronRepulsionGeomX00Driver_hpp */

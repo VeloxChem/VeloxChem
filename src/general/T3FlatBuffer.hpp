@@ -33,6 +33,28 @@ class CT3FlatBuffer
             });
         }
     }
+    
+    /// @brief The default constructor.
+    /// @param indices The vector of indices along x axis of tensor.
+    /// @param width The width of tensor along  y,z axes.
+    /// @param nbatches The number of batches.
+    CT3FlatBuffer(const std::vector<size_t>& indices, const size_t width, const size_t nbatches)
+    {
+        _indices = indices;
+        
+        _width = width;
+        
+        _data.reserve(_indices.size() * nbatches);
+        
+        if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, nbatches), [&] (const auto index) {
+                std::ranges::for_each(_indices, [&](const auto& index) {
+                    _data.push_back(std::vector<T>(nelems, T{0.0}));
+                });
+            });
+        }
+    }
 
     /// @brief The default copy constructor.
     /// @param other The SIMD array to be copied.
@@ -105,6 +127,14 @@ class CT3FlatBuffer
     aux_width() const -> size_t
     {
         return _indices.size();
+    }
+    
+    /// @brief Gets number of blocks in tensor  width along x axis.
+    /// @return The number of blocks in tensor.
+    inline auto
+    aux_blocks() const -> size_t
+    {
+        return _data.size() / _indices.size();
     }
     
    private:
