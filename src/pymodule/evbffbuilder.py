@@ -7,7 +7,7 @@ from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .forcefieldgenerator import ForceFieldGenerator
-from .reaction_matcher import ReactionMatcher
+from .reactionmatcher import ReactionMatcher
 
 import numpy as np
 import networkx as nx
@@ -220,8 +220,8 @@ class EvbForceFieldBuilder():
         for i, elem in enumerate(pro_elems):
             pro_graph.nodes[i]['elem'] = elem
             
-
-        total_mapping = ReactionMatcher.match_reaction_graphs(rea_graph, pro_graph)
+        rm = ReactionMatcher()
+        total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
         EvbForceFieldBuilder._apply_mapping_to_forcefield(product_ff, total_mapping)

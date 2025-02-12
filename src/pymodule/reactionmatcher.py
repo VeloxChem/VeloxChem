@@ -6,11 +6,34 @@ import numpy as np
 import time
 from collections import Counter
 
+import sys
+from mpi4py import MPI
+from .outputstream import OutputStream
+from .veloxchemlib import mpi_master
 
 class ReactionMatcher:
 
-    @staticmethod
-    def match_reaction_graphs(A: nx.Graph, B: nx.Graph):
+    def __init__(self, comm=None, ostream=None):
+        if comm is None:
+            comm = MPI.COMM_WORLD
+
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
+        # output stream
+        self.ostream = ostream
+
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        self.max_time = 600
+
+    def match_reaction_graphs(self, A: nx.Graph, B: nx.Graph):
         # figure out how many bonds need to change -> difficult to impossible with multiple graphs right?
         largest_in_A = len(list(nx.connected_components(A))[0])
         largest_in_B = len(list(nx.connected_components(B))[0])
@@ -24,54 +47,62 @@ class ReactionMatcher:
 
         if not mapping == {}:
             spent_time = time.time() - start_time
-            print(f"Found mapping without removing bonds. Spent {spent_time} seconds.")
+            self.ostream.print_info(f"Found mapping without removing bonds. Spent {spent_time} seconds.")
         else:
-            # print("No mapping found without removing bonds, trying to remove one bond")
+            # self.ostream.print_info("No mapping found without removing bonds, trying to remove one bond")
             Am1_mappings = []
             for edge in A.edges:
                 Am1 = nx.Graph(A)
                 Am1.remove_edge(*edge)
                 bond_elems = (A.nodes[edge[0]]["elem"], A.nodes[edge[1]]["elem"])
+
                 mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(Am1, B)
                 if mapping != {}:
                     Am1_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
+
             if len(Am1_mappings) > 0:
-                Am1_mappings = sorted(Am1_mappings, key=lambda x: x["forming_bonds"]+x["breaking_bonds"])
-                total_mappings = len(Am1_mappings)
-                least_changing_bonds = Am1_mappings[0]["forming_bonds"]+Am1_mappings[0]["breaking_bonds"]
-                best_mappnigs = [mapping for mapping in Am1_mappings if mapping["forming_bonds"]+mapping["breaking_bonds"] == least_changing_bonds]
-                spent_time = time.time() - start_time
-                print(f"Found {total_mappings} mappings with removing one bond, of which {len(best_mappnigs)} have {least_changing_bonds}+1 changing bonds which is the minimal amount. Spent {spent_time} seconds.")
-                mapping = Am1_mappings[0]["mapping"]
-                
+                mapping = self._sort_broken_mappings(Am1_mappings)
             else:
-                # print("No mapping found without removing bonds, trying to remove two bonds")
                 Am2_mappings = []
+                remaining_edges = set(A.edges)
                 for edge1 in A.edges:
+                    if time.time() - start_time > self.max_time:
+                        self.ostream.print_info(f"Spent more then {self.max_time} seconds finding mapping, aborting")
+                        mapping = {}
+                        break
+                    edge_set = set()
+                    edge_set.add(edge1)
+                    remaining_edges = remaining_edges - edge_set
                     Am1 = nx.Graph(A)
                     Am1.remove_edge(*edge1)
-                    for edge2 in Am1.edges:
+                    for edge2 in remaining_edges:
                         Am2 = nx.Graph(Am1)
                         Am2.remove_edge(*edge2)
                         bond_elems1 = {A.nodes[edge1[0]]["elem"], A.nodes[edge1[1]]["elem"]}
                         bond_elems2 = {A.nodes[edge2[0]]["elem"], A.nodes[edge2[1]]["elem"]}
-                        
                         mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(Am2, B)
                         if mapping != {}:
                             Am2_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
                 if len(Am2_mappings) > 0:
-                    Am2_mappings = sorted(Am2_mappings, key=lambda x: x["forming_bonds"]+x["breaking_bonds"])
-                    total_mappings = len(Am2_mappings)
-                    least_changing_bonds = Am2_mappings[0]["forming_bonds"]+Am2_mappings[0]["breaking_bonds"]
-                    best_mappnigs = [mapping for mapping in Am2_mappings if mapping["forming_bonds"]+mapping["breaking_bonds"] == least_changing_bonds]
-                    spent_time = time.time() - start_time
-                    print(f"Found {total_mappings} mappings with removing 2 bonds, of which {len(best_mappnigs)} have {least_changing_bonds} changing bonds which is the minimal amount. Spent {spent_time} seconds.")
-                    mapping = Am2_mappings[0]["mapping"]
+                    mapping = self._sort_broken_mappings(Am2_mappings)
         if mapping == {}:
-            print("No mapping found with removing two bonds, removing 3 bonds is not implemented. Try suggesting some broken bonds.")
+            self.ostream.print_info("No mapping found with removing two bonds, removing 3 bonds is not implemented. Try suggesting some broken bonds.")
         if swapped:
             mapping = {v: k for k, v in mapping.items()}
+
+        spent_time = time.time() - start_time
+        self.ostream.print_info(f"Spent {spent_time:.3f} seconds finding mapping")
+        self.ostream.flush()
         return mapping
+
+    def _sort_broken_mappings(self, mappings):
+        sorted_mappings = sorted(mappings, key=lambda x: x["forming_bonds"]+x["breaking_bonds"])
+        total_mappings = len(sorted_mappings)
+        least_changing_bonds = mappings[0]["forming_bonds"]+mappings[0]["breaking_bonds"]
+        best_mappnigs = [mapping for mapping in mappings if mapping["forming_bonds"]+mapping["breaking_bonds"] == least_changing_bonds]
+        
+        self.ostream.print_info(f"Found {total_mappings} mappings with removing 2 bonds, of which {len(best_mappnigs)} have {least_changing_bonds}+2 changing bonds which is the minimal amount")
+        return mappings[0]["mapping"]
         
     @staticmethod
     def _match_subgraph(A, B):
@@ -133,7 +164,7 @@ class ReactionMatcher:
             if swapped:
                 mapping = {v: k for k, v in mapping.items()}
 
-            # print(f"Found mapping through largest subgraph: {mapping}")
+            # self.ostream.print_info(f"Found mapping through largest subgraph: {mapping}")
             size = len(mapping)
         else:
             size = None

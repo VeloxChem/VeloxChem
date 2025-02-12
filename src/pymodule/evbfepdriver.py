@@ -83,6 +83,7 @@ class EvbFepDriver():
         self.ostream.print_info(f"System time per snapshot: {step_size * write_step} ps")
         self.ostream.print_info(f"System time per frame: {step_size * total_sample_steps} ps")
         self.ostream.print_info(f"Total system time: {step_size * total_sample_steps * len(self.Lambda)} ps",)
+        self.ostream.flush()
         integrator_temperature = temperature * mmunit.kelvin  #type: ignore
         integrator_friction_coeff = 1 / mmunit.picosecond
 
@@ -140,6 +141,7 @@ class EvbFepDriver():
             ))
 
             self.ostream.print_info("Minimizing energy")
+            self.ostream.flush()
             simulation.minimizeEnergy()
 
             if l == 0:
@@ -206,7 +208,6 @@ class EvbFepDriver():
                 ))
 
             self.ostream.print_info(f"Running sampling with step size {runsimulation.integrator.getStepSize()}")
-            
             self.ostream.flush()    
             runsimulation.step(total_sample_steps)
             state = runsimulation.context.getState(getPositions=True)

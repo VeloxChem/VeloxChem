@@ -128,7 +128,10 @@ class EvbSystemBuilder():
         if CNT or Graphene:
             X, Y = self._add_CNT_graphene(system, CNT, Graphene, nb_force, topology, M, N, system_mol, positions)
             box_x: float = X * 0.1
-            box_y: float = X * 0.1
+            if Graphene:
+                box_y: float = Y * 0.1
+            else:
+                box_y: float = X * 0.1
             box_z: float = X * 0.1
         else:
             box_x = 2 * padding
@@ -273,18 +276,10 @@ class EvbSystemBuilder():
             'comment': 'Graphene angle, ce-ce-ce GAFF parameters'
         }
 
-        graphene_dih_0: dict = {
+        graphene_dihedral: dict = {
             "type": "Fourier",
             "barrier": 25,
-            "phase": 0.0,
-            "periodicity": 2,
-            "comment": 'Graphene torsion, X -X -c -o GAFF parameters'
-        }
-
-        graphene_dih_180: dict = {
-            "type": "Fourier",
-            "barrier": 25,
-            "phase": 180.0,
+            "phase": 180,
             "periodicity": 2,
             "comment": 'Graphene torsion, X -X -c -o GAFF parameters'
         }
@@ -370,40 +365,40 @@ class EvbSystemBuilder():
                 angles.update({(center + 2, center + 3, right + 0): graphene_angle})
                 angles.update({(right + 0, center + 3, up + 2): graphene_angle})
 
-                dihedrals.update({(left + 3, center + 0, center + 1, down + 0): graphene_dih_0})
-                dihedrals.update({(up + 1, center + 0, center + 1, down + 0): graphene_dih_180})
-                dihedrals.update({(left + 3, center + 0, center + 1, center + 2): graphene_dih_180})
-                dihedrals.update({(left + 3, center + 0, center + 1, center + 2): graphene_dih_0})
+                dihedrals.update({(left + 3, center + 0, center + 1, down + 0): graphene_dihedral})
+                dihedrals.update({(up + 1, center + 0, center + 1, down + 0): graphene_dihedral})
+                dihedrals.update({(left + 3, center + 0, center + 1, center + 2): graphene_dihedral})
+                dihedrals.update({(left + 3, center + 0, center + 1, center + 2): graphene_dihedral})
 
-                dihedrals.update({(center + 0, center + 1, center + 2, center + 3): graphene_dih_0})
-                dihedrals.update({(down + 0, center + 1, center + 2, center + 3): graphene_dih_180})
-                dihedrals.update({(center + 0, center + 1, center + 2, down + 3): graphene_dih_180})
-                dihedrals.update({(down + 0, center + 1, center + 2, down + 3): graphene_dih_0})
+                dihedrals.update({(center + 0, center + 1, center + 2, center + 3): graphene_dihedral})
+                dihedrals.update({(down + 0, center + 1, center + 2, center + 3): graphene_dihedral})
+                dihedrals.update({(center + 0, center + 1, center + 2, down + 3): graphene_dihedral})
+                dihedrals.update({(down + 0, center + 1, center + 2, down + 3): graphene_dihedral})
 
-                dihedrals.update({(center + 1, center + 2, center + 3, up + 2): graphene_dih_0})
-                dihedrals.update({(down + 3, center + 2, center + 3, up + 2): graphene_dih_180})
-                dihedrals.update({(center + 1, center + 2, center + 3, right + 0): graphene_dih_180})
-                dihedrals.update({(down + 3, center + 2, center + 3, right + 0): graphene_dih_0})
+                dihedrals.update({(center + 1, center + 2, center + 3, up + 2): graphene_dihedral})
+                dihedrals.update({(down + 3, center + 2, center + 3, up + 2): graphene_dihedral})
+                dihedrals.update({(center + 1, center + 2, center + 3, right + 0): graphene_dihedral})
+                dihedrals.update({(down + 3, center + 2, center + 3, right + 0): graphene_dihedral})
 
-                dihedrals.update({(center + 2, center + 3, right + 0, right + 1): graphene_dih_0})
-                dihedrals.update({(up + 2, center + 3, right + 0, right + 1): graphene_dih_180})
-                dihedrals.update({(center + 2, center + 3, right + 0, upright + 1): graphene_dih_180})
-                dihedrals.update({(up + 2, center + 3, right + 0, upright + 1): graphene_dih_0})
+                dihedrals.update({(center + 2, center + 3, right + 0, right + 1): graphene_dihedral})
+                dihedrals.update({(up + 2, center + 3, right + 0, right + 1): graphene_dihedral})
+                dihedrals.update({(center + 2, center + 3, right + 0, upright + 1): graphene_dihedral})
+                dihedrals.update({(up + 2, center + 3, right + 0, upright + 1): graphene_dihedral})
 
-                dihedrals.update({(left + 3, center + 0, up + 1, up + 0): graphene_dih_0})
-                dihedrals.update({(center + 1, center + 0, up + 1, up + 0): graphene_dih_180})
-                dihedrals.update({(left + 3, center + 0, up + 1, up + 2): graphene_dih_180})
-                dihedrals.update({(center + 1, center + 0, up + 1, up + 2): graphene_dih_0})
+                dihedrals.update({(left + 3, center + 0, up + 1, up + 0): graphene_dihedral})
+                dihedrals.update({(center + 1, center + 0, up + 1, up + 0): graphene_dihedral})
+                dihedrals.update({(left + 3, center + 0, up + 1, up + 2): graphene_dihedral})
+                dihedrals.update({(center + 1, center + 0, up + 1, up + 2): graphene_dihedral})
 
-                dihedrals.update({(center + 2, center + 3, up + 2, up + 1): graphene_dih_0})
-                dihedrals.update({(center + 2, center + 3, up + 2, up + 3): graphene_dih_180})
-                dihedrals.update({(right + 0, center + 3, up + 2, up + 1): graphene_dih_180})
-                dihedrals.update({(right + 0, center + 3, up + 2, up + 3): graphene_dih_0})
+                dihedrals.update({(center + 2, center + 3, up + 2, up + 1): graphene_dihedral})
+                dihedrals.update({(center + 2, center + 3, up + 2, up + 3): graphene_dihedral})
+                dihedrals.update({(right + 0, center + 3, up + 2, up + 1): graphene_dihedral})
+                dihedrals.update({(right + 0, center + 3, up + 2, up + 3): graphene_dihedral})
 
-                impropers.update({(left + 3, center + 0, center + 1, up + 2): graphene_dih_180})
-                impropers.update({(center + 0, center + 1, down + 0, center + 2): graphene_dih_180})
-                impropers.update({(center + 1, center + 2, down + 3, center + 3): graphene_dih_180})
-                impropers.update({(center + 2, center + 3, right + 0, up + 2): graphene_dih_180})
+                impropers.update({(left + 3, center + 0, center + 1, up + 2): graphene_dihedral})
+                impropers.update({(center + 0, center + 1, down + 0, center + 2): graphene_dihedral})
+                impropers.update({(center + 1, center + 2, down + 3, center + 3): graphene_dihedral})
+                impropers.update({(center + 2, center + 3, right + 0, up + 2): graphene_dihedral})
 
         
         carbon_harmonic_bond_force = mm.HarmonicBondForce()
@@ -441,7 +436,7 @@ class EvbSystemBuilder():
                     
         system.addForce(carbon_harmonic_bond_force)
         system.addForce(carbon_harmonic_angle_force)
-        # system.addForce(carbon_fourier_dihedral_force)
+        system.addForce(carbon_fourier_dihedral_force)
 
         return X, Y
 

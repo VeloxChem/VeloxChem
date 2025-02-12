@@ -600,7 +600,7 @@ class EvbDriver():
             self.ostream.flush()
             equil_steps = 100
             sample_steps = 200
-            write_step = 1
+            write_step = 5
             initial_equil_steps = 100
             step_size = 0.001
             equil_step_size = 0.001
@@ -608,6 +608,7 @@ class EvbDriver():
 
         for conf in self.system_confs:
             self.ostream.print_info(f"Running FEP for {conf['name']}")
+            self.ostream.flush()
             FEP = EvbFepDriver()
             FEP.run_FEP(
                 equilliberation_steps=equil_steps,
@@ -621,7 +622,6 @@ class EvbDriver():
                 configuration=conf
             )
 
-            self.ostream.flush()
 
     def compute_energy_profiles(self, barrier, free_energy):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
