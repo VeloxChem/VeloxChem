@@ -204,17 +204,17 @@ comp_electron_repulsion_geom100_spp(T& distributor,
 
             }
 
-            t3cfunc::bra_transform<1>(skbuffer, 0, cbuffer, 0, 0, 1);
+            t3cfunc::bra_transform<0>(skbuffer, 0, cbuffer, 0, 0, 1);
 
-            t3cfunc::bra_transform<1>(skbuffer, 3, cbuffer, 3, 0, 1);
+            t3cfunc::bra_transform<0>(skbuffer, 3, cbuffer, 3, 0, 1);
 
-            t3cfunc::bra_transform<1>(skbuffer, 6, cbuffer, 6, 0, 1);
+            t3cfunc::bra_transform<0>(skbuffer, 6, cbuffer, 6, 0, 1);
 
-            t3cfunc::bra_transform<1>(skbuffer, 9, cbuffer, 9, 0, 2);
+            t3cfunc::bra_transform<0>(skbuffer, 9, cbuffer, 9, 0, 2);
 
-            t3cfunc::bra_transform<1>(skbuffer, 15, cbuffer, 15, 0, 2);
+            t3cfunc::bra_transform<0>(skbuffer, 15, cbuffer, 15, 0, 2);
 
-            t3cfunc::bra_transform<1>(skbuffer, 21, cbuffer, 21, 0, 2);
+            t3cfunc::bra_transform<0>(skbuffer, 21, cbuffer, 21, 0, 2);
 
             t3ceri::comp_hrr_electron_repulsion_xpp(skbuffer, 27, 0, 9, cfactors, 6, 1);
 

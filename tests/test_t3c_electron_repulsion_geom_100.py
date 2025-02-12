@@ -37,22 +37,14 @@ class TestThreeCenterElectronRepulsionGeom100Driver:
         npyfile = str(here / 'data' / 'h2o.svp.int3c2e.geom.001.o1.npy')
         ref_buf = -np.load(npyfile)
         
-        print(ref_buf.shape)
-
         indexes = np.triu_indices(24)
-        
         bra_ids = eri_buf.indices()
         
-        print(bra_ids)
-        
-        for i in [0, 1, 2]:
-            for k, l in zip(indexes[0], indexes[1]):
-                print(i, k, l, " : ", ref_buf[2, k, l, bra_ids[i]], " : ", eri_buf.value(28 + i, k, l))
-                assert mt.isclose(eri_buf.value(28 + i, k, l),
-                                  ref_buf[2, k, l, bra_ids[i]],
-                                  rel_tol=1.0e-12,
-                                  abs_tol=1.0e-12)
-                                  
-                                  
-    
-        assert False
+        for i in range(3):
+            for j in range(3):
+                for k, l in zip(indexes[0], indexes[1]):
+                    assert mt.isclose(eri_buf.value(14 * i + j, k, l),
+                                      ref_buf[i, k, l, bra_ids[j]],
+                                      rel_tol=1.0e-12,
+                                      abs_tol=1.0e-12)
+
