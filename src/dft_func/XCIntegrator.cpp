@@ -427,3 +427,114 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
 
     return allgtovalues;
 }
+
+auto
+CXCIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                          const CMolecularBasis& basis,
+                                                          const CMolecularGrid&  molecularGrid) const -> std::vector<CDenseMatrix>
+{
+    // number of OpenMP threads
+
+    auto nthreads = omp_get_max_threads();
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // GTO values on grid points
+
+    CDenseMatrix allgtovalues(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_x(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_y(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_z(naos, molecularGrid.getNumberOfGridPoints());
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // compute GTO values on grid points
+
+#pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
+            const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
+            const auto grid_z_ptr = zcoords + gridblockpos + grid_batch_offset;
+
+            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + grid_batch_size);
+            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + grid_batch_size);
+            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + grid_batch_size);
+
+            // go through GTO blocks
+
+            for (const auto& gto_block : gto_blocks)
+            {
+                // prescreen GTO block
+
+                // 1st order GTO derivative
+                auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 1, _screeningThresholdForGTOValues, boxdim);
+
+                // GTO values on grid points
+
+                auto cmat = gtoval::get_gto_values_for_gga(gto_block, grid_x, grid_y, grid_z, cgto_mask);
+
+                if (cmat.is_empty()) continue;
+
+                auto submat_0_ptr = cmat.sub_matrix({0, 0});
+                auto submat_x_ptr = cmat.sub_matrix({1, 0});
+                auto submat_y_ptr = cmat.sub_matrix({1, 1});
+                auto submat_z_ptr = cmat.sub_matrix({1, 2});
+
+                auto subgaos_0_ptr = submat_0_ptr->data();
+                auto subgaos_x_ptr = submat_x_ptr->data();
+                auto subgaos_y_ptr = submat_y_ptr->data();
+                auto subgaos_z_ptr = submat_z_ptr->data();
+
+                for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++)
+                {
+                    std::memcpy(allgtovalues.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_0_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_x.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_x_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_y.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_y_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_z.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_z_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                }
+            }
+        }
+    }
+
+    return std::vector<CDenseMatrix>({allgtovalues, allgtovalues_x, allgtovalues_y, allgtovalues_z});
+}

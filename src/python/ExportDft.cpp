@@ -730,6 +730,23 @@ export_dft(py::module& m)
             "Computes GTO values on grid points.",
             "molecule"_a,
             "basis"_a,
+            "molecular_grid"_a)
+        .def(
+            "compute_gto_values_and_derivatives",
+            [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
+                -> py::array_t<double> {
+                auto gtovaluesderivs = self.computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, molecularGrid);
+                py::list ret;
+                for (int i = 0; i < static_cast<int32_t>(gtovaluesderivs.size()); i++)
+                {
+                    ret.append(vlx_general::pointer_to_numpy(
+                        gtovaluesderivs[i].values(), {gtovaluesderivs[i].getNumberOfRows(), gtovaluesderivs[i].getNumberOfColumns()}));
+                }
+                return ret;
+            },
+            "Computes GTO values and derivatives on grid points.",
+            "molecule"_a,
+            "basis"_a,
             "molecular_grid"_a);
 
     // CXCMolecularGradient class
