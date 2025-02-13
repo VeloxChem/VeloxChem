@@ -245,7 +245,7 @@ class EvbDriver():
                         self.ostream.print_info(f"Could not read line {line} from {charge_path}. Continuing")
             print_charge = sum([round(charge, 3) for charge in charges])
             self.ostream.print_info(
-                f"Loading charges from {charge_path} file, total_charg = {print_charge}"
+                f"Loading charges from {charge_path} file, total charge: {print_charge}"
             )
 
         forcefield = None
