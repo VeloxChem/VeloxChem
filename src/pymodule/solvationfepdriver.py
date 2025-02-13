@@ -28,7 +28,7 @@ from io import StringIO
 from contextlib import redirect_stderr
 from pathlib import Path
 import numpy as np
-import os, sys
+import sys
 import time
 import h5py
 
@@ -112,7 +112,6 @@ class SolvationFepDriver:
         
         # Create directory for storing all generated data
         self.output_folder = Path("solvation_fep_output")
-        self.output_folder.mkdir(parents=True, exist_ok=True)
 
         # Options for the SolvationBuilder
         self.padding = 2.0
@@ -177,6 +176,7 @@ class SolvationFepDriver:
         :return:
             A list containing the free energy calculations for each stage.
         """
+        
         sol_builder = SolvationBuilder()
 
         sol_builder.solvate(solute=molecule, 
@@ -188,7 +188,7 @@ class SolvationFepDriver:
                             equilibrate=False)
         
         self.solvent_name = solvent
-        
+        self.output_folder.mkdir(parents=True, exist_ok=True)
         # Note: GROMACS files will be used instead of OpenMM files.
         # For some reason, the results are more consistent. (?)
         sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
@@ -225,6 +225,7 @@ class SolvationFepDriver:
         self.solute_pdb = solute_pdb
         self.solute_xml = solute_xml
         self.other_xml_files = other_xml_files
+        self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
         u_kln = self.u_kln_matrices
@@ -254,6 +255,7 @@ class SolvationFepDriver:
         self.system_top = system_top
         self.solute_gro = solute_gro
         self.solute_top = solute_top
+        self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
         u_kln = self.u_kln_matrices
@@ -313,7 +315,7 @@ class SolvationFepDriver:
 
         # Calculate the final free energy
         final_free_energy = free_en_s1 + free_en_s2 - (free_en_s3 + free_en_s4)
-        self.ostream.print_line(f"Final free energy: {final_free_energy} kcal/mol")
+        self.ostream.print_line(f"Final free energy: {final_free_energy} kJ/mol")
         self.ostream.flush()
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
@@ -393,7 +395,7 @@ class SolvationFepDriver:
         self.ostream.flush()
         delta_f = self._calculate_free_energy(u_kln)
         free_energy = delta_f['Delta_f'][-1, 0]
-        self.ostream.print_line(f"Free energy for stage {stage}: {delta_f['Delta_f'][-1, 0]:.4f} +/- {delta_f['dDelta_f'][-1, 0]:.4f} kcal/mol")
+        self.ostream.print_line(f"Free energy for stage {stage}: {delta_f['Delta_f'][-1, 0]:.4f} +/- {delta_f['dDelta_f'][-1, 0]:.4f} kJ/mol")
         self.ostream.flush()
 
         return delta_f, free_energy
@@ -701,7 +703,7 @@ class SolvationFepDriver:
                     positions_with_units = positions[n] * unit.nanometers
                     simulation.context.setPositions(positions_with_units)
                     state = simulation.context.getState(getEnergy=True)
-                    u_kln[k, l, n] = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
+                    u_kln[k, l, n] = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
 
                 time_end_forcefield = time.time()
                 elapsed_time_forcefield = time_end_forcefield - time_start_forcefield
