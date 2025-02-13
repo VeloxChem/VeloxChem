@@ -68,7 +68,7 @@ class InterpolationDriver():
         - imforcefield_file: File containing the necessary information to construct the interpolation forcefield
     """
 
-    def __init__(self, z_matrix, comm=None, ostream=None):
+    def __init__(self, z_matrix=None, comm=None, ostream=None):
         """
         Initializes the IMPES driver.
         """
@@ -102,6 +102,7 @@ class InterpolationDriver():
         
         self.distance_thrsh = 0.5
         self.z_matrix = z_matrix
+        self.impes_dict = None
 
         self.old_gradient = None
 
@@ -181,25 +182,43 @@ class InterpolationDriver():
         keys = h5f.keys()
 
         remove_from_label = ""
+        z_matrix_label = ''
         if self.impes_coordinate.use_inverse_bond_length:
             remove_from_label += "_rinv"
+            z_matrix_label += '_rinv'
         else:
             remove_from_label += "_r"
-        if self.impes_coordinate.use_cosine_dihedral:
-            remove_from_label += "_cosine"
-        else:
-            remove_from_label += "_dihedral"
+            z_matrix_label += '_r'
+        remove_from_label += "_dihedral"
         remove_from_label += "_energy"
 
+        z_matrix_label += '_dihedral'
+        z_matrix_bonds = z_matrix_label + '_bonds'
+        z_matrix_angles = z_matrix_label + '_angles'
+        z_matrix_dihedrals = z_matrix_label + '_dihedrals'
+        z_matrix_labels = [z_matrix_bonds, z_matrix_angles, z_matrix_dihedrals]
+        z_matrix = []
+            
         labels = []
+        counter = 0
         for key in keys:
             if remove_from_label in key:
+
                 label = key.replace(remove_from_label, "")
                 if label not in labels:
                     labels.append(label)
+                
+                if counter == 0:
+                    for label_obj in z_matrix_labels:
+
+                        z_label = label + label_obj
+                        current_z_list = [z_list.tolist() for z_list in list(h5f.get(z_label))]
+                        z_matrix.extend(current_z_list)
+                counter = 1
+
 
         h5f.close()
-        return labels
+        return labels, z_matrix
 
     def define_impes_coordinate(self, coordinates):
         """Defines the current coordinate based on the coordinates array.
@@ -235,6 +254,7 @@ class InterpolationDriver():
             self.imforcefield_file = chk_file
         if qm_data_points is None:
             qm_data_points = self.read_qm_data_points()
+
         if self.interpolation_type == 'simple':
             self.simple_interpolation(qm_data_points)
         elif self.interpolation_type == 'shepard':
@@ -319,7 +339,6 @@ class InterpolationDriver():
         for i, data_point in enumerate(qm_data_points):
             
             distance, weight_gradient, _ = self.cartesian_distance(data_point)
-            print('Distance in IMpes', distance)
             if abs(distance) < min_distance:
                 min_distance = abs(distance)
 
@@ -339,6 +358,7 @@ class InterpolationDriver():
 
             sum_weights += weight
             sum_weight_gradients += weight_grad
+
             potential = self.compute_potential(qm_data_point)
             gradient = self.compute_gradient(qm_data_point)
             gradients.append(gradient)
@@ -378,8 +398,9 @@ class InterpolationDriver():
             'ImpesDriver: Please provide a chekpoint file name.')
        
         if not self.labels:
-            labels = self.read_labels()
+            labels, z_matrix = self.read_labels()
             self.labels = labels  
+            self.z_matrix = z_matrix
         z_matrix = self.impes_coordinate.z_matrix
        
         for label in self.labels:

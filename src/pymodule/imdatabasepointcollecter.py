@@ -570,8 +570,8 @@ class IMDatabasePointCollecter:
             self.duration = float(dynamics_settings['duration'])
 
         if 'temperature' in dynamics_settings:
-            self.temperature = float(dynamics_settings['temperature'])
-            self.starting_temperature = float(dynamics_settings['temperature'])
+            self.temperature = dynamics_settings['temperature']
+            self.starting_temperature = dynamics_settings['temperature']
 
         if 'pressure' in dynamics_settings:
             self.pressure = float(dynamics_settings['pressure'])
@@ -623,7 +623,9 @@ class IMDatabasePointCollecter:
         if 'basis_set' in dynamics_settings:
             basis_label = dynamics_settings['basis_set']
             self.basis = MolecularBasis.read(self.molecule, basis_label)
-
+        
+        if 'xc_fun' in dynamics_settings:
+            self.qm_driver.xcfun = dynamics_settings['xc_fun']
 
         # Dertermines if non-adiabatic couplings should be calculated
         if 'NAC' in dynamics_settings:
@@ -775,7 +777,7 @@ class IMDatabasePointCollecter:
         # load datafile if there is one
         impes_driver = InterpolationDriver(self.z_matrix)
         impes_driver.update_settings(self.impes_dict)
-        self.im_labels = impes_driver.read_labels()
+        self.im_labels, _ = impes_driver.read_labels()
         print('beginning labels', self.im_labels)
         if self.qm_data_points is None:
            self.qm_data_points = []
@@ -1778,7 +1780,7 @@ class IMDatabasePointCollecter:
 
             else:
                 self.skipping_value -= 1
-            
+                
             self.point_checker += 1 
             if self.add_a_point == True and self.step > self.collect_qm_points or self.check_a_point == True and self.step > self.collect_qm_points:
                 print('no point correlation ')
