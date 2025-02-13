@@ -136,7 +136,7 @@ class EvbFepDriver():
 
             simulation.context.setPositions(initial_positions)
             simulation.reporters.append(mmapp.XTCReporter(
-                str(self.run_folder / "minim_{l:.3f}.xtc"),
+                str(self.run_folder / f"minim_{l:.3f}.xtc"),
                 write_step,
             ))
 

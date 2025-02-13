@@ -57,6 +57,8 @@ class EvbDriver():
         self.system_confs: list[dict] = []
         self.debug = False
 
+        self.t_label = int(time.time())
+
     def build_and_run_default_water_EVB(self, reactant: str | Molecule, product: str | list[str] | Molecule | list[Molecule], barrier, free_energy, ordered_input=False):
         """Automatically perform an EVB calculation using a vacuum system as reference and a system solvated in water as target system.
 
@@ -74,21 +76,22 @@ class EvbDriver():
             Lambda = np.round(Lambda,3)
         else:
             Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
-        self.ostream.print_info("Building forcefields")
-
+        self.ostream.print_blank()
+        self.ostream.print_header("Building forcefields")
+        self.ostream.flush()
         self.build_forcefields(reactant, product, ordered_input=ordered_input,optimise=True)
         self.ostream.print_blank()
-        self.ostream.print_info("Building systems")
+        self.ostream.print_header("Building systems")
         self.ostream.flush()
         self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
 
         self.ostream.print_blank()
-        self.ostream.print_info("Running FEP")
+        self.ostream.print_header("Running FEP")
         self.ostream.flush()
         self.run_FEP()
         if not self.debug:
             self.ostream.print_blank()
-            self.ostream.print_info("Computing energy profiles")
+            self.ostream.print_header("Computing energy profiles")
             self.ostream.flush()
             self.compute_energy_profiles(barrier, free_energy)
         else:
@@ -163,7 +166,10 @@ class EvbDriver():
             pro_input = [self._get_input_files(file) for file in product_names]
 
             if isinstance(product_charge, int):
-                product_charge: list[int] = [product_charge]
+                if len(product) != 1:
+                    assert product_charge == 0, "A charge should be provided for every provided product"
+
+                product_charge: list[int] = [product_charge] * len(product)
                 reactant_charge: int = product_charge[0]  # type: ignore
             else:
                 reactant_charge = sum(product_charge)
@@ -237,9 +243,9 @@ class EvbDriver():
                         charges.append(float(line))
                     except ValueError:
                         self.ostream.print_info(f"Could not read line {line} from {charge_path}. Continuing")
-            print_charge = [round(charge, 3) for charge in charges]
+            print_charge = sum([round(charge, 3) for charge in charges])
             self.ostream.print_info(
-                f"Loading charges from {charge_path} file, total charge = {print_charge}"
+                f"Loading charges from {charge_path} file, total_charg = {print_charge}"
             )
 
         forcefield = None
@@ -384,24 +390,24 @@ class EvbDriver():
 
         #Per configuration
         for conf in configurations:
-            t = int(time.time())
             #create folders,
             
-            data_folder = f"EVB_{self.name}_{conf["name"]}_data_{t}"
+            data_folder = f"EVB_{self.name}_{conf["name"]}_data_{self.t_label}"
             conf["data_folder"] = data_folder
             run_folder = f"{data_folder}/run"
             conf["run_folder"] = run_folder
             cwd = Path().cwd()
             data_folder_path = cwd / data_folder
             run_folder_path = cwd / run_folder
-            self.ostream.print_info(f"Saving files to {data_folder_path} and {run_folder_path}")
 
             data_folder_path.mkdir(parents=True, exist_ok=True)
             run_folder_path.mkdir(parents=True, exist_ok=True)
 
             # build the system
             system_builder = EvbSystemBuilder()
-
+            self.ostream.print_blank()
+            self.ostream.print_header(f"Building systems for {conf['name']}")
+            self.ostream.flush()
             systems, topology, initial_positions = system_builder.build_systems(
                 reactant=self.reactant,
                 product=self.product,
@@ -410,6 +416,8 @@ class EvbDriver():
                 constraints=constraints,
             )
 
+            self.ostream.print_info(f"Saving files to {data_folder_path} and {run_folder_path}")
+            self.ostream.flush()
             self.save_systems_as_xml(systems, conf["run_folder"])
 
             top_path = cwd / data_folder / "topology.pdb"
@@ -466,8 +474,7 @@ class EvbDriver():
                 "pressure": 1,
                 "ion_count": 0,
                 "CNT": True,
-                "M": 5,
-                "N": 9,
+                "CNT_radius": 0.5,
             }
         elif name == "graphene":
             conf = {
@@ -478,8 +485,7 @@ class EvbDriver():
                 "pressure": 1,
                 "ion_count": 0,
                 "graphene": True,
-                "M": 5,
-                "N": 9,
+                "graphene_size": 2,
             }
         elif name == "E_field":
             conf = {
@@ -607,7 +613,8 @@ class EvbDriver():
             initial_equil_step_size = 0.001
 
         for conf in self.system_confs:
-            self.ostream.print_info(f"Running FEP for {conf['name']}")
+            self.ostream.print_blank()
+            self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver()
             FEP.run_FEP(
