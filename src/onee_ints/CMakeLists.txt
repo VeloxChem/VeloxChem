@@ -6,6 +6,7 @@ target_sources(vlxobjs
     ElectricFieldIntegrals.cpp
     ElectricFieldIntegralsGradient.cpp
     ElectricFieldPotentialGradientAtMMSites.cpp
+    ElectricFieldPotentialHessian.cpp
     ElectricFieldValues.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
