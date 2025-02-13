@@ -2391,8 +2391,7 @@ class LinearSolver:
 
             # hole
             ind_occ = nocc - i_nto - 1
-            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_occ,
-                            'alpha')
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_occ)
 
             if self.rank == mpi_master():
                 occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
@@ -2407,8 +2406,7 @@ class LinearSolver:
 
             # electron
             ind_vir = nocc + i_nto
-            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_vir,
-                            'alpha')
+            vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_vir)
 
             if self.rank == mpi_master():
                 vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(

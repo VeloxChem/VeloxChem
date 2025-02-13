@@ -51,10 +51,12 @@ from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
+from .cpcmdriver import CpcmDriver
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_libxc_reference
-from .sanitychecks import molecule_sanity_check, dft_sanity_check, pe_sanity_check
+from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
+                           pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
@@ -213,6 +215,14 @@ class ScfDriver:
         self.embedding_options = None
         self._embedding_drv = None
 
+        # solvation model
+        self.solvation_model = None
+        self._cpcm = False
+        self.cpcm_drv = None
+        self.cpcm_epsilon = 78.39
+        self.cpcm_grid_per_sphere = 194
+        self.cpcm_x = 0
+
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
         self.qm_vdw_params = None
@@ -287,6 +297,12 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'solvation_model': ('str', 'solvation model'),
+                'cpcm_grid_per_sphere':
+                    ('int', 'number of grid points per sphere (C-PCM)'),
+                'cpcm_epsilon':
+                    ('float', 'dielectric constant of solvent (C-PCM)'),
+                'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -507,6 +523,16 @@ class ScfDriver:
         # check pe setup
         pe_sanity_check(self)
 
+        # check solvation model setup
+        solvation_model_sanity_check(self)
+        if self._cpcm:
+            self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
+            self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
+            self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.x = self.cpcm_x
+        else:
+            self.cpcm_drv = None
+
         # check print level (verbosity of output)
         if self.print_level < 2:
             self.print_level = 1
@@ -566,6 +592,26 @@ class ScfDriver:
                        tm.time() - grid_t0))
             self.ostream.print_blank()
 
+        # set up polarizable continuum model
+        if self._cpcm:
+            cpcm_info = 'Using C-PCM with the ISWIG discretization method.'
+            self.ostream.print_info(cpcm_info)
+            self.ostream.print_blank()
+            iswig_ref = 'A. W. Lange, J. M. Herbert,'
+            iswig_ref += ' J. Chem. Phys. 2010, 133, 244111.'
+            self.ostream.print_reference(iswig_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            (self._cpcm_grid,
+             self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
+            self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
+                self._cpcm_grid, self._cpcm_sw_func)
+            self._cpcm_Bmat = self.cpcm_drv.form_matrix_B(
+                self._cpcm_grid, molecule)
+            self._cpcm_Bzvec = np.dot(self._cpcm_Bmat,
+                                      molecule.get_element_ids())
+
         # set up polarizable embedding
         if self._pe:
 
@@ -614,6 +660,10 @@ class ScfDriver:
 
         # set up point charges without PE
         elif self.point_charges is not None:
+
+            pot_info = 'Preparing for QM/MM calculation.'
+            self.ostream.print_info(pot_info)
+            self.ostream.print_blank()
 
             if isinstance(self.point_charges, str):
                 potfile = self.point_charges
@@ -1321,6 +1371,39 @@ class ScfDriver:
 
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
+            if self._cpcm:
+                if self.scf_type == 'restricted':
+                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
+                                                       self._cpcm_grid,
+                                                       den_mat[0] * 2.0)
+                else:
+                    Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
+                                                       self._cpcm_grid,
+                                                       den_mat[0] + den_mat[1])
+
+                if self.rank == mpi_master():
+                    scale_f = -(self.cpcm_drv.epsilon - 1) / (
+                        self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                    rhs = scale_f * (self._cpcm_Bzvec + Cvec)
+                    self._cpcm_q = np.linalg.solve(self._cpcm_Amat, rhs)
+
+                    e_sol = self.cpcm_drv.compute_solv_energy(
+                        self._cpcm_Bzvec, Cvec, self._cpcm_q)
+                    e_el += e_sol
+                    self.cpcm_epol = e_sol
+                else:
+                    self._cpcm_q = None
+                    self.cpcm_epol = None
+                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+
+                Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
+                    molecule, ao_basis, self._cpcm_grid, self._cpcm_q)
+
+                if self.rank == mpi_master():
+                    fock_mat[0] += Fock_sol
+                    if self.scf_type != 'restricted':
+                        fock_mat[1] += Fock_sol
+
             if (self.rank == mpi_master() and i > 0 and
                     self.level_shifting > 0.0):
 
@@ -1536,6 +1619,16 @@ class ScfDriver:
                     self._scf_tensors['potfile'] = self.potfile
                     self._scf_tensors['E_emb'] = e_emb
                     self._scf_tensors['F_emb'] = V_emb
+
+                if self.point_charges is not None:
+                    self._scf_tensors['point_charges'] = self.point_charges
+                if self.qm_vdw_params is not None:
+                    self._scf_tensors['qm_vdw_params'] = self.qm_vdw_params
+
+                if self.solvation_model is not None:
+                    self._scf_tensors['solvation_model'] = self.solvation_model
+                    self._scf_tensors[
+                        'dielectric_constant'] = self.cpcm_drv.epsilon
 
             else:
                 self._scf_tensors = None
@@ -2475,6 +2568,17 @@ class ScfDriver:
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self._cpcm:
+            cur_str = 'Solvation Model                 : '
+            cur_str += 'C-PCM with ISWIG Discretization'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Dielectric Constant       : '
+            cur_str += f'{self.cpcm_drv.epsilon}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per Atomic Sphere  : '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self.electric_field is not None:
             cur_str = 'Static Electric Field           : '
             cur_str += str(self.electric_field)
@@ -2725,12 +2829,19 @@ class ScfDriver:
         etot = self._iter_data['energy']
 
         e_el = etot - enuc - enuc_mm - e_d4 - e_ef_nuc
+        if self._cpcm:
+            e_el -= self.cpcm_epol
 
         valstr = f'Total Energy                       :{etot:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Electronic Energy                  :{e_el:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))
+
+        if self._cpcm:
+            valstr = 'Electrostatic Solvation Energy     :'
+            valstr += f'{self.cpcm_epol:20.10f} a.u.'
+            self.ostream.print_header(valstr.ljust(92))
 
         valstr = f'Nuclear Repulsion Energy           :{enuc:20.10f} a.u.'
         self.ostream.print_header(valstr.ljust(92))

@@ -22,7 +22,6 @@ class TestScfRestrictedOpenDriver:
         mol = Molecule.read_xyz_string(xyz_string)
         mol.set_charge(charge)
         mol.set_multiplicity(mult)
-        mol.check_multiplicity()
 
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
         min_bas = MolecularBasis.read(mol, 'ao-start-guess', ostream=None)

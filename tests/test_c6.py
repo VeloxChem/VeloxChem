@@ -19,7 +19,6 @@ class TestC6:
         H   -0.0582782  -0.3702550   0.2638279
         """
         mol = Molecule.read_xyz_string(xyz_string)
-        mol.check_multiplicity()
 
         basis_label = 'def2-svp'
         bas = MolecularBasis.read(mol, basis_label, ostream=None)

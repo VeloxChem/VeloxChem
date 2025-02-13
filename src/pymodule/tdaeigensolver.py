@@ -189,6 +189,12 @@ class TdaEigenSolver(LinearSolver):
         # check pe setup
         pe_sanity_check(self)
 
+        # check solvation model setup
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                'solvation_model' not in scf_tensors,
+                type(self).__name__ + ': Solvation model not implemented')
+
         # check print level (verbosity of output)
         if self.print_level < 2:
             self.print_level = 1

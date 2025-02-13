@@ -30,6 +30,7 @@ import sys
 import re
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+from collections import defaultdict
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .atomtypeidentifier import AtomTypeIdentifier
@@ -39,13 +40,14 @@ from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
+from .scfrestdriver import ScfRestrictedDriver
 from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input, get_random_string_parallel
 from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
-#from .xtbhessiandriver import XtbHessianDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
 
 
@@ -107,6 +109,7 @@ class ForceFieldGenerator:
         self.molecule_name = 'vlx_' + get_random_string_parallel(self.comm)
         self.scan_xyz_files = None
         self.atom_types = None
+        self.rotatable_bonds = []
 
         # topology settings
         self.eq_param = True
@@ -120,6 +123,7 @@ class ForceFieldGenerator:
         self.nrexcl = 3
         self.force_field_data = None
         self.force_field_data_extension = None
+        self.topology_update_flag = False
 
         # number of rounds for fitting dihedral potentials
         self.n_rounds = 3
@@ -296,7 +300,7 @@ class ForceFieldGenerator:
         for i, dih in enumerate(self.target_dihedrals):
             self.validate_force_field(i)
 
-        # save output files
+        # ave output files
 
         if self.rank == mpi_master() and self.keep_files:
             out_dir = Path(self.molecule_name + '_files')
@@ -317,6 +321,481 @@ class ForceFieldGenerator:
                 pass
             self.workdir = None
 
+    def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False):
+        """
+        Changes the dihedral constants for a specific rotatable bond in order to
+        fit the QM scan.
+
+        :param rotatable_bond:
+            The list of indices of the rotatable bond. (1-indexed)
+        :param scan_file:
+            The file with the QM scan. If None is provided it a QM scan will be performed.
+        :param scf_drv:
+            The SCF driver. If None is provided it will use HF.
+        :param basis:
+            The AO basis set. If None is provided it will use 6-31G*.
+        :param scan_range:
+            List with the range of dihedral angles. Default is [0, 360].
+        :param n_points:
+            The number of points to be calculated. Default is 19.
+        :param scan_verbose:
+            If the QM scan should be print all the information.
+        :param visualize:
+            If the dihedral scans should be visualized.
+        :param fit_extremes:
+            If the dihedral parameters should be fitted to the QM scan extremes
+        """
+
+        try:
+            from scipy.optimize import least_squares
+            from scipy.signal import argrelextrema
+
+        except ImportError:
+            error_msg = 'Scipy is required for fitting dihedral potentials.'
+            assert_msg_critical(False, error_msg)
+
+        # If scan file is provided, read it
+        if scan_file is not None:
+            with open(scan_file, 'r') as f:
+                lines = f.readlines()
+
+            for line in lines:
+                if line.startswith('Scan'):
+                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
+                    # Extract the dihedral indices
+                    scanned_dih = [int(i) for i in line.split('Dihedral')[1].split()[0].split('-')]
+                    central_atom_1 = scanned_dih[1] - 1
+                    central_atom_2 = scanned_dih[2] - 1
+
+                    # Check if the rotatable bond matches the scan file
+                    if not (central_atom_1 == rotatable_bond[0] - 1 and central_atom_2 == rotatable_bond[1] - 1):
+                        raise ValueError('The rotatable bond does not match the scan file.')
+
+                    break
+
+        else:
+            central_atom_1 = rotatable_bond[0] - 1
+            central_atom_2 = rotatable_bond[1] - 1
+
+        # Identify the dihedral indices for the rotatable bond
+        dihedral_indices = []
+        dihedral_types = []
+        multiple_dihedrals = []
+
+        for (i,j,k,l), dihedral in self.dihedrals.items():
+            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
+                dihedral_indices.append([i,j,k,l])
+                dihedral_types.append(dihedral['comment'])
+                if dihedral['multiple'] == True:
+                    multiple_dihedrals.append(True)
+                else:
+                    multiple_dihedrals.append(False)
+
+        # Transform the dihedral indices to 1-indexed for printing
+        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        
+        # Print a header
+        header = 'VeloxChem Dihedral Reparametrization'
+        self.ostream.print_header(header)
+        self.ostream.print_header('=' * len(header))
+        self.ostream.print_blank()
+        self.ostream.flush()
+        # Print some information
+        self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
+
+        # Print the dihedral indices *in 1 index* and types
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
+        self.ostream.flush()
+
+        # If the scan file is provided, read it
+        if scan_file is not None:
+            # Check if the name of the file is correct 1-2-3-4.xyz
+            reference_dih = scanned_dih
+            print('Reference dihedral:',reference_dih)
+            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
+            file_path = Path(scan_file)
+            # Note: Sometimes geomeTRIC writes the dihedral atoms in reverse order
+            if file_path.stem not in [f"{reference_dih[0]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[3]}",
+                                 f"{reference_dih[3]}-{reference_dih[2]}-{reference_dih[1]}-{reference_dih[0]}"]:
+                
+                raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
+            self.read_qm_scan_xyz_files([scan_file])
+        else:
+            # Perform a QM scan
+            self.ostream.print_info('No scan file provided. Performing QM scan...')
+            self.ostream.flush()
+        
+            if scf_drv is None:
+                scf_drv = ScfRestrictedDriver()
+                if not scan_verbose:
+                    scf_drv.ostream.mute()
+                self.ostream.print_info('SCF driver not provided. Using default: RHF')
+                self.ostream.flush()
+            
+            if basis is None:
+                basis = MolecularBasis.read(self.molecule,'6-31G*')
+                self.ostream.print_info('Basis set not provided. Using dafault: 6-31G*')
+                self.ostream.flush()
+
+            # Perform the reference SCF calculation
+            if scf_result is None:
+                self.ostream.print_info('Performing SCF calculation...')
+                self.ostream.flush()
+                scf_result = scf_drv.compute(self.molecule, basis)
+            
+            # Take one of the dihedrals to perform the scan
+            reference_dih = dihedral_indices[0]
+            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
+
+            opt_drv = OptimizationDriver(scf_drv)
+            
+            if not scan_verbose:
+                opt_drv.ostream.mute()
+
+            constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
+            print('Constraint:',constraint)
+            opt_drv.constraints = [constraint]
+
+            # Scan the dihedral
+            self.ostream.print_info(f'Dihedral: {reference_dih_name} taken for scan...')
+            self.ostream.print_info(f'Angle range: {scan_range[0]}-{scan_range[1]}')
+            self.ostream.print_info(f'Number of points: {n_points}')
+            self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
+            self.ostream.flush()
+            opt_drv.compute(self.molecule, basis, scf_result)
+            self.ostream.print_info('Scan completed.')
+            self.ostream.flush()
+
+            # Change the default file name to the dihedral indices
+            file_path = Path("scan-final.xyz")
+            file_path.rename(f"{reference_dih_name}.xyz")
+
+            # Read the QM scan
+            self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
+
+        # Group dihedrals by their types
+        dihedral_groups = defaultdict(list)
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            # If the dihedral is multiple add all the types
+            if dihedral['multiple'] == True:
+                # Handle multiple dihedrals
+                for idx, dihedral_type in enumerate(dihedral['comment']):
+                    dihedral_groups[dihedral_type].append((i, j, k, l))
+            else:
+                dihedral_type = dihedral['comment']
+                dihedral_groups[dihedral_type].append((i, j, k, l))
+
+        # Extract initial parameters for each dihedral instance
+        barriers = []
+        phases = []
+        periodicities = []
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            if dihedral['multiple'] == True:
+                # Handle multiple dihedrals
+                for idx, dihedral_type in enumerate(dihedral['comment']):
+                    barrier = dihedral['barrier'][idx]
+                    phase = dihedral['phase'][idx]
+                    periodicity = abs(dihedral['periodicity'][idx])
+                    barriers.append(barrier)
+                    phases.append(phase)
+                    periodicities.append(periodicity)
+
+            else:
+                barrier = dihedral['barrier']
+                phase = dihedral['phase']
+                periodicity = dihedral['periodicity']
+                barriers.append(barrier)
+                phases.append(phase)
+                periodicities.append(periodicity)
+
+        # Make a copy of the original dihedrals dictionary
+        original_dihedrals_dict = self.dihedrals.copy()
+
+        # Convert to NumPy arrays
+        barriers = np.array(barriers, dtype=float)
+        phases_array = np.array(phases, dtype=float)
+        periodicities_array = np.array(periodicities, dtype=float)
+        phases_array_rad = np.deg2rad(phases_array)
+        dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
+
+        # Print initial barriers
+        self.ostream.print_info(f"GAFF barriers: {barriers} will be used as initial guess.")
+        self.ostream.flush()
+
+        # Store the original barriers and perform the initial validation
+        original_barriers = barriers.copy()
+        gaff_dihedral = self.validate_force_field(0)
+        if visualize:
+            self.visualize(gaff_dihedral)
+
+        # Set the dihedral barriers to zero for the scan
+        for i, j, k, l in dihedral_indices:
+            if self.dihedrals[(i, j, k, l)]['multiple'] == True:
+                for idx, dihedral_type in enumerate(self.dihedrals[(i, j, k, l)]['comment']):
+                    self.dihedrals[(i, j, k, l)]['barrier'][idx] = 0.0
+            else:
+                self.dihedrals[(i, j, k, l)]['barrier'] = 0.0
+
+        # Validate the dihedral MM parameters
+        initial_data = self.validate_force_field(0)
+
+        # Prepare data for fitting
+        qm_energies = np.array(initial_data['qm_scan_kJpermol'])
+        mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
+
+        # Define the dihedral potential function
+        def dihedral_potential(phi, barriers, phases_rad, periodicities):
+            total_potential = np.zeros_like(phi)
+            #Group barriers, if some are the same use the same barrier
+            if np.unique(barriers).size != barriers.size:
+                unique_barriers = np.unique(barriers)
+                for barrier in unique_barriers:
+                    barrier_indices = np.where(barriers == barrier)[0]
+                    for idx in barrier_indices:
+                        total_potential += barrier * (1 + np.cos(periodicities[idx] * phi - phases_rad[idx]))
+            else:
+                for barrier, phase_rad, periodicity in zip(barriers, phases_rad, periodicities):
+                    total_potential += barrier * (1 + np.cos(periodicity * phi - phase_rad))
+
+            return total_potential
+        
+        def extract_maxima(barriers, qm_energies):
+
+            dihedral_energies = dihedral_potential(
+                dihedral_angles_rad,
+                barriers,
+                phases_array_rad,
+                periodicities_array
+            )
+            mm_energies = dihedral_energies + mm_baseline
+
+            # Relative energies
+            mm_energies_rel = mm_energies - np.min(mm_energies)
+
+            # Identify maxima indices for QM and MM energies
+            qm_maxima_indices = argrelextrema(qm_energies, np.greater)[0]   
+            mm_maxima_indices = argrelextrema(mm_energies_rel, np.greater)[0]
+
+            # Identify the minima for the QM and MM energies
+            qm_minima_indices = argrelextrema(qm_energies, np.less)[0]
+            mm_minima_indices = argrelextrema(mm_energies_rel, np.less)[0]
+
+            # Use first and last points as maxima (usual behavior for cosine dihedrals)
+            qm_extremes = [0, len(qm_energies) - 1]
+            mm_extremes = [0, len(mm_energies_rel) - 1]
+
+            # Build the arrays with the maxima and minima
+            qm_maxima_indices = np.concatenate((qm_maxima_indices, qm_minima_indices, qm_extremes))
+            mm_maxima_indices = np.concatenate((mm_maxima_indices, mm_minima_indices, mm_extremes))
+
+            return qm_maxima_indices, mm_maxima_indices
+
+        def objective_function(barriers_to_fit, qm_maxima_indices, mm_maxima_indices):
+
+            # Update the dihedral parameters in the force field
+            dihedral_energies = dihedral_potential(
+                dihedral_angles_rad,
+                barriers_to_fit,
+                phases_array_rad,
+                periodicities_array
+            )
+            mm_energies_fit = dihedral_energies + mm_baseline
+
+            # Relative energies
+            mm_energies_fit_rel = mm_energies_fit
+            qm_energies_rel = qm_energies
+
+            if fit_extremes:
+
+                # Match QM and MM maxima using nearest x-axis values
+                matched_qm_maxima = []
+                matched_mm_maxima = []
+                for qm_idx in qm_maxima_indices:
+                    # Handle the case where mm_maxima_indices is empty
+                    if len(mm_maxima_indices) > 0:
+                        nearest_mm_idx = mm_maxima_indices[np.argmin(np.abs(mm_maxima_indices - qm_idx))]
+                        matched_qm_maxima.append(qm_energies_rel[qm_idx])
+                        matched_mm_maxima.append(mm_energies_fit_rel[nearest_mm_idx])
+
+                # Convert to arrays
+                matched_qm_rel = np.array(matched_qm_maxima)
+                matched_mm_rel = np.array(matched_mm_maxima)
+
+                qm_energies_rel = matched_qm_rel
+                mm_energies_fit_rel = matched_mm_rel
+
+            # Residuals
+            residuals = (qm_energies_rel - mm_energies_fit_rel) #* weights
+
+            # Return the squared residuals for optimization
+            return residuals**2
+
+        self.ostream.print_info('Fitting the dihedral parameters...')
+        if fit_extremes:
+            self.ostream.print_info('Only singular points are used for fitting')
+        self.ostream.flush()
+
+        # Use the original barriers as the initial guess
+        initial_guess = original_barriers.copy()
+        
+        # Extract maxima for QM and MM energies
+        if fit_extremes:
+            qm_maxima_indices, mm_maxima_indices = extract_maxima(barriers, qm_energies)
+            args = (qm_maxima_indices, mm_maxima_indices)
+        else:
+            args = (None, None)
+
+        # Set as bound that the barriers should be positive
+        bounds = (0, np.inf)
+
+        # Perform the optimization
+        self.ostream.print_info('Optimizing dihedral via Least-Squares fitting...')
+        self.ostream.flush()
+        result = least_squares(
+            fun = objective_function,
+            x0 = initial_guess,
+            jac = '3-point',
+            method='dogbox',
+            bounds=bounds,
+            args=args,
+            verbose=0,
+            xtol=1e-12,  
+            ftol=1e-12,  
+            gtol=1e-12,  
+            max_nfev=2000  
+        )
+
+        # Update the force field parameters with the optimized barriers
+        fitted_barriers = result.x
+
+        # Get the final MM energy profile
+        fitted_dihedral_energies = dihedral_potential(
+            dihedral_angles_rad,
+            fitted_barriers,
+            phases_array_rad,
+            periodicities_array
+        ) + mm_baseline
+
+        # Adjust the barriers to the dihedral types
+        if np.unique(barriers).size != barriers.size:
+
+            unique_barriers = np.unique(barriers)
+
+            for barrier in unique_barriers:
+                barrier_indices = np.where(barriers == barrier)[0]
+                mean_barrier = np.mean(fitted_barriers[barrier_indices])
+                for idx in barrier_indices:
+                    fitted_barriers[idx] = mean_barrier
+
+        # List of the fitted barriers
+        fit_barrier_to_print = fitted_barriers.copy()
+        self.ostream.print_info(f'New fitted barriers: {fit_barrier_to_print}')
+
+        # If there are multiple dihedrals group them in list of lists
+        if np.any(multiple_dihedrals):
+            fitted_barriers_grouped = []
+            for i, j, k, l in dihedral_indices:
+                dihedral = self.dihedrals[(i, j, k, l)]
+                if dihedral['multiple'] == True:
+                    # Handle multiple dihedrals
+                    number_dihedrals = len(dihedral['comment'])
+                    fitted_barriers_grouped.append(fitted_barriers[:number_dihedrals])
+                    fitted_barriers = fitted_barriers[number_dihedrals:]
+                else:
+                    fitted_barriers_grouped.append([fitted_barriers[0]])
+                    fitted_barriers = fitted_barriers[1:]
+
+            fitted_barriers = fitted_barriers_grouped
+
+
+        # Assign the fitted barriers to the dihedrals
+        for idx, (i, j, k, l) in enumerate(dihedral_indices):
+            dihedral = self.dihedrals[(i, j, k, l)]
+            if dihedral['multiple'] == True:
+                dihedral['barrier'] = fitted_barriers[idx]
+                # The comment is a list of strings, add ' (fitted)' to each string
+                dihedral['comment'] = [str(dihedral['comment'][idx] + ' (fitted)') for idx in range(len(dihedral['comment']))]
+            else:
+                if any(multiple_dihedrals):
+                    dihedral['barrier'] = fitted_barriers[idx][0]
+                else:
+                    dihedral['barrier'] = fitted_barriers[idx]
+
+                dihedral['comment'] = str(dihedral['comment'] + ' (fitted)')
+
+
+        # Validate the fitted parameters
+        self.ostream.print_info('Validating fitted parameters...')
+        self.ostream.flush()
+
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+        self.ostream.print_info(
+            '  ---------------------------------------------------------------')
+        for angle, e_mm, e_qm in zip(self.scan_dih_angles[0], fitted_dihedral_energies, qm_energies):
+            self.ostream.print_info(
+                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                f'{(e_mm - e_qm):10.3f}')
+        self.ostream.print_blank()
+        # Summarize the fitting quality
+        self.ostream.print_info('Fitting quality results:')
+        self.ostream.print_info('  ---------------------------------------------------------------')
+        # Average difference
+        avg_diff = np.mean(fitted_dihedral_energies - qm_energies)
+        self.ostream.print_info(f'Average difference: {abs(avg_diff):.3f} kJ/mol')
+        # Standard deviation
+        std_diff = np.std(fitted_dihedral_energies - qm_energies)
+        self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
+        self.ostream.flush()
+
+        # Visualize the fitted dihedral using a spline
+        if visualize:
+
+            from scipy.interpolate import make_interp_spline
+            import matplotlib.pyplot as plt
+
+            # Smooth the x (angles) and y (energies) data using a spline
+            dihedral_angles = np.array(self.scan_dih_angles[0])  
+            qm_energies = np.array(qm_energies)                 
+            fitted_energies = np.array(fitted_dihedral_energies)  
+
+            # Create a dense set of angles for smooth interpolation
+            dense_angles = np.linspace(dihedral_angles.min(), dihedral_angles.max(), 300)
+
+            # Fit splines to QM and MM data
+            qm_spline = make_interp_spline(dihedral_angles, qm_energies, k=3)  
+            mm_spline = make_interp_spline(dihedral_angles, fitted_energies, k=3)
+
+            # Evaluate the splines on the dense set of angles
+            qm_smooth = qm_spline(dense_angles)
+            mm_smooth = mm_spline(dense_angles)
+
+            # Plot the smoothed QM and MM energies
+            plt.figure(figsize=(8, 6))
+            plt.plot(dense_angles, qm_smooth, label='QM (spline)', linewidth=4, color='black', alpha=0.7)
+            plt.plot(dense_angles, mm_smooth, label='MM (spline)', linewidth=4, color='darkcyan', alpha=0.7)
+
+            # Plot original data points for reference
+            plt.scatter(dihedral_angles, qm_energies, color='black', s=25, label='QM (points)')
+            plt.scatter(dihedral_angles, fitted_energies, color='darkcyan', s=25, label='MM (points)')
+
+            # Add labels, legend, and grid
+            plt.xlabel('dihedral angle {}-{}-{}-{} (deg)'.format(reference_dih[0], 
+                                                                 reference_dih[1], 
+                                                                 reference_dih[2], 
+                                                                 reference_dih[3]))
+            plt.ylabel('Energy (kJ/mol)')
+            # Center right legend outside the plot
+            plt.legend(loc='center right', bbox_to_anchor=(1.25, 0.5))
+            plt.title(f'Fitted Dihedral Potential for rotatable bond {rotatable_bond[0]}-{rotatable_bond[1]}')
+            plt.show()
+
+        self.ostream.print_info('Dihedral MM parameters have been reparametrized and updated in the topology.')
+        self.ostream.flush()
+   
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
         Reads QM scan xyz files.
@@ -325,17 +804,10 @@ class ForceFieldGenerator:
             The list of xyz files from QM scan.
         """
 
-        if self.scan_dih_angles is None:
-            self.scan_dih_angles = []
-
-        if self.scan_energies is None:
-            self.scan_energies = []
-
-        if self.scan_geometries is None:
-            self.scan_geometries = []
-
-        if self.target_dihedrals is None:
-            self.target_dihedrals = []
+        self.scan_dih_angles = []
+        self.scan_energies = []
+        self.scan_geometries = []
+        self.target_dihedrals = []
 
         # reading QM data
 
@@ -448,7 +920,81 @@ class ForceFieldGenerator:
 
         return content.splitlines()
 
-    def create_topology(self, molecule, basis=None, scf_result=None, resp=True):
+    @staticmethod
+    def get_gaff_data_dict():
+        """
+        Gets GAFF data into a dictionary.
+        """
+
+        data = {
+            'version': None,
+            'refs': [],
+            'atom_types': [],
+            'bonds': [],
+            'angles': [],
+            'dihedrals': [],
+            'impropers': [],
+            'fudgeQQ': None,
+            'fudgeLJ': None,
+        }
+
+        gaff_path = Path(__file__).parent / 'tests' / 'data' / 'gaff-2.11.xml'
+        tree = ET.parse(str(gaff_path))
+        root = tree.getroot()
+
+        for node in root:
+
+            if node.tag == 'Info':
+                for subnode in node:
+                    if subnode.tag == 'Source':
+                        info = subnode.attrib
+                        data['version'] = info['Source']
+                    elif subnode.tag == 'Reference':
+                        data['refs'].append(subnode.text)
+
+            elif node.tag == 'AtomTypes':
+                for subnode in node:
+                    if subnode.tag == 'Type':
+                        info = subnode.attrib
+                        data['atom_types'].append(info)
+
+            elif node.tag == 'HarmonicBondForce':
+                for subnode in node:
+                    if subnode.tag == 'Bond':
+                        info = subnode.attrib
+                        data['bonds'].append(info)
+
+            elif node.tag == 'HarmonicAngleForce':
+                for subnode in node:
+                    if subnode.tag == 'Angle':
+                        info = subnode.attrib
+                        data['angles'].append(info)
+
+            elif node.tag == 'PeriodicTorsionForce':
+                for subnode in node:
+                    if subnode.tag == 'Proper':
+                        info = subnode.attrib
+                        data['dihedrals'].append(info)
+                    elif subnode.tag == 'Improper':
+                        info = subnode.attrib
+                        data['impropers'].append(info)
+
+            elif node.tag == 'NonbondedForce':
+                info = node.attrib
+                data['fudgeQQ'] = info['coulomb14scale']
+                data['fudgeLJ'] = info['lj14scale']
+
+                for subnode in node:
+                    if subnode.tag == 'Atom':
+                        info = subnode.attrib
+                        for idx in range(len(data['atom_types'])):
+                            if data['atom_types'][idx]['class'] == info['class']:
+                                data['atom_types'][idx]['sigma'] = info['sigma']
+                                data['atom_types'][idx]['epsilon'] = info['epsilon']
+
+        return data
+
+    def create_topology(self, molecule, basis=None, scf_result=None, resp=True, use_xml=True):
         """
         Analyzes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
@@ -464,17 +1010,32 @@ class ForceFieldGenerator:
             If False partial charges will be set to zero.
         """
 
-        # Read the force field data lines.
+        ff_data_dict = None
+        ff_data_lines = None
 
-        if self.force_field_data is None:
+        # Read the force field data
+
+        if use_xml:
+            ff_data_dict = self.get_gaff_data_dict()
+        elif self.force_field_data is None:
             ff_data_lines = self.get_gaff_data_lines()
         else:
             with open(self.force_field_data, 'r') as ff_data:
                 ff_data_lines = ff_data.readlines()
 
         # check GAFF version
+
         gaff_version = None
-        if ff_data_lines[0].startswith('AMBER General Force Field'):
+
+        if use_xml:
+            ff_data_version = ff_data_dict['version'].replace('gaff-', '').replace('.dat', '')
+            if '.' in ff_data_version:
+                version_major = ff_data_version.split('.')[0]
+                version_minor = ff_data_version.split('.')[1]
+                if version_major.isdigit() and version_minor.isdigit():
+                    gaff_version = f'{version_major}.{version_minor}'
+
+        elif ff_data_lines[0].startswith('AMBER General Force Field'):
             ff_data_version = ff_data_lines[0].split('Version')[1].split()[0]
             ff_data_version = ff_data_version.replace(',', '')
             if '.' in ff_data_version:
@@ -495,12 +1056,20 @@ class ForceFieldGenerator:
         # set GAFF version
         atomtypeidentifier.gaff_version = gaff_version
 
-        self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
-            self.molecule)
+        if self.topology_update_flag:
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
+                self.molecule, self.connectivity_matrix)
+            # The partial charges have to be recalculated
+            self.partial_charges = None
+        else:
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
+                self.molecule)
+            self.connectivity_matrix = np.copy(
+                atomtypeidentifier.connectivity_matrix)
+            
         atomtypeidentifier.identify_equivalences()
-
-        self.connectivity_matrix = np.copy(
-            atomtypeidentifier.connectivity_matrix)
+        
+        self.atom_info_dict = atomtypeidentifier.atom_info_dict
 
         if not resp:
             # skip RESP charges calculation
@@ -666,15 +1235,26 @@ class ForceFieldGenerator:
                 else:
                     break
 
-            for line in ff_data_lines:
-                if line.startswith(f'  {at}     '):
-                    atom_ff = line[5:].strip().split()
-                    sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
-                    epsilon = float(atom_ff[1]) * 4.184
-                    comment = 'GAFF'
-                    atom_type_found = True
-                    use_gaff = True
-                    break
+            if use_xml:
+                for atom_type_data in ff_data_dict['atom_types']:
+                    # Note: need strip() for converting e.g. 'c ' to 'c'
+                    if atom_type_data['class'] == at.strip():
+                        sigma = float(atom_type_data['sigma'])
+                        epsilon = float(atom_type_data['epsilon'])
+                        comment = 'GAFF'
+                        atom_type_found = True
+                        use_gaff = True
+                        break
+            else:
+                for line in ff_data_lines:
+                    if line.startswith(f'  {at}     '):
+                        atom_ff = line[5:].strip().split()
+                        sigma = float(atom_ff[0]) * 2**(-1 / 6) * 2 / 10
+                        epsilon = float(atom_ff[1]) * 4.184
+                        comment = 'GAFF'
+                        atom_type_found = True
+                        use_gaff = True
+                        break
 
             if not atom_type_found:
                 if at == 'ow':
@@ -752,20 +1332,35 @@ class ForceFieldGenerator:
                 re.compile(r'\A' + f'{at_1}-{at_2}  '),
                 re.compile(r'\A' + f'{at_2}-{at_1}  '),
             ]
+            target_bond_types = [
+                # Note: need strip() for converting e.g. 'c ' to 'c'
+                (at_1.strip(), at_2.strip()),
+                (at_2.strip(), at_1.strip()),
+            ]
 
             bond_found = False
             r, k_r, comment = None, None, None
 
-            for line in ff_data_lines:
-                for p in patterns:
-                    m = re.search(p, line)
-                    if m is not None:
-                        bond_ff = line[5:].strip().split()
-                        r = float(bond_ff[1]) * 0.1
-                        k_r = float(bond_ff[0]) * 4.184 * 2 * 100
-                        comment = m.group(0)
-                        bond_found = True
-                        break
+            if use_xml:
+                for bond_data in ff_data_dict['bonds']:
+                    for target_bond in target_bond_types:
+                        if target_bond == (bond_data['class1'], bond_data['class2']):
+                            r = float(bond_data['length'])
+                            k_r = float(bond_data['k'])
+                            comment = '-'.join(target_bond)
+                            bond_found = True
+                            break
+            else:
+                for line in ff_data_lines:
+                    for p in patterns:
+                        m = re.search(p, line)
+                        if m is not None:
+                            bond_ff = line[5:].strip().split()
+                            r = float(bond_ff[1]) * 0.1
+                            k_r = float(bond_ff[0]) * 4.184 * 2 * 100
+                            comment = m.group(0)
+                            bond_found = True
+                            break
 
             if not bond_found:
                 # Default value for bonds
@@ -813,20 +1408,35 @@ class ForceFieldGenerator:
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
                 re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
             ]
+            target_angle_types = [
+                # Note: need strip() for converting e.g. 'c ' to 'c'
+                (at_1.strip(), at_2.strip(), at_3.strip()),
+                (at_3.strip(), at_2.strip(), at_1.strip()),
+            ]
 
             angle_found = False
             theta, k_theta, comment = None, None, None
 
-            for line in ff_data_lines:
-                for p in patterns:
-                    m = re.search(p, line)
-                    if m is not None:
-                        angle_ff = line[8:].strip().split()
-                        theta = float(angle_ff[1])
-                        k_theta = float(angle_ff[0]) * 4.184 * 2
-                        comment = m.group(0)
-                        angle_found = True
-                        break
+            if use_xml:
+                for angle_data in ff_data_dict['angles']:
+                    for target_angle in target_angle_types:
+                        if target_angle == (angle_data['class1'], angle_data['class2'], angle_data['class3']):
+                            theta = float(angle_data['angle']) / np.pi * 180.0
+                            k_theta = float(angle_data['k'])
+                            comment = '-'.join(target_angle)
+                            angle_found = True
+                            break
+            else:
+                for line in ff_data_lines:
+                    for p in patterns:
+                        m = re.search(p, line)
+                        if m is not None:
+                            angle_ff = line[8:].strip().split()
+                            theta = float(angle_ff[1])
+                            k_theta = float(angle_ff[0]) * 4.184 * 2
+                            comment = m.group(0)
+                            angle_found = True
+                            break
 
             if not angle_found:
                 # Default value for angles
@@ -862,9 +1472,14 @@ class ForceFieldGenerator:
                 re.compile(r'\A' + f'{at_1}-{at_2}-{at_3}-{at_4} '),
                 re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
             ]
+            target_dihedral_types = [
+                (at_1.strip(), at_2.strip(), at_3.strip(), at_4.strip()),
+                (at_4.strip(), at_3.strip(), at_2.strip(), at_1.strip()),
+            ]
 
             # special treatment for rotatable bonds, e.g. cc-cc, cd-cd, cc-na
             # and cd-na bonds between non-pure aromatic rings
+
             special_comment = ''
 
             if [at_2, at_3] in [['cc', 'cc'], ['cd', 'cd']]:
@@ -872,6 +1487,9 @@ class ForceFieldGenerator:
                         j, k, 'non_pure_aromatic'):
                     patterns = [
                         re.compile(r'\A' + 'X -cp-cp-X  '),
+                    ]
+                    target_dihedral_types = [
+                        ('', 'cp', 'cp', ''),
                     ]
                     special_comment = ('(Guessed for rotatable ' +
                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
@@ -884,6 +1502,10 @@ class ForceFieldGenerator:
                         re.compile(r'\A' + 'X -ca-na-X  '),
                         re.compile(r'\A' + 'X -na-ca-X  '),
                     ]
+                    target_dihedral_types = [
+                        ('', 'ca', 'na', ''),
+                        ('', 'na', 'ca', ''),
+                    ]
                     special_comment = ('(Guessed for rotatable ' +
                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
 
@@ -891,43 +1513,21 @@ class ForceFieldGenerator:
 
             dihedral_ff_lines = []
             dihedral_matches = []
-            for line in ff_data_lines:
-                for p in patterns:
-                    m = re.search(p, line)
-                    if m is not None:
-                        dihedral_ff = line[11:60].strip().split()
-                        if len(dihedral_ff) == 4:
-                            dihedral_ff_lines.append(line)
-                            dihedral_matches.append(
-                                m.group(0) + special_comment)
+
+            dihedral_ff_data = []
+
+            if use_xml:
+                for dihedral_data in ff_data_dict['dihedrals']:
+                    for target_dihedral in target_dihedral_types:
+                        if target_dihedral == (dihedral_data['class1'],
+                                               dihedral_data['class2'],
+                                               dihedral_data['class3'],
+                                               dihedral_data['class4']):
+                            dihedral_ff_data.append(dict(dihedral_data))
+                            dihedral_matches.append(self.get_dihedral_type_string(target_dihedral) + special_comment)
                             dihedral_found = True
                             break
-
-            if not dihedral_found:
-                patterns = [
-                    re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
-                    re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
-                ]
-
-                dihedral_ff_lines = []
-                dihedral_matches = []
-                for line in ff_data_lines:
-                    for p in patterns:
-                        m = re.search(p, line)
-                        if m is not None:
-                            dihedral_ff = line[11:60].strip().split()
-                            if len(dihedral_ff) == 4:
-                                dihedral_ff_lines.append(line)
-                                dihedral_matches.append(m.group(0))
-                                dihedral_found = True
-                                break
-
-            if not dihedral_found:
-                # guesses for proper dihedrals
-                patterns = self.get_dihedral_guess_patterns(at_2, at_3)
-
-                dihedral_ff_lines = []
-                dihedral_matches = []
+            else:
                 for line in ff_data_lines:
                     for p in patterns:
                         m = re.search(p, line)
@@ -936,10 +1536,91 @@ class ForceFieldGenerator:
                             if len(dihedral_ff) == 4:
                                 dihedral_ff_lines.append(line)
                                 dihedral_matches.append(
-                                    m.group(0) + '(Guessed for ' +
-                                    f'{at_1}-{at_2}-{at_3}-{at_4})')
+                                    m.group(0) + special_comment)
                                 dihedral_found = True
                                 break
+
+            if not dihedral_found:
+                patterns = [
+                    re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
+                    re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
+                ]
+                target_dihedral_types = [
+                    ('', at_2.strip(), at_3.strip(), ''),
+                    ('', at_3.strip(), at_2.strip(), ''),
+                ]
+
+                dihedral_ff_lines = []
+                dihedral_matches = []
+
+                dihedral_ff_data = []
+
+                if use_xml:
+                    for dihedral_data in ff_data_dict['dihedrals']:
+                        for target_dihedral in target_dihedral_types:
+                            if target_dihedral == (dihedral_data['class1'],
+                                                   dihedral_data['class2'],
+                                                   dihedral_data['class3'],
+                                                   dihedral_data['class4']):
+                                dihedral_ff_data.append(dict(dihedral_data))
+                                dihedral_matches.append(self.get_dihedral_type_string(target_dihedral))
+                                dihedral_found = True
+                                break
+                else:
+                    for line in ff_data_lines:
+                        for p in patterns:
+                            m = re.search(p, line)
+                            if m is not None:
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 4:
+                                    dihedral_ff_lines.append(line)
+                                    dihedral_matches.append(m.group(0))
+                                    dihedral_found = True
+                                    break
+
+            if not dihedral_found:
+                # guesses for proper dihedrals
+                patterns = self.get_dihedral_guess_patterns(at_2, at_3)
+                target_dihedral_types = []
+                for p in patterns:
+                    target_dih_str = p.pattern.replace(r'\A', '')
+                    target_dih_tuple = tuple([
+                        x.strip().replace('X', '')
+                        for x in target_dih_str.split('-')
+                    ])
+                    target_dihedral_types.append(target_dih_tuple)
+
+                dihedral_ff_lines = []
+                dihedral_matches = []
+
+                dihedral_ff_data = []
+
+                if use_xml:
+                    for dihedral_data in ff_data_dict['dihedrals']:
+                        for target_dihedral in target_dihedral_types:
+                            if target_dihedral == (dihedral_data['class1'],
+                                                   dihedral_data['class2'],
+                                                   dihedral_data['class3'],
+                                                   dihedral_data['class4']):
+                                dihedral_ff_data.append(dict(dihedral_data))
+                                dihedral_matches.append(self.get_dihedral_type_string(target_dihedral) +
+                                                        '(Guessed for ' +
+                                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
+                                dihedral_found = True
+                                break
+                else:
+                    for line in ff_data_lines:
+                        for p in patterns:
+                            m = re.search(p, line)
+                            if m is not None:
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 4:
+                                    dihedral_ff_lines.append(line)
+                                    dihedral_matches.append(
+                                        m.group(0) + '(Guessed for ' +
+                                        f'{at_1}-{at_2}-{at_3}-{at_4})')
+                                    dihedral_found = True
+                                    break
 
             if not dihedral_found:
                 warnmsg = f'ForceFieldGenerator: dihedral {at_1}-{at_2}-{at_3}-{at_4}'
@@ -960,26 +1641,41 @@ class ForceFieldGenerator:
             dihedral_periodicities = []
             dihedral_comments = []
 
-            for line, comment in zip(dihedral_ff_lines, dihedral_matches):
-                dihedral_ff = line[11:60].strip().split()
+            if use_xml:
+                for dihedral_data, comment in zip(dihedral_ff_data, dihedral_matches):
+                    dih_param_idx = 1
+                    while f'periodicity{dih_param_idx}' in dihedral_data:
+                        periodicity = int(dihedral_data[f'periodicity{dih_param_idx}'])
+                        barrier = float(dihedral_data[f'k{dih_param_idx}'])
+                        phase = float(dihedral_data[f'phase{dih_param_idx}']) / np.pi * 180.0
 
-                multiplicity = int(dihedral_ff[0])
-                barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
-                phase = float(dihedral_ff[2])
-                # Note: negative periodicity implies multitermed dihedral
-                # See https://ambermd.org/FileFormats.php
-                try:
-                    periodicity = int(dihedral_ff[3])
-                except ValueError:
-                    periodicity = int(float(dihedral_ff[3]))
+                        dihedral_barriers.append(barrier)
+                        dihedral_phases.append(phase)
+                        dihedral_periodicities.append(periodicity)
+                        dihedral_comments.append(comment)
 
-                dihedral_barriers.append(barrier)
-                dihedral_phases.append(phase)
-                dihedral_periodicities.append(periodicity)
-                dihedral_comments.append(comment)
+                        dih_param_idx += 1
+            else:
+                for line, comment in zip(dihedral_ff_lines, dihedral_matches):
+                    dihedral_ff = line[11:60].strip().split()
 
-                if periodicity > 0:
-                    break
+                    multiplicity = int(dihedral_ff[0])
+                    barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
+                    phase = float(dihedral_ff[2])
+                    # Note: negative periodicity implies multitermed dihedral
+                    # See https://ambermd.org/FileFormats.php
+                    try:
+                        periodicity = int(dihedral_ff[3])
+                    except ValueError:
+                        periodicity = int(float(dihedral_ff[3]))
+
+                    dihedral_barriers.append(barrier)
+                    dihedral_phases.append(phase)
+                    dihedral_periodicities.append(periodicity)
+                    dihedral_comments.append(comment)
+
+                    if periodicity > 0:
+                        break
 
             if len(dihedral_barriers) == 1:
 
@@ -1003,57 +1699,19 @@ class ForceFieldGenerator:
                     'comment': dihedral_comments,
                 }
 
-        # convert multi-termed dihedral to RB type
-        for (i, j, k, l), dih in self.dihedrals.items():
+        # Fetch the rotatable bonds from the molecule and the atom types involved
+        rotatable_bonds_types = {}
+        for i, j, k, l in self.dihedrals:
+            # Ensure consistent ordering of bond indices
+            bond_indices = (min(j, k), max(j, k))
+            bond_types = (self.atom_types[bond_indices[0]], self.atom_types[bond_indices[1]])
+            rotatable_bonds_types[bond_indices] = bond_types
 
-            if dih['multiple']:
+        # Check if the rotatable bonds are indeed rotatable or not
+        updated_rotatable_bonds = self.check_rotatable_bonds(rotatable_bonds_types)
 
-                valid_phases = True
-                for phase in dih['phase']:
-                    if not (abs(phase) < 1.0e-6 or abs(phase - 180.0) < 1.0e-6):
-                        valid_phases = False
-                        break
-
-                valid_periodicity = True
-                for periodicity in dih['periodicity']:
-                    if abs(periodicity) not in [1, 2, 3, 4]:
-                        valid_periodicity = False
-                        break
-
-                if not (valid_phases and valid_periodicity):
-                    continue
-
-                F_coefs = {x: 0.0 for x in [1, 2, 3, 4]}
-                E_shift = 0.0
-
-                for barrier, phase, periodicity in zip(dih['barrier'],
-                                                       dih['phase'],
-                                                       dih['periodicity']):
-                    if abs(phase) < 1.0e-6:
-                        # phase == 0 degree
-                        F_coefs[abs(periodicity)] += barrier
-                    else:
-                        # phase == 180 degree
-                        F_coefs[abs(periodicity)] -= barrier
-                        E_shift += 2.0 * barrier
-
-                C_coefs = [0.0 for x in range(6)]
-
-                # JPCA 2021, 125, 2673-2681
-                # Note that we also take into account the phases in Fourier series
-                C_coefs[0] = (F_coefs[1] + F_coefs[3] + 2.0 * F_coefs[4] +
-                              E_shift)
-                C_coefs[1] = -1.0 * F_coefs[1] + 3.0 * F_coefs[3]
-                C_coefs[2] = 2.0 * F_coefs[2] - 8.0 * F_coefs[4]
-                C_coefs[3] = -4.0 * F_coefs[3]
-                C_coefs[4] = 8.0 * F_coefs[4]
-                C_coefs[5] = 0.0
-
-                self.dihedrals[(i, j, k, l)] = {
-                    'type': 'RB',
-                    'RB_coefficients': C_coefs,
-                    'comment': dih['comment'][0] + ' RB',
-                }
+        # Create a 1-indexed list of rotatable bonds without duplicates
+        self.rotatable_bonds = [[bond[0] + 1, bond[1] + 1] for bond in updated_rotatable_bonds.keys()]
 
         # Impropers
 
@@ -1093,22 +1751,44 @@ class ForceFieldGenerator:
                     re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
                     re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
                 ]
+                target_dihedral_types = [
+                    (at_2.strip(), at_3.strip(), at_4.strip(), at_1.strip()),
+                    (at_2.strip(), at_1.strip(), at_4.strip(), at_3.strip()),
+                    (at_2.strip(), at_4.strip(), at_1.strip(), at_3.strip()),
+                    (at_2.strip(), at_3.strip(), at_1.strip(), at_4.strip()),
+                    (at_2.strip(), at_4.strip(), at_3.strip(), at_1.strip()),
+                    (at_2.strip(), at_1.strip(), at_3.strip(), at_4.strip()),
+                ]
 
                 dihedral_found = False
                 barrier, phase, periodicity, comment = None, None, None, None
 
-                for line in ff_data_lines:
-                    for p in patterns:
-                        m = re.search(p, line)
-                        if m is not None:
-                            dihedral_ff = line[11:60].strip().split()
-                            if len(dihedral_ff) == 3:
-                                barrier = float(dihedral_ff[0]) * 4.184
-                                phase = float(dihedral_ff[1])
-                                periodicity = int(float(dihedral_ff[2]))
-                                comment = m.group(0)
+                if use_xml:
+                    for dihedral_data in ff_data_dict['impropers']:
+                        for target_dihedral in target_dihedral_types:
+                            if target_dihedral == (dihedral_data['class1'],
+                                                   dihedral_data['class2'],
+                                                   dihedral_data['class3'],
+                                                   dihedral_data['class4']):
+                                periodicity = int(dihedral_data[f'periodicity1'])
+                                barrier = float(dihedral_data[f'k1'])
+                                phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
+                                comment = self.get_dihedral_type_string(target_dihedral)
                                 dihedral_found = True
                                 break
+                else:
+                    for line in ff_data_lines:
+                        for p in patterns:
+                            m = re.search(p, line)
+                            if m is not None:
+                                dihedral_ff = line[11:60].strip().split()
+                                if len(dihedral_ff) == 3:
+                                    barrier = float(dihedral_ff[0]) * 4.184
+                                    phase = float(dihedral_ff[1])
+                                    periodicity = int(float(dihedral_ff[2]))
+                                    comment = m.group(0)
+                                    dihedral_found = True
+                                    break
 
                 if not dihedral_found:
                     patterns = [
@@ -1119,19 +1799,41 @@ class ForceFieldGenerator:
                         re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
                         re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
                     ]
+                    target_dihedral_types = [
+                        (at_2.strip(), '', at_3.strip(), at_1.strip()),
+                        (at_2.strip(), '', at_1.strip(), at_3.strip()),
+                        (at_2.strip(), '', at_4.strip(), at_3.strip()),
+                        (at_2.strip(), '', at_3.strip(), at_4.strip()),
+                        (at_2.strip(), '', at_4.strip(), at_1.strip()),
+                        (at_2.strip(), '', at_1.strip(), at_4.strip()),
+                    ]
 
-                    for line in ff_data_lines:
-                        for p in patterns:
-                            m = re.search(p, line)
-                            if m is not None:
-                                dihedral_ff = line[11:60].strip().split()
-                                if len(dihedral_ff) == 3:
-                                    barrier = float(dihedral_ff[0]) * 4.184
-                                    phase = float(dihedral_ff[1])
-                                    periodicity = int(float(dihedral_ff[2]))
-                                    comment = m.group(0)
+                    if use_xml:
+                        for dihedral_data in ff_data_dict['impropers']:
+                            for target_dihedral in target_dihedral_types:
+                                if target_dihedral == (dihedral_data['class1'],
+                                                       dihedral_data['class2'],
+                                                       dihedral_data['class3'],
+                                                       dihedral_data['class4']):
+                                    periodicity = int(dihedral_data[f'periodicity1'])
+                                    barrier = float(dihedral_data[f'k1'])
+                                    phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
+                                    comment = self.get_dihedral_type_string(target_dihedral)
                                     dihedral_found = True
                                     break
+                    else:
+                        for line in ff_data_lines:
+                            for p in patterns:
+                                m = re.search(p, line)
+                                if m is not None:
+                                    dihedral_ff = line[11:60].strip().split()
+                                    if len(dihedral_ff) == 3:
+                                        barrier = float(dihedral_ff[0]) * 4.184
+                                        phase = float(dihedral_ff[1])
+                                        periodicity = int(float(dihedral_ff[2]))
+                                        comment = m.group(0)
+                                        dihedral_found = True
+                                        break
 
                 if not dihedral_found:
                     patterns = [
@@ -1139,19 +1841,38 @@ class ForceFieldGenerator:
                         re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
                         re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
                     ]
+                    target_dihedral_types = [
+                        (at_2.strip(), '', '', at_3.strip()),
+                        (at_2.strip(), '', '', at_1.strip()),
+                        (at_2.strip(), '', '', at_4.strip()),
+                    ]
 
-                    for line in ff_data_lines:
-                        for p in patterns:
-                            m = re.search(p, line)
-                            if m is not None:
-                                dihedral_ff = line[11:60].strip().split()
-                                if len(dihedral_ff) == 3:
-                                    barrier = float(dihedral_ff[0]) * 4.184
-                                    phase = float(dihedral_ff[1])
-                                    periodicity = int(float(dihedral_ff[2]))
-                                    comment = m.group(0)
+                    if use_xml:
+                        for dihedral_data in ff_data_dict['impropers']:
+                            for target_dihedral in target_dihedral_types:
+                                if target_dihedral == (dihedral_data['class1'],
+                                                       dihedral_data['class2'],
+                                                       dihedral_data['class3'],
+                                                       dihedral_data['class4']):
+                                    periodicity = int(dihedral_data[f'periodicity1'])
+                                    barrier = float(dihedral_data[f'k1'])
+                                    phase = float(dihedral_data[f'phase1']) / np.pi * 180.0
+                                    comment = self.get_dihedral_type_string(target_dihedral)
                                     dihedral_found = True
                                     break
+                    else:
+                        for line in ff_data_lines:
+                            for p in patterns:
+                                m = re.search(p, line)
+                                if m is not None:
+                                    dihedral_ff = line[11:60].strip().split()
+                                    if len(dihedral_ff) == 3:
+                                        barrier = float(dihedral_ff[0]) * 4.184
+                                        phase = float(dihedral_ff[1])
+                                        periodicity = int(float(dihedral_ff[2]))
+                                        comment = m.group(0)
+                                        dihedral_found = True
+                                        break
 
                 if not dihedral_found:
                     # Default values for impropers
@@ -1174,6 +1895,28 @@ class ForceFieldGenerator:
                     'periodicity': periodicity,
                     'comment': comment
                 }
+
+    @staticmethod
+    def get_dihedral_type_string(target_dihedral):
+        """
+        Gets type string of a dihedral.
+
+        :param target_dihedral:
+            A tuple of atom types.
+
+        :return:
+            The type string of a dihedral.
+        """
+
+        new_dih_types = []
+
+        for at in target_dihedral:
+            if at:
+                new_dih_types.append(at)
+            else:
+                new_dih_types.append('X')
+
+        return '-'.join(new_dih_types)
 
     def get_dihedral_guess_patterns(self, at_2, at_3):
         """
@@ -1275,84 +2018,188 @@ class ForceFieldGenerator:
 
         return []
 
-    def add_bond(self, bond, force_constant=250000.00, equilibrium=None):
+    def add_bond(self, bond):
         """
         Adds a bond to the topology.
 
         :param bond:
-            The bond to be added. As a tuple of 1-based atom indices.
+            The bond to be added. As a list of 1-based atom indices.
         :param force_constant:
             The force constant of the bond. Default is 250000.00 kJ/mol/nm^2.
         :param equilibrium:
             The equilibrium distance of the bond. If none it will be calculated.
         """
 
+        # Extract indices from the list
         i, j = bond
 
         # Convert to zero-based indices
         i = i - 1
         j = j - 1
 
-        if equilibrium is None:
-            coords = self.molecule.get_coordinates_in_angstrom()
-            equilibrium = np.linalg.norm(coords[i] - coords[j]) * 0.1
+        # Update the connectivity matrix
+        self.connectivity_matrix[i, j] = 1
 
-        self.bonds[(i, j)] = {
-            'type': 'harmonic',
-            'force_constant': force_constant,
-            'equilibrium': equilibrium,
-            'comment': 'User-defined'
-        }
+        # Change the topology update flag to True
+        self.topology_update_flag = True
 
-    def add_angle(self, angle, force_constant=1000.00, equilibrium=None):
+        # Print the information
+        msg = f'Added bond {i + 1}-{j + 1}'
+        self.ostream.print_info(msg)
+        self.ostream.flush()
+
+        msg = "Re-run create_topology() to update the topology."
+        self.ostream.print_info(msg)
+        self.ostream.flush()
+    
+    def add_dihedral(self, dihedral, barrier=1, phase=0, periodicity=1):
         """
-        Adds an angle to the topology.
+        Adds a dihedral to the an existing dihedral in the topology
+        converting it in a multiple dihedral.
 
-        :param angle:
-            The angle to be added. As a tuple of 1-based atom indices.
-        :param force_constant:
-            The force constant of the angle. Default is 1000.00 kJ/mol/rad^2.
-        :param equilibrium:
-            The equilibrium angle of the angle. If none it will be calculated.
+        :param dihedral:
+            The dihedral to be added. As a list of 1-based atom indices.
+        :param barrier:
+            The barrier of the dihedral. Default is 1.00 kJ/mol.
+        :param phase:
+            The phase of the dihedral. Default is 0.00 degrees.
+        :param periodicity:
+            The periodicity of the dihedral. Default is 1.
         """
 
-        i, j, k = angle
+        # Extract indices from the list
+        i, j, k, l = dihedral
 
         # Convert to zero-based indices
         i = i - 1
         j = j - 1
         k = k - 1
+        l = l - 1
 
-        if equilibrium is None:
-            coords = self.molecule.get_coordinates_in_angstrom()
-            a = coords[i] - coords[j]
-            b = coords[k] - coords[j]
-            equilibrium = safe_arccos(
-                np.dot(a, b) / np.linalg.norm(a) /
-                np.linalg.norm(b)) * 180 / np.pi
+        # Exctract the original dihedral parameters
+        original_dihedral = self.dihedrals[(i, j, k, l)]
+        if original_dihedral['multiple']:
+            # Values are already in lists
+            barriers_list = original_dihedral['barrier']
+            phases_list = original_dihedral['phase']
+            periodicities_list = original_dihedral['periodicity']
+            comments_list = original_dihedral['comment']
+        else:
+            barriers_list = [original_dihedral['barrier']]
+            phases_list = [original_dihedral['phase']]
+            periodicities_list = [original_dihedral['periodicity']]
+            comments_list = [original_dihedral['comment']]
 
-        self.angles[(i, j, k)] = {
-            'type': 'harmonic',
-            'force_constant': force_constant,
-            'equilibrium': equilibrium,
-            'comment': 'User-defined'
+        # Update the dihedral's data lists
+        barriers_list.append(barrier)
+        phases_list.append(phase)
+        # Negative periodicity implies multitermed dihedral
+        periodicities_list.append(-periodicity)
+        comments_list.append(f'Added {i + 1}-{j + 1}-{k + 1}-{l + 1} dihedral')
+
+        # Update the dihedral in the topology
+        self.dihedrals[(i, j, k, l)] = {
+            'type': 'Fourier',
+            'multiple': True,
+            'barrier': barriers_list,
+            'phase': phases_list,
+            'periodicity': periodicities_list,
+            'comment': comments_list
         }
 
-    def reparameterize(self,
-                       hessian=None,
-                       reparameterize_all=False,
-                       reparameterize_keys=None):
+        # Print the information
+        msg = f'Added dihedral {i + 1}-{j + 1}-{k + 1}-{l + 1}'
+        self.ostream.print_info(msg)
+        self.ostream.flush()
+
+    def check_rotatable_bonds(self, rotatable_bonds_types):
         """
-        Reparameterizes all unknown parameters with the Seminario method using
+        Checks the rotatable bonds in the molecule and the atom types involved.
+
+        :param rotatable_bonds_types:
+            The dictionary of possible rotatable bonds and the atom types involved.
+            key: tuple of atom indices
+            value: tuple of atom types
+        """
+
+        non_rotatable_bonds = set()
+        for atom1 in ['c2', 'n2', 'cc', 'ce', 'nc', 'ne']:
+            for atom2 in ['c2', 'n2', 'cd', 'cf', 'nd', 'nf']:
+                non_rotatable_bonds.add((atom1, atom2))
+                non_rotatable_bonds.add((atom2, atom1))
+        non_rotatable_bonds = list(non_rotatable_bonds)
+
+        # Identify bonds to delete based on criteria
+        bonds_to_delete = []
+
+        for (i, j), bond in rotatable_bonds_types.items():
+            # Check if the bond is non-rotatable due to atom types
+            if bond in non_rotatable_bonds:
+                bonds_to_delete.append((i, j))
+                continue
+
+            # Check if the bond is part of a ring
+            if self.is_bond_in_ring(i, j):
+                bonds_to_delete.append((i, j))
+                continue
+
+        # Remove identified non-rotatable bonds
+        for key in bonds_to_delete:
+            rotatable_bonds_types.pop(key, None)
+
+        # Exclude bonds involving terminal atoms
+        bonds_to_delete = []
+        for (i, j), bond in rotatable_bonds_types.items():
+            atom_i_connections = np.where(self.connectivity_matrix[i] == 1)[0]
+            atom_j_connections = np.where(self.connectivity_matrix[j] == 1)[0]
+
+            if len(atom_i_connections) == 1 or len(atom_j_connections) == 1:
+                bonds_to_delete.append((i, j))
+
+        # Remove terminal atom bonds
+        for key in bonds_to_delete:
+            rotatable_bonds_types.pop(key, None)
+
+        return rotatable_bonds_types
+
+    def is_bond_in_ring(self, atom_i, atom_j):
+        """
+        Determines if the bond between atom_i and atom_j is part of a ring.
+
+        :param atom_i: 
+            Index of the first atom in the bond.
+        :param atom_j: 
+            Index of the second atom in the bond.
+        :return: 
+            True if the bond is part of a ring, False otherwise.
+        """
+
+        atom_i_info = self.atom_info_dict[atom_i + 1]  # +1 because atom_info_dict keys start from 1
+        atom_j_info = self.atom_info_dict[atom_j + 1]
+
+        # Check if both atoms are in cycles
+        if atom_i_info["CyclicStructure"] == "cycle" and atom_j_info["CyclicStructure"] == "cycle":
+            # Find common cycles
+            common_cycles = set(atom_i_info["CycleNumber"]).intersection(atom_j_info["CycleNumber"])
+            if common_cycles:
+                return True
+        return False
+
+    def reparametrize(self,
+                       hessian=None,
+                       reparametrize_all=False,
+                       reparametrize_keys=None):
+        """
+        Reparametrizes all unknown parameters with the Seminario method using
         the given Hessian matrix.
 
         :param hessian:
             The Hessian matrix, or the method to generate Hessian.
-        :param reparameterize_all:
-            If True, all parameters are reparameterized. If False, only unknown
-            parameters are reparameterized.
-        :param reparameterize_keys:
-            List of specific keys to reparameterize, can be bonds and angles.
+        :param reparametrize_all:
+            If True, all parameters are reparametrized. If False, only unknown
+            parameters are reparametrized.
+        :param reparametrize_keys:
+            List of specific keys to reparametrize, can be bonds and angles.
         """
 
         # Hessian matrix
@@ -1360,12 +2207,12 @@ class ForceFieldGenerator:
         if hessian is None:
             # TODO: generate Hessian using VeloxChem
             assert_msg_critical(
-                False, 'ForceFieldGenerator.reparameterize: expecting Hessian')
+                False, 'ForceFieldGenerator.reparametrize: expecting Hessian')
 
         elif isinstance(hessian, str):
             assert_msg_critical(
                 hessian.lower() == 'xtb',
-                'ForceFieldGenerator.reparameterize: invalid Hessian option')
+                'ForceFieldGenerator.reparametrize: invalid Hessian option')
 
             # XTB optimization
             self.ostream.print_info('Optimizing molecule using XTB...')
@@ -1374,6 +2221,10 @@ class ForceFieldGenerator:
             xtb_drv = XtbDriver(self.comm, self.ostream)
             xtb_grad_drv = XtbGradientDriver(xtb_drv)
             xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
+            # Mute all drivers
+            xtb_drv.ostream.mute()
+            xtb_grad_drv.ostream.mute()
+            xtb_opt_drv.ostream.mute()
             xtb_opt_drv.filename = self.molecule_name
             xtb_opt_results = xtb_opt_drv.compute(self.molecule)
             self.molecule = Molecule.read_xyz_string(
@@ -1396,12 +2247,12 @@ class ForceFieldGenerator:
             natoms = self.molecule.number_of_atoms()
             assert_msg_critical(
                 hessian.shape == (natoms * 3, natoms * 3),
-                'ForceFieldGenerator.reparameterize: invalid Hessian matrix')
+                'ForceFieldGenerator.reparametrize: invalid Hessian matrix')
 
         else:
             assert_msg_critical(
                 False,
-                'ForceFieldGenerator.reparameterize: invalid Hessian option')
+                'ForceFieldGenerator.reparametrize: invalid Hessian option')
 
         angstrom_to_nm = 0.1  # 1 angstrom is 0.1 nm
         bohr_to_nm = bohr_in_angstrom() * angstrom_to_nm
@@ -1420,15 +2271,15 @@ class ForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        # Reparameterize bonds
+        # Reparametrize bonds
 
         for i, j in self.bonds:
 
-            if not reparameterize_all:
-                if reparameterize_keys is None:
+            if not reparametrize_all:
+                if reparametrize_keys is None:
                     if self.bonds[(i, j)]['comment'].capitalize() != 'Guessed':
                         continue
-                elif (i, j) not in reparameterize_keys:
+                elif (i, j) not in reparametrize_keys:
                     continue
 
             new_equilibrium = np.linalg.norm(coords_in_au[i] -
@@ -1472,16 +2323,16 @@ class ForceFieldGenerator:
                 self.bonds[(i, j)]['equilibrium'] = aver_r
                 self.bonds[(i, j)]['force_constant'] = aver_k_r
 
-        # Reparameterize angles
+        # Reparametrize angles
 
         for i, j, k in self.angles:
 
-            if not reparameterize_all:
-                if reparameterize_keys is None:
+            if not reparametrize_all:
+                if reparametrize_keys is None:
                     if (self.angles[(i, j, k)]['comment'].capitalize()
                             != 'Guessed'):
                         continue
-                elif (i, j, k) not in reparameterize_keys:
+                elif (i, j, k) not in reparametrize_keys:
                     continue
 
             a = coords_in_au[i] - coords_in_au[j]
@@ -1556,7 +2407,7 @@ class ForceFieldGenerator:
         itp_fname = str(itp_file)
 
         if mol_name is None:
-            mol_name = Path(self.molecule_name).stem
+            mol_name = 'MOL'
 
         with open(top_fname, 'w') as f_top:
 
@@ -1621,8 +2472,9 @@ class ForceFieldGenerator:
 
         itp_filename = str(itp_file)
         if mol_name is None:
-            mol_name = Path(self.molecule_name).stem
-        res_name = 'MOL'
+            mol_name = 'MOL'
+
+        res_name = mol_name
 
         with open(itp_filename, 'w') as f_itp:
             # Header
@@ -1702,49 +2554,26 @@ class ForceFieldGenerator:
                 f_itp.write('\n[ dihedrals ]\n')
                 f_itp.write('; propers\n')
 
-            dih_RB_lines = []
             dih_fourier_lines = []
 
             for (i, j, k, l), dih in self.dihedrals.items():
-                if dih['type'] == 'RB':
-                    line_str = '{:6}{:7}{:7}{:7}{:7}'.format(
-                        i + 1, j + 1, k + 1, l + 1, 3)
-                    for coef in dih['RB_coefficients']:
-                        line_str += '{:11.5f}'.format(coef)
-                    line_str += ' ; {}\n'.format(dih['comment'])
-                    dih_RB_lines.append(line_str)
 
-                elif dih['type'] == 'Fourier':
-                    if dih['multiple']:
-                        for barrier, phase, periodicity, comment in zip(
-                                dih['barrier'], dih['phase'],
-                                dih['periodicity'], dih['comment']):
-                            line_str = '{:6}{:7}{:7}{:7}'.format(
-                                i + 1, j + 1, k + 1, l + 1)
-                            line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
-                                9, phase, barrier, abs(periodicity), comment)
-                            dih_fourier_lines.append(line_str)
-                    else:
+                if dih['multiple']:
+                    for barrier, phase, periodicity, comment in zip(
+                            dih['barrier'], dih['phase'],
+                            dih['periodicity'], dih['comment']):
                         line_str = '{:6}{:7}{:7}{:7}'.format(
                             i + 1, j + 1, k + 1, l + 1)
                         line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
-                            9, dih['phase'], dih['barrier'],
-                            abs(dih['periodicity']), dih['comment'])
+                            9, phase, barrier, abs(periodicity), comment)
                         dih_fourier_lines.append(line_str)
-
                 else:
-                    errmsg = 'ForceFieldGenerator.create_topology:'
-                    errmsg += ' Invalid dihedral type ' + dih['type']
-                    assert_msg_critical(False, errmsg)
-
-            if dih_RB_lines:
-                line_str = ';   ai     aj     ak     al    funct'
-                line_str += '     C0         C1         C2         C3'
-                line_str += '         C4         C5\n'
-                f_itp.write(line_str)
-
-            for line_str in dih_RB_lines:
-                f_itp.write(line_str)
+                    line_str = '{:6}{:7}{:7}{:7}'.format(
+                        i + 1, j + 1, k + 1, l + 1)
+                    line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
+                        9, dih['phase'], dih['barrier'],
+                        abs(dih['periodicity']), dih['comment'])
+                    dih_fourier_lines.append(line_str)
 
             if dih_fourier_lines:
                 f_itp.write(
@@ -1847,37 +2676,39 @@ class ForceFieldGenerator:
         # Periodic Dihedrals section
         Dihedrals = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for dihedral_id, dihedral_data in self.dihedrals.items():
-            if dihedral_data['type'] == 'RB':
-                continue
-            attributes = {
-                "class1": str(dihedral_id[0] + 1),
-                "class2": str(dihedral_id[1] + 1),
-                "class3": str(dihedral_id[2] + 1),
-                "class4": str(dihedral_id[3] + 1),
-                "periodicity1": str(dihedral_data['periodicity']),
-                "phase1": str(dihedral_data['phase'] * np.pi / 180),
-                "k1": str(dihedral_data['barrier'])
-            }
-            ET.SubElement(Dihedrals, "Proper", **attributes)
+            # Not multiple dihedrals has periodicity1, phase1, k1
+            if not dihedral_data['multiple']:
+                attributes = {
+                    "class1": str(dihedral_id[0] + 1),
+                    "class2": str(dihedral_id[1] + 1),
+                    "class3": str(dihedral_id[2] + 1),
+                    "class4": str(dihedral_id[3] + 1),
+                    "periodicity1": str(dihedral_data['periodicity']),
+                    "phase1": str(dihedral_data['phase'] * np.pi / 180),
+                    "k1": str(dihedral_data['barrier'])
+                }
+                ET.SubElement(Dihedrals, "Proper", **attributes)
 
-        # RB Dihedrals section
-        RB_Dihedrals = ET.SubElement(ForceField, "RBTorsionForce")
-        for dihedral_id, dihedral_data in self.dihedrals.items():
-            if dihedral_data['type'] == 'Fourier':
-                continue
-            attributes = {
-                "class1": str(dihedral_id[0] + 1),
-                "class2": str(dihedral_id[1] + 1),
-                "class3": str(dihedral_id[2] + 1),
-                "class4": str(dihedral_id[3] + 1),
-                "c0": str(dihedral_data['RB_coefficients'][0]),
-                "c1": str(dihedral_data['RB_coefficients'][1]),
-                "c2": str(dihedral_data['RB_coefficients'][2]),
-                "c3": str(dihedral_data['RB_coefficients'][3]),
-                "c4": str(dihedral_data['RB_coefficients'][4]),
-                "c5": str(dihedral_data['RB_coefficients'][5])
-            }
-            ET.SubElement(RB_Dihedrals, "Proper", **attributes)
+            # Multiple dihedrals have periodicityi, phasei, ki for i in range(len(periodicity))
+            # Format: http://docs.openmm.org/7.6.0/userguide/application/05_creating_ffs.html#periodictorsionforce
+            else:
+                
+                # One set of classes
+                attributes = {
+                    "class1": str(dihedral_id[0] + 1),
+                    "class2": str(dihedral_id[1] + 1),
+                    "class3": str(dihedral_id[2] + 1),
+                    "class4": str(dihedral_id[3] + 1),
+                }
+                # Multiple sets of periodicity, phase, k
+                for i in range(len(dihedral_data['periodicity'])):
+                    attributes.update({
+                        f"periodicity{i+1}": str(abs(dihedral_data['periodicity'][i])),
+                        f"phase{i+1}": str(dihedral_data['phase'][i] * np.pi / 180),
+                        f"k{i+1}": str(dihedral_data['barrier'][i])
+                    })
+
+                ET.SubElement(Dihedrals, "Proper", **attributes)
 
         # Improper Dihedrals section
         Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
@@ -1934,8 +2765,9 @@ class ForceFieldGenerator:
 
         gro_filename = str(gro_file)
         if mol_name is None:
-            mol_name = Path(self.molecule_name).stem
-        res_name = 'MOL'
+            mol_name = 'MOL'
+
+        res_name = mol_name
 
         coords_in_nm = self.molecule.get_coordinates_in_angstrom() * 0.1
 
@@ -2057,7 +2889,7 @@ class ForceFieldGenerator:
         """
 
         if mol_name is None:
-            mol_name = Path(self.molecule_name).stem
+            mol_name = 'MOL'
 
         itp_file = Path(filename).with_suffix('.itp')
         top_file = Path(filename).with_suffix('.top')
@@ -2175,28 +3007,6 @@ class ForceFieldGenerator:
 
         self.set_dihedral_parameters(dih, coef_list)
 
-        # write itp and gro files
-
-        mol_name = Path(self.molecule_name).stem
-
-        workdir = Path('.') if self.workdir is None else self.workdir
-
-        self.ffversion += 1
-        new_itp_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.itp')
-        new_top_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.top')
-
-        if self.rank == mpi_master():
-            self.write_itp(new_itp_fname, mol_name)
-            self.write_top(new_top_fname, new_itp_fname, mol_name)
-        self.comm.barrier()
-
-        self.ostream.print_info('...done.')
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            f'Generated new topology file: {Path(new_top_fname).name}')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
     def validate_force_field(self, i):
         """
         Validates force field by RMSD of dihedral potentials.
@@ -2256,7 +3066,7 @@ class ForceFieldGenerator:
         :param dihedral:
             The dihedral (list of four atom ids).
         :param geometries:
-            The scanned geometris for this dihedral.
+            The scanned geometries for this dihedral.
         :param angles:
             The scanned angles for this dihedral.
         """
@@ -2354,29 +3164,45 @@ class ForceFieldGenerator:
         :param validation_result:
             The dictionary containing the result of validation.
         """
-
+        # TODO: Add a spline instead.
         try:
             import matplotlib.pyplot as plt
+            from scipy.interpolate import make_interp_spline
         except ImportError:
             raise ImportError('Unable to import Matplotlib. Please install ' +
                               'Matplotlib via \'conda install matplotlib\'')
+        
+
 
         qm_scan_kJpermol = validation_result['qm_scan_kJpermol']
         mm_scan_kJpermol = validation_result['mm_scan_kJpermol']
         dihedral_angles = validation_result['dihedral_angles']
         dihedral_indices = validation_result['dihedral_indices']
 
-        plt.plot(dihedral_angles, qm_scan_kJpermol, '-o', label="QM")
-        plt.plot(dihedral_angles, mm_scan_kJpermol, '-o', label="MM")
+        # Fit spline
+        dihedrals_dense = np.linspace(min(dihedral_angles), max(dihedral_angles), 300)
+        spl = make_interp_spline(dihedral_angles, qm_scan_kJpermol, k=3)
+        qm_scan_kJpermol_spl = spl(dihedrals_dense)
+        spl = make_interp_spline(dihedral_angles, mm_scan_kJpermol, k=3)
+        mm_scan_kJpermol_spl = spl(dihedrals_dense)
 
-        plt.grid()
-        plt.legend(loc='upper right')
-        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(dihedral_indices[0] + 1,
+        # Plot spline
+        plt.plot(dihedrals_dense, qm_scan_kJpermol_spl, color='black', linewidth=4,  label='QM (spline)', alpha=0.7)
+        plt.plot(dihedrals_dense, mm_scan_kJpermol_spl, color='darkcyan', linewidth=4, label='MM (spline)' , alpha=0.7)
+
+        # Print the original points 
+        plt.scatter(dihedral_angles, qm_scan_kJpermol, color='black', s=25, label='QM (points)')
+        plt.scatter(dihedral_angles, mm_scan_kJpermol, color='darkcyan', s=25, label='MM (points)')
+
+        # Legend center right outside the plot
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.xlabel('dihedral angle {}-{}-{}-{} (deg)'.format(dihedral_indices[0] + 1,
                                                        dihedral_indices[1] + 1,
                                                        dihedral_indices[2] + 1,
                                                        dihedral_indices[3] + 1))
-        plt.ylabel('E in kJ/mol')
-        plt.title('dihedral potential of {}'.format(self.molecule_name))
+        plt.ylabel('Energy (kJ/mol)')
+        plt.title('Dihedral Potential for rotatable bond {}-{}'.format(dihedral_indices[1] + 1,
+                                                                       dihedral_indices[2] + 1))
         plt.show()
 
     def get_included_file(self, top_fname):
