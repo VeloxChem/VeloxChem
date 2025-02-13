@@ -94,6 +94,11 @@ class LinearResponseEigenSolver(LinearSolver):
         self.core_excitation = False
         self.num_core_orbitals = 0
 
+        # subspace restricted (LR-TDDFT) approx.
+        self.sra = False
+        self.num_vir_orbitals = 0
+        self.num_val_orbitals = 0
+
         self.nto = False
         self.nto_pairs = None
         self.nto_cubes = False
@@ -109,6 +114,9 @@ class LinearResponseEigenSolver(LinearSolver):
             'nstates': ('int', 'number of excited states'),
             'core_excitation': ('bool', 'compute core-excited states'),
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
+            'sra': ('bool', 'subspace-restricted approach'),
+            'num_val_orbitals': ('int', 'number of involved valence-orbitals'),
+            'num_vir_orbitals': ('int', 'number of involved virtual-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'nto_cubes': ('bool', 'write NTO cube files'),
@@ -547,6 +555,14 @@ class LinearResponseEigenSolver(LinearSolver):
                             self.num_core_orbitals, -1)
                         y_mat = eigvec[eigvec.size // 2:].reshape(
                             self.num_core_orbitals, -1)
+                    elif self.sra:
+                        mo_occ = np.hstack((scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
+                                scf_tensors['C_alpha'][:, nocc - self.num_val_orbitals:nocc].copy()))
+                        mo_vir = scf_tensors['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()
+                        z_mat = eigvec[:eigvec.size // 2].reshape(
+                            self.num_core_orbitals + self.num_val_orbitals, -1)
+                        y_mat = eigvec[eigvec.size // 2:].reshape(
+                            self.num_core_orbitals + self.num_val_orbitals, -1)
                     else:
                         mo_occ = scf_tensors['C_alpha'][:, :nocc]
                         mo_vir = scf_tensors['C_alpha'][:, nocc:]
@@ -847,6 +863,12 @@ class LinearResponseEigenSolver(LinearSolver):
             excitations = [(i, a)
                            for i in range(self.num_core_orbitals)
                            for a in range(nocc, norb)]
+        elif self.sra:
+            core_and_val_indices = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, nocc, 1)) #list(range(nocc+1, nocc+1 - self.num_val_orbitals, -1)) 
+            excitations = [(i, a)
+                            for i in core_and_val_indices
+                            for a in range(nocc, nocc+self.num_vir_orbitals)]
+            n_exc = (self.num_core_orbitals + self.num_val_orbitals) * self.num_vir_orbitals
         else:
             excitations = [
                 (i, a) for i in range(nocc) for a in range(nocc, norb)
@@ -946,6 +968,9 @@ class LinearResponseEigenSolver(LinearSolver):
         if self.core_excitation:
             ediag, sdiag = self.construct_ediag_sdiag_half(
                 orb_ene, nocc, norb, self.num_core_orbitals)
+        elif self.sra:
+            ediag, sdiag = self.construct_ediag_sdiag_half(
+                orb_ene, nocc, norb, self.num_core_orbitals + self.num_val_orbitals)
         else:
             ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 

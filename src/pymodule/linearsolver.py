@@ -671,6 +671,10 @@ class LinearSolver:
                     range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            if getattr(self, 'sra', False):
+                core_val_exc_inds = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, norb))# + list(range(nocc, norb))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                fa_mo = np.linalg.multi_dot([mo_core_val_exc.T, fa, mo_core_val_exc])
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
@@ -848,6 +852,17 @@ class LinearSolver:
                         mo_core_exc = mo[:, core_exc_orb_inds]
                         dak = np.linalg.multi_dot(
                             [mo_core_exc, dak, mo_core_exc.T])
+                    elif getattr(self, 'sra', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals, 
+                                            self.num_val_orbitals, self.num_vir_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals,
+                                                     self.num_val_orbitals, self.num_vir_orbitals)
+                        core_val_exc_inds = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, norb))
+                        mo_core_val_exc = mo[:, core_val_exc_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_val_exc, dak, mo_core_val_exc.T])
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
@@ -916,6 +931,11 @@ class LinearSolver:
                             mo_core_exc = mo[:, core_exc_orb_inds]
                             fak_mo = np.linalg.multi_dot(
                                 [mo_core_exc.T, fak, mo_core_exc])
+                        elif getattr(self, 'sra', False):
+                            core_val_exc_inds = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, norb))
+                            mo_core_val_exc = mo[:, core_val_exc_inds]
+                            fak_mo = np.linalg.multi_dot(
+                                [mo_core_val_exc, fak, mo_core_val_exc.T])
                         else:
                             fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
@@ -929,6 +949,14 @@ class LinearSolver:
                             gmo_vec_halfsize = self.lrmat2vec(
                                 gmo, nocc, norb,
                                 self.num_core_orbitals)[:half_size]
+                        elif getattr(self, 'sra', False):
+                            gmo = -self.commut_mo_density(
+                                fat_mo, nocc, self.num_core_orbitals,
+                                self.num_val_orbitals, self.num_vir_orbitals)
+                            gmo_vec_halfsize = self.lrmat2vec(
+                                gmo, nocc, norb,
+                                self.num_core_orbitals,
+                                self.num_val_orbitals, self.num_vir_orbitals)[:half_size]
                         else:
                             gmo = -self.commut_mo_density(fat_mo, nocc)
                             gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
@@ -1043,6 +1071,11 @@ class LinearSolver:
                     range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            elif getattr(self, 'sra', False):
+                core_val_exc_inds = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, norb))
+                mo_core_val_exc = mo[:, core_val_exc_inds]
+                fa_mo = np.linalg.multi_dot(
+                    [mo_core_val_exc, fak, mo_core_val_exc.T])
             else:
                 fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
@@ -1942,7 +1975,8 @@ class LinearSolver:
             return tuple()
 
     @staticmethod
-    def commut_mo_density(A, nocc, num_core_orbitals=None):
+    def commut_mo_density(A, nocc, num_core_orbitals=None,
+                          num_val_orbitals=None, num_vir_orbitals=None):
         """
         Commutes matrix A and MO density
 
@@ -1965,6 +1999,13 @@ class LinearSolver:
                 num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
             mat[num_core_orbitals:, :num_core_orbitals] = A[
                 num_core_orbitals:, :num_core_orbitals]
+            
+        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals > 0:
+            num_core_val_orbs = num_core_orbitals + num_val_orbitals
+            mat[:num_core_val_orbs,
+                num_core_val_orbs:] = -A[:num_core_val_orbs, num_core_val_orbs:]
+            mat[num_core_val_orbs:, :num_core_val_orbs] = A[
+                num_core_val_orbs:, :num_core_val_orbs]
 
         else:
             mat[:nocc, nocc:] = -A[:nocc, nocc:]
@@ -1989,7 +2030,8 @@ class LinearSolver:
         return np.matmul(A, B) - np.matmul(B, A)
 
     @staticmethod
-    def lrvec2mat(vec, nocc, norb, num_core_orbitals=None):
+    def lrvec2mat(vec, nocc, norb, num_core_orbitals=None,
+                  num_val_orbitals=None, num_vir_orbitals=None):
         """
         Converts vectors to matrices.
 
@@ -2015,6 +2057,18 @@ class LinearSolver:
                 num_core_orbitals, nvir)
             mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(
                 num_core_orbitals, nvir).T
+            
+        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals > 0:
+            nvir = num_vir_orbitals
+            num_core_val_orbs = num_core_orbitals + num_val_orbitals
+            n_ov = num_core_val_orbs * nvir
+            mat = np.zeros((num_core_val_orbs + nvir, num_core_val_orbs + nvir),
+                           dtype=vec.dtype)
+            # excitation and de-excitation
+            mat[:num_core_val_orbs, num_core_val_orbs:] = vec[:n_ov].reshape(
+                num_core_val_orbs, nvir)
+            mat[num_core_val_orbs:, :num_core_val_orbs] = vec[n_ov:].reshape(
+                num_core_val_orbs, nvir).T
 
         else:
             n_ov = nocc * nvir

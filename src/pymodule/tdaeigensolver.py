@@ -99,7 +99,7 @@ class TdaEigenSolver(LinearSolver):
         self.core_excitation = False
         self.num_core_orbitals = 0
 
-        # subspace restricted (LR-TDDFT) approx.
+        # subspace restricted (TDA) approx.
         self.sra = False
         self.num_vir_orbitals = 0
         self.num_val_orbitals = 0
@@ -365,8 +365,6 @@ class TdaEigenSolver(LinearSolver):
                                                 num_core_orbitals].copy()
                 mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
             elif self.sra:
-                #mo_occ = scf_tensors['C_alpha'][:, :self.
-                #                                num_core_orbitals].copy()
                 mo_occ = np.hstack((scf_tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
                                 scf_tensors['C_alpha'][:, nocc - self.num_val_orbitals:nocc].copy()))
                 mo_vir = scf_tensors['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()
@@ -651,7 +649,6 @@ class TdaEigenSolver(LinearSolver):
             mo_occ = tensors['C_alpha'][:, :self.num_core_orbitals].copy()
             mo_vir = tensors['C_alpha'][:, nocc:].copy()
         elif self.sra:
-            #mo_occ = tensors['C_alpha'][:, :self.num_core_orbitals].copy()
             mo_occ = np.hstack((tensors['C_alpha'][:, :self.num_core_orbitals].copy(),
                                 tensors['C_alpha'][:, nocc - self.num_val_orbitals:nocc].copy()))
             mo_vir = tensors['C_alpha'][:, nocc:nocc+self.num_vir_orbitals].copy()

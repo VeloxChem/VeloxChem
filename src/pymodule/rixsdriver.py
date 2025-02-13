@@ -77,6 +77,7 @@ class RixsDriver:
 
         # method settings
         self.nr_ve = None # nr_ce
+        self.nstates = None
 
         # CVS
         self.nr_ce = None # nr_ce
@@ -148,15 +149,15 @@ class RixsDriver:
         returns the state-to-state transition-density-matrix in ao-basis
         """
 
+        X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
         if self.sra:
             X_val_mo = np.zeros((self.nocc, self.nvir, self.nr_ve))
             X_val_mo[:self.nr_CO] = valence_eigenvectors[:self.nr_CO]
             X_val_mo[-self.nr_val:] = valence_eigenvectors[self.nr_CO:]
-            X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
+
             X_cor_mo[:self.nr_CO] = core_eigenvectors[:self.nr_CO]
             X_cor_mo[-self.nr_val:] = core_eigenvectors[self.nr_CO:]
         elif self.nr_CO > 0:
-            X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
             X_cor_mo[:self.nr_CO] = core_eigenvectors.reshape(self.nr_CO, self.nvir, self.nr_ce)
             X_val_mo = valence_eigenvectors.reshape(self.nocc, self.nvir, self.nr_ve)
         else:
@@ -177,7 +178,7 @@ class RixsDriver:
         gamma_ij_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ij, gamma_ij, C_ij, optimize=True)
 
         gamma_ao = gamma_ab_ao - gamma_ij_ao
-        gamma_ao *= np.sqrt(2) #2 # alpha and beta spin
+        #gamma_ao *= 2 # alpha and beta spin?
         return gamma_ao
 
     def gts_tdm(self, scf_results, core_eigenvectors):
@@ -240,10 +241,13 @@ class RixsDriver:
             for all molecular directions and outgoing photon polarisation
         """
         
-        eigenvalues = core_eigenvalues # excitation energies
-        e_n = (1 / (eigenvalues - w - self.gamma_n*1j)) # denominator
+        #eigenvalues = core_eigenvalues # excitation energies
+        #eigenvalues = self.photon_energy # excitation energies
+        e_n = (1 / (core_eigenvalues - w - self.gamma_n*1j)) # denominator
         #print(f'e_n:{e_n.shape}, dip:{dipole_ints.shape} gamma:{gamma_ao[:,:,f].shape}, gamma_ng:{gamma_ng_ao.shape}')
+        
         scatt_amp = np.einsum('n, xij, ijn, yab, abn -> xy', e_n, -dipole_ints, gamma_ao[:,:,f], -dipole_ints, gamma_ng_ao, optimize='greedy')
+        #scatt_amp = np.einsum('n, xij, ij, yab, ab -> xy', e_n, -dipole_ints, gamma_ao[:,:,f,0], -dipole_ints, gamma_ng_ao[:,:,0], optimize='greedy')
         return scatt_amp
     
     def osc_str(self, tdpm, omega_prime):# tda_res_core, tda_res_val):
@@ -274,7 +278,7 @@ class RixsDriver:
         
         returns the RIXS transition intensity for the given frequencies, w (and) and state f
         """
-        if w_p == None:
+        if w_p is None:
             w_prime = w - valence_eigenvalues[f] #w - w_f0 
         else:
             w_prime = w_p
@@ -310,6 +314,7 @@ class RixsDriver:
                 largest_core = max(largest_core, core_index)
         return largest_core
 
+    """
     def elastic_rixs_xsection(self, eigenvals_core, dipole_ints, gamma_ng_ao, theta):
         sigma = np.zeros((self.nr_ce), dtype=np.complex128)
         # excitation energies
@@ -324,6 +329,17 @@ class RixsDriver:
             sigma[n] = 1/15 * ((2 - (1/2) * np.sin(theta) ** 2) * np.sum(np.abs(_F)**2) 
                    + ((3/4) * np.sin(theta) ** 2 - 1/2) * (np.sum(_F * _F.T.conj())
                                                    + np.trace(np.abs(_F)**2)))
+        return sigma
+    """
+    def elastic_rixs_xsection(self, w, tdm_ng, core_eigenvalues, dipole_ints):
+        #eigenvalues = self.photon_energy # excitation energies
+        e_n = (1 / (core_eigenvalues - w - self.gamma_n * 1j)) # denominator
+
+        F = np.einsum('n, xij, ijn, yab, abn -> xy', e_n, -dipole_ints, tdm_ng, -dipole_ints, tdm_ng, optimize='greedy')
+        #F = np.einsum('n, xij, ij, yab, ab -> xy', e_n, -dipole_ints, tdm_ng[:,:,0], -dipole_ints, tdm_ng[:,:,0], optimize='greedy')
+        sigma = 1/15 * ((2 - (1/2) * np.sin(self.theta) ** 2) * np.sum(np.abs(F)**2) 
+                   + ((3/4) * np.sin(self.theta) ** 2 - 1/2) * (np.sum(F * F.T.conj())
+                                                   + np.trace(np.abs(F)**2)))
         return sigma
 
     def compute(self, molecule, ao_basis, scf_results, tda_res_val, tda_res_core=None, nr_CO=None, nr_vir=None, nr_val=None):
@@ -345,6 +361,9 @@ class RixsDriver:
             eigenvector = tda_res_val['eigenvectors'].reshape(self.nr_CO + self.nr_val, self.nvir, self.nr_ce + self.nr_ve)
             core_eigenvectors     = eigenvector[:, : , self.nr_ve:]
             core_eigenvalues      = tda_res_val['eigenvalues'][self.nr_ve:]
+            if self.nstates is not None:
+                core_eigenvectors[..., self.nstates:] = 0
+                core_eigenvalues[self.nstates:] = 0
             valence_eigenvectors  = eigenvector[:, : , :self.nr_ve]
             valence_eigenvalues   = tda_res_val['eigenvalues'][:self.nr_ve]
         else: 
@@ -371,19 +390,27 @@ class RixsDriver:
         if self.photon_energy is None:
             self.photon_energy = omega_n # resonant
         
+        # shape: (final state, incoming energy)
         ene_loss              = np.zeros((self.nr_ve, len(self.photon_energy)))
         emiss                 = np.zeros((self.nr_ve, len(self.photon_energy)))
         crossections          = np.zeros((self.nr_ve, len(self.photon_energy)))
-        scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, self.nr_ce), dtype=np.complex128)
+        elastic_crossections  = np.zeros((len(self.photon_energy)))
+        scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, len(self.photon_energy)), dtype=np.complex128)
 
-        for j,vs_i in enumerate(range(self.nr_ve)):
+        #for incoming_ene in self.photon_energy:
+        for j, vs_i in enumerate(range(self.nr_ve)):
+            #for k, w_n in enumerate(omega_n):
             for k, w_n in enumerate(self.photon_energy):
                 emiss[vs_i, k]        = w_n - omega_f[vs_i]
-                ene_loss[vs_i, k]     = w_n - (w_n - omega_f[vs_i])
+                #ene_loss[vs_i, k]     = w_n - (w_n - omega_f[vs_i])
+                ene_loss[vs_i, k]     = omega_f[vs_i]
                 crossections[vs_i, k] = self.rixs_xsection(w_n, vs_i, tdm_fn, 
                                                             tdm_ng, core_eigenvalues, valence_eigenvalues, 
                                                             dipole_ints, self.theta).real
                 scattering_amp_tensor[:,:, j, k] = self.F_mat
+                if j == 0:
+                    elastic_crossections[k] = self.elastic_rixs_xsection(w_n, tdm_ng, core_eigenvalues, 
+                                                            dipole_ints).real
 
         self.emission      = emiss
         self.ene_loss      = ene_loss
@@ -397,7 +424,8 @@ class RixsDriver:
         T_fn = self.transition_dipole_mom(tdm_fn, dipole_ints)
         self.oscillator_strength  = self.osc_str(T_fn, emission_ene) 
 
-        self.elastic_rixs = self.elastic_rixs_xsection(omega_n, dipole_ints, tdm_ng, self.theta).real
+        #self.elastic_rixs = self.elastic_rixs_xsection(omega_n, dipole_ints, tdm_ng, self.theta).real
+        self.elastic_crossections = elastic_crossections
 
     def write_hdf5(self, fname):
         """
