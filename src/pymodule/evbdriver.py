@@ -69,13 +69,6 @@ class EvbDriver():
             free_energy (float): the reaction free energy in kcal/mol of the vacuum system
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
         """
-        if not self.debug:
-            Lambda = np.linspace(0,0.1,11)
-            Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,41))
-            Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,11))
-            Lambda = np.round(Lambda,3)
-        else:
-            Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
         self.ostream.print_blank()
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
@@ -83,7 +76,7 @@ class EvbDriver():
         self.ostream.print_blank()
         self.ostream.print_header("Building systems")
         self.ostream.flush()
-        self.build_systems(Lambda=Lambda, configurations=["vacuum", "water"])
+        self.build_systems(configurations=["vacuum", "water"])
 
         self.ostream.print_blank()
         self.ostream.print_header("Running FEP")
@@ -360,18 +353,28 @@ class EvbDriver():
 
     def build_systems(
         self,
-        Lambda: list[float]|np.ndarray,
         configurations: list[str] | list[dict],  # type: ignore
+        Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
+        save_output = True,
     ):
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
         Args:
-            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing.
             configurations (list[str] | list[dict]): The given configurations for which to perform an FEP. The first configuration will be regarded as the reference configuration. 
+            Lambda (list[float] | np.ndarray): The Lambda vector to be used for the FEP. Should start with 0, end with 1 and be monotonically increasing. 
+                Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
         """
+        if Lambda is None:
+            if not self.debug:
+                Lambda = np.linspace(0,0.1,11)
+                Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,41))
+                Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,11))
+                Lambda = np.round(Lambda,3)
+            else:
+                Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
         assert (Lambda[0] == 0 and Lambda[-1] == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(np.diff(Lambda) > 0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
         Lambda = [round(lam, 3) for lam in Lambda]
@@ -416,30 +419,32 @@ class EvbDriver():
                 constraints=constraints,
             )
 
-            self.ostream.print_info(f"Saving files to {data_folder_path} and {run_folder_path}")
-            self.ostream.flush()
-            self.save_systems_as_xml(systems, conf["run_folder"])
-
-            top_path = cwd / data_folder / "topology.pdb"
-            mmapp.PDBFile.writeFile(
-                topology,
-                initial_positions * 10,  # positions are handled in nanometers, but pdb's should be in angstroms
-                open(top_path, "w"),
-            )
-
-            options_path = cwd / data_folder / "options.json"
-            with open(options_path, "w") as file:
-                json.dump(
-                    {
-                        "temperature": conf.get("temperature", self.temperature),
-                        "Lambda": Lambda,
-                    },
-                    file,
-                )
-
             conf["systems"] = systems
             conf["topology"] = topology
             conf["initial_positions"] = initial_positions
+            
+            if save_output:
+                self.ostream.print_info(f"Saving files to {data_folder_path} and {run_folder_path}")
+                self.ostream.flush()
+                self.save_systems_as_xml(systems, conf["run_folder"])
+
+                top_path = cwd / data_folder / "topology.pdb"
+                mmapp.PDBFile.writeFile(
+                    topology,
+                    initial_positions * 10,  # positions are handled in nanometers, but pdb's should be in angstroms
+                    open(top_path, "w"),
+                )
+
+                options_path = cwd / data_folder / "options.json"
+                with open(options_path, "w") as file:
+                    json.dump(
+                        {
+                            "temperature": conf.get("temperature", self.temperature),
+                            "Lambda": Lambda,
+                        },
+                        file,
+                    )
+
 
         self.system_confs = configurations
         self.ostream.flush()
