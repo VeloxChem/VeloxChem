@@ -96,6 +96,8 @@ class EvbDriver():
         self,
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
+        reactant_scf: dict = None,
+        product_scf: dict | list[dict] = None,
         product_charge: int | list[int] = 0,  # type: ignore
         reactant_multiplicity: int = 1,
         product_multiplicity: int | list[int] = 1,
@@ -197,9 +199,13 @@ class EvbDriver():
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
+            if isinstance(product_scf, dict):
+                product_scf = [product_scf]
             self.reactant, self.product = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
+                reactant_scf,
+                product_scf,
                 reactant_charge,
                 product_charge,
                 reactant_multiplicity,

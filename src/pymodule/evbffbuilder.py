@@ -2,6 +2,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 
 from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestdriver import ScfRestrictedDriver
 from .respchargesdriver import RespChargesDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -52,6 +53,8 @@ class EvbForceFieldBuilder():
         self,
         reactant_input: dict,
         product_input: list[dict],
+        reactant_scf_result: dict,
+        product_scf_result: list[dict],
         reactant_charge: int = 0,
         product_charge: list[int] = [0],
         reactant_multiplicity: int = 1,
@@ -66,12 +69,13 @@ class EvbForceFieldBuilder():
             reactant_multiplicity,
             self.reparameterise,
             self.optimise,
+            reactant_scf_result,
         )
         self.reactant.ostream.flush()
 
         products: list[ForceFieldGenerator] = []
 
-        for i, input in enumerate(product_input):
+        for i, (input, scf_result) in enumerate(zip(product_input, product_scf_result)):
             products.append(
                 self.get_forcefield(
                     input,
@@ -79,6 +83,7 @@ class EvbForceFieldBuilder():
                     product_multiplicity[i],  # type:ignore
                     self.reparameterise,
                     self.optimise,
+                    scf_result,
                 ))
 
         rea_elems = self.reactant.molecule.get_element_ids()
@@ -138,21 +143,26 @@ class EvbForceFieldBuilder():
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule)
             else:
-                if max(molecule.get_masses()) > 84:
-                    basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
-                    self.ostream.print_info(
-                        f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
-                    )
-                else:
-                    basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
-                scf_drv = ScfUnrestrictedDriver()
-                scf_results = scf_drv.compute(molecule, basis)
-                if not scf_drv.is_converged:
-                    scf_drv.conv_thresh = 1.0e-4
-                    scf_drv.max_iter = 200
+                if scf_results is None:
+                    if max(molecule.get_masses()) > 84:
+                        basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
+                        self.ostream.print_info(
+                            f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
+                        )
+                    else:
+                        basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
+                    if multiplicity == 1:
+                        scf_drv = ScfRestrictedDriver()
+                    else:
+                        scf_drv = ScfUnrestrictedDriver()
                     scf_results = scf_drv.compute(molecule, basis)
-                assert scf_drv.is_converged, f"SCF calculation for RESP charges on compound {filename} did not converge, aborting"
-
+                    if not scf_drv.is_converged:
+                        scf_drv.conv_thresh = 1.0e-4
+                        scf_drv.max_iter = 200
+                        scf_results = scf_drv.compute(molecule, basis)
+                    assert scf_drv.is_converged, f"SCF calculation for RESP charges on compound {filename} did not converge, aborting"
+                else:
+                    self.ostream.print_info("Using provided SCF results for RESP charges")
                 resp_drv = RespChargesDriver()
                 self.ostream.print_info("Calculating RESP charges")
                 forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
