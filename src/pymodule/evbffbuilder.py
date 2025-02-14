@@ -110,6 +110,7 @@ class EvbForceFieldBuilder():
         multiplicity: int,
         reparameterise: bool,
         optimise: bool,
+        scf_results: dict | None = None,
     ) -> ForceFieldGenerator:
 
         molecule = input["molecule"]

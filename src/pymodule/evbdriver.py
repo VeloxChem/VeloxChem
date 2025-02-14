@@ -54,6 +54,7 @@ class EvbDriver():
         self.input_folder: str = "input_files"
 
         self.name: str = None
+        self.results = None
         self.system_confs: list[dict] = []
         self.debug = False
 
@@ -529,11 +530,15 @@ class EvbDriver():
     def load_initialisation(self, data_folder: str, name: str):
         
         pdb = mmapp.PDBFile(f"{data_folder}/topology.pdb")
-        systems = self.load_systems_from_xml(f"{data_folder}/run")
         with open(f"{data_folder}/options.json", "r") as file:
             options = json.load(file)
             temperature = options["temperature"]
             Lambda = options["Lambda"]
+        if self.Lambda != Lambda:
+            self.ostream.print_warning(f"Lambda vector in {data_folder}/options.json does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file.")
+
+        self.Lambda = Lambda
+        systems = self.load_systems_from_xml(f"{data_folder}/run")
         conf = {
             "name": name,
             "data_folder": data_folder,
@@ -548,7 +553,7 @@ class EvbDriver():
         self.system_confs.append(conf)
         self.ostream.print_info(f"Initialised configuration with {len(systems)} systems, topology, initial positions, temperatue {temperature} and Lambda vector {Lambda} from {data_folder}")
         self.ostream.print_info(f"Current configurations: {[conf['name'] for conf in self.system_confs]}")
-        
+        self.ostream.flush()
 
     def save_systems_as_xml(self, systems: dict, folder: str):
         """Save the systems as xml files to the given folder.
@@ -651,13 +656,44 @@ class EvbDriver():
         reference_folder = self.system_confs[0]["data_folder"]
         target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
         dp = EvbDataProcessing()
-        results = self.load_output_from_folders(reference_folder, target_folders)
-        dp.compute(results, barrier, free_energy)
-        self.save_results(dp.results)
-        dp.print_results()
+        results = self._load_output_from_folders(reference_folder, target_folders)
+        results = dp.compute(results, barrier, free_energy)
+        self._save_dict_as_h5(results, f"results_{self.name}_{self.t_label}")
+        dp.print_results(results, self.ostream)
+        self.results = results
         self.ostream.flush()
 
-    def load_output_from_folders(self, reference_folder, target_folders) -> dict:
+    def print_results(self, results: dict = None, file_name: str = None):
+        if results is None:
+            if file_name is None:
+                assert self.results is not None, "No results known, and none provided"
+            
+            if self.results is None:
+                self.results = self._load_dict_from_h5(file_name)
+            else:
+                results = self.results
+            
+            
+        dp = EvbDataProcessing()
+        dp.print_results(results, self.ostream)
+        self.ostream.flush()
+        pass
+
+    def plot_results(self, results: dict = None, file_name: str = None):
+        if results is None:
+            if file_name is None:
+                assert self.results is not None, "No results known, and none provided"
+            
+            if self.results is None:
+                self.results = self._load_dict_from_h5(file_name)
+            else:
+                results = self.results
+        dp = EvbDataProcessing()
+        dp.plot_results(results)
+        self.ostream.flush()
+        pass
+
+    def _load_output_from_folders(self, reference_folder, target_folders) -> dict:
         """Load results from the output of the FEP calculations, and return a dictionary. Looks for Energies.dat, Data_combined.dat and options.json in each folder.
 
         Args:
@@ -675,16 +711,32 @@ class EvbDriver():
         folders = [reference_folder] + target_folders
         results = {}
         cwd = Path().cwd()
+        
+        common_results = []
+        specific_results = {}
         for name, folder in zip([reference] + targets, folders):
             E_file = str(cwd / folder / "Energies.dat")
             data_file = str(cwd / folder / "Data_combined.dat")
             options_file = str(cwd / folder / "options.json")
-            result = self.load_output_files(E_file, data_file, options_file)
-            results.update({name: result})
+            specific, common = self._load_output_files(E_file, data_file, options_file)
+            specific_results.update({name:specific})
+            common_results.append(common)
+        
+        results.update({"configuration_results": specific_results})
+        for common in common_results[1:]:
+            for key, val in common.items():
+                if isinstance (common[key], list) or isinstance(common[key], np.ndarray):
+                    assert np.all(common[key] == common_results[0][key]), f"Common results are not the same for all configurations. Key: {key}, value: {val}"
+                else:
+                    assert common[key] == common_results[0][key], f"Common results are not the same for all configurations. Key: {key}, value: {val}"
+
+        for key, val in common_results[0].items():
+            results.update({key: val})
         return results
 
+
     @staticmethod
-    def load_output_files(E_file, data_file, options_file):
+    def _load_output_files(E_file, data_file, options_file):
         """Load the output from one FEP calculation
 
         Args:
@@ -693,7 +745,7 @@ class EvbDriver():
             options_file (path): The location of the options json file.
 
         Returns:
-            dict: A dictionary containing the results of the FEP calculation
+            dict, dict: A dictionaries containing the results of the FEP calculation. The first one contains results specific to this configuration, the second one contains results that should be the same for all configurations.
         """
         Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = np.loadtxt(E_file,skiprows=1,delimiter=',').T
 
@@ -705,29 +757,31 @@ class EvbDriver():
         Lambda = options["Lambda"]
         Temp_set = options["temperature"]
         options.pop("Lambda")
-        result = {
+        specific_result = {
             "E1_ref": E1_ref,
             "E2_ref": E2_ref,
             "E1_run": E1_run,
             "E2_run": E2_run,
             "E_m": E_m,
-            "step": step,
             "Ep": Ep,
             "Ek": Ek,
             "Temp_step": Temp,
-            "Temp_set": Temp_set,
             "Vol": Vol,
             "Dens": Dens,
+            "options": options,
+            "Temp_set": Temp_set,
+        }
+        common_result = {
+            "step": step,
             "Lambda": Lambda,
             "Lambda_frame": Lambda_frame,
             "Lambda_indices": [np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame],
-            "options": options,
         }
-        return result
+        return specific_result, common_result
 
     @staticmethod
-    def load_result(file):
-        """Load results from an h5 file
+    def _load_dict_from_h5(file):
+        """Load a dictionary from from an h5 file
 
         Args:
             file (path): The file to load the results from.
@@ -736,38 +790,40 @@ class EvbDriver():
             dict: Dictionary with the results
         """
         with h5py.File(file, "r") as f:
-            result = {}
-            for key, value in f.items():
-                if isinstance(value, h5py.Dataset):
-                    result[key] = value[()]
-                elif isinstance(value, h5py.Group):
-                    group = {}
-                    for k, v in value.items():
-                        group[k] = v[()]
-                    result[key] = group
-                else:
-                    result[key] = value
-        return result
+            def load_group(group):
+                data = {}
+                for k, v in group.items():
+                    if isinstance(v, h5py.Group):
+                        data[k] = load_group(v)
+                    elif isinstance(v, h5py.Dataset):
+                        data[k] = v[()]
+                    else:
+                        data[k] = v
+                return data
 
-    def save_results(self, results: dict[str, dict]):
-        """Save the results to seperate h5 files
+            data = load_group(f)
+        return data
+
+    def _save_dict_as_h5(self, data: dict, file_name: str):
+        """Save the provided dictionary to an h5 file
 
         Args:
             results (dict[str, dict]): Dictionary of dictionaries containing the results to save. The key string will be used as filename
         """
         cwd = Path.cwd()
-        for name, result in results.items():
-            file_path = str(cwd / f"{name}.h5")
-            with h5py.File(file_path, "w") as file:
-                self.ostream.print_info(f"Saving results to {file_path}")
-                for key, value in result.items():
-                    if isinstance(value, np.ndarray) or isinstance(value, list):
-                        file.create_dataset(key, data=value)
-                    elif isinstance(value, dict):
-                        group = file.create_group(key)
-                        for k, v in value.items():
-                            group.create_dataset(k, data=v)
+        
+        file_path = str(cwd / f"{file_name}.h5")
+
+        with h5py.File(file_path, "w") as file:
+            self.ostream.print_info(f"Saving results to {file_path}")
+            def save_group(data, group):
+                for k, v in data.items():
+                    if isinstance(v, dict):
+                        subgroup = group.create_group(k)
+                        save_group(v, subgroup)
+                    elif isinstance(v, np.ndarray) or isinstance(v, list):
+                        group.create_dataset(k, data=v)
                     else:
-                        file[key] = value
-                pass
-        pass
+                        group[k] = v
+
+            save_group(data, file)
