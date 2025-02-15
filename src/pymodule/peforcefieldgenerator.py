@@ -553,10 +553,16 @@ class PEForceFieldGenerator:
 
         self.ostream.print_blank()
 
-        title = 'Local Properties (LoProp) Calculations'
+        title = 'Local Properties (LoProp)'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
+
+        loprop_ref = 'L. Gagliardi, R. Lindh, G. Karlström,'
+        loprop_ref += ' J. Chem. Phys. 2004, 121, 4494-4500.'
+        self.ostream.print_reference('Reference: ' + loprop_ref)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         title = 'Molecular Polarizabilities'
         self.ostream.print_header(title)

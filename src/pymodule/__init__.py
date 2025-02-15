@@ -165,6 +165,9 @@ from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 
+# for backward compatibility only
+from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
+
 # Python functions
 from .errorhandler import assert_msg_critical
 from .features import print_features
