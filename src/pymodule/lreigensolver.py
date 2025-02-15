@@ -247,11 +247,22 @@ class LinearResponseEigenSolver(LinearSolver):
         orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
-
+        """
+        if getattr(self, 'sra', False) and not self.core_excitation:
+            norb = self.num_core_orbitals + self.num_val_orbitals + self.num_vir_orbitals
+            core_val_exc_inds = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, nocc)) + list(range(nocc, nocc+self.num_vir_orbitals))
+            orb_ene = scf_tensors['E_alpha'][core_val_exc_inds]
+            nocc = self.num_core_orbitals + self.num_val_orbitals
+        """
         if self.rank == mpi_master():
             assert_msg_critical(
                 self.nstates <= nocc * (norb - nocc),
                 'LinearResponseEigenSolver: too many excited states')
+            if getattr(self, 'sra', False) and not self.core_excitation:
+                assert_msg_critical(
+                self.nstates <= (self.num_core_orbitals + self.num_val_orbitals) 
+                                * (self.num_vir_orbitals),
+                'LinearResponseEigenSolver (SRA): too many excited states')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -294,6 +305,7 @@ class LinearResponseEigenSolver(LinearSolver):
         # generate initial guess from scratch
         else:
             igs = self._initial_excitations(self.nstates, orb_ene, nocc, norb)
+
             bger, bung = self._setup_trials(igs, None)
 
             profiler.set_timing_key('Preparation')
@@ -877,11 +889,11 @@ class LinearResponseEigenSolver(LinearSolver):
                            for i in range(self.num_core_orbitals)
                            for a in range(nocc, norb)]
         elif self.sra:
-            core_and_val_indices = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, nocc, 1)) #list(range(nocc+1, nocc+1 - self.num_val_orbitals, -1)) 
+            core_and_val_indices = list(range(self.num_core_orbitals)) + list(range(nocc - self.num_val_orbitals, nocc)) 
             excitations = [(i, a)
                             for i in core_and_val_indices
                             for a in range(nocc, nocc+self.num_vir_orbitals)]
-            n_exc = (self.num_core_orbitals + self.num_val_orbitals) * self.num_vir_orbitals
+            #n_exc = (self.num_core_orbitals + self.num_val_orbitals) * self.num_vir_orbitals
         else:
             excitations = [
                 (i, a) for i in range(nocc) for a in range(nocc, norb)
@@ -983,7 +995,8 @@ class LinearResponseEigenSolver(LinearSolver):
                 orb_ene, nocc, norb, self.num_core_orbitals)
         elif self.sra:
             ediag, sdiag = self.construct_ediag_sdiag_half(
-                orb_ene, nocc, norb, self.num_core_orbitals + self.num_val_orbitals)
+                orb_ene, nocc, norb, self.num_core_orbitals, self.num_val_orbitals,
+                self.num_vir_orbitals)
         else:
             ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 
