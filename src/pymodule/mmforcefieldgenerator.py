@@ -320,7 +320,7 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False):
+    def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False, initial_validation=True):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -367,7 +367,8 @@ class MMForceFieldGenerator:
                     central_atom_2 = scanned_dih[2] - 1
 
                     # Check if the rotatable bond matches the scan file
-                    if not (central_atom_1 == rotatable_bond[0] - 1 and central_atom_2 == rotatable_bond[1] - 1):
+                    if sorted([central_atom_1, central_atom_2]) != sorted(
+                            [rotatable_bond[0] - 1, rotatable_bond[1] - 1]):
                         raise ValueError('The rotatable bond does not match the scan file.')
 
                     break
@@ -409,13 +410,11 @@ class MMForceFieldGenerator:
         # If the scan file is provided, read it
         if scan_file is not None:
             # Check if the name of the file is correct 1-2-3-4.xyz
-            reference_dih = scanned_dih
-            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
             file_path = Path(scan_file)
             # Note: Sometimes geomeTRIC writes the dihedral atoms in reverse order
-            if file_path.stem not in [f"{reference_dih[0]}-{reference_dih[1]}-{reference_dih[2]}-{reference_dih[3]}",
-                                 f"{reference_dih[3]}-{reference_dih[2]}-{reference_dih[1]}-{reference_dih[0]}"]:
-                
+            if file_path.stem not in [
+                    f"{scanned_dih[0]}-{scanned_dih[1]}-{scanned_dih[2]}-{scanned_dih[3]}",
+                    f"{scanned_dih[3]}-{scanned_dih[2]}-{scanned_dih[1]}-{scanned_dih[0]}"]:
                 raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
             self.read_qm_scan_xyz_files([scan_file])
         else:
@@ -518,19 +517,19 @@ class MMForceFieldGenerator:
         dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
 
         # Print initial barriers
-        self.ostream.print_info(f"GAFF barriers: {barriers} will be used as initial guess.")
+        self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
         self.ostream.flush()
 
         # Store the original barriers and perform the initial validation
         original_barriers = barriers.copy()
 
-        self.ostream.print_info('Validating initial force field...')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        gaff_dihedral = self.validate_force_field(0, print_summary=True)
-        if visualize:
-            self.visualize(gaff_dihedral)
+        if initial_validation:
+            self.ostream.print_info('Validating initial force field...')
+            self.ostream.print_blank()
+            self.ostream.flush()
+            gaff_dihedral = self.validate_force_field(0, print_summary=True)
+            if visualize:
+                self.visualize(gaff_dihedral)
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
@@ -541,29 +540,21 @@ class MMForceFieldGenerator:
                 self.dihedrals[(i, j, k, l)]['barrier'] = 0.0
 
         # Scan the dihedral
-        self.ostream.print_info('Performing dihedral scan...')
+        self.ostream.print_info('Performing dihedral scan for MM baseline...')
         self.ostream.print_blank()
         self.ostream.flush()
 
         initial_data = self.validate_force_field(0)
 
-        # Prepare data for fitting
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
         mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
 
-        # Define the dihedral potential function
         def dihedral_potential(phi, barriers, phases_rad, periodicities):
+
             total_potential = np.zeros_like(phi)
-            #Group barriers, if some are the same use the same barrier
-            if np.unique(barriers).size != barriers.size:
-                unique_barriers = np.unique(barriers)
-                for barrier in unique_barriers:
-                    barrier_indices = np.where(barriers == barrier)[0]
-                    for idx in barrier_indices:
-                        total_potential += barrier * (1 + np.cos(periodicities[idx] * phi - phases_rad[idx]))
-            else:
-                for barrier, phase_rad, periodicity in zip(barriers, phases_rad, periodicities):
-                    total_potential += barrier * (1 + np.cos(periodicity * phi - phase_rad))
+
+            for barrier, phase_rad, periodicity in zip(barriers, phases_rad, periodicities):
+                total_potential += barrier * (1 + np.cos(periodicity * phi - phase_rad))
 
             return total_potential
         
@@ -677,12 +668,17 @@ class MMForceFieldGenerator:
                                     np.min(fitted_dihedral_energies))
 
         # Adjust the barriers to the dihedral types
-        if np.unique(barriers).size != barriers.size:
+        param_tuples = list(zip(
+            original_barriers, phases_array_rad, periodicities_array))
 
-            unique_barriers = np.unique(barriers)
-
-            for barrier in unique_barriers:
-                barrier_indices = np.where(barriers == barrier)[0]
+        if len(set(param_tuples)) != len(param_tuples):
+            for unique_param_tuple in set(param_tuples):
+                barrier_indices = [
+                    idx for idx in range(len(original_barriers))
+                    if unique_param_tuple == (original_barriers[idx],
+                                              phases_array_rad[idx],
+                                              periodicities_array[idx])
+                ]
                 mean_barrier = np.mean(fitted_barriers[barrier_indices])
                 for idx in barrier_indices:
                     fitted_barriers[idx] = mean_barrier
@@ -692,7 +688,7 @@ class MMForceFieldGenerator:
         self.ostream.print_info(f'New fitted barriers: {fit_barrier_to_print}')
 
         # If there are multiple dihedrals group them in list of lists
-        if np.any(multiple_dihedrals):
+        if any(multiple_dihedrals):
             fitted_barriers_grouped = []
             for i, j, k, l in dihedral_indices:
                 dihedral = self.dihedrals[(i, j, k, l)]
