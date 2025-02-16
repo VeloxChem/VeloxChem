@@ -212,7 +212,7 @@ class InterpolationDatapoint:
                 self.b_matrix[i, :derivative.shape[0]] = derivative
 
             # self.b_matrix[i] = derivative
-            # self.original_b_matrix[i] = derivative
+            self.original_b_matrix[i] = derivative
 
 
     def calculate_b2_matrix(self):
@@ -240,9 +240,9 @@ class InterpolationDatapoint:
                 self.b2_matrix[i] = -r_inv_2 * second_derivative
 
                 for m in range(n_atoms):
-                    for n in range(m, n_atoms):
+                    for n in range(n_atoms):
                         self.b2_matrix[i, m*3:(m+1)*3, n*3:(n+1)*3] += 2 * r_inv_3 * np.outer(self.original_b_matrix[i, m*3:(m+1)*3], self.original_b_matrix[i, n*3:(n+1)*3])
-                self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
+                # self.b2_matrix[i] = 0.5 * (self.b2_matrix[i] + self.b2_matrix[i].T)
 
             else:
                 self.b2_matrix[i] = second_derivative
@@ -255,7 +255,7 @@ class InterpolationDatapoint:
 
         :param tol:
             Tolerance for the singular values of the B matrix.
-.
+
         """
         
         dimension = self.gradient.shape[0] * 3 - 6
@@ -304,8 +304,7 @@ class InterpolationDatapoint:
 
         :param tol:
             Tolerance for the singular values of the B matrix.
-        :param alpha:
-            Tikhonov regularization parameter.
+
         """
 
         if self.internal_gradient is None:
@@ -346,13 +345,54 @@ class InterpolationDatapoint:
         g_minus_matrix = np.dot(U, np.dot(np.diag(s_inv), Vt))
 
         b2_gradient = np.einsum("qxy,q->xy", self.b2_matrix, self.internal_gradient)
+        self.b2_gradient = b2_gradient
         intermediate_matrix = np.dot(self.b_matrix, self.hessian - b2_gradient)
 
         self.internal_hessian = np.linalg.multi_dot([
             g_minus_matrix, intermediate_matrix, self.b_matrix.T, g_minus_matrix.T
         ])
         self.internal_hessian = 0.5 * (self.internal_hessian + self.internal_hessian.T)
+    
+    def backtransform_internal_gradient_to_cartesian_coordinates(self):
+        '''
+        Performs the back-transformation of the internal gradient to the
+        Cartesian space.
+
+        :returns:
+            The gradient in Cartesian coordinates.
+        '''
         
+        cartesian_gradient = np.linalg.multi_dot([self.b_matrix.T, self.internal_gradient]).reshape(self.cartesian_coordinates.shape[0], 3)
+
+        return cartesian_gradient
+
+    def backtransform_internal_hessian_to_cartesian_coordinates(self):
+        '''
+        Performs the back-transformation of the internal hessian to the
+        Cartesian space.
+
+        :returns:
+            The hessian in Cartesian coordinates.
+
+        '''
+
+        
+        cartesian_hessian = np.linalg.multi_dot([self.b_matrix.T, self.internal_hessian, self.b_matrix]) + self.b2_gradient
+
+        return cartesian_hessian
+
+    def backtransform_gradient_and_hessian(self):
+        """
+        Performs all steps required to transform from internal coordinates
+        to the Cartesian coordinates.
+
+        """
+        assert_msg_critical(self.internal_gradient is not None, 'InterpolationDatapoint: No internal gradient is defined.')
+        assert_msg_critical(self.internal_hessian is not None, 'InterpolationDatapoint: No internal hessian is defined.')
+
+        # Transform the gradient and Hessian to internal coordinates
+        self.backtransform_internal_gradient_to_cartesian_coordinates()
+        self.backtransform_internal_hessian_to_cartesian_coordinates()
 
 
     def transform_gradient_and_hessian(self):

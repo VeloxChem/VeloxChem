@@ -252,6 +252,7 @@ class InterpolationDriver():
             self.labels = labels
         if chk_file:
             self.imforcefield_file = chk_file
+        qm_data_points = self.qm_data_points
         if qm_data_points is None:
             qm_data_points = self.read_qm_data_points()
 
@@ -339,6 +340,7 @@ class InterpolationDriver():
         for i, data_point in enumerate(qm_data_points):
             
             distance, weight_gradient, _ = self.cartesian_distance(data_point)
+
             if abs(distance) < min_distance:
                 min_distance = abs(distance)
 
@@ -349,7 +351,7 @@ class InterpolationDriver():
             (qm_data_points[index], distance, wg) 
             for distance, index, wg in distances_and_gradients 
             if abs(distance) <= min_distance + self.distance_thrsh]
-            
+        distances_from_points = [] 
         for qm_data_point, distance, weight_grad in close_distances:
             denominator = (
                 (distance / self.confidence_radius)**(2 * self.exponent_p) +
@@ -365,7 +367,7 @@ class InterpolationDriver():
             potentials.append(potential)
             weights.append(weight)
             weight_gradients.append(weight_grad)
-
+            distances_from_points.append(distance)
             
         n_points = len(close_distances)
         self.impes_coordinate.energy = 0
@@ -373,6 +375,8 @@ class InterpolationDriver():
         self.impes_coordinate.NAC = np.zeros((natms, 3))
         weights = np.array(weights) / sum_weights
         
+        for i, w in enumerate(weights):
+            print(f'Label: {self.labels[i]} with weight: {w} with distance: {distances_from_points[i]}')
 
         for i in range(n_points):
 

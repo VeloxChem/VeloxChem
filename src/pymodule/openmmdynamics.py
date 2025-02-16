@@ -1189,7 +1189,7 @@ class OpenMMDynamics:
         # Set up reporting
         self.simulation.reporters.clear()
         self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
-
+        
         # Print header
         print('QM/MM Simulation Parameters')
         print('=' * 60)

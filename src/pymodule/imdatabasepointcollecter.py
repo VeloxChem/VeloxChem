@@ -195,6 +195,8 @@ class IMDatabasePointCollecter:
         self.point_adding_molecule = {}
         self.energy_threshold = None
         self.collect_qm_points = None
+        self.previous_energy_list = []
+        
 
         self.qm_datafile = None
 
@@ -214,6 +216,7 @@ class IMDatabasePointCollecter:
         self.cluster_run = None
         self.skipping_value = 0
         self.basis = None
+        self.molecule = None
 
         # output_file variables that will be written into self.general_variable_output
         self.gradients = None
@@ -795,6 +798,7 @@ class IMDatabasePointCollecter:
         
         print('current datapoints around the given starting structure', self.desired_datpoint_density, self.density_around_data_point[0], self.density_around_data_point[1], '\n allowed derivation from the given structure', self.allowed_molecule_deviation, '\n ---------------------------------------')
         self.allowed_molecules = []
+        self.molecules = []
         self.coordinates = []
         self.coordinates_xyz = []
         self.gradients = []
@@ -849,10 +853,6 @@ class IMDatabasePointCollecter:
             # Total energy
             total = pot + kinetic
             self.total_energies.append(total.value_in_unit(unit.kilojoules_per_mole))
-            print('scaling factor', self.scaling_factor)
-            
-            #if step % 10 == 0 and self.scaling_factor > 0.1:
-            #    self.scaling_factor -= 0.1
                 
             # Information output
             if step % save_freq == 0:
@@ -1769,9 +1769,7 @@ class IMDatabasePointCollecter:
                 for i, qm_data_point in enumerate(self.qm_data_points, start=1):
                     length_vectors = (self.current_im_choice.impes_coordinate.cartesian_distance_vector(qm_data_point))
 
-                    print('distance in correlation', (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom(),
-                          (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom(), i, len(self.qm_data_points))
-                    if (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom() < 0.3:
+                    if (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom() < 0.2:
                         self.add_a_point = False
                         break          
                         
@@ -1780,7 +1778,8 @@ class IMDatabasePointCollecter:
 
             else:
                 self.skipping_value -= 1
-                
+            
+            # self.add_a_point = True
             self.point_checker += 1 
             if self.add_a_point == True and self.step > self.collect_qm_points or self.check_a_point == True and self.step > self.collect_qm_points:
                 print('no point correlation ')
@@ -1791,8 +1790,9 @@ class IMDatabasePointCollecter:
 
                 context.setPositions(self.coordinates[0])
                 self.coordinates = self.coordinates[:1]
-                context.setVelocities(self.velocities[0])
-                self.velocities = self.velocities[:1]
+                # context.setVelocities(self.velocities[0])
+                context.setVelocitiesToTemperature(self.temperature)
+                self.velocities = [context.getState(getVelocities=True).getVelocities()]
                 
                 new_positions = context.getState(getPositions=True).getPositions()
                 qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
@@ -1821,8 +1821,10 @@ class IMDatabasePointCollecter:
         else:
             context.setPositions(self.coordinates[0])
             self.coordinates = self.coordinates[:1]
-            context.setVelocities(self.velocities[0])
-            self.velocities = self.velocities[:1]
+            context.setVelocitiesToTemperature(self.temperature)
+            self.velocities = [context.getState(getVelocities=True).getVelocities()]
+            # context.setVelocities(self.velocities[0])
+            # self.velocities = self.velocities[:1]
             new_positions = context.getState(getPositions=True).getPositions()
             qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
             positions_ang = (qm_positions) * 10
@@ -1878,7 +1880,28 @@ class IMDatabasePointCollecter:
 
         energy_difference = (abs(qm_energy[0] - self.impes_drivers[-1].impes_coordinate.energy))
         print('energy differences', energy_difference * hartree_in_kcalpermol())
-        self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20) - 1
+        
+        # calcualte energy gradient
+        self.previous_energy_list.append(energy_difference)
+
+        if len(self.previous_energy_list) > 3:
+            # Compute gradient (rate of change of energy difference)
+            grad1 = self.previous_energy_list[-2] - self.previous_energy_list[-3]
+            grad2 = self.previous_energy_list[-1] - self.previous_energy_list[-2]
+
+            # Base skipping value calculation
+            base_skip = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20) - 1
+
+            # Adjust skipping value based on gradient
+            if grad2 > grad1:  # Energy difference is increasing
+                self.skipping_value = max(1, base_skip - 1)  # Reduce skipping for more frequent checks
+            else:  # Energy difference is decreasing
+                self.skipping_value = base_skip + 10  # Increase skipping to check less often
+
+            print(f"Energy Difference: {energy_difference:.6f}, Gradient: {grad2 - grad1:.6f}, Skipping Value: {self.skipping_value}")
+
+        else:
+            self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
         if energy_difference * hartree_in_kcalpermol() > self.energy_threshold:
             self.add_a_point = True
@@ -1924,7 +1947,30 @@ class IMDatabasePointCollecter:
        
         gradient = self.compute_gradient(molecule, basis, scf_results)
         hessian = self.compute_hessian(molecule, basis)
+        
+        natoms = molecule.number_of_atoms()
+        elem = molecule.get_labels()
+        coords = molecule.get_coordinates_in_bohr().reshape(natoms * 3)
 
+        R_kjmol = 0.00831446261815324
+        particles = self.system.getNumParticles() * 1.5
+        kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
+        temp = kinetic.value_in_unit(unit.kilojoules_per_mole) / (particles * R_kjmol)
+
+        vib_frequencies, normal_modes_vec, gibbs_energy = (
+            geometric.normal_modes.frequency_analysis(
+                coords,
+                hessian[0],
+                elem,
+                energy=energy[0],
+                temperature=temp,
+                pressure=self.pressure,
+                outfnm=f'vibrational_point_{energy[0]}',
+                normalized=False))
+        
+        print('vibrational frequencies', vib_frequencies)
+        eigenvalues, _ = np.linalg.eigh(hessian)
+        print('Eigenvalues', min(eigenvalues))
         impes_coordinate = InterpolationDatapoint(self.z_matrix)
 
         impes_coordinate.update_settings(self.impes_dict)
@@ -1934,11 +1980,7 @@ class IMDatabasePointCollecter:
         impes_coordinate = InterpolationDatapoint(self.z_matrix)
         impes_coordinate.update_settings(self.impes_dict)
         impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
-        # impes_coordinate.define_internal_coordinates()
-        # impes_coordinate.compute_internal_coordinates_values()
-        # print(impes_coordinate.internal_coordinates_values)
-        
-        # exit()
+
         impes_coordinate.energy = energy[0]
         impes_coordinate.gradient = gradient[0]
         impes_coordinate.hessian = hessian[0]

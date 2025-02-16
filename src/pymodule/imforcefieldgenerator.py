@@ -216,7 +216,7 @@ class IMForceFieldGenerator:
         self.snapshots = self.nsteps
         self.trajectory_file = 'trajectory.pdb'
         self.desired_point_density = 50
-        self.converged_cycle = 4
+        self.converged_cycle = 5
         self.energy_threshold = 1.5
         self.start_collect = 0
         self.solvent = 'gas'
@@ -226,7 +226,7 @@ class IMForceFieldGenerator:
         # individual run
         self.qm_energies = []
         self.total_energies = []
-        self.molecules = []
+        self.molecules = None
         self.kinetic_energies = []
         self.point_added_molecules = []
         self.unique_molecules = []
@@ -235,6 +235,27 @@ class IMForceFieldGenerator:
         # confirm database quality
         self.dynamics_method = 'MM'
         self.nstruc_to_confirm_database_quality = 50
+
+        self.interpolation_settings = { 'interpolation_type':self.interpolation_type, 
+                            'exponent_p':self.exponent_p,
+                            'exponent_q':self.exponent_q, 
+                            'confidence_radius':self.confidence_radius,
+                            'imforcefield_file':self.imforcefieldfile,
+                            'use_inverse_bond_length':True
+                          }
+
+        self.dynamics_settings = {  'qm_driver': self.qm_driver,
+                                    'grad_driver': self.qm_grad_driver,
+                                    'hess_driver': self.qm_hess_driver,
+                                    'basis_set':self.basis_set_label,
+                                    'xc_fun':self.xcfun,
+                                    'duration':self.duration, 'temperature':self.temperature, 'solvent':self.solvent,
+                                    'pressure':self.force_constant, 'force_constant': self.force_constant, 'ensemble':self.ensemble,
+                                    'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
+                                    'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
+                                    'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
+                                    'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect,
+                                    'FF_datafile':self.FF_datafile}
 
 
     def set_up_the_system(self, molecule, target_dihedrals=None, sampling_structures=1):
@@ -329,6 +350,7 @@ class IMForceFieldGenerator:
                 if self.dihedrals is not None:
                     
                     key = (key_old, int(round(mol.get_dihedral_in_degrees(key_old))))
+                
 
                 forcefield_generator = ForceFieldGenerator()
                 forcefield_generator.force_field_data = self.dynamics_settings['FF_datafile']
@@ -362,23 +384,21 @@ class IMForceFieldGenerator:
                     self.qm_energies.append(im_database_driver.qm_potentials)
                     self.total_energies.append(im_database_driver.total_energies)
                     self.kinetic_energies.append(im_database_driver.kinetic_energies)
-                    self.molecules.append(im_database_driver.molecules)
+                    self.molecules = im_database_driver.molecules
                     self.point_added_molecules.append(im_database_driver.point_adding_molecule)
                     self.unique_molecules.append(im_database_driver.allowed_molecules)
 
+                
+                entries = list(self.molecules_along_rp.values())
 
+                if self.imforcefieldfile is None:
+                    self.imforcefieldfile = 'IMDatabase.h5'
+
+                self.confirm_database_quality(entries[0][0], self.imforcefieldfile, given_molecular_strucutres=self.molecules)
+    
                 counter += 1
-
         
-        entries = list(self.molecules_along_rp.values())
-
-        if self.imforcefieldfile is None:
-            self.imforcefieldfile = 'IMDatabase.h5'
-
-        self.confirm_database_quality(entries[0][0], self.imforcefieldfile)
-
-
-        print('The construction of the database was sucessfull')    
+        print('The construction of the database was sucessfull')
 
     
     def database_density_check_with_molecule(self, molecule, qm_datapoints, specific_dihedrals=None, nsampling=None):
@@ -623,21 +643,25 @@ class IMForceFieldGenerator:
             
 
         if self.dynamics_method == 'IM':
-            interpolation_driver = InterpolationDriver(self.z_matrix)
+            interpolation_driver = InterpolationDriver()
             interpolation_driver.update_settings(self.interpolation_settings)
             interpolation_driver.imforcefield_file = self.imforcefieldfile
-            self.qmlabels, _ = interpolation_driver.read_labels()
-            interpolation_driver.update_settings(self.interpolation_settings)
+            qmlabels, z_matrix = interpolation_driver.read_labels()
+            sorted_labels = sorted(qmlabels, key=lambda x: int(x.split('_')[1]))
+
+            interpolation_driver.impes_coordinate.z_matrix = z_matrix
 
             qm_data_points = []
 
-            for label in self.qmlabels:
-                qm_data_point = InterpolationDatapoint(self.z_matrix)
+            for label in sorted_labels:
+                print('label', label)
+                qm_data_point = InterpolationDatapoint(z_matrix)
                 qm_data_point.read_hdf5(self.imforcefieldfile, label)
                 qm_data_points.append(qm_data_point)   
+            interpolation_driver.labels = sorted_labels
             interpolation_driver.qm_data_points = qm_data_points
             openmmdyn = OpenMMDynamics()
-            openmmdyn.create_system_from_molecule(molecule, ff_gen=forcefield_generator, solvent=self.dynamics_settings['solvent'], qm_atoms='all')
+            openmmdyn.create_system_from_molecule(molecule, ff_gen=forcefield_generator, solvent=self.solvent, qm_atoms='all')
             openmmdyn.platform = 'CUDA'
 
             openmmdyn.run_qmmm(interpolation_driver, interpolation_driver, ensemble=self.ensemble, temperature=self.temperature,
@@ -645,6 +669,22 @@ class IMForceFieldGenerator:
                                snapshots=self.snapshots, traj_file='Database_quality_conformation.pdb')
             
             all_structures = openmmdyn.dynamic_molecules
+
+        if self.dynamics_method == 'IM_Driver':
+            interpolation_driver = InterpolationDriver()
+            interpolation_driver.update_settings(self.interpolation_settings)
+            interpolation_driver.imforcefield_file = self.imforcefieldfile
+            self.qmlabels, z_matrix = interpolation_driver.read_labels()
+
+            interpolation_driver.impes_coordinate.z_matrix = z_matrix
+            im_database_driver = IMDatabasePointCollecter()
+            im_database_driver.platform = 'CUDA'
+
+            im_database_driver.system_from_molecule(molecule, z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')
+            self.interpolation_settings['imforcefield_file'] = self.imforcefieldfile
+            im_database_driver.update_settings(self.dynamics_settings, self.interpolation_settings)
+            im_database_driver.collect_qm_points = self.nsteps
+            im_database_driver.run_qmmm()
 
         return all_structures
 
@@ -665,7 +705,7 @@ class IMForceFieldGenerator:
            An optional list of additional molecular structures that will be used for the validation.
 
        :returns:
-           List of quality-checked molecular structures, IM-energies, QM-energies.
+           List of IM-energies, QM-energies.
         """
 
         # For all Methods a ForceField of the molecule is requiered
@@ -674,25 +714,41 @@ class IMForceFieldGenerator:
         forcefield_generator.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         forcefield_generator.create_topology(molecule)
         
+        self.imforcefieldfile = im_database_file
+        if self.interpolation_settings is None:
+            self.interpolation_settings = { 'interpolation_type':self.interpolation_type, 
+                            'exponent_p':self.exponent_p,
+                            'exponent_q':self.exponent_q, 
+                            'confidence_radius':self.confidence_radius,
+                            'imforcefield_file':self.imforcefieldfile,
+                            'use_inverse_bond_length':True
+                          }
+
         if self.dynamics_method == 'MM':
             rot_bonds = forcefield_generator.rotatable_bonds
             forcefield_generator.reparametrize_dihedrals(rot_bonds[0], scan_range=[180, 360], n_points=7, visualize=True)
 
         database_quality = False
+
+
         while database_quality is False:
             
             database_expanded = False
-            all_structures = self.simple_run_dynamics(molecule, forcefield_generator)
+            all_structures = given_molecular_strucutres
+            if given_molecular_strucutres is None:
+                all_structures = self.simple_run_dynamics(molecule, forcefield_generator)
 
             datapoint_molecules = self.database_extracter(im_database_file, molecule.get_labels())
                 
             rmsd = -np.inf
             random_structure_choices = None
             counter = 0
-            if given_molecular_strucutres is None:
-                random_structure_choices = given_molecular_strucutres
+            # if given_molecular_strucutres is not None:
+            #     random_structure_choices = given_molecular_strucutres
+
+    
             
-            while rmsd < 0.3 and given_molecular_strucutres is None and counter <= 20:
+            while rmsd < 0.3 and counter <= 20:
                 
                 individual_distances = []
                 random_structure_choices = random.choices(all_structures, k=self.nstruc_to_confirm_database_quality)
@@ -713,7 +769,7 @@ class IMForceFieldGenerator:
             
             qm_energies = []
             im_energies = []
-            qm_driver = self.dynamics_settings['qm_driver']
+            qm_driver = self.qm_driver
             basis = MolecularBasis.read(molecule, self.basis_set_label)
             impes_driver = InterpolationDriver()
             impes_driver.update_settings(self.interpolation_settings)
@@ -721,7 +777,7 @@ class IMForceFieldGenerator:
             labels, z_matrix = impes_driver.read_labels()
             impes_driver.impes_coordinate.z_matrix = z_matrix
             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
-            
+            print('labels used for the interpolation', sorted_labels)
             for i, mol in enumerate(random_structure_choices):
 
                 impes_driver.compute(mol, labels=sorted_labels)
@@ -744,10 +800,52 @@ class IMForceFieldGenerator:
             if not database_expanded:
                 database_quality = True
 
+        
+        self.plot_final_energies(qm_energies, im_energies)
+        
         self.structures_to_xyz_file(random_structure_choices, 'random_xyz_traj.xyz', im_energies, qm_energies)
 
 
-        return random_structure_choices, qm_energies, im_energies
+
+        return qm_energies, im_energies
+    
+    def plot_final_energies(self, qm_energies, im_energies):
+        """Plots the final potential energies of QM and IM methods.
+
+        :param qm_energies:
+            A list or NumPy array of QM potential energies.
+
+        :param im_energies:
+            A list or NumPy array of IM potential energies.
+
+        """
+        
+        import matplotlib.pyplot as plt
+        
+        qm_energies_plot = np.array(qm_energies)
+        im_energies_org = np.array(im_energies)
+
+
+        sort_indices = np.argsort(qm_energies_plot) 
+        qm_energies_sorted = qm_energies_plot[sort_indices]  
+        im_energies_org_sorted = im_energies_org[sort_indices]
+
+        ss_total = np.sum((qm_energies_sorted - np.mean(qm_energies_sorted)) ** 2)
+        r2_org = 1 - np.sum((qm_energies_sorted - im_energies_org_sorted) ** 2) / ss_total
+
+        plt.figure(figsize=(10, 6))
+
+        plt.plot(qm_energies_sorted - qm_energies_sorted[0], qm_energies_sorted - qm_energies_sorted[0], label="Reference (y = x)", color="black", linestyle="-")
+        plt.scatter(qm_energies_sorted - qm_energies_sorted[0], qm_energies_sorted - qm_energies_sorted[0], label="QM Energy", color="black", alpha=1.0)
+
+        plt.scatter(qm_energies_sorted - qm_energies_sorted[0], im_energies_org_sorted - qm_energies_sorted[0], label=f"IM Energy (R$^2$ = {r2_org})", color="red", alpha=0.7)
+        plt.xlabel("Potential Energies (kcal mol$^{-1}$)", fontsize=12)
+        plt.ylabel("Potential Energies (kcal mol$^{-1}$)", fontsize=12)
+        plt.legend()
+        plt.grid(alpha=0.5)
+
+        plt.savefig("correlation_energy_plot.svg")
+        plt.show(block=True)
 
     def structures_to_xyz_file(self, molecules_for_xyz, structure_filename, im_energies=None, qm_energies=None):
         """Writes molecular structures to an XYZ file.
@@ -837,15 +935,13 @@ class IMForceFieldGenerator:
         energy = None
         gradient = None
         hessian = None
-        
-        
-        
+           
         # define impesdriver to determine if stucture should be added:
         interpolation_driver = InterpolationDriver()
+        interpolation_driver.update_settings(self.interpolation_settings)
         interpolation_driver.imforcefield_file = imforcefielddatafile
         labels, z_matrix = interpolation_driver.read_labels()
         interpolation_driver.impes_coordinate.z_matrix = z_matrix
-        interpolation_driver.update_settings(self.interpolation_settings)
         sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
 
         interpolation_driver.compute(molecule, labels=sorted_labels)
@@ -854,12 +950,31 @@ class IMForceFieldGenerator:
 
         energy, scf_results = self.compute_energy(self.qm_driver, molecule, basis)
         
-        if (abs(energy[0] - interpolation_driver.impes_coordinate.energy)) * hartree_in_kcalpermol() > 0.95:
-            assert_msg_critical((abs(energy[0] - interpolation_driver.impes_coordinate.energy)) * hartree_in_kcalpermol(), 
-                                'The potential energy for the given structure is already approximated within chemical accuracy (less then 1.0 kcal/mol)')
+        # if (abs(energy[0] - interpolation_driver.impes_coordinate.energy)) * hartree_in_kcalpermol() < 0.95:
+        #     assert_msg_critical((abs(energy[0] - interpolation_driver.impes_coordinate.energy)) * hartree_in_kcalpermol(), 
+        #                         'The potential energy for the given structure is already approximated within chemical accuracy (less then 1.0 kcal/mol)')
         
+        print((abs(energy[0] - interpolation_driver.impes_coordinate.energy)) * hartree_in_kcalpermol()) 
+
         gradient = self.compute_gradient(self.qm_grad_driver, molecule, basis, scf_results)
-        hessian = self.compute_hessian(self.qm_hess_driver, molecule, basis, scf_results)
+        hessian = self.compute_hessian(self.qm_hess_driver, molecule, basis)
+
+        natoms = molecule.number_of_atoms()
+        elem = molecule.get_labels()
+        coords = molecule.get_coordinates_in_bohr().reshape(natoms * 3)
+
+        vib_frequencies, normal_modes_vec, gibbs_energy = (
+            geometric.normal_modes.frequency_analysis(
+                coords,
+                hessian[0],
+                elem,
+                energy=energy[0],
+                temperature=self.temperature,
+                pressure=self.pressure,
+                outfnm=f'vibrational_point_{energy[0]}',
+                normalized=False))
+    
+        print('Vibrational frequencies', vib_frequencies, gibbs_energy)
 
         impes_coordinate = InterpolationDatapoint(z_matrix)
         impes_coordinate.update_settings(self.interpolation_settings)
@@ -868,7 +983,7 @@ class IMForceFieldGenerator:
         impes_coordinate.gradient = gradient[0]
         impes_coordinate.hessian = hessian[0]
         impes_coordinate.transform_gradient_and_hessian()
-        
+
         impes_coordinate.write_hdf5(imforcefielddatafile, f'point_{len(sorted_labels) + 1}')
         
         print(f"Database expansion with {', '.join(labels)}")
@@ -903,7 +1018,6 @@ class IMForceFieldGenerator:
             qm_driver.ostream.mute()
             scf_tensors = qm_driver.compute(molecule, basis)
             qm_energy = qm_driver.scf_energy
-            qm_energy = np.array([qm_energy])
             qm_driver.ostream.unmute()
 
         if qm_energy is None:
@@ -938,7 +1052,7 @@ class IMForceFieldGenerator:
             grad_driver.compute(molecule, basis, scf_results)
             qm_gradient = grad_driver.gradient
             qm_gradient = np.array([qm_gradient])
-            self.grad_driver.ostream.unmute()
+            grad_driver.ostream.unmute()
 
         if qm_gradient is None:
             error_txt = "Could not compute the QM gradient. "
@@ -949,7 +1063,7 @@ class IMForceFieldGenerator:
 
 
     # TODO: mute outside to save time?
-    def compute_hessian(self, hess_driver, molecule, basis=None, scf_results=None):
+    def compute_hessian(self, hess_driver, molecule, basis=None):
         """ Computes the QM Hessian using self.hess_driver.
 
             :param molecule:
@@ -971,7 +1085,7 @@ class IMForceFieldGenerator:
 
         elif isinstance(hess_driver, ScfHessianDriver):
             hess_driver.ostream.mute()
-            hess_driver.compute(molecule, basis, scf_results)
+            hess_driver.compute(molecule, basis)
             qm_hessian = hess_driver.hessian
             qm_hessian = np.array([qm_hessian])
             hess_driver.ostream.unmute()
