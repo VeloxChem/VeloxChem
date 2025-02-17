@@ -1168,7 +1168,7 @@ class PolarizabilityGradient:
                     if (y != x):
                         omega_ao[y, x] += omega_ao[x, y]
 
-        return omega_ao#.reshape(dof, dof, nao, nao)
+        return omega_ao
 
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """

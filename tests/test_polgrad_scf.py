@@ -12,21 +12,12 @@ from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polarizabilitygradient import PolarizabilityGradient
 
-#try:
-#    import pyscf
-#except ImportError:
-#    pass
-
 class TestPolgrad:
 
     def run_polgrad_real(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
         scf_dict = {}
         method_settings = {}
-        #if xcfun is not None:
-        #    scf_drv._dft = True
-        #    scf_drv.xcfun = xcfun
-        #    method_settings = {'xcfun': xcfun}
 
         scf_drv.update_settings(scf_dict, method_settings)
         scf_drv.ostream.mute()
@@ -94,10 +85,6 @@ class TestPolgrad:
         scf_drv = ScfRestrictedDriver()
         scf_dict = {}
         method_settings = {}
-        #if xcfun is not None:
-        #    scf_drv._dft = True
-        #    scf_drv.xcfun = xcfun
-        #    method_settings = {'xcfun': xcfun}
 
         scf_drv.update_settings(scf_dict, method_settings)
         scf_drv.ostream.mute()
@@ -164,8 +151,6 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-#    @pytest.mark.skipif('pyscf' not in sys.modules,
-#                        reason='pyscf for integral derivatives not available')
     def test_hf_polarizabilitygradient_real(self):
         h2o_xyz = """3
 
@@ -180,8 +165,6 @@ class TestPolgrad:
 
         self.run_polgrad_real(molecule, basis, None, "polarizabilitygradient_hf_real")
 
-#    @pytest.mark.skipif('pyscf' not in sys.modules,
-#                        reason='pyscf for integral derivatives not available')
     def test_hf_polarizabilitygradient_complex(self):
         h2o_xyz = """3
 
