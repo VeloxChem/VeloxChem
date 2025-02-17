@@ -12,7 +12,7 @@ import openmm.unit as mmunit
 from mpi4py import MPI
 
 from .outputstream import OutputStream
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 
 from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
@@ -49,8 +49,8 @@ class EvbDriver():
 
         self.input_folder: str
 
-        self.reactant: ForceFieldGenerator = None
-        self.product: ForceFieldGenerator = None
+        self.reactant: MMForceFieldGenerator = None
+        self.product: MMForceFieldGenerator = None
         self.input_folder: str = "input_files"
 
         self.name: str = None
@@ -274,7 +274,7 @@ class EvbDriver():
 
     #todo, should be moved to forcefieldgenerator class
     @staticmethod
-    def load_forcefield_from_json(path: str) -> ForceFieldGenerator:
+    def load_forcefield_from_json(path: str) -> MMForceFieldGenerator:
         """
         Load forcefield data from a JSON file.
 
@@ -282,10 +282,10 @@ class EvbDriver():
             Path (str): The path to the JSON file containing the forcefield data.
 
         Returns:
-            ForceFieldGenerator: The updated forcefield object with the loaded data.
+            MMForceFieldGenerator: The updated forcefield object with the loaded data.
         """
         with open(path, "r", encoding="utf-8") as file:
-            forcefield = ForceFieldGenerator()
+            forcefield = MMForceFieldGenerator()
             ff_data = json.load(file)
 
             forcefield.atoms = EvbDriver._str_to_tuple_key(ff_data["atoms"])
@@ -297,12 +297,12 @@ class EvbDriver():
 
     #todo, should be moved to forcefieldgenerator class
     @staticmethod
-    def save_forcefield(forcefield: ForceFieldGenerator, path: str):
+    def save_forcefield(forcefield: MMForceFieldGenerator, path: str):
         """
         Save the forcefield data of the forcefieldgenerator to a JSON file, converting all tuples to strings
 
         Args:
-            forcefield (ForceFieldGenerator): The forcefield object containing the data to be saved.
+            forcefield (MMForceFieldGenerator): The forcefield object containing the data to be saved.
             filename (str): The name of the file to save the forcefield data to.
 
         Returns:

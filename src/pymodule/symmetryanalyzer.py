@@ -30,6 +30,7 @@ from .molecule import Molecule
 from .symmetryoperations import (Inversion, Rotation, Reflection,
                                  ImproperRotation)
 from .symmetryoperations import rotation_matrix
+from .sanitychecks import molecule_sanity_check
 from .errorhandler import assert_msg_critical, safe_arccos, safe_arcsin
 
 
@@ -184,6 +185,9 @@ class SymmetryAnalyzer:
                 - The list of available Abelian groups for symmetrization.
                 - An array with the reoriented geometry in bohr.
         """
+
+        # check molecule
+        molecule_sanity_check(molecule)
 
         # Get tolerance parameters
         assert_msg_critical(
@@ -598,6 +602,25 @@ class SymmetryAnalyzer:
         centered_mol = Molecule(self._symbols, self._centered_coords, 'au')
 
         if self._natoms == 1:
+            return centered_mol
+
+        if point_group == 'C1':
+            # only reorient molecule
+            Ivals, Ivecs = centered_mol.moments_of_inertia(principal_axes=True)
+            z_axis = np.array(Ivecs[2])
+            v_axis = np.cross(Ivecs[1], z_axis)
+            y_axis = np.cross(z_axis, v_axis)
+            y_axis /= np.linalg.norm(y_axis)
+
+            x_axis = np.cross(y_axis, z_axis)
+            rot_mat = np.array([x_axis, y_axis, z_axis])
+
+            rot_coords = np.matmul(centered_mol.get_coordinates_in_bohr(),
+                                   rot_mat.T)
+
+            for i in range(self._natoms):
+                centered_mol.set_atom_coordinates(i, rot_coords[i])
+
             return centered_mol
 
         # go through symmetry elements

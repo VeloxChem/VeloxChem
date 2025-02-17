@@ -7,7 +7,7 @@ from .respchargesdriver import RespChargesDriver
 from .xtbdriver import XtbDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionmatcher import ReactionMatcher
 
 import numpy as np
@@ -44,8 +44,8 @@ class EvbForceFieldBuilder():
 
         self.input_folder: str = "input_files"
 
-        self.reactant: ForceFieldGenerator = None
-        self.products: list[ForceFieldGenerator] = None
+        self.reactant: MMForceFieldGenerator = None
+        self.products: list[MMForceFieldGenerator] = None
         self.gaff_path = None
         pass
 
@@ -73,7 +73,7 @@ class EvbForceFieldBuilder():
         )
         self.reactant.ostream.flush()
 
-        products: list[ForceFieldGenerator] = []
+        products: list[MMForceFieldGenerator] = []
 
         for i, (input, scf_result) in enumerate(zip(product_input, product_scf_result)):
             products.append(
@@ -111,7 +111,7 @@ class EvbForceFieldBuilder():
         reparameterise: bool,
         optimise: bool,
         scf_results: dict | None = None,
-    ) -> ForceFieldGenerator:
+    ) -> MMForceFieldGenerator:
 
         molecule = input["molecule"]
         molecule.set_multiplicity(multiplicity)
@@ -133,7 +133,7 @@ class EvbForceFieldBuilder():
                 opt_results = opt_drv.compute(molecule)
                 molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
 
-            forcefield = ForceFieldGenerator()
+            forcefield = MMForceFieldGenerator()
             if self.gaff_path is not None:
                 forcefield.force_field_data = self.gaff_path
 
@@ -205,12 +205,12 @@ class EvbForceFieldBuilder():
     #Match the indices of the reactant and product forcefield generators
     def _match_reactant_and_product(
         self,
-        reactant_ff: ForceFieldGenerator,
+        reactant_ff: MMForceFieldGenerator,
         rea_elems: list,
-        product_ff: ForceFieldGenerator,
+        product_ff: MMForceFieldGenerator,
         pro_elems: list,
         breaking_bonds: list[tuple[int, int]] | None = None,
-    ) -> ForceFieldGenerator:
+    ) -> MMForceFieldGenerator:
         assert len(reactant_ff.atoms) == len(product_ff.atoms), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
         rea_graph = nx.Graph()
@@ -240,8 +240,8 @@ class EvbForceFieldBuilder():
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
     @staticmethod
-    def _create_combined_forcefield(forcefields: list[ForceFieldGenerator]) -> ForceFieldGenerator:
-        forcefield = ForceFieldGenerator()
+    def _create_combined_forcefield(forcefields: list[MMForceFieldGenerator]) -> MMForceFieldGenerator:
+        forcefield = MMForceFieldGenerator()
         forcefield.atoms = {}
         forcefield.bonds = {}
         forcefield.angles = {}
@@ -265,7 +265,7 @@ class EvbForceFieldBuilder():
 
     # Remap indices in the forcefield to the new indices
     @staticmethod
-    def _apply_mapping_to_forcefield(forcefield: ForceFieldGenerator, mapping: dict[int, int]) -> ForceFieldGenerator:
+    def _apply_mapping_to_forcefield(forcefield: MMForceFieldGenerator, mapping: dict[int, int]) -> MMForceFieldGenerator:
         new_product_atoms = {}
         for atom_key in forcefield.atoms:
             key = mapping[atom_key]

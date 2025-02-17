@@ -13,9 +13,9 @@ from mpi4py import MPI
 from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, Point
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .atomtypeidentifier import AtomTypeIdentifier
-from .systembuilder import SystemBuilder
+from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
 
 
@@ -77,8 +77,8 @@ class EvbSystemBuilder():
 
     def build_systems(
         self,
-        reactant: ForceFieldGenerator,
-        product: ForceFieldGenerator,
+        reactant: MMForceFieldGenerator,
+        product: MMForceFieldGenerator,
         Lambda: list,
         configuration: dict,
         constraints: list = []
@@ -463,7 +463,7 @@ class EvbSystemBuilder():
         return box
 
     def _add_solvent(self, system, system_mol, solvent, box, reactant, ion_count, topology, nb_force):
-        vlxsysbuilder = SystemBuilder()
+        vlxsysbuilder = SolvationBuilder()
 
         box_volume: float = box[0]*box[1]*box[2]  # nm^3
         box_A: list[float] = [10 * elem for elem in box]  # A
@@ -523,7 +523,7 @@ class EvbSystemBuilder():
             elements = vlx_solvent_molecule.get_labels()
 
             self.ostream.print_info("Generating solvent forcefield")
-            solvent_ff = ForceFieldGenerator()
+            solvent_ff = MMForceFieldGenerator()
             if vlx_solvent_molecule == solvent_molecule:
                 if solvent == 'spce':
                     resname = "HOH"
@@ -640,7 +640,7 @@ class EvbSystemBuilder():
                     solvent_ff.impropers = {}
                 else:
                     resname = "SOL"
-                    solvent_ff = ForceFieldGenerator()
+                    solvent_ff = MMForceFieldGenerator()
                     solvent_ff.create_topology(vlx_solvent_molecule)
             elif vlx_solvent_molecule == na_mol:
                 resname = "ION"
@@ -1156,7 +1156,7 @@ class EvbSystemBuilder():
 
         return [lj_force,coulomb_force]
 
-    def _create_exceptions_from_bonds(self, molecule: ForceFieldGenerator) -> dict[tuple[int, int], dict[str, float]]:
+    def _create_exceptions_from_bonds(self, molecule: MMForceFieldGenerator) -> dict[tuple[int, int], dict[str, float]]:
         particles = molecule.atoms
 
         exclusions = [set() for _ in range(len(particles))]
