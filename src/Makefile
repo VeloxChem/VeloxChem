@@ -50,6 +50,7 @@ VLX_LIBS_DIR += dft_func
 VLX_LIBS_DIR += t3c_overlap
 VLX_LIBS_DIR += t3c_electron_repulsion
 VLX_LIBS_DIR += t3c_func
+VLX_LIBS_DIR += t3c_electron_repulsion_geom_X00
 
 
 # Generate all internal libraries related files

@@ -58,6 +58,8 @@ comp_bra_geom1_electron_repulsion_dxx(CSimdArray<double>& cbuffer,
 
             /// set up bra offset for contr_buffer_dxx
 
+            const auto d_geom_100_off = idx_geom_100_dxx + i * dcomps + j;
+
             /// Set up 0-6 components of targeted buffer : cbuffer.data(
 
             auto g_x_0_0_xx_0 = cbuffer.data(d_geom_100_off + 0 * ccomps * dcomps);
@@ -75,17 +77,17 @@ comp_bra_geom1_electron_repulsion_dxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_x_0, g_x_0_0_xx_0, g_x_0_0_xy_0, g_x_0_0_xz_0, g_x_0_0_yy_0, g_x_0_0_yz_0, g_x_0_0_zz_0, g_xxx_0, g_xxy_0, g_xxz_0, g_xyy_0, g_xyz_0, g_xzz_0, g_y_0, g_z_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_x_0_0_xx_0[k] = -2.0 * g_x[k] + g_xxx[k];
+                g_x_0_0_xx_0[k] = -2.0 * g_x_0[k] + g_xxx_0[k];
 
-                g_x_0_0_xy_0[k] = -g_y[k] + g_xxy[k];
+                g_x_0_0_xy_0[k] = -g_y_0[k] + g_xxy_0[k];
 
-                g_x_0_0_xz_0[k] = -g_z[k] + g_xxz[k];
+                g_x_0_0_xz_0[k] = -g_z_0[k] + g_xxz_0[k];
 
-                g_x_0_0_yy_0[k] = g_xyy[k];
+                g_x_0_0_yy_0[k] = g_xyy_0[k];
 
-                g_x_0_0_yz_0[k] = g_xyz[k];
+                g_x_0_0_yz_0[k] = g_xyz_0[k];
 
-                g_x_0_0_zz_0[k] = g_xzz[k];
+                g_x_0_0_zz_0[k] = g_xzz_0[k];
             }
 
             /// Set up 6-12 components of targeted buffer : cbuffer.data(
@@ -105,17 +107,17 @@ comp_bra_geom1_electron_repulsion_dxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_x_0, g_xxy_0, g_xyy_0, g_xyz_0, g_y_0, g_y_0_0_xx_0, g_y_0_0_xy_0, g_y_0_0_xz_0, g_y_0_0_yy_0, g_y_0_0_yz_0, g_y_0_0_zz_0, g_yyy_0, g_yyz_0, g_yzz_0, g_z_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_y_0_0_xx_0[k] = g_xxy[k];
+                g_y_0_0_xx_0[k] = g_xxy_0[k];
 
-                g_y_0_0_xy_0[k] = -g_x[k] + g_xyy[k];
+                g_y_0_0_xy_0[k] = -g_x_0[k] + g_xyy_0[k];
 
-                g_y_0_0_xz_0[k] = g_xyz[k];
+                g_y_0_0_xz_0[k] = g_xyz_0[k];
 
-                g_y_0_0_yy_0[k] = -2.0 * g_y[k] + g_yyy[k];
+                g_y_0_0_yy_0[k] = -2.0 * g_y_0[k] + g_yyy_0[k];
 
-                g_y_0_0_yz_0[k] = -g_z[k] + g_yyz[k];
+                g_y_0_0_yz_0[k] = -g_z_0[k] + g_yyz_0[k];
 
-                g_y_0_0_zz_0[k] = g_yzz[k];
+                g_y_0_0_zz_0[k] = g_yzz_0[k];
             }
 
             /// Set up 12-18 components of targeted buffer : cbuffer.data(
@@ -135,17 +137,17 @@ comp_bra_geom1_electron_repulsion_dxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_x_0, g_xxz_0, g_xyz_0, g_xzz_0, g_y_0, g_yyz_0, g_yzz_0, g_z_0, g_z_0_0_xx_0, g_z_0_0_xy_0, g_z_0_0_xz_0, g_z_0_0_yy_0, g_z_0_0_yz_0, g_z_0_0_zz_0, g_zzz_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_z_0_0_xx_0[k] = g_xxz[k];
+                g_z_0_0_xx_0[k] = g_xxz_0[k];
 
-                g_z_0_0_xy_0[k] = g_xyz[k];
+                g_z_0_0_xy_0[k] = g_xyz_0[k];
 
-                g_z_0_0_xz_0[k] = -g_x[k] + g_xzz[k];
+                g_z_0_0_xz_0[k] = -g_x_0[k] + g_xzz_0[k];
 
-                g_z_0_0_yy_0[k] = g_yyz[k];
+                g_z_0_0_yy_0[k] = g_yyz_0[k];
 
-                g_z_0_0_yz_0[k] = -g_y[k] + g_yzz[k];
+                g_z_0_0_yz_0[k] = -g_y_0[k] + g_yzz_0[k];
 
-                g_z_0_0_zz_0[k] = -2.0 * g_z[k] + g_zzz[k];
+                g_z_0_0_zz_0[k] = -2.0 * g_z_0[k] + g_zzz_0[k];
             }
         }
     }

@@ -94,6 +94,8 @@ comp_bra_geom1_electron_repulsion_gxx(CSimdArray<double>& cbuffer,
 
             /// set up bra offset for contr_buffer_gxx
 
+            const auto g_geom_100_off = idx_geom_100_gxx + i * dcomps + j;
+
             /// Set up 0-15 components of targeted buffer : cbuffer.data(
 
             auto g_x_0_0_xxxx_0 = cbuffer.data(g_geom_100_off + 0 * ccomps * dcomps);
@@ -129,35 +131,35 @@ comp_bra_geom1_electron_repulsion_gxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_x_0_0_xxxx_0, g_x_0_0_xxxy_0, g_x_0_0_xxxz_0, g_x_0_0_xxyy_0, g_x_0_0_xxyz_0, g_x_0_0_xxzz_0, g_x_0_0_xyyy_0, g_x_0_0_xyyz_0, g_x_0_0_xyzz_0, g_x_0_0_xzzz_0, g_x_0_0_yyyy_0, g_x_0_0_yyyz_0, g_x_0_0_yyzz_0, g_x_0_0_yzzz_0, g_x_0_0_zzzz_0, g_xxx_0, g_xxxxx_0, g_xxxxy_0, g_xxxxz_0, g_xxxyy_0, g_xxxyz_0, g_xxxzz_0, g_xxy_0, g_xxyyy_0, g_xxyyz_0, g_xxyzz_0, g_xxz_0, g_xxzzz_0, g_xyy_0, g_xyyyy_0, g_xyyyz_0, g_xyyzz_0, g_xyz_0, g_xyzzz_0, g_xzz_0, g_xzzzz_0, g_yyy_0, g_yyz_0, g_yzz_0, g_zzz_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_x_0_0_xxxx_0[k] = -4.0 * g_xxx[k] + g_xxxxx[k];
+                g_x_0_0_xxxx_0[k] = -4.0 * g_xxx_0[k] + g_xxxxx_0[k];
 
-                g_x_0_0_xxxy_0[k] = -3.0 * g_xxy[k] + g_xxxxy[k];
+                g_x_0_0_xxxy_0[k] = -3.0 * g_xxy_0[k] + g_xxxxy_0[k];
 
-                g_x_0_0_xxxz_0[k] = -3.0 * g_xxz[k] + g_xxxxz[k];
+                g_x_0_0_xxxz_0[k] = -3.0 * g_xxz_0[k] + g_xxxxz_0[k];
 
-                g_x_0_0_xxyy_0[k] = -2.0 * g_xyy[k] + g_xxxyy[k];
+                g_x_0_0_xxyy_0[k] = -2.0 * g_xyy_0[k] + g_xxxyy_0[k];
 
-                g_x_0_0_xxyz_0[k] = -2.0 * g_xyz[k] + g_xxxyz[k];
+                g_x_0_0_xxyz_0[k] = -2.0 * g_xyz_0[k] + g_xxxyz_0[k];
 
-                g_x_0_0_xxzz_0[k] = -2.0 * g_xzz[k] + g_xxxzz[k];
+                g_x_0_0_xxzz_0[k] = -2.0 * g_xzz_0[k] + g_xxxzz_0[k];
 
-                g_x_0_0_xyyy_0[k] = -g_yyy[k] + g_xxyyy[k];
+                g_x_0_0_xyyy_0[k] = -g_yyy_0[k] + g_xxyyy_0[k];
 
-                g_x_0_0_xyyz_0[k] = -g_yyz[k] + g_xxyyz[k];
+                g_x_0_0_xyyz_0[k] = -g_yyz_0[k] + g_xxyyz_0[k];
 
-                g_x_0_0_xyzz_0[k] = -g_yzz[k] + g_xxyzz[k];
+                g_x_0_0_xyzz_0[k] = -g_yzz_0[k] + g_xxyzz_0[k];
 
-                g_x_0_0_xzzz_0[k] = -g_zzz[k] + g_xxzzz[k];
+                g_x_0_0_xzzz_0[k] = -g_zzz_0[k] + g_xxzzz_0[k];
 
-                g_x_0_0_yyyy_0[k] = g_xyyyy[k];
+                g_x_0_0_yyyy_0[k] = g_xyyyy_0[k];
 
-                g_x_0_0_yyyz_0[k] = g_xyyyz[k];
+                g_x_0_0_yyyz_0[k] = g_xyyyz_0[k];
 
-                g_x_0_0_yyzz_0[k] = g_xyyzz[k];
+                g_x_0_0_yyzz_0[k] = g_xyyzz_0[k];
 
-                g_x_0_0_yzzz_0[k] = g_xyzzz[k];
+                g_x_0_0_yzzz_0[k] = g_xyzzz_0[k];
 
-                g_x_0_0_zzzz_0[k] = g_xzzzz[k];
+                g_x_0_0_zzzz_0[k] = g_xzzzz_0[k];
             }
 
             /// Set up 15-30 components of targeted buffer : cbuffer.data(
@@ -195,35 +197,35 @@ comp_bra_geom1_electron_repulsion_gxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_xxx_0, g_xxxxy_0, g_xxxyy_0, g_xxxyz_0, g_xxy_0, g_xxyyy_0, g_xxyyz_0, g_xxyzz_0, g_xxz_0, g_xyy_0, g_xyyyy_0, g_xyyyz_0, g_xyyzz_0, g_xyz_0, g_xyzzz_0, g_xzz_0, g_y_0_0_xxxx_0, g_y_0_0_xxxy_0, g_y_0_0_xxxz_0, g_y_0_0_xxyy_0, g_y_0_0_xxyz_0, g_y_0_0_xxzz_0, g_y_0_0_xyyy_0, g_y_0_0_xyyz_0, g_y_0_0_xyzz_0, g_y_0_0_xzzz_0, g_y_0_0_yyyy_0, g_y_0_0_yyyz_0, g_y_0_0_yyzz_0, g_y_0_0_yzzz_0, g_y_0_0_zzzz_0, g_yyy_0, g_yyyyy_0, g_yyyyz_0, g_yyyzz_0, g_yyz_0, g_yyzzz_0, g_yzz_0, g_yzzzz_0, g_zzz_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_y_0_0_xxxx_0[k] = g_xxxxy[k];
+                g_y_0_0_xxxx_0[k] = g_xxxxy_0[k];
 
-                g_y_0_0_xxxy_0[k] = -g_xxx[k] + g_xxxyy[k];
+                g_y_0_0_xxxy_0[k] = -g_xxx_0[k] + g_xxxyy_0[k];
 
-                g_y_0_0_xxxz_0[k] = g_xxxyz[k];
+                g_y_0_0_xxxz_0[k] = g_xxxyz_0[k];
 
-                g_y_0_0_xxyy_0[k] = -2.0 * g_xxy[k] + g_xxyyy[k];
+                g_y_0_0_xxyy_0[k] = -2.0 * g_xxy_0[k] + g_xxyyy_0[k];
 
-                g_y_0_0_xxyz_0[k] = -g_xxz[k] + g_xxyyz[k];
+                g_y_0_0_xxyz_0[k] = -g_xxz_0[k] + g_xxyyz_0[k];
 
-                g_y_0_0_xxzz_0[k] = g_xxyzz[k];
+                g_y_0_0_xxzz_0[k] = g_xxyzz_0[k];
 
-                g_y_0_0_xyyy_0[k] = -3.0 * g_xyy[k] + g_xyyyy[k];
+                g_y_0_0_xyyy_0[k] = -3.0 * g_xyy_0[k] + g_xyyyy_0[k];
 
-                g_y_0_0_xyyz_0[k] = -2.0 * g_xyz[k] + g_xyyyz[k];
+                g_y_0_0_xyyz_0[k] = -2.0 * g_xyz_0[k] + g_xyyyz_0[k];
 
-                g_y_0_0_xyzz_0[k] = -g_xzz[k] + g_xyyzz[k];
+                g_y_0_0_xyzz_0[k] = -g_xzz_0[k] + g_xyyzz_0[k];
 
-                g_y_0_0_xzzz_0[k] = g_xyzzz[k];
+                g_y_0_0_xzzz_0[k] = g_xyzzz_0[k];
 
-                g_y_0_0_yyyy_0[k] = -4.0 * g_yyy[k] + g_yyyyy[k];
+                g_y_0_0_yyyy_0[k] = -4.0 * g_yyy_0[k] + g_yyyyy_0[k];
 
-                g_y_0_0_yyyz_0[k] = -3.0 * g_yyz[k] + g_yyyyz[k];
+                g_y_0_0_yyyz_0[k] = -3.0 * g_yyz_0[k] + g_yyyyz_0[k];
 
-                g_y_0_0_yyzz_0[k] = -2.0 * g_yzz[k] + g_yyyzz[k];
+                g_y_0_0_yyzz_0[k] = -2.0 * g_yzz_0[k] + g_yyyzz_0[k];
 
-                g_y_0_0_yzzz_0[k] = -g_zzz[k] + g_yyzzz[k];
+                g_y_0_0_yzzz_0[k] = -g_zzz_0[k] + g_yyzzz_0[k];
 
-                g_y_0_0_zzzz_0[k] = g_yzzzz[k];
+                g_y_0_0_zzzz_0[k] = g_yzzzz_0[k];
             }
 
             /// Set up 30-45 components of targeted buffer : cbuffer.data(
@@ -261,35 +263,35 @@ comp_bra_geom1_electron_repulsion_gxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_xxx_0, g_xxxxz_0, g_xxxyz_0, g_xxxzz_0, g_xxy_0, g_xxyyz_0, g_xxyzz_0, g_xxz_0, g_xxzzz_0, g_xyy_0, g_xyyyz_0, g_xyyzz_0, g_xyz_0, g_xyzzz_0, g_xzz_0, g_xzzzz_0, g_yyy_0, g_yyyyz_0, g_yyyzz_0, g_yyz_0, g_yyzzz_0, g_yzz_0, g_yzzzz_0, g_z_0_0_xxxx_0, g_z_0_0_xxxy_0, g_z_0_0_xxxz_0, g_z_0_0_xxyy_0, g_z_0_0_xxyz_0, g_z_0_0_xxzz_0, g_z_0_0_xyyy_0, g_z_0_0_xyyz_0, g_z_0_0_xyzz_0, g_z_0_0_xzzz_0, g_z_0_0_yyyy_0, g_z_0_0_yyyz_0, g_z_0_0_yyzz_0, g_z_0_0_yzzz_0, g_z_0_0_zzzz_0, g_zzz_0, g_zzzzz_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_z_0_0_xxxx_0[k] = g_xxxxz[k];
+                g_z_0_0_xxxx_0[k] = g_xxxxz_0[k];
 
-                g_z_0_0_xxxy_0[k] = g_xxxyz[k];
+                g_z_0_0_xxxy_0[k] = g_xxxyz_0[k];
 
-                g_z_0_0_xxxz_0[k] = -g_xxx[k] + g_xxxzz[k];
+                g_z_0_0_xxxz_0[k] = -g_xxx_0[k] + g_xxxzz_0[k];
 
-                g_z_0_0_xxyy_0[k] = g_xxyyz[k];
+                g_z_0_0_xxyy_0[k] = g_xxyyz_0[k];
 
-                g_z_0_0_xxyz_0[k] = -g_xxy[k] + g_xxyzz[k];
+                g_z_0_0_xxyz_0[k] = -g_xxy_0[k] + g_xxyzz_0[k];
 
-                g_z_0_0_xxzz_0[k] = -2.0 * g_xxz[k] + g_xxzzz[k];
+                g_z_0_0_xxzz_0[k] = -2.0 * g_xxz_0[k] + g_xxzzz_0[k];
 
-                g_z_0_0_xyyy_0[k] = g_xyyyz[k];
+                g_z_0_0_xyyy_0[k] = g_xyyyz_0[k];
 
-                g_z_0_0_xyyz_0[k] = -g_xyy[k] + g_xyyzz[k];
+                g_z_0_0_xyyz_0[k] = -g_xyy_0[k] + g_xyyzz_0[k];
 
-                g_z_0_0_xyzz_0[k] = -2.0 * g_xyz[k] + g_xyzzz[k];
+                g_z_0_0_xyzz_0[k] = -2.0 * g_xyz_0[k] + g_xyzzz_0[k];
 
-                g_z_0_0_xzzz_0[k] = -3.0 * g_xzz[k] + g_xzzzz[k];
+                g_z_0_0_xzzz_0[k] = -3.0 * g_xzz_0[k] + g_xzzzz_0[k];
 
-                g_z_0_0_yyyy_0[k] = g_yyyyz[k];
+                g_z_0_0_yyyy_0[k] = g_yyyyz_0[k];
 
-                g_z_0_0_yyyz_0[k] = -g_yyy[k] + g_yyyzz[k];
+                g_z_0_0_yyyz_0[k] = -g_yyy_0[k] + g_yyyzz_0[k];
 
-                g_z_0_0_yyzz_0[k] = -2.0 * g_yyz[k] + g_yyzzz[k];
+                g_z_0_0_yyzz_0[k] = -2.0 * g_yyz_0[k] + g_yyzzz_0[k];
 
-                g_z_0_0_yzzz_0[k] = -3.0 * g_yzz[k] + g_yzzzz[k];
+                g_z_0_0_yzzz_0[k] = -3.0 * g_yzz_0[k] + g_yzzzz_0[k];
 
-                g_z_0_0_zzzz_0[k] = -4.0 * g_zzz[k] + g_zzzzz[k];
+                g_z_0_0_zzzz_0[k] = -4.0 * g_zzz_0[k] + g_zzzzz_0[k];
             }
         }
     }

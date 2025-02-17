@@ -27,10 +27,6 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
     
     const auto nrows = _t3_values->width();
     
-    // reference indexes on bra side
-
-    const auto refp = a_indices[ibra_gto + 1];
-    
     // dimensions of bra and ket orbital indexes
 
     const auto adim = a_indices.size() - 1;

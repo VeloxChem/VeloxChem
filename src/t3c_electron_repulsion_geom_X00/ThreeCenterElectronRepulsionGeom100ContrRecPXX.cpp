@@ -46,6 +46,8 @@ comp_bra_geom1_electron_repulsion_pxx(CSimdArray<double>& cbuffer,
 
             /// set up bra offset for contr_buffer_pxx
 
+            const auto p_geom_100_off = idx_geom_100_pxx + i * dcomps + j;
+
             /// Set up 0-3 components of targeted buffer : cbuffer.data(
 
             auto g_x_0_0_x_0 = cbuffer.data(p_geom_100_off + 0 * ccomps * dcomps);
@@ -57,11 +59,11 @@ comp_bra_geom1_electron_repulsion_pxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_0_0, g_x_0_0_x_0, g_x_0_0_y_0, g_x_0_0_z_0, g_xx_0, g_xy_0, g_xz_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_x_0_0_x_0[k] = -g_0[k] + g_xx[k];
+                g_x_0_0_x_0[k] = -g_0_0[k] + g_xx_0[k];
 
-                g_x_0_0_y_0[k] = g_xy[k];
+                g_x_0_0_y_0[k] = g_xy_0[k];
 
-                g_x_0_0_z_0[k] = g_xz[k];
+                g_x_0_0_z_0[k] = g_xz_0[k];
             }
 
             /// Set up 3-6 components of targeted buffer : cbuffer.data(
@@ -75,11 +77,11 @@ comp_bra_geom1_electron_repulsion_pxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_0_0, g_xy_0, g_y_0_0_x_0, g_y_0_0_y_0, g_y_0_0_z_0, g_yy_0, g_yz_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_y_0_0_x_0[k] = g_xy[k];
+                g_y_0_0_x_0[k] = g_xy_0[k];
 
-                g_y_0_0_y_0[k] = -g_0[k] + g_yy[k];
+                g_y_0_0_y_0[k] = -g_0_0[k] + g_yy_0[k];
 
-                g_y_0_0_z_0[k] = g_yz[k];
+                g_y_0_0_z_0[k] = g_yz_0[k];
             }
 
             /// Set up 6-9 components of targeted buffer : cbuffer.data(
@@ -93,11 +95,11 @@ comp_bra_geom1_electron_repulsion_pxx(CSimdArray<double>& cbuffer,
             #pragma omp simd aligned(g_0_0, g_xz_0, g_yz_0, g_z_0_0_x_0, g_z_0_0_y_0, g_z_0_0_z_0, g_zz_0  : 64)
             for (size_t k = 0; k < nelems; k++)
             {
-                g_z_0_0_x_0[k] = g_xz[k];
+                g_z_0_0_x_0[k] = g_xz_0[k];
 
-                g_z_0_0_y_0[k] = g_yz[k];
+                g_z_0_0_y_0[k] = g_yz_0[k];
 
-                g_z_0_0_z_0[k] = -g_0[k] + g_zz[k];
+                g_z_0_0_z_0[k] = -g_0_0[k] + g_zz_0[k];
             }
         }
     }

@@ -41,7 +41,7 @@ class TestThreeCenterElectronRepulsionGeom100Driver:
         bra_ids = eri_buf.indices()
         
         for i in range(3):
-            for j in range(3):
+            for j in range(14):
                 for k, l in zip(indexes[0], indexes[1]):
                     assert mt.isclose(eri_buf.value(14 * i + j, k, l),
                                       ref_buf[i, k, l, bra_ids[j]],
