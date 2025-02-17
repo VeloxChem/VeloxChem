@@ -57,6 +57,7 @@ class EvbDriver():
         self.results = None
         self.system_confs: list[dict] = []
         self.debug = False
+        self.fast_run = False
 
         self.t_label = int(time.time())
 
@@ -376,9 +377,14 @@ class EvbDriver():
         """
         if Lambda is None:
             if not self.debug:
-                Lambda = np.linspace(0,0.1,11)
-                Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,41))
-                Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,11))
+                if self.fast_run:
+                    Lambda = np.linspace(0,0.1,6)
+                    Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,21))
+                    Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,6))
+                else:
+                    Lambda = np.linspace(0,0.1,11)
+                    Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,41))
+                    Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,11))
                 Lambda = np.round(Lambda,3)
             else:
                 Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
@@ -431,7 +437,7 @@ class EvbDriver():
             conf["initial_positions"] = initial_positions
             
             if save_output:
-                self.ostream.print_info(f"Saving files to {data_folder_path} and {run_folder_path}")
+                self.ostream.print_info(f"Saving files to {data_folder_path}")
                 self.ostream.flush()
                 self.save_systems_as_xml(systems, conf["run_folder"])
 
@@ -629,7 +635,7 @@ class EvbDriver():
             initial_equil_step_size (float, optional): The step size during initial equiliberation in picoseconds. Defaults to 0.002.
         """
         if self.debug:
-            self.ostream.print_info("Debugging enabled, using low number of steps. Do not use for production")
+            self.ostream.print_warning("Debugging enabled, using low number of steps. Do not use for production")
             self.ostream.flush()
             equil_steps = 100
             sample_steps = 200
@@ -638,6 +644,10 @@ class EvbDriver():
             step_size = 0.001
             equil_step_size = 0.001
             initial_equil_step_size = 0.001
+
+        if self.fast_run:
+            self.ostream.print_warning("Fast run enabled, using modest number of steps. Be careful with using results")
+            sample_steps=25000
 
         for conf in self.system_confs:
             self.ostream.print_blank()
@@ -657,22 +667,32 @@ class EvbDriver():
             )
 
 
-    def compute_energy_profiles(self, barrier, free_energy):
+    def compute_energy_profiles(self, barrier, free_energy, lambda_sub_sample=1, lambda_sub_sample_ends=False, time_sub_sample=1):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
             barrier (float): the reaction barrier in kcal/mol of the reference system
             free_energy (float): the reaction free energy in kcal/mol of the reference system
+            lambda_sub_sample (int, optional): Factor with which the lambda vector will be subsampled. Setting this to two will discard every other lambda frame. Defaults to 1.
+            lambda_sub_sample_ends (bool, optional): If set to False, the lambda frames up to 0.1 and from 0.9 will not be subsampled. Defaults to False.
+            time_sub_sample (int, optional): Factor with which the time vector will be subsampled. Setting this to two will discard every other snapshot. Defaults to 1.
         """
         dp = EvbDataProcessing()
-        results = self._load_output_from_folders()
+        results = self._load_output_from_folders(lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample)
+        self.ostream.flush()
         results = dp.compute(results, barrier, free_energy)
         self._save_dict_as_h5(results, f"results_{self.name}_{self.t_label}")
-        dp.print_results(results, self.ostream)
         self.results = results
+        self.print_results()
         self.ostream.flush()
 
     def print_results(self, results: dict = None, file_name: str = None):
+        """Print EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
+
+        Args:
+            results (dict, optional): A dictionary with EVB results. Defaults to None.
+            file_name (str, optional): Filename of an h5 file containing EVB results. Defaults to None.
+        """
         if results is None:
             if file_name is None:
                 assert self.results is not None, "No results known, and none provided"
@@ -689,6 +709,12 @@ class EvbDriver():
         pass
 
     def plot_results(self, results: dict = None, file_name: str = None):
+        """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
+
+        Args:
+            results (dict, optional): A dictionary with EVB results. Defaults to None.
+            file_name (str, optional): Filename of an h5 file containing EVB results. Defaults to None.
+        """
         if results is None:
             if file_name is None:
                 assert self.results is not None, "No results known, and none provided"
@@ -702,16 +728,7 @@ class EvbDriver():
         self.ostream.flush()
         pass
 
-    def _load_output_from_folders(self) -> dict:
-        """Load results from the output of the FEP calculations, and return a dictionary. Looks for Energies.dat, Data_combined.dat and options.json in each folder.
-
-        Args:
-            reference_folder (str): The folder containing the output files of the reference system.
-            target_folders (str): A list of folders containing the output files of the target systems.
-
-        Returns:
-            dict: A dictionary containing the results of the FEP calculations for the reference and target systems.
-        """
+    def _load_output_from_folders(self, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample) -> dict:
         reference_folder = self.system_confs[0]["data_folder"]
         target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
 
@@ -728,7 +745,7 @@ class EvbDriver():
             E_file = str(cwd / folder / "Energies.dat")
             data_file = str(cwd / folder / "Data_combined.dat")
             options_file = str(cwd / folder / "options.json")
-            specific, common = self._load_output_files(E_file, data_file, options_file)
+            specific, common = self._load_output_files(E_file, data_file, options_file, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample)
             specific_results.update({name:specific})
             common_results.append(common)
         
@@ -744,29 +761,35 @@ class EvbDriver():
             results.update({key: val})
         return results
 
-
-    @staticmethod
-    def _load_output_files(E_file, data_file, options_file):
-        """Load the output from one FEP calculation
-
-        Args:
-            E_file (path): The location of the energies file
-            data_file (path): The location of the data file
-            options_file (path): The location of the options json file.
-
-        Returns:
-            dict, dict: A dictionaries containing the results of the FEP calculation. The first one contains results specific to this configuration, the second one contains results that should be the same for all configurations.
-        """
-        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = np.loadtxt(E_file,skiprows=1,delimiter=',').T
-
-        Data = np.loadtxt(data_file,skiprows=1,delimiter=',')
-        step, Ep, Ek, Temp, Vol, Dens = Data.T
-
+    def _load_output_files(self, E_file, data_file, options_file, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample):
         with open(options_file, "r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
         Temp_set = options["temperature"]
         options.pop("Lambda")
+
+        if lambda_sub_sample > 1:
+            if lambda_sub_sample_ends:
+                Lambda = Lambda[::lambda_sub_sample]
+            else:
+                arg01 = np.where(np.array(Lambda)<=0.1)[0][-1]+1
+                arg09 = np.where(np.array(Lambda)>=0.9)[0][0]-1
+                Lambda = Lambda[:arg01]+Lambda[arg01:arg09:lambda_sub_sample]+Lambda[arg09:]
+                # Lambda_middle = 
+            self.ostream.print_info(f"Subsampling Lambda vector with factor {lambda_sub_sample}. New Lambda vector: {Lambda}")
+
+        if Lambda[-1] != 1:
+            self.ostream.print_info("Lambda vector does not end at 1. Appending 1 to the Lambda vector")
+            Lambda = np.append(Lambda, 1)
+        
+        E_data = np.loadtxt(E_file,skiprows=1,delimiter=',').T
+        l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
+        
+        sub_indices = l_sub_indices[::time_sub_sample]
+
+        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = E_data[:,sub_indices]
+        step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file,skiprows=1,delimiter=',').T[:,sub_indices]
+
         specific_result = {
             "E1_ref": E1_ref,
             "E2_ref": E2_ref,
@@ -818,7 +841,7 @@ class EvbDriver():
         """Save the provided dictionary to an h5 file
 
         Args:
-            results (dict[str, dict]): Dictionary of dictionaries containing the results to save. The key string will be used as filename
+            results (dict): Dictionary to be saved.
         """
         cwd = Path.cwd()
         

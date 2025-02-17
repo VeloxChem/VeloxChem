@@ -1,9 +1,6 @@
-import json
-import math
 import pymbar
 import numpy as np
 import scipy
-import h5py
 
 import sys
 from mpi4py import MPI
@@ -73,8 +70,10 @@ class EvbDataProcessing:
         self.Lambda_indices = results["Lambda_indices"]
 
         self.ostream.print_info("Fitting H12 and alpha")
+        self.ostream.flush()
         self.alpha, self.H12 = self._fit_EVB_parameters()
         self.ostream.print_info("Calculating FEP and EVB curves")
+        self.ostream.flush()
         self._get_FEP_and_EVB()
         results["coordinate_bins"] = self.coordinate_bins
         return results
@@ -100,7 +99,7 @@ class EvbDataProcessing:
             )  
             xi = np.linspace(-10000, 10000, 20000)
             dGevb_ana, shiftxi, fepxi = self._dGevb_analytical(dGfep, self.Lambda, H12, xi)
-            dGevb_smooth, barrier, free_energy = self._get_free_energies(dGevb_ana, smooth=False)
+            dGevb_smooth, barrier, free_energy = self._get_free_energies(dGevb_ana, fitting=True)
             barrier_dif = self.barrier - barrier
             free_energy_dif = self.free_energy - free_energy
             
@@ -206,29 +205,40 @@ class EvbDataProcessing:
 
         return dGevb, pns, dGcor
 
-    def _get_free_energies(self, dGevb, smooth=True):
-        if smooth:
+    def _get_free_energies(self, dGevb, fitting = False):
+        if fitting:
             dGevb_smooth = scipy.signal.savgol_filter(dGevb, self.smooth_window_size, self.smooth_polynomial_order)
         else:
             dGevb_smooth = dGevb
 
-        min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
-        max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
-        if len(min_arg) != 2:
-            Erea = dGevb_smooth[0]
-            Epro = dGevb_smooth[-1]
+        if fitting:
+            min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
+            max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
         else:
-            Erea = dGevb_smooth[min_arg[0]]
-            Epro = dGevb_smooth[min_arg[1]]
+            scope = len(dGevb_smooth)//4
+            min_arg = scipy.signal.argrelmin(dGevb_smooth,order=scope)[0]
+            max_arg = scipy.signal.argrelmax(dGevb_smooth,order=scope)[0]
+            if len(min_arg) < 2:
+                min_arg = scipy.signal.argrelmin(dGevb_smooth)[0]
+            if len(max_arg) < 1:
+                max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
 
-        if len(max_arg) != 1:
+            if len(min_arg) < 2:
+                min_arg = [0,-1]
+        if len(min_arg) and not fitting!= 2:
+            self.ostream.print_warning(f"Found {len(min_arg)} minima in the EVB profile instead of 2. Confirm the calculated extrema with the plot.")
+        Erea = dGevb_smooth[min_arg[0]]
+        Epro = dGevb_smooth[min_arg[-1]]
+
+        if len(max_arg) != 1 and not fitting:
             Ebar = dGevb_smooth[len(dGevb_smooth) // 2]
+            self.ostream.print_warning(f"Found {len(max_arg)} maxima in the EVB profile instead of 1. Confirm the calculated extrema with the plot.")
         else:
             Ebar = dGevb_smooth[max_arg[0]]
         barrier = Ebar - Erea
         free_energy = Epro - Erea
         dGevb_smooth -= Erea
-
+        self.ostream.flush()
         return dGevb_smooth, barrier, free_energy
 
     def _get_FEP_and_EVB(self):
@@ -357,16 +367,17 @@ class EvbDataProcessing:
 
     @staticmethod
     def print_results(results, ostream):
-        ostream.print_info(f"{'Discrete':<30}\t Barrier \t\t Free Energy")
+        
+        ostream.print_info(f"{'Discrete':<30} {'Barrier':>15} {'Free Energy':>15}")
         for name, result in results["configuration_results"].items():
             if "discrete" in result.keys():
-                ostream.print_info(f"{name:<30} \t {result['discrete']['barrier']} \t {result['discrete']['free_energy']}")
+                ostream.print_info(f"{name:<30} {result['discrete']['barrier']:15.2f} {result['discrete']['free_energy']:15.2f}")
 
         ostream.print_info("\n")
-        ostream.print_info("Analytical\t Barrier \t\t Free Energy")
+        ostream.print_info(f"{'Analytical':<30} {'Barrier':>15} {'Free Energy':>15}")
         for name, result in results["configuration_results"].items():
             if "analytical" in result.keys():
-                ostream.print_info(f"{name:<30} \t {result['analytical']['barrier']} \t {result['analytical']['free_energy']}")
+                ostream.print_info(f"{name:<30} {result['analytical']['barrier']:15.2f} {result['analytical']['free_energy']:15.2f}")
 
     @staticmethod
     def _import_matplotlib():
@@ -409,7 +420,7 @@ class EvbDataProcessing:
                     dens_max = np.append(dens_max, np.max(dE_hist))
                 else:
                     dens_max = np.append(dens_max, 0)
-            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3) #todo maybe get rid of this?
+            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3)
 
             ax[j,0].scatter(dE,L_values,c=dens,s=5)
             ax[j,0].plot([dE_min,dE_min],[0,0.3])
@@ -493,6 +504,7 @@ class EvbDataProcessing:
                         color=colors[colorkeys[i]],
                         linestyle=discrete_linestyle,
                     )
+            
             if plot_analytical:
                 if "analytical" in result.keys():
                     ax[1].plot(
@@ -501,6 +513,7 @@ class EvbDataProcessing:
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
+            
 
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
             legend_labels.append(name)
