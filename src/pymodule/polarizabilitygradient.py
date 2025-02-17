@@ -300,43 +300,50 @@ class PolarizabilityGradient:
             ]
 
             if 'dist_cphf_ov' in all_orbrsp_results.keys():
+                # NOTE WIP
+                cphf_ov = self.get_lambda_response_vector(
+                    molecule, scf_tensors, all_orbrsp_results['dist_cphf_ov'], f)
+
                 # get lambda multipliers from distributed array
-                if self.is_complex:
-                    if self.rank == mpi_master():
-                        cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+                #if self.is_complex:
+                #    if self.rank == mpi_master():
+                #        cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
 
-                    for idx, xy in enumerate(xy_pairs):
-                        tmp_cphf_re = all_orbrsp_results['dist_cphf_ov'][
-                            2 * dof_red * f + idx].get_full_vector()
-                        tmp_cphf_im = all_orbrsp_results['dist_cphf_ov'][
-                            2 * dof_red * f + dof_red + idx].get_full_vector()
+                #    for idx, xy in enumerate(xy_pairs):
+                #        tmp_cphf_re = all_orbrsp_results['dist_cphf_ov'][
+                #            2 * dof_red * f + idx].get_full_vector()
+                #        tmp_cphf_im = all_orbrsp_results['dist_cphf_ov'][
+                #            2 * dof_red * f + dof_red + idx].get_full_vector()
 
-                        if self.rank == mpi_master():
-                            x = xy[0]
-                            y = xy[1]
-                            cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
+                #        if self.rank == mpi_master():
+                #            x = xy[0]
+                #            y = xy[1]
+                #            cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
 
-                            if (y != x):
-                                cphf_ov[y, x] += cphf_ov[x, y]
-                    del tmp_cphf_re
-                    del tmp_cphf_im
-                else:
-                    if self.rank == mpi_master():
-                        cphf_ov = np.zeros((dof, dof, nocc * nvir))
+                #            if (y != x):
+                #                cphf_ov[y, x] += cphf_ov[x, y]
+                #    del tmp_cphf_re
+                #    del tmp_cphf_im
+                #else:
+                #    if self.rank == mpi_master():
+                #        cphf_ov = np.zeros((dof, dof, nocc * nvir))
 
-                    for idx, xy in enumerate(xy_pairs):
-                        tmp_cphf_ov = all_orbrsp_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
+                #    for idx, xy in enumerate(xy_pairs):
+                #        tmp_cphf_ov = all_orbrsp_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
 
-                        if self.rank == mpi_master():
-                            x = xy[0]
-                            y = xy[1]
-                            cphf_ov[x, y] += tmp_cphf_ov
+                #        if self.rank == mpi_master():
+                #            x = xy[0]
+                #            y = xy[1]
+                #            cphf_ov[x, y] += tmp_cphf_ov
 
-                            if (y != x):
-                                cphf_ov[y, x] += cphf_ov[x, y]
-                    del tmp_cphf_ov
+                #            if (y != x):
+                #                cphf_ov[y, x] += cphf_ov[x, y]
+                #    del tmp_cphf_ov
+                ## DEBUG
+                #print('MAX DIFF:', np.max(np.abs(cphf_ov - cphf_ov_test)))
 
             else:
+                # TODO get conj. gradient solver to also return dist. array
                 # get lambda multipliers from array in orbrsp dict
                 cphf_ov_red = all_cphf_red[f]
 
@@ -409,8 +416,10 @@ class PolarizabilityGradient:
 
                 # Lagrange multipliers
                 # TODO read from dist. array when implemented
-                omega_ao = orbrsp_results['omega_ao'].reshape(
-                    dof, dof, nao, nao)
+                omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
+                #omega_ao = orbrsp_results['omega_ao'].reshape(
+                #    dof, dof, nao, nao)
+                #print('MAX DIFF:', np.max(np.abs(omega_ao - omega_ao_test)))
 
                 # TODO remove
                 #lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
@@ -496,7 +505,7 @@ class PolarizabilityGradient:
                         # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                                2.0 * omega_ao[x, y].reshape(nao**2),
+                                    2.0 * omega_ao[x, y],#.reshape(nao**2), # TODO cleanup
                                       gmat_ovlp.reshape(nao**2)]))
 
                 gmats_ovlp = Matrices()
@@ -584,6 +593,9 @@ class PolarizabilityGradient:
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+
+            # TODO return dictionary with polgrad_results
+            #return dict(polgrad_results)
 
     def compute_eri_contrib(self, molecule, basis, gs_dm, rel_dm_ao,
                                          x_plus_y, x_minus_y, local_atoms):
@@ -749,8 +761,6 @@ class PolarizabilityGradient:
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_yx) * factor
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy) * factor
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx) * factor
-
-        #eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
 
         return eri_deriv_contrib
 
@@ -1088,6 +1098,127 @@ class PolarizabilityGradient:
             return x_ger_full + x_ung_full
         else:
             return None
+
+    def get_lambda_response_vector(self, molecule, scf_tensors, lambda_list, fdx):
+        """
+        Gets the full lambda multipliers vector from distributed array.
+
+        :param lambda_list:
+            The list with distributed arrays.
+        :param fdx:
+            The frequency index.
+
+        :return:
+            The orbital response lambda vector.
+        """
+
+        dof = len(self.vector_components)
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        dof_red = len(xy_pairs)
+
+        if self.rank == mpi_master():
+            mo = scf_tensors['C_alpha']  # only alpha part
+            nocc = molecule.number_of_alpha_electrons()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+        if self.is_complex:
+            if self.rank == mpi_master():
+                lambda_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+            else:
+                lambda_ov = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_lambda_re = lambda_list[
+                    2 * dof_red * fdx + idx].get_full_vector()
+                tmp_lambda_im = lambda_list[
+                    2 * dof_red * fdx + dof_red + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+
+                    lambda_ov[x, y] += tmp_lambda_re + 1j * tmp_lambda_im
+
+                    if (y != x):
+                        lambda_ov[y, x] += lambda_ov[x, y]
+        else:
+            if self.rank == mpi_master():
+                lambda_ov = np.zeros((dof, dof, nocc * nvir))
+            else:
+                lambda_ov = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_lambda_ov = lambda_list[dof_red * fdx + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+                    lambda_ov[x, y] += tmp_lambda_ov
+
+                    if (y != x):
+                        lambda_ov[y, x] += lambda_ov[x, y]
+
+        return lambda_ov
+
+    def get_omega_response_vector(self, basis, omega_list, fdx):
+        """
+        Gets the full omega multipliers vector from distributed array.
+
+        :param omega_list:
+            The list with distributed arrays.
+        :param fdx:
+            The frequency index.
+
+        :return:
+            The orbital response omega vector.
+        """
+
+        dof = len(self.vector_components)
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        dof_red = len(xy_pairs)
+
+        if self.rank == mpi_master():
+            nao = basis.get_dimensions_of_basis()
+
+        if self.is_complex:
+            if self.rank == mpi_master():
+                omega_ao = np.zeros((dof, dof, nao * nao), dtype = np.dtype('complex128'))
+            else:
+                omega_ao = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_omega_re = omega_list[
+                    2 * dof_red * fdx + idx].get_full_vector()
+                tmp_omega_im = omega_list[
+                    2 * dof_red * fdx + dof_red + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+
+                    omega_ao[x, y] += tmp_omega_re + 1j * tmp_omega_im
+
+                    if (y != x):
+                        omega_ao[y, x] += omega_ao[x, y]
+        else:
+            if self.rank == mpi_master():
+                omega_ao = np.zeros((dof, dof, nao * nao))
+            else:
+                omega_ao = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_omega_ao = omega_list[dof_red * fdx + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+                    omega_ao[x, y] += tmp_omega_ao
+
+                    if (y != x):
+                        omega_ao[y, x] += omega_ao[x, y]
+
+        return omega_ao#.reshape(dof, dof, nao, nao)
 
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
