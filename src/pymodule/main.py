@@ -53,7 +53,6 @@ from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
-#from .cphfsolver import CphfSolver
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
 from .xtbdriver import XtbDriver
@@ -283,12 +282,11 @@ def main():
         numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
-
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'vibrational', 'freq', 'cphf', 'polarizability_gradient'
+        'vibrational', 'polarizability_gradient'
     ]
 
     scf_type = 'restricted'
@@ -364,6 +362,8 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
+            orbrsp_dict = dict(task.input_dict['orbital_response'])
+
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
                 'Invalid response property for gradient calculation')
@@ -371,9 +371,11 @@ def main():
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
-            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
+                                          method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                   rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
@@ -442,6 +444,8 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
+            orbrsp_dict = dict(task.input_dict['orbital_response'])
+
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
                 'Invalid response property for geometry optimization')
@@ -449,9 +453,11 @@ def main():
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
-            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
+                                          method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True

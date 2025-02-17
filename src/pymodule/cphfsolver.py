@@ -79,7 +79,8 @@ class CphfSolver(LinearSolver):
         self._input_keywords['orbitalresponse'] = {
             'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
             'print_residuals': ('bool', 'print iteration to output'),
-            'max_iter': ('int', 'maximum number of iterations')
+            'max_iter': ('int', 'maximum number of iterations'),
+            'force_checkpoint': ('bool', 'write orbital response to checkpoiny file'),
         }
 
     def update_settings(self, cphf_dict, method_dict=None):
@@ -185,12 +186,10 @@ class CphfSolver(LinearSolver):
 
         # checkpoint info
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.orbrsp.h5'
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
         elif (self.checkpoint_file is not None and
-              self.checkpoint_file.endswith('.rsp.h5')):
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint = self.checkpoint_file[:-7] + '_orbrsp.h5'
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -376,6 +375,7 @@ class CphfSolver(LinearSolver):
                     self._graceful_exit_for_cphf(molecule, basis, dft_dict,
                                                  pe_dict, orbrsp_vector_labels)
 
+            print(self.force_checkpoint)
             if self.force_checkpoint:
                 self._write_checkpoint_for_cphf(molecule, basis, dft_dict,
                                                 pe_dict, orbrsp_vector_labels)
@@ -799,6 +799,7 @@ class CphfSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self.is_converged,
                                              root=mpi_master())
 
+    # TODO: Currently not working!
     def compute_conjugate_gradient(self, molecule, basis, scf_tensors, *args):
         """
         Computes the coupled-perturbed Hartree-Fock (CPHF) coefficients.
@@ -884,14 +885,18 @@ class CphfSolver(LinearSolver):
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, *args)
 
-        if self.rank == mpi_master():
-            cphf_rhs = cphf_rhs_dict['cphf_rhs']
-            dof = cphf_rhs.shape[0]
-            cphf_rhs = cphf_rhs.reshape(dof, nocc, nvir)
-        else:
-            cphf_rhs = None
+        dist_rhs = cphf_rhs_dict['dist_cphf_rhs']
+        dof = len(dist_rhs)
 
         profiler.stop_timer('CPHF RHS')
+
+        if self.rank == mpi_master():
+            cphf_rhs = np.zeros((dof, nocc, nvir))
+            for ivec, dist_array in enumerate(dist_rhs):
+                vec = dist_array.get_full_vector().reshape(nocc, nvir)
+                cphf_rhs[ivec] = vec
+        else:
+            cphf_rhs = None
 
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
 
@@ -916,8 +921,14 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
+            dist_cphf_ov = []
+            for ivec in range(dof):
+                cphf_ov_vec = cphf_ov[ivec].reshape(nocc*nvir)
+                dist_array = DistributedArray(cphf_ov_vec, self.comm)
+                dist_cphf_ov.append(dist_array)
+
             # merge the rhs dict with the solution
-            cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
+            cphf_ov_dict = {**cphf_rhs_dict, 'dist_cphf_ov': dist_cphf_ov}
 
             return cphf_ov_dict
 
@@ -1190,12 +1201,10 @@ class CphfSolver(LinearSolver):
             return
 
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.orbrsp.h5'
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
         elif (self.checkpoint_file is not None and
-              self.checkpoint_file.endswith('.rsp.h5')):
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint_file = self.checkpoint_file[:-7] + '_orbrsp.h5'
 
         t0 = tm.time()
 

@@ -457,7 +457,7 @@ class OptimizationDriver:
                 self.ostream.flush()
 
                 # Write opt results to checkpoint file
-                final_checkpoint_file_name = filename + "_opt_results.h5"
+                final_checkpoint_file_name = filename + ".h5"
                 self._write_final_hdf5(final_checkpoint_file_name, final_mol, opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
@@ -910,6 +910,7 @@ class OptimizationDriver:
         if valid_checkpoint:
             hf = h5py.File(fname, 'w')
 
+            opt_group = 'opt/'
             # Save molecule data -- final geometry:
             hf.create_dataset('nuclear_charges', data=molecule.get_element_ids())
 
@@ -931,15 +932,17 @@ class OptimizationDriver:
 
             # Check if it is a scan job or not
             if 'scan_energies' in opt_results.keys():
-                hf.create_dataset("scan_energies", data=opt_results["scan_energies"])
+                hf.create_dataset(opt_group + 'scan_energies',
+                                  data=opt_results['scan_energies'])
 
-                hf.create_dataset("scan_coordinates_au",
-                                  data=np.array(opt_results["scan_coordinates_au"]))
+                hf.create_dataset(opt_group + 'scan_coordinates_au',
+                                  data=np.array(opt_results['scan_coordinates_au']))
             else:
-                hf.create_dataset("opt_energies", data=opt_results["opt_energies"])
+                hf.create_dataset(opt_group + 'opt_energies',
+                                  data=opt_results['opt_energies'])
 
-                hf.create_dataset("opt_coordinates_au",
-                                  data=np.array(opt_results["opt_coordinates_au"]))
+                hf.create_dataset(opt_group + 'opt_coordinates_au',
+                                  data=np.array(opt_results['opt_coordinates_au']))
 
             valstr = 'Optimization results written to file: '
             valstr += fname

@@ -175,7 +175,7 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         rsp_group = 'rsp/'
         dset = hf.create_dataset(rsp_group + keys[0], data=vec)
         for key in keys[1:]:
-            hf[key] = dset
+            hf[rsp_group + key] = dset
         hf.close()
 
 def write_lr_rsp_results_to_hdf5(fname, rsp_results):
