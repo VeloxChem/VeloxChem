@@ -527,18 +527,25 @@ class EvbDriver():
 
         return conf
 
-    def load_initialisation(self, data_folder: str, name: str):
-        
+    def load_initialisation(self, data_folder: str, name: str, skip_systems = False):
+        """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
+        The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
+
+        Args:
+            data_folder (str): The folder to load the data from
+            name (str): The name of the configuration. Can be arbitrary, but should be unique.
+            skip_systems (bool, optional): If set to true, the systems will not be loaded from the xml files. Used for debugging. Defaults to False.
+        """
         pdb = mmapp.PDBFile(f"{data_folder}/topology.pdb")
         with open(f"{data_folder}/options.json", "r") as file:
             options = json.load(file)
             temperature = options["temperature"]
             Lambda = options["Lambda"]
-        if self.Lambda != Lambda:
+        if self.Lambda != Lambda and self.Lambda is not None:
             self.ostream.print_warning(f"Lambda vector in {data_folder}/options.json does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file.")
 
         self.Lambda = Lambda
-        systems = self.load_systems_from_xml(f"{data_folder}/run")
+
         conf = {
             "name": name,
             "data_folder": data_folder,
@@ -547,8 +554,12 @@ class EvbDriver():
             "initial_positions": pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers),
             "temperature": temperature,
             "Lambda": Lambda,
-            "systems": systems,
         }
+        if not skip_systems:
+            systems = self.load_systems_from_xml(f"{data_folder}/run")
+            conf["systems"] = systems
+        else:
+            systems = []
 
         self.system_confs.append(conf)
         self.ostream.print_info(f"Initialised configuration with {len(systems)} systems, topology, initial positions, temperatue {temperature} and Lambda vector {Lambda} from {data_folder}")
@@ -653,10 +664,8 @@ class EvbDriver():
             barrier (float): the reaction barrier in kcal/mol of the reference system
             free_energy (float): the reaction free energy in kcal/mol of the reference system
         """
-        reference_folder = self.system_confs[0]["data_folder"]
-        target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
         dp = EvbDataProcessing()
-        results = self._load_output_from_folders(reference_folder, target_folders)
+        results = self._load_output_from_folders()
         results = dp.compute(results, barrier, free_energy)
         self._save_dict_as_h5(results, f"results_{self.name}_{self.t_label}")
         dp.print_results(results, self.ostream)
@@ -693,7 +702,7 @@ class EvbDriver():
         self.ostream.flush()
         pass
 
-    def _load_output_from_folders(self, reference_folder, target_folders) -> dict:
+    def _load_output_from_folders(self) -> dict:
         """Load results from the output of the FEP calculations, and return a dictionary. Looks for Energies.dat, Data_combined.dat and options.json in each folder.
 
         Args:
@@ -703,10 +712,11 @@ class EvbDriver():
         Returns:
             dict: A dictionary containing the results of the FEP calculations for the reference and target systems.
         """
-        reference = reference_folder.split("/")[-1]
-        targets = []
-        for target in target_folders:
-            targets.append(target.split("/")[-1])
+        reference_folder = self.system_confs[0]["data_folder"]
+        target_folders = [conf["data_folder"] for conf in self.system_confs[1:]]
+
+        reference_name = self.system_confs[0]["name"]
+        target_names = [conf["name"] for conf in self.system_confs[1:]]
 
         folders = [reference_folder] + target_folders
         results = {}
@@ -714,7 +724,7 @@ class EvbDriver():
         
         common_results = []
         specific_results = {}
-        for name, folder in zip([reference] + targets, folders):
+        for name, folder in zip([reference_name] + target_names, folders):
             E_file = str(cwd / folder / "Energies.dat")
             data_file = str(cwd / folder / "Data_combined.dat")
             options_file = str(cwd / folder / "options.json")

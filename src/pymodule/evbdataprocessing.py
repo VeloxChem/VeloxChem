@@ -505,14 +505,6 @@ class EvbDataProcessing:
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
             legend_labels.append(name)
 
-        E_legend_lines = []
-        E_legend_labels = []
-        E_legend_lines.append(Line2D([0], [0], linestyle="--", color="grey"))
-        E_legend_labels.append("E1")
-        E_legend_lines.append(Line2D([0], [0], linestyle=":", color="grey"))
-        E_legend_labels.append("E2")
-        ax[0].legend(E_legend_lines, E_legend_labels)
-
         if plot_analytical and plot_discrete:
             EVB_legend_lines = []
             EVB_legend_labels = []
@@ -526,8 +518,8 @@ class EvbDataProcessing:
         ax[0].set_xlabel(r"$\lambda$")
         ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kcal/mol)")
 
-        ax[0].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
-        ax[0].set_ylabel(r"$\Delta G_{EVB}$ (kcal/mol)")
+        ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
+        ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kcal/mol)")
         fig.legend(
             legend_lines,
             legend_labels,
