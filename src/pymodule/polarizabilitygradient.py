@@ -300,47 +300,9 @@ class PolarizabilityGradient:
             ]
 
             if 'dist_cphf_ov' in all_orbrsp_results.keys():
-                # NOTE WIP
+                # get lambda multipliers from distributed arrays
                 cphf_ov = self.get_lambda_response_vector(
                     molecule, scf_tensors, all_orbrsp_results['dist_cphf_ov'], f)
-
-                # get lambda multipliers from distributed array
-                #if self.is_complex:
-                #    if self.rank == mpi_master():
-                #        cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
-
-                #    for idx, xy in enumerate(xy_pairs):
-                #        tmp_cphf_re = all_orbrsp_results['dist_cphf_ov'][
-                #            2 * dof_red * f + idx].get_full_vector()
-                #        tmp_cphf_im = all_orbrsp_results['dist_cphf_ov'][
-                #            2 * dof_red * f + dof_red + idx].get_full_vector()
-
-                #        if self.rank == mpi_master():
-                #            x = xy[0]
-                #            y = xy[1]
-                #            cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
-
-                #            if (y != x):
-                #                cphf_ov[y, x] += cphf_ov[x, y]
-                #    del tmp_cphf_re
-                #    del tmp_cphf_im
-                #else:
-                #    if self.rank == mpi_master():
-                #        cphf_ov = np.zeros((dof, dof, nocc * nvir))
-
-                #    for idx, xy in enumerate(xy_pairs):
-                #        tmp_cphf_ov = all_orbrsp_results['dist_cphf_ov'][dof_red * f + idx].get_full_vector()
-
-                #        if self.rank == mpi_master():
-                #            x = xy[0]
-                #            y = xy[1]
-                #            cphf_ov[x, y] += tmp_cphf_ov
-
-                #            if (y != x):
-                #                cphf_ov[y, x] += cphf_ov[x, y]
-                #    del tmp_cphf_ov
-                ## DEBUG
-                #print('MAX DIFF:', np.max(np.abs(cphf_ov - cphf_ov_test)))
 
             else:
                 # TODO get conj. gradient solver to also return dist. array
@@ -408,23 +370,14 @@ class PolarizabilityGradient:
                     np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
                     for x in range(dof)
                 ])
-                del x_plus_y_mo
-                del x_minus_y_mo
+                del x_plus_y_mo, x_minus_y_mo
 
                 orbrsp_results = all_orbrsp_results[w]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
                 # Lagrange multipliers
-                # TODO read from dist. array when implemented
                 omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
-                #omega_ao = orbrsp_results['omega_ao'].reshape(
-                #    dof, dof, nao, nao)
-                #print('MAX DIFF:', np.max(np.abs(omega_ao - omega_ao_test)))
-
-                # TODO remove
-                #lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
-                #lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
-
+               
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
                 lambda_ao = np.array([
@@ -505,7 +458,7 @@ class PolarizabilityGradient:
                         # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                                    2.0 * omega_ao[x, y],#.reshape(nao**2), # TODO cleanup
+                                    2.0 * omega_ao[x, y],
                                       gmat_ovlp.reshape(nao**2)]))
 
                 gmats_ovlp = Matrices()
@@ -567,12 +520,9 @@ class PolarizabilityGradient:
                         pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
-
-                # TODO move get label to the function computing xc contrib.
-                xcfun_label = self.xcfun.get_func_label()
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
-                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y)
 
                 # add contribution to the SCF polarizability gradient
                 if self.rank == mpi_master():
@@ -1315,7 +1265,7 @@ class PolarizabilityGradient:
         return orbrsp_drv.cphf_results
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y, xcfun_label):
+                                    x_minus_y):
         """
         Directs the calculation of the exchange-correlation contribution to the DFT
         polarizability gradient.
@@ -1330,12 +1280,12 @@ class PolarizabilityGradient:
             The relaxed density matric in AO basis.
         :param x_minus_y:
             The X-Y response vector.
-        :param xcfun_label:
-            The label for the XC functional
 
         :return xc_contrib:
             The XC-contribution to the polarizability gradient
         """
+
+        xcfun_label = self.xcfun.get_func_label()
 
         if self.is_complex:
             xc_contrib = self.compute_polgrad_xc_contrib_complex(
