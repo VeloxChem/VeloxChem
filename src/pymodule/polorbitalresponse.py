@@ -1545,13 +1545,11 @@ class PolOrbitalResponse(CphfSolver):
         else:
             xy_pairs = None
             dof_red = None
-        #    dof = None
             nocc = None
             nvir = None
 
         xy_pairs = self.comm.bcast(xy_pairs, root=mpi_master())
         dof_red = self.comm.bcast(dof_red, root=mpi_master())
-        #dof = self.comm.bcast(dof, root=mpi_master())
         nocc = self.comm.bcast(nocc , root=mpi_master())
         nvir = self.comm.bcast(nvir , root=mpi_master())
 
@@ -1582,10 +1580,12 @@ class PolOrbitalResponse(CphfSolver):
                     if self.rank == mpi_master():
                         x = xy[0]
                         y = xy[1]
+
                         cphf_ov[x, y] += tmp_cphf_ov
 
                         if (y != x):
                             cphf_ov[y, x] += cphf_ov[x, y]
+                del tmp_cphf_ov
 
             if self.rank == mpi_master():
 
@@ -1734,15 +1734,13 @@ class PolOrbitalResponse(CphfSolver):
                     omega_red.append(omega[x, y].copy())
                 omega_red = np.array(omega_red)
 
-                # TODO make distributed
-                omega = omega.reshape(dof * dof, nao, nao)
-
                 # save omega multipliers in cphf_results dictionary
+                omega = omega.reshape(dof * dof, nao, nao)
                 self.cphf_results[(w)]['omega_ao'] = omega
                 # TODO remove
                 #self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
-            # save omega in distributed array
+            # reduce dimensions and save omega in distributed array
             for xy in range(dof_red):
                 if self.rank == mpi_master():
                     polorb_omega_xy = omega_red[xy].reshape(nao * nao)
@@ -1753,7 +1751,7 @@ class PolOrbitalResponse(CphfSolver):
                 )
 
         if self.rank == mpi_master():
-            self.cphf_results['dist_polorb_omega'] = dist_polorb_omega
+            self.cphf_results['dist_omega_ao'] = dist_polorb_omega
            
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -1812,18 +1810,19 @@ class PolOrbitalResponse(CphfSolver):
         else:
             xy_pairs = None
             dof_red = None
-            #dof = None
             nocc = None
             nvir = None
 
         xy_pairs = self.comm.bcast(xy_pairs, root=mpi_master())
         dof_red = self.comm.bcast(dof_red, root=mpi_master())
-        #dof = self.comm.bcast(dof, root=mpi_master())
         nocc = self.comm.bcast(nocc , root=mpi_master())
         nvir = self.comm.bcast(nvir , root=mpi_master())
 
         # timings
         loop_start_time = tm.time()
+
+        # list for omega distributeed arrays
+        dist_polorb_omega = []
 
         for f, w in enumerate(self.frequencies):
 
@@ -1832,6 +1831,7 @@ class PolOrbitalResponse(CphfSolver):
                 for x in self.vector_components
             ]
 
+            # cphf subspace solver returns the solution as distributed array
             if self.use_subspace_solver:
                 if self.rank == mpi_master():
                     cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
@@ -1845,7 +1845,9 @@ class PolOrbitalResponse(CphfSolver):
                     if self.rank == mpi_master():
                         x = xy[0]
                         y = xy[1]
+
                         cphf_ov[x, y] += tmp_cphf_re + 1j * tmp_cphf_im
+
                         if (y != x):
                             cphf_ov[y, x] += cphf_ov[x, y]
                 del tmp_cphf_re
@@ -1853,13 +1855,13 @@ class PolOrbitalResponse(CphfSolver):
 
             if self.rank == mpi_master():
 
+                self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
+                self.ostream.flush()
+
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
                 for idx in range(len(full_vec)):
                     full_vec[idx] *= -1.0
 
-                self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
-                self.ostream.flush()
-               
                 # get fock matrices from cphf_results
                 fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
                 fock_ao_rhs_imag = self.cphf_results[w]['fock_ao_rhs_imag']
@@ -2027,22 +2029,48 @@ class PolOrbitalResponse(CphfSolver):
                             )
                             omega[m, n] += omega_gxc_contrib
 
+                        # TODO don't bother when Distributed fully implemented
                         # set values in lower off-diagonal
                         if (n != m):
                             omega[n, m] = omega[m, n]
+                # NOTE WIP
+                # reduce dimensions for storage
+                omega_red = []
+                for x, y in xy_pairs:
+                    omega_red.append(omega[x, y].copy())
+                omega_red = np.array(omega_red)
 
-                # TODO reduce dimensions
-
-                # TODO distributed
-
+                # TODO legacy (soon): save in dict with freq. keys
                 omega = omega.reshape(dof * dof, nao, nao)
-
-                # save omega multipliers in cphf_results dictionary as list of dist. arrays
                 self.cphf_results[(w)]['omega_ao'] = omega
                 # TODO remove
                 # self.cphf_results[(w)]['lambda_ao'] = cphf_ao
 
-        # TODO save list of dist arrays in dict
+            # NOTE WIP
+            # save RHS in distributed array
+            dist_polorb_omega_re = []
+            dist_polorb_omega_im = []
+            # reduce dimensions and save omega in distributed array
+            for xy in range(dof_red):
+                if self.rank == mpi_master():
+                    polorb_omega_xy_re = omega_red[xy].real.reshape(nao * nao)
+                    polorb_omega_xy_im = omega_red[xy].imag.reshape(nao * nao)
+                else:
+                    polorb_omega_xy_re = None
+                    polorb_omega_xy_im = None
+
+                dist_polorb_omega_re.append(
+                    DistributedArray(polorb_omega_xy_re, self.comm, root=mpi_master())
+                )
+                dist_polorb_omega_im.append(
+                    DistributedArray(polorb_omega_xy_im, self.comm, root=mpi_master())
+                )
+            dist_polorb_omega.extend(dist_polorb_omega_re + dist_polorb_omega_im)
+
+
+        # NOTE WIP
+        if self.rank == mpi_master():
+            self.cphf_results['dist_omega_ao'] = dist_polorb_omega
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '
