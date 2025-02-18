@@ -2041,7 +2041,7 @@ class LinearSolver:
             mat[num_core_orbitals:, :num_core_orbitals] = A[
                 num_core_orbitals:, :num_core_orbitals]
             
-        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals > 0:
+        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals + num_val_orbitals > 0:
             num_core_val_orbs = num_core_orbitals + num_val_orbitals
             mat[:num_core_val_orbs,
                 num_core_val_orbs:] = -A[:num_core_val_orbs, num_core_val_orbs:]
@@ -2099,7 +2099,7 @@ class LinearSolver:
             mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(
                 num_core_orbitals, nvir).T
             
-        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals > 0:
+        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals + num_val_orbitals > 0:
             nvir = num_vir_orbitals
             num_core_val_orbs = num_core_orbitals + num_val_orbitals
             n_ov = num_core_val_orbs * nvir
@@ -2147,7 +2147,7 @@ class LinearSolver:
                              num_core_orbitals:].reshape(n_ov)
             vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(
                 n_ov)
-        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals > 0:
+        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals + num_val_orbitals > 0:
             nvir = num_vir_orbitals
             num_core_val_orbs = num_core_orbitals + num_val_orbitals
             n_ov = num_core_val_orbs * nvir
@@ -2337,7 +2337,7 @@ class LinearSolver:
         if num_core_orbitals is not None and None in (num_val_orbitals, num_vir_orbitals) and num_core_orbitals > 0:
             n_ov = num_core_orbitals * nvir
             eocc = orb_ene[:num_core_orbitals]
-        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals > 0:
+        elif None not in (num_core_orbitals, num_val_orbitals, num_vir_orbitals) and num_core_orbitals + num_val_orbitals > 0:
             nvir = num_vir_orbitals
             num_core_val_orbs = num_core_orbitals + num_val_orbitals
             n_ov = num_core_val_orbs * nvir
@@ -2602,7 +2602,7 @@ class LinearSolver:
             if getattr(self, 'core_excitation', False):
                 homo_str = f'core_{i + 1}'
             elif getattr(self, 'sra', False):
-                if i <= self.num_core_orbitals and self.num_core_orbitals > 0:
+                if i < self.num_core_orbitals and self.num_core_orbitals > 0:
                     homo_str = f'core_{i + 1}'
                 else:
                     homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc - 1 - i}'

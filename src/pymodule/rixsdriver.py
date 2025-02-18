@@ -1,4 +1,4 @@
-#
+##
 #                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
@@ -29,8 +29,7 @@ import math
 import h5py
 import sys
 
-from .veloxchemlib import bohr_in_angstrom, mpi_master
-from .veloxchemlib import hartree_in_ev, bohr_in_angstroms
+from .veloxchemlib import hartree_in_ev, bohr_in_angstrom, mpi_master
 from .oneeints import compute_electric_dipole_integrals
 from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
@@ -41,7 +40,9 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 
 class RixsDriver:
     """
-    Implements RIXS driver.
+    Implements the RIXS driver.
+    Note: includes only the inelastic, resonant term in
+    the 2nd order pert. expression.
 
     :param comm:
         The MPI communicator.
@@ -49,13 +50,14 @@ class RixsDriver:
         The output stream.
 
     Instance variables:
-        - theta: Angle.
-        - gamma_n: Broadening term.
+        - photon_energy: Incoming photon energy; omega (a.u.)
+        - theta: Angle (rad)
+        - gamma_n: Life-time broadening (a.u.)
     """
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initializes (CVS-)RIXS driver.
+        Initializes the RIXS driver.
         """
 
         if comm is None:
@@ -76,17 +78,7 @@ class RixsDriver:
         self.ostream = ostream
 
         # method settings
-        self.nr_ve = None # nr_ce
-        self.nstates = None
-
-        # CVS
-        self.nr_ce = None # nr_ce
-        self.nr_CO = None # nr_ce
         self.photon_energy = None
-
-        # SRA
-        self.sra = False
-
         self.theta = 0
         self.gamma_n = .124/hartree_in_ev() # a.u.
 
@@ -95,7 +87,8 @@ class RixsDriver:
             'rixs': {
                 'theta': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
                 'gamma': ('float', 'broadening term'),
-                'nr_CO': ('int', 'number of involved core-orbitals'),
+                #'nr_CO': ('int', 'number of involved core-orbitals'),
+                'photon_energy': ('float', 'incoming photon energy'),
             },
         }
 
@@ -121,190 +114,265 @@ class RixsDriver:
         if 'filename' in rixs_dict:
             self.filename = rixs_dict['filename']
 
+    def scattering_amplitude_tensor(self, omega, eigenvalue, intermediate_tdens,
+                             final_tdens, dipole_integrals, elastic=False):
         """
-        if self.electric_field is not None:
-            assert_msg_critical(
-                len(self.electric_field) == 3,
-                'SCF driver: Expecting 3 values in \'electric field\' input')
-            assert_msg_critical(
-                not self._pe,
-                'SCF driver: \'electric field\' input is incompatible with ' +
-                'polarizable embedding')
-            # disable restart of calculation with static electric field since
-            # checkpoint file does not contain information about the electric
-            # field
-            self.restart = False
-        """
-    
-    def sts_tdm(self, scf_results, valence_eigenvectors, core_eigenvectors):
-        """
-        The state-to-state transition-density-matrix
-
-        :param molecule    : molecule object (could be removed w/ small modifications)
-        :param ao_basis    : atomic orbital basis (could be removed)
-        :param scf_results : results of the SCF calculation
-        :tda_res_val       : linear-response results for the valence calculation
-        :tda_res_core      : linear-response results for the core calculation
-
-        returns the state-to-state transition-density-matrix in ao-basis
-        """
-
-        X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
-        if self.sra:
-            X_val_mo = np.zeros((self.nocc, self.nvir, self.nr_ve))
-            X_val_mo[:self.nr_CO] = valence_eigenvectors[:self.nr_CO]
-            X_val_mo[-self.nr_val:] = valence_eigenvectors[self.nr_CO:]
-
-            X_cor_mo[:self.nr_CO] = core_eigenvectors[:self.nr_CO]
-            X_cor_mo[-self.nr_val:] = core_eigenvectors[self.nr_CO:]
-        elif self.nr_CO > 0:
-            X_cor_mo[:self.nr_CO] = core_eigenvectors.reshape(self.nr_CO, self.nvir, self.nr_ce)
-            X_val_mo = valence_eigenvectors.reshape(self.nocc, self.nvir, self.nr_ve)
-        else:
-            X_cor_mo = core_eigenvectors.reshape(self.nocc, self.nvir, self.nr_ce)
-            X_val_mo = valence_eigenvectors.reshape(self.nocc, self.nvir, self.nr_ve)
-
-        # Electron- and hole density matrices
-        gamma_ab = np.einsum('ipJ, iqI -> pqIJ', X_cor_mo, X_val_mo, optimize=True)
-        gamma_ij = np.einsum('qaJ, paI -> pqIJ', X_cor_mo, X_val_mo, optimize=True)
-
-        # Transform
-        if self.sra:
-            C_ab = scf_results['C_alpha'][:,self.nocc:self.nocc + self.nvir]
-        else:
-            C_ab = scf_results['C_alpha'][:,self.nocc:]
-        C_ij = scf_results['C_alpha'][:,:self.nocc]
-        gamma_ab_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ab, gamma_ab, C_ab, optimize=True)
-        gamma_ij_ao = np.einsum('vp, pqIJ, wq -> vwIJ', C_ij, gamma_ij, C_ij, optimize=True)
-
-        gamma_ao = gamma_ab_ao - gamma_ij_ao
-        #gamma_ao *= 2 # alpha and beta spin?
-        return gamma_ao
-
-    def gts_tdm(self, scf_results, core_eigenvectors):
-        """
-        The GS-to-state transition-density-matrix (GS to core) in ao --
-        essentially transformed and reshaped eigenvector
-
-        :param molecule: 
-            molecule object (could be removed w/ small modifications)
-        :param ao_basis: 
-            atomic orbital basis (could be removed)
-        :param scf_results: 
-            results of the SCF calculation (could be removed w/ small modifications)
-        :tda_res_val:
-            linear-response results for the valence calculation
-        :tda_res_core:
-            linear-response results for the core calculation
-
-        :returns: 
-            the GS-to-state transition-density-matrix in ao-basis
-        """
-
-        if self.sra:
-            X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
-            X_cor_mo[:self.nr_CO] = core_eigenvectors[:self.nr_CO]
-            X_cor_mo[-self.nr_val:] = core_eigenvectors[self.nr_CO:]
-        elif self.nr_CO > 0:
-            X_cor_mo = np.zeros((self.nocc, self.nvir, self.nr_ce))
-            X_cor_mo[:self.nr_CO] = core_eigenvectors.reshape(self.nr_CO, self.nvir, self.nr_ce)
-        else:
-            X_cor_mo = core_eigenvectors.reshape(self.nocc, self.nvir, self.nr_ce)
-
-        # Transform
-        if self.sra:
-            C_ab = scf_results['C_alpha'][:,self.nocc:self.nocc + self.nvir]
-        #    C_ij = scf_results['C_alpha'][:,:self.nr_CO]
-        else:
-            C_ab = scf_results['C_alpha'][:,self.nocc:]
-        C_ij = scf_results['C_alpha'][:,:self.nocc]
-        gamma_ng_ao = np.einsum('vp, pqJ, wq -> vwJ', C_ij, X_cor_mo, C_ab, optimize=True)
-        gamma_ng_ao *= np.sqrt(2) # 2 # alpha and beta spin
-        return gamma_ng_ao
-
-    def F_xy(self, w, f, gamma_ao,
-         gamma_ng_ao, core_eigenvalues,
-         dipole_ints):
-        """
-        The RIXS scattering amptlitude (sum-over-states transition strength).
+        The RIXS scattering amptlitude (sum-over-states transition amplitude).
         
-        :param w:
+        :param omega:
             Energy of incoming photon 
         :param f: 
-            Which, out of the nr_ve, final valence states to end at
-        :param gamma_factor: 
-            Broadening factor, or half-width of the core-excited state; 
-            in the resonant case corresponding to state with eigenvalue w
-    
+            The final valence states to end
+        :param eigenvalue: 
+            Energy of intermediate/core excited state
+        :param intermediate_tdens:
+            Transition density from ground to
+            intermediate/core excited state (AO)
+        :param final_tdens:
+            Transition density matrix from 
+            intermediate to final excited state (AO)
+        :param dipole_integrals:
+            Electric dipole integrals (length gauge)
+            in AO-basis
+        
         :return: 
-            The scattering amplitude/transition strength 
-            for all molecular directions and outgoing photon polarisation
+            The scattering amplitude tensor; shape: (3,3)
         """
-        
-        #eigenvalues = core_eigenvalues # excitation energies
-        #eigenvalues = self.photon_energy # excitation energies
-        e_n = (1 / (core_eigenvalues - w - self.gamma_n*1j)) # denominator
-        #print(f'e_n:{e_n.shape}, dip:{dipole_ints.shape} gamma:{gamma_ao[:,:,f].shape}, gamma_ng:{gamma_ng_ao.shape}')
-        
-        scatt_amp = np.einsum('n, xij, ijn, yab, abn -> xy', e_n, -dipole_ints, gamma_ao[:,:,f], -dipole_ints, gamma_ng_ao, optimize='greedy')
-        #scatt_amp = np.einsum('n, xij, ij, yab, ab -> xy', e_n, -dipole_ints, gamma_ao[:,:,f,0], -dipole_ints, gamma_ng_ao[:,:,0], optimize='greedy')
-        return scatt_amp
-    
-    def osc_str(self, tdpm, omega_prime):# tda_res_core, tda_res_val):
-        """
-        Computes the oscillator strength between the core and valence states
 
-        returns: oscillator strengths as array, shape = (core_exc, valence_exc)
-        """
-        if tdpm.ndim == 3:
-            unweighted_f = (2/3) * np.einsum('fnx->nf', tdpm ** 2)
-        elif tdpm.ndim == 2:
-            unweighted_f = (2/3) * np.einsum('nx->n', tdpm ** 2)
-        f = omega_prime * unweighted_f
-        return f
+        e_n = 1 / (omega - (eigenvalue + 1j * self.gamma_n))
 
-    def rixs_xsection(self, w, f, gamma_ao,
-         gamma_ng_ao, core_eigenvalues, valence_eigenvalues,
-         dipole_ints, theta, w_p=None):
-        """
-        Calculate the RIXS cross-section, sigma.
-    
-        :param w            : Energy of the incident photon
-        :param w_p          : Energy of the outgoing/scattered photon, if None: these are matched with valence energies
-        :param f            : Index of the final/target excited state
-        :param theta        : Scattering angle 
-        :param gamma_factor : Broadening factor for Lorentzian profile
-        :param tda_res(_val) : The results tensor of the TDDFT/TDA ground to valence excited state
-        
-        returns the RIXS transition intensity for the given frequencies, w (and) and state f
-        """
-        if w_p is None:
-            w_prime = w - valence_eigenvalues[f] #w - w_f0 
+        if elastic:
+            # TODO: addd missing term (F.T_f) in eq.7 
+            # ref. Gel'mukhanov, F., & Ågren, H. (1999). Physics Reports, 312(3-6), 87-330.
+            scatt_amp = np.einsum('n, xij, ijn, yab, abn -> xyn', e_n, dipole_integrals, intermediate_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
+
         else:
-            w_prime = w_p
-            
-        F = self.F_xy(w, f, gamma_ao,
-         gamma_ng_ao, core_eigenvalues,
-         dipole_ints)
-        self.F_mat = F
+            scatt_amp = np.einsum('n, xij, ijn, yab, abn -> xy', e_n, dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
+
+        return scatt_amp
+
+    def cross_section(self, F):
+        """
+        Computes the cross-section
         
-        sigma = w_prime/w * 1/15 * ((2 - (1/2) * np.sin(theta) ** 2) * np.sum(np.abs(F)**2) 
-                   + ((3/4) * np.sin(theta) ** 2 - 1/2) * (np.sum(F * F.T.conj())
+        :param F:
+            The scattering amplitude tensor
+
+        :return:
+            The scattering cross-section
+        """
+        sigma = 1/15 * ((2 - (1/2) * np.sin(self.theta) ** 2) * np.sum(np.abs(F)**2) 
+                   + ((3/4) * np.sin(self.theta) ** 2 - 1/2) * (np.sum(F * F.T.conj())
                                                    + np.trace(np.abs(F)**2)))
         return sigma
-
-    def transition_dipole_mom(self, gamma_ao, dipole_integrals):
-        if gamma_ao.ndim == 3:
-            T_fn = np.einsum('ijn,xij->nx', gamma_ao, -dipole_integrals)
-        elif gamma_ao.ndim == 4:
-            T_fn = np.einsum('ijfn,xij->fnx', gamma_ao, -dipole_integrals)
-        return T_fn
-
-    def omega_p(self, core_eigenvalues, val_eigenvalues):
-        d_E = [ce - val_eigenvalues for ce in core_eigenvalues]
-        return np.array(d_E)
     
-    def find_nr_CO(self, excitation_details):
+    def print_info(self):
+        """
+        Prints relevant orbital and state information
+        """
+        if self.photon_energy is None:
+            print('Compute first!')
+        else:
+            info = self.orb_and_state_dict
+            intermed_states = info['num_intermediate_states']
+            final_states = info['num_final_states']
+            mo_c_ind = info['mo_core_indices']
+            mo_val_ind = info['mo_val_indices']
+            mo_vir_ind = info['mo_vir_indices']
+            ce_states = info['core_states']
+            ve_states = info['val_states']
+            print(f'\nNumber of states: (intermediate, final): ({intermed_states}, {final_states})')
+            print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
+            print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
+    
+    def compute(self, molecule, basis, scf_tensors, rsp_tensors,
+                 cvs_rsp_tensors=None, num_core_orbitals=None):
+        """
+        Computes the relevant RIXS properties
+        
+        :param molecule:
+            The molecule object
+        :param basis:
+            The atomic orbital basis object
+        :scf_tensors:
+            The converged SCF results
+        :rsp_tensors:
+            The linear-response results
+        :cvs_rsp_tensors:
+            The core-valence-separated linear-response results
+        :num_core_orbitals:
+            Defines the split between intermediate and final states
+            (not yet implemented)
+            NOTE: To run full diagonalization, do a subspace-restricted calculation
+                  with the full space, indicating which orbitals define the core
+
+        :return:
+            Dictionary with outgoing photon energy in energy loss and full energy (emisison)
+            as well as scattering amplitudes and cross-sections
+        """
+
+        norb = scf_tensors['C_alpha'].shape[0]
+        nocc = molecule.number_of_alpha_electrons()
+        nvir = norb - nocc
+
+        self.cvs = False
+        self.sra = False
+
+        # TODO: add safeguards for when both num_intermediate_states and cvs is given
+        # TODO: think if there is ever a case where get_num_val_orbs() don't find all valence?
+
+        if num_core_orbitals is not None:
+            self.ostream.print_info(
+                'Full space eigenvector assumed for RIXS. Number of intermediate/source/core orbitals {:d}'.format(
+                    num_core_orbitals))
+            # use intermediate states to define the split b/w core and valence
+            num_val_orbitals = nocc - num_core_orbitals
+            #num_val_orbitals = nocc
+            num_vir_orbitals = nvir # =nvir
+
+            num_tot_states = len(rsp_tensors['eigenvalues'])
+            num_final_states = num_val_orbitals * num_vir_orbitals
+            num_intermediate_states = num_tot_states - num_final_states
+
+        elif cvs_rsp_tensors is not None:
+            self.ostream.print_info(
+                'Running RIXS with CVS approximation.')
+            self.cvs = True
+            num_core_orbitals = self.get_num_core_orbs(cvs_rsp_tensors)
+            num_val_orbitals  = nocc - num_core_orbitals # self.get_num_val_orbs(rsp_tensors) # = nocc
+            num_vir_orbitals  = nvir # self.get_num_vir_orbs(rsp_tensors) # = nvir
+
+            num_final_states = len(rsp_tensors['eigenvalues'])
+            num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
+            num_tot_states = num_final_states + num_intermediate_states
+            core_states = list(range(num_intermediate_states))
+            occupied_core = num_core_orbitals
+
+        else:
+            self.ostream.print_info(
+                'Assuming subspace-restricted approximation.')
+            # TODO: add assertion for splitting of response vector
+            #assert_msg_critical(
+            #   np.any(rsp_tensors['excitation_details'] core) is not None,
+            #   '')
+            self.sra = True
+            num_core_orbitals = self.get_num_core_orbs(rsp_tensors)
+            num_val_orbitals  = self.get_num_val_orbs(rsp_tensors)
+            num_vir_orbitals  = self.get_num_vir_orbs(rsp_tensors)
+            
+            num_tot_states = len(rsp_tensors['eigenvalues'])
+            num_final_states = num_val_orbitals * num_vir_orbitals
+            num_intermediate_states = num_tot_states - num_final_states
+            assert_msg_critical(num_intermediate_states > 0, 'Too few excited states included in response calculation')
+            core_states = list(range(num_final_states, num_tot_states))
+            cvs_rsp_tensors = rsp_tensors
+            occupied_core = num_core_orbitals + num_val_orbitals
+
+        
+        mo_core_indices = list(range(num_core_orbitals))
+        mo_val_indices  = list(range(nocc - num_val_orbitals, nocc))
+        mo_vir_indices  = list(range(nocc, nocc + num_vir_orbitals))
+        mo_occ = scf_tensors['C_alpha'][:, mo_core_indices + mo_val_indices]
+        mo_vir = scf_tensors['C_alpha'][:, mo_vir_indices]
+
+        val_states = list(range(num_final_states))
+        core_eigvecs_dist = np.array([cvs_rsp_tensors['eigenvectors_distributed'][state] for state in core_states])
+        core_eigvals = cvs_rsp_tensors['eigenvalues'][core_states]
+        valence_eigvecs_dist = np.array([rsp_tensors['eigenvectors_distributed'][state] for state in val_states])
+        valence_eigvals = rsp_tensors['eigenvalues'][val_states]
+        
+        # For bookkeeping
+        self.orb_and_state_dict = {
+            'num_intermediate_states': num_intermediate_states,
+            'num_final_states': num_final_states,
+            'mo_core_indices': mo_core_indices,
+            'mo_val_indices': mo_val_indices,
+            'mo_vir_indices': mo_vir_indices,
+            'core_states': core_states,
+            'val_states': val_states,
+        }
+        
+
+        if self.photon_energy is None:
+            # assume first core resonance
+            self.ostream.print_info(
+                'Incoming photon energy not set; calculating only for the first core resonance.')
+            self.photon_energy = [core_eigvals[0]]
+
+        dipole_integrals = compute_electric_dipole_integrals(
+                molecule, basis, [0.0,0.0,0.0])
+
+        ene_losses = []
+        emission_enes = []
+        cross_sections = []
+        scattering_amplitudes = []
+
+        for w_ind, omega in enumerate(self.photon_energy):
+
+            for f in range(num_final_states):
+
+                valence_eigvec = self.get_full_solution_vector(valence_eigvecs_dist[f])
+                    
+                valence_z_mat = valence_eigvec[:len(valence_eigvec) // 2].reshape(
+                            num_core_orbitals + num_val_orbitals, num_vir_orbitals)
+                valence_y_mat = valence_eigvec[len(valence_eigvec) // 2:].reshape(
+                            num_core_orbitals + num_val_orbitals, num_vir_orbitals)
+                
+                gs_to_core_tdens = np.zeros((norb, norb, num_intermediate_states))
+                core_to_val_tdens = np.zeros((norb, norb, num_intermediate_states))
+
+                for n in range(num_intermediate_states):
+
+                    core_eigvec = self.get_full_solution_vector(core_eigvecs_dist[n])
+                    
+                    core_z_mat = core_eigvec[:len(core_eigvec) // 2].reshape(
+                            occupied_core, num_vir_orbitals)
+                    core_y_mat = core_eigvec[len(core_eigvec) // 2:].reshape(
+                            occupied_core, num_vir_orbitals)
+
+                    if self.cvs:
+                        core_z_mat = np.vstack([core_z_mat, np.zeros((num_val_orbitals, core_z_mat.shape[1]))])
+                        core_y_mat = np.vstack([core_y_mat, np.zeros((num_val_orbitals, core_y_mat.shape[1]))])
+                   
+                    # want a + sign here but
+                    gs_to_core_tdens[..., n] = np.sqrt(2) * np.linalg.multi_dot([mo_occ, core_z_mat - core_y_mat, mo_vir.T])
+
+                    core_to_val_tdens[..., n] = (
+                                np.linalg.multi_dot(
+                                    [mo_vir, valence_z_mat.T, core_z_mat, mo_vir.T]) -
+                                np.linalg.multi_dot(
+                                    [mo_occ, valence_z_mat, core_z_mat.T, mo_occ.T]))
+
+                    core_to_val_tdens[..., n] += (
+                                np.linalg.multi_dot(
+                                    [mo_occ, valence_y_mat, core_y_mat.T, mo_occ.T]) -
+                                np.linalg.multi_dot(
+                                    [mo_vir, valence_y_mat.T, core_y_mat, mo_vir.T]))
+                    
+                emission_ene = omega - valence_eigvals[f]
+                emission_enes.append([w_ind, n, emission_ene])
+                energy_loss = omega - emission_ene
+                ene_losses.append([w_ind, n, energy_loss])
+                    
+                F = self.scattering_amplitude_tensor(omega, core_eigvals, gs_to_core_tdens,
+                                                       core_to_val_tdens, dipole_integrals)
+                scattering_amplitudes.append(F)
+
+                sigma = self.cross_section(F)
+                cross_sections.append(sigma.real)
+        
+        return_dict = {
+                    'cross_sections': cross_sections,
+                    'scattering_amplitudes': scattering_amplitudes,
+                    'emission_energies': emission_enes,
+                    'energy_losses': ene_losses}
+
+        return return_dict
+
+    # TODO: find better solution for the below functions
+    @staticmethod
+    def get_num_core_orbs(rsp_results):
+        excitation_details = rsp_results['excitation_details']
         largest_core = 0  # Initialize the largest core index as 0
 
         for detail in excitation_details:
@@ -313,226 +381,52 @@ class RixsDriver:
                 core_index = int(entry.split('core_')[1].split()[0])
                 largest_core = max(largest_core, core_index)
         return largest_core
+    
+    @staticmethod
+    def get_num_val_orbs(rsp_results):
+        excitation_details = rsp_results['excitation_details']
+        largest_valence = 0  # Initialize the largest valence index as 0
 
-    """
-    def elastic_rixs_xsection(self, eigenvals_core, dipole_ints, gamma_ng_ao, theta):
-        sigma = np.zeros((self.nr_ce), dtype=np.complex128)
-        # excitation energies
-        e_n = np.array([(1 / (en - eigenvals_core - self.gamma_n*1j)) for en in eigenvals_core]) # denominator
-        #print(f'e_n:{e_n.shape}, dip:{dipole_ints.shape} gamma:{gamma_ao[:,:,f].shape}, gamma_ng:{gamma_ng_ao.shape}')
+        for detail in excitation_details:
+            entry = detail[0]
+            if 'HOMO-' in entry:
+                val_index = int(entry.split('HOMO-')[1].split()[0])
+                largest_valence = max(largest_valence, val_index)
+        return largest_valence + 1
 
-        F = np.einsum('kn, xij, ijn, yab, abn -> kxy', e_n, -dipole_ints, gamma_ng_ao, -dipole_ints, gamma_ng_ao, optimize='greedy')
-        #F = e_n * np.einsum('xij, ijf, yab, abf -> nxy', -dipole_ints, gamma_ng_ao, -dipole_ints, gamma_ng_ao, optimize='greedy')
+    @staticmethod
+    def get_num_vir_orbs(rsp_results):
+        excitation_details = rsp_results['excitation_details']
+        largest_virtual = 0  # Initialize the largest virtual index as 0
 
-        for n in range(self.nr_ce):
-            _F = F[n]
-            sigma[n] = 1/15 * ((2 - (1/2) * np.sin(theta) ** 2) * np.sum(np.abs(_F)**2) 
-                   + ((3/4) * np.sin(theta) ** 2 - 1/2) * (np.sum(_F * _F.T.conj())
-                                                   + np.trace(np.abs(_F)**2)))
-        return sigma
-    """
-    def elastic_rixs_xsection(self, w, tdm_ng, core_eigenvalues, dipole_ints):
-        #eigenvalues = self.photon_energy # excitation energies
-        e_n = (1 / (core_eigenvalues - w - self.gamma_n * 1j)) # denominator
-
-        F = np.einsum('n, xij, ijn, yab, abn -> xy', e_n, -dipole_ints, tdm_ng, -dipole_ints, tdm_ng, optimize='greedy')
-        #F = np.einsum('n, xij, ij, yab, ab -> xy', e_n, -dipole_ints, tdm_ng[:,:,0], -dipole_ints, tdm_ng[:,:,0], optimize='greedy')
-        sigma = 1/15 * ((2 - (1/2) * np.sin(self.theta) ** 2) * np.sum(np.abs(F)**2) 
-                   + ((3/4) * np.sin(self.theta) ** 2 - 1/2) * (np.sum(F * F.T.conj())
-                                                   + np.trace(np.abs(F)**2)))
-        return sigma
-
-    def compute(self, molecule, ao_basis, scf_results, tda_res_val, tda_res_core=None, nr_CO=None, nr_vir=None, nr_val=None):
-        self.norb = scf_results['C_alpha'].shape[0]
-        self.nocc = int(sum(scf_results['occ_alpha'])) #molecule.number_of_alpha_electrons()
-        self.nvir = self.norb - self.nocc
-
-        if not tda_res_core:
-            # SRA
-            assert_msg_critical(nr_CO is not None,
-                                'RixsDriver: need the number of core, valence, and virtual orbitals involved for subspace-restricted approx.')
-            self.sra = True
-            self.nr_CO = nr_CO
-            self.nr_val = nr_val
-            self.nvir = nr_vir
-            self.nr_ce = nr_CO * nr_vir
-            self.nr_ve = nr_val * nr_vir
-
-            eigenvector = tda_res_val['eigenvectors'].reshape(self.nr_CO + self.nr_val, self.nvir, self.nr_ce + self.nr_ve)
-            core_eigenvectors     = eigenvector[:, : , self.nr_ve:]
-            core_eigenvalues      = tda_res_val['eigenvalues'][self.nr_ve:]
-            if self.nstates is not None:
-                core_eigenvectors[..., self.nstates:] = 0
-                core_eigenvalues[self.nstates:] = 0
-            valence_eigenvectors  = eigenvector[:, : , :self.nr_ve]
-            valence_eigenvalues   = tda_res_val['eigenvalues'][:self.nr_ve]
-        else: 
-            # CVS, i.e., two-shot approach
-            self.nr_ve = len(tda_res_val['excitation_details'])
-            self.nr_ce = len(tda_res_core['excitation_details'])
-            self.nr_CO = self.find_nr_CO(tda_res_core['excitation_details'])
-
-            core_eigenvectors     = tda_res_core['eigenvectors']
-            core_eigenvalues      = tda_res_core['eigenvalues']
-            valence_eigenvectors  = tda_res_val['eigenvectors']
-            valence_eigenvalues   = tda_res_val['eigenvalues']
-        
-        tdm_ng = self.gts_tdm(scf_results, core_eigenvectors)
-        tdm_fn = self.sts_tdm(scf_results, valence_eigenvectors, core_eigenvectors)
-
-        dip_tuple   = compute_electric_dipole_integrals(molecule, ao_basis)
-        dipole_ints = -1.0 * np.array([dip_tuple[0],
-                                       dip_tuple[1],
-                                       dip_tuple[2]])
-
-        omega_f = valence_eigenvalues
-        omega_n = core_eigenvalues
-        if self.photon_energy is None:
-            self.photon_energy = omega_n # resonant
-        
-        # shape: (final state, incoming energy)
-        ene_loss              = np.zeros((self.nr_ve, len(self.photon_energy)))
-        emiss                 = np.zeros((self.nr_ve, len(self.photon_energy)))
-        crossections          = np.zeros((self.nr_ve, len(self.photon_energy)))
-        elastic_crossections  = np.zeros((len(self.photon_energy)))
-        scattering_amp_tensor = np.zeros((3, 3, self.nr_ve, len(self.photon_energy)), dtype=np.complex128)
-
-        #for incoming_ene in self.photon_energy:
-        for j, vs_i in enumerate(range(self.nr_ve)):
-            #for k, w_n in enumerate(omega_n):
-            for k, w_n in enumerate(self.photon_energy):
-                emiss[vs_i, k]        = w_n - omega_f[vs_i]
-                #ene_loss[vs_i, k]     = w_n - (w_n - omega_f[vs_i])
-                ene_loss[vs_i, k]     = omega_f[vs_i]
-                crossections[vs_i, k] = self.rixs_xsection(w_n, vs_i, tdm_fn, 
-                                                            tdm_ng, core_eigenvalues, valence_eigenvalues, 
-                                                            dipole_ints, self.theta).real
-                scattering_amp_tensor[:,:, j, k] = self.F_mat
-                if j == 0:
-                    elastic_crossections[k] = self.elastic_rixs_xsection(w_n, tdm_ng, core_eigenvalues, 
-                                                            dipole_ints).real
-
-        self.emission      = emiss
-        self.ene_loss      = ene_loss
-        self.crossections  = crossections
-        self.scatt_amp_mat = scattering_amp_tensor
-        
-        emission_ene             = self.omega_p(core_eigenvalues, valence_eigenvalues)
-        self.emission_energy_map = emission_ene
-        self.ene_loss_map        = np.array([ce - emission_ene[i] for i, ce in enumerate(core_eigenvalues)])
-
-        T_fn = self.transition_dipole_mom(tdm_fn, dipole_ints)
-        self.oscillator_strength  = self.osc_str(T_fn, emission_ene) 
-
-        #self.elastic_rixs = self.elastic_rixs_xsection(omega_n, dipole_ints, tdm_ng, self.theta).real
-        self.elastic_crossections = elastic_crossections
-
-    def write_hdf5(self, fname):
+        for detail in excitation_details:
+            entry = detail[0]
+            if 'LUMO+' in entry:
+                vir_index = int(entry.split('LUMO+')[1].split()[0])
+                largest_virtual = max(largest_virtual, vir_index)
+        return largest_virtual + 1
+    
+    @staticmethod
+    def get_full_solution_vector(solution):
         """
-        TODO
-        Writes the RIXS {output?} to the specified output file in h5
-        format. The h5 file saved contains the following datasets:
+        Gets a full solution vector from the distributed solution.
 
-        - amplitudes
-            The scattering amplitudes for the calculated truncated_freqs,
-            as 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
-        - zero_padded
-            Is the dataset zero padded or not
-        - 'xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'
-            =>  Amplitudes for all directions
-        - zero_padded_freqs
-            The zero padded frequency list
-        - zero_padded_amplitudes
-            The pulse amplitudes for the calculated frequencies zero
-            padded to match th zero padded frequencies.
+        :param solution:
+            The distributed solution as a tuple.
 
-        :param fname:
-            Name of the checkpoint file.
+        :return:
+            The full solution vector.
         """
 
-        if not fname:
-            raise ValueError('No filename given to write_hdf5()')
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
 
-        # Add the .h5 extension if not given
-        if not fname[-3:] == '.h5':
-            fname += '.h5'
-
-        # Convert the boolean to a a numpy array value
-        zeropad = np.array([self.zero_pad])
-
-        # Save all the internal data to the h5 datafile named 'fname'
-        try:
-            with h5py.File(fname, 'w') as hf:
-                hf.create_dataset('frequencies', data=self.zero_padded_freqs)
-                hf.create_dataset('amplitudes',
-                                  data=self.zero_padded_amplitudes)
-                hf.create_dataset('zero_padded', data=zeropad)
-
-                # Loop over all directions
-                for xyz1 in ['x', 'y', 'z']:
-                    for xyz2 in ['x', 'y', 'z']:
-                        polarizability = []
-                        # Add all polarizability for the give direction
-                        for freq in self.zero_padded_freqs:
-                            polarizability.append(
-                                self.results['properties_zeropad'][(xyz1, xyz2,
-                                                                    freq)])
-
-                        hf.create_dataset('{}{}'.format(xyz1, xyz2),
-                                          data=np.array(polarizability))
-
-        except Exception as e:
-            print('Pulsed response failed to create h5 data file: {}'.format(e),
-                  file=sys.stdout)
-            
-    def print_header(self):
-        """
-        TODO
-        Prints RIXS calculation setup details to output
-        stream.
-        """
-
-        # Print string width (global norm)
-        str_width = 60
-
-        # PRT header
-        self.ostream.print_blank()
-        title = 'RIXS Linear Reponse CVS Calculation'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        # Print all settings
-        header_fields = {
-            'field_cutoff_ratio': 'Field cutoff ratio',
-            'envelope': 'Envelope',
-            'pulse_widths': 'Pulse Duration',
-            'carrier_frequencies': 'Carrier Frequency',
-            'centers': 'Pulse Center time',
-            'field_max': 'Max Field',
-            'pol_dir': 'Polarization Direction',
-            'frequency_range': 'Frequency Range',
-            'zero_pad': 'Zero padding results',
-        }
-
-        # Print the header information fields
-        for key, text in header_fields.items():
-            cur_str = '{0:30s} : {1:s}'.format(text,
-                                                str(self.pulse_settings[key]))
-            self.ostream.print_header(cur_str.ljust(str_width))
-        self.ostream.print_blank()
-
-        # Print the list of truncated frequencies and their amplitudes
-        valstr = '{:<12s}  |  {:>18s}'.format('Frequency', 'Amplitude')
-        self.ostream.print_header(valstr.ljust(str_width))
-        self.ostream.print_header(('-' * 45).ljust(str_width))
-
-        for freq, amp in zip(self.truncated_freqs, self.amplitudes):
-            cur_str = '{:<12.6f}  :  {:>12.8f}   {:>+12.8f}j'.format(
-                freq, amp.real, amp.imag)
-            self.ostream.print_header(cur_str.ljust(str_width))
-        self.ostream.print_blank()
-
+        if solution.rank == mpi_master():
+            x_ger_full = np.hstack((x_ger, x_ger))
+            x_ung_full = np.hstack((x_ung, -x_ung))
+            return x_ger_full + x_ung_full
+        else:
+            return None
 
     
 
