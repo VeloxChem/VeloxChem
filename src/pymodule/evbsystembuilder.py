@@ -779,7 +779,7 @@ class EvbSystemBuilder():
                 f"Added {solvent_nb_atom_count} atoms to the nonbonded force and {solvent_system_atom_count} atoms to the system"
             )
 
-    def _add_reaction_forces(self, system, lam, reference_state=False, lj_soft_core=False, coul_soft_core=False) -> mm.System:
+    def _add_reaction_forces(self, system, lam, reference_state=False, lj_soft_core=False, coul_soft_core=False):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
@@ -812,7 +812,7 @@ class EvbSystemBuilder():
             E_field_force.addParticle(i, [0])  # Actual charges are lambda dependent, and are set later
         return E_field_force
 
-    def _create_bond_forces(self, lam, reference_state) -> list[mm.Force]:
+    def _create_bond_forces(self, lam, reference_state):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
@@ -914,7 +914,7 @@ class EvbSystemBuilder():
                         )
         return [harmonic_force, morse_force, max_distance]
 
-    def _create_angle_forces(self, lam: float) -> typing.List[mm.Force]:
+    def _create_angle_forces(self, lam: float):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
@@ -939,7 +939,7 @@ class EvbSystemBuilder():
                     self._add_angle(harmonic_force, angle, atom_ids, scale)
         return [harmonic_force]
 
-    def _create_proper_torsion_forces(self, lam) -> typing.List[mm.Force]:
+    def _create_proper_torsion_forces(self, lam):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
@@ -967,7 +967,7 @@ class EvbSystemBuilder():
                     self._add_torsion(fourier_force, dihed, atom_ids, scale)
         return [fourier_force, RB_force]
 
-    def _create_improper_torsion_forces(self, lam) -> typing.List[mm.Force]:
+    def _create_improper_torsion_forces(self, lam):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
@@ -1109,7 +1109,7 @@ class EvbSystemBuilder():
         else:
             return hard_core_expression
 
-    def _create_nonbonded_forces(self, lam, lj_soft_core=False, coul_soft_core=False) -> typing.List[mm.Force]:
+    def _create_nonbonded_forces(self, lam, lj_soft_core=False, coul_soft_core=False):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
@@ -1237,7 +1237,7 @@ class EvbSystemBuilder():
             if current_level > 0:
                 EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions, base_particle, i, current_level - 1)
 
-    def _create_constraint_forces(self, lam, reference_state: bool) -> typing.List[mm.Force]:
+    def _create_constraint_forces(self, lam, reference_state: bool):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
