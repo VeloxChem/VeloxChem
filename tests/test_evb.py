@@ -212,30 +212,36 @@ class TestEvb:
 
     def test_data_processing(self):
         # Load simulation data
-        results = {}
+        input_results = {}
         EVB = EvbDriver()
         folder = Path(__file__).parent / 'data'
+
+        specific_results = {}
 
         E_file = folder / 'evb_RuVbdaO_Br_2_vacuum_Energies.dat'
         data_file = folder / 'evb_RuVbdaO_Br_2_vacuum_Data_combined.dat'
         options_file = folder / 'evb_options.json'
-        results.update({'vacuum': EVB.load_output_files(E_file, data_file, options_file)})
+        specific, common = EVB._load_output_files(E_file, data_file, options_file)
+        specific_results.update({'vacuum': specific})
 
         E_file = folder / 'evb_RuVbdaO_Br_2_water_Energies.dat'
         data_file = folder / 'evb_RuVbdaO_Br_2_water_Data_combined.dat'
         options_file = folder / 'evb_options.json'
-        results.update({'water': EVB.load_output_files(E_file, data_file, options_file)})
+        specific, common = EVB._load_output_files(E_file, data_file, options_file)
+        specific_results.update({'water': specific})
 
+        input_results.update(common)
+        input_results.update({"configuration_results": specific_results})
+
+
+        # EVB.load_initialisation(str(vac_folder), 'vacuum', skip_systems=True, skip_pdb=True)
+        # EVB.load_initialisation(str(water_folder), 'water', skip_systems=True, skip_pdb=True)
         # do data processing
         dp = EvbDataProcessing()
-        comp_results = dp.compute(results, 5, 10)
-        result_vac_comp = comp_results[list(results.keys())[0]]
-        result_water_comp = comp_results[list(results.keys())[1]]
+        
+        comp_results = dp.compute(input_results, 5, 10)
 
         # compare with final results
-        data_path = Path(__file__).parent / 'data'
-        result_vac_ref = EVB.load_result(data_path / "evb_RuVbdaO_Br_2_vacuum_data_26.h5")
-        result_water_ref = EVB.load_result(data_path / "evb_RuVbdaO_Br_2_water_data_26.h5")
-
-        assert TestEvb._compare_dict(result_vac_comp, result_vac_ref)
-        assert TestEvb._compare_dict(result_water_comp, result_water_ref)
+        reference_results = EVB._load_dict_from_h5(folder / "evb_reference_results.h5")
+        assert TestEvb._compare_dict(comp_results, reference_results)
+        

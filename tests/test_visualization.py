@@ -37,13 +37,15 @@ class TestVisualization:
         vis_drv = VisualizationDriver(task.mpi_comm)
 
         mo_coefs = mol_orbs.alpha_to_numpy()
-        vis_drv.compute(grid, task.molecule, task.ao_basis, mo_coefs, homo)
+        vis_drv.compute(grid, task.molecule, task.ao_basis, mo_coefs, homo,
+                        'alpha')
 
         points = [[0.3 + 1.0 * ix, 0.6 + 1.0 * iy, 0.9 + 1.0 * iz]
                   for ix in range(2)
                   for iy in range(3)
                   for iz in range(3)]
-        mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mo_coefs, homo)
+        mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mo_coefs,
+                                homo, 'alpha')
 
         if task.mpi_rank == mpi_master():
             homo_values = grid.values_to_numpy()
@@ -180,7 +182,7 @@ class TestVisualization:
 
         mo_coefs = mol_orbs.alpha_to_numpy()
         vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mo_coefs,
-                        task.molecule.number_of_alpha_electrons() - 1)
+                        task.molecule.number_of_alpha_electrons() - 1, 'alpha')
 
         if task.mpi_rank == mpi_master():
             read_grid = CubicGrid.read_cube(homo_cube_fname)

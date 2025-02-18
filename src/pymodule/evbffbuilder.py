@@ -53,8 +53,8 @@ class EvbForceFieldBuilder():
         self,
         reactant_input: dict,
         product_input: list[dict],
-        reactant_scf_result: dict,
-        product_scf_result: list[dict],
+        reactant_scf_result: dict | None = None,
+        product_scf_result: list[dict] | None | list[None]= None,
         reactant_charge: int = 0,
         product_charge: list[int] = [0],
         reactant_multiplicity: int = 1,
@@ -74,6 +74,9 @@ class EvbForceFieldBuilder():
         self.reactant.ostream.flush()
 
         products: list[ForceFieldGenerator] = []
+
+        if product_scf_result is None:
+            product_scf_result = [None] * len(product_input)
 
         for i, (input, scf_result) in enumerate(zip(product_input, product_scf_result)):
             products.append(

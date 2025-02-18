@@ -73,7 +73,7 @@ class TestOrbitalViewer:
         cubic_grid = CubicGrid(orbviewer.origin, orbviewer.stepsize,
                                orbviewer.npoints)
         vis_drv.compute(cubic_grid, mol, bas, orbviewer._mo_coefs,
-                        orbviewer._i_orb)
+                        orbviewer._i_orb, 'alpha')
 
         if scf_drv.rank == mpi_master():
             orbital_ref = cubic_grid.values_to_numpy()

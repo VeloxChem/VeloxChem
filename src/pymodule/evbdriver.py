@@ -533,7 +533,7 @@ class EvbDriver():
 
         return conf
 
-    def load_initialisation(self, data_folder: str, name: str, skip_systems = False):
+    def load_initialisation(self, data_folder: str, name: str, skip_systems = False, skip_pdb = False):
         """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
@@ -541,8 +541,8 @@ class EvbDriver():
             data_folder (str): The folder to load the data from
             name (str): The name of the configuration. Can be arbitrary, but should be unique.
             skip_systems (bool, optional): If set to true, the systems will not be loaded from the xml files. Used for debugging. Defaults to False.
+            skip_topology (bool, optional): If set to true, the topology will not be loaded from the pdb file. Used for debugging. Defaults to False.
         """
-        pdb = mmapp.PDBFile(f"{data_folder}/topology.pdb")
         with open(f"{data_folder}/options.json", "r") as file:
             options = json.load(file)
             temperature = options["temperature"]
@@ -556,16 +556,20 @@ class EvbDriver():
             "name": name,
             "data_folder": data_folder,
             "run_folder": f"{data_folder}/run",
-            "topology": pdb.getTopology(),
-            "initial_positions": pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers),
             "temperature": temperature,
-            "Lambda": Lambda,
+            "Lambda": Lambda
         }
         if not skip_systems:
             systems = self.load_systems_from_xml(f"{data_folder}/run")
             conf["systems"] = systems
         else:
             systems = []
+
+        if not skip_pdb:
+            pdb = mmapp.PDBFile(f"{data_folder}/topology.pdb")
+            conf["topology"] = pdb.getTopology()
+            conf["initial_positions"]  = pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers)
+        
 
         self.system_confs.append(conf)
         self.ostream.print_info(f"Initialised configuration with {len(systems)} systems, topology, initial positions, temperatue {temperature} and Lambda vector {Lambda} from {data_folder}")
@@ -666,7 +670,6 @@ class EvbDriver():
                 configuration=conf
             )
 
-
     def compute_energy_profiles(self, barrier, free_energy, lambda_sub_sample=1, lambda_sub_sample_ends=False, time_sub_sample=1):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
@@ -761,7 +764,7 @@ class EvbDriver():
             results.update({key: val})
         return results
 
-    def _load_output_files(self, E_file, data_file, options_file, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample):
+    def _load_output_files(self, E_file, data_file, options_file, lambda_sub_sample=1, lambda_sub_sample_ends=False, time_sub_sample=1):
         with open(options_file, "r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
