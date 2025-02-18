@@ -1,14 +1,9 @@
-import sys
+from mpi4py import MPI
+import numpy as np
 import typing
 import copy
 import math
-
-import numpy as np
-import openmm as mm
-import openmm.app as mmapp
-import openmm.unit as mmunit
-
-from mpi4py import MPI
+import sys
 
 from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom, Point
 from .veloxchemlib import mpi_master
@@ -17,6 +12,14 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .atomtypeidentifier import AtomTypeIdentifier
 from .solvationbuilder import SolvationBuilder
 from .molecule import Molecule
+from .errorhandler import assert_msg_critical
+
+try:
+    import openmm as mm
+    import openmm.app as mmapp
+    import openmm.unit as mmunit
+except ImportError:
+    pass
 
 
 class EvbSystemBuilder():
@@ -83,6 +86,8 @@ class EvbSystemBuilder():
         configuration: dict,
         constraints: list = []
     ):
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
         self.temperature = configuration.get("temperature", self.temperature)
         NPT = configuration.get("NPT", False)
@@ -240,6 +245,9 @@ class EvbSystemBuilder():
         return self.systems, self.topology, self.positions
 
     def _add_CNT_graphene(self, system, CNT: bool, Graphene: bool, nb_force, topology, system_mol, positions, box, graphene_size, CNT_radius):
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         if CNT and Graphene:
             raise ValueError("CNT and Graphene cannot be used simultaneously, pick one please")
 
@@ -463,6 +471,9 @@ class EvbSystemBuilder():
         return box
 
     def _add_solvent(self, system, system_mol, solvent, box, reactant, ion_count, topology, nb_force):
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         vlxsysbuilder = SolvationBuilder()
 
         box_volume: float = box[0]*box[1]*box[2]  # nm^3
@@ -769,6 +780,9 @@ class EvbSystemBuilder():
             )
 
     def _add_reaction_forces(self, system, lam, reference_state=False, lj_soft_core=False, coul_soft_core=False) -> mm.System:
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         reference_state = reference_state
 
         forces: list[mm.Force] = []
@@ -785,6 +799,9 @@ class EvbSystemBuilder():
         return system
 
     def _create_E_field(self, system, E_field):
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         E_field_force = mm.CustomExternalForce("-q*(Ex*x+Ey*y+Ez*z)")
         E_field_force.addGlobalParameter("Ex", E_field[0])
         E_field_force.addGlobalParameter("Ey", E_field[1])
@@ -796,6 +813,8 @@ class EvbSystemBuilder():
         return E_field_force
 
     def _create_bond_forces(self, lam, reference_state) -> list[mm.Force]:
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
         harmonic_force = mm.HarmonicBondForce()
         harmonic_force.setName("Reaction harmonic bond")
@@ -896,6 +915,9 @@ class EvbSystemBuilder():
         return [harmonic_force, morse_force, max_distance]
 
     def _create_angle_forces(self, lam: float) -> typing.List[mm.Force]:
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         harmonic_force = mm.HarmonicAngleForce()
         harmonic_force.setName("Reaction harmonic angle")
         angle_keys = list(set(self.reactant.angles) | set(self.product.angles))
@@ -918,6 +940,9 @@ class EvbSystemBuilder():
         return [harmonic_force]
 
     def _create_proper_torsion_forces(self, lam) -> typing.List[mm.Force]:
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         fourier_force = mm.PeriodicTorsionForce()
         fourier_force.setName("Reaction proper fourier torsion")
         RB_force = mm.RBTorsionForce()
@@ -943,6 +968,8 @@ class EvbSystemBuilder():
         return [fourier_force, RB_force]
 
     def _create_improper_torsion_forces(self, lam) -> typing.List[mm.Force]:
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
         fourier_force = mm.PeriodicTorsionForce()
         fourier_force.setName("Reaction improper fourier torsion")
@@ -1083,6 +1110,9 @@ class EvbSystemBuilder():
             return hard_core_expression
 
     def _create_nonbonded_forces(self, lam, lj_soft_core=False, coul_soft_core=False) -> typing.List[mm.Force]:
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         coulomb_force = mm.CustomBondForce(self._get_couloumb_expression(coul_soft_core))
         if coul_soft_core:
             coulomb_force.setName("Reaction internal coulomb")
@@ -1208,6 +1238,9 @@ class EvbSystemBuilder():
                 EvbSystemBuilder._add_exclusions_to_set(bonded12, exclusions, base_particle, i, current_level - 1)
 
     def _create_constraint_forces(self, lam, reference_state: bool) -> typing.List[mm.Force]:
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
+
         bond_constraint = mm.HarmonicBondForce()
         bond_constraint.setName("Bond constraint")
         angle_constraint = mm.HarmonicAngleForce()

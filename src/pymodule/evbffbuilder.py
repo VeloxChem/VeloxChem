@@ -1,6 +1,11 @@
+from mpi4py import MPI
+import numpy as np
+import networkx as nx
+import sys
+
+from .veloxchemlib import mpi_master
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
-
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .respchargesdriver import RespChargesDriver
@@ -9,14 +14,7 @@ from .xtbhessiandriver import XtbHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .reactionmatcher import ReactionMatcher
-
-import numpy as np
-import networkx as nx
-
-import sys
-from mpi4py import MPI
 from .outputstream import OutputStream
-from .veloxchemlib import mpi_master
 
 
 class EvbForceFieldBuilder():

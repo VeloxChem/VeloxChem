@@ -1,9 +1,18 @@
-import openmm.app as mmapp
-import openmm as mm
+from .errorhandler import assert_msg_critical
+
+try:
+    import openmm.app as mmapp
+    import openmm as mm
+except ImportError:
+    pass
+
 
 class EvbReporter():
     #todo do this with force groups instead of different systems
     def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, append = False):
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbReporter.')
+
         self.out = open(file, 'a' if append else 'w')
         self.report_interval = report_interval
         
@@ -29,6 +38,9 @@ class EvbReporter():
         return {'steps': steps, 'periodic': None, 'include':['positions','energy']}
 
     def report(self, simulation, state):
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbReporter.')
+
         positions = state.getPositions(asNumpy=True)
         E = [state.getPotentialEnergy().value_in_unit(mm.unit.kilocalories_per_mole)]
         for simulation in self.simulations:

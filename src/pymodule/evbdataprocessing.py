@@ -1,11 +1,22 @@
-import pymbar
-import numpy as np
-import scipy
-
-import sys
 from mpi4py import MPI
+from io import StringIO
+from contextlib import redirect_stderr
+import numpy as np
+import sys
+
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
+from .errorhandler import assert_msg_critical
+
+with redirect_stderr(StringIO()) as fg_err:
+    try:
+        import pymbar
+        import scipy
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        from matplotlib.lines import Line2D
+    except ImportError:
+        pass
 
 
 class EvbDataProcessing:
@@ -79,6 +90,9 @@ class EvbDataProcessing:
         return results
 
     def _fit_EVB_parameters(self):
+
+        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+
         reference_key = list(self.results.keys())[0]
 
         E1_ref = self.results[reference_key]["E1_ref"]
@@ -117,6 +131,9 @@ class EvbDataProcessing:
         return E2_shifted, V, dE, Eg
 
     def _calculate_dGfep(self, dE, Temp_set):
+
+        assert_msg_critical('pymbar' in sys.modules, 'pymbar is required for EvbDataProcessing.')
+
         de_lambda = self._bin(dE)
         dG_bar = [0.0]
         for i, l in enumerate(self.Lambda[:-1]):
@@ -206,6 +223,9 @@ class EvbDataProcessing:
         return dGevb, pns, dGcor
 
     def _get_free_energies(self, dGevb, fitting = False):
+
+        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+
         if fitting:
             dGevb_smooth = scipy.signal.savgol_filter(dGevb, self.smooth_window_size, self.smooth_polynomial_order)
         else:
@@ -325,6 +345,9 @@ class EvbDataProcessing:
 
     @staticmethod
     def _calculate_coordinate_bins(Lambda_indices, results, bin_size, dens_threshold):
+
+        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+
         dE_min = 0
         dE_max = 0
         for result in results.values():
@@ -380,18 +403,11 @@ class EvbDataProcessing:
                 ostream.print_info(f"{name:<30} {result['analytical']['barrier']:15.2f} {result['analytical']['free_energy']:15.2f}")
 
     @staticmethod
-    def _import_matplotlib():
-        try:
-            import matplotlib.pyplot as plt
-            import matplotlib.colors as mcolors
-            from matplotlib.lines import Line2D
-            return plt, mcolors, Line2D
-        except ImportError:
-            raise ImportError("Matplotlib is not installed, plotting is not possible.")
-
-    @staticmethod
     def plot_dE_density(results):
-        plt, mcolors, Line2D = EvbDataProcessing._import_matplotlib()
+
+        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+
+        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
 
         result_count = len(results["configuration_results"])
         coordinate_bins = results["coordinate_bins"]
@@ -476,9 +492,11 @@ class EvbDataProcessing:
 
     @staticmethod
     def plot_results(results, plot_analytical=True, plot_discrete=True):
+
+        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+
         coordinate_bins = results["coordinate_bins"]
         Lambda = results["Lambda"]
-        plt, mcolors, Line2D = EvbDataProcessing._import_matplotlib()
 
         fig, ax = plt.subplots(1, 2, figsize=(10, 4))
         bin_indicators = (coordinate_bins[:-1] + coordinate_bins[1:]) / 2
@@ -543,8 +561,10 @@ class EvbDataProcessing:
 
     @staticmethod
     def plot_evb_details(results):
+
+        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+
         result_count = len(results["configuration_results"])
-        plt, mcolors, Line2D = EvbDataProcessing._import_matplotlib()
         fig, ax = plt.subplots(1, result_count, figsize=(5 * result_count, 5))
         colors = mcolors.TABLEAU_COLORS
         coordinate_bins = results["coordinate_bins"]

@@ -1,24 +1,27 @@
-import sys
+from mpi4py import MPI
+from pathlib import Path
+import numpy as np
 import time
 import json
 import h5py
-from pathlib import Path
+import sys
 
-import numpy as np
-import openmm as mm
-import openmm.app as mmapp
-import openmm.unit as mmunit
-
-from mpi4py import MPI
-
+from .veloxchemlib import mpi_master
+from .molecule import Molecule
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
-
 from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
-from .veloxchemlib import mpi_master, Molecule
+from .errorhandler import assert_msg_critical
+
+try:
+    import openmm as mm
+    import openmm.app as mmapp
+    import openmm.unit as mmunit
+except ImportError:
+    pass
 
 
 class EvbDriver():
@@ -375,6 +378,9 @@ class EvbDriver():
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
+
         if Lambda is None:
             if not self.debug:
                 if self.fast_run:
@@ -543,6 +549,9 @@ class EvbDriver():
             skip_systems (bool, optional): If set to true, the systems will not be loaded from the xml files. Used for debugging. Defaults to False.
             skip_topology (bool, optional): If set to true, the topology will not be loaded from the pdb file. Used for debugging. Defaults to False.
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
+
         with open(f"{data_folder}/options.json", "r") as file:
             options = json.load(file)
             temperature = options["temperature"]
@@ -583,6 +592,9 @@ class EvbDriver():
             systems (dict): The systems to save
             folder (str): The folder relative to the current working directory to save the systems to.
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
+
         path = Path().cwd() / folder
         self.ostream.print_info(f"Saving systems to {path}")
         for lam in self.Lambda:
@@ -606,6 +618,9 @@ class EvbDriver():
         Returns:
             dict: The loaded systems
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
+
         systems = {}
         path = Path().cwd() / folder
         for lam in self.Lambda:

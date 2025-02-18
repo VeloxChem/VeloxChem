@@ -1,20 +1,20 @@
-import sys
-from pathlib import Path
-# from EVB.timer import Timer
-# from EVB.system_builder import System_builder
-
-import numpy as np
-import openmm as mm
-import openmm.app as mmapp
-import openmm.unit as mmunit
-
 from mpi4py import MPI
+from pathlib import Path
+import numpy as np
+import time
+import sys
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import EvbReporter
+from .errorhandler import assert_msg_critical
 
-import time
+try:
+    import openmm as mm
+    import openmm.app as mmapp
+    import openmm.unit as mmunit
+except ImportError:
+    pass
 
 
 class EvbFepDriver():
@@ -23,6 +23,8 @@ class EvbFepDriver():
         '''
         Initialize the EVB driver class.
         '''
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbFepDriver.')
 
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -59,6 +61,9 @@ class EvbFepDriver():
         Lambda,
         configuration
     ):
+
+        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbFepDriver.')
+
         systems = configuration["systems"]
         topology = configuration["topology"]
         temperature = configuration["temperature"]
