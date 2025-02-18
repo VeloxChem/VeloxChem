@@ -202,7 +202,7 @@ class PolarizabilityGradient:
 
         if self.numerical:
             # compute
-            self.compute_numerical(molecule, basis, self._scf_drv)
+            self.polgradient = self.compute_numerical(molecule, basis, self._scf_drv)
         else:
             # sanity checks linear response input
             if (self.rank == mpi_master()) and (lr_results is None):
@@ -213,7 +213,7 @@ class PolarizabilityGradient:
                 polgrad_sanity_check(self, self.flag, lr_results)
                 self._check_real_or_complex_input(lr_results)
             # compute
-            self.compute_analytical(molecule, basis, scf_tensors, lr_results)
+            self.polgradient = self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
             self.print_geometry(molecule)
@@ -225,6 +225,8 @@ class PolarizabilityGradient:
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+
+        return self.polgradient
 
     def compute_analytical(self, molecule, basis, scf_tensors, lr_results):
         """
@@ -535,8 +537,6 @@ class PolarizabilityGradient:
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
         if self.rank == mpi_master():
-            self.polgradient = dict(polgrad_results)
-
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += '{:d} frequencies: {:.6f} sec **'.format(
                 n_freqs, tm.time() - loop_start_time)
@@ -544,8 +544,9 @@ class PolarizabilityGradient:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            # TODO return dictionary with polgrad_results
-            #return dict(polgrad_results)
+            return polgrad_results
+        else:
+            return {}
 
     def compute_eri_contrib(self, molecule, basis, gs_dm, rel_dm_ao,
                                          x_plus_y, x_minus_y, local_atoms):
@@ -1192,20 +1193,17 @@ class PolarizabilityGradient:
         scf_drv.ostream.mute()
         lr_drv.ostream.mute()
 
-        # dictionary for results
-        polgrad_results = {}
-
         # construct polarizability gradient
         num_polgradient = self.construct_numerical_gradient(molecule, ao_basis, scf_drv, lr_drv)
-
-        if self.rank == mpi_master():
-            for f, w in enumerate(self.frequencies):
-                polgrad_results[w] = num_polgradient[f]
-            self.polgradient = dict(polgrad_results)
 
         # unmute the output streams
         scf_drv.ostream.unmute()
         lr_drv.ostream.unmute()
+
+        if self.rank == mpi_master():
+            return num_polgradient
+        else:
+            return {}
 
     def set_lr_driver(self):
         """
@@ -1657,6 +1655,9 @@ class PolarizabilityGradient:
         # timings
         loop_start_time = tm.time()
 
+        # dictionary for polarizability gradients
+        polgrad_results = {}
+
         for i in range(natm):
             for d in range(3):
                 coords[i, d] += self.delta_h
@@ -1711,17 +1712,23 @@ class PolarizabilityGradient:
                                     ) / (12.0 * self.delta_h))
                 else:
                     for f, w in enumerate(self.frequencies):
+                        tmp_polgradient = np.zeros((3, 3, 3 * natm), dtype=self.grad_dt)
                         for aop, acomp in enumerate('xyz'):
                             for bop, bcomp in enumerate('xyz'):
                                 key = (acomp, bcomp, w)
                                 if self.rank == mpi_master():
-                                    num_polgradient[f, aop, bop, 3 * i + d] = (
-                                        (lr_results_p1['response_functions'][key]
+                                    num_polgradient[f, aop, bop, 3 * i + d] = ((
+                                         lr_results_p1['response_functions'][key]
                                          -
                                          lr_results_m1['response_functions'][key]
                                          ) / (2.0 * self.delta_h))
 
         if self.rank == mpi_master():
+
+            # convert array to dict
+            for f, w in enumerate(self.frequencies):
+                polgrad_results[w] = num_polgradient[f]
+
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += '{:d} frequencies: {:.6f} sec **'.format(
                 n_freqs, tm.time() - loop_start_time)
@@ -1729,7 +1736,7 @@ class PolarizabilityGradient:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return num_polgradient
+        return polgrad_results
 
     def _init_dft(self, molecule, scf_tensors):
         """
