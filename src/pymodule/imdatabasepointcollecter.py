@@ -24,38 +24,49 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
-from time import time
-from xml.dom import minidom
-import xml.etree.ElementTree as ET
 import numpy as np
+from pathlib import Path
+from sys import stdout
 import sys
+from time import time
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
+import random
+import re
 
+from contextlib import redirect_stderr
+from io import StringIO
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
+
+import openmm as mm
+import openmm.app as app
+import openmm.unit as unit
+from .molecule import Molecule
 from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
-from .molecule import Molecule
-from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
-from .mmforcefieldgenerator import MMForceFieldGenerator
-from .solvationbuilder import SolvationBuilder
-from .xtbdriver import XtbDriver
-from .scfdriver import ScfDriver
-from .scfrestdriver import ScfRestrictedDriver
-from .scfrestopendriver import ScfRestrictedOpenDriver
-from .scfunrestdriver import ScfUnrestrictedDriver
-from .optimizationdriver import OptimizationDriver
-from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
+from .forcefieldgenerator import ForceFieldGenerator
+from .solvationbuilder import SolvationBuilder
 
-try:
-    import openmm as mm
-    import openmm.app as app
-    import openmm.unit as unit
-except ImportError:
-    pass
+# Drivers
+from .scfrestdriver import ScfRestrictedDriver
+from .molecularbasis import MolecularBasis
+from .scfgradientdriver import ScfGradientDriver
+from .scfhessiandriver import ScfHessianDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
+from .xtbhessiandriver import XtbHessianDriver
+# from .externalqmdriver import ExternalQMDriver
+# from .externalqmgradientdriver import ExternalQMGradientDriver
+# from .externalqmhessiandriver import ExternalQMHessianDriver
+from .interpolationdriver import InterpolationDriver
+from .interpolationdatapoint import InterpolationDatapoint
 
 
-class OpenMMDynamics:
+
+class IMDatabasePointCollecter:
     """
     Implements the OpenMMDynamics.
     Performs classical MD and QM/MM simulations.
@@ -90,8 +101,7 @@ class OpenMMDynamics:
         - molecule: The VeloxChem molecule object.
         - unique_residues: The list of unique residues in the system.
         - unique_molecules: The list of unique molecules in the system.
-        - qm_driver: The VeloxChem driver object. Options are XtbDriver or an ScfDriver.
-        - basis: The basis set for the QM region if an SCF driver is used.
+        - qm_driver: The VeloxChem driver object. Options are XtbDriver and InterpolationDriver.
         - grad_driver: The VeloxChem gradient driver object.
         - qm_atoms: The list of atom indices for the QM region.
         - mm_subregion: The list of atom indices for the MM subregion (part of a molecule).
@@ -106,18 +116,14 @@ class OpenMMDynamics:
         """
         Initializes the class with default simulation parameters.
         """
-
-        assert_msg_critical(
-            'openmm' in sys.modules,
-            'OpenMM is required for OpenMMDynamics.')
-
+        np.set_printoptions(threshold=sys.maxsize)
         # MPI and output stream
         if comm is None:
             comm = MPI.COMM_WORLD
 
         if ostream is None:
             if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
+                ostream = OutputStream(stdout)
             else:
                 ostream = OutputStream(None)
 
@@ -131,17 +137,18 @@ class OpenMMDynamics:
 
         # Instance variables
         # Simulation parameters
-        self.platform = 'reference'
-        self.ensemble = 'NVE'
-        self.temperature = 298.15 
-        self.friction = 1.0 
-        self.timestep = 2.0
-        self.nsteps = 1000
+        self.platform = None
+        self.ensemble = None
+        self.temperature = None
+        self.friction = None
+        self.timestep = None
+        self.nsteps = None
         self.parent_ff = 'amber03.xml'
         self.water_ff = 'spce.xml'
         self.box_size = 2.0 
         self.padding = 1.0
         self.cutoff = 1.0
+        self.scaling_factor = 0.0
         self.integrator = None
 
         # OpenMM objects
@@ -156,208 +163,91 @@ class OpenMMDynamics:
 
         # VeloxChem objects
         self.molecule = None
+        self.energy_gabs = {}
+        self.state_energies = {}
         self.unique_residues = []
         self.unique_molecules = []
 
+        self.current_im_choice = None
+        
         # QM Region parameters
         self.qm_driver = None
-        self.basis = None
         self.grad_driver = None
         self.qm_atoms = None
         self.mm_subregion = None
         self.linking_atoms = None
         self.qm_force_index = None
         self.driver_flag = None
+        self.swapped = False
+        self.state_swtiched = False
+        self.velo_switch = False
 
-        # QM stabilizer parameters
-        self.scaling_factor = 0.01
+        self.snapshots = None
+        self.load_system = None
+        self.pressure = None
+        self.output_file = None
+        self.adiabatic_basis = False
+        self.density_around_data_point = None
+        self.impes_drivers = None
+        self.im_labels = None
+        self.qm_energies = None
+        self.qm_data_points = None
+        self.point_adding_molecule = {}
+        self.energy_threshold = None
+        self.collect_qm_points = None
+        self.previous_energy_list = []
+        
+
+        self.qm_datafile = None
+
+        self.ff_datafile = None
+        self.starting_temperature = None
+
+        self.current_state = None
+        self.current_im_choice = None
+        self.current_gradient = 0
+        self.current_energy = 0
+        self.point_checker = 1
+        self.allowed_molecule_deviation = None
+        self.last_point_added = None
+        self.im_labels = []
+        self.add_a_point = False
+        self.check_a_point = False
+        self.cluster_run = None
+        self.skipping_value = 0
+        self.basis = None
+        self.molecule = None
+
+        # output_file variables that will be written into self.general_variable_output
+        self.gradients = None
+        self.velocities = None
+        self.coordinates = None
+        self.coordinates_xyz = None
+        self.molecules = []
+        self.all_gradients = []
+        
+        
+        self.summary_output = 'summary_output.txt'
+        with open(self.summary_output, 'w') as file:
+            file.write("########## Summaray Ouput of Structures and Energies ##########\n\n")
+        self.coordinates_xyz = None
+
+        self.velocities = []
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
-        
-    # Loading methods
-    # TODO: Integrate the guess with the read_pdb_file in Molecule.
-    def load_system_PDB(self, filename):
-        """
-        Loads a system from a PDB file, extracting unique residues and their details.
-
-        :param filename: 
-            Path to the PDB file. Example: 'system.pdb'.
-        """
-        
-        pdb_path = Path(filename)
-        if not pdb_path.is_file():
-            raise FileNotFoundError(f"{filename} does not exist.")
-        
-        pdbstr = pdb_path.read_text()
-        residues = {}
-
-        # Formatting issues flags
-        label_guess_warning = False
-        conect_warning = True
-
-        self.unique_residues = []  # Initialize unique_residues earlier
-
-        for line in pdbstr.strip().splitlines():
-            # Skip the header lines
-            if line.startswith(('REMARK', 'HEADER', 'TITLE', 'COMPND', 'SOURCE')):
-                continue
-            # Skip the CRYST1 record it will be extracted from the System object
-            if line.startswith('CRYST1'):
-                continue
-            # Add the ATOM and HETATM records to the residues dictionary
-            if line.startswith(('ATOM', 'HETATM')):
-                atom_label = line[76:78].strip()
-                if not atom_label:
-                    label_guess_warning = True
-                    atom_name = line[12:16].strip()
-                    atom_label = atom_name[0]
-
-                residue = line[17:20].strip()
-                residue_number = int(line[22:26])
-                coordinates = [float(line[i:i+8]) for i in range(30, 54, 8)]
-
-                residue_identifier = (residue, residue_number)
-
-                if residue_identifier not in residues:
-                    residues[residue_identifier] = {
-                        'labels': [],
-                        'coordinates': []
-                    }
-                
-                residues[residue_identifier]['labels'].append(atom_label)
-                residues[residue_identifier]['coordinates'].append(coordinates)
-            
-            # If a line starts with TER, skip it
-            if line.startswith('TER'):
-                continue
-            # If any line starts with CONECT, set the conect_warning flag to False
-            if line.startswith('CONECT'):
-                conect_warning = False
-
-            # If a line starts with END, break the loop
-            if line.startswith('END'):
-                break
-            
-
-        # Overwrite the PDB file with the guessed atom labels in columns 77-78
-        # if the labels are missing
-        if label_guess_warning:
-            with open(filename, 'w') as f:
-                for line in pdbstr.strip().splitlines():
-                    if line.startswith(('ATOM', 'HETATM')):
-                        atom_name = line[12:16].strip()
-                        atom_label = atom_name[0]
-                        new_line = line[:76] + f"{atom_label:>2}" + line[78:] + '\n'
-                        f.write(new_line)
-                    else:
-                        f.write(line + '\n')
-            msg = 'Atom labels were guessed based on atom names (first character).'
-            msg += f'Please verify the atom labels in the {filename} PDB file.'
-            self.ostream.print_warning(msg)
-            self.ostream.flush()
-
-        if conect_warning:
-            msg = 'CONECT records not found in the PDB file.'
-            msg += 'The connectivity matrix will be used to determine the bonds.'
-            self.ostream.print_warning(msg)
-            self.ostream.flush()
-            # Create a molecule from the PDB file
-            molecule = Molecule.read_pdb_file(filename)
-            connectivity_matrix = molecule.get_connectivity_matrix()
-            # Determine all the bonds in the molecule
-            with open(filename, 'a') as f:
-                for i in range(connectivity_matrix.shape[0]):
-                    for j in range(i + 1, connectivity_matrix.shape[1]):
-                        if connectivity_matrix[i, j] == 1:
-                            # Convert indices to 1-based index for PDB format and ensure proper column alignment
-                            i_index = i + 1
-                            j_index = j + 1
-                            # Align to the right 
-                            con_string = "{:6s}{:>5d}{:>5d}".format('CONECT', i_index, j_index)
-                            f.write(con_string + '\n')
-
-        # Create VeloxChem Molecule objects for each unique residue
-
-        molecules = []
-        unq_residues = []
-
-        for (residue, number), data in residues.items():
-            coordinates_array = np.array(data['coordinates'])
-            mol = Molecule(data['labels'], coordinates_array, "angstrom")
-            molecules.append(mol)
-            unq_residues.append((residue, number))
-
-
-        # Initialize a set to track the first occurrence of each residue name
-        seen_residue_names = set()
-
-        # Lists to store the filtered residues and molecules
-        self.unique_residues = []
-        self.unique_molecules = []
-
-        for index, (residue_name, number) in enumerate(unq_residues):
-            if residue_name not in seen_residue_names:
-                seen_residue_names.add(residue_name)
-                self.unique_residues.append((residue_name, number))
-                self.unique_molecules.append(molecules[index])
-
-        # Print results
-        info_msg = f"Unique Residues: {self.unique_residues}, saved as molecules."
-        self.ostream.print_info(info_msg)
-        self.ostream.flush()
-    
-    def load_system_from_files(self, system_xml, system_pdb):
-        """
-        Loads a preexisting system from an XML file and a PDB file.
-
-        :param system_xml: 
-            XML file containing the system parameters.
-        :param system_pdb: 
-            PDB file containing the system coordinates.
-        """
-        self.pdb = app.PDBFile(system_pdb)
-
-        with open(system_xml, 'r') as file:
-            self.system = mm.XmlSerializer.deserialize(file.read())
-
-        self.phase = 'gas'
-        self.qm_atoms = []
-        self.qm_force_index = -1  # Initialize with an invalid index
-
-        # Iterate over all forces in the system to find the CustomExternalForce and detect QM atoms
-        for i, force in enumerate(self.system.getForces()):
-            if isinstance(force, mm.CustomExternalForce):
-                self.qm_force_index = i  # Set the index of the QM force
-                # Assuming that the particle indices are directly stored in the force
-                for j in range(force.getNumParticles()):
-                    # Get the actual particle index (usually force index and particle index are the same)
-                    index, parameters = force.getParticleParameters(j)
-                    self.qm_atoms.append(index)
-                msg = f"QM Atoms detected: {self.qm_atoms}"
-                self.ostream.print_info(msg)
-                self.ostream.flush()
-                break
-
-        if self.qm_force_index == -1:
-            msg = "No CustomExternalForce found, no QM atoms detected."
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        else:
-            msg = f"CustomExternalForce found at index {self.qm_force_index}."
-            self.ostream.print_info(msg)
-            self.ostream.flush()
             
     # Method to generate OpenMM system from VeloxChem objects
-    def create_system_from_molecule(self, 
-                             molecule, 
+    def system_from_molecule(self,
+                             molecule,
+                             z_matrix, 
                              ff_gen, 
                              solvent='gas', 
                              qm_atoms=None, 
                              filename='residue', 
                              residue_name='MOL'):
         """
-        Creates an OpenMM system from a VeloxChem molecule and a forcefield generator.
+        Generates an OpenMM system from a VeloxChem molecule and a forcefield generator.
         
         :param molecule:
             VeloxChem molecule object.
@@ -379,6 +269,7 @@ class OpenMMDynamics:
         self.molecule = molecule
         self.positions = molecule.get_coordinates_in_angstrom()
         self.labels = molecule.get_labels()
+        self.z_matrix = z_matrix
 
         # Options for the QM region if it's required.
         # TODO: Take this if else tree to a separate method.
@@ -415,6 +306,7 @@ class OpenMMDynamics:
         elif qm_atoms is None:
             ff_gen.write_openmm_files(filename, residue_name)
 
+        # TODO: Incorporate the SystemBuilder here to avoid using the Modeller.
         if solvent == 'gas':
             phase = 'gas'
             self.pdb = app.PDBFile(f'{filename}.pdb')     
@@ -422,18 +314,15 @@ class OpenMMDynamics:
             forcefield_files = [f'{filename}.xml']
 
         if solvent != 'gas':
-            # Solvate the molecule using the SolvationBuilder
+            # Solvate the molecule using the SystemBuilder
             phase = 'periodic'
-            sol_builder = SolvationBuilder()
-            sol_builder.steps = 10000
-            sol_builder.solvate(solute=molecule, 
+            sys_builder = SolvationBuilder()
+            sys_builder.solvate(solute=molecule, 
                                 solvent=solvent,
                                 padding=self.padding,
-                                equilibrate=True,
+                                equilibrate=True
                                 )
-            
-            sol_builder.write_openmm_files(solute_ff=ff_gen)
-            
+            #sys_builder.write_openmm_files(solute_ff=ff_gen)
             if solvent == 'spce':
                 self.water_ff = 'spce.xml'
                 forcefield_files = [f'{filename}.xml', self.parent_ff, self.water_ff]
@@ -448,7 +337,7 @@ class OpenMMDynamics:
                 solvent_ff = 'solvent_1.xml'
                 forcefield_files = [f'{filename}.xml', self.parent_ff, solvent_ff]
 
-            # Load the PDB from the SolvationBuilder
+            # Load the PDB from the SystemBuilder
             self.pdb = app.PDBFile('equilibrated_system.pdb')
 
         # Create the ForceField object        
@@ -468,7 +357,7 @@ class OpenMMDynamics:
         if qm_atoms:
             self.set_qm_mm_system(phase, 
                                   ff_gen)
-            self.qm_stabilizer(ff_gen)
+            # self.qm_stabilizer(ff_gen)
         
         # Write the system to a xml file (for debugging purposes)
         with open(f'{filename}_system.xml', 'w') as f:
@@ -496,234 +385,56 @@ class OpenMMDynamics:
         
         self.phase = phase
 
-    # Methods to build a custom system from a PDB file and custom XML files
-    def create_md_system_from_files(self, 
-                            pdb_file, 
-                            xml_file,
-                            filename='custom'):
+    def add_bias_force(self, atoms, force_constant, target):
         """
-        Creates a system from a PDB file containing multiple residues and custom XML files.
-        
-        :param system_pdb:
-            PDB file containing the system or a list of PDB files.
-        :param xml_file:
-            XML file containing the forcefield parameters or a list of XML files.
-        :param filename:
-            Base filename for output and intermediate files. Default is 'custom_system'.
-        """
-        
-        # Load the PDB file and format it correctly
-        # This method already prints the unique residues info!
-        self.load_system_PDB(pdb_file)
+        Method to add a biasing force to the system.
 
-        # Load the generated QM region topology and system PDB
-        self.pdb = app.PDBFile(pdb_file)
-        # Check if the system is periodic from the PDB file
-        if self.pdb.topology.getUnitCellDimensions() is not None:
-            periodic = True
-            msg = 'PBC detected from the PDB file.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        else:
-            periodic = False
-
-        # Combine XML files into a forcefield
-        xml_files = [xml_file] if isinstance(xml_file, str) else xml_file
-        msg = f'Added XML Files: {xml_files}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-
-        # Combine XML files into a forcefield
-        forcefield = app.ForceField(*xml_files, self.parent_ff, self.water_ff)
-
-        # Create the system with appropriate nonbonded settings
-        if periodic:
-            nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-            nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-            constraints = app.HBonds
-        else:
-            nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-            nonbondedCutoff = None
-            constraints = app.HBonds
-
-        # Check if nonbondedCutoff is defined before using it in createSystem
-        system_arguments = {
-            'nonbondedMethod': nonbondedMethod,
-            'constraints': constraints
-        }   
-        
-        if nonbondedCutoff is not None:
-            system_arguments['nonbondedCutoff'] = nonbondedCutoff
-
-        self.system = forcefield.createSystem(self.pdb.topology, 
-                                              **system_arguments)
-
-        # Save system to XML and PDB for inspection and reuse
-        with open(f'{filename}_system.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(self.system))
-            msg = f'System parameters written to {filename}_system.xml'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        with open(f'{filename}_system.pdb', 'w') as pdb_file:
-            app.PDBFile.writeFile(self.pdb.topology, 
-                                  self.pdb.positions, 
-                                  pdb_file)
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        self.phase = 'gas'
-
-    def create_qmmm_system_from_files(self, 
-                            pdb_file, 
-                            xml_file, 
-                            qm_residue, 
-                            ff_gen_qm=None, 
-                            qm_atoms='all', 
-                            filename='custom'):
-        """
-        Builds a QM/MM system from a PDB file containing multiple residues and custom XML files.
-        
-        :param pdb_file: 
-            PDB file containing the system.
-        :param xml_file: 
-            XML file containing the forcefield parameters. Can be a list of XML files.
-        :param qm_residue: 
-            Tuple containing the name and number of the QM residue. (e.g. ('MOL', 1))
-        :param ff_gen_qm: 
-            Optional custom forcefield generator for the QM region. If None, a new one will be created.
-        :param qm_atoms:
-            Options: 'all' or a list of atom indices for QM region.
-        :param filename: 
-            Base filename for output and intermediate files.
+        :param atoms:
+            List of atom indices to apply the force.
+        :param force_constant:
+            Force constant for the biasing force.
+        :param target:
+            Target equilibrium parameter (distance (nm), angle and torsion (deg))
         """
 
-        # Load the PDB file and format it correctly
-        self.load_system_PDB(pdb_file)
-
-        # Extracting the residue name and number for clarity and correct usage
-        qm_residue_name, qm_residue_number = qm_residue
-        qm_residue_index = self.unique_residues.index((qm_residue_name, qm_residue_number))
-        msg = f'QM Residue: {qm_residue_name}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-
-        qm_molecule = self.unique_molecules[qm_residue_index]
-
-        # Generate or use an existing forcefield generator for the QM region
-        if ff_gen_qm is None:
-            ff_gen_qm = MMForceFieldGenerator()
-            ff_gen_qm.create_topology(qm_molecule)
-
-        # Determine qm_atoms based on the QM residue
-        if qm_atoms == 'all':
-            msg = 'Full molecule as QM region'
+        if len(atoms) == 2:
+            msg = f'Adding stretch force between atoms {atoms[0]} and {atoms[1]} with force constant {force_constant}.'
             self.ostream.print_info(msg)
-            qm_atoms = list(range(qm_molecule.number_of_atoms()))
-            self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
-        elif isinstance(qm_atoms, list):
-            if qm_atoms == list(range(qm_molecule.number_of_atoms())): 
-                msg = 'Full molecule as QM region'
-                self.ostream.print_info(msg)
-                self._create_QM_residue(ff_gen_qm,
-                        qm_atoms, 
-                        filename=filename, 
-                        residue_name=qm_residue_name)
-            msg = 'QM/MM partition inside the molecule'
+            self.ostream.flush()
+            force = mm.CustomBondForce('0.5*k*(r-r0)^2')
+            force.addGlobalParameter('k', force_constant)
+            force.addGlobalParameter('r0', target)
+            force.addBond(atoms[0], atoms[1])
+            self.system.addForce(force)
+        elif len(atoms) == 3:
+            target_rad = target * np.pi / 180
+            msg = f'Adding bend force between atoms {atoms[0]}, {atoms[1]}, and {atoms[2]} with force constant {force_constant}.'
             self.ostream.print_info(msg)
-            qm_atoms = qm_atoms
-            self._create_QM_subregion(ff_gen_qm,
-                                      qm_atoms, 
-                                      qm_molecule, 
-                                      filename,
-                                      residue_name=qm_residue_name)
+            self.ostream.flush()
+            force = mm.CustomAngleForce('0.5*k*(theta-theta0)^2')
+            force.addGlobalParameter('k', force_constant)
+            force.addGlobalParameter('theta0', target_rad)
+            force.addAngle(atoms[0], atoms[1], atoms[2])
+            self.system.addForce(force)
+        elif len(atoms) == 4:
+            target_rad = target * np.pi / 180
+            msg = f'Adding torsion force between atoms {atoms[0]}, {atoms[1]}, {atoms[2]}, and {atoms[3]} with force constant {force_constant}.'        
+            self.ostream.print_info(msg)
+            self.ostream.flush()
+            force = mm.CustomTorsionForce('0.5*k*(theta-theta0)^2')
+            force.addGlobalParameter('k', force_constant)
+            force.addGlobalParameter('theta0', target_rad)
+            force.addTorsion(atoms[0], atoms[1], atoms[2], atoms[3])
+            self.system.addForce(force)
         else:
-            raise ValueError('Invalid value for qm_atoms. Please use "all" or a list of atom indices.')
-
-        # Load the generated QM region topology and system PDB
-        self.pdb = app.PDBFile(pdb_file)
-
-        # Check if the system is periodic from the PDB file
-        if self.pdb.topology.getUnitCellDimensions() is not None:
-            periodic = True
-            msg = 'PBC detected from the PDB file.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        # Get self.positions from the topology
-        self.positions = self.pdb.positions
-
-        # Combine XML files into a forcefield
-        xml_files = [f'{filename}.xml'] + ([xml_file] if isinstance(xml_file, str) else xml_file)
-        msg = f'Added XML Files: {xml_files}'
-        self.ostream.print_info(msg)
-        self.ostream.flush()
-
-        # Combine XML files into a forcefield
-        forcefield = app.ForceField(*xml_files)
-
-        # Create the system with appropriate nonbonded settings
-        if periodic:
-            nonbondedMethod = app.PME  # Particle Mesh Ewald method for periodic systems
-            nonbondedCutoff = self.cutoff * unit.nanometer  # Assuming self.cutoff is defined elsewhere appropriately
-            constraints = app.HBonds
-        else:
-            nonbondedMethod = app.NoCutoff  # No cutoff for non-periodic systems
-            nonbondedCutoff = None
-            constraints = app.HBonds
-
-        # Check if nonbondedCutoff is defined before using it in createSystem
-        system_arguments = {
-            'nonbondedMethod': nonbondedMethod,
-            'constraints': constraints
-        }   
-
-        if nonbondedCutoff is not None:
-            system_arguments['nonbondedCutoff'] = nonbondedCutoff
-
-        self.system = forcefield.createSystem(self.pdb.topology, **system_arguments)
-
-        # Set QM atoms based on the QM residue
-        #self.qm_atoms = [atom.index for atom in self.pdb.topology.atoms() if (atom.residue.name == qm_residue_name and atom.residue.id == str(qm_residue_number))]
-        self.qm_atoms = qm_atoms
-
-        # Setting QM/MM system
-        self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
-
-        # Adding the stabilizer force to the QM region
-        self.qm_stabilizer(ff_gen_qm)
-
-        # Save system to XML and PDB for inspection and reuse
-        with open(f'{filename}_system.xml', 'w') as f:
-            f.write(mm.XmlSerializer.serialize(self.system))
-            msg = f'System parameters written to {filename}_system.xml'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        with open(f'{filename}_system.pdb', 'w') as pdb_file:
-            app.PDBFile.writeFile(self.pdb.topology, self.pdb.positions, pdb_file)
-            msg = f'System coordinates written to {filename}_system.pdb'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-
-        # Correct phase setting
-        self.phase = 'gas'
-
-    # Simulation methods
+            raise ValueError('Invalid number of atoms for the biasing force.')
+     
     def conformational_sampling(self, 
                                 ensemble='NVT', 
                                 temperature=700, 
                                 timestep=2.0, 
                                 nsteps=10000, 
                                 snapshots=10,
-                                lowest_conformations=None,
-                                qm_driver=None,
-                                basis=None,
-                                constraints=None,
                                 minimize=True):
 
         """
@@ -739,413 +450,279 @@ class OpenMMDynamics:
             Number of steps in the simulation. Default is 1000.
         :param snapshots:
             The number of snapshots to save. Default is 10.
-        :param lowest_conformations:
-            Number of lowest energy conformations to save. Default is None.
-        :param qm_minimization:
-            QM driver object for energy minimization. Default is None.
-        :param basis:
-            Basis set for the SCF driver if qm_driver is not None.
-        :param constraints:
-            Constraints for the system. Default is None.
-        :param minimize:
-            If True, the energy of the conformations will be minimized. Default is True.
+
 
         :return:
-            energies: List of potential energies of the conformations.
-            opt_coordinates: List of XYZ format strings of the minimized coordinates.
-        """
+            Tuple containing the minimized potential energies and the XYZ format strings of the relaxed coordinates.
 
+        """
         if self.system is None:
-            raise RuntimeError('System has not been created! First create a system using the appropriate method.')
+            raise RuntimeError('System has not been created!')
+        if self.molecule is None:
+            raise RuntimeError('Molecule object does not exist!')
 
         self.ensemble = ensemble
         self.temperature = temperature * unit.kelvin
+
         self.timestep = timestep * unit.femtosecond
         self.nsteps = nsteps
 
         self.integrator = self._create_integrator()
-        topology = self.pdb.topology
-        self.positions = self.pdb.positions
+        topology = self.modeller.topology if self.phase in ['water', 'periodic'] else self.pdb.topology
+        self.positions = self.modeller.positions if self.phase in ['water', 'periodic'] else self.pdb.positions
 
         self.simulation = app.Simulation(topology, self.system, self.integrator)
         self.simulation.context.setPositions(self.positions)
         self.simulation.context.setVelocitiesToTemperature(self.temperature)
 
-        if self.molecule is None:
-            if len(self.unique_molecules) > 1:
-                # There are several residues in the system, print a warning because the conformational sampling may not be meaningful
-                warning_msg = 'You are using a PDB file to run the simulation. The coordinates saved will correspond to the whole PDB file.'
-                warning_msg += 'Make sure you have one residue in your PDB file or the results may not be meaningful.'
-                self.ostream.print_warning(warning_msg)
-                self.ostream.flush()
-            # This is the case where the user has not created a molecule object and used files to create the system.
-            self.labels = [atom.element.symbol for atom in self.pdb.topology.atoms()]
-
-        # Determine the frequency of saving depending on the number of snapshots.
-        save_freq = max(nsteps // snapshots, 1)
+        save_freq = nsteps // snapshots if snapshots else nsteps
         energies = []
         opt_coordinates = []
 
         for step in range(nsteps):
             self.simulation.step(1)
-
             if step % save_freq == 0:
                 state = self.simulation.context.getState(getPositions=True, getEnergy=True)
                 energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
                 coordinates = state.getPositions()
-                self.simulation.context.setPositions(coordinates)
+                self.simulation.context.setPositions(coordinates) 
 
                 if minimize:
-                    self.ostream.print_info(f'Step: {step}, Potential energy: {energy}')
-                    self.ostream.flush()
+
+                    print(f'Step: {step}, Potential energy: {energy}')
                     self.simulation.minimizeEnergy()
                     minimized_state = self.simulation.context.getState(getPositions=True, getEnergy=True)
                     minimized_energy = minimized_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
                     minimized_coordinates = minimized_state.getPositions()
 
-                    # Create a xyz with the minimized coordinates
                     energies.append(minimized_energy)
-                    self.ostream.print_info(f'Minimized energy: {minimized_energy}')
-                    self.ostream.flush()
+                    print(f'Minimized energy: {minimized_energy}')
                     xyz = f"{len(self.labels)}\n\n"
                     for label, coord in zip(self.labels, minimized_coordinates):
-                        xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
-                    self.ostream.print_info(f'Saved coordinates for step {step}')
-                    self.ostream.flush()
+                        xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  # Convert nm to Angstroms
+                    print('Saved coordinates for step', step)
                     opt_coordinates.append(xyz)
 
-                else:
-                    # Create a xyz with the coordinates
-                    self.ostream.print_info(f'Step: {step}, Potential energy: {energy}')
-                    self.ostream.flush()
-                    self.ostream.print_info(f'Energy of the conformation: {energy}')
-                    self.ostream.flush()
-                    xyz = f"{len(self.labels)}\n\n"
-                    for label, coord in zip(self.labels, coordinates):
-                        xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
-                    opt_coordinates.append(xyz)
-                    energies.append(energy)
-                    self.ostream.print_info(f'Saved coordinates for step {step}')
+                # Create a xyz with the coordinates
+                print('Energy of the conformation:', energy)
+                xyz = f"{len(self.labels)}\n\n"
+                for label, coord in zip(self.labels, coordinates):
+                    xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
+                opt_coordinates.append(xyz)
+                energies.append(energy)
+                print('Saved coordinates for step', step)
 
-        self.ostream.print_info('Conformational sampling completed!')
-        self.ostream.print_info(f'Number of conformations: {len(opt_coordinates)}')
-        self.ostream.flush()
+        print('Conformational sampling completed!')
+        print(f'Number of conformations: {len(opt_coordinates)}')
 
-        if lowest_conformations:
-            msg = f'Looking for the {lowest_conformations} lowest energy conformations.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+        return energies, opt_coordinates
 
-            # Filter out the conformations with RMSD < 0.1 and keep the lowest energy one.
+    def sort_points_with_association(self, points, associated_list):
+        '''
+        This function is sorting the points from a given database
+        starting from the first entry to the last (point_0,..., point_n)
 
-            for i, coord in enumerate(opt_coordinates):
-                molecule = Molecule.from_xyz_string(coord)
-                molecule_coords = molecule.get_coordinates_in_angstrom()
-                energy = energies[i]
-                for j, coord2 in enumerate(opt_coordinates):
-                    if i != j:
-                        molecule2 = Molecule.from_xyz_string(coord2)
-                        molecule2_coords = molecule2.get_coordinates_in_angstrom()
-                        rmsd = self._calculate_rmsd(molecule_coords, molecule2_coords)
-                        if rmsd < 0.1:
-                            if energies[j] < energy:
-                                energies[i] = energies[j]
-                                opt_coordinates[i] = opt_coordinates[j]
+        :param points:
+            list of database points
+        :param associated_list:
+            list of labels that are associated to the individual datapoints
 
-            energies = sorted(energies)[:lowest_conformations]
-            opt_coordinates = opt_coordinates[:lowest_conformations]
+        '''
+        
+        # Define a custom key function to extract the numerical part
+        def extract_number(point):
+            return int(point.split('_')[1])
+
+        # Combine the points and associated list into tuples
+        combined = list(zip(points, associated_list))
+
+        # Sort the combined list using the custom key function
+        sorted_combined = sorted(combined, key=lambda x: extract_number(x[0]))
+
+        # Unzip the sorted combined list back into two lists
+        sorted_points, sorted_associated_list = zip(*sorted_combined)
+
+        return list(sorted_points), list(sorted_associated_list)
+    
+    
+    def update_settings(self, dynamics_settings, impes_dict=None):
+        """
+        Updates settings in the ImpesDynamicsDriver.
+        :param molecule:
+            The Molecule object.
+        :param impes_dict:
+            The input dictionary of settings for IMPES.
+        """
+
+        assert_msg_critical(
+        dynamics_settings['qm_driver'] is not None or dynamics_settings['grad_driver'] is not None or dynamics_settings['hess_driver'] is not None,
+        'dynamics_settings: Not all drivers (energy, gradient, hessian) are defined please add the missing driver/s in settings.')
+
+        self.qm_driver = dynamics_settings['qm_driver']
+        self.grad_driver = dynamics_settings['grad_driver']
+        self.hess_driver = dynamics_settings['hess_driver']
+
+        self.qm_driver.ostream.mute()
+        self.impes_dict = impes_dict
+
+
+        if 'print_step' in dynamics_settings:
+            self.print_step = int(dynamics_settings['print_step'])
+
+        if 'duration' in dynamics_settings:
+            self.duration = float(dynamics_settings['duration'])
+
+        if 'temperature' in dynamics_settings:
+            self.temperature = dynamics_settings['temperature']
+            self.starting_temperature = dynamics_settings['temperature']
+
+        if 'pressure' in dynamics_settings:
+            self.pressure = float(dynamics_settings['pressure'])
+
+        if 'force_constant' in dynamics_settings:
+            self.force_constant = float(dynamics_settings['force_constant'])
+
+        if 'friction' in dynamics_settings:
+            self.friction = float(dynamics_settings['friction'])
+
+        if 'timestep' in dynamics_settings:
+            self.timestep = float(dynamics_settings['timestep'])
+
+        if 'nsteps' in dynamics_settings:
+            self.nsteps = int(dynamics_settings['nsteps'])
+
+        if 'snapshots' in dynamics_settings:
+            self.snapshots = int(dynamics_settings['snapshots'])
+
+        # Start the simulation form a given state
+        if 'load_system' in dynamics_settings:
+            self.load_system = dynamics_settings['load_system']
+
+        if 'trajectory_file' in dynamics_settings:
+            self.out_file = dynamics_settings['trajectory_file']
+        else:
+            self.out_file = 'trajectory.pdb'
+
+        # Determines the ensemble in order to set the correct simulation set_up
+        if 'ensemble' in dynamics_settings:
+            self.ensemble = dynamics_settings['ensemble']
+        
+        if 'FF_datafile' in dynamics_settings:
+            self.ff_datafile = dynamics_settings['FF_datafile']
+
+        #################################### DATABASE construciton inputs #############################
+
+        if 'imforcefield_file' in impes_dict:
+            self.qm_datafile = impes_dict['imforcefield_file']
+
+        # The desired density around a given starting structure/datapoint
+        if 'desired_datapoint_density' in dynamics_settings:
+            self.desired_datpoint_density = int(dynamics_settings['desired_datapoint_density'])
+
+        # The number of iteration cycles without database expansion after which the description around the reference point has converged
+        if 'converged_cycle' in dynamics_settings:
+            self.unadded_cycles = int(dynamics_settings['converged_cycle'])
+        
+        if 'basis_set' in dynamics_settings:
+            basis_label = dynamics_settings['basis_set']
+            self.basis = MolecularBasis.read(self.molecule, basis_label)
+        
+        if 'xc_fun' in dynamics_settings:
+            self.qm_driver.xcfun = dynamics_settings['xc_fun']
+
+        # Dertermines if non-adiabatic couplings should be calculated
+        if 'NAC' in dynamics_settings:
+            self.calc_NAC = dynamics_settings['NAC']
+        else:
+            self.calc_NAC = False
+
+        if 'ADT' in dynamics_settings:
+            self.adiabatic_basis = True
+
+        if 'cluster_run' in dynamics_settings:
+            self.cluster_run = dynamics_settings['cluster_run']
+        # TODO: these need to be different dictionary entries
+        if 'collect_qm_points_from' in dynamics_settings:
+            self.collect_qm_points = dynamics_settings['collect_qm_points_from']
+
+        # time step at which QM data point collection should start
+        if 'qmc_start' in dynamics_settings:
+            self.qmc_start = float(dynamics_settings["qmc_start"])
+            # To prevent collecting points before qmc_start,
+            # set collect_qm_points to False
+            self.collect_qm_points = False
+
+        # time step at which QM data point collection should stop
+        if 'qmc_stop' in dynamics_settings:
+            self.qmc_stop = float(dynamics_settings["qmc_stop"])
+
+        # index of the excited state (in case of TDDFT QM data points)
+        if "excited_state_index" in dynamics_settings:
+            self.excited_state_index = int(dynamics_settings["excited_state_index"])
+
+        # keywords used to reverse the dynamics
+        # to a previous iteration.
+        if 'reverse' in dynamics_settings:
+            self.reverse = True
+        else:
+            self.reverse = False
+
+        # how many iterations to reverse
+        if 'reverse_by' in dynamics_settings:
+            self.reverse_by = int(dynamics_settings['reverse_by'])
+            self.reverse = True
+        
+        if 'energy_threshold' in dynamics_settings:
+            self.energy_threshold = dynamics_settings['energy_threshold']
+
+        # threshold to determine if a bond is breaking
+        if 'bond_threshold' in dynamics_settings:
+            self.bond_threshold = float(dynamics_settings['bond_threshold'])
+        
+        if 'symmetry_groups' in impes_dict:
+            self.non_core_symmetry_groups = impes_dict['symmetry_groups']
+
+        if self.qm_datafile is None:
+
+            #positions_ang = self.molecule.get_coordinates()
+            #atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
+            #qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
+            #new_molecule = Molecule(qm_atom_labels, positions_ang, units="au")
+            new_molecule = self.molecule
+            self.qm_data_points = []
+            qm_energy, scf_tensors = self.compute_energy(new_molecule, basis=self.basis)
             
-            msg = 'Lowest energy conformations saved'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
+            self.im_labels = []
+            self.qm_energies = []
+            self.qm_datafile = 'IMDatabase.h5'
+            label_list = f'point_{0}'
+            self.add_point(new_molecule, label_list, qm_energy, self.qm_datafile, self.basis, scf_results=scf_tensors)
 
-        if qm_driver:
-            # Use qm_miniization to minimize the energy of the conformations
-            # Name flag based on if is instance of the XtbDriver or ScfDriver
-            if isinstance(qm_driver, XtbDriver):
-                drv_name = 'XTB Driver'
-            elif isinstance(qm_driver, ScfRestrictedDriver):
-                drv_name = 'RSCF Driver'
-            elif isinstance(qm_driver, ScfUnrestrictedDriver):
-                drv_name = 'USCF Driver'
-            elif isinstance(qm_driver, ScfRestrictedOpenDriver):
-                drv_name = 'ROSCF Driver'
-
-            if drv_name != 'XTB Driver' and basis is None:
-                raise ValueError('Basis set is required for the SCF driver.')
-
-            msg = f'Requested QM minimization with {drv_name}'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            qm_energies = []
-            qm_opt_coordinates = []
-            for conf , coords in enumerate(opt_coordinates):
-                self.ostream.print_info(f'Conformation {conf}')
-                self.ostream.flush()
-                molecule = Molecule.from_xyz_string(coords)
-                qm_energy, qm_coords = self.qm_minimization(molecule, basis, qm_driver, constraints)
-                qm_energies.append(qm_energy)
-                qm_opt_coordinates.append(qm_coords)
-                msg = f'Energy of the conformation: {qm_energy}'
-                self.ostream.print_info(msg)
-                self.ostream.flush()
-
-            energies = qm_energies
-            opt_coordinates = qm_opt_coordinates
-
-        # Convert the opt_coordinates to molecule objects
-
-        opt_molecules = [Molecule.from_xyz_string(coords) for coords in opt_coordinates]
-
-        return energies, opt_molecules
-
-    def run_md(self, 
-               restart_file=None,
-               ensemble='NVE',
-               temperature=298.15, 
-               pressure=1.0, 
-               friction=1.0,
-               timestep=2.0, 
-               nsteps=1000, 
-               snapshots=100, 
-               traj_file='trajectory.pdb',
-               state_file='output.xml',
-               save_last_frame=True,
-               output_file='output'):
-        """
-        Runs an MD simulation using OpenMM, storing the trajectory and simulation data.
-
-        :param restart_file:
-            Last state of the simulation to restart from. Default is None.
-        :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVE'.
-        :param temperature:
-            Temperature of the system in Kelvin. Default is 298.15 K.
-        :param pressure:
-            Pressure of the system in atmospheres. Default is 1.0 atm.
-        :param friction:
-            Friction coefficient in 1/ps. Default is 1.0.
-        :param timestep:
-            Timestep of the simulation in femtoseconds. Default is 2.0 fs.
-        :param nsteps:
-            Number of steps in the simulation. Default is 1000.
-        :param snapshots:
-            Frequency of snapshots. Default is 100.
-        :param traj_file:
-            Output file name for the trajectory. Default is 'trajectory.pdb'.
-        :param state_file:
-            Output file name for the simulation state. Default is 'output.xml'.
-        """
-
-        if self.system is None:
-            raise RuntimeError('System has not been created!')
-
-        self.ensemble = ensemble
-        self.temperature = temperature * unit.kelvin
-        self.friction = friction / unit.picosecond
-        self.timestep = timestep * unit.femtoseconds
-        self.nsteps = nsteps
-
-        self.total_potentials = []
-        self.kinetic_energies = []
-        self.temperatures = []
-        self.total_energies = []
-
-
-        # Create or update the integrator
-        if self.integrator is None:
-            new_integrator = self._create_integrator()
-        else:
-            new_integrator = self.integrator
-
-        self.topology = self.pdb.topology
-        
-        self.positions = self.pdb.positions
-        
-        self.simulation = app.Simulation(self.topology, self.system, new_integrator)
-
-        self.simulation.context.setPositions(self.positions)
-        
-        # Load the state if a restart file is provided
-        if restart_file is not None:
-            self.simulation.loadState(restart_file)
-            msg = f'Restarting simulation from {restart_file}'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-        
-        else:
-            self.simulation.context.setPositions(self.positions)
-
-            # Set initial velocities if the ensemble is NVT or NPT
-            if self.ensemble in ['NVT', 'NPT']:
-                self.simulation.context.setVelocitiesToTemperature(self.temperature)
-
-        # Minimize the energy before starting the simulation
-        self.simulation.minimizeEnergy()
-
-        # Set up reporting
-        save_freq = max(nsteps // snapshots, 1)
-        self.simulation.reporters.clear()  
-        self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
-
-        # Print header
-        print('MD Simulation parameters:')
-        print('=' * 50)
-        print('Ensemble:', ensemble)
-        if ensemble in ['NVT', 'NPT']:
-            print('Temperature:', temperature, 'K')
-            if ensemble == 'NPT':
-                print('Pressure:', pressure, 'atm')
-        print('Friction:', friction, '1/ps')
-        print('Timestep:', timestep, 'fs')
-        print('Total simulation time in ns:', nsteps * timestep / 1e6)
-        print('=' * 50)
-
-
-        start_time = time()
-        for step in range(nsteps):
-            self.simulation.step(1)
-            if step % save_freq == 0:
-                state = self.simulation.context.getState(getEnergy=True)
-                print(f"Step: {step} / {nsteps} Time: {round((step * timestep)/1000, 2)} ps")
-
-                # Potential energy
-                pot = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                print('Potential Energy', pot, 'kJ/mol')
-                self.total_potentials.append(pot)
-
-                # Kinetic energy
-                kin = state.getKineticEnergy().value_in_unit(unit.kilojoules_per_mole)
-                print('Kinetic Energy:', kin, 'kJ/mol')
-                self.kinetic_energies.append(kin)
-
-                # Temperature
-                dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
-                if hasattr(self.integrator, 'computeSystemTemperature'):
-                    temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
-                else:
-                    temp = (2*state.getKineticEnergy()/(dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin) 
-
-                self.temperatures.append(temp)
-                print('Temperature:', temp, 'K')
-
-                # Total energy
-                total = pot + kin
-                self.total_energies.append(total)
-                print('Total Energy:', total, 'kJ/mol')
-                print('-' * 60)
-
-
-        end_time = time()
-        elapsed_time = end_time - start_time
-        elapsed_time_days = elapsed_time / (24 * 3600)
-        performance = (nsteps * timestep / 1e6) / elapsed_time_days
-
-        print('MD simulation completed!')
-        print(f'Number of steps: {nsteps}')
-        print(f'Trajectory saved as {traj_file}')
-        print('=' * 60)
-        print('Simulation Averages:')
-        print('=' * 60)
-        print('Total Potential Energy:', np.mean(self.total_potentials), '±', np.std(self.total_potentials), 'kJ/mol')
-        print('Kinetic Energy:', np.mean(self.kinetic_energies), '±', np.std(self.kinetic_energies), 'kJ/mol')
-        print('Temperature:', np.mean(self.temperatures), '±', np.std(self.temperatures), 'K')
-        print('Total Energy:', np.mean(self.total_energies), '±', np.std(self.total_energies), 'kJ/mol')
-        print('=' * 60)
-        print(f'Elapsed time: {int(elapsed_time // 60)} minutes, {int(elapsed_time % 60)} seconds')
-        print(f'Performance: {performance:.2f} ns/day')
-        print(f'Trajectory saved as {traj_file}')
-
-        # Save the state of the simulation
-        self.simulation.saveState(state_file)
-        print(f'Simulation state saved as {state_file}')
-
-        if save_last_frame:
-            # Save the last frame of the trajectory as last_frame.pdb
-            with open('last_frame.pdb', 'w') as f:
-                app.PDBFile.writeFile(self.simulation.topology, self.simulation.context.getState(getPositions=True).getPositions(), f)
-            print('Last frame saved as last_frame.pdb')
-
-        # Write the output to a file
-        self._save_output(output_file)
-        self.ostream.print_info(f'Simulation output saved as {output_file}')
-        self.ostream.flush()
-
-    def run_qmmm(self, 
-                 qm_driver,
-                 grad_driver,
-                 basis = None,
-                 restart_file = None, 
-                 ensemble='NVE', 
-                 temperature=298.15, 
-                 pressure=1.0, 
-                 friction=1.0,
-                 timestep=0.5,
-                 nsteps=1000, 
-                 snapshots=100, 
-                 traj_file='trajectory.pdb',
-                 state_file='output.xml',
-                 output_file='output'):
+    
+    
+    def run_qmmm(self):
         """
         Runs a QM/MM simulation using OpenMM, storing the trajectory and simulation data.
 
-        :param qm_driver:
-            QM driver object from VeloxChem.
-        :param grad_driver:
-            Gradient driver object from VeloxChem.
-        :param basis:
-            Molecular basis string.
-        :param restart_file:
-            Last state of the simulation to restart from. Default is None.
-        :param ensemble:
-            Type of ensemble. Options are 'NVE', 'NVT', 'NPT'. Default is 'NVE'.
-        :param temperature:
-            Temperature of the system in Kelvin. Default is 298.15 K.
-        :param pressure:
-            Pressure of the system in atmospheres. Default is 1.0 atm.
-        :param friction:
-            Friction coefficient in 1/ps. Default is 1.0.
-        :param timestep:
-            Timestep of the simulation in femtoseconds. Default is 0.5 fs.
-        :param nsteps:
-            Number of steps in the simulation. Default is 1000.
-        :param snapshots:
-            Frequency of snapshots. Default is 100.
-        :param traj_file:
-            Output file name for the trajectory. Default is 'trajectory.pdb'.
-        :param state_file:
-            Output file name for the simulation state. Default is 'output.xml'.
         """
+
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
-        if basis is not None:
-            self.basis = basis
-
-        self.ensemble = ensemble
-        self.temperature = temperature * unit.kelvin
-        self.friction = friction / unit.picosecond
+        temperature = self.temperature
+        self.temperature = self.temperature * unit.kelvin
+        
+        friction = self.friction
+        self.friction = self.friction / unit.picosecond
+        
+        timestep = self.timestep
         self.timestep = timestep * unit.femtoseconds
-        self.nsteps = nsteps
-
-        self.qm_driver = qm_driver
-        self.grad_driver = grad_driver
-        self.qm_driver.ostream.mute()
 
         # Driver flag 
         if isinstance(self.qm_driver, XtbDriver):
             self.driver_flag = 'XTb Driver'
-        elif isinstance(self.qm_driver, ScfRestrictedDriver):
-            self.driver_flag = 'RSCF Driver'
-        elif isinstance(self.qm_driver, ScfUnrestrictedDriver):
-            self.driver_flag = 'USCF Driver'
-        elif isinstance(self.qm_driver, ScfRestrictedOpenDriver):
-            self.driver_flag = 'ROSCF Driver'
         elif isinstance(self.qm_driver, InterpolationDriver):
-            self.driver_flag = 'IM Driver'
-        
-        else:
-            raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
+            self.driver_flag = 'Impes Driver'
 
         self.qm_potentials = []
         self.qm_mm_interaction_energies = []
@@ -1154,9 +731,9 @@ class OpenMMDynamics:
         self.kinetic_energies = []
         self.temperatures = []
         self.total_energies = []
-        self.dynamic_molecules = []
-        
-        save_freq = nsteps // snapshots if snapshots else nsteps
+        self.coordinates_xyz = []
+
+        save_freq = self.nsteps // self.snapshots if self.snapshots else self.nsteps
 
         # Create or update the integrator
         if self.integrator is None:
@@ -1171,8 +748,8 @@ class OpenMMDynamics:
         self.simulation = app.Simulation(self.topology, self.system, new_integrator)
 
         # Load the state if a restart file is provided
-        if restart_file is not None:
-            self.simulation.loadState(restart_file)
+        if self.load_system is not None:
+            self.simulation.loadState(self.load_system)
         
         else:
             self.simulation.context.setPositions(self.positions)
@@ -1180,37 +757,72 @@ class OpenMMDynamics:
             # Set initial velocities if the ensemble is NVT or NPT
             if self.ensemble in ['NVT', 'NPT']:
                 self.simulation.context.setVelocitiesToTemperature(self.temperature)
-            else:
-                self.simulation.context.setVelocitiesToTemperature(10 * unit.kelvin)
-
-        # There is no minimization step for QM/MM simulations
-        # It causes instabilities in the MM region!
         
         # Set up reporting
         self.simulation.reporters.clear()
-        self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
-        
+        self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
+
         # Print header
         print('QM/MM Simulation Parameters')
         print('=' * 60)
         print('QM Driver:', self.driver_flag)
-        print('Ensemble:', ensemble)
+        print('Ensemble:', self.ensemble)
         print('Integration method:', new_integrator.__class__.__name__)
-        if ensemble in ['NVT', 'NPT']:
-            print('Temperature:', temperature, 'K')
-            if ensemble == 'NPT':
-                print('Pressure:', pressure, 'atm')
-        print('Friction:', friction, '1/ps')
-        print('Timestep:', timestep, 'fs')
-        print('Total simulation time in ns:', nsteps * timestep / 1e6)
+        if self.ensemble in ['NVT', 'NPT']:
+            print('Temperature:', self.temperature, 'K')
+            if self.ensemble == 'NPT':
+                print('Pressure:', self.pressure, 'atm')
+        print('Friction:', self.friction, '1/ps')
+        print('Timestep:', self.timestep, 'fs')
+        print('Total simulation time in ns:', self.nsteps * timestep / 1e6)
         print('=' * 60)
 
-        start_time = time()
+        # load datafile if there is one
+        impes_driver = InterpolationDriver(self.z_matrix)
+        impes_driver.update_settings(self.impes_dict)
+        self.im_labels, _ = impes_driver.read_labels()
+        print('beginning labels', self.im_labels)
+        if self.qm_data_points is None:
+           self.qm_data_points = []
+           self.qm_energies = []
+           for label in self.im_labels:
+               qm_data_point = InterpolationDatapoint(self.z_matrix)
+               qm_data_point.read_hdf5(self.qm_datafile, label)
+               self.qm_energies.append(qm_data_point.energy)
+               self.qm_data_points.append(qm_data_point)
 
-        for step in range(nsteps):
+        self.mover_along_path = 0
+        self.adjuster = 0
+        self.last_point_added = 0
+        self.cycle_iteration = self.unadded_cycles
+        
+        print('current datapoints around the given starting structure', self.desired_datpoint_density, self.density_around_data_point[0], self.density_around_data_point[1], '\n allowed derivation from the given structure', self.allowed_molecule_deviation, '\n ---------------------------------------')
+        self.allowed_molecules = []
+        self.molecules = []
+        self.coordinates = []
+        self.coordinates_xyz = []
+        self.gradients = []
+        self.velocities = []
+        self.velocities_np = []
+        self.velocities_np.append(self.simulation.context.getState(getVelocities=True).getVelocities(True))
+
+        self.impes_drivers = []
+        self.current_state = 0
+        driver_object = InterpolationDriver(self.z_matrix)
+
+        driver_object.update_settings(self.impes_dict)
+        self.impes_drivers.append(driver_object)
+        self.current_im_choice = self.impes_drivers[-1]
+    
+        self.FFlabels, self.qm_data_points = self.sort_points_with_association(self.im_labels, self.qm_data_points)
+
+        start_time = time()
+        self.step = 0 
+
+        for step in range(self.nsteps):
 
             self.update_forces(self.simulation.context)
-
+            
             # Potential energies
             # QM region
             qm = self.get_qm_potential_energy()
@@ -1228,28 +840,24 @@ class OpenMMDynamics:
             pot = qm * unit.kilojoules_per_mole + qm_mm + mm
             self.total_potentials.append(pot.value_in_unit(unit.kilojoules_per_mole))
 
-            # Kinetic energyex
-            
+            # Kinetic energy
             kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
             self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
 
             # Temperature
-            dof = self.system.getNumParticles() * 3 - self.system.getNumConstraints()
-            if hasattr(self.integrator, 'computeSystemTemperature'):
-                temp = self.integrator.computeSystemTemperature().value_in_unit(unit.kelvin)
-            else:
-                temp = (2 * kinetic / (dof * unit.MOLAR_GAS_CONSTANT_R)).value_in_unit(unit.kelvin)
+            R_kjmol = 0.00831446261815324
+            particles = self.system.getNumParticles() * 1.5
+            temp = kinetic.value_in_unit(unit.kilojoules_per_mole) / (particles * R_kjmol)
             self.temperatures.append(temp)
 
             # Total energy
             total = pot + kinetic
             self.total_energies.append(total.value_in_unit(unit.kilojoules_per_mole))
-
-
+                
             # Information output
             if step % save_freq == 0:
                 
-                print(f"Step: {step} / {nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
+                print(f"Step: {step} / {self.nsteps} Time: {round((step * timestep) / 1000, 2)} ps")
                 print('Potential Energy QM region:', qm, 'kJ/mol')
                 print('Potential Energy MM region:', mm)
                 print('QM/MM Interaction Energy:', qm_mm)
@@ -1257,18 +865,39 @@ class OpenMMDynamics:
                 print('Kinetic Energy:', kinetic)
                 print('Temperature:', temp, 'K')
                 print('Total Energy:', total)
-                print('-' * 60)   
+                print('-' * 60)
+                print('Current Density', self.density_around_data_point[0], '-->', self.desired_datpoint_density, self.unadded_cycles)   
 
+            self.output_file_writer(self.summary_output)
+            self.step += 1
+            if self.step == 5650:
+                print('both')
+                # exit()
             self.simulation.step(1)
+            if step % 100 == 0 and step != 0:
+                self.simulation.saveCheckpoint('checkpoint')
+                #self.output_file_writer(self.summary_output)
+                #print('cooridnates', simulation.context.getState(getPositions=True).getPositions())
+
+            if step == self.nsteps and self.density_around_data_point[0] != self.desired_datpoint_density:
+                step = 0
+            
+            if self.density_around_data_point[0] >= self.desired_datpoint_density:
+                step = self.nsteps
+                break
+
+            if self.unadded_cycles == 0:
+                step = self.nsteps
+                break
 
         end_time = time()
         elapsed_time = end_time - start_time
         elapsed_time_days = elapsed_time / (24 * 3600)
-        performance = (nsteps * timestep / 1e6) / elapsed_time_days
+        performance = (self.nsteps * timestep / 1e6) / elapsed_time_days
 
         print('QM/MM simulation completed!')
-        print(f'Number of steps: {nsteps}')
-        print(f'Trajectory saved as {traj_file}')
+        print(f'Number of steps: {self.nsteps}')
+        print(f'Trajectory saved as {self.out_file}')
         print('=' * 60)
         print('Simulation Averages:')
         print('=' * 60)
@@ -1282,16 +911,8 @@ class OpenMMDynamics:
         print('=' * 60)
         print(f'Elapsed time: {int(elapsed_time // 60)} minutes, {int(elapsed_time % 60)} seconds')
         print(f'Performance: {performance:.2f} ns/day')
-        print(f'Trajectory saved as {traj_file}')
+        print(f'Trajectory saved as {self.out_file}')
 
-        # Save the simulation data
-        self.simulation.saveState(state_file)
-        print(f'Simulation state saved as {state_file}')
-
-        # Write the output to a file
-        self._save_output(output_file)
-        self.ostream.print_info(f'Simulation report saved as {output_file}.out')
-        self.ostream.flush()
 
     # Post-simulation analysis methods
     def plot_energy(self,
@@ -1365,83 +986,6 @@ class OpenMMDynamics:
         viewer.zoomTo()
 
         viewer.show()
-    
-    # Other methods:
-    
-    def qm_minimization(self, molecule, basis, scf_drv, constraints=None):
-        """
-        Minimizes the energy using a QM driver.
-
-        :param molecule:
-            VeloxChem Molecule object.
-        :param basis:
-            Basis set for the SCF driver.
-        :param scf_drv:
-            VeloxChem SCF driver object.
-        :param constraints:
-            Constraints for the optimization. Default is None. Format example: ["set dihedral 6 1 2 3 0.0", "freeze distance 6 1", ...]
-        """
-
-        opt_drv = OptimizationDriver(scf_drv)
-        opt_drv.ostream.mute()
-
-        if constraints:
-            opt_drv.constraints(constraints)
-
-        basis = MolecularBasis.read(molecule, basis)
-
-        scf_results = scf_drv.compute(molecule, basis)
-
-        results = opt_drv.compute(molecule, basis, scf_results)
-
-        min_energy = results['opt_energies'][-1]
-        min_coords = results['opt_geometries'][-1]
-
-        return min_energy, min_coords
-    
-    def add_bias_force(self, atoms, force_constant, target):
-        """
-        Method to add a biasing force to the system.
-
-        :param atoms:
-            List of atom indices to apply the force.
-        :param force_constant:
-            Force constant for the biasing force.
-        :param target:
-            Target equilibrium parameter (distance (nm), angle and torsion (deg))
-        """
-
-        if len(atoms) == 2:
-            msg = f'Adding stretch force between atoms {atoms[0]} and {atoms[1]} with force constant {force_constant}.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            force = mm.CustomBondForce('0.5*k*(r-r0)^2')
-            force.addGlobalParameter('k', force_constant)
-            force.addGlobalParameter('r0', target)
-            force.addBond(atoms[0], atoms[1])
-            self.system.addForce(force)
-        elif len(atoms) == 3:
-            target_rad = target * np.pi / 180
-            msg = f'Adding bend force between atoms {atoms[0]}, {atoms[1]}, and {atoms[2]} with force constant {force_constant}.'
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            force = mm.CustomAngleForce('0.5*k*(theta-theta0)^2')
-            force.addGlobalParameter('k', force_constant)
-            force.addGlobalParameter('theta0', target_rad)
-            force.addAngle(atoms[0], atoms[1], atoms[2])
-            self.system.addForce(force)
-        elif len(atoms) == 4:
-            target_rad = target * np.pi / 180
-            msg = f'Adding torsion force between atoms {atoms[0]}, {atoms[1]}, {atoms[2]}, and {atoms[3]} with force constant {force_constant}.'        
-            self.ostream.print_info(msg)
-            self.ostream.flush()
-            force = mm.CustomTorsionForce('0.5*k*(theta-theta0)^2')
-            force.addGlobalParameter('k', force_constant)
-            force.addGlobalParameter('theta0', target_rad)
-            force.addTorsion(atoms[0], atoms[1], atoms[2], atoms[3])
-            self.system.addForce(force)
-        else:
-            raise ValueError('Invalid number of atoms for the biasing force.')
 
     # Private methods
     def _save_output(self, output_file):
@@ -1546,7 +1090,7 @@ class OpenMMDynamics:
         if conect_warning:
 
             # Create a molecule from the PDB file
-            molecule = Molecule.read_pdb_file(filename)
+            molecule = Molecule.read_PDB_file(filename)
             connectivity_matrix = molecule.get_connectivity_matrix()
             # Determine all the bonds in the molecule
             with open(filename, 'a') as f:
@@ -1571,6 +1115,7 @@ class OpenMMDynamics:
             OpenMM Integrator: Configured integrator for the simulation.
         """
         # Common parameters for Langevin integrators
+
         if self.ensemble in ['NVT', 'NPT']:
             integrator = mm.LangevinIntegrator(self.temperature, self.friction, self.timestep)
             integrator.setConstraintTolerance(1e-5)
@@ -1654,8 +1199,7 @@ class OpenMMDynamics:
         with open(filename + '.xml', 'w') as output_file:
             output_file.write(indented_string)
 
-        self.ostream.print_info(f'QM region parameters written to {filename}.xml')
-        self.ostream.flush()
+        print(f'QM region parameters written to {filename}.xml')
 
     def _create_QM_subregion(self, ff_gen, qm_atoms, molecule, filename='qm_region', residue_name='QMR'):
         """
@@ -1873,9 +1417,9 @@ class OpenMMDynamics:
         :param qm_atoms:
             List of atom indices to be included in the QM region.
         :param phase:
-            Phase of the system ('gas', 'periodic').
+            Phase of the system ('gas', 'water', 'periodic').
         :param ff_gen:
-            MMForceFieldGenerator object from VeloxChem.
+            ForceFieldGenerator object from VeloxChem.
         """
 
         from openmm import NonbondedForce
@@ -1884,17 +1428,12 @@ class OpenMMDynamics:
         total_atoms = self.system.getNumParticles()
         
         # The MM subregion is counted as regular MM atoms
-        qm_group = list(self.qm_atoms)
-        msg = f'QM region: {qm_group[0]} ... {qm_group[-1]}'
-        self.ostream.print_info(msg)
-        mm_group = list(set(range(total_atoms)) - set(qm_group))
-       
-        if mm_group != []:
-            msg = f'MM region: {mm_group[0]} ... {mm_group[-1]}'
-            self.ostream.print_info(msg)
+        qm_group = set(self.qm_atoms)
+        print('QM Group:', qm_group)
+        mm_group = set(range(total_atoms)) - qm_group
+        print('MM Group:', mm_group)
         if not mm_group:
-            self.ostream.print_info('No external MM atoms found in the system')
-        self.ostream.flush()
+            print('No external MM atoms found in the system')
 
         # Add custom hessian forces
         force_expression = mm.CustomExternalForce("-fx*x-fy*y-fz*z")
@@ -1923,15 +1462,17 @@ class OpenMMDynamics:
 
             # CustomNonbondedForce for QM/MM interactions
             vdw = mm.CustomNonbondedForce("4*epsilon*((sigma/r)^12-(sigma/r)^6); sigma=0.5*(sigma1+sigma2); epsilon=sqrt(epsilon1*epsilon2)")
-            if phase == 'periodic':
+            if phase in ['water', 'periodic']:
                 vdw.setNonbondedMethod(mm.CustomNonbondedForce.CutoffPeriodic)
                 vdw.setCutoffDistance(self.cutoff)
             vdw.addPerParticleParameter("sigma")
             vdw.addPerParticleParameter("epsilon")
 
 
-            if phase == 'periodic':
+            if phase in ['water', 'periodic']:
                 # OpenMM uses Reaction Field method for CustomNB with PBC.
+                # DEBUG Only for testing purposes
+                print('Using Reaction Field method for long-range electrostatics!')
                 rfDielectric = nonbonded_force.getReactionFieldDielectric()
                 krf = (1 / (self.cutoff**3)) * (rfDielectric - 1) / (2*rfDielectric + 1)
                 crf = (1 /  self.cutoff) * (3*rfDielectric) / (2*rfDielectric + 1)
@@ -2007,6 +1548,37 @@ class OpenMMDynamics:
             if isinstance(force, mm.CustomExternalForce):
                 self.qm_force_index = i
                 break
+
+    def calculate_translation_coordinates(self, coordinates, rotation_point=None):
+        """Center the molecule by translating its geometric center to (0, 0, 0)."""
+        center = np.mean(coordinates, axis=0)
+        translated_coordinates = coordinates - center
+
+        return translated_coordinates, center
+
+    def cartesian_just_distance(self, coordinate_1, coordinate_2):
+        """Calculates and returns the cartesian distance between
+           self.coordinates and data_point coordinates.
+           Besides the distance, it also returns the weight gradient,
+           which requires the distance vector to be computed.
+           :param data_point:
+                InterpolationDatapoint object
+        """
+        # First, translate the cartesian coordinates to zero
+        target_coordinates, center_target = self.calculate_translation_coordinates(coordinate_1)
+        reference_coordinates, center_reference = (
+            self.calculate_translation_coordinates(coordinate_2))
+        # Then, determine the rotation matrix which
+        # aligns data_point (target_coordinates)
+        # to self.impes_coordinate (reference_coordinates)
+        rotation_matrix = geometric.rotate.get_rot(target_coordinates,
+                                                   reference_coordinates)
+        # Rotate the data point
+        rotated_coordinates = np.dot(rotation_matrix, target_coordinates.T).T
+        # Calculate the Cartesian distance
+        distance_vector = (reference_coordinates - rotated_coordinates)
+
+        return np.linalg.norm(distance_vector)
     
     def qm_stabilizer(self, ff_gen_qm):
         
@@ -2017,9 +1589,8 @@ class OpenMMDynamics:
         :param qm_atoms: 
             List of atom indices to be included in the QM region.
         :param ff_gen_qm: 
-            MMForceFieldGenerator object from VeloxChem.
+            ForceFieldGenerator object from VeloxChem.
         """
-
 
         # Harmonic bond contribution. Parameters are read from ff_gen_qm
         bonds = ff_gen_qm.bonds
@@ -2080,7 +1651,10 @@ class OpenMMDynamics:
             The gradient and potential energy of the QM region.
         """
 
-        positions_ang = (new_positions) * 10 
+        # self.coordinates_xyz.append(new_positions * 10)
+        positions_ang = new_positions * 10 
+
+        new_molecule = None
         # Check if there is a QM/MM partition in the system
         if self.mm_subregion is not None:
             # Create a molecule with a link atom (H)
@@ -2110,29 +1684,26 @@ class OpenMMDynamics:
                 positions_ang[atom1] = positions_ang[atom2] - direction * self.linking_atom_distance
 
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
-            self.dynamic_molecules.append(new_molecule)
 
         else:
             # Atom labels for the QM region
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
-            self.dynamic_molecules.append(new_molecule)
+            self.unique_molecules.append(new_molecule)
+        
+        self.impes_drivers[-1].compute(new_molecule, self.qm_data_points, None, self.im_labels)
 
-        if self.basis is not None:
-            basis = MolecularBasis.read(new_molecule, self.basis)
-            scf_result = self.qm_driver.compute(new_molecule, basis)
-            gradient = self.grad_driver.compute(new_molecule, basis, scf_result)
-            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
-            gradient = self.grad_driver.get_gradient()
-        else:
-            self.qm_driver.compute(new_molecule)
-            if self.driver_flag != 'IM Driver':
-                self.grad_driver.compute(new_molecule)
-            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
-            gradient = self.grad_driver.get_gradient()
 
-        return gradient, potential_kjmol
+        potential_kjmol = self.impes_drivers[-1].impes_coordinate.energy * hartree_in_kcalpermol() * 4.184
+        self.current_gradient = self.impes_drivers[-1].impes_coordinate.gradient
+        self.current_energy = potential_kjmol
+                        
+            # Potential energy is in Hartree, convert to kJ/mol
+            
+
+        return self.current_gradient, potential_kjmol
+
 
     def update_gradient(self, new_positions):
         """
@@ -2146,19 +1717,6 @@ class OpenMMDynamics:
         gradient, _ = self.update_gradient_and_energy(new_positions)
 
         return gradient
-    
-    def update_potential_energy(self, new_positions):
-        """
-        Updates and returns the potential energy of the QM region.
-
-        :param new_positions:
-            The new positions of the atoms in the QM region.
-        :return:
-            The potential energy of the QM region.
-        """
-        _, potential_energy = self.update_gradient_and_energy(new_positions)
-
-        return potential_energy
 
     def update_forces(self, context):
         """
@@ -2174,100 +1732,476 @@ class OpenMMDynamics:
         # Update the forces of the QM region
         qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
 
+        self.velocities_np.append(context.getState(getVelocities=True).getVelocities(True))
         gradient = self.update_gradient(qm_positions)
+
+        positions_ang = (qm_positions) * 10
+        atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
+        qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
+
+        new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+
         force = -np.array(gradient) * conversion_factor
+        self.all_gradients.append(gradient)
+        ############################################################
+        #################### Correlation Check #####################
+        ############################################################
+        allowed = True 
+        self.add_a_point = False
+        
+        if self.density_around_data_point[1] is not None:
+            current_dihedral = new_molecule.get_dihedral_in_degrees(self.density_around_data_point[1])
+            lower, upper = self.allowed_molecule_deviation
 
-        custom_force = self.system.getForce(self.qm_force_index)
+            # Case 1: If boundaries do not wrap (e.g., [-60, 60])
+            if lower < upper:
+                allowed = lower <= current_dihedral <= upper
+            else:
+                # Case 2: If boundaries wrap around (e.g., [120, -120])
+                allowed = current_dihedral >= lower or current_dihedral <= upper
+        
+        if allowed:
+            openmm_coordinate = context.getState(getPositions=True).getPositions()
+            self.coordinates.append(openmm_coordinate)
+            self.velocities.append(context.getState(getVelocities=True).getVelocities())
+            self.gradients.append(gradient)
+            if self.skipping_value == 0:
+                for i, qm_data_point in enumerate(self.qm_data_points, start=1):
+                    length_vectors = (self.current_im_choice.impes_coordinate.cartesian_distance_vector(qm_data_point))
 
-        # Construct a set from the list of tuples self.broken_bonds
-        #broken_bond_atoms = set([atom for bond in self.broken_bonds for atom in bond])
+                    if (np.linalg.norm(length_vectors) / np.sqrt(len(self.molecule.get_labels()))) * bohr_in_angstrom() < 0.2:
+                        self.add_a_point = False
+                        break          
+                        
+                    if i == len(self.qm_data_points):
+                        self.add_a_point = True
 
-        for i, atom_idx in enumerate(self.qm_atoms):
-            custom_force.setParticleParameters(i, atom_idx, force[i])
+            else:
+                self.skipping_value -= 1
             
-        custom_force.updateParametersInContext(context)
+            # self.add_a_point = True
+            self.point_checker += 1 
+            if self.add_a_point == True and self.step > self.collect_qm_points or self.check_a_point == True and self.step > self.collect_qm_points:
+                print('no point correlation ')
+                self.point_correlation_check(new_molecule, self.basis)
+            if self.point_checker == 0:            
+                
+                self.point_checker += 1
+
+                context.setPositions(self.coordinates[0])
+                self.coordinates = self.coordinates[:1]
+                # context.setVelocities(self.velocities[0])
+                context.setVelocitiesToTemperature(self.temperature)
+                self.velocities = [context.getState(getVelocities=True).getVelocities()]
+                
+                new_positions = context.getState(getPositions=True).getPositions()
+                qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
+                positions_ang = (qm_positions) * 10
+                atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
+                qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
+                new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+                gradient_2 = self.update_gradient(qm_positions)
+                force = -np.array(gradient_2) * conversion_factor
+            
+            if (self.point_checker + self.last_point_added) % self.duration == 0 and self.point_checker != 0:
+                print('start when last point was added', self.point_checker + self.last_point_added)
+                self.last_point_added = 0
+                self.unadded_cycles -= 1
+
+            if self.point_checker < 500 and self.cycle_iteration != self.unadded_cycles:
+                self.unadded_cycles += 1
+            
+            self.coordinates_xyz.append(qm_positions * 10)
+            ############################################################
+            self.molecules.append(new_molecule)
+            for i, atom_idx in enumerate(self.qm_atoms):
+                self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
+            self.system.getForce(self.qm_force_index).updateParametersInContext(context)
+        
+        else:
+            context.setPositions(self.coordinates[0])
+            self.coordinates = self.coordinates[:1]
+            context.setVelocitiesToTemperature(self.temperature)
+            self.velocities = [context.getState(getVelocities=True).getVelocities()]
+            # context.setVelocities(self.velocities[0])
+            # self.velocities = self.velocities[:1]
+            new_positions = context.getState(getPositions=True).getPositions()
+            qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
+            positions_ang = (qm_positions) * 10
+            atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
+            qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
+            new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            gradient_2 = self.update_gradient(qm_positions)
+            force = -np.array(gradient_2) * conversion_factor
+            
+            self.molecules.append(new_molecule)
+            self.coordinates_xyz.append(qm_positions * 10)
+            for i, atom_idx in enumerate(self.qm_atoms):
+                self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
+            self.system.getForce(self.qm_force_index).updateParametersInContext(context)
+    
     
     def get_qm_potential_energy(self):
         """
         Returns the potential energy of the QM region.
 
+        Args:
+            context: The OpenMM context object.
         Returns:
             The potential energy of the QM region.
         """
-        if self.basis is not None:
-            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
-        else:
-            potential_energy = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+
+        #positions = context.getState(getPositions=True).getPositions()
+        #qm_positions = np.array([positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
+        potential_energy = self.current_energy
 
         return potential_energy
     
-    def _calculate_rmsd(self, coord1, coord2):
+    
+    
+        ####################################################################
+    ################ Functions to expand the database ##################
+    ####################################################################
+
+    def point_correlation_check(self, molecule, basis=None):
+        """ Takes the current point on the PES and checks with a QM-energy
+            calculation is necessary based on the current difference to the
+            interpolation. Based on the difference the step_size of the next
+            step is determined.
+
+            :param molecule:
+                The molecule corresponding to the current conformation
+                in the IM dynamics.
         """
-        Calculate the root mean square deviation (RMSD) between two sets of atomic coordinates
-        after optimal alignment using the Kabsch algorithm. This method accounts for rotational
-        and translational differences between the molecular conformations.
 
-        :param coord1: 
-            The coordinates of the first molecule.
-        :param coord2:
-            The coordinates of the second molecule.
+        qm_energy = 0
+        print('############# Energy is QM claculated ############')
+        qm_energy, scf_tensors = self.compute_energy(molecule, basis)
 
-
-        :return:
-        - rmsd_value: float
-            The RMSD between the two aligned molecules.
-        """
-
-        # Center the coordinates to eliminate translational differences
-        centroid1 = np.mean(coord1, axis=0)  
-        centroid2 = np.mean(coord2, axis=0) 
-        coord1_centered = coord1 - centroid1
-        coord2_centered = coord2 - centroid2
-
-        # The covariance matrix captures how the centered coordinates of the two molecules relate
-        covariance_matrix = np.dot(coord1_centered.T, coord2_centered)
+        energy_difference = (abs(qm_energy[0] - self.impes_drivers[-1].impes_coordinate.energy))
+        print('energy differences', energy_difference * hartree_in_kcalpermol())
         
-        # Perform Singular Value Decomposition (SVD) on the covariance matrix
-        V, S, Wt = np.linalg.svd(covariance_matrix)
+        # calcualte energy gradient
+        self.previous_energy_list.append(energy_difference)
 
-        # Correct for improper rotation (reflection)
-        # Calculate the determinant of the rotation matrix to check for reflection
-        # A determinant of -1 indicates a reflection, which we need to correct
-        d = np.sign(np.linalg.det(np.dot(V, Wt)))
+        if len(self.previous_energy_list) > 3:
+            # Compute gradient (rate of change of energy difference)
+            grad1 = self.previous_energy_list[-2] - self.previous_energy_list[-3]
+            grad2 = self.previous_energy_list[-1] - self.previous_energy_list[-2]
 
-        # If the determinant is negative, adjust the matrices to ensure a proper rotation
-        if d < 0:
-            # Reflect the last column of V and invert the last singular value
-            V[:, -1] *= -1
-            S[-1] *= -1
+            # Base skipping value calculation
+            base_skip = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20) - 1
 
-        # Compute the optimal rotation matrix
-        # Multiply V and Wt to get the rotation matrix that best aligns coord1 to coord2
-        rotation_matrix = np.dot(V, Wt)
+            # Adjust skipping value based on gradient
+            if grad2 > grad1:  # Energy difference is increasing
+                self.skipping_value = max(1, base_skip - 1)  # Reduce skipping for more frequent checks
+            else:  # Energy difference is decreasing
+                self.skipping_value = base_skip + 10  # Increase skipping to check less often
 
-        # Apply the rotation to the centered coordinates of the first molecule
-        # Rotate coord1_centered using the rotation matrix
-        coord1_rotated = np.dot(coord1_centered, rotation_matrix)
+            print(f"Energy Difference: {energy_difference:.6f}, Gradient: {grad2 - grad1:.6f}, Skipping Value: {self.skipping_value}")
 
-        #Calculate the RMSD between the rotated coordinates and the centered coordinates of the second molecule
-        diff = coord1_rotated - coord2_centered
+        else:
+            self.skipping_value = min(round(abs(self.energy_threshold / (energy_difference * hartree_in_kcalpermol())**2)), 20)
 
-        # Square the differences
-        diff_squared = diff ** 2
+        if energy_difference * hartree_in_kcalpermol() > self.energy_threshold:
+            self.add_a_point = True
+        else:
+            self.allowed_molecules.append(molecule.get_coordinates_in_bohr())
+            self.add_a_point = False
+        if self.add_a_point:
+            print('✨ A point is added! ✨', self.point_checker)
+            print(molecule.get_xyz_string())
+            label = f"point_{len(self.im_labels) +1}"
+            self.add_point(molecule, label, qm_energy, self.qm_datafile, basis, scf_results=scf_tensors)
+            self.last_point_added = self.point_checker - 1
+            self.point_checker = 0
+            self.point_adding_molecule[self.step] = (molecule, qm_energy, label)
 
-        # Sum the squared differences over all atoms and coordinate axes (x, y, z)
-        sum_diff_squared = np.sum(diff_squared)
 
-        # Calculate the mean squared deviation
-        mean_diff_squared = sum_diff_squared / len(coord1)
+    def add_point(self, molecule, label, energy, filename, basis=None, scf_results=None):
+        """ Adds a new point to the database.
 
-        # Take the square root of the mean squared deviation to obtain the RMSD
-        rmsd_value = np.sqrt(mean_diff_squared)
+            :param molecule:
+                the molecule.
+            :param label:
+                the label for the new point to be added.
+            :param energy:
+                the energy of the previous QM calcualtion.
+            :param basis:
+                the basis set (if required).
+            :scf_result:
+                the scf_result of previous QM calculation (if required).
+        """
 
-        return rmsd_value
+        if self.qm_driver is None:
+            raise ValueError("No energy driver defined.")
+        if self.grad_driver is None:
+            raise ValueError("No gradient driver defined.")
+        if self.hess_driver is None:
+            raise ValueError("No Hessian driver defined.")
 
+        energy = energy
+        gradient = None
+        hessian = None
+
+       
+        gradient = self.compute_gradient(molecule, basis, scf_results)
+        hessian = self.compute_hessian(molecule, basis)
+        
+        natoms = molecule.number_of_atoms()
+        elem = molecule.get_labels()
+        coords = molecule.get_coordinates_in_bohr().reshape(natoms * 3)
+
+        R_kjmol = 0.00831446261815324
+        particles = self.system.getNumParticles() * 1.5
+        kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
+        temp = kinetic.value_in_unit(unit.kilojoules_per_mole) / (particles * R_kjmol)
+
+        vib_frequencies, normal_modes_vec, gibbs_energy = (
+            geometric.normal_modes.frequency_analysis(
+                coords,
+                hessian[0],
+                elem,
+                energy=energy[0],
+                temperature=temp,
+                pressure=self.pressure,
+                outfnm=f'vibrational_point_{energy[0]}',
+                normalized=False))
+        
+        print('vibrational frequencies', vib_frequencies)
+        eigenvalues, _ = np.linalg.eigh(hessian)
+        print('Eigenvalues', min(eigenvalues))
+        impes_coordinate = InterpolationDatapoint(self.z_matrix)
+
+        impes_coordinate.update_settings(self.impes_dict)
+        
+        qm_points_list = []
+
+        impes_coordinate = InterpolationDatapoint(self.z_matrix)
+        impes_coordinate.update_settings(self.impes_dict)
+        impes_coordinate.cartesian_coordinates = molecule.get_coordinates_in_bohr()
+
+        impes_coordinate.energy = energy[0]
+        impes_coordinate.gradient = gradient[0]
+        impes_coordinate.hessian = hessian[0]
+        impes_coordinate.transform_gradient_and_hessian()
+        # impes_coordinate.normal_modes = normal_modes_relevant
+        # impes_coordinate.coefficient_displacement_thresholds = 
+        if self.impes_drivers is not None:
+            self.impes_drivers[0].impes_coordinate.gradient = gradient[0]
+
+        qm_points_list.append(impes_coordinate)
+        
+        for i, qm_datapoint in enumerate(qm_points_list):
+            
+            qm_datapoint.write_hdf5(filename, label)
+            self.im_labels.append(label)
+            self.qm_energies.append(qm_datapoint.energy)
+            self.qm_data_points.append(qm_datapoint)
+
+        self.density_around_data_point[0] += 1
+        
+    def compute_energy(self, molecule, basis=None):
+        """ Computes the QM energy using self.qm_driver.
+
+            :param molecule:
+                The molecule.
+            :param basis:
+                The basis set.
+
+            :returns the QM energy.
+        """
+        # Dtermine the type of energy driver, to be able to
+        # call it correctly.
+
+        qm_energy = None
+        scf_tensors = None
+
+        # XTB
+        if isinstance(self.qm_driver, XtbDriver):
+
+            self.qm_driver.compute(molecule)
+            qm_energy = self.qm_driver.get_energy()
+            qm_energy = np.array([qm_energy])
+            print('qm_energy', qm_energy, qm_energy[0])
+
+        # restricted SCF
+        elif isinstance(self.qm_driver, ScfRestrictedDriver):
+            self.qm_driver.ostream.mute()
+            scf_tensors = self.qm_driver.compute(molecule, basis)
+            qm_energy = self.qm_driver.scf_energy
+            qm_energy = np.array([qm_energy])
+            self.qm_driver.ostream.unmute()
+
+        if qm_energy is None:
+            error_txt = "Could not compute the QM energy. "
+            error_txt += "Please define a QM driver."
+            raise ValueError(error_txt)
+
+        return qm_energy, scf_tensors
+
+    def compute_gradient(self, molecule, basis=None, scf_results=None):
+        """ Computes the QM gradient using self.grad_driver.
+
+            :param molecule:
+                The molecule.
+            :param basis:
+                The basis set.
+
+            :returns the QM gradient.
+        """
+
+        qm_gradient = None
+
+        if isinstance(self.grad_driver, XtbGradientDriver):
+            self.grad_driver.ostream.mute()
+            self.grad_driver.compute(molecule)
+            self.grad_driver.ostream.unmute()
+            qm_gradient = self.grad_driver.gradient
+            qm_gradient = np.array([qm_gradient])
+
+        elif isinstance(self.grad_driver, ScfGradientDriver):
+            self.grad_driver.ostream.mute()
+            self.grad_driver.compute(molecule, basis, scf_results)
+            qm_gradient = self.grad_driver.gradient
+            qm_gradient = np.array([qm_gradient])
+            self.grad_driver.ostream.unmute()
+
+        if qm_gradient is None:
+            error_txt = "Could not compute the QM gradient. "
+            error_txt += "Please define a QM gradient driver."
+            raise ValueError(error_txt)
+
+        return qm_gradient
+
+    # TODO: mute outside to save time?
+    def compute_hessian(self, molecule, basis=None):
+        """ Computes the QM Hessian using self.hess_driver.
+
+            :param molecule:
+                The molecule.
+            :param basis:
+                The basis set.
+
+            :returns the QM Hessian matrix.
+        """
+
+        qm_hessian = None
+
+        if isinstance(self.hess_driver, XtbHessianDriver):
+            self.hess_driver.ostream.mute()
+            self.hess_driver.compute(molecule)
+            qm_hessian = self.hess_driver.hessian
+            self.hess_driver.ostream.unmute()
+            qm_hessian = np.array([qm_hessian])
+
+        elif isinstance(self.hess_driver, ScfHessianDriver):
+            # self.hess_driver.ostream.mute()
+            self.hess_driver.compute(molecule, basis)
+            qm_hessian = self.hess_driver.hessian
+            qm_hessian = np.array([qm_hessian])
+            # self.hess_driver.ostream.unmute()
+
+
+        if qm_hessian is None:
+            error_txt = "Could not compute the QM Hessian. "
+            error_txt += "Please define a QM Hessian driver."
+            raise ValueError(error_txt)
+
+        return qm_hessian
+
+
+
+    def get_qm_potential_energy(self):
+        """
+        Returns the potential energy of the QM region.
+
+        Args:
+            context: The OpenMM context object.
+        Returns:
+            The potential energy of the QM region.
+        """
+
+        potential_energy = self.current_energy
+
+        return potential_energy
+    
+    def output_file_writer(self, outputfile):
+
+        # Open the file in write mode ('w')
+        with open(outputfile, 'a') as file:
+            # Write the section header
+            
+            file.write(f"\n######################################\n")
+            file.write(f"############## Step {self.step} ################\n")
+            file.write(f"######################################\n")
+            file.write("\n########## Coordinates (Angstrom) ##########\n\n")
+            
+            for i, coord in enumerate(self.coordinates_xyz[self.step]):
+
+                file.write(f'{self.molecule.get_labels()[i]}   {coord[0]:.4f}    {coord[1]:.4f}     {coord[2]:.4f}\n')
+
+            file.write("\n########## Gradient (hatree/bohr) ##########\n\n")
+            
+            for i, grad in enumerate(self.all_gradients[self.step]):
+
+                file.write(f' {grad[0]:.4f}    {grad[1]:.4f}     {grad[2]:.4f}\n')
+            
+            file.write("########## Kinetic Energy (kJ mol^-1) ##########\n\n")
+            file.write(f"kin E = {self.kinetic_energies[self.step]:.8f}\n\n")
+            file.write("########## Potential Energy (kJ mol^-1) ##########\n\n")
+            file.write(f"pot E = {self.total_potentials[self.step]:.8f}\n\n")
+            file.write("########## Total Energy (kJ mol^-1) ##########\n\n")
+            file.write(f"tot E = {self.total_energies[self.step]:.8f}\n\n")
+            file.write("########## Temperature K ##########\n\n")
+            file.write(f"T = {self.temperatures[self.step]:.8f}\n\n")
+            file.write("########## ENERGY GAP (kJ mol^-1) ##########\n\n")
+            
+            # Write the column headers
+            file.write("STATE | ENERGY GAP\n\n")
+
+
+    def calculate_translation_coordinates_analysis(self, given_coordinates):
+        """Center the molecule by translating its geometric center to (0, 0, 0)."""
+        center = np.mean(given_coordinates, axis=0)
+        translated_coordinates = given_coordinates - center
+
+        return translated_coordinates
     
 
+    def calculate_distance_to_ref(self, current_coordinates, datapoint_coordinate):
+        """Calculates and returns the cartesian distance between
+           self.coordinates and data_point coordinates.
+           Besides the distance, it also returns the weight gradient,
+           which requires the distance vector to be computed.
 
+           :param data_point:
+                InterpolationDatapoint object
+        """
 
+        # First, translate the cartesian coordinates to zero
+        target_coordinates = self.calculate_translation_coordinates_analysis(datapoint_coordinate)
+        reference_coordinates = self.calculate_translation_coordinates_analysis(current_coordinates)
+
+        # Then, determine the rotation matrix which
+        # aligns data_point (target_coordinates)
+        # to self.impes_coordinate (reference_coordinates)     
+        rotation_matrix_core = geometric.rotate.get_rot(target_coordinates,
+                                                reference_coordinates)
+        
+
+        # Rotate the data point
+        rotated_coordinates_core = np.dot(rotation_matrix_core, target_coordinates.T).T
+        # Calculate the Cartesian distance
+        ref_structure_check = reference_coordinates.copy()
+        distance_core = (np.linalg.norm(rotated_coordinates_core - ref_structure_check))
+
+        distance_vector_core = (ref_structure_check - rotated_coordinates_core)
+        distance_vector_core_norm = np.zeros(reference_coordinates.shape[0])
+
+        for i in range(len(distance_vector_core_norm)):
+            distance_vector_core_norm[i] += np.linalg.norm(distance_vector_core[i])
+
+        return ref_structure_check, distance_core, distance_vector_core
+        
 

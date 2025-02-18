@@ -170,6 +170,10 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
+from .imforcefieldgenerator import IMForceFieldGenerator
+from .imdatabasepointcollecter import IMDatabasePointCollecter
+from .interpolationdriver import InterpolationDriver
+from .interpolationdatapoint import InterpolationDatapoint
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
