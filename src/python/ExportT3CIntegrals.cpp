@@ -49,8 +49,8 @@ export_t3cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CThreeCenterElectronRepulsionGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis,  CMolecularBasis& aux_basis, const int iatom) -> std::shared_ptr<CT3FlatBuffer<double>> {
-                return std::make_shared<CT3FlatBuffer<double>>(geom_drv.compute(basis, aux_basis, molecule, iatom));
+            [](const CThreeCenterElectronRepulsionGeom0X0Driver<1>& geom_drv, const CMolecule& molecule, const CMolecularBasis& basis,  CMolecularBasis& aux_basis, const int iatom) -> std::shared_ptr<CT3RectFlatBuffer<double>> {
+                return std::make_shared<CT3RectFlatBuffer<double>>(geom_drv.compute(basis, aux_basis, molecule, iatom));
              },
             "Computes gradient integrals for given molecule, basis, auxilary basis and selected atom.");
 }

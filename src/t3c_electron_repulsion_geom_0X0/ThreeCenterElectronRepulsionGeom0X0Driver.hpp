@@ -11,8 +11,9 @@
 #include "Point.hpp"
 #include "TensorComponents.hpp"
 #include "T3CUtils.hpp"
-//#include "T3CGeomX00Distributor.hpp"
-//#include "ThreeCenterElectronRepulsionGeom100Func.hpp"
+#include "T3RectFlatBuffer.hpp"
+#include "T3CGeom0X0Distributor.hpp"
+#include "ThreeCenterElectronRepulsionGeom010Func.hpp"
 
 #include <iostream>
 
@@ -65,7 +66,7 @@ class CThreeCenterElectronRepulsionGeom0X0Driver
     auto compute(const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
                  const CMolecule       &molecule,
-                 const int             iatom) const -> CT3FlatBuffer<double>;
+                 const int             iatom) const -> CT3RectFlatBuffer<double>;
 };
 
 template <int N>
@@ -73,7 +74,7 @@ auto
 CThreeCenterElectronRepulsionGeom0X0Driver<N>::compute(const CMolecularBasis &basis,
                                                        const CMolecularBasis &aux_basis,
                                                        const CMolecule       &molecule,
-                                                       const int             iatom) const -> CT3FlatBuffer<double>
+                                                       const int             iatom) const -> CT3RectFlatBuffer<double>
 {
     // set up GTOs data
     
@@ -93,17 +94,27 @@ CThreeCenterElectronRepulsionGeom0X0Driver<N>::compute(const CMolecularBasis &ba
     
     const auto red_indices = t3cfunc::unique_indices(ketr_gto_blocks);
     
-    CT3FlatBuffer<double> buffer(aux_indices, red_indices.size());
+    std::vector<size_t> full_indices(basis.dimensions_of_basis());
+    
+    std::iota(full_indices.begin(), full_indices.end(), size_t{0});
+    
+    const auto mask_indices = t3cfunc::mask_indices(ketr_gto_blocks);
+    
+    CT3RectFlatBuffer<double> buffer(aux_indices, mask_indices, basis.dimensions_of_basis(), 3);
+    
+    // set distributor
+    
+    CT3CGeom0X0Distributor distributor(&buffer);
     
     // main compute loop
     
     std::ranges::for_each(bra_gto_blocks, [&](const auto& gblock) {
         auto bra_range = std::pair<size_t, size_t>{size_t{0}, gblock.number_of_basis_functions()};
         std::ranges::for_each(gto_pair_blocks, [&](const auto& gp_pairs) {
-//            if constexpr (N == 1)
-//            {
-//                t3cerifunc::compute_geom_100(distributor, gblock, gp_pairs, bra_range);
-//            }
+            if constexpr (N == 1)
+            {
+                t3cerifunc::compute_geom_010(distributor, gblock, gp_pairs, bra_range);
+            }
         });
     });
     
