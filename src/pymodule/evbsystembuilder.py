@@ -95,6 +95,7 @@ class EvbSystemBuilder():
         solvent = configuration.get("solvent", None)
         padding = configuration.get("padding", 1)
         CNT = configuration.get("CNT", False)
+        CNT = False # todo fix the exploding CNT
         Graphene = configuration.get("graphene", False)
         graphene_size = configuration.get("graphene_size", 2)
         CNT_radius = configuration.get("CNT_radius", 0.5)

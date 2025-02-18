@@ -489,17 +489,17 @@ class EvbDriver():
                 "padding": 1.2,
                 "ion_count": 0,
             }
-        elif name == "CNT":
-            conf = {
-                "name": "water_CNT",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "ion_count": 0,
-                "CNT": True,
-                "CNT_radius": 0.5,
-            }
+        # elif name == "CNT":
+        #     conf = {
+        #         "name": "water_CNT",
+        #         "solvent": "spce",
+        #         "temperature": self.temperature,
+        #         "NPT": True,
+        #         "pressure": 1,
+        #         "ion_count": 0,
+        #         "CNT": True,
+        #         "CNT_radius": 0.5,
+        #     }
         elif name == "graphene":
             conf = {
                 "name": "water_graphene",
