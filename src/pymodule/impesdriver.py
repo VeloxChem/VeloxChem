@@ -205,7 +205,7 @@ class ImpesDriver():
         """
         self.impes_coordinate.reset_coordinates_impes_driver(coordinates)
 
-    def compute(self, molecule, qm_data_points=None, chk_file=None, labels=None, NACs=False, available_resources=None):
+    def compute(self, molecule, qm_data_points=None, chk_file=None, labels=None, NACs=False):
         """Computes the energy and gradient by interpolation
            between pre-defined points.
 
@@ -220,7 +220,6 @@ class ImpesDriver():
                 used.
         """
 
-        self.available_resources = available_resources or cpu_count()
         self.NACs = NACs
         self.molecule = molecule
 
