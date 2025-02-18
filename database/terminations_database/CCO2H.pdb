@@ -1,0 +1,17 @@
+TITLE     Structure2
+REMARK   4      COMPLIES WITH FORMAT V. 3.0, 1-DEC-2006
+REMARK 888
+REMARK 888 WRITTEN BY MAESTRO (A PRODUCT OF SCHRODINGER, LLC)
+HETATM    1 C1   MOL     0       0.045   0.052   0.183  1.00  0.00           X  
+HETATM    2 O1   MOL     0       1.262  -0.027   0.072  1.00  0.00           O  
+HETATM    3 O2   MOL     0      -0.649   1.218   0.185  1.00  0.00           O  
+HETATM    4 C2   MOL     0      -0.863  -1.160   0.335  1.00  0.00           x  
+HETATM    5 H1   MOL     0      -0.039   1.933   0.089  1.00  0.00           H  
+CONECT    1    2    3    4
+CONECT    1    2
+CONECT    2    1
+CONECT    2    1
+CONECT    3    1    5
+CONECT    4    1
+CONECT    5    3
+END   
