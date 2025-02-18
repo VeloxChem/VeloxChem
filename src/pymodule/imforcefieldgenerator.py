@@ -25,15 +25,10 @@
 
 import numpy as np
 import os
-from pathlib import Path
-from sys import stdout
-from time import time
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
 import random
-
 from contextlib import redirect_stderr
 from io import StringIO
+
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -42,24 +37,17 @@ from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .molecularbasis import MolecularBasis
 from .openmmdynamics import OpenMMDynamics
-
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imdatabasepointcollecter import IMDatabasePointCollecter
-# from .impesdatabasebuilder import ImpesDatabaseBuilder
-# from .imdatabasedriver import IMDatabaseDriver
-#from .impesforcefieldgenerator_parallel import ImpesForceFieldGeneratorParallel
-from .forcefieldgenerator import ForceFieldGenerator
-from .atomtypeidentifier import AtomTypeIdentifier
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
+
 
 class IMForceFieldGenerator:
     """
@@ -315,7 +303,7 @@ class IMForceFieldGenerator:
         
         # First set up the system for which the database needs to be constructed
         if self.qm_driver is ScfRestrictedDriver:
-            assert_msg_critical(self.qm_driver, 'ImForceFieldGenerator: QM-Driver/ QM-Gradient-Driver / QM-Hessian-Driver were initialized as ScF Method!.')
+            assert_msg_critical(self.qm_driver, 'IMForceFieldGenerator: QM-Driver/ QM-Gradient-Driver / QM-Hessian-Driver were initialized as ScF Method!.')
         
         print('MOlecule labels', molecule.get_labels())
         self.interpolation_settings = { 'interpolation_type':self.interpolation_type, 
@@ -352,7 +340,7 @@ class IMForceFieldGenerator:
                     key = (key_old, int(round(mol.get_dihedral_in_degrees(key_old))))
                 
 
-                forcefield_generator = ForceFieldGenerator()
+                forcefield_generator = MMForceFieldGenerator()
                 forcefield_generator.force_field_data = self.dynamics_settings['FF_datafile']
                 self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}.pdb'
                 forcefield_generator.partial_charges = mol.get_partial_charges(mol.get_charge())
@@ -616,7 +604,7 @@ class IMForceFieldGenerator:
             A VeloxChem Molecule object representing the target system.
 
         :param forcefield_generator:
-            A defined ForceFieldGenerator object.
+            A defined MMForceFieldGenerator object.
 
         :returns:
             A list of molecular structures obtained from the dynamics simulation.
@@ -709,7 +697,7 @@ class IMForceFieldGenerator:
         """
 
         # For all Methods a ForceField of the molecule is requiered
-        forcefield_generator = ForceFieldGenerator()
+        forcefield_generator = MMForceFieldGenerator()
         forcefield_generator.force_field_data = self.FF_datafile
         forcefield_generator.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         forcefield_generator.create_topology(molecule)

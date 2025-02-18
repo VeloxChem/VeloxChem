@@ -32,7 +32,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream

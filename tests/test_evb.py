@@ -200,7 +200,7 @@ class TestEvb:
         assert TestEvb._compare_systems(wat_systems['product'], str(data_path / 'evb_ethanol_solv_recalc_product_sys.xml'))
 
     @staticmethod
-    def _compare_systems(system: mm.System, path: str):
+    def _compare_systems(system, path):
         # Compare strings of serialised systems instead of the systems themselves because the systems are swig proxy's
         sys_string = mm.XmlSerializer.serialize(system)
         with open(path, 'r') as input:

@@ -23,14 +23,8 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-import multiprocessing as mp
-import os
 import numpy as np
-import math
-import random
-from scipy.optimize import linear_sum_assignment
 import sys
-from .profiler import Profiler
 import h5py
 from contextlib import redirect_stderr
 from io import StringIO
