@@ -39,7 +39,6 @@ from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
 from .xtbdriver import XtbDriver
-from .scfdriver import ScfDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver

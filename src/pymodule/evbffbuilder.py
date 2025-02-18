@@ -162,7 +162,7 @@ class EvbForceFieldBuilder():
                         scf_drv.conv_thresh = 1.0e-4
                         scf_drv.max_iter = 200
                         scf_results = scf_drv.compute(molecule, basis)
-                    assert scf_drv.is_converged, f"SCF calculation for RESP charges on compound {filename} did not converge, aborting"
+                    assert scf_drv.is_converged, "SCF calculation for RESP charges did not converge, aborting"
                 else:
                     self.ostream.print_info("Using provided SCF results for RESP charges")
                 resp_drv = RespChargesDriver()

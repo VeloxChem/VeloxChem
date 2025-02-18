@@ -264,7 +264,7 @@ class EvbDataProcessing:
     def _get_FEP_and_EVB(self):
 
         for result in self.results.values():
-            Temp = result["Temp_step"]
+            # Temp = result["Temp_step"]
             E1_ref = result["E1_ref"]
             E2_ref = result["E2_ref"]
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12)

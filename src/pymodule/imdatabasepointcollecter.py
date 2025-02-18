@@ -713,10 +713,10 @@ class IMDatabasePointCollecter:
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
-        temperature = self.temperature
+        # temperature = self.temperature
         self.temperature = self.temperature * unit.kelvin
         
-        friction = self.friction
+        # friction = self.friction
         self.friction = self.friction / unit.picosecond
         
         timestep = self.timestep
@@ -1198,7 +1198,7 @@ class IMDatabasePointCollecter:
             ET.SubElement(NonbondedForce, "Atom", **attributes)
 
         # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")  
@@ -1404,7 +1404,7 @@ class IMDatabasePointCollecter:
                 ET.SubElement(ImproperForce, "Torsion", **attributes)
 
         # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")  
@@ -1852,25 +1852,7 @@ class IMDatabasePointCollecter:
             self.system.getForce(self.qm_force_index).updateParametersInContext(context)
     
     
-    def get_qm_potential_energy(self):
-        """
-        Returns the potential energy of the QM region.
-
-        Args:
-            context: The OpenMM context object.
-        Returns:
-            The potential energy of the QM region.
-        """
-
-        #positions = context.getState(getPositions=True).getPositions()
-        #qm_positions = np.array([positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
-        potential_energy = self.current_energy
-
-        return potential_energy
-    
-    
-    
-        ####################################################################
+    ####################################################################
     ################ Functions to expand the database ##################
     ####################################################################
 

@@ -1,13 +1,10 @@
-import networkx as nx
-import itertools
+from mpi4py import MPI
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
-import numpy as np
+import networkx as nx
 import time
-from collections import Counter
-
 import sys
-from mpi4py import MPI
+
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master
 

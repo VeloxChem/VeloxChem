@@ -507,7 +507,7 @@ class MMForceFieldGenerator:
                 periodicities.append(periodicity)
 
         # Make a copy of the original dihedrals dictionary
-        original_dihedrals_dict = self.dihedrals.copy()
+        # original_dihedrals_dict = self.dihedrals.copy()
 
         # Convert to NumPy arrays
         barriers = np.array(barriers, dtype=float)

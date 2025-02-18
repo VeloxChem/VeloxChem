@@ -1,3 +1,5 @@
+import sys
+
 from .errorhandler import assert_msg_critical
 
 try:
