@@ -1,15 +1,23 @@
+from pathlib import Path
+import numpy as np
+import pytest
+import sys
+
+from veloxchem.molecule import Molecule
 from veloxchem.evbdriver import EvbDriver
 from veloxchem.evbffbuilder import EvbForceFieldBuilder
 from veloxchem.evbsystembuilder import EvbSystemBuilder
 from veloxchem.evbdataprocessing import EvbDataProcessing
-from pathlib import Path
-import veloxchem as vlx
-import openmm as mm
-import numpy as np
+
+try:
+    import openmm as mm
+except ImportError:
+    pass
 
 
 class TestEvb:
 
+    @pytest.mark.skipif('openmm' not in sys.modules, reason='openmm not available')
     def test_forcefield_builder(self):
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
         ffbuilder = EvbForceFieldBuilder()
@@ -48,7 +56,7 @@ class TestEvb:
         """
 
         reactant_input = {
-            "molecule": vlx.Molecule.from_xyz_string(ethanol_xyz),
+            "molecule": Molecule.from_xyz_string(ethanol_xyz),
             "optimise": False,
             "forcefield": None,
             "hessian": None,
@@ -56,7 +64,7 @@ class TestEvb:
         }
         product_input = [
             {
-                "molecule": vlx.Molecule.from_xyz_string(ethene_xyz),
+                "molecule": Molecule.from_xyz_string(ethene_xyz),
                 "optimise": False,
                 "forcefield": None,
                 "hessian": None,
@@ -64,7 +72,7 @@ class TestEvb:
             }
             ,
             {
-                "molecule": vlx.Molecule.from_xyz_string(water_xyz),
+                "molecule": Molecule.from_xyz_string(water_xyz),
                 "optimise": False,
                 "forcefield": None,
                 "hessian": None,
@@ -141,6 +149,7 @@ class TestEvb:
                     return False
         return True
 
+    @pytest.mark.skipif('openmm' not in sys.modules, reason='openmm not available')
     def test_system_builder(self):
         data_path = Path(__file__).parent / 'data'
         # load forcefields
@@ -161,7 +170,7 @@ class TestEvb:
         H         -2.54504        1.76624       -0.66695
         H         -4.87808       -0.68100        0.42754
         """
-        reactant_mol = vlx.Molecule.from_xyz_string(ethanol_xyz)
+        reactant_mol = Molecule.from_xyz_string(ethanol_xyz)
         reactant = EvbDriver.load_forcefield_from_json(reapath)
         reactant.molecule = reactant_mol
         product = EvbDriver.load_forcefield_from_json(propath)
@@ -210,6 +219,7 @@ class TestEvb:
             return result
         return False
 
+    @pytest.mark.skipif('openmm' not in sys.modules, reason='openmm not available')
     def test_data_processing(self):
         # Load simulation data
         input_results = {}
