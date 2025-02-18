@@ -414,9 +414,9 @@ class EvbDriver():
         for conf in configurations:
             #create folders,
             
-            data_folder = f"EVB_{self.name}_{conf["name"]}_data_{self.t_label}"
+            data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
             conf["data_folder"] = data_folder
-            run_folder = f"{data_folder}/run"
+            run_folder = str(Path(data_folder) / "run")
             conf["run_folder"] = run_folder
             cwd = Path().cwd()
             data_folder_path = cwd / data_folder
@@ -552,7 +552,7 @@ class EvbDriver():
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
 
-        with open(f"{data_folder}/options.json", "r") as file:
+        with open(str(Path(data_folder) / "options.json"), "r") as file:
             options = json.load(file)
             temperature = options["temperature"]
             Lambda = options["Lambda"]
@@ -564,18 +564,18 @@ class EvbDriver():
         conf = {
             "name": name,
             "data_folder": data_folder,
-            "run_folder": f"{data_folder}/run",
+            "run_folder": str(Path(data_folder) / "run"),
             "temperature": temperature,
             "Lambda": Lambda
         }
         if not skip_systems:
-            systems = self.load_systems_from_xml(f"{data_folder}/run")
+            systems = self.load_systems_from_xml(str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
 
         if not skip_pdb:
-            pdb = mmapp.PDBFile(f"{data_folder}/topology.pdb")
+            pdb = mmapp.PDBFile(str(Path(data_folder) / "topology.pdb"))
             conf["topology"] = pdb.getTopology()
             conf["initial_positions"]  = pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers)
         
