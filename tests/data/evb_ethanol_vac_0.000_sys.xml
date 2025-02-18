@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <System openmmVersion="8.2" type="System" version="1">
 	<PeriodicBoxVectors>
-		<A x="2.4" y="0" z="0"/>
-		<B x="0" y="2.4" z="0"/>
-		<C x="0" y="0" z="2.4"/>
+		<A x="2.374577" y="0" z="0"/>
+		<B x="0" y="2.272386" z="0"/>
+		<C x="0" y="0" z="2.1984339999999998"/>
 	</PeriodicBoxVectors>
 	<Particles>
 		<Particle mass="12.01078"/>
@@ -19,7 +19,7 @@
 	<Constraints/>
 	<Forces>
 		<Force forceGroup="0" frequency="1" name="CMM remover" type="CMMotionRemover" version="1"/>
-		<Force alpha="0" cutoff=".96" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="0" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="4" name="General nonbonded force" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance=".864" type="NonbondedForce" useSwitchingFunction="1" version="4">
+		<Force alpha="0" cutoff=".8793736" dispersionCorrection="1" ewaldTolerance=".0005" exceptionsUsePeriodic="0" forceGroup="0" includeDirectSpace="1" ljAlpha="0" ljnx="0" ljny="0" ljnz="0" method="4" name="General nonbonded force" nx="0" ny="0" nz="0" recipForceGroup="-1" rfDielectric="78.3" switchingDistance=".79143624" type="NonbondedForce" useSwitchingFunction="1" version="4">
 			<GlobalParameters/>
 			<ParticleOffsets/>
 			<ExceptionOffsets/>
