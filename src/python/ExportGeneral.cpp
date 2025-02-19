@@ -111,6 +111,7 @@ export_general(py::module &m) -> void
     m.def("bohr_in_angstroms", &units::bohr_in_angstrom, "Gets Bohr value in Angstroms.");
     m.def("hartree_in_ev", &units::hartree_in_ev, "Gets Hartree value in electronvolts.");
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole, "Gets Hartree value in kcal/mol.");
+    m.def("hartree_in_kjpermol", &units::getHartreeValueInKiloJoulePerMole, "Gets Hartree value in kJ/mol.");
     m.def("hartree_in_inverse_nm", &units::getHartreeValueInInverseNanometer, "Gets Hartree value in inverse nanometer.");
     m.def("hartree_in_wavenumber", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");
     m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");

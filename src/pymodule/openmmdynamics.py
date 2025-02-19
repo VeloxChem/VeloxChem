@@ -36,7 +36,7 @@ from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
 from .xtbdriver import XtbDriver
 from .scfdriver import ScfDriver
@@ -612,7 +612,7 @@ class OpenMMDynamics:
 
         # Generate or use an existing forcefield generator for the QM region
         if ff_gen_qm is None:
-            ff_gen_qm = ForceFieldGenerator()
+            ff_gen_qm = MMForceFieldGenerator()
             ff_gen_qm.create_topology(qm_molecule)
 
         # Determine qm_atoms based on the QM residue
@@ -1868,7 +1868,7 @@ class OpenMMDynamics:
         :param phase:
             Phase of the system ('gas', 'periodic').
         :param ff_gen:
-            ForceFieldGenerator object from VeloxChem.
+            MMForceFieldGenerator object from VeloxChem.
         """
 
         from openmm import NonbondedForce
@@ -2010,7 +2010,7 @@ class OpenMMDynamics:
         :param qm_atoms: 
             List of atom indices to be included in the QM region.
         :param ff_gen_qm: 
-            ForceFieldGenerator object from VeloxChem.
+            MMForceFieldGenerator object from VeloxChem.
         """
 
 

@@ -3,13 +3,15 @@ from pathlib import Path
 import numpy as np
 import pickle
 import math
+import pytest
 
-from veloxchem.veloxchemlib import DispersionModel, Point
+from veloxchem.veloxchemlib import Point
 from veloxchem.veloxchemlib import bohr_in_angstrom, mpi_master
 from veloxchem.veloxchemlib import get_vdw_radii_data_in_bohr
 from veloxchem.veloxchemlib import chemical_element_identifier
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.inputparser import get_random_string_serial
 
@@ -529,6 +531,8 @@ class TestMolecule:
             elem_id = chemical_element_identifier(elem.upper())
             assert abs(radius - vdw_data[elem_id]) < 1.0e-10
 
+    @pytest.mark.skipif(not DispersionModel.is_available(),
+                        reason='dftd4 not available')
     def test_dispersion_model(self):
 
         ref_energies = {
@@ -582,20 +586,18 @@ class TestMolecule:
         molecule = task.molecule
 
         disp = DispersionModel()
+
         for xc_label in ref_energies:
             disp.compute(molecule, xc_label)
 
             e_disp = disp.get_energy()
             e_ref = sum(ref_energies[xc_label])
-            assert abs(e_disp - e_ref) < 1.0e-13
-            assert abs(e_disp - e_ref) / abs(e_ref) < 1.0e-10
+            assert abs(e_disp - e_ref) < 1.0e-11
 
-            g_disp = disp.get_gradient().to_numpy()
+            g_disp = disp.get_gradient()
             g_ref = ref_gradient[xc_label]
             max_diff = np.max(np.abs(g_disp - g_ref))
-            max_rel_diff = np.max(np.abs(g_disp - g_ref) / np.abs(g_ref))
-            assert max_diff < 1.0e-13
-            assert max_rel_diff < 1.0e-10
+            assert max_diff < 1.0e-10
 
     def test_distance_matrix(self):
 

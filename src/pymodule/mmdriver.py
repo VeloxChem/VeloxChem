@@ -75,12 +75,12 @@ class MMDriver:
         # TODO: separate the basic part of MMDriver into another class to avoid
         # cyclic import
 
-        # NOTE: Never use this method inside ForceFieldGenerator.
+        # NOTE: Never use this method inside MMForceFieldGenerator.
         # Otherwise it will be a cyclic import.
 
-        from .forcefieldgenerator import ForceFieldGenerator
+        from .mmforcefieldgenerator import MMForceFieldGenerator
 
-        ff_generator = ForceFieldGenerator()
+        ff_generator = MMForceFieldGenerator()
         ff_generator.ostream.mute()
         ff_generator.create_topology(molecule)
 
