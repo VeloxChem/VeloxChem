@@ -51,8 +51,6 @@ class EvbForceFieldBuilder():
         self,
         reactant_input: dict,
         product_input: list[dict],
-        reactant_scf_result: dict | None = None,
-        product_scf_result: list[dict] | None | list[None]= None,
         reactant_charge: int = 0,
         product_charge: list[int] = [0],
         reactant_multiplicity: int = 1,
@@ -67,24 +65,21 @@ class EvbForceFieldBuilder():
             reactant_multiplicity,
             self.reparameterise,
             self.optimise,
-            reactant_scf_result,
         )
         self.reactant.ostream.flush()
 
         products: list[MMForceFieldGenerator] = []
 
-        if product_scf_result is None:
-            product_scf_result = [None] * len(product_input)
+        
 
-        for i, (input, scf_result) in enumerate(zip(product_input, product_scf_result)):
+        for i, input in enumerate(product_input):
             products.append(
                 self.get_forcefield(
                     input,
                     product_charge[i],
                     product_multiplicity[i],  # type:ignore
                     self.reparameterise,
-                    self.optimise,
-                    scf_result,
+                    self.optimise
                 ))
 
         rea_elems = self.reactant.molecule.get_element_ids()
@@ -111,7 +106,6 @@ class EvbForceFieldBuilder():
         multiplicity: int,
         reparameterise: bool,
         optimise: bool,
-        scf_results: dict | None = None,
     ) -> MMForceFieldGenerator:
 
         molecule = input["molecule"]
@@ -141,33 +135,39 @@ class EvbForceFieldBuilder():
             #Load or calculate the charges
             
             if input["charges"] is not None:
+                assert len(input["charges"]) == molecule.number_of_atoms(), "The number of provided charges does not match the number of atoms in the molecule"
+                charge_sum = sum(input["charges"])
+                if charge_sum - round(charge_sum) > 0.001:
+                    self.ostream.print_warning(f"Sum of charges is {charge_sum} is not close to an integer. Confirm that the input is correct.")  
                 forcefield.partial_charges = input["charges"]
                 self.ostream.print_info("Creating topology")
+                self.ostream.flush()
                 forcefield.create_topology(molecule)
             else:
-                if scf_results is None:
-                    if max(molecule.get_masses()) > 84:
-                        basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
-                        self.ostream.print_info(
-                            f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
-                        )
-                    else:
-                        basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
-                    if multiplicity == 1:
-                        scf_drv = ScfRestrictedDriver()
-                    else:
-                        scf_drv = ScfUnrestrictedDriver()
-                    scf_results = scf_drv.compute(molecule, basis)
-                    if not scf_drv.is_converged:
-                        scf_drv.conv_thresh = 1.0e-4
-                        scf_drv.max_iter = 200
-                        scf_results = scf_drv.compute(molecule, basis)
-                    assert scf_drv.is_converged, "SCF calculation for RESP charges did not converge, aborting"
+                if max(molecule.get_masses()) > 84:
+                    basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
+                    self.ostream.print_info(
+                        f"Heavy ({max(molecule.get_masses())}) atom found. Using STO-6G basis (only comes in for RESP calculation)."
+                    )
                 else:
-                    self.ostream.print_info("Using provided SCF results for RESP charges")
+                    basis = MolecularBasis.read(molecule, "6-31G*", ostream=None)
+                if multiplicity == 1:
+                    scf_drv = ScfRestrictedDriver()
+                else:
+                    scf_drv = ScfUnrestrictedDriver()
+                self.ostream.flush()
+                scf_results = scf_drv.compute(molecule, basis)
+                if not scf_drv.is_converged:
+                    scf_drv.conv_thresh = 1.0e-4
+                    scf_drv.max_iter = 200
+                    scf_results = scf_drv.compute(molecule, basis)
+                assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
+                
                 resp_drv = RespChargesDriver()
                 self.ostream.print_info("Calculating RESP charges")
+                self.ostream.flush()
                 forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
+                self.ostream.flush()
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule, basis, scf_result=scf_results)
 
@@ -198,8 +198,10 @@ class EvbForceFieldBuilder():
                 else:
                     xtb_drv = XtbDriver()
                     xtb_hessian_drv = XtbHessianDriver(xtb_drv)
+                    self.ostream.flush()
                     xtb_hessian_drv.compute(molecule)
                     hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
+                self.ostream.flush()
                 forcefield.reparametrize(hessian=hessian)
         return forcefield
 

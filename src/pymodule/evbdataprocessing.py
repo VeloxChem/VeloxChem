@@ -54,8 +54,7 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
-        self.kb = 1.987204259e-3  # kcal/molK #todo use vlx, but where can I find it?
-        self.joule_to_cal = 1 / 4.184
+        self.kb = 8.3144621e-3 # kJ/molK #todo use vlx, but where can I find it?
         self.verbose: bool = True
 
         self.calculate_discrete = True
@@ -243,18 +242,30 @@ class EvbDataProcessing:
             if len(max_arg) < 1:
                 max_arg = scipy.signal.argrelmax(dGevb_smooth)[0]
 
-            if len(min_arg) < 2:
-                min_arg = [0,-1]
-        if len(min_arg) and not fitting!= 2:
-            self.ostream.print_warning(f"Found {len(min_arg)} minima in the EVB profile instead of 2. Confirm the calculated extrema with the plot.")
-        Erea = dGevb_smooth[min_arg[0]]
-        Epro = dGevb_smooth[min_arg[-1]]
+            # if len(min_arg) < 2:
+            #     min_arg = [0,-1]
 
-        if len(max_arg) != 1 and not fitting:
-            Ebar = dGevb_smooth[len(dGevb_smooth) // 2]
-            self.ostream.print_warning(f"Found {len(max_arg)} maxima in the EVB profile instead of 1. Confirm the calculated extrema with the plot.")
+        if len(min_arg) >= 2:
+            Erea = dGevb_smooth[min_arg[0]]
+            Epro = dGevb_smooth[min_arg[-1]]
         else:
+            Erea = dGevb_smooth[0]
+            Epro = dGevb_smooth[-1]
+
+        if not fitting and len(min_arg) != 2:
+            self.ostream.print_warning(f"Found {len(min_arg)} minima in the EVB profile instead of 2. Confirm the calculated extrema with the plot.")
+
+        if len(max_arg) == 1:
             Ebar = dGevb_smooth[max_arg[0]]
+        elif len(max_arg) >1:
+            mid_arg = max_arg[len(max_arg) // 2]
+            Ebar = dGevb_smooth[mid_arg]
+        else:
+            Ebar = dGevb_smooth[len(dGevb_smooth) // 2]
+
+        if not fitting and len(max_arg) != 1:
+            self.ostream.print_warning(f"Found {len(max_arg)} maxima in the EVB profile instead of 1. Confirm the calculated extrema with the plot.")
+
         barrier = Ebar - Erea
         free_energy = Epro - Erea
         dGevb_smooth -= Erea
@@ -391,16 +402,16 @@ class EvbDataProcessing:
     @staticmethod
     def print_results(results, ostream):
         
-        ostream.print_info(f"{'Discrete':<30} {'Barrier':>15} {'Free Energy':>15}")
+        ostream.print_info(f"{'Discrete':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}")
         for name, result in results["configuration_results"].items():
             if "discrete" in result.keys():
-                ostream.print_info(f"{name:<30} {result['discrete']['barrier']:15.2f} {result['discrete']['free_energy']:15.2f}")
+                ostream.print_info(f"{name:<30} {result['discrete']['barrier']:20.2f} {result['discrete']['free_energy']:20.2f}")
 
         ostream.print_info("\n")
-        ostream.print_info(f"{'Analytical':<30} {'Barrier':>15} {'Free Energy':>15}")
+        ostream.print_info(f"{'Analytical':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}")
         for name, result in results["configuration_results"].items():
             if "analytical" in result.keys():
-                ostream.print_info(f"{name:<30} {result['analytical']['barrier']:15.2f} {result['analytical']['free_energy']:15.2f}")
+                ostream.print_info(f"{name:<30} {result['analytical']['barrier']:20.2f} {result['analytical']['free_energy']:20.2f}")
 
     @staticmethod
     def plot_dE_density(results):
@@ -442,7 +453,7 @@ class EvbDataProcessing:
             ax[j,0].plot([dE_min,dE_min],[0,0.3])
             ax[j,0].plot([dE_max,dE_max],[0.7,1])
             ax[j,0].set_ylabel(r"$\lambda$")
-            ax[j,0].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
+            ax[j,0].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
             ax[j,0].set_ylim(0,1)
             ax[j,0].set_xlim(min(dE) * 1.1,max(dE) * 1.1)
 
@@ -479,7 +490,7 @@ class EvbDataProcessing:
             ax[j,1].plot([dE_min,dE_min],[0,1])
             ax[j,1].plot([dE_max,dE_max],[0,1])
             ax[j,1].set_ylabel("Density")
-            ax[j,1].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
+            ax[j,1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
             ax[j,1].tick_params(
                 axis='y',          # changes apply to the x-axis
                 which='both',      # both major and minor ticks are affected
@@ -547,10 +558,10 @@ class EvbDataProcessing:
 
         # ax[0].legend()
         ax[0].set_xlabel(r"$\lambda$")
-        ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kcal/mol)")
+        ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
 
-        ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
-        ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kcal/mol)")
+        ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+        ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
         fig.legend(
             legend_lines,
             legend_labels,

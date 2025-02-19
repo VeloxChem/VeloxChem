@@ -44,7 +44,7 @@ class ReactionMatcher:
 
         if not mapping == {}:
             spent_time = time.time() - start_time
-            self.ostream.print_info(f"Found mapping without removing bonds. Spent {spent_time} seconds.")
+            self.ostream.print_info(f"Found mapping without removing bonds.")
         else:
             # self.ostream.print_info("No mapping found without removing bonds, trying to remove one bond")
             Am1_mappings = []
@@ -58,6 +58,7 @@ class ReactionMatcher:
                     Am1_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
 
             if len(Am1_mappings) > 0:
+                self.ostream.print_info(f"Found {len(Am1_mappings)} mappings with removing 1 bond")
                 mapping = self._sort_broken_mappings(Am1_mappings)
             else:
                 Am2_mappings = []
@@ -82,6 +83,7 @@ class ReactionMatcher:
                             Am2_mappings.append({"mapping": mapping, "forming_bonds": forming_bonds, "breaking_bonds": breaking_bonds})
                 if len(Am2_mappings) > 0:
                     mapping = self._sort_broken_mappings(Am2_mappings)
+                    self.ostream.print_info(f"Found {len(Am2_mappings)} mappings with removing 2 bonds")
         if mapping == {}:
             self.ostream.print_info("No mapping found with removing two bonds, removing 3 bonds is not implemented. Try suggesting some broken bonds.")
         if swapped:

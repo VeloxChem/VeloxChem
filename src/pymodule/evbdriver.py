@@ -70,8 +70,8 @@ class EvbDriver():
         Args:
             reactant (str | Molecule): The reactant. If a string is given, the corresponding xyz file must be present in the input_files folder.
             product (str | list[str] | Molecule | list[Molecule]): A list of products. If a (list of) string(s) is given, the corresponding xyz file(s) must be present in the input_files folder.
-            barrier (float): the reaction barrier in kcal/mol of the vacuum system
-            free_energy (float): the reaction free energy in kcal/mol of the vacuum system
+            barrier (float): the reaction barrier in kJ/mol of the vacuum system
+            free_energy (float): the reaction free energy in kJ/mol of the vacuum system
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
         """
         self.ostream.print_blank()
@@ -101,8 +101,8 @@ class EvbDriver():
         self,
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
-        reactant_scf: dict = None,
-        product_scf: dict | list[dict] = None,
+        reactant_partial_charges: list[float] = None,
+        product_partial_charges: list[float] | list[list[float]] = None,
         product_charge: int | list[int] = 0,  # type: ignore
         reactant_multiplicity: int = 1,
         product_multiplicity: int | list[int] = 1,
@@ -117,6 +117,8 @@ class EvbDriver():
         Args:
             reactant (str | Molecule): The reactant. If a string is given, the corresponding xyz file must be present in the input_files folder.
             product (str | list[str] | Molecule | list[Molecule]): A list of products. If a (list of) string(s) is given, the corresponding xyz file(s) must be present in the input_files folder.
+            reactant_partial_charges (list[float], optional): The partial charges of the reactant. If not provided, the charges will be calculated using the RESP method. Defaults to None.
+            product_partial_charges (list[float] | list[list[float]], optional): The partial charges of each provided product. If not provided, the charges will be calculated using the RESP method.
             product_charge (int | list[int], optional): The nominal charge of each provided product. List should have the same length as the amount of products provided. 
                 The reactant will be assigned the sum of the product charges. Defaults to 0.
             reactant_multiplicity (int, optional): The multiplicity of the reactant. Defaults to 1.
@@ -183,6 +185,17 @@ class EvbDriver():
         else:
             raise ValueError("Reactant and product must be either a both string or a Molecule object")
 
+        if reactant_partial_charges is not None:
+            rea_input["charges"] = reactant_partial_charges
+        if product_partial_charges is not None:
+            if isinstance(product_partial_charges[0], float):
+                assert len(product) == 1, "Provide a list of seperate partial charges for every separate product"
+                pro_input[0]["charges"] = product_partial_charges
+            else:
+                assert len(product) == len(product_partial_charges), "Amount of products and lists of partial charges must match"
+                for pro, charges in zip(pro_input, product_partial_charges):
+                    pro["charges"] = charges
+
         cwd = Path().cwd()
         reactant_path = cwd / self.input_folder / f"{reactant_name}_ff_data.json"
         combined_product_path = cwd / self.input_folder / f"{combined_product_name}_ff_data.json"
@@ -204,13 +217,10 @@ class EvbDriver():
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
-            if isinstance(product_scf, dict):
-                product_scf = [product_scf]
+
             self.reactant, self.product = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
-                reactant_scf,
-                product_scf,
                 reactant_charge,
                 product_charge,
                 reactant_multiplicity,
@@ -425,6 +435,9 @@ class EvbDriver():
             data_folder_path.mkdir(parents=True, exist_ok=True)
             run_folder_path.mkdir(parents=True, exist_ok=True)
 
+            self.save_forcefield(self.reactant, str(data_folder_path / "reactant_ff.json"))
+            self.save_forcefield(self.product, str(data_folder_path / "product_ff.json"))
+
             # build the system
             system_builder = EvbSystemBuilder()
             self.ostream.print_blank()
@@ -489,17 +502,17 @@ class EvbDriver():
                 "padding": 1.2,
                 "ion_count": 0,
             }
-        elif name == "CNT":
-            conf = {
-                "name": "water_CNT",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "ion_count": 0,
-                "CNT": True,
-                "CNT_radius": 0.5,
-            }
+        # elif name == "CNT":
+        #     conf = {
+        #         "name": "water_CNT",
+        #         "solvent": "spce",
+        #         "temperature": self.temperature,
+        #         "NPT": True,
+        #         "pressure": 1,
+        #         "ion_count": 0,
+        #         "CNT": True,
+        #         "CNT_radius": 0.5,
+        #     }
         elif name == "graphene":
             conf = {
                 "name": "water_graphene",
@@ -689,8 +702,8 @@ class EvbDriver():
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
-            barrier (float): the reaction barrier in kcal/mol of the reference system
-            free_energy (float): the reaction free energy in kcal/mol of the reference system
+            barrier (float): the reaction barrier in kJ/mol of the reference system
+            free_energy (float): the reaction free energy in kJ/mol of the reference system
             lambda_sub_sample (int, optional): Factor with which the lambda vector will be subsampled. Setting this to two will discard every other lambda frame. Defaults to 1.
             lambda_sub_sample_ends (bool, optional): If set to False, the lambda frames up to 0.1 and from 0.9 will not be subsampled. Defaults to False.
             time_sub_sample (int, optional): Factor with which the time vector will be subsampled. Setting this to two will discard every other snapshot. Defaults to 1.
