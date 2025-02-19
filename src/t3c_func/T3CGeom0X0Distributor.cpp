@@ -73,13 +73,20 @@ CT3CGeom0X0Distributor::distribute(const CSimdArray<double>&        buffer,
                     
                         const auto refs = d_indices[m + 1];
                     
-                        // compute r and s indexes
-                    
-                        const auto r = mask_indices.at(k * cdim + refr);
+                        const auto r = k * cdim + refr;
                     
                         const auto s = l * ddim + refs;
-                        
-                        ptr_values[r * nrows + s] = curr_buffer[m - ket_range.first];
+                    
+                        // assign integrals
+                    
+                        if (r <= s)
+                        {
+                            ptr_values[mask_indices.at(r) * nrows + s] = curr_buffer[m - ket_range.first];
+                        }
+                        else
+                        {
+                            ptr_values[mask_indices.at(s) * nrows + r] = curr_buffer[m - ket_range.first];
+                        }
                     }
                 }
             }
