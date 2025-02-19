@@ -249,10 +249,10 @@ class EvbDataProcessing:
             Erea = dGevb_smooth[min_arg[0]]
             Epro = dGevb_smooth[min_arg[-1]]
         else:
-            Erea = dGevb_smooth[min_arg[0]]
-            Epro = dGevb_smooth[min_arg[-1]]
+            Erea = dGevb_smooth[0]
+            Epro = dGevb_smooth[-1]
 
-        if fitting and len(min_arg) != 2:
+        if not fitting and len(min_arg) != 2:
             self.ostream.print_warning(f"Found {len(min_arg)} minima in the EVB profile instead of 2. Confirm the calculated extrema with the plot.")
 
         if len(max_arg) == 1:
@@ -263,7 +263,7 @@ class EvbDataProcessing:
         else:
             Ebar = dGevb_smooth[len(dGevb_smooth) // 2]
 
-        if fitting and len(max_arg) != 1:
+        if not fitting and len(max_arg) != 1:
             self.ostream.print_warning(f"Found {len(max_arg)} maxima in the EVB profile instead of 1. Confirm the calculated extrema with the plot.")
 
         barrier = Ebar - Erea
@@ -402,16 +402,16 @@ class EvbDataProcessing:
     @staticmethod
     def print_results(results, ostream):
         
-        ostream.print_info(f"{'Discrete':<30} {'Barrier':>15} {'Free Energy':>15}")
+        ostream.print_info(f"{'Discrete':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}")
         for name, result in results["configuration_results"].items():
             if "discrete" in result.keys():
-                ostream.print_info(f"{name:<30} {result['discrete']['barrier']:15.2f} {result['discrete']['free_energy']:15.2f}")
+                ostream.print_info(f"{name:<30} {result['discrete']['barrier']:20.2f} {result['discrete']['free_energy']:20.2f}")
 
         ostream.print_info("\n")
-        ostream.print_info(f"{'Analytical':<30} {'Barrier':>15} {'Free Energy':>15}")
+        ostream.print_info(f"{'Analytical':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}")
         for name, result in results["configuration_results"].items():
             if "analytical" in result.keys():
-                ostream.print_info(f"{name:<30} {result['analytical']['barrier']:15.2f} {result['analytical']['free_energy']:15.2f}")
+                ostream.print_info(f"{name:<30} {result['analytical']['barrier']:20.2f} {result['analytical']['free_energy']:20.2f}")
 
     @staticmethod
     def plot_dE_density(results):
