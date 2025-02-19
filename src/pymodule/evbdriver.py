@@ -101,8 +101,8 @@ class EvbDriver():
         self,
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
-        reactant_scf: dict = None,
-        product_scf: dict | list[dict] = None,
+        reactant_partial_charges: list[float] = None,
+        product_partial_charges: list[float] | list[list[float]] = None,
         product_charge: int | list[int] = 0,  # type: ignore
         reactant_multiplicity: int = 1,
         product_multiplicity: int | list[int] = 1,
@@ -117,6 +117,8 @@ class EvbDriver():
         Args:
             reactant (str | Molecule): The reactant. If a string is given, the corresponding xyz file must be present in the input_files folder.
             product (str | list[str] | Molecule | list[Molecule]): A list of products. If a (list of) string(s) is given, the corresponding xyz file(s) must be present in the input_files folder.
+            reactant_partial_charges (list[float], optional): The partial charges of the reactant. If not provided, the charges will be calculated using the RESP method. Defaults to None.
+            product_partial_charges (list[float] | list[list[float]], optional): The partial charges of each provided product. If not provided, the charges will be calculated using the RESP method.
             product_charge (int | list[int], optional): The nominal charge of each provided product. List should have the same length as the amount of products provided. 
                 The reactant will be assigned the sum of the product charges. Defaults to 0.
             reactant_multiplicity (int, optional): The multiplicity of the reactant. Defaults to 1.
@@ -183,6 +185,17 @@ class EvbDriver():
         else:
             raise ValueError("Reactant and product must be either a both string or a Molecule object")
 
+        if reactant_partial_charges is not None:
+            rea_input["charges"] = reactant_partial_charges
+        if product_partial_charges is not None:
+            if isinstance(product_partial_charges[0], float):
+                assert len(product) == 1, "Provide a list of seperate partial charges for every separate product"
+                pro_input[0]["charges"] = product_partial_charges
+            else:
+                assert len(product) == len(product_partial_charges), "Amount of products and lists of partial charges must match"
+                for pro, charges in zip(pro_input, product_partial_charges):
+                    pro["charges"] = charges
+
         cwd = Path().cwd()
         reactant_path = cwd / self.input_folder / f"{reactant_name}_ff_data.json"
         combined_product_path = cwd / self.input_folder / f"{combined_product_name}_ff_data.json"
@@ -204,13 +217,10 @@ class EvbDriver():
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
-            if isinstance(product_scf, dict):
-                product_scf = [product_scf]
+
             self.reactant, self.product = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
-                reactant_scf,
-                product_scf,
                 reactant_charge,
                 product_charge,
                 reactant_multiplicity,
