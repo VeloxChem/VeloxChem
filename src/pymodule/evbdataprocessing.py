@@ -11,7 +11,13 @@ from .errorhandler import assert_msg_critical
 with redirect_stderr(StringIO()) as fg_err:
     try:
         import pymbar
+    except ImportError:
+        pass
+    try:
         import scipy
+    except ImportError:
+        pass
+    try:
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
         from matplotlib.lines import Line2D

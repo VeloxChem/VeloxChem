@@ -40,6 +40,9 @@ from .errorhandler import assert_msg_critical
 with redirect_stderr(StringIO()) as fg_err:
     try:
         from pymbar import MBAR, timeseries
+    except ImportError:
+        pass
+    try:
         import openmm as mm
         import openmm.app as app
         import openmm.unit as unit
