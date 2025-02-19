@@ -1,7 +1,6 @@
 import sys
 
 from .errorhandler import assert_msg_critical
-import sys
 
 try:
     import openmm.app as mmapp
