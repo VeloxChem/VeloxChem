@@ -71,7 +71,7 @@ class EvbSystemBuilder():
 
         self.constraints: list[dict] = []
 
-        self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom()
+        self.k = 4.184 * hartree_in_kcalpermol() * 0.1 * bohr_in_angstrom() # Coulombic pre-factor
 
         self.deg_to_rad: float = np.pi / 180
 

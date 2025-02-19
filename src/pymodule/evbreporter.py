@@ -42,11 +42,11 @@ class EvbReporter():
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbReporter.')
 
         positions = state.getPositions(asNumpy=True)
-        E = [state.getPotentialEnergy().value_in_unit(mm.unit.kilocalories_per_mole)]
+        E = [state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)]
         for simulation in self.simulations:
             simulation.context.setPositions(positions)
             state = simulation.context.getState(getEnergy=True)
-            E.append(state.getPotentialEnergy().value_in_unit(mm.unit.kilocalories_per_mole))
+            E.append(state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole))
         line = f"{self.Lambda}, {E[1]}, {E[2]}, {E[3]}, {E[4]}, {E[0]}\n"
         self.out.write(line)
         

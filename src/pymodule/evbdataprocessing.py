@@ -54,8 +54,7 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
-        self.kb = 1.987204259e-3  # kcal/molK #todo use vlx, but where can I find it?
-        self.joule_to_cal = 1 / 4.184
+        self.kb = 8.3144621e-3 # kJ/molK #todo use vlx, but where can I find it?
         self.verbose: bool = True
 
         self.calculate_discrete = True
@@ -454,7 +453,7 @@ class EvbDataProcessing:
             ax[j,0].plot([dE_min,dE_min],[0,0.3])
             ax[j,0].plot([dE_max,dE_max],[0.7,1])
             ax[j,0].set_ylabel(r"$\lambda$")
-            ax[j,0].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
+            ax[j,0].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
             ax[j,0].set_ylim(0,1)
             ax[j,0].set_xlim(min(dE) * 1.1,max(dE) * 1.1)
 
@@ -491,7 +490,7 @@ class EvbDataProcessing:
             ax[j,1].plot([dE_min,dE_min],[0,1])
             ax[j,1].plot([dE_max,dE_max],[0,1])
             ax[j,1].set_ylabel("Density")
-            ax[j,1].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
+            ax[j,1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
             ax[j,1].tick_params(
                 axis='y',          # changes apply to the x-axis
                 which='both',      # both major and minor ticks are affected
@@ -559,10 +558,10 @@ class EvbDataProcessing:
 
         # ax[0].legend()
         ax[0].set_xlabel(r"$\lambda$")
-        ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kcal/mol)")
+        ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
 
-        ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kcal/mol)")
-        ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kcal/mol)")
+        ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+        ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
         fig.legend(
             legend_lines,
             legend_labels,
