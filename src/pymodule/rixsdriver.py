@@ -185,8 +185,9 @@ class RixsDriver:
             print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
     
-    def compute(self, molecule, basis, scf_tensors, rsp_tensors,
-                 cvs_rsp_tensors=None, num_core_orbitals=None):
+    def compute(self, molecule, basis, scf_tensors, 
+                rsp_tensors, cvs_rsp_tensors=None,
+                rsp_outfile=None, cvs_rsp_outfile=None):
         """
         Computes the relevant RIXS properties
         
@@ -211,7 +212,7 @@ class RixsDriver:
             as well as scattering amplitudes and cross-sections
         """
 
-        norb = scf_tensors['C_alpha'].shape[0]
+        norb_AO, norb = scf_tensors['C_alpha'].shape[0], scf_tensors['C_alpha'].shape[1] # .shape[0]
         nocc = molecule.number_of_alpha_electrons()
         nvir = norb - nocc
 
@@ -220,7 +221,7 @@ class RixsDriver:
 
         # TODO: add safeguards for when both num_intermediate_states and cvs is given
         # TODO: think if there is ever a case where get_num_val_orbs() don't find all valence?
-
+        """
         if num_core_orbitals is not None:
             self.ostream.print_info(
                 'Full space eigenvector assumed for RIXS. Number of intermediate/source/core orbitals {:d}'.format(
@@ -233,17 +234,26 @@ class RixsDriver:
             num_tot_states = len(rsp_tensors['eigenvalues'])
             num_final_states = num_val_orbitals * num_vir_orbitals
             num_intermediate_states = num_tot_states - num_final_states
+        """
 
-        elif cvs_rsp_tensors is not None:
+        if cvs_rsp_tensors is not None:
             self.ostream.print_info(
                 'Running RIXS with CVS approximation.')
             self.cvs = True
-            num_core_orbitals = self.get_num_core_orbs(cvs_rsp_tensors)
+            try:
+                num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
+                num_final_states = len(rsp_tensors['eigenvalues'])
+                num_core_orbitals = self.get_num_core_orbs(cvs_rsp_tensors)
+            except KeyError:
+                core_eigvals = self.extract_eigenvalues(cvs_rsp_outfile)
+                valence_eigvals = self.extract_eigenvalues(rsp_outfile)
+                num_intermediate_states = len(core_eigvals) #max(int(key[1:]) for key in cvs_rsp_tensors.keys() if key.startswith('S'))
+                num_final_states = len(valence_eigvals)  #max(int(key[1:]) for key in rsp_tensors.keys() if key.startswith('S'))
+                num_core_orbitals = self.extract_largest_core(cvs_rsp_outfile)
+
             num_val_orbitals  = nocc - num_core_orbitals # self.get_num_val_orbs(rsp_tensors) # = nocc
             num_vir_orbitals  = nvir # self.get_num_vir_orbs(rsp_tensors) # = nvir
 
-            num_final_states = len(rsp_tensors['eigenvalues'])
-            num_intermediate_states = len(cvs_rsp_tensors['eigenvalues'])
             num_tot_states = num_final_states + num_intermediate_states
             core_states = list(range(num_intermediate_states))
             occupied_core = num_core_orbitals
@@ -276,10 +286,14 @@ class RixsDriver:
         mo_vir = scf_tensors['C_alpha'][:, mo_vir_indices]
 
         val_states = list(range(num_final_states))
-        core_eigvecs_dist = np.array([cvs_rsp_tensors['eigenvectors_distributed'][state] for state in core_states])
-        core_eigvals = cvs_rsp_tensors['eigenvalues'][core_states]
-        valence_eigvecs_dist = np.array([rsp_tensors['eigenvectors_distributed'][state] for state in val_states])
-        valence_eigvals = rsp_tensors['eigenvalues'][val_states]
+        try:
+            core_eigvals = cvs_rsp_tensors['eigenvalues'][core_states]
+            valence_eigvals = rsp_tensors['eigenvalues'][val_states]
+            core_eigvecs = np.array([self.get_full_solution_vector(cvs_rsp_tensors['eigenvectors_distributed'][state]) for state in core_states])
+            valence_eigvecs = np.array([self.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][state]) for state in val_states])
+        except KeyError:
+            core_eigvecs = np.array([cvs_rsp_tensors['S' + str(i + 1)] for i in range(num_intermediate_states)]) #.T
+            valence_eigvecs = np.array([rsp_tensors['S' + str(i + 1)] for i in range(num_final_states)]) #.T
         
         # For bookkeeping
         self.orb_and_state_dict = {
@@ -292,7 +306,6 @@ class RixsDriver:
             'val_states': val_states,
         }
         
-
         if self.photon_energy is None:
             # assume first core resonance
             self.ostream.print_info(
@@ -302,28 +315,28 @@ class RixsDriver:
         dipole_integrals = compute_electric_dipole_integrals(
                 molecule, basis, [0.0,0.0,0.0])
 
-        ene_losses = []
-        emission_enes = []
-        cross_sections = []
-        scattering_amplitudes = []
+        ene_losses = np.zeros((num_final_states, len(self.photon_energy)))
+        emission_enes = np.zeros((num_final_states, len(self.photon_energy)))
+        cross_sections = np.zeros((num_final_states, len(self.photon_energy))) # []
+        scattering_amplitudes = np.zeros((num_final_states, len(self.photon_energy), 3, 3), dtype=np.complex128)
 
         for w_ind, omega in enumerate(self.photon_energy):
 
             for f in range(num_final_states):
 
-                valence_eigvec = self.get_full_solution_vector(valence_eigvecs_dist[f])
+                valence_eigvec = valence_eigvecs[f]
                     
                 valence_z_mat = valence_eigvec[:len(valence_eigvec) // 2].reshape(
                             num_core_orbitals + num_val_orbitals, num_vir_orbitals)
                 valence_y_mat = valence_eigvec[len(valence_eigvec) // 2:].reshape(
                             num_core_orbitals + num_val_orbitals, num_vir_orbitals)
                 
-                gs_to_core_tdens = np.zeros((norb, norb, num_intermediate_states))
-                core_to_val_tdens = np.zeros((norb, norb, num_intermediate_states))
+                gs_to_core_tdens = np.zeros((norb_AO, norb_AO, num_intermediate_states))
+                core_to_val_tdens = np.zeros((norb_AO, norb_AO, num_intermediate_states))
 
                 for n in range(num_intermediate_states):
 
-                    core_eigvec = self.get_full_solution_vector(core_eigvecs_dist[n])
+                    core_eigvec = core_eigvecs[n]
                     
                     core_z_mat = core_eigvec[:len(core_eigvec) // 2].reshape(
                             occupied_core, num_vir_orbitals)
@@ -349,17 +362,19 @@ class RixsDriver:
                                 np.linalg.multi_dot(
                                     [mo_vir, valence_y_mat.T, core_y_mat, mo_vir.T]))
                     
+                # TODO: improve results dictionary structure
                 emission_ene = omega - valence_eigvals[f]
-                emission_enes.append([w_ind, n, emission_ene])
-                energy_loss = omega - emission_ene
-                ene_losses.append([w_ind, n, energy_loss])
-                    
+                emission_enes[f, w_ind] = emission_ene
+                energy_loss = omega - emission_ene # independent of intermediate state, but 
+                ene_losses[f, w_ind] = energy_loss # keeping it like this for consistency
+                
+                
                 F = self.scattering_amplitude_tensor(omega, core_eigvals, gs_to_core_tdens,
                                                        core_to_val_tdens, dipole_integrals)
-                scattering_amplitudes.append(F)
-
                 sigma = self.cross_section(F)
-                cross_sections.append(sigma.real)
+
+                scattering_amplitudes[f, w_ind] = F
+                cross_sections[f, w_ind] = sigma.real
         
         return_dict = {
                     'cross_sections': cross_sections,
@@ -369,7 +384,66 @@ class RixsDriver:
 
         return return_dict
 
+    @staticmethod
+    def convert_rsp(rsp_tensor, eigenvals):
+        # eigenvalues
+        #return {'eigenvalues': eigenvals}
+        pass
+
     # TODO: find better solution for the below functions
+    @staticmethod
+    def extract_eigenvalues(file_path):
+        eigenvals = []
+        in_section = False
+
+        with open(file_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                
+                if "One-Photon Absorption" in line:
+                    in_section = True
+                    continue
+                if in_section and ("Electronic Circular Dichroism" in line or "Excited States" in line):
+                    break
+                if in_section and line.startswith("Excited State"):
+                    parts = line.split()
+                    au_value = float(parts[3])
+                    eigenvals.append(au_value)
+
+        return np.array(eigenvals)
+
+    @staticmethod
+    def extract_largest_core(file_path):
+        """
+        Find largest core orbital, by looking through the 
+        output file and finding the largest integer connected
+        to core_ strign
+        """
+        largest_core = 0
+
+        with open(file_path, 'r') as file:
+            for line in file:
+
+                index = line.find("core_")
+                if index == -1:
+                    continue  # core_ not found on this line
+
+                start = index + len("core_")
+                number_str = ""
+
+                for char in line[start:]:
+                    if char.isdigit():
+                        number_str += char
+                    else:
+                        break
+
+                if number_str:
+                    core_num = int(number_str)
+                    if largest_core is None or core_num > largest_core:
+                        largest_core = core_num
+
+        return largest_core
+
     @staticmethod
     def get_num_core_orbs(rsp_results):
         excitation_details = rsp_results['excitation_details']
@@ -380,6 +454,7 @@ class RixsDriver:
             if 'core_' in entry:
                 core_index = int(entry.split('core_')[1].split()[0])
                 largest_core = max(largest_core, core_index)
+
         return largest_core
     
     @staticmethod
