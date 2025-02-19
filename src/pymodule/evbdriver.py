@@ -425,6 +425,9 @@ class EvbDriver():
             data_folder_path.mkdir(parents=True, exist_ok=True)
             run_folder_path.mkdir(parents=True, exist_ok=True)
 
+            self.save_forcefield(self.reactant, str(data_folder_path / "reactant_ff.json"))
+            self.save_forcefield(self.product, str(data_folder_path / "product_ff.json"))
+
             # build the system
             system_builder = EvbSystemBuilder()
             self.ostream.print_blank()
