@@ -11,15 +11,19 @@ except ImportError:
 
 class EvbReporter():
     #todo do this with force groups instead of different systems
-    def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, append = False):
+    def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, outputstream, append = False):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbReporter.')
 
         # OpenMM HIP version is slighly older and uses a different format for reporters
         if version('openmm') < '8.2':
+            outputstream.print_info('Older version of OpenMM detected. Using tuple format for returning reporter information.')
+            outputstream.flush()
             self.use_tuple = True
         else:
+            
             self.use_tuple = False
+        
 
         self.out = open(file, 'a' if append else 'w')
         self.report_interval = report_interval
@@ -44,7 +48,8 @@ class EvbReporter():
     def describeNextReport(self, simulation):
         steps = self.report_interval - simulation.currentStep%self.report_interval
         if self.use_tuple:
-            return (steps, True, True, False, False, True)
+            
+            return (steps, None, True, False, False, True)
         else:
             return {'steps': steps, 'periodic': True, 'include':['positions','energy']}
         

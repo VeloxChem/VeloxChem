@@ -499,7 +499,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1.2,
+                "padding": 1,
                 "ion_count": 0,
             }
         # elif name == "CNT":
@@ -531,7 +531,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1.5,
+                "padding": 1,
                 "ion_count": 0,
                 "E_field": [0, 0, 10],
             }
@@ -543,7 +543,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1.5,
+                "padding": 1,
                 "ion_count": 0,
                 "no_reactant": True,
             }

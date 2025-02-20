@@ -196,6 +196,7 @@ class EvbFepDriver():
                 systems[1],
                 topology,
                 l,
+                self.ostream,
                 append=append,
             ))
 
