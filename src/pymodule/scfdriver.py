@@ -37,7 +37,7 @@ from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .veloxchemlib import xcfun
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
@@ -781,7 +781,7 @@ class ScfDriver:
                         vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
 
                 # kJ/mol to Hartree
-                vdw_ene /= (4.184 * hartree_in_kcalpermol())
+                vdw_ene /= hartree_in_kjpermol()
 
                 self._nuc_mm_energy += vdw_ene
 
