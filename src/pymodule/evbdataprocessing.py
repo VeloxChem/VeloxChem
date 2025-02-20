@@ -5,6 +5,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import boltzmann_in_hartreeperkelvin, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -54,7 +55,8 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
-        self.kb = 8.3144621e-3 # kJ/molK #todo use vlx, but where can I find it?
+        # Boltzmann constant: ca 8.314e-3 kJ/mol/K
+        self.kb = boltzmann_in_hartreeperkelvin() * hartree_in_kjpermol()
         self.verbose: bool = True
 
         self.calculate_discrete = True
