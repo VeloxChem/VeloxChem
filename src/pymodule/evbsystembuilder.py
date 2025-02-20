@@ -84,7 +84,8 @@ class EvbSystemBuilder():
         product: MMForceFieldGenerator,
         Lambda: list,
         configuration: dict,
-        constraints: list = []
+        constraints: list = [],
+        neutralize: bool = True,
     ):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
@@ -150,7 +151,7 @@ class EvbSystemBuilder():
         self.ostream.print_info(f"Building system in box with dimensions {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm")
         
         if solvent:
-            self._add_solvent(system, system_mol, solvent, box, reactant, ion_count, topology, nb_force)
+            self._add_solvent(system, system_mol, solvent, box, reactant, ion_count, topology, nb_force, neutralize)
         else:
             self.positions = np.array(positions) * 0.1
 
@@ -473,7 +474,7 @@ class EvbSystemBuilder():
 
         return box
 
-    def _add_solvent(self, system, system_mol, solvent, box, reactant, ion_count, topology, nb_force):
+    def _add_solvent(self, system, system_mol, solvent, box, reactant, ion_count, topology, nb_force, neutralize):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
@@ -488,10 +489,13 @@ class EvbSystemBuilder():
         charge = reactant.molecule.get_charge()
         charge_quantities = [0, 0]
         self.ostream.print_info(f"Charge of the system: {charge}")
-        if charge > 0:
-            charge_quantities = [ion_count, ion_count + charge]
-        elif charge < 0:
-            charge_quantities = [ion_count - charge, ion_count]
+        if neutralize:
+            if charge > 0:
+                charge_quantities = [ion_count, ion_count + charge]
+            elif charge < 0:
+                charge_quantities = [ion_count - charge, ion_count]
+        else:
+            self.ostream.print_info("Not neutralizing the system")
 
         solute_volume: float = vlxsysbuilder._get_volume(system_mol) * 0.001  #nm^3
         solvent_volume: float = box_volume - solute_volume

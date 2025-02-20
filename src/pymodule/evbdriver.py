@@ -377,6 +377,7 @@ class EvbDriver():
         configurations: list[str] | list[dict],  # type: ignore
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
+        neutralize: bool = True,
         save_output = True,
     ):
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
@@ -387,6 +388,8 @@ class EvbDriver():
                 Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
+            neutralise (bool, optional): If any solvated systems should be neutralised by adding ions. Defaults to True.
+            save_output (bool, optional): If the systems should be saved to disk. Defaults to True.
         """
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
