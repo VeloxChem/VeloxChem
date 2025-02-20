@@ -24,17 +24,19 @@ Contributors
 * Karan Ahmadazdeh
 * Olav Vahtras
 * Juan de Gracia
+* Bastiaan van Hoorn
 * Manuel Brand
-* Nanna H. List
 * Erik Vitols
+* Nanna H. List
 * Xiaoyu Chen
 * Lukas Lampe
 * Mathieu Linares
 * Noah Deveaux
 * Magnus Ringholm
+* Valentin LindFeld
 * Thomas Fransson
 * Jonas Vester
-* Bastiaan van Hoorn
+* Julia Rune
 * Gabriel L. S. Rodrigues
 * Mikael T. Scott
 * Maximilian Scheurer
@@ -42,4 +44,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2025-01-30 by ``git shortlog -sn``
+The list of contributors was obtained 2025-02-20 by ``git shortlog -sn``
