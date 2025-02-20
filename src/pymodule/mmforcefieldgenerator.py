@@ -293,7 +293,7 @@ class MMForceFieldGenerator:
             for i, dih in enumerate(self.target_dihedrals):
                 dih_central_bond = [dih[1] + 1, dih[2] + 1]
                 scan_file = str(Path(inp_dir) / self.scan_xyz_files[i])
-                self.reparametrize_dihedrals(
+                self.reparameterize_dihedrals(
                     dih_central_bond, scan_file=scan_file, fit_extremes=False)
 
         # save output files
@@ -320,7 +320,7 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False, initial_validation=True):
+    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False, initial_validation=True):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -395,7 +395,7 @@ class MMForceFieldGenerator:
         dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
         
         # Print a header
-        header = 'VeloxChem Dihedral Reparametrization'
+        header = 'VeloxChem Dihedral Reparameterization'
         self.ostream.print_header(header)
         self.ostream.print_header('=' * len(header))
         self.ostream.print_blank()
@@ -730,7 +730,7 @@ class MMForceFieldGenerator:
         if visualize:
             self.visualize(fitted_dihedral_results)
 
-        self.ostream.print_info('Dihedral MM parameters have been reparametrized and updated in the topology.')
+        self.ostream.print_info('Dihedral MM parameters have been reparameterized and updated in the topology.')
         self.ostream.flush()
    
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
@@ -2126,21 +2126,21 @@ class MMForceFieldGenerator:
                 return True
         return False
 
-    def reparametrize(self,
+    def reparameterize(self,
                        hessian=None,
-                       reparametrize_all=False,
-                       reparametrize_keys=None):
+                       reparameterize_all=False,
+                       reparameterize_keys=None):
         """
-        Reparametrizes all unknown parameters with the Seminario method using
+        Reparameterizes all unknown parameters with the Seminario method using
         the given Hessian matrix.
 
         :param hessian:
             The Hessian matrix, or the method to generate Hessian.
-        :param reparametrize_all:
-            If True, all parameters are reparametrized. If False, only unknown
-            parameters are reparametrized.
-        :param reparametrize_keys:
-            List of specific keys to reparametrize, can be bonds and angles.
+        :param reparameterize_all:
+            If True, all parameters are reparameterized. If False, only unknown
+            parameters are reparameterized.
+        :param reparameterize_keys:
+            List of specific keys to reparameterize, can be bonds and angles.
         """
 
         # Hessian matrix
@@ -2148,12 +2148,12 @@ class MMForceFieldGenerator:
         if hessian is None:
             # TODO: generate Hessian using VeloxChem
             assert_msg_critical(
-                False, 'MMForceFieldGenerator.reparametrize: expecting Hessian')
+                False, 'MMForceFieldGenerator.reparameterize: expecting Hessian')
 
         elif isinstance(hessian, str):
             assert_msg_critical(
                 hessian.lower() == 'xtb',
-                'ForceFieldGenerator.reparametrize: invalid Hessian option')
+                'ForceFieldGenerator.reparameterize: invalid Hessian option')
 
             # XTB optimization
             self.ostream.print_info('Optimizing molecule using XTB...')
@@ -2188,12 +2188,12 @@ class MMForceFieldGenerator:
             natoms = self.molecule.number_of_atoms()
             assert_msg_critical(
                 hessian.shape == (natoms * 3, natoms * 3),
-                'MMForceFieldGenerator.reparametrize: invalid Hessian matrix')
+                'MMForceFieldGenerator.reparameterize: invalid Hessian matrix')
 
         else:
             assert_msg_critical(
                 False,
-                'MMForceFieldGenerator.reparametrize: invalid Hessian option')
+                'MMForceFieldGenerator.reparameterize: invalid Hessian option')
 
         angstrom_to_nm = 0.1  # 1 angstrom is 0.1 nm
         bohr_to_nm = bohr_in_angstrom() * angstrom_to_nm
@@ -2212,15 +2212,15 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        # Reparametrize bonds
+        # Reparameterize bonds
 
         for i, j in self.bonds:
 
-            if not reparametrize_all:
-                if reparametrize_keys is None:
+            if not reparameterize_all:
+                if reparameterize_keys is None:
                     if self.bonds[(i, j)]['comment'].capitalize() != 'Guessed':
                         continue
-                elif (i, j) not in reparametrize_keys:
+                elif (i, j) not in reparameterize_keys:
                     continue
 
             new_equilibrium = np.linalg.norm(coords_in_au[i] -
@@ -2264,16 +2264,16 @@ class MMForceFieldGenerator:
                 self.bonds[(i, j)]['equilibrium'] = aver_r
                 self.bonds[(i, j)]['force_constant'] = aver_k_r
 
-        # Reparametrize angles
+        # Reparameterize angles
 
         for i, j, k in self.angles:
 
-            if not reparametrize_all:
-                if reparametrize_keys is None:
+            if not reparameterize_all:
+                if reparameterize_keys is None:
                     if (self.angles[(i, j, k)]['comment'].capitalize()
                             != 'Guessed'):
                         continue
-                elif (i, j, k) not in reparametrize_keys:
+                elif (i, j, k) not in reparameterize_keys:
                     continue
 
             a = coords_in_au[i] - coords_in_au[j]

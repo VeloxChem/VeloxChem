@@ -714,7 +714,7 @@ class IMForceFieldGenerator:
 
         if self.dynamics_method == 'MM':
             rot_bonds = forcefield_generator.rotatable_bonds
-            forcefield_generator.reparametrize_dihedrals(rot_bonds[0], scan_range=[180, 360], n_points=7, visualize=True)
+            forcefield_generator.reparameterize_dihedrals(rot_bonds[0], scan_range=[180, 360], n_points=7, visualize=True)
 
         database_quality = False
 

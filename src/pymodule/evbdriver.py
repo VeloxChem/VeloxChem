@@ -106,7 +106,7 @@ class EvbDriver():
         product_charge: int | list[int] = 0,  # type: ignore
         reactant_multiplicity: int = 1,
         product_multiplicity: int | list[int] = 1,
-        reparameterise: bool = True,
+        reparameterize: bool = True,
         optimise: bool = False,
         ordered_input: bool = False,
         breaking_bonds: tuple[int,int] | list[tuple[int, int]] = None,
@@ -123,7 +123,7 @@ class EvbDriver():
                 The reactant will be assigned the sum of the product charges. Defaults to 0.
             reactant_multiplicity (int, optional): The multiplicity of the reactant. Defaults to 1.
             product_multiplicity (int | list[int], optional): The multiplicity of each provided product. List should have the same length as the amount of products provided. Defaults to 1.
-            reparameterise (bool, optional): If unknown parameters in the forcefield should be reparameterised. Defaults to True.
+            reparameterize (bool, optional): If unknown parameters in the forcefield should be reparameterized. Defaults to True.
             optimise (bool, optional): If the provided structure should be optimised before the forcefield is generated. Defaults to False.
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
             breaking_bonds (list[tuple[int, int]], optional): A list of tuples of atom-indices of breaking bonds. 
@@ -212,7 +212,7 @@ class EvbDriver():
             self.product = self.load_forcefield_from_json(str(combined_product_path))
         else:
             ffbuilder = EvbForceFieldBuilder()
-            ffbuilder.reparameterise = reparameterise
+            ffbuilder.reparameterize = reparameterize
             ffbuilder.optimise = optimise
 
             if isinstance(breaking_bonds, tuple):
@@ -277,7 +277,7 @@ class EvbDriver():
         hessian_path = cwd / self.input_folder / f"{filename}_hess.np"
         if hessian_path.exists():
             self.ostream.print_info(
-                f"Found hessian file at {hessian_path}, using it to reparameterise.")
+                f"Found hessian file at {hessian_path}, using it to reparameterize.")
             hessian = np.loadtxt(hessian_path)
         else:
             self.ostream.print_info(

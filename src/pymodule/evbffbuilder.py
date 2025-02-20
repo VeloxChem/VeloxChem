@@ -38,7 +38,7 @@ class EvbForceFieldBuilder():
         self.nodes = self.comm.Get_size()
 
         self.optimise: bool = False
-        self.reparameterise: bool = True
+        self.reparameterize: bool = True
 
         self.input_folder: str = "input_files"
 
@@ -63,7 +63,7 @@ class EvbForceFieldBuilder():
             reactant_input,
             reactant_charge,
             reactant_multiplicity,
-            self.reparameterise,
+            self.reparameterize,
             self.optimise,
         )
         self.reactant.ostream.flush()
@@ -78,7 +78,7 @@ class EvbForceFieldBuilder():
                     input,
                     product_charge[i],
                     product_multiplicity[i],  # type:ignore
-                    self.reparameterise,
+                    self.reparameterize,
                     self.optimise
                 ))
 
@@ -104,7 +104,7 @@ class EvbForceFieldBuilder():
         input: dict,
         charge: int,
         multiplicity: int,
-        reparameterise: bool,
+        reparameterize: bool,
         optimise: bool,
     ) -> MMForceFieldGenerator:
 
@@ -189,8 +189,8 @@ class EvbForceFieldBuilder():
                     atom['epsilon'] = epsilon
                     atom['comment'] = "Reaction-water hydrogen"         
 
-            #Reparameterise the forcefield if necessary and requested
-            if reparameterise:
+            #Reparameterize the forcefield if necessary and requested
+            if reparameterize:
                 self.ostream.print_info("Reparameterising force field.")
                 
                 if input["hessian"] is not None:
@@ -202,7 +202,7 @@ class EvbForceFieldBuilder():
                     xtb_hessian_drv.compute(molecule)
                     hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
                 self.ostream.flush()
-                forcefield.reparametrize(hessian=hessian)
+                forcefield.reparameterize(hessian=hessian)
         return forcefield
 
     #Match the indices of the reactant and product forcefield generators
