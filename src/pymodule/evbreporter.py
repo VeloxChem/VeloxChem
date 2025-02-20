@@ -48,19 +48,17 @@ class EvbReporter():
     def describeNextReport(self, simulation):
         steps = self.report_interval - simulation.currentStep%self.report_interval
         if self.use_tuple:
-            
-            return (steps, True, False, False, True, False) #steps, positions, velocities, forces, energy, pbc
+            return (steps, True, False, False, True, True) #steps, positions, velocities, forces, energy, pbc
         else:
             return {'steps': steps, 'periodic': True, 'include':['positions','energy']}
         
-
     def report(self, simulation, state):
 
         positions = state.getPositions(asNumpy=True)
         E = [state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)]
-        for simulation in self.simulations:
-            simulation.context.setPositions(positions)
-            state = simulation.context.getState(getEnergy=True)
+        for sim in self.simulations:
+            sim.context.setPositions(positions)
+            state = sim.context.getState(getEnergy=True)
             E.append(state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole))
         line = f"{self.Lambda}, {E[1]}, {E[2]}, {E[3]}, {E[4]}, {E[0]}\n"
         self.out.write(line)
