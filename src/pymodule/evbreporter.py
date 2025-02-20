@@ -49,7 +49,7 @@ class EvbReporter():
         steps = self.report_interval - simulation.currentStep%self.report_interval
         if self.use_tuple:
             
-            return (steps, None, True, False, False, True)
+            return (steps, True, False, False, True, False) #steps, positions, velocities, forces, energy, pbc
         else:
             return {'steps': steps, 'periodic': True, 'include':['positions','energy']}
         
