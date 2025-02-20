@@ -8,6 +8,7 @@
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXDS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXPP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXPS.hpp"
+#include "ThreeCenterElectronRepulsionContrRecXPS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXSD.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXSP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXSS.hpp"
@@ -276,7 +277,7 @@ comp_electron_repulsion_geom010_dds(T& distributor,
 
             t3cfunc::bra_transform<2>(skbuffer, 355, cbuffer, 84, 0, 3);
 
-            t3ceri::comp_ket_geom010_electron_repulsion_xss(skbuffer, 20, 0, 5, cfactors, 6, 2);
+            t3ceri::comp_hrr_electron_repulsion_xps(skbuffer, 20, 0, 5, cfactors, 6, 2);
 
             t3ceri::comp_ket_geom010_electron_repulsion_xss(skbuffer, 405, 305, 310, cfactors, 6, 2);
 
