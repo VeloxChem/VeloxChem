@@ -506,6 +506,16 @@ class EvbDriver():
                 "padding": 1,
                 "ion_count": 0,
             }
+        elif name == "benzene":
+            conf = {
+                "name": "benzene",
+                "solvent": "benzene",
+                "temperature": self.temperature,
+                "NPT": True,
+                "pressure": 1,
+                "padding": 1,
+                "ion_count": 0,
+            }
         # elif name == "CNT":
         #     conf = {
         #         "name": "water_CNT",
