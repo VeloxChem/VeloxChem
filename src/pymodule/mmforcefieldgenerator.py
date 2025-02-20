@@ -629,6 +629,8 @@ class MMForceFieldGenerator:
                 'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
             }
 
+            self.print_validation_summary(fitted_dihedral_results)
+
             if visualize:
                 self.visualize(fitted_dihedral_results)
 
@@ -748,6 +750,8 @@ class MMForceFieldGenerator:
             'mm_scan_kJpermol': np.copy(fitted_dihedral_energies),
             'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
         }
+
+        self.print_validation_summary(fitted_dihedral_results)
 
         if visualize:
             self.visualize(fitted_dihedral_results)
@@ -3132,6 +3136,31 @@ class MMForceFieldGenerator:
                 dih_keys_to_remove.append((i, j, k, l))
         for dih_key in dih_keys_to_remove:
             del self.dihedrals[dih_key]
+
+    def print_validation_summary(self, fitted_dihedral_results):
+        """
+        Prints validation summary.
+
+        :param validation_result:
+            The dictionary containing the result of validation.
+        """
+
+        self.ostream.print_info('Summary of validation')
+        self.ostream.print_info('---------------------')
+
+        scan_diff = (fitted_dihedral_results['mm_scan_kJpermol'] -
+                     fitted_dihedral_results['qm_scan_kJpermol'])
+        max_diff = np.max(np.abs(scan_diff))
+        std_diff = np.std(scan_diff)
+        self.fitting_summary = {
+            'maximum_difference': max_diff,
+            'standard_deviation': std_diff,
+        }
+
+        self.ostream.print_info(f'Maximum difference: {max_diff:.3f} kJ/mol')
+        self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def visualize(self, validation_result):
         """
