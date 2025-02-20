@@ -95,59 +95,48 @@ class TestEvb:
         reactant_ref = EvbDriver.load_forcefield_from_json(reapath)
         product_ref = EvbDriver.load_forcefield_from_json(propath)
 
-        assert TestEvb._compare_dict(reactant.bonds, reactant_ref.bonds)
-        assert TestEvb._compare_dict(reactant.angles, reactant_ref.angles)
-        assert TestEvb._compare_dict(reactant.dihedrals, reactant_ref.dihedrals)
-        assert TestEvb._compare_dict(reactant.impropers, reactant_ref.impropers)
+        self._compare_dict(reactant.bonds, reactant_ref.bonds)
+        self._compare_dict(reactant.angles, reactant_ref.angles)
+        self._compare_dict(reactant.dihedrals, reactant_ref.dihedrals)
+        self._compare_dict(reactant.impropers, reactant_ref.impropers)
 
-        assert TestEvb._compare_dict(product.bonds, product_ref.bonds)
-        assert TestEvb._compare_dict(product.angles, product_ref.angles)
-        assert TestEvb._compare_dict(product.dihedrals, product_ref.dihedrals)
-        assert TestEvb._compare_dict(product.impropers, product_ref.impropers)
+        self._compare_dict(product.bonds, product_ref.bonds)
+        self._compare_dict(product.angles, product_ref.angles)
+        self._compare_dict(product.dihedrals, product_ref.dihedrals)
+        self._compare_dict(product.impropers, product_ref.impropers)
     
-    """
-    Compare two dictionaries recursively while rounding floats to 1e-6. Keys need to match exactly
-    """
-    @staticmethod
-    def _compare_dict(dict1, dict2, float_tol=1e-2):
-        if len(dict1.keys()) != len(dict2.keys()):
-            print(f"Key count mismatch: {len(dict1.keys())} != {len(dict2.keys())}")
-            return False
+    def _compare_dict(self, dict1, dict2, float_tol=1e-2):
 
-        for (key, val1) in dict1.items():
-            if key not in dict2:
-                print(f"Could not find key {key} in second dictionary")
-                return False
+        assert sorted(list(dict1.keys())) == sorted(list(dict2.keys()))
 
-            type1 = type(val1)
+        for key in dict1:
+
+            if key == 'comment':
+                continue
+
+            val1 = dict1[key]
             val2 = dict2[key]
 
-            if type1 != type(val2):
+            type1 = type(val1)
+            type2 = type(val2)
+
+            # try to convert val2
+            if type1 != type2:
                 try:
                     val2 = type1(val2)
                 except (ValueError, TypeError):
                     print(f"Type mismatch: {type1} != {type(val2)} for key {key}")
-                    return False
-            if key == 'comment':
-                pass
-            elif type1 == dict:
-                TestEvb._compare_dict(val1, val2)
-            elif type1 == float:
-                if abs(val1 - val2) > float_tol:
-                    print(f"Value mismatch: {val1} != {val2} for key {key}")
-                    return False
-            elif type1 == list or type1 == np.ndarray:
-                if len(val1) != len(val2):
-                    print(f"Length mismatch: {len(val1)} != {len(val2)} for key {key}")
-                    return False
-                if not np.allclose(val1, val2, atol=float_tol):
-                    print(f"Array mismatch: {val1} != {val2} for key {key}")
-                    return False
+                    assert False
+
+            # compare val1 with val2
+            if type1 is dict:
+                self._compare_dict(val1, val2)
+            elif type1 is float or type1 is np.float64:
+                assert abs(val1 - val2) < float_tol
+            elif type1 is list or type1 is np.ndarray:
+                assert np.allclose(val1, val2, atol=float_tol)
             else:
-                if val1 != val2:
-                    print(f"Value mismatch: {val1} != {val2} for key {key}")
-                    return False
-        return True
+                assert val1 == val2
 
     @pytest.mark.skipif('openmm' not in sys.modules, reason='openmm not available')
     def test_system_builder(self):
@@ -253,5 +242,5 @@ class TestEvb:
 
         # compare with final results
         reference_results = EVB._load_dict_from_h5(folder / "evb_reference_results.h5")
-        assert TestEvb._compare_dict(comp_results, reference_results)
+        self._compare_dict(comp_results, reference_results)
         
