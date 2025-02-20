@@ -102,6 +102,7 @@ monkey:pip_install:
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
     - CXX=g++ python -m pip install
         git+https://gitlab.com/FraME-projects/PyFraME.git@35188b620c84f74a73e2c28d737abee4386a503a
+    - python -m pip install openmm rdkit pymbar
     - export DFTD4_HOME=/usr/local
     - export XTBHOME=/usr/local
     - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++"
