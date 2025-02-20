@@ -452,6 +452,7 @@ class EvbDriver():
                 Lambda=self.Lambda,
                 configuration=conf,
                 constraints=constraints,
+                neutralize=neutralize,
             )
 
             conf["systems"] = systems
