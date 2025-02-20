@@ -23,7 +23,7 @@ class EvbReporter():
             outputstream.flush()
             self.use_tuple = True
         else:
-        self.use_tuple = False
+            self.use_tuple = False
         
 
         self.out = open(file, 'a' if append else 'w')
