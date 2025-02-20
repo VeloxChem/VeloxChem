@@ -663,7 +663,7 @@ class EvbDriver():
             write_step (int, optional): Per how many steps to take a sample and save its data as well as the trajectory point. Defaults to 1000.
             initial_equil_steps (int, optional): The amount of timesteps to add to the equiliberation at the first Lambda frame. Defaults to 5000.
             step_size (float, optional): The step size during the sampling in picoseconds. Defaults to 0.001.
-            equil_step_size (float, optional): The step size during the equiliberation in picoseconds. Is typically larger then step_size as equilliberation is done with frozen H-bonds. Defaults to 0.002.
+            equil_step_size (float, optional): The step size during the equiliberation in picoseconds. Is typically larger then step_size as equiliberation is done with frozen H-bonds. Defaults to 0.002.
             initial_equil_step_size (float, optional): The step size during initial equiliberation in picoseconds. Defaults to 0.002.
         """
         if self.debug:
@@ -687,10 +687,10 @@ class EvbDriver():
             self.ostream.flush()
             FEP = EvbFepDriver()
             FEP.run_FEP(
-                equilliberation_steps=equil_steps,
+                equiliberation_steps=equil_steps,
                 total_sample_steps=sample_steps,
                 write_step=write_step,
-                lambda_0_equilliberation_steps=initial_equil_steps,
+                lambda_0_equiliberation_steps=initial_equil_steps,
                 step_size=step_size,
                 equil_step_size=equil_step_size,
                 initial_equil_step_size=initial_equil_step_size,
