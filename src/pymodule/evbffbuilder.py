@@ -169,7 +169,7 @@ class EvbForceFieldBuilder():
                 forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
                 self.ostream.flush()
                 self.ostream.print_info("Creating topology")
-                forcefield.create_topology(molecule, basis, scf_result=scf_results)
+                forcefield.create_topology(molecule, basis, scf_results=scf_results)
 
             # The atomtypeidentifier returns water with no Lennard-Jones on the hydrogens, which leads to unstable simulations
             for atom in forcefield.atoms.values():

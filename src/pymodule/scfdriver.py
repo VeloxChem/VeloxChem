@@ -586,7 +586,7 @@ class ScfDriver:
                 disp.compute(molecule, xc_label)
                 self._d4_energy = disp.get_energy()
 
-                dftd4_info = 'Using D4 dispersion correction.'
+                dftd4_info = 'Using the D4 dispersion correction.'
                 self.ostream.print_info(dftd4_info)
                 self.ostream.print_blank()
                 for dftd4_ref in disp.get_references():
