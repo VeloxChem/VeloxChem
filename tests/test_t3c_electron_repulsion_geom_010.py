@@ -41,11 +41,9 @@ class TestThreeCenterElectronRepulsionGeom010Driver:
         
         print(mask_ids)
         
-        print(eri_buf.indices())
-        
         for i in range(3):
             for j in range(24):
-                for k in [0, 1, 2]:
+                for k in [0, 1, 2, 7, 8, 11, 12, 15, 16, 19, 20, 21, 22, 23]:
                     for l in range(24):
                         print("grad ", i, " (", j, "|", k, ",", l, ") = ",
                               eri_buf.value(24 * i + j, k, l), " vs. ",
