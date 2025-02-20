@@ -17,12 +17,6 @@ with redirect_stderr(StringIO()) as fg_err:
         import scipy
     except ImportError:
         pass
-    try:
-        import matplotlib.pyplot as plt
-        import matplotlib.colors as mcolors
-        from matplotlib.lines import Line2D
-    except ImportError:
-        pass
 
 
 class EvbDataProcessing:
@@ -422,9 +416,9 @@ class EvbDataProcessing:
     @staticmethod
     def plot_dE_density(results):
 
-        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+        import matplotlib.pyplot as plt
 
-        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
 
         result_count = len(results["configuration_results"])
         coordinate_bins = results["coordinate_bins"]
@@ -510,7 +504,9 @@ class EvbDataProcessing:
     @staticmethod
     def plot_results(results, plot_analytical=True, plot_discrete=True):
 
-        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        from matplotlib.lines import Line2D
 
         coordinate_bins = results["coordinate_bins"]
         Lambda = results["Lambda"]
@@ -579,7 +575,8 @@ class EvbDataProcessing:
     @staticmethod
     def plot_evb_details(results):
 
-        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
 
         result_count = len(results["configuration_results"])
         fig, ax = plt.subplots(1, result_count, figsize=(5 * result_count, 5))

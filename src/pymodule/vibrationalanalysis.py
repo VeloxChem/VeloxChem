@@ -26,7 +26,6 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 import numpy as np
-import sys
 import h5py
 import tempfile
 
@@ -48,12 +47,6 @@ from .sanitychecks import raman_sanity_check
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
-
-try:
-    import matplotlib.pyplot as plt
-    import matplotlib.lines as mlines
-except ImportError:
-    pass
 
 
 class VibrationalAnalysis:
@@ -1137,8 +1130,8 @@ class VibrationalAnalysis:
             A Matplotlib axis object.
         """
 
-        assert_msg_critical('matplotlib' in sys.modules,
-                            'matplotlib is required.')
+        import matplotlib.pyplot as plt
+        import matplotlib.lines as mlines
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
@@ -1232,6 +1225,9 @@ class VibrationalAnalysis:
             A Matplotlib axis object.
         """
 
+        import matplotlib.pyplot as plt
+        import matplotlib.lines as mlines
+
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
 
@@ -1322,6 +1318,8 @@ class VibrationalAnalysis:
         :return:
             A Matplotlib axis object.
         """
+
+        import matplotlib.pyplot as plt
 
         if plot_type.lower() == 'ir':
             self.plot_ir(vib_results,
