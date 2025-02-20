@@ -32,7 +32,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
@@ -2122,13 +2122,13 @@ class OpenMMDynamics:
             basis = MolecularBasis.read(new_molecule, self.basis)
             scf_results = self.qm_driver.compute(new_molecule, basis)
             gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
-            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
         else:
             self.qm_driver.compute(new_molecule)
             if self.driver_flag != 'IM Driver':
                 self.grad_driver.compute(new_molecule)
-            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
 
         return gradient, potential_kjmol
@@ -2167,7 +2167,7 @@ class OpenMMDynamics:
             context: The OpenMM context object.
         """
 
-        conversion_factor = (4.184 * hartree_in_kcalpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
+        conversion_factor = (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
         new_positions = context.getState(getPositions=True).getPositions()
 
         # Update the forces of the QM region
@@ -2194,9 +2194,9 @@ class OpenMMDynamics:
             The potential energy of the QM region.
         """
         if self.basis is not None:
-            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
         else:
-            potential_energy = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+            potential_energy = self.qm_driver.get_energy() * hartree_in_kjpermol()
 
         return potential_energy
     

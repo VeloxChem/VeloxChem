@@ -32,7 +32,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from collections import defaultdict
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kjpermol
 from .atomtypeidentifier import AtomTypeIdentifier
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -2221,10 +2221,7 @@ class MMForceFieldGenerator:
                 False,
                 'MMForceFieldGenerator.reparameterize: invalid Hessian option')
 
-        angstrom_to_nm = 0.1  # 1 angstrom is 0.1 nm
-        bohr_to_nm = bohr_in_angstrom() * angstrom_to_nm
-        cal_to_joule = 4.184  # 1 calorie is 4.184 joule
-        hartree_to_kJmol = hartree_in_kcalpermol() * cal_to_joule
+        bohr_to_nm = bohr_in_angstrom() * 0.1
 
         coords_in_au = self.molecule.get_coordinates_in_bohr()
 
@@ -2253,7 +2250,7 @@ class MMForceFieldGenerator:
                                              coords_in_au[j]) * bohr_to_nm
 
             new_force_constant = seminario.calculate_bond_force_constant(i, j)
-            new_force_constant *= hartree_to_kJmol / (bohr_to_nm**2)
+            new_force_constant *= hartree_in_kjpermol() / (bohr_to_nm**2)
 
             self.bonds[(i, j)]['equilibrium'] = new_equilibrium
             self.bonds[(i, j)]['force_constant'] = new_force_constant
@@ -2310,7 +2307,7 @@ class MMForceFieldGenerator:
 
             new_force_constant = seminario.calculate_angle_force_constant(
                 i, j, k)
-            new_force_constant *= hartree_to_kJmol
+            new_force_constant *= hartree_in_kjpermol()
 
             self.angles[(i, j, k)]['equilibrium'] = new_equilibrium
             self.angles[(i, j, k)]['force_constant'] = new_force_constant
@@ -2949,7 +2946,7 @@ class MMForceFieldGenerator:
 
         if self.rank == mpi_master():
             rel_e_qm = np.array(qm_scan) - min(qm_scan)
-            rel_e_qm *= hartree_in_kcalpermol() * 4.184
+            rel_e_qm *= hartree_in_kjpermol()
             rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
 
             difference = rel_e_qm - rel_e_mm
@@ -2997,7 +2994,7 @@ class MMForceFieldGenerator:
         mm_scan = np.array(mm_scan) - min(mm_scan)
 
         qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
-        qm_scan *= hartree_in_kcalpermol() * 4.184
+        qm_scan *= hartree_in_kjpermol()
 
         self.ostream.print_blank()
         self.ostream.print_info(
@@ -3070,7 +3067,7 @@ class MMForceFieldGenerator:
             ]
             pot_energy = self.minimize_mm_energy(geom, constraints)
             # convert to kJ/mol
-            pot_energy *= 4.184 * hartree_in_kcalpermol()
+            pot_energy *= hartree_in_kjpermol()
             energies.append(pot_energy)
 
             if print_energies:

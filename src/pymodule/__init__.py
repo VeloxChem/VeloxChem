@@ -69,7 +69,7 @@ from .veloxchemlib import available_pdft_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import hartree_in_kcalpermol, hartree_in_kjpermol
 from .veloxchemlib import hartree_in_wavenumber, hartree_in_wavenumbers
 from .veloxchemlib import dipole_in_debye
 from .veloxchemlib import rotatory_strength_in_cgs
