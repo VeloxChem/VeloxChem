@@ -294,7 +294,7 @@ class MMForceFieldGenerator:
                 dih_central_bond = [dih[1] + 1, dih[2] + 1]
                 scan_file = str(Path(inp_dir) / self.scan_xyz_files[i])
                 self.reparameterize_dihedrals(
-                    dih_central_bond, scan_file=scan_file, fit_extremes=False)
+                    dih_central_bond, scan_file=scan_file, fit_extrema=False)
 
         # save output files
 
@@ -320,7 +320,7 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False, initial_validation=True):
+    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extrema=False, initial_validation=True):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -341,8 +341,8 @@ class MMForceFieldGenerator:
             If the QM scan should be print all the information.
         :param visualize:
             If the dihedral scans should be visualized.
-        :param fit_extremes:
-            If the dihedral parameters should be fitted to the QM scan extremes
+        :param fit_extrema:
+            If the dihedral parameters should be fitted to the QM scan extrema
         """
 
         try:
@@ -567,12 +567,12 @@ class MMForceFieldGenerator:
             qm_minima_indices = argrelextrema(qm_energies, np.less)[0]
 
             # Use first and last points as maxima (usual behavior for cosine dihedrals)
-            qm_extremes = [0, len(qm_energies) - 1]
+            qm_extrema = [0, len(qm_energies) - 1]
 
             # Build the arrays with the maxima and minima
             qm_maxima_indices = (list(qm_maxima_indices) +
                                  list(qm_minima_indices) +
-                                 qm_extremes)
+                                 qm_extrema)
 
             qm_maxima_indices = sorted(list(set(qm_maxima_indices)))
 
@@ -593,7 +593,7 @@ class MMForceFieldGenerator:
             mm_energies_fit_rel = np.array(mm_energies_fit) - np.min(mm_energies_fit)
             qm_energies_rel = np.array(qm_energies) - np.min(qm_energies)
 
-            if fit_extremes:
+            if fit_extrema:
 
                 # Match QM and MM maxima using nearest x-axis values
                 matched_qm_maxima = []
@@ -615,7 +615,7 @@ class MMForceFieldGenerator:
             return residuals**2
 
         self.ostream.print_info('Fitting the dihedral parameters...')
-        if fit_extremes:
+        if fit_extrema:
             self.ostream.print_info('Only minimum/maximum points are used for fitting.')
         self.ostream.flush()
 
@@ -626,7 +626,7 @@ class MMForceFieldGenerator:
         initial_guess[:-1] = original_barriers[:]
         
         # Extract maxima for QM and MM energies
-        if fit_extremes:
+        if fit_extrema:
             qm_maxima_indices = extract_maxima(barriers, qm_energies)
             args = (qm_maxima_indices,)
         else:
