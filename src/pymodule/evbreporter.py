@@ -1,5 +1,6 @@
 from .errorhandler import assert_msg_critical
 import sys
+from importlib.metadata import version
 
 try:
     import openmm.app as mmapp
@@ -13,6 +14,12 @@ class EvbReporter():
     def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, append = False):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbReporter.')
+
+        # OpenMM HIP version is slighly older and uses a different format for reporters
+        if version('openmm') < '8.2':
+            self.use_tuple = True
+        else:
+            self.use_tuple = False
 
         self.out = open(file, 'a' if append else 'w')
         self.report_interval = report_interval
@@ -36,11 +43,13 @@ class EvbReporter():
 
     def describeNextReport(self, simulation):
         steps = self.report_interval - simulation.currentStep%self.report_interval
-        return {'steps': steps, 'periodic': None, 'include':['positions','energy']}
+        if self.use_tuple:
+            return (steps, True, True, False, False, True)
+        else:
+            return {'steps': steps, 'periodic': True, 'include':['positions','energy']}
+        
 
     def report(self, simulation, state):
-
-        assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbReporter.')
 
         positions = state.getPositions(asNumpy=True)
         E = [state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)]
