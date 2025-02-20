@@ -51,10 +51,10 @@ class EvbFepDriver():
 
     def run_FEP(
         self,
-        equiliberation_steps,
+        equilibration_steps,
         total_sample_steps,
         write_step,
-        lambda_0_equiliberation_steps,
+        lambda_0_equilibration_steps,
         step_size,
         equil_step_size,
         initial_equil_step_size,
@@ -84,7 +84,7 @@ class EvbFepDriver():
         self.ostream.print_info(f"Total lambda points: {len(self.Lambda)}")
         self.ostream.print_info(f"Snapshots per lambda: {total_sample_steps / write_step}")
         self.ostream.print_info(f"Snapshots to be recorded: {self.total_snapshots}")
-        self.ostream.print_info(f"Total simulation steps: {(total_sample_steps + equiliberation_steps) * len(self.Lambda) + lambda_0_equiliberation_steps}")
+        self.ostream.print_info(f"Total simulation steps: {(total_sample_steps + equilibration_steps) * len(self.Lambda) + lambda_0_equilibration_steps}")
         self.ostream.print_info(f"System time per snapshot: {step_size * write_step} ps")
         self.ostream.print_info(f"System time per frame: {step_size * total_sample_steps} ps")
         self.ostream.print_info(f"Total system time: {step_size * total_sample_steps * len(self.Lambda)} ps",)
@@ -151,16 +151,16 @@ class EvbFepDriver():
 
             if l == 0:
                 simulation.integrator.setStepSize(initial_equil_step_size * mmunit.picoseconds)
-                self.ostream.print_info(f"Running initial equiliberation with step size {simulation.integrator.getStepSize()}")
+                self.ostream.print_info(f"Running initial equilibration with step size {simulation.integrator.getStepSize()}")
                 self.ostream.flush()
-                simulation.step(lambda_0_equiliberation_steps)
+                simulation.step(lambda_0_equilibration_steps)
                 timer.start()
 
             # Equiliberate
             simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
-            self.ostream.print_info(f"Running equiliberation with step size {simulation.integrator.getStepSize()}")
+            self.ostream.print_info(f"Running equilibration with step size {simulation.integrator.getStepSize()}")
             self.ostream.flush()
-            simulation.step(equiliberation_steps)
+            simulation.step(equilibration_steps)
 
             equil_positions = simulation.context.getState(getPositions=True).getPositions()
 

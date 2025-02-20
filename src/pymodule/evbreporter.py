@@ -1,5 +1,5 @@
-import sys
 from importlib.metadata import version
+import sys
 
 from .errorhandler import assert_msg_critical
 
@@ -15,7 +15,7 @@ class EvbReporter():
     #todo do this with force groups instead of different systems
     def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, outputstream, append = False):
 
-        assert_msg_critical('openmm' in sys.modules and version('openmm') >= '8.2', 'openmm >8.2 is required for EvbReporter.')
+        assert_msg_critical('openmm' in sys.modules and version('openmm') >= '8.2', 'openmm >=8.2 is required for EvbReporter.')
 
         # # OpenMM HIP version is slighly older and uses a different format for reporters
         # if version('openmm') < '8.2':
