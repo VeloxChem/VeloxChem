@@ -2120,8 +2120,8 @@ class OpenMMDynamics:
 
         if self.basis is not None:
             basis = MolecularBasis.read(new_molecule, self.basis)
-            scf_result = self.qm_driver.compute(new_molecule, basis)
-            gradient = self.grad_driver.compute(new_molecule, basis, scf_result)
+            scf_results = self.qm_driver.compute(new_molecule, basis)
+            gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
             potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
             gradient = self.grad_driver.get_gradient()
         else:

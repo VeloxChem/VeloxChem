@@ -320,7 +320,7 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extrema=False, initial_validation=True):
+    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_results=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extrema=False, initial_validation=True):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -333,24 +333,25 @@ class MMForceFieldGenerator:
             The SCF driver. If None is provided it will use HF.
         :param basis:
             The AO basis set. If None is provided it will use 6-31G*.
+        :param scf_results:
+            The dictionary containing converged SCF results.
         :param scan_range:
             List with the range of dihedral angles. Default is [0, 360].
         :param n_points:
             The number of points to be calculated. Default is 19.
         :param scan_verbose:
-            If the QM scan should be print all the information.
+            Whether the QM scan should print all the information.
         :param visualize:
-            If the dihedral scans should be visualized.
+            Whether the dihedral scans should be visualized.
         :param fit_extrema:
-            If the dihedral parameters should be fitted to the QM scan extrema
+            Whether the dihedral parameters should be fitted to the QM scan extrema.
         """
 
         try:
             from scipy.optimize import least_squares
             from scipy.signal import argrelextrema
-
         except ImportError:
-            error_msg = 'Scipy is required for fitting dihedral potentials.'
+            error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
         # If scan file is provided, read it
@@ -435,10 +436,10 @@ class MMForceFieldGenerator:
                 self.ostream.flush()
 
             # Perform the reference SCF calculation
-            if scf_result is None:
+            if scf_results is None:
                 self.ostream.print_info('Performing SCF calculation...')
                 self.ostream.flush()
-                scf_result = scf_drv.compute(self.molecule, basis)
+                scf_results = scf_drv.compute(self.molecule, basis)
             
             # Take one of the dihedrals to perform the scan
             reference_dih = dihedral_indices[0]
@@ -458,7 +459,7 @@ class MMForceFieldGenerator:
             self.ostream.print_info(f'Number of points: {n_points}')
             self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
             self.ostream.flush()
-            opt_drv.compute(self.molecule, basis, scf_result)
+            opt_drv.compute(self.molecule, basis, scf_results)
             self.ostream.print_info('Scan completed.')
             self.ostream.flush()
 
@@ -516,21 +517,6 @@ class MMForceFieldGenerator:
         phases_array_rad = np.deg2rad(phases_array)
         dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
 
-        # Print initial barriers
-        self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
-        self.ostream.flush()
-
-        # Store the original barriers and perform the initial validation
-        original_barriers = barriers.copy()
-
-        if initial_validation:
-            self.ostream.print_info('Validating initial force field...')
-            self.ostream.print_blank()
-            self.ostream.flush()
-            gaff_dihedral = self.validate_force_field(0, print_summary=True)
-            if visualize:
-                self.visualize(gaff_dihedral)
-
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
             if self.dihedrals[(i, j, k, l)]['multiple'] == True:
@@ -540,7 +526,9 @@ class MMForceFieldGenerator:
                 self.dihedrals[(i, j, k, l)]['barrier'] = 0.0
 
         # Scan the dihedral
-        self.ostream.print_info('Performing dihedral scan for MM baseline...')
+        self.ostream.print_info(
+            'Performing dihedral scan for MM baseline ' +
+            'by excluding the involved dihedral barriers...')
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -613,6 +601,36 @@ class MMForceFieldGenerator:
 
             # Return the squared residuals for optimization
             return residuals**2
+
+        # Print initial barriers
+        self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
+        self.ostream.flush()
+
+        # Store the original barriers and perform the initial validation
+        original_barriers = barriers.copy()
+
+        if initial_validation:
+            self.ostream.print_info('Validating the initial force field...')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            mm_energies = dihedral_potential(
+                dihedral_angles_rad,
+                original_barriers,
+                phases_array_rad,
+                periodicities_array
+            )
+            mm_energies += mm_baseline
+
+            fitted_dihedral_results = {
+                'dihedral_indices': list(initial_data['dihedral_indices']),
+                'dihedral_angles': list(initial_data['dihedral_angles']),
+                'mm_scan_kJpermol': np.copy(mm_energies) - np.min(mm_energies),
+                'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
+            }
+
+            if visualize:
+                self.visualize(fitted_dihedral_results)
 
         self.ostream.print_info('Fitting the dihedral parameters...')
         if fit_extrema:
@@ -724,9 +742,13 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        fitted_dihedral_results = self.validate_force_field(0, print_summary=True)
+        fitted_dihedral_results = {
+            'dihedral_indices': list(initial_data['dihedral_indices']),
+            'dihedral_angles': list(initial_data['dihedral_angles']),
+            'mm_scan_kJpermol': np.copy(fitted_dihedral_energies),
+            'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
+        }
 
-        # Visualize the fitted dihedral using a spline
         if visualize:
             self.visualize(fitted_dihedral_results)
 
@@ -931,7 +953,7 @@ class MMForceFieldGenerator:
 
         return data
 
-    def create_topology(self, molecule, basis=None, scf_result=None, resp=True, use_xml=True):
+    def create_topology(self, molecule, basis=None, scf_results=None, resp=True, use_xml=True):
         """
         Analyzes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
@@ -940,7 +962,7 @@ class MMForceFieldGenerator:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_result:
+        :param scf_results:
             A converged SCF result.
         :param resp:
             If RESP charges should be computed.
@@ -1016,7 +1038,7 @@ class MMForceFieldGenerator:
             self.ostream.flush()
 
         if self.partial_charges is None:
-            if scf_result is None:
+            if scf_results is None:
                 # compute RESP charges from scratch
                 if basis is None:
                     if self.rank == mpi_master():
@@ -1059,7 +1081,7 @@ class MMForceFieldGenerator:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        scf_result, 'resp')
+                                                        scf_results, 'resp')
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 

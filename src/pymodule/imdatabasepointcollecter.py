@@ -1922,8 +1922,8 @@ class IMDatabasePointCollecter:
                 the energy of the previous QM calcualtion.
             :param basis:
                 the basis set (if required).
-            :scf_result:
-                the scf_result of previous QM calculation (if required).
+            :scf_results:
+                the scf_results of previous QM calculation (if required).
         """
 
         assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
