@@ -130,8 +130,10 @@ class EvbSystemBuilder():
             x_size = 0.1*(max(positions[:, 0]) - min(positions[:, 0]))
             y_size = 0.1*(max(positions[:, 1]) - min(positions[:, 1]))
             z_size = 0.1*(max(positions[:, 2]) - min(positions[:, 2]))
+            size = max(x_size, y_size, z_size)
             
-            box = [2*padding + x_size, 2*padding + y_size, 2*padding + z_size]
+            box = 3*[2*padding + size]
+            # box = [2*padding + x_size, 2*padding + y_size, 2*padding + z_size]
             
             self.ostream.print_info(f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f} nm and padding: {padding:.3f} nm.")
         else:
