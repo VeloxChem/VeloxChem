@@ -8,21 +8,39 @@
 
 #include "ThreeCenterElectronRepulsionGeom010RecSSS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecSSP.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecSPS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecSSD.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecSDS.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecSPP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecSSF.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecSPD.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecSDP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecSSG.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecSDD.hpp"
 
 #include "ThreeCenterElectronRepulsionGeom010RecPSS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecPSP.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecPPS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecPSD.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecPDS.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecPPP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecPSF.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecPPD.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecPDP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecPSG.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecPDD.hpp"
 
 #include "ThreeCenterElectronRepulsionGeom010RecDSS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecDSP.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecDPS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecDSD.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecDDS.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecDPP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecDSF.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecDPD.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecDDP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecDSG.hpp"
+#include "ThreeCenterElectronRepulsionGeom010RecDDD.hpp"
 
 #include "ThreeCenterElectronRepulsionGeom010RecFSS.hpp"
 #include "ThreeCenterElectronRepulsionGeom010RecFSP.hpp"
@@ -68,9 +86,30 @@ compute_geom_010(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 0})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_sps(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({0, 2})))
     {
         t3ceri::comp_electron_repulsion_geom010_ssd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({2, 0})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_sds(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_spp(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
@@ -82,9 +121,30 @@ compute_geom_010(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_spd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({2, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_sdp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({0, 4})))
     {
         t3ceri::comp_electron_repulsion_geom010_ssg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 0) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_sdd(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
@@ -104,9 +164,30 @@ compute_geom_010(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({1, 0})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_pps(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({0, 2})))
     {
         t3ceri::comp_electron_repulsion_geom010_psd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({2, 0})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_pds(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_ppp(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
@@ -118,12 +199,36 @@ compute_geom_010(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_ppd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({2, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_pdp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({0, 4})))
     {
         t3ceri::comp_electron_repulsion_geom010_psg(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
+    
+    if ((aux_angmom == 1) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_pdd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    
+    
     
     
     if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({0, 0})))
@@ -140,9 +245,30 @@ compute_geom_010(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({1, 0})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_dps(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({0, 2})))
     {
         t3ceri::comp_electron_repulsion_geom010_dsd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({2, 0})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_dds(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_dpp(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
@@ -154,9 +280,30 @@ compute_geom_010(T&                               distributor,
         return;
     }
     
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_dpd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({2, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_ddp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
     if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({0, 4})))
     {
         t3ceri::comp_electron_repulsion_geom010_dsg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 2) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom010_ddd(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }

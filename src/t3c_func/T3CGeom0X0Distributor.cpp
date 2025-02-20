@@ -79,14 +79,8 @@ CT3CGeom0X0Distributor::distribute(const CSimdArray<double>&        buffer,
                     
                         // assign integrals
                     
-                        if (r <= s)
-                        {
-                            ptr_values[mask_indices.at(r) * nrows + s] = curr_buffer[m - ket_range.first];
-                        }
-                        else
-                        {
-                            ptr_values[mask_indices.at(s) * nrows + r] = curr_buffer[m - ket_range.first];
-                        }
+                        ptr_values[mask_indices.at(r) * nrows + s] = curr_buffer[m - ket_range.first];
+                       
                     }
                 }
             }

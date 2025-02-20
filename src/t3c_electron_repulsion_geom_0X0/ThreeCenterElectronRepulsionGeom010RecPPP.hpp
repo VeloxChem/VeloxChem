@@ -1,13 +1,13 @@
-#ifndef ThreeCenterElectronRepulsionGeom010RecDSD_hpp
-#define ThreeCenterElectronRepulsionGeom010RecDSD_hpp
+#ifndef ThreeCenterElectronRepulsionGeom010RecPPP_hpp
+#define ThreeCenterElectronRepulsionGeom010RecPPP_hpp
 
 #include <array>
 #include <cstddef>
 #include <utility>
 
+#include "ThreeCenterElectronRepulsionGeom010ContrRecXPP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXSD.hpp"
-#include "ThreeCenterElectronRepulsionPrimRecDSD.hpp"
-#include "ThreeCenterElectronRepulsionPrimRecDSF.hpp"
+#include "ThreeCenterElectronRepulsionGeom010ContrRecXSP.hpp"
 #include "ThreeCenterElectronRepulsionPrimRecPSD.hpp"
 #include "ThreeCenterElectronRepulsionPrimRecPSF.hpp"
 #include "ThreeCenterElectronRepulsionPrimRecPSP.hpp"
@@ -26,14 +26,14 @@
 
 namespace t3ceri { // t3ceri namespace
 
-/// @brief Computes d^(1)/dC^(1)(D|1/|r-r'||SD)  integral derivatives.
+/// @brief Computes d^(1)/dC^(1)(P|1/|r-r'||PP)  integral derivatives.
 /// @param distributor The pointer to Fock matrix/matrices distributor.
 /// @param bra_gto_block The basis functions block on bra side.
 /// @param ket_gto_pair_block The basis function pairs block on ket side.
 /// @param bra_range The range [bra_first, bra_last) of basis functions on bra side.
 template <class T>
 inline auto
-comp_electron_repulsion_geom010_dsd(T& distributor,
+comp_electron_repulsion_geom010_ppp(T& distributor,
                                     const CGtoBlock& bra_gto_block,
                                     const CGtoPairBlock& ket_gto_pair_block,
                                     const std::pair<size_t, size_t>& bra_range) -> void
@@ -80,25 +80,25 @@ comp_electron_repulsion_geom010_dsd(T& distributor,
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> pbuffer(228, ket_npgtos);
+    CSimdArray<double> pbuffer(92, ket_npgtos);
 
     // allocate aligned Cartesian integrals
 
-    CSimdArray<double> cbuffer(96, 1);
+    CSimdArray<double> cbuffer(66, 1);
 
     // allocate aligned half transformed integrals
 
-    CSimdArray<double> skbuffer(170, 1);
+    CSimdArray<double> skbuffer(228, 1);
 
     // allocate aligned spherical integrals
 
-    CSimdArray<double> sbuffer(75, 1);
+    CSimdArray<double> sbuffer(81, 1);
 
     // setup Boys fuction data
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
-    CSimdArray<double> bf_data(7, ket_npgtos);
+    CSimdArray<double> bf_data(6, ket_npgtos);
 
     // set up ket partitioning
 
@@ -176,81 +176,75 @@ comp_electron_repulsion_geom010_dsd(T& distributor,
 
                 t4cfunc::comp_distances_wp(pfactors, 26, 17, r_a);
 
-                t3cfunc::comp_boys_args(bf_data, 6, pfactors, 13, a_exp);
+                t3cfunc::comp_boys_args(bf_data, 5, pfactors, 13, a_exp);
 
-                bf_table.compute(bf_data, 0, 6);
+                bf_table.compute(bf_data, 0, 5);
 
                 t3cfunc::comp_ovl_factors(pfactors, 16, 2, 3, a_norm, a_exp);
 
-                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 0, pfactors, 16, bf_data, 0);
+                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 0, pfactors, 16, bf_data, 1);
 
-                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 1, pfactors, 16, bf_data, 1);
+                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 1, pfactors, 16, bf_data, 2);
 
-                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 2, pfactors, 16, bf_data, 2);
+                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 2, pfactors, 16, bf_data, 3);
 
-                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 3, pfactors, 16, bf_data, 3);
+                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 3, pfactors, 16, bf_data, 4);
 
-                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 4, pfactors, 16, bf_data, 4);
+                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 4, 0, 1, pfactors, 20, 23);
 
-                t3ceri::comp_prim_electron_repulsion_sss(pbuffer, 5, pfactors, 16, bf_data, 5);
+                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 7, 1, 2, pfactors, 20, 23);
 
-                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 6, 0, 1, pfactors, 20, 23);
+                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 10, 2, 3, pfactors, 20, 23);
 
-                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 9, 1, 2, pfactors, 20, 23);
+                t3ceri::comp_prim_electron_repulsion_ssd(pbuffer, 13, 0, 1, 4, 7, pfactors, 20, 23, a_exp);
 
-                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 12, 2, 3, pfactors, 20, 23);
+                t3ceri::comp_prim_electron_repulsion_ssd(pbuffer, 19, 1, 2, 7, 10, pfactors, 20, 23, a_exp);
 
-                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 15, 3, 4, pfactors, 20, 23);
+                t3ceri::comp_prim_electron_repulsion_ssf(pbuffer, 25, 4, 7, 13, 19, pfactors, 20, 23, a_exp);
 
-                t3ceri::comp_prim_electron_repulsion_ssp(pbuffer, 18, 4, 5, pfactors, 20, 23);
+                t3ceri::comp_prim_electron_repulsion_psp(pbuffer, 35, 0, 4, pfactors, 26, a_exp);
 
-                t3ceri::comp_prim_electron_repulsion_ssd(pbuffer, 21, 0, 1, 6, 9, pfactors, 20, 23, a_exp);
+                t3ceri::comp_prim_electron_repulsion_psd(pbuffer, 44, 4, 13, pfactors, 26, a_exp);
 
-                t3ceri::comp_prim_electron_repulsion_ssd(pbuffer, 27, 1, 2, 9, 12, pfactors, 20, 23, a_exp);
+                t3ceri::comp_prim_electron_repulsion_psf(pbuffer, 62, 13, 25, pfactors, 26, a_exp);
 
-                t3ceri::comp_prim_electron_repulsion_ssd(pbuffer, 33, 2, 3, 12, 15, pfactors, 20, 23, a_exp);
+                t2cfunc::reduce(cbuffer, 0, pbuffer, 35, 9, ket_width, ket_npgtos);
 
-                t3ceri::comp_prim_electron_repulsion_ssd(pbuffer, 39, 3, 4, 15, 18, pfactors, 20, 23, a_exp);
+                pbuffer.scale(pfactors, 0, 2.0, {35, 44});
 
-                t3ceri::comp_prim_electron_repulsion_ssf(pbuffer, 45, 6, 9, 21, 27, pfactors, 20, 23, a_exp);
+                pbuffer.scale(pfactors, 0, 2.0, {44, 62});
 
-                t3ceri::comp_prim_electron_repulsion_ssf(pbuffer, 55, 9, 12, 27, 33, pfactors, 20, 23, a_exp);
+                pbuffer.scale(pfactors, 0, 2.0, {62, 92});
 
-                t3ceri::comp_prim_electron_repulsion_ssf(pbuffer, 65, 12, 15, 33, 39, pfactors, 20, 23, a_exp);
+                t2cfunc::reduce(cbuffer, 9, pbuffer, 35, 9, ket_width, ket_npgtos);
 
-                t3ceri::comp_prim_electron_repulsion_psp(pbuffer, 75, 2, 12, pfactors, 26, a_exp);
+                t2cfunc::reduce(cbuffer, 18, pbuffer, 44, 18, ket_width, ket_npgtos);
 
-                t3ceri::comp_prim_electron_repulsion_psd(pbuffer, 84, 12, 33, pfactors, 26, a_exp);
-
-                t3ceri::comp_prim_electron_repulsion_psf(pbuffer, 102, 33, 65, pfactors, 26, a_exp);
-
-                t3ceri::comp_prim_electron_repulsion_dsd(pbuffer, 132, 21, 27, 75, 84, pfactors, 26, a_exp);
-
-                t3ceri::comp_prim_electron_repulsion_dsf(pbuffer, 168, 45, 55, 84, 102, pfactors, 26, a_exp);
-
-                pbuffer.scale(pfactors, 0, 2.0, {132, 168});
-
-                pbuffer.scale(pfactors, 0, 2.0, {168, 228});
-
-                t2cfunc::reduce(cbuffer, 0, pbuffer, 132, 36, ket_width, ket_npgtos);
-
-                t2cfunc::reduce(cbuffer, 36, pbuffer, 168, 60, ket_width, ket_npgtos);
+                t2cfunc::reduce(cbuffer, 36, pbuffer, 62, 30, ket_width, ket_npgtos);
 
             }
 
-            t3cfunc::bra_transform<2>(skbuffer, 0, cbuffer, 0, 0, 2);
+            t3cfunc::bra_transform<1>(skbuffer, 0, cbuffer, 0, 0, 1);
 
-            t3cfunc::bra_transform<2>(skbuffer, 30, cbuffer, 36, 0, 3);
+            t3cfunc::bra_transform<1>(skbuffer, 90, cbuffer, 9, 0, 1);
 
-            t3ceri::comp_ket_geom010_electron_repulsion_xsd(skbuffer, 80, 0, 30, cfactors, 6, 2);
+            t3cfunc::bra_transform<1>(skbuffer, 99, cbuffer, 18, 0, 2);
 
-            t3cfunc::ket_transform<0, 2>(sbuffer, 0, skbuffer, 80, 2);
+            t3cfunc::bra_transform<1>(skbuffer, 117, cbuffer, 36, 0, 3);
 
-            t3cfunc::ket_transform<0, 2>(sbuffer, 25, skbuffer, 110, 2);
+            t3ceri::comp_ket_geom010_electron_repulsion_xsp(skbuffer, 147, 90, 99, cfactors, 6, 1);
 
-            t3cfunc::ket_transform<0, 2>(sbuffer, 50, skbuffer, 140, 2);
+            t3ceri::comp_ket_geom010_electron_repulsion_xsd(skbuffer, 174, 99, 117, cfactors, 6, 1);
 
-            distributor.distribute(sbuffer, 0, bra_gto_indices, c_indices, d_indices, 2, 0, 2, j, ket_range);
+            t3ceri::comp_ket_geom010_electron_repulsion_xpp(skbuffer, 9, 0, 147, 174, cfactors, 6, 1);
+
+            t3cfunc::ket_transform<1, 1>(sbuffer, 0, skbuffer, 9, 1);
+
+            t3cfunc::ket_transform<1, 1>(sbuffer, 27, skbuffer, 36, 1);
+
+            t3cfunc::ket_transform<1, 1>(sbuffer, 54, skbuffer, 63, 1);
+
+            distributor.distribute(sbuffer, 0, bra_gto_indices, c_indices, d_indices, 1, 1, 1, j, ket_range);
         }
     }
 
@@ -258,4 +252,4 @@ comp_electron_repulsion_geom010_dsd(T& distributor,
 
 } // t3ceri namespace
 
-#endif /* ThreeCenterElectronRepulsionGeom010RecDSD_hpp */
+#endif /* ThreeCenterElectronRepulsionGeom010RecPPP_hpp */
