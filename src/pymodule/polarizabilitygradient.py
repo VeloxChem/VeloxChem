@@ -364,11 +364,11 @@ class PolarizabilityGradient:
 
                 # transform to AO basis: mi,xia,na->xmn
                 # TODO rename to _ao for clarity
-                x_plus_y = np.array([
+                x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
                     for x in range(dof)
                 ])
-                x_minus_y = np.array([
+                x_minus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
                     for x in range(dof)
                 ])
@@ -397,15 +397,15 @@ class PolarizabilityGradient:
             else:
                 #orbrsp_results = None
                 gs_dm = None
-                x_plus_y = None
-                x_minus_y = None
+                x_plus_y_ao = None
+                x_minus_y_ao = None
                 omega_ao = None
                 rel_dm_ao = None
 
             #orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
             gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
-            x_plus_y = self.comm.bcast(x_plus_y, root=mpi_master())
-            x_minus_y = self.comm.bcast(x_minus_y, root=mpi_master())
+            x_plus_y_ao = self.comm.bcast(x_plus_y_ao, root=mpi_master())
+            x_minus_y_ao = self.comm.bcast(x_minus_y_ao, root=mpi_master())
             omega_ao = self.comm.bcast(omega_ao, root=mpi_master())
             rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
 
@@ -494,11 +494,11 @@ class PolarizabilityGradient:
                         # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
-                                    x_minus_y[x].reshape(nao**2),
+                                    x_minus_y_ao[x].reshape(nao**2),
                                     d_dipole[y, icoord].reshape(nao**2)
                                 ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
                                     d_dipole[x, icoord].reshape(nao**2),
-                                    x_minus_y[y].reshape(nao**2)
+                                    x_minus_y_ao[y].reshape(nao**2)
                                 ]))
 
                 gmats_dip = Matrices()
@@ -507,7 +507,7 @@ class PolarizabilityGradient:
             # on-the-fly to pol_gradient
             # ERI contribution
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
-                                    rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
+                                    rel_dm_ao, x_plus_y_ao, x_minus_y_ao, local_atoms)
 
             # TODO distributed ?
             pol_gradient += eri_contrib
@@ -524,7 +524,7 @@ class PolarizabilityGradient:
             if self._dft:
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
-                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y)
+                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao)
 
                 # add contribution to the SCF polarizability gradient
                 if self.rank == mpi_master():
@@ -549,7 +549,7 @@ class PolarizabilityGradient:
             return {}
 
     def compute_eri_contrib(self, molecule, basis, gs_dm, rel_dm_ao,
-                                         x_plus_y, x_minus_y, local_atoms):
+                                         x_plus_y_ao, x_minus_y_ao, local_atoms):
         """
         oDirects the computation of the contribution from ERI derivative integrals
         to the polarizability gradient.
@@ -562,9 +562,9 @@ class PolarizabilityGradient:
             The ground state density.
         :param rel_dm_ao:
             The relaxed density matrix.
-        :param x_plus_y:
+        :param x_plus_y_ao:
             The X+Y response vectors.
-        :param x_minus_y:
+        :param x_minus_y_ao:
             The X-Y response vectors.
         :param local_atoms:
             The atom partition for the MPI node.
@@ -575,15 +575,15 @@ class PolarizabilityGradient:
 
         if self.is_complex:
             eri_deriv_contrib = self.compute_eri_contrib_complex(molecule, basis, gs_dm,
-                                            rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
+                                            rel_dm_ao, x_plus_y_ao, x_minus_y_ao, local_atoms)
         else:
             eri_deriv_contrib = self.compute_eri_contrib_real(molecule, basis, gs_dm,
-                                            rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
+                                            rel_dm_ao, x_plus_y_ao, x_minus_y_ao, local_atoms)
 
         return eri_deriv_contrib
 
     def compute_eri_contrib_real(self, molecule, basis, gs_dm, rel_dm_ao,
-                                         x_plus_y, x_minus_y, local_atoms):
+                                         x_plus_y_ao, x_minus_y_ao, local_atoms):
         """
         Computes the contribution from ERI derivative integrals
         to the real polarizability gradient.
@@ -596,9 +596,9 @@ class PolarizabilityGradient:
             The ground state density.
         :param rel_dm_ao:
             The relaxed density matrix.
-        :param x_plus_y:
+        :param x_plus_y_ao:
             The X+Y response vectors.
-        :param x_minus_y:
+        :param x_minus_y_ao:
             The X-Y response vectors.
         :param local_atoms:
             The atom partition for the MPI node.
@@ -650,32 +650,32 @@ class PolarizabilityGradient:
                 den_mat_for_fock_rel.set_values(2.0*rel_dm_ao[x,y])
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_x.set_values(x_plus_y[x])
+                den_mat_for_fock_xpy_x.set_values(x_plus_y_ao[x])
                 # (X+Y)_y
                 den_mat_for_fock_xpy_y = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_y.set_values(x_plus_y[y])
+                den_mat_for_fock_xpy_y.set_values(x_plus_y_ao[y])
                 # (X+Y)_x - (X+Y)_x
                 den_mat_for_fock_xpy_m_xpyT_x = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_x.set_values( x_plus_y[x]
-                                                        - x_plus_y[x].T)
+                den_mat_for_fock_xpy_m_xpyT_x.set_values( x_plus_y_ao[x]
+                                                        - x_plus_y_ao[x].T)
                 # (X+Y)_y - (X+Y)_y
                 den_mat_for_fock_xpy_m_xpyT_y = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y.set_values( x_plus_y[y]
-                                                        - x_plus_y[y].T)
+                den_mat_for_fock_xpy_m_xpyT_y.set_values( x_plus_y_ao[y]
+                                                        - x_plus_y_ao[y].T)
                 # (X-Y)_x
                 den_mat_for_fock_xmy_x = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_x.set_values(x_minus_y[x])
+                den_mat_for_fock_xmy_x.set_values(x_minus_y_ao[x])
                 # (X-Y)_y
                 den_mat_for_fock_xmy_y = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_y.set_values(x_minus_y[y])
+                den_mat_for_fock_xmy_y.set_values(x_minus_y_ao[y])
                 # (X-Y)_x + (X-Y)_x
                 den_mat_for_fock_xmy_p_xmyT_x = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_x.set_values( x_minus_y[x]
-                                                        + x_minus_y[x].T)
+                den_mat_for_fock_xmy_p_xmyT_x.set_values( x_minus_y_ao[x]
+                                                        + x_minus_y_ao[x].T)
                 # (X-Y)_y + (X-Y)_y
                 den_mat_for_fock_xmy_p_xmyT_y = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y.set_values( x_minus_y[y]
-                                                        + x_minus_y[y].T)
+                den_mat_for_fock_xmy_p_xmyT_y.set_values( x_minus_y_ao[y]
+                                                        + x_minus_y_ao[y].T)
                 # contraction of integrals and DMs
                 erigrad_rel = fock_grad_drv.compute(basis, screener_atom,
                                              screener,
@@ -716,7 +716,7 @@ class PolarizabilityGradient:
         return eri_deriv_contrib
 
     def compute_eri_contrib_complex(self, molecule, basis, gs_dm, rel_dm_ao,
-                                         x_plus_y, x_minus_y, local_atoms):
+                                         x_plus_y_ao, x_minus_y_ao, local_atoms):
         """
         Computes the contribution from ERI derivative integrals
         to the complex polarizability gradient.
@@ -729,9 +729,9 @@ class PolarizabilityGradient:
             The ground state density.
         :param rel_dm_ao:
             The relaxed density matrix.
-        :param x_plus_y:
+        :param x_plus_y_ao:
             The X+Y response vectors.
-        :param x_minus_y:
+        :param x_minus_y_ao:
             The X-Y response vectors.
         :param local_atoms:
             The atom partition for the MPI node.
@@ -785,52 +785,52 @@ class PolarizabilityGradient:
                 den_mat_for_fock_rel_imag.set_values(2.0*rel_dm_ao[x,y].imag)
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_x_real.set_values(x_plus_y[x].real)
+                den_mat_for_fock_xpy_x_real.set_values(x_plus_y_ao[x].real)
                 den_mat_for_fock_xpy_x_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_x_imag.set_values(x_plus_y[x].imag)
+                den_mat_for_fock_xpy_x_imag.set_values(x_plus_y_ao[x].imag)
                 # (X+Y)_y
                 den_mat_for_fock_xpy_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_y_real.set_values(x_plus_y[y].real)
+                den_mat_for_fock_xpy_y_real.set_values(x_plus_y_ao[y].real)
                 den_mat_for_fock_xpy_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_y_imag.set_values(x_plus_y[y].imag)
+                den_mat_for_fock_xpy_y_imag.set_values(x_plus_y_ao[y].imag)
                 # (X+Y)_x - (X+Y)_x
                 den_mat_for_fock_xpy_m_xpyT_x_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_x_real.set_values( (x_plus_y[x]
-                                                        - x_plus_y[x].T).real )
+                den_mat_for_fock_xpy_m_xpyT_x_real.set_values( (x_plus_y_ao[x]
+                                                        - x_plus_y_ao[x].T).real )
                 den_mat_for_fock_xpy_m_xpyT_x_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_x_imag.set_values( (x_plus_y[x]
-                                                        - x_plus_y[x].T).imag )
+                den_mat_for_fock_xpy_m_xpyT_x_imag.set_values( (x_plus_y_ao[x]
+                                                        - x_plus_y_ao[x].T).imag )
                 # (X+Y)_y - (X+Y)_y
                 den_mat_for_fock_xpy_m_xpyT_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y_real.set_values( (x_plus_y[y]
-                                                        - x_plus_y[y].T).real )
+                den_mat_for_fock_xpy_m_xpyT_y_real.set_values( (x_plus_y_ao[y]
+                                                        - x_plus_y_ao[y].T).real )
                 den_mat_for_fock_xpy_m_xpyT_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y_imag.set_values( (x_plus_y[y]
-                                                        - x_plus_y[y].T).imag )
+                den_mat_for_fock_xpy_m_xpyT_y_imag.set_values( (x_plus_y_ao[y]
+                                                        - x_plus_y_ao[y].T).imag )
                 # (X-Y)_x
                 den_mat_for_fock_xmy_x_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_x_real.set_values(x_minus_y[x].real)
+                den_mat_for_fock_xmy_x_real.set_values(x_minus_y_ao[x].real)
                 den_mat_for_fock_xmy_x_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_x_imag.set_values(x_minus_y[x].imag)
+                den_mat_for_fock_xmy_x_imag.set_values(x_minus_y_ao[x].imag)
                 # (X-Y)_y
                 den_mat_for_fock_xmy_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_y_real.set_values(x_minus_y[y].real)
+                den_mat_for_fock_xmy_y_real.set_values(x_minus_y_ao[y].real)
                 den_mat_for_fock_xmy_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_y_imag.set_values(x_minus_y[y].imag)
+                den_mat_for_fock_xmy_y_imag.set_values(x_minus_y_ao[y].imag)
                 # (X-Y)_x + (X-Y)_x
                 den_mat_for_fock_xmy_p_xmyT_x_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_x_real.set_values( (x_minus_y[x]
-                                                        + x_minus_y[x].T).real)
+                den_mat_for_fock_xmy_p_xmyT_x_real.set_values( (x_minus_y_ao[x]
+                                                        + x_minus_y_ao[x].T).real)
                 den_mat_for_fock_xmy_p_xmyT_x_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_x_imag.set_values( (x_minus_y[x]
-                                                        + x_minus_y[x].T).imag)
+                den_mat_for_fock_xmy_p_xmyT_x_imag.set_values( (x_minus_y_ao[x]
+                                                        + x_minus_y_ao[x].T).imag)
                 # (X-Y)_y + (X-Y)_y
                 den_mat_for_fock_xmy_p_xmyT_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y_real.set_values( (x_minus_y[y]
-                                                        + x_minus_y[y].T).real)
+                den_mat_for_fock_xmy_p_xmyT_y_real.set_values( (x_minus_y_ao[y]
+                                                        + x_minus_y_ao[y].T).real)
                 den_mat_for_fock_xmy_p_xmyT_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y_imag.set_values( (x_minus_y[y]
-                                                        + x_minus_y[y].T).imag)
+                den_mat_for_fock_xmy_p_xmyT_y_imag.set_values( (x_minus_y_ao[y]
+                                                        + x_minus_y_ao[y].T).imag)
                 # contraction of integrals and DMs
                 # Re
                 erigrad_rel_re = fock_grad_drv.compute(basis, screener_atom,
@@ -1263,7 +1263,7 @@ class PolarizabilityGradient:
         return orbrsp_drv.cphf_results
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y):
+                                    x_minus_y_ao):
         """
         Directs the calculation of the exchange-correlation contribution to the DFT
         polarizability gradient.
@@ -1276,7 +1276,7 @@ class PolarizabilityGradient:
             The ground state density matrix.
         :param rel_dm_ao:
             The relaxed density matric in AO basis.
-        :param x_minus_y:
+        :param x_minus_y_ao:
             The X-Y response vector.
 
         :return xc_contrib:
@@ -1287,15 +1287,15 @@ class PolarizabilityGradient:
 
         if self.is_complex:
             xc_contrib = self.compute_polgrad_xc_contrib_complex(
-                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y_ao, xcfun_label)
         else:
             xc_contrib = self.compute_polgrad_xc_contrib_real(
-                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y_ao, xcfun_label)
 
         return xc_contrib
 
     def compute_polgrad_xc_contrib_real(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y, xcfun_label):
+                                    x_minus_y_ao, xcfun_label):
         """
         Calculates the exchange-correlation contribution to the real
         polarizability gradient.
@@ -1308,7 +1308,7 @@ class PolarizabilityGradient:
             The ground state density matrix.
         :param rel_dm_ao:
             The relaxed density matric in AO basis.
-        :param x_minus_y:
+        :param x_minus_y_ao:
             The X-Y response vector.
         :param xcfun_label:
             The label for the XC functional
@@ -1328,10 +1328,10 @@ class PolarizabilityGradient:
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
 
                     # symmetrize
-                    x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
-                                                          x_minus_y[m].T)
-                    x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y[n] +
-                                                          x_minus_y[n].T)
+                    x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y_ao[m] +
+                                                          x_minus_y_ao[m].T)
+                    x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y_ao[n] +
+                                                          x_minus_y_ao[n].T)
 
                 else:
                     rhow_dm_sym = None
@@ -1357,7 +1357,7 @@ class PolarizabilityGradient:
         return xc_pol_gradient
 
     def compute_polgrad_xc_contrib_complex(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y, xcfun_label):
+                                    x_minus_y_ao, xcfun_label):
         """
         Calculates the exchange-correlation contribution to the complex
         polarizability gradient.
@@ -1370,7 +1370,7 @@ class PolarizabilityGradient:
             The ground state density matrix.
         :param rel_dm_ao:
             The relaxed density matric in AO basis.
-        :param x_minus_y:
+        :param x_minus_y_ao:
             The X-Y response vector.
         :param xcfun_label:
             The label for the XC functional
@@ -1394,13 +1394,13 @@ class PolarizabilityGradient:
                     rhow_dm_sym_list_imag = [np.array(rhow_dm_sym.imag)]
 
                     # symmetrize
-                    x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y[m] +
-                                                          x_minus_y[m].T)
+                    x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y_ao[m] +
+                                                          x_minus_y_ao[m].T)
                     x_minus_y_sym_m_list_real = [ np.array(x_minus_y_sym_m.real) ]
                     x_minus_y_sym_m_list_imag = [ np.array(x_minus_y_sym_m.imag) ]
 
-                    x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y[n] +
-                                                          x_minus_y[n].T)
+                    x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y_ao[n] +
+                                                          x_minus_y_ao[n].T)
                     x_minus_y_sym_n_list_real = [np.array(x_minus_y_sym_n.real)]
                     x_minus_y_sym_n_list_imag = [np.array(x_minus_y_sym_n.imag)]
 
