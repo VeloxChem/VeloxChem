@@ -202,8 +202,6 @@ comp_electron_repulsion_geom010_pss(T& distributor,
             t3cfunc::bra_transform<1>(skbuffer, 3, cbuffer, 3, 0, 1);
 
             t3ceri::comp_ket_geom010_electron_repulsion_xss(skbuffer, 12, 0, 3, cfactors, 6, 1);
-            
-            //t3ceri::comp_hrr_electron_repulsion_xps(skbuffer, 12, 0, 3, cfactors, 6, 1);
 
             t3cfunc::ket_transform<0, 0>(sbuffer, 0, skbuffer, 12, 1);
 

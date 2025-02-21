@@ -5,10 +5,10 @@
 #include <cstddef>
 #include <utility>
 
+#include "ThreeCenterElectronRepulsionContrRecXPP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXDP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXPD.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXPP.hpp"
-#include "ThreeCenterElectronRepulsionContrRecXPP.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXSD.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXSF.hpp"
 #include "ThreeCenterElectronRepulsionGeom010ContrRecXSP.hpp"
