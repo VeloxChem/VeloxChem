@@ -51,13 +51,14 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
     hipSafe(hipMalloc(&d_A, n * sizeof(double)));
     hipSafe(hipMalloc(&d_B, n * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_A, A, n * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_B, B, n * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpyAsync(d_A, A, n * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpyAsync(d_B, B, n * sizeof(double), hipMemcpyHostToDevice));
 
     hipblasHandle_t handle;
     hipblasSafe(hipblasCreate(&handle));
 
     double dot_product;
+    hipSafe(hipDeviceSynchronize());
     hipblasSafe(hipblasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
 
     hipblasSafe(hipblasDestroy(handle));
@@ -130,17 +131,19 @@ computeErrorVector(double* errvec, const double* X, const double* F, const doubl
     hipSafe(hipMalloc(&d_B, nao * nao * sizeof(double)));
     hipSafe(hipMalloc(&d_C, nao * nao * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_A, F, nao * nao * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_B, D, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpyAsync(d_A, F, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpyAsync(d_B, D, nao * nao * sizeof(double), hipMemcpyHostToDevice));
 
     double alpha = 1.0, beta = 0.0;
 
     // Note: we compute C^T = B^T * A^T since hipblas is column-major
 
+    hipSafe(hipDeviceSynchronize());
     // D^T F^T (=> FD)
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_B, nao, d_A, nao, &beta, d_C, nao));
 
     // S^T(FD)^T (=> FDS)
+    hipSafe(hipDeviceSynchronize());
     hipSafe(hipMemcpy(d_A, S, nao * nao * sizeof(double), hipMemcpyHostToDevice));
 
     hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, nao, nao, nao, &alpha, d_A, nao, d_C, nao, &beta, d_B, nao));
@@ -208,8 +211,8 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     hipSafe(hipMalloc(&d_X, nmo * nao * sizeof(double)));
     hipSafe(hipMalloc(&d_Y, nmo * nao * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_F, F, nao * nao * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpyAsync(d_F, F, nao * nao * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpyAsync(d_X, X, nmo * nao * sizeof(double), hipMemcpyHostToDevice));
 
     double alpha = 1.0, beta = 0.0;
 
@@ -219,6 +222,7 @@ transformMatrix(double* transformed_F, const double* X, const double* F,
     auto op_XT = (trans_X == std::string("N")) ? HIPBLAS_OP_T : HIPBLAS_OP_N;
     auto lda_XT = (trans_X == std::string("N")) ? nao : nmo;
 
+    hipSafe(hipDeviceSynchronize());
     // Note: we compute C^T = B^T * A^T since hipblas is column-major
 
     // X^T F^T (=> FX)

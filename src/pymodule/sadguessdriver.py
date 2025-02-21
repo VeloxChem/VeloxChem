@@ -741,9 +741,10 @@ class SadGuessDriver:
             return []
 
     def get_alpha_beta_occ_for_molecule(self, molecule, net_charge,
-                                        num_unpaired_electrons):
+                                        num_unpaired_electrons,
+                                        num_gpu_per_node):
 
-        partial_charges = molecule.get_partial_charges(net_charge)
+        partial_charges = molecule.get_partial_charges(net_charge, num_gpu_per_node)
 
         elem_ids = molecule.get_element_ids()
         sum_elem_ids = sum(elem_ids)
@@ -804,7 +805,7 @@ class SadGuessDriver:
 
         return aoinds_atoms
 
-    def compute(self, molecule, basis_1, basis_2, density_type):
+    def compute(self, molecule, basis_1, basis_2, density_type, num_gpu_per_node):
         """
         TODO
         """
@@ -818,10 +819,10 @@ class SadGuessDriver:
         S22 = S22mat.get_full_matrix().to_numpy()
 
         return self._comp_sad_guess(molecule, basis_1, basis_2, S12, S22,
-                                    density_type)
+                                    density_type, num_gpu_per_node)
 
     def _comp_sad_guess(self, molecule, basis_1, basis_2, S12, S22,
-                        density_type):
+                        density_type, num_gpu_per_node):
         """
         TODO
         """
@@ -865,7 +866,7 @@ class SadGuessDriver:
         multiplicity = molecule.get_multiplicity()
 
         alpha_occ, beta_occ = self.get_alpha_beta_occ_for_molecule(
-            molecule, net_charge, multiplicity - 1)
+            molecule, net_charge, multiplicity - 1, num_gpu_per_node)
 
         # C_SAD matrix
 

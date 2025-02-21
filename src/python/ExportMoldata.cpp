@@ -113,7 +113,7 @@ export_moldata(py::module& m)
             "Gets nuclear charges for molecule.")
         .def(
             "get_partial_charges",
-            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
+            [](const CMolecule& self, const double net_charge, const int numGpuPerNode) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge, numGpuPerNode); },
             "Gets partial charges for molecule.")
         .def("get_masses", &CMolecule::getMasses, "Gets a vector of atomic masses in molecule.")
         .def("get_labels", &CMolecule::getLabels, "Gets a vector of atomic labels in molecule.")

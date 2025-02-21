@@ -479,7 +479,7 @@ class ScfDriver:
                     den_mat = self.gen_initial_density_restart(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
-                        molecule, ao_basis, min_basis)
+                        molecule, ao_basis, min_basis, self._get_num_gpus_per_node())
                 naos = den_mat.shape[0]
             else:
                 naos = None
@@ -515,7 +515,7 @@ class ScfDriver:
                     den_mat = self.gen_initial_density_restart(molecule)
                 else:
                     den_mat = self.gen_initial_density_sad(
-                        molecule, val_basis, min_basis)
+                        molecule, val_basis, min_basis, self._get_num_gpus_per_node())
                 naos = den_mat.shape[0]
             else:
                 naos = None
@@ -573,7 +573,7 @@ class ScfDriver:
 
         return self.scf_tensors
 
-    def gen_initial_density_sad(self, molecule, ao_basis, min_basis):
+    def gen_initial_density_sad(self, molecule, ao_basis, min_basis, num_gpu_per_node):
         """
         Computes initial AO density using superposition of atomic densities
         scheme.
@@ -591,7 +591,7 @@ class ScfDriver:
 
         sad_drv = SadGuessDriver()
 
-        return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type)
+        return sad_drv.compute(molecule, min_basis, ao_basis, self.scf_type, num_gpu_per_node)
 
     def gen_initial_density_proj(self, molecule, ao_basis, valence_basis,
                                  valence_mo):
@@ -932,7 +932,7 @@ class ScfDriver:
 
             S = ovl_mat
 
-            eigvals, eigvecs_T = eigh_gpu(S, screener.get_num_gpus_per_node())
+            eigvals, eigvecs_T = eigh_gpu(S, num_gpus_per_node)
             eigvecs = eigvecs_T.T
 
             num_eigs = sum(eigvals > self.ovl_thresh)
