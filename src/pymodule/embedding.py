@@ -10,7 +10,8 @@ from .oneeints import (compute_nuclear_potential_integrals,
                        compute_electrostatic_potential_hessian,
                        compute_electrostatic_integrals_gradient,
                        compute_electric_field_fock_gradient,
-                       compute_electric_field_potential_gradient_for_mm)
+                       compute_electric_field_potential_gradient_for_mm,
+                       compute_electric_field_potential_hessian)
 from .errorhandler import assert_msg_critical
 
 try:
@@ -322,7 +323,7 @@ class EmbeddingIntegralDriver:
         """Calculate the electronic field gradients on coordinates.
 
         Args:
-            coordinates: Coordinates on which the fields are to be evaluated.
+            coordinates: Coordinates on which the field gradients are to be evaluated.
                 Shape: (number of atoms, 3)
                 Dtype: np.float64
             density_matrix: Density Matrix that is the source of the electronic field.
@@ -335,7 +336,7 @@ class EmbeddingIntegralDriver:
         Returns:
             Electronic field gradients.
                 Shape: (3, number of atoms, 3)
-                Dtype: np.float64.
+                Dtype: np.float64
         """
         return compute_electric_field_potential_gradient_for_mm(
             molecule=self.molecule,
@@ -345,26 +346,34 @@ class EmbeddingIntegralDriver:
             qm_atom_index=i
         )
 
-    def electronic_fields(self, coordinates: np.ndarray,
-                          density_matrix: np.ndarray) -> np.ndarray:
-        """Calculate the electronic fields on coordinates.
+    def compute_electronic_field_hessian(self,
+                                         coordinates,
+                                         induced_dipoles,
+                                         density_matrix):
+        """Calculate the electronic field Hessian on coordinates.
 
         Args:
-            coordinates: Coordinates on which the fields are to be evaluated.
+            coordinates: Coordinates on which the field Hessian is to be evaluated.
                 Shape: (number of atoms, 3)
+                Dtype: np.float64
+            induced_dipoles: Induced dipoles at coordinates.
+                Shape (number of induced dipoles, 3)
                 Dtype: np.float64
             density_matrix: Density Matrix that is the source of the electronic field.
                 Shape: (number of ao functions, number of ao functions)
                 Dtype: np.float64
-
         Returns:
-            Electronic fields.
-                Shape: (number of atoms, 3)
-                Dtype: np.float64.
+            Electronic field Hessian.
+                Shape: (3 * number of atoms, 3 * number of atoms)
+                Dtype: np.float64
         """
+        return compute_electric_field_potential_hessian(self.molecule,
+                                                        self.basis,
+                                                        coordinates,
+                                                        induced_dipoles,
+                                                        density_matrix)
 
-        return compute_electric_field_values(self.molecule, self.basis,
-                                                    coordinates, density_matrix)
+
 
 class PolarizableEmbedding:
     """
@@ -770,7 +779,7 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem= self.classical_subsystem)
-        e_ind_hess = induction_interactions.compute_electronic_induction_energy_hessian(
+        e_ind_hess = induction_interactions.compute_induction_energy_hessian(
             density_matrix=density_matrix,
             classical_subsystem=self.classical_subsystem,
             quantum_subsystem=self.quantum_subsystem,
