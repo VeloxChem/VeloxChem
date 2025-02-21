@@ -31,7 +31,7 @@ import tempfile
 import math
 import h5py
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -669,12 +669,12 @@ class OptimizationDriver:
 
         line = '{:>5s}{:>20s}  {:>25s}{:>30s}'.format(
             'Scan', 'Energy (a.u.)', 'Relative Energy (a.u.)',
-            'Relative Energy (kcal/mol)')
+            'Relative Energy (kJ/mol)')
         self.ostream.print_header(line)
         self.ostream.print_header('-' * len(line))
         for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
             line = '{:>5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
-                i + 1, e, rel_e, rel_e * hartree_in_kcalpermol())
+                i + 1, e, rel_e, rel_e * hartree_in_kjpermol())
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
@@ -852,13 +852,13 @@ class OptimizationDriver:
 
         min_energy = np.min(energies)
         rel_energies = energies - min_energy
-        rel_energies_kcal = rel_energies * hartree_in_kcalpermol()
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
 
         xyz_data_i = geometries[step]
-        steps = range(len(rel_energies_kcal))
-        total_steps = len(rel_energies_kcal) - 1
+        steps = range(len(rel_energies_kJ))
+        total_steps = len(rel_energies_kJ) - 1
         x = np.linspace(0, total_steps, 100)
-        y = np.interp(x, steps, rel_energies_kcal)
+        y = np.interp(x, steps, rel_energies_kJ)
         plt.figure(figsize=(6.5, 4))
         plt.plot(x,
                  y,
@@ -868,7 +868,7 @@ class OptimizationDriver:
                  ls='-',
                  zorder=0)
         plt.scatter(steps,
-                    rel_energies_kcal,
+                    rel_energies_kJ,
                     color='black',
                     alpha=0.7,
                     s=120 / math.log(total_steps, 10),
@@ -876,14 +876,14 @@ class OptimizationDriver:
                     edgecolor="darkcyan",
                     zorder=1)
         plt.scatter(step,
-                    rel_energies_kcal[step],
+                    rel_energies_kJ[step],
                     marker='o',
                     color='darkcyan',
                     alpha=1.0,
                     s=120 / math.log(total_steps, 10),
                     zorder=2)
         plt.xlabel('Iteration')
-        plt.ylabel('Relative energy [kcal/mol]')
+        plt.ylabel('Relative energy [kJ/mol]')
         plt.title("Geometry optimization")
         # Ensure x-axis displays as integers
         plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))

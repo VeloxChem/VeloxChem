@@ -23,6 +23,7 @@ dependencies:
   - openmm
   - scipy
   - rdkit
+  - dftd4-python
   - xtb
   - geometric
   - libxc

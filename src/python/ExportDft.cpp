@@ -730,7 +730,29 @@ export_dft(py::module& m)
             "Computes GTO values on grid points.",
             "molecule"_a,
             "basis"_a,
-            "molecular_grid"_a);
+            "molecular_grid"_a)
+        .def(
+            "compute_gto_values_and_derivatives",
+            [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid, const int deriv_order)
+                -> py::array_t<double> {
+                errors::assertMsgCritical((deriv_order == 1) || (deriv_order == 2),
+                                          std::string("compute_gto_values_and_derivatives: deriv_order > 2 not implemented"));
+                std::vector<CDenseMatrix> gtovaluesderivs;
+                if (deriv_order == 1) gtovaluesderivs = self.computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, molecularGrid);
+                if (deriv_order == 2) gtovaluesderivs = self.computeGtoValuesAndSecondOrderDerivativesOnGridPoints(molecule, basis, molecularGrid);
+                py::list ret;
+                for (int i = 0; i < static_cast<int>(gtovaluesderivs.size()); i++)
+                {
+                    ret.append(vlx_general::pointer_to_numpy(
+                        gtovaluesderivs[i].values(), {gtovaluesderivs[i].getNumberOfRows(), gtovaluesderivs[i].getNumberOfColumns()}));
+                }
+                return ret;
+            },
+            "Computes GTO values and derivatives on grid points.",
+            "molecule"_a,
+            "basis"_a,
+            "molecular_grid"_a,
+            "deriv_order"_a);
 
     // CXCMolecularGradient class
 

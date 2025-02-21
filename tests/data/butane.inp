@@ -1,5 +1,5 @@
 @jobs
-task: force field
+task: mm force field
 @end
 
 @method settings
@@ -7,7 +7,7 @@ basis: 6-31G*
 @end
 
 @force field
-scan_xyz_files: butane-scan-final.xyz
+scan_xyz_files: 1-5-8-11.xyz
 @end
 
 @molecule

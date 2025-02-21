@@ -30,12 +30,12 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
-from .loprop import LoPropDriver
+from .peforcefieldgenerator import PEForceFieldGenerator
 from .scfgradientdriver import ScfGradientDriver
 from .tddftgradientdriver import TddftGradientDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
@@ -255,7 +255,7 @@ def main():
 
     # Force field generator
 
-    if task_type == 'force field':
+    if task_type == 'mm force field':
         force_field_dict = (dict(task.input_dict['force_field'])
                             if 'force_field' in task.input_dict else {})
         force_field_dict['filename'] = task.input_dict['filename']
@@ -264,7 +264,7 @@ def main():
                      if 'resp_charges' in task.input_dict else {})
         resp_dict['filename'] = task.input_dict['filename']
 
-        force_field_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
+        force_field_drv = MMForceFieldGenerator(task.mpi_comm, task.ostream)
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
 
@@ -286,7 +286,7 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'vibrational', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient'
     ]
 
     scf_type = 'restricted'
@@ -644,11 +644,11 @@ def main():
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
 
-    # LoProp
+    # PE force field
 
-    if task_type == 'loprop':
-        loprop_driver = LoPropDriver(task.mpi_comm, task.ostream)
-        loprop_driver.compute(task.molecule, task.ao_basis, scf_results)
+    if task_type in ['loprop', 'pe force field']:
+        pe_ff_gen = PEForceFieldGenerator(task.mpi_comm, task.ostream)
+        pe_ff_gen.compute(task.molecule, task.ao_basis, scf_results)
 
     # RESP and ESP charges
 

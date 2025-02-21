@@ -269,6 +269,14 @@ class CXCIntegrator
     auto computeGtoValuesOnGridPoints(const CMolecule&       molecule,
                                       const CMolecularBasis& basis,
                                       const CMolecularGrid&  molecularGrid) const -> CDenseMatrix;
+
+    auto computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                    const CMolecularBasis& basis,
+                                                    const CMolecularGrid&  molecularGrid) const -> std::vector<CDenseMatrix>;
+
+    auto computeGtoValuesAndSecondOrderDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                               const CMolecularBasis& basis,
+                                                               const CMolecularGrid&  molecularGrid) const -> std::vector<CDenseMatrix>;
 };
 
 #endif /* XCIntegrator_hpp */

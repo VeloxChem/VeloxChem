@@ -400,9 +400,7 @@ def _Molecule_from_dict(mol_dict):
     assert_msg_critical(
         mol.check_multiplicity(),
         'Molecule: Incompatible multiplicity and number of electrons')
-    assert_msg_critical(
-        mol.check_proximity(0.1),
-        'Molecule: Corrupted geometry with closely located atoms')
+    assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
     return mol
 

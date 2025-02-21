@@ -257,7 +257,7 @@ class VibrationalAnalysis:
 
         if 'filename' in vib_dict:
             self.filename = vib_dict['filename']
-            self.checkpoint_file = f'{self.filename}-vib-results.h5'
+            self.checkpoint_file = f'{self.filename}.h5'
             self.result_file = f'{self.filename}-vib-results.out'
         else:
             self.result_file = 'vib-results.out'
@@ -1047,38 +1047,40 @@ class VibrationalAnalysis:
         if file_path.is_file():
             file_path.unlink()
 
-        hf = h5py.File(fname, 'w')
+        hf = h5py.File(fname, 'a')
+
+        vib_group = 'vib/'
 
         nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset('nuclear_repulsion', data=nuc_rep)
+        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         natm = molecule.number_of_atoms()
 
-        normal_mode_grp = hf.create_group('normal_modes')
+        normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
         for n, Q in enumerate(self.normed_normal_modes, 1):
             normal_mode_grp.create_dataset(str(n),
                                            data=np.array([Q]).reshape(natm, 3))
 
-        hf.create_dataset('hessian', data=self.hessian)
-        hf.create_dataset('vib_frequencies',
+        hf.create_dataset(vib_group + 'hessian', data=self.hessian)
+        hf.create_dataset(vib_group + 'vib_frequencies',
                           data=np.array([self.vib_frequencies]))
-        hf.create_dataset('force_constants',
+        hf.create_dataset(vib_group + 'force_constants',
                           data=np.array([self.force_constants]))
-        hf.create_dataset('reduced_masses',
+        hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array([self.reduced_masses]))
         if self.do_ir:
-            hf.create_dataset('ir_intensities',
+            hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array([self.ir_intensities]))
         if self.do_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('raman_activity')
+            raman_grp = hf.create_group(vib_group + 'raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('resonance_raman_activity')
+            raman_grp = hf.create_group(vib_group + 'resonance_raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
