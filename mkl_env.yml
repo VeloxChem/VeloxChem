@@ -9,6 +9,7 @@ dependencies:
   - mpich
   - blas=*=*mkl*
   - mkl-include
+  - eigen
   - mpi4py
   - numpy
   - h5py
@@ -22,11 +23,13 @@ dependencies:
   - mdanalysis
   - openmm
   - scipy
-  - openbabel
+  - rdkit
+  - dftd4-python
   - xtb
   - geometric
-  - libxc<7
+  - libxc
   - clang-format
   - yapf
   - toml
   - flake8
+  - pymbar

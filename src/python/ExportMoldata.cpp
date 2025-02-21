@@ -28,13 +28,13 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
+#include "AtomicPartialChargesModel.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "DispersionModel.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
-#include "PartialCharges.hpp"
 #include "Point.hpp"
 #include "StringFormat.hpp"
 
@@ -233,7 +233,7 @@ export_moldata(py::module &m)
             "Gets nuclear charges for molecule.")
         .def(
             "get_partial_charges",
-            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
+            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return atmparchg::getPartialCharges(self, net_charge); },
             "Gets partial charges for molecule.")
         .def(
             "vdw_radii_to_numpy",
@@ -290,16 +290,24 @@ export_moldata(py::module &m)
         .def("__deepcopy__", [](const CMolecule &self, py::dict) { return CMolecule(self); });
 
     // CDispersionModel class
+    // Note: DispersionModel is prefixed by an underscore and will be used in dispersionmodel.py
 
-    PyClass<CDispersionModel>(m, "DispersionModel")
+    PyClass<CDispersionModel>(m, "_DispersionModel")
         .def(py::init<>())
+        .def_static("is_available", &CDispersionModel::is_available, "Checks if dftd4 is available.")
         .def("compute",
              &CDispersionModel::compute,
              "Computes dispersion energy and gradient for a given molecule and a given density functional.",
              "molecule"_a,
              "xcLabel"_a)
-        .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
-        .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
+        .def("get_energy", &CDispersionModel::get_energy, "Gets dispersion energy.")
+        .def(
+            "get_gradient",
+            [](const CDispersionModel& self) -> py::array_t<double> {
+                auto grad = self.get_gradient();
+                return vlx_general::pointer_to_numpy(grad.values(), {grad.getNumberOfRows(), grad.getNumberOfColumns()});
+            },
+            "Gets dispersion gradient.");
 }
 
 }  // namespace vlx_moldata

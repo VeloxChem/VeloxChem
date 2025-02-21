@@ -6,6 +6,9 @@ on:
       - master
       - simd_master_test
       - multipsi_newcore
+      - dftd4-test
+      - xtb-test
+      - c_pcm
 
 jobs:
   vlx_ci:
@@ -16,7 +19,7 @@ jobs:
         shell: bash -l {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-1aa36de
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-468ec9b
 
     env:
       VLX_NUM_BUILD_JOBS: 4
@@ -56,8 +59,10 @@ jobs:
           git config --global --add safe.directory $PWD
           git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
-          CXX=g++ python -m pip install git+https://gitlab.com/FraME-projects/PyFraME.git@cpp-pert_tools
+          CXX=g++ python -m pip install \
+            git+https://gitlab.com/FraME-projects/PyFraME.git@35188b620c84f74a73e2c28d737abee4386a503a
           echo "=== VeloxChem build ==="
+          export DFTD4_HOME=/usr/local
           export XTBHOME=/usr/local
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
           SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++" \

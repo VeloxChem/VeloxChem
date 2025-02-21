@@ -1,7 +1,6 @@
 from mpi4py import MPI
 import numpy as np
 import pytest
-import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -9,10 +8,12 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.gradientdriver import GradientDriver
 from veloxchem.tddftgradientdriver import TddftGradientDriver
 
+
+@pytest.mark.solvers
 class TestGrad:
+
     def run_tddft_grad(self, xcfun_label, tamm_dancoff, ref_grad):
 
         molecule_string = """
@@ -70,9 +71,9 @@ class TestGrad:
         xcfun_label = 'slater'
         tamm_dancoff = True
         ref_grad = np.array(
-            [[-0.000000000000001, -0.000000000000005,  0.096828839746124],
-              [ 0.              ,  -0.059512179812975, -0.048405146528462],
-              [-0.              ,   0.059512179812977, -0.048405146528465]])
+            [[-0.000000000000001, -0.000000000000005, 0.096828839746124],
+             [0., -0.059512179812975, -0.048405146528462],
+             [-0., 0.059512179812977, -0.048405146528465]])
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
@@ -80,9 +81,9 @@ class TestGrad:
         xcfun_label = 'blyp'
         tamm_dancoff = True
         ref_grad = np.array(
-            [[ 0.000000000000002,  0.000000000000003,  0.081702810507772],
-              [-0.               , -0.052036797551521, -0.040837361620094],
-              [ 0.               ,  0.052036797551518, -0.040837361620095]])
+            [[0.000000000000002, 0.000000000000003, 0.081702810507772],
+             [-0., -0.052036797551521, -0.040837361620094],
+             [0., 0.052036797551518, -0.040837361620095]])
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
@@ -90,9 +91,9 @@ class TestGrad:
         xcfun_label = 'slater'
         tamm_dancoff = False
         ref_grad = np.array(
-            [[ 0.000000000000001, -0.000000000000006,  0.097148642876961],
-              [ 0.,                -0.060393461796934, -0.048565041680259],
-              [ 0.,                 0.060393461796936, -0.048565041680257]])
+            [[0.000000000000001, -0.000000000000006, 0.097148642876961],
+             [0., -0.060393461796934, -0.048565041680259],
+             [0., 0.060393461796936, -0.048565041680257]])
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
@@ -100,8 +101,8 @@ class TestGrad:
         xcfun_label = 'blyp'
         tamm_dancoff = False
         ref_grad = np.array(
-            [[-0.000000000000001, -0.000000000000001,  0.0818110121047  ],
-              [-0.               , -0.052800208718226, -0.040891498953149],
-              [ 0.               ,  0.052800208718228, -0.040891498953151]])
+            [[-0.000000000000001, -0.000000000000001, 0.0818110121047],
+             [-0., -0.052800208718226, -0.040891498953149],
+             [0., 0.052800208718228, -0.040891498953151]])
 
         self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)

@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import h5py
+import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -9,9 +10,15 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.hessianorbitalresponse import HessianOrbitalResponse
 
 
+@pytest.mark.solvers
 class TestCphfSolver:
 
-    def run_cphfsolver(self, molecule, basis, xcfun=None, label=None):
+    def run_cphfsolver(self,
+                       molecule,
+                       basis,
+                       xcfun=None,
+                       label=None,
+                       use_subcomms=False):
         scf_drv = ScfRestrictedDriver()
         method_settings = {}
         if xcfun is not None:
@@ -26,6 +33,9 @@ class TestCphfSolver:
         orbrsp_settings = {'conv_thresh': 2e-7}
         hess_orbrsp_drv.update_settings(orbrsp_settings, method_settings)
         hess_orbrsp_drv.ostream.mute()
+
+        hess_orbrsp_drv.use_subcomms = use_subcomms
+
         # TODO: hess_orbrsp_drv should return cphf_results
         hess_orbrsp_drv.compute(molecule, basis, scf_tensors)
 
@@ -68,6 +78,12 @@ class TestCphfSolver:
 
         self.run_cphfsolver(molecule, basis, "hf", "cphf_coefficients")
 
+        self.run_cphfsolver(molecule,
+                            basis,
+                            "hf",
+                            "cphf_coefficients",
+                            use_subcomms=True)
+
     def test_cpks_coefficients(self):
         nh3_xyz = """4
 
@@ -82,3 +98,9 @@ class TestCphfSolver:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         self.run_cphfsolver(molecule, basis, "b3lyp", "cpks_coefficients_b3lyp")
+
+        self.run_cphfsolver(molecule,
+                            basis,
+                            "b3lyp",
+                            "cpks_coefficients_b3lyp",
+                            use_subcomms=True)

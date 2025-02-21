@@ -286,8 +286,6 @@ class TestCphfPolgrad:
             assert np.max(np.abs(cphfpolgrad_omega_coefficients)
                                    - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6 
 
-#    @pytest.mark.skipif('pyscf' not in sys.modules,
-#                        reason='pyscf for integral derivatives not available')
     def test_cphfpolgrad_coefficients_real(self):
         h2o_xyz = """3
 
@@ -299,7 +297,6 @@ class TestCphfPolgrad:
 
         molecule = Molecule.from_xyz_string(h2o_xyz)
         basis = MolecularBasis.read(molecule, basis_set_label)
-
 
         self.run_cphfpolgrad_cg_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real",
                                   "cphfpolgrad_omega_coefficients_red_real")

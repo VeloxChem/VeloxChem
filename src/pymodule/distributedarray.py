@@ -202,7 +202,7 @@ class DistributedArray:
         :param: col:
             The column index (used only when self.data.ndim is 2).
         :return:
-            The full vector on the master node, None on other nodes.
+            The full vector on the root rank, None on other ranks.
         """
 
         data = None
@@ -215,6 +215,23 @@ class DistributedArray:
         if self.rank == root:
             full_shape_0 = sum([m.shape[0] for m in data])
             return np.hstack(data).reshape(full_shape_0)
+        else:
+            return None
+
+    def get_full_matrix(self, root=mpi_master()):
+        """
+        Gets full column matrix of a distributed array.
+
+        :return:
+            The full matrix on the root rank, None on other ranks.
+        """
+
+        if self.data.ndim == 2:
+            data = self.comm.gather(self.data, root=root)
+            if self.rank == root:
+                return np.vstack(data)
+            else:
+                return None
         else:
             return None
 

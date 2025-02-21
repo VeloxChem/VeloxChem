@@ -38,8 +38,10 @@ def molecule_sanity_check(mol):
         The molecule.
     """
 
-    mol.check_multiplicity()
-    mol.check_proximity(0.1)
+    assert_msg_critical(
+        mol.check_multiplicity(),
+        'Molecule: Incompatible multiplicity and number of electrons')
+    assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
 
 def scf_results_sanity_check(obj, scf_results):
@@ -208,14 +210,19 @@ def raman_sanity_check(obj):
                 obj.do_raman = True
                 obj.do_resonance_raman = False
             else:
-                freq_list = list(obj.frequencies)
-                freq_list.pop(idx0)
-                warn_msg += 'It has been removed from the list.'
+                # out-commented lines below left from a merge conflict,
+                # I don't remember why I made this list-trick
+                # but I am sure I had a good reason
+                #freq_list = list(obj.frequencies)
+                #freq_list.pop(idx0)
+                obj.frequencies.pop(idx0)
+                warn_msg += 'It has been removed from the list.\n'
                 warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
                 warn_msg += str(obj.frequencies)
             obj.ostream.print_warning(warn_msg)
         except ValueError:
             pass
+
 
 def pe_sanity_check(obj, method_dict=None):
     """
@@ -367,3 +374,32 @@ def embedding_options_sanity_check(options):
         raise KeyError(
             "At least one of 'json_file' or 'objects' must be provided in 'inputs'."
         )
+
+
+def solvation_model_sanity_check(obj):
+    """
+    Checks solvation model and updates relevant attributes.
+    """
+
+    if obj.solvation_model is not None:
+        assert_msg_critical(
+            not obj._pe,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'polarizable embedding')
+
+        assert_msg_critical(
+            obj.point_charges is None,
+            type(obj).__name__ +
+            ': The \'solvation_model\' option is incompatible with ' +
+            'point charges')
+
+        assert_msg_critical(
+            obj.solvation_model.lower() in ['cpcm', 'c-pcm', 'c_pcm'],
+            type(obj).__name__ +
+            ': Only the C-PCM solvation model is implemented.')
+
+        obj._cpcm = True
+
+    else:
+        obj._cpcm = False

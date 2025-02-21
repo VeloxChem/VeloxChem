@@ -216,7 +216,7 @@ class PolarizabilityGradient:
             self.polgradient = self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
-            self.print_geometry(molecule)
+            # self.print_geometry(molecule)
             if self.do_print_polgrad:
                 self.print_polarizability_gradient(molecule)
 

@@ -340,6 +340,25 @@ auto local_distribute_geom(std::vector<double>&             values,
                            const size_t                     bra_igto,
                            const std::pair<size_t, size_t>& ket_range) -> void;
 
+auto local_distribute_geom_no_symm(std::vector<double>&             values,
+                           const int                        cart_ind,
+                           const CMatrix*                   density,
+                           const CMatrix*                   density_2,
+                           const std::string&               label,
+                           const double                     exchange_factor,
+                           const CSimdArray<double>&        buffer,
+                           const size_t                     offset,
+                           const std::vector<size_t>&       a_indices,
+                           const std::vector<size_t>&       b_indices,
+                           const std::vector<size_t>&       c_indices,
+                           const std::vector<size_t>&       d_indices,
+                           const int                        a_angmom,
+                           const int                        b_angmom,
+                           const int                        c_angmom,
+                           const int                        d_angmom,
+                           const size_t                     bra_igto,
+                           const std::pair<size_t, size_t>& ket_range) -> void;
+
 /// @brief Distributes buffer of integrals into local Fock matrix.
 /// @param focks  The local Fock matrices.
 /// @param suffix The suffix of Fock matrix identifier.

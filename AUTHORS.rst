@@ -23,11 +23,13 @@ Contributors
 * Mickael Delcey
 * Karan Ahmadazdeh
 * Olav Vahtras
-* Manuel Brand
 * Juan de Gracia
+* Manuel Brand
 * Nanna H. List
+* Erik Vitols
 * Xiaoyu Chen
 * Lukas Lampe
+* Mathieu Linares
 * Noah Deveaux
 * Magnus Ringholm
 * Thomas Fransson
@@ -40,4 +42,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2024-12-06 by ``git shortlog -sn``
+The list of contributors was obtained 2025-01-30 by ``git shortlog -sn``

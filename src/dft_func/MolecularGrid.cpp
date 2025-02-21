@@ -88,7 +88,11 @@ CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
 
     , _gridPointCounts(source._gridPointCounts)
 
+    , _gridPointCountsOriginal(source._gridPointCountsOriginal)
+
     , _gridPointDisplacements(source._gridPointDisplacements)
+
+    , _gridPointDisplacementsOriginal(source._gridPointDisplacementsOriginal)
 
     , _maxNumberOfGridPointsPerBox(source._maxNumberOfGridPointsPerBox)
 {
@@ -104,7 +108,11 @@ CMolecularGrid::CMolecularGrid(CMolecularGrid&& source) noexcept
 
     , _gridPointCounts(std::move(source._gridPointCounts))
 
+    , _gridPointCountsOriginal(std::move(source._gridPointCountsOriginal))
+
     , _gridPointDisplacements(std::move(source._gridPointDisplacements))
+
+    , _gridPointDisplacementsOriginal(std::move(source._gridPointDisplacementsOriginal))
 
     , _maxNumberOfGridPointsPerBox(std::move(source._maxNumberOfGridPointsPerBox))
 {
@@ -127,7 +135,11 @@ CMolecularGrid::operator=(const CMolecularGrid& source) -> CMolecularGrid&
 
     _gridPointCounts = source._gridPointCounts;
 
+    _gridPointCountsOriginal = source._gridPointCountsOriginal;
+
     _gridPointDisplacements = source._gridPointDisplacements;
+
+    _gridPointDisplacementsOriginal = source._gridPointDisplacementsOriginal;
 
     _maxNumberOfGridPointsPerBox = source._maxNumberOfGridPointsPerBox;
 
@@ -147,7 +159,11 @@ CMolecularGrid::operator=(CMolecularGrid&& source) noexcept -> CMolecularGrid&
 
     _gridPointCounts = std::move(source._gridPointCounts);
 
+    _gridPointCountsOriginal = std::move(source._gridPointCountsOriginal);
+
     _gridPointDisplacements = std::move(source._gridPointDisplacements);
+
+    _gridPointDisplacementsOriginal = std::move(source._gridPointDisplacementsOriginal);
 
     _maxNumberOfGridPointsPerBox = std::move(source._maxNumberOfGridPointsPerBox);
 
@@ -165,7 +181,11 @@ CMolecularGrid::operator==(const CMolecularGrid& other) const -> bool
 
     if (_gridPointCounts != other._gridPointCounts) return false;
 
+    if (_gridPointCountsOriginal != other._gridPointCountsOriginal) return false;
+
     if (_gridPointDisplacements != other._gridPointDisplacements) return false;
+
+    if (_gridPointDisplacementsOriginal != other._gridPointDisplacementsOriginal) return false;
 
     if (_maxNumberOfGridPointsPerBox != other._maxNumberOfGridPointsPerBox) return false;
 
@@ -307,7 +327,11 @@ CMolecularGrid::partitionGridPoints() -> std::string
 
         _gridPointCounts = partitioner.getGridPointCounts();
 
+        _gridPointCountsOriginal = partitioner.getGridPointCounts();
+
         _gridPointDisplacements = partitioner.getGridPointDisplacements();
+
+        _gridPointDisplacementsOriginal = partitioner.getGridPointDisplacements();
 
         return partitioner.getGridStatistics();
     }
@@ -326,7 +350,7 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
     {
         _isDistributed = true;
 
-        auto numboxes = _gridPointCounts.size();
+        auto numboxes = static_cast<int>(_gridPointCountsOriginal.size());
 
         // sort before distribute
 
@@ -334,50 +358,64 @@ CMolecularGrid::distributeCountsAndDisplacements(const int rank, const int nnode
 
         for (int box_id = 0; box_id < numboxes; box_id++)
         {
-            auto count = _gridPointCounts.data()[box_id];
+            auto count = _gridPointCountsOriginal[box_id];
 
             count_index_pairs.push_back(std::make_pair(count, box_id));
         }
 
         std::sort(count_index_pairs.begin(), count_index_pairs.end());
 
-        // re-arrange sorted indices for parallelization
+        // update original counts and displacements
 
-        std::vector<std::vector<int>> newcounts, newdispls;
+        std::vector<int> orig_counts, orig_displs;
 
-        for (int p = 0; p < nnodes; p++)
+        for (int box_id = 0; box_id < numboxes; box_id++)
         {
-            std::vector<int> counts_p, displs_p;
+            auto index = count_index_pairs[box_id].second;
 
-            for (int box_id = numboxes - 1 - p; box_id >= 0; box_id -= nnodes)
-            {
-                auto index = count_index_pairs[box_id].second;
-
-                counts_p.push_back(_gridPointCounts.data()[index]);
-                displs_p.push_back(_gridPointDisplacements.data()[index]);
-            }
-
-            newcounts.push_back(counts_p);
-            newdispls.push_back(displs_p);
+            orig_counts.push_back(_gridPointCountsOriginal[index]);
+            orig_displs.push_back(_gridPointDisplacementsOriginal[index]);
         }
+
+        _gridPointCountsOriginal = orig_counts;
+        _gridPointDisplacementsOriginal = orig_displs;
 
         // update counts and displacements
 
-        _gridPointCounts = newcounts[rank];
-        _gridPointDisplacements = newdispls[rank];
+        std::vector<int> counts_p, displs_p;
+
+        for (int box_id = numboxes - 1 - rank; box_id >= 0; box_id -= nnodes)
+        {
+            counts_p.push_back(_gridPointCountsOriginal[box_id]);
+            displs_p.push_back(_gridPointDisplacementsOriginal[box_id]);
+        }
+
+        _gridPointCounts = counts_p;
+        _gridPointDisplacements = displs_p;
     }
 }
 
 auto
 CMolecularGrid::reDistributeCountsAndDisplacements(const int rank, const int nnodes) -> void
 {
-    _isPartitioned = false;
+    std::string errpartitioned("MolecularGrid.reDistributeCountsAndDisplacements: Molecular grid must be parttioned and distributed");
 
-    partitionGridPoints();
+    errors::assertMsgCritical((_isPartitioned && _isDistributed), errpartitioned);
 
-    _isDistributed = false;
+    // recalculate counts and displacements
 
-    distributeCountsAndDisplacements(rank, nnodes);
+    auto numboxes = static_cast<int>(_gridPointCountsOriginal.size());
+
+    std::vector<int> counts_p, displs_p;
+
+    for (int box_id = numboxes - 1 - rank; box_id >= 0; box_id -= nnodes)
+    {
+        counts_p.push_back(_gridPointCountsOriginal[box_id]);
+        displs_p.push_back(_gridPointDisplacementsOriginal[box_id]);
+    }
+
+    _gridPointCounts = counts_p;
+    _gridPointDisplacements = displs_p;
 }
 
 auto

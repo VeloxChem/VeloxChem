@@ -27,9 +27,13 @@ class TestXCMolHess:
         scf_drv.grid_level = grid_level
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
-        gs_dm = scf_drv.density.alpha_to_numpy(0)
+        if scf_drv.rank == mpi_master():
+            gs_dm = scf_results['D_alpha']
+        else:
+            gs_dm = None
+        gs_dm = scf_drv.comm.bcast(gs_dm, root=mpi_master())
 
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
@@ -42,15 +46,14 @@ class TestXCMolHess:
                                                         xcfun_label)
         exc_deriv_2 = scf_drv.comm.reduce(exc_deriv_2, root=mpi_master())
 
-        vxc_deriv_1 = []
-        for iatom in range(molecule.number_of_atoms()):
-            vxc_deriv_atom = xc_mol_hess.integrate_vxc_fock_gradient(
-                molecule, basis, [gs_dm], mol_grid, xcfun_label, iatom)
-            vxc_deriv_1.append(vxc_deriv_atom)
+        atom_list = list(range(molecule.number_of_atoms()))
+        vxc_deriv_1 = xc_mol_hess.integrate_vxc_fock_gradient(
+            molecule, basis, [gs_dm], mol_grid, xcfun_label, atom_list)
         vxc_deriv_1 = np.array(vxc_deriv_1)
         vxc_deriv_1 = scf_drv.comm.reduce(vxc_deriv_1, root=mpi_master())
 
         if scf_drv.rank == mpi_master():
+            vxc_deriv_1 = vxc_deriv_1.reshape(ref_vxc_deriv_1.shape)
             assert np.max(np.abs(ref_exc_deriv_2 - exc_deriv_2)) < 1.0e-4
             assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
 
