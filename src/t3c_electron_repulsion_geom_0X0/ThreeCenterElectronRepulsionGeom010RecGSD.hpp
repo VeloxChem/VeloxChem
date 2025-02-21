@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <utility>
 
-#include "ThreeCenterElectronRepulsionContrRecXPD.hpp"
+#include "ThreeCenterElectronRepulsionGeom010ContrRecXSD.hpp"
 #include "ThreeCenterElectronRepulsionPrimRecDSD.hpp"
 #include "ThreeCenterElectronRepulsionPrimRecDSF.hpp"
 #include "ThreeCenterElectronRepulsionPrimRecDSP.hpp"
@@ -302,7 +302,7 @@ comp_electron_repulsion_geom010_gsd(T& distributor,
 
             t3cfunc::bra_transform<4>(skbuffer, 54, cbuffer, 90, 0, 3);
 
-            t3ceri::comp_hrr_electron_repulsion_xpd(skbuffer, 144, 0, 54, cfactors, 6, 4);
+            t3ceri::comp_ket_geom010_electron_repulsion_xsd(skbuffer, 144, 0, 54, cfactors, 6, 4);
 
             t3cfunc::ket_transform<0, 2>(sbuffer, 0, skbuffer, 144, 4);
 

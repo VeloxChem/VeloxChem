@@ -44,66 +44,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_xxx_zz = cbuffer.data(fd_off + 5);
 
-        auto g_xxy_xx = cbuffer.data(fd_off + 6);
-
-        auto g_xxy_xy = cbuffer.data(fd_off + 7);
-
-        auto g_xxy_xz = cbuffer.data(fd_off + 8);
-
-        auto g_xxy_yy = cbuffer.data(fd_off + 9);
-
-        auto g_xxy_yz = cbuffer.data(fd_off + 10);
-
-        auto g_xxy_zz = cbuffer.data(fd_off + 11);
-
-        auto g_xxz_xx = cbuffer.data(fd_off + 12);
-
-        auto g_xxz_xy = cbuffer.data(fd_off + 13);
-
-        auto g_xxz_xz = cbuffer.data(fd_off + 14);
-
-        auto g_xxz_yy = cbuffer.data(fd_off + 15);
-
-        auto g_xxz_yz = cbuffer.data(fd_off + 16);
-
-        auto g_xxz_zz = cbuffer.data(fd_off + 17);
-
-        auto g_xyy_xx = cbuffer.data(fd_off + 18);
-
-        auto g_xyy_xy = cbuffer.data(fd_off + 19);
-
-        auto g_xyy_xz = cbuffer.data(fd_off + 20);
-
-        auto g_xyy_yy = cbuffer.data(fd_off + 21);
-
-        auto g_xyy_yz = cbuffer.data(fd_off + 22);
-
-        auto g_xyy_zz = cbuffer.data(fd_off + 23);
-
-        auto g_xyz_xx = cbuffer.data(fd_off + 24);
-
-        auto g_xyz_xy = cbuffer.data(fd_off + 25);
-
-        auto g_xyz_xz = cbuffer.data(fd_off + 26);
-
-        auto g_xyz_yy = cbuffer.data(fd_off + 27);
-
-        auto g_xyz_yz = cbuffer.data(fd_off + 28);
-
-        auto g_xyz_zz = cbuffer.data(fd_off + 29);
-
-        auto g_xzz_xx = cbuffer.data(fd_off + 30);
-
-        auto g_xzz_xy = cbuffer.data(fd_off + 31);
-
-        auto g_xzz_xz = cbuffer.data(fd_off + 32);
-
-        auto g_xzz_yy = cbuffer.data(fd_off + 33);
-
-        auto g_xzz_yz = cbuffer.data(fd_off + 34);
-
-        auto g_xzz_zz = cbuffer.data(fd_off + 35);
-
         auto g_yyy_xx = cbuffer.data(fd_off + 36);
 
         auto g_yyy_xy = cbuffer.data(fd_off + 37);
@@ -115,30 +55,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_yyy_yz = cbuffer.data(fd_off + 40);
 
         auto g_yyy_zz = cbuffer.data(fd_off + 41);
-
-        auto g_yyz_xx = cbuffer.data(fd_off + 42);
-
-        auto g_yyz_xy = cbuffer.data(fd_off + 43);
-
-        auto g_yyz_xz = cbuffer.data(fd_off + 44);
-
-        auto g_yyz_yy = cbuffer.data(fd_off + 45);
-
-        auto g_yyz_yz = cbuffer.data(fd_off + 46);
-
-        auto g_yyz_zz = cbuffer.data(fd_off + 47);
-
-        auto g_yzz_xx = cbuffer.data(fd_off + 48);
-
-        auto g_yzz_xy = cbuffer.data(fd_off + 49);
-
-        auto g_yzz_xz = cbuffer.data(fd_off + 50);
-
-        auto g_yzz_yy = cbuffer.data(fd_off + 51);
-
-        auto g_yzz_yz = cbuffer.data(fd_off + 52);
-
-        auto g_yzz_zz = cbuffer.data(fd_off + 53);
 
         auto g_zzz_xx = cbuffer.data(fd_off + 54);
 
@@ -540,27 +456,17 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_x_0_xxx_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 9);
 
-        auto g_x_0_xxy_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 10);
-
         auto g_x_0_xxy_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 11);
-
-        auto g_x_0_xxy_xxz = cbuffer.data(ff_geom_10_off + 0 * acomps + 12);
 
         auto g_x_0_xxy_xyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 13);
 
         auto g_x_0_xxy_xyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 14);
-
-        auto g_x_0_xxy_xzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 15);
 
         auto g_x_0_xxy_yyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 16);
 
         auto g_x_0_xxy_yyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 17);
 
         auto g_x_0_xxy_yzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 18);
-
-        auto g_x_0_xxy_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 19);
-
-        auto g_x_0_xxz_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 20);
 
         auto g_x_0_xxz_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 21);
 
@@ -580,17 +486,11 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_x_0_xxz_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 29);
 
-        auto g_x_0_xyy_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 30);
-
         auto g_x_0_xyy_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 31);
-
-        auto g_x_0_xyy_xxz = cbuffer.data(ff_geom_10_off + 0 * acomps + 32);
 
         auto g_x_0_xyy_xyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 33);
 
         auto g_x_0_xyy_xyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 34);
-
-        auto g_x_0_xyy_xzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 35);
 
         auto g_x_0_xyy_yyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 36);
 
@@ -598,29 +498,17 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_x_0_xyy_yzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 38);
 
-        auto g_x_0_xyy_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 39);
-
-        auto g_x_0_xyz_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 40);
-
         auto g_x_0_xyz_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 41);
-
-        auto g_x_0_xyz_xxz = cbuffer.data(ff_geom_10_off + 0 * acomps + 42);
 
         auto g_x_0_xyz_xyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 43);
 
         auto g_x_0_xyz_xyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 44);
-
-        auto g_x_0_xyz_xzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 45);
 
         auto g_x_0_xyz_yyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 46);
 
         auto g_x_0_xyz_yyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 47);
 
         auto g_x_0_xyz_yzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 48);
-
-        auto g_x_0_xyz_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 49);
-
-        auto g_x_0_xzz_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 50);
 
         auto g_x_0_xzz_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 51);
 
@@ -640,17 +528,11 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_x_0_xzz_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 59);
 
-        auto g_x_0_yyy_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 60);
-
         auto g_x_0_yyy_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 61);
-
-        auto g_x_0_yyy_xxz = cbuffer.data(ff_geom_10_off + 0 * acomps + 62);
 
         auto g_x_0_yyy_xyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 63);
 
         auto g_x_0_yyy_xyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 64);
-
-        auto g_x_0_yyy_xzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 65);
 
         auto g_x_0_yyy_yyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 66);
 
@@ -658,19 +540,11 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_x_0_yyy_yzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 68);
 
-        auto g_x_0_yyy_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 69);
-
-        auto g_x_0_yyz_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 70);
-
         auto g_x_0_yyz_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 71);
-
-        auto g_x_0_yyz_xxz = cbuffer.data(ff_geom_10_off + 0 * acomps + 72);
 
         auto g_x_0_yyz_xyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 73);
 
         auto g_x_0_yyz_xyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 74);
-
-        auto g_x_0_yyz_xzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 75);
 
         auto g_x_0_yyz_yyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 76);
 
@@ -678,29 +552,17 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_x_0_yyz_yzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 78);
 
-        auto g_x_0_yyz_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 79);
-
-        auto g_x_0_yzz_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 80);
-
         auto g_x_0_yzz_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 81);
-
-        auto g_x_0_yzz_xxz = cbuffer.data(ff_geom_10_off + 0 * acomps + 82);
 
         auto g_x_0_yzz_xyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 83);
 
         auto g_x_0_yzz_xyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 84);
-
-        auto g_x_0_yzz_xzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 85);
 
         auto g_x_0_yzz_yyy = cbuffer.data(ff_geom_10_off + 0 * acomps + 86);
 
         auto g_x_0_yzz_yyz = cbuffer.data(ff_geom_10_off + 0 * acomps + 87);
 
         auto g_x_0_yzz_yzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 88);
-
-        auto g_x_0_yzz_zzz = cbuffer.data(ff_geom_10_off + 0 * acomps + 89);
-
-        auto g_x_0_zzz_xxx = cbuffer.data(ff_geom_10_off + 0 * acomps + 90);
 
         auto g_x_0_zzz_xxy = cbuffer.data(ff_geom_10_off + 0 * acomps + 91);
 
@@ -732,14 +594,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_y_0_xxx_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 5);
 
-        auto g_y_0_xxx_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 6);
-
-        auto g_y_0_xxx_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 7);
-
-        auto g_y_0_xxx_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 8);
-
-        auto g_y_0_xxx_zzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 9);
-
         auto g_y_0_xxy_xxx = cbuffer.data(ff_geom_10_off + 100 * acomps + 10);
 
         auto g_y_0_xxy_xxy = cbuffer.data(ff_geom_10_off + 100 * acomps + 11);
@@ -751,14 +605,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_y_0_xxy_xyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 14);
 
         auto g_y_0_xxy_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 15);
-
-        auto g_y_0_xxy_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 16);
-
-        auto g_y_0_xxy_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 17);
-
-        auto g_y_0_xxy_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 18);
-
-        auto g_y_0_xxy_zzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 19);
 
         auto g_y_0_xxz_xxx = cbuffer.data(ff_geom_10_off + 100 * acomps + 20);
 
@@ -772,14 +618,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_y_0_xxz_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 25);
 
-        auto g_y_0_xxz_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 26);
-
-        auto g_y_0_xxz_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 27);
-
-        auto g_y_0_xxz_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 28);
-
-        auto g_y_0_xxz_zzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 29);
-
         auto g_y_0_xyy_xxx = cbuffer.data(ff_geom_10_off + 100 * acomps + 30);
 
         auto g_y_0_xyy_xxy = cbuffer.data(ff_geom_10_off + 100 * acomps + 31);
@@ -791,14 +629,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_y_0_xyy_xyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 34);
 
         auto g_y_0_xyy_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 35);
-
-        auto g_y_0_xyy_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 36);
-
-        auto g_y_0_xyy_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 37);
-
-        auto g_y_0_xyy_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 38);
-
-        auto g_y_0_xyy_zzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 39);
 
         auto g_y_0_xyz_xxx = cbuffer.data(ff_geom_10_off + 100 * acomps + 40);
 
@@ -812,14 +642,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_y_0_xyz_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 45);
 
-        auto g_y_0_xyz_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 46);
-
-        auto g_y_0_xyz_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 47);
-
-        auto g_y_0_xyz_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 48);
-
-        auto g_y_0_xyz_zzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 49);
-
         auto g_y_0_xzz_xxx = cbuffer.data(ff_geom_10_off + 100 * acomps + 50);
 
         auto g_y_0_xzz_xxy = cbuffer.data(ff_geom_10_off + 100 * acomps + 51);
@@ -831,14 +653,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_y_0_xzz_xyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 54);
 
         auto g_y_0_xzz_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 55);
-
-        auto g_y_0_xzz_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 56);
-
-        auto g_y_0_xzz_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 57);
-
-        auto g_y_0_xzz_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 58);
-
-        auto g_y_0_xzz_zzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 59);
 
         auto g_y_0_yyy_xxx = cbuffer.data(ff_geom_10_off + 100 * acomps + 60);
 
@@ -872,8 +686,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_y_0_yyz_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 75);
 
-        auto g_y_0_yyz_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 76);
-
         auto g_y_0_yyz_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 77);
 
         auto g_y_0_yyz_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 78);
@@ -891,8 +703,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_y_0_yzz_xyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 84);
 
         auto g_y_0_yzz_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 85);
-
-        auto g_y_0_yzz_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 86);
 
         auto g_y_0_yzz_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 87);
 
@@ -912,8 +722,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_y_0_zzz_xzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 95);
 
-        auto g_y_0_zzz_yyy = cbuffer.data(ff_geom_10_off + 100 * acomps + 96);
-
         auto g_y_0_zzz_yyz = cbuffer.data(ff_geom_10_off + 100 * acomps + 97);
 
         auto g_y_0_zzz_yzz = cbuffer.data(ff_geom_10_off + 100 * acomps + 98);
@@ -932,14 +740,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_z_0_xxx_xzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 5);
 
-        auto g_z_0_xxx_yyy = cbuffer.data(ff_geom_10_off + 200 * acomps + 6);
-
-        auto g_z_0_xxx_yyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 7);
-
-        auto g_z_0_xxx_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 8);
-
-        auto g_z_0_xxx_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 9);
-
         auto g_z_0_xxy_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 10);
 
         auto g_z_0_xxy_xxy = cbuffer.data(ff_geom_10_off + 200 * acomps + 11);
@@ -951,14 +751,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_z_0_xxy_xyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 14);
 
         auto g_z_0_xxy_xzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 15);
-
-        auto g_z_0_xxy_yyy = cbuffer.data(ff_geom_10_off + 200 * acomps + 16);
-
-        auto g_z_0_xxy_yyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 17);
-
-        auto g_z_0_xxy_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 18);
-
-        auto g_z_0_xxy_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 19);
 
         auto g_z_0_xxz_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 20);
 
@@ -972,14 +764,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_z_0_xxz_xzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 25);
 
-        auto g_z_0_xxz_yyy = cbuffer.data(ff_geom_10_off + 200 * acomps + 26);
-
-        auto g_z_0_xxz_yyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 27);
-
-        auto g_z_0_xxz_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 28);
-
-        auto g_z_0_xxz_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 29);
-
         auto g_z_0_xyy_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 30);
 
         auto g_z_0_xyy_xxy = cbuffer.data(ff_geom_10_off + 200 * acomps + 31);
@@ -991,14 +775,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_z_0_xyy_xyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 34);
 
         auto g_z_0_xyy_xzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 35);
-
-        auto g_z_0_xyy_yyy = cbuffer.data(ff_geom_10_off + 200 * acomps + 36);
-
-        auto g_z_0_xyy_yyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 37);
-
-        auto g_z_0_xyy_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 38);
-
-        auto g_z_0_xyy_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 39);
 
         auto g_z_0_xyz_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 40);
 
@@ -1012,14 +788,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_z_0_xyz_xzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 45);
 
-        auto g_z_0_xyz_yyy = cbuffer.data(ff_geom_10_off + 200 * acomps + 46);
-
-        auto g_z_0_xyz_yyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 47);
-
-        auto g_z_0_xyz_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 48);
-
-        auto g_z_0_xyz_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 49);
-
         auto g_z_0_xzz_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 50);
 
         auto g_z_0_xzz_xxy = cbuffer.data(ff_geom_10_off + 200 * acomps + 51);
@@ -1031,14 +799,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_z_0_xzz_xyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 54);
 
         auto g_z_0_xzz_xzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 55);
-
-        auto g_z_0_xzz_yyy = cbuffer.data(ff_geom_10_off + 200 * acomps + 56);
-
-        auto g_z_0_xzz_yyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 57);
-
-        auto g_z_0_xzz_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 58);
-
-        auto g_z_0_xzz_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 59);
 
         auto g_z_0_yyy_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 60);
 
@@ -1058,8 +818,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_z_0_yyy_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 68);
 
-        auto g_z_0_yyy_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 69);
-
         auto g_z_0_yyz_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 70);
 
         auto g_z_0_yyz_xxy = cbuffer.data(ff_geom_10_off + 200 * acomps + 71);
@@ -1078,8 +836,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
 
         auto g_z_0_yyz_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 78);
 
-        auto g_z_0_yyz_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 79);
-
         auto g_z_0_yzz_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 80);
 
         auto g_z_0_yzz_xxy = cbuffer.data(ff_geom_10_off + 200 * acomps + 81);
@@ -1097,8 +853,6 @@ comp_ket_geom010_electron_repulsion_xgd(CSimdArray<double>& cbuffer,
         auto g_z_0_yzz_yyz = cbuffer.data(ff_geom_10_off + 200 * acomps + 87);
 
         auto g_z_0_yzz_yzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 88);
-
-        auto g_z_0_yzz_zzz = cbuffer.data(ff_geom_10_off + 200 * acomps + 89);
 
         auto g_z_0_zzz_xxx = cbuffer.data(ff_geom_10_off + 200 * acomps + 90);
 
