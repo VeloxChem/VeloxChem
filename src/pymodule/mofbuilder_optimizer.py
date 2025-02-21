@@ -17,6 +17,7 @@ def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
     cz = (cL**2.0 - cx**2.0 - cy**2.0) ** 0.5
     unit_cell = np.asarray([[ax, ay, az], [bx, by, bz], [cx, cy, cz]]).T
     return unit_cell
+
 def fractional_to_cartesian(fractional_coords, T):
     T = T.astype(float)
     fractional_coords = fractional_coords.astype(float)
@@ -189,12 +190,8 @@ def optimize_rotations_pre(
     maxfun,
     maxiter,
     disp,
-    maxcor,
-    ftol,
-    gtol,
     eps,
     iprint,
-    maxls,
 ):
     """
     Optimize rotations for all nodes in the graph.
@@ -223,12 +220,8 @@ def optimize_rotations_pre(
             "maxfun": maxfun,
             "maxiter": maxiter,
             "disp": disp,
-            "maxcor": maxcor,
-            "ftol": ftol,
-            "gtol": gtol,
             "eps": eps,
             "iprint": iprint,
-            "maxls": maxls,
         },
     )
 
@@ -259,12 +252,8 @@ def optimize_rotations_after(
     maxfun,
     maxiter,
     disp,
-    maxcor,
-    ftol,
-    gtol,
     eps,
     iprint,
-    maxls,
 ):
     """
     Optimize rotations for all nodes in the graph.
@@ -292,12 +281,8 @@ def optimize_rotations_after(
             "maxfun": maxfun,
             "maxiter": maxiter,
             "disp": disp,
-            "maxcor": maxcor,
-            "ftol": ftol,
-            "gtol": gtol,
             "eps": eps,
             "iprint": iprint,
-            "maxls": maxls,
         },
     )
 

@@ -16,11 +16,15 @@ from mofbuilder_utils import (
 
 class MofBuilder:
     def __init__(self):
-        # seach mof_family name in the config file # if not found, raise error and ask user to generate the template cif and add it to the config file
-        # from config get linker topic, node metal type, dummy node True or False, template cif, node cif
-        # in database by calling MOF family name and node metal type, dummy node True or False
+        # call preparation driver
+        # find database path which should be decided later
+        # load the MOF_topology_dict flie in database folder
         preparation = prepare()
         self.preparation = preparation
+
+    def show_available_mof_families(self):
+        # show available mof families and hints for preparation
+        self.preparation.list_mof_family()
         print(
             "MOF builder is initialized, please prepare the building material by calling the preparation driver"
         )
@@ -32,6 +36,8 @@ class MofBuilder:
         print("***check the preparation status by calling preparation_check()***")
 
     def preparation_check(self):
+        # check the preparation status
+        # necessary for MofBuilder to start building
         preparation = self.preparation
         if preparation.check_status():
             print("-" * 80)
@@ -57,7 +63,7 @@ class MofBuilder:
     def set_supercell(self, supercell):
         self.supercell = supercell
 
-    # maxfun, maxiter, display,maxcor,ftol,gtol,eps, maxls, iprint,method
+    # maxfun, maxiter, display,eps, iprint,method
     def set_rotation_optimizer_maxfun(self, maxfun):
         self.rotation_optimizer_maxfun = maxfun
 
@@ -67,20 +73,8 @@ class MofBuilder:
     def set_rotation_optimizer_display(self, display):
         self.rotation_optimizer_display = display
 
-    def set_rotation_optimizer_maxcor(self, maxcor):
-        self.rotation_optimizer_maxcor = maxcor
-
-    def set_rotation_optimizer_ftol(self, ftol):
-        self.rotation_optimizer_ftol = ftol
-
-    def set_rotation_optimizer_gtol(self, gtol):
-        self.rotation_optimizer_gtol = gtol
-
     def set_rotation_optimizer_eps(self, eps):
         self.rotation_optimizer_eps = eps
-
-    def set_rotation_optimizer_maxls(self, maxls):
-        self.rotation_optimizer_maxls = maxls
 
     def set_rotation_optimizer_iprint(self, iprint):
         self.rotation_optimizer_iprint = iprint
@@ -161,16 +155,8 @@ class MofBuilder:
                 self.net.set_rotation_optimizer_maxiter(self.rotation_optimizer_maxiter)
             if hasattr(self, "rotation_optimizer_method"):
                 self.net.set_rotation_optimizer_method(self.rotation_optimizer_method)
-            if hasattr(self, "rotation_optimizer_maxcor"):
-                self.net.set_rotation_optimizer_maxcor(self.rotation_optimizer_maxcor)
-            if hasattr(self, "rotation_optimizer_ftol"):
-                self.net.set_rotation_optimizer_ftol(self.rotation_optimizer_ftol)
-            if hasattr(self, "rotation_optimizer_gtol"):
-                self.net.set_rotation_optimizer_gtol(self.rotation_optimizer_gtol)
             if hasattr(self, "rotation_optimizer_eps"):
                 self.net.set_rotation_optimizer_eps(self.rotation_optimizer_eps)
-            if hasattr(self, "rotation_optimizer_maxls"):
-                self.net.set_rotation_optimizer_maxls(self.rotation_optimizer_maxls)
             if hasattr(self, "rotation_optimizer_iprint"):
                 self.net.set_rotation_optimizer_iprint(self.rotation_optimizer_iprint)
             if hasattr(self, "rotation_optimizer_display"):
@@ -232,21 +218,12 @@ class MofBuilder:
                 self.net.set_rotation_optimizer_maxiter(self.rotation_optimizer_maxiter)
             if hasattr(self, "rotation_optimizer_method"):
                 self.net.set_rotation_optimizer_method(self.rotation_optimizer_method)
-            if hasattr(self, "rotation_optimizer_maxcor"):
-                self.net.set_rotation_optimizer_maxcor(self.rotation_optimizer_maxcor)
-            if hasattr(self, "rotation_optimizer_ftol"):
-                self.net.set_rotation_optimizer_ftol(self.rotation_optimizer_ftol)
-            if hasattr(self, "rotation_optimizer_gtol"):
-                self.net.set_rotation_optimizer_gtol(self.rotation_optimizer_gtol)
             if hasattr(self, "rotation_optimizer_eps"):
                 self.net.set_rotation_optimizer_eps(self.rotation_optimizer_eps)
-            if hasattr(self, "rotation_optimizer_maxls"):
-                self.net.set_rotation_optimizer_maxls(self.rotation_optimizer_maxls)
             if hasattr(self, "rotation_optimizer_iprint"):
                 self.net.set_rotation_optimizer_iprint(self.rotation_optimizer_iprint)
             if hasattr(self, "rotation_optimizer_display"):
                 self.net.set_rotation_optimizer_display(self.rotation_optimizer_display)
-
             if hasattr(self, "saved_optimized_rotations"):
                 self.net.load_saved_optimized_rotations(self.saved_optimized_rotations)
             if hasattr(self, "optimized_rotations_filename"):

@@ -3,21 +3,24 @@ import veloxchem as vlx
 from mofbuilder_utils import nodepdb2G,add_dummy_atoms_nodepdb,process_linker_molecule,fetch_pdbfile,read_mof_top_dict,find_data_folder,copy_file
 
 
-class prepare():
+
+class prepare:
     def __init__(self):
-        #clean up
-        if hasattr(self,'mof_top_dict'):
+        # clean up
+        if hasattr(self, "mof_top_dict"):
             del self.mof_top_dict
-        if hasattr(self,'data_path'):
+        if hasattr(self, "data_path"):
             del self.data_path
 
         data_path = find_data_folder()
         mof_top_dict = read_mof_top_dict(data_path)
-        #print mof_top_dict keys fit to screen
-        print('Available MOF Family:')
-        print(' '.join(mof_top_dict.keys()))
         self.mof_top_dict = mof_top_dict
         self.data_path = data_path
+
+    def list_mof_family(self):
+        # print mof_top_dict keys fit to screen
+        print("Available MOF Family:")
+        print(" ".join(self.mof_top_dict.keys()))
     
     def select_template_dir(self,template_dir):
         self.set_template_dir = template_dir

@@ -2957,7 +2957,7 @@ def convert_node_array_to_gro_lines(array, line_num_start, res_num_start):
         ind_inres = i + 1
         name = line[1]
         value_atom_number_in_gro = int(ind_inres + line_num_start)  # atom_number
-        value_label = re.sub("\d", "", line[6]) + str(ind_inres)  # atom_label
+        value_label = re.sub("\d", "", line[2]) + str(ind_inres)  # atom_label
         value_resname = str(name)[0:3]  # +str(eG.nodes[n]['index'])  # residue_name
         value_resnumber = int(res_num_start + int(line[0]))  # residue number
         value_x = 0.1 * float(line[3])  # x
@@ -3236,23 +3236,8 @@ class net_optimizer:
         """
         self.display = display
 
-    def set_rotation_optimizer_maxcor(self, maxcor):
-        """
-        set the maxcor of the optimization
-        """
-        self.maxcor = maxcor
 
-    def set_rotation_optimizer_ftol(self, ftol):
-        """
-        set the ftol of the optimization
-        """
-        self.ftol = ftol
 
-    def set_rotation_optimizer_gtol(self, gtol):
-        """
-        set the gtol of the optimization
-        """
-        self.gtol = gtol
 
     def set_rotation_optimizer_eps(self, eps):
         """
@@ -3266,11 +3251,7 @@ class net_optimizer:
         """
         self.iprint = iprint
 
-    def set_rotation_optimizer_maxls(self, maxls):
-        """
-        set the maxls of the optimization
-        """
-        self.maxls = maxls
+
 
     def check_node_template_match(self):
         """
@@ -3332,30 +3313,18 @@ class net_optimizer:
         if not hasattr(self, "display"):
             self.display = True
 
-        if not hasattr(self, "maxcor"):
-            self.maxcor = 10
-
-        if not hasattr(self, "ftol"):
-            self.ftol = 1e-6
-
-        if not hasattr(self, "gtol"):
-            self.gtol = 1e-2
-
         if not hasattr(self, "eps"):
-            self.eps = 1e-5
+            self.eps = 1e-8
 
         if not hasattr(self, "iprint"):
             self.iprint = -1
 
-        if not hasattr(self, "maxls"):
-            self.maxls = 20
+
 
         G = self.G
         node_xcoords = self.node_x_ccoords
         node_coords = self.node_ccoords
         linker_length = self.linker_length
-        opt_method = self.opt_method
-
         constant_length = self.constant_length
 
         x_com_length = np.mean([np.linalg.norm(i) for i in node_xcoords])
@@ -3434,12 +3403,8 @@ class net_optimizer:
                 maxfun=self.maxfun,
                 maxiter=self.maxiter,
                 disp=self.display,
-                maxcor=self.maxcor,
-                ftol=self.ftol,
-                gtol=self.gtol,
                 eps=self.eps,
                 iprint=self.iprint,
-                maxls=self.maxls,
             )
 
             (
@@ -3456,12 +3421,8 @@ class net_optimizer:
                 maxfun=self.maxfun,
                 maxiter=self.maxiter,
                 disp=self.display,
-                maxcor=self.maxcor,
-                ftol=self.ftol,
-                gtol=self.gtol,
                 eps=self.eps,
                 iprint=self.iprint,
-                maxls=self.maxls,
             )
             print("-" * 80)
             print(" " * 20, "rotations optimization completed", " " * 20)
@@ -3499,12 +3460,8 @@ class net_optimizer:
                         maxfun=self.maxfun,
                         maxiter=self.maxiter,
                         disp=self.display,
-                        maxcor=self.maxcor,
-                        ftol=self.ftol,
-                        gtol=self.gtol,
                         eps=self.eps,
                         iprint=self.iprint,
-                        maxls=self.maxls,
                     )
 
                     (
@@ -3521,12 +3478,8 @@ class net_optimizer:
                         maxfun=self.maxfun,
                         maxiter=self.maxiter,
                         disp=self.display,
-                        maxcor=self.maxcor,
-                        ftol=self.ftol,
-                        gtol=self.gtol,
                         eps=self.eps,
                         iprint=self.iprint,
-                        maxls=self.maxls,
                     )
                     print("-" * 80)
                     print(" " * 20, "rotations optimization completed", " " * 20)
