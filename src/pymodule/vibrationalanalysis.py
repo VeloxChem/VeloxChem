@@ -315,7 +315,8 @@ class VibrationalAnalysis:
             vib_results['gibbs_free_energy'] = self.gibbs_free_energy
             vib_results['free_energy_summary'] = self.free_energy_summary
             vib_results['vib_frequencies'] = self.vib_frequencies
-            # NOTE: now they get the normalized ones
+            # FIXME: normalized or not? What should the user get?
+            # NOTE: JHA changes -- now they get for normalized ones
             vib_results['normal_modes'] = self.normal_modes
 
             # calculate force constants
@@ -390,7 +391,7 @@ class VibrationalAnalysis:
         vdata_file = Path(temp_path, fname)
 
         self.vib_frequencies, self.raw_normal_modes, self.gibbs_free_energy = (
-            geometric.raw_normal_modes.frequency_analysis(
+            geometric.normal_modes.frequency_analysis(
                 coords,
                 self.hessian,
                 elem,
