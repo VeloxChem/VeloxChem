@@ -375,7 +375,6 @@ class CphfSolver(LinearSolver):
                     self._graceful_exit_for_cphf(molecule, basis, dft_dict,
                                                  pe_dict, orbrsp_vector_labels)
 
-            print(self.force_checkpoint)
             if self.force_checkpoint:
                 self._write_checkpoint_for_cphf(molecule, basis, dft_dict,
                                                 pe_dict, orbrsp_vector_labels)

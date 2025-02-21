@@ -1037,15 +1037,12 @@ class VibrationalAnalysis:
             Name of the HDF5 file.
         """
 
-        valid_checkpoint = (fname and isinstance(fname, str))
+        valid_checkpoint = (fname and isinstance(fname, str) and
+                            Path(fname).is_file())
 
         if not valid_checkpoint:
             return False
 
-        # check if h5 file exists and deletes if True
-        file_path = Path(fname)
-        if file_path.is_file():
-            file_path.unlink()
 
         hf = h5py.File(fname, 'a')
 
