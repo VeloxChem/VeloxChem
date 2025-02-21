@@ -35,6 +35,7 @@ from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
 from .veloxchemlib import compute_electric_field_fock_gradient
 from .veloxchemlib import compute_electric_field_potential_gradient_for_mm
+from .veloxchemlib import compute_electric_field_potential_hessian
 from .matrices import Matrices
 
 
