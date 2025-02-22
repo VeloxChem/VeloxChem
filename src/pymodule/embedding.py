@@ -145,7 +145,7 @@ class EmbeddingIntegralDriver:
             basis=self.basis,
             coordinates=charge_coordinates,
             charges=charges,
-            density=density_matrix)
+            D=density_matrix)
         return op
 
 

@@ -6,6 +6,7 @@ on:
       - master
       - simd_master_test
       - multipsi_newcore
+      - embedding_test
 
 jobs:
   vlx_ci:
@@ -57,7 +58,7 @@ jobs:
           git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
           CXX=g++ python -m pip install \
-            git+https://gitlab.com/FraME-projects/PyFraME.git@35188b620c84f74a73e2c28d737abee4386a503a
+            git+https://gitlab.com/FraME-projects/PyFraME.git@84a356bfe3b9af17345ec754383a38792291dbbb
           echo "=== VeloxChem build ==="
           export XTBHOME=/usr/local
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
