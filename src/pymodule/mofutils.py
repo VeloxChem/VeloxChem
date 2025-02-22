@@ -2991,9 +2991,9 @@ def merge_node_edge_term(nodes_tG, edges_tG, terms_tG, node_res_num, edge_res_nu
     return merged_node_edge_term
 
 
-def save_node_edge_term_gro(merged_node_edge_term, gro_name):
-    os.makedirs("output_gros", exist_ok=True)
-    gro_name = os.path.join("output_gros", gro_name)
+def save_node_edge_term_gro(merged_node_edge_term, gro_name, dir_name='output_gros'):
+    os.makedirs(dir_name, exist_ok=True)
+    gro_name = os.path.join(dir_name, gro_name)
     with open(gro_name + ".gro", "w") as f:
         head = []
         head.append("eG_NET\n")
@@ -3004,9 +3004,9 @@ def save_node_edge_term_gro(merged_node_edge_term, gro_name):
         f.writelines(tail)
 
 
-class net_optimizer:
+class NetOptimizer:
     """
-    net_optimizer is a class to optimize the node and edge structure of the MOF, add terminations to nodes.
+    NetOptimizer is a class to optimize the node and edge structure of the MOF, add terminations to nodes.
 
     :param template_cif (str):
         cif file of the template, including only V and E *(EC)nodes info in primitive cell
@@ -4066,8 +4066,9 @@ class net_optimizer:
         merged_node_edge_term = merge_node_edge_term(
             nodes_eG, edges_eG, terms_eG, node_res_num, edge_res_num
         )
-        save_node_edge_term_gro(merged_node_edge_term, gro_name)
-        print(str(gro_name) + ".gro is saved")
+        dir_name = "output_gros"
+        save_node_edge_term_gro(merged_node_edge_term, gro_name, dir_name)
+        print(str(gro_name) + ".gro is saved in folder " + str(dir_name))
         print("node_res_num: ", node_res_num)
         print("edge_res_num: ", edge_res_num)
         print("term_res_num: ", term_res_num)

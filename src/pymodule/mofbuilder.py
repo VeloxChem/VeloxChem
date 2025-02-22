@@ -4,7 +4,7 @@ import os
 
 from .mofpreparer import MofPreparer
 from .mofutils import (
-    net_optimizer,
+    NetOptimizer,
     nn,
     extract_node_name_from_gro_resindex,
     replace_edges_by_callname,
@@ -148,7 +148,7 @@ class MofBuilder:
             template_cif = self.template_cif
             node_pdb = self.node_pdb
             supercell = self.supercell
-            self.net = net_optimizer()
+            self.net = NetOptimizer()
             if hasattr(self, "rotation_optimizer_maxfun"):
                 self.net.set_rotation_optimizer_maxfun(self.rotation_optimizer_maxfun)
             if hasattr(self, "rotation_optimizer_maxiter"):
@@ -210,7 +210,7 @@ class MofBuilder:
             template_cif = self.template_cif
             node_pdb = self.node_pdb
             supercell = self.supercell
-            self.net = net_optimizer()
+            self.net = NetOptimizer()
 
             if hasattr(self, "rotation_optimizer_maxfun"):
                 self.net.set_rotation_optimizer_maxfun(self.rotation_optimizer_maxfun)
