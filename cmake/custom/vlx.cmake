@@ -62,6 +62,11 @@ file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR})
 
 add_subdirectory(src)
 
+# handle folder with data files
+install(DIRECTORY   ${PROJECT_SOURCE_DIR}/database
+        DESTINATION ${PYMOD_INSTALL_FULLDIR}
+        FILES_MATCHING PATTERN "*")
+
 # handle folder with basis sets
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis)
 # we glob the basis set files in basis and let CMake add a rule such that

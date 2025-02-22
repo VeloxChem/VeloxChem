@@ -189,10 +189,11 @@ from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
-from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
-                          configure_mkl_rt)
+from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
+                          get_data_path, set_omp_num_threads, configure_mkl_rt)
 
 set_vlxbasispath()
+set_vlxdatapath()
 set_omp_num_threads()
 configure_mkl_rt()
 
