@@ -1,16 +1,14 @@
-import sys
-import re
-import time
+from pathlib import Path
 import numpy as np
 import networkx as nx
+import itertools
+import sys
+import os
+import re
 # TODO
 from Bio.SVDSuperimposer import SVDSuperimposer
-import itertools
-import os
 # TODO
 import glob
-# TODO
-import shutil
 
 from .molecule import Molecule
 from .mofoptimizer import (optimize_rotations_pre,
@@ -64,17 +62,15 @@ def is_list_A_in_B(A, B):
 
 ######below are from fetchfile.py####################
 def copy_file(old_path, new_path):
-    # Check if the source file exists
-    if not os.path.exists(old_path):
-        raise FileNotFoundError(f"The source file does not exist: {old_path}")
 
-    # Ensure the destination directory exists
-    new_dir = os.path.dirname(new_path)
-    if not os.path.exists(new_dir):
-        os.makedirs(new_dir)  # Create the directory if it doesn't exist
+    src = Path(old_path)
+    dest = Path(new_path)
 
-    # Copy the file
-    shutil.copy2(old_path, new_path)  # copy2 preserves metadata
+    if (not dest.is_file()) or (not src.samefile(dest)):
+        if not dest.parent.is_dir():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(src.read_text())
+
     print(f"File copied from {old_path} to {new_path}")
 
 
