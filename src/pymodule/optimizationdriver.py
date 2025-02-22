@@ -39,6 +39,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
@@ -200,6 +201,7 @@ class OptimizationDriver:
         elif (isinstance(drv, ScfGradientDriver) or
               isinstance(drv, XtbGradientDriver) or
               isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, TddftGradientDriver) or
               isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
