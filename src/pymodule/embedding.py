@@ -726,7 +726,7 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
     Subclass for Hessian (Hess) calculations utilizing polarizable embedding.
     """
 
-    def __init__(self, molecule, ao_basis, options, comm=None, log_level=20):
+    def __init__(self, molecule, ao_basis, options, density, comm=None, log_level=20):
         super().__init__(molecule, ao_basis, options, comm, log_level)
         self._e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
@@ -752,7 +752,22 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
                 combination_rule=self.vdw_combination_rule)
         else:
             self._e_vdw_hess = 0.0
+        if np.all(self.classical_subsystem.induced_dipoles.induced_dipoles == 0):
+            el_fields = self.quantum_subsystem.compute_electronic_fields(
+                coordinates=self.classical_subsystem.coordinates,
+                density_matrix=density,
+                integral_driver=self._integral_driver)
 
+            nuc_fields = self.quantum_subsystem.compute_nuclear_fields(
+                self.classical_subsystem.coordinates)
+
+            self.classical_subsystem.solve_induced_dipoles(
+                external_fields=(el_fields + nuc_fields),
+                threshold=self._threshold,
+                max_iterations=self._max_iterations,
+                solver=self._solver,
+                mic=self._mic,
+                box=self.simulation_box.box)
     def compute_pe_fock_gradient_contributions(self, i):
 
         es_fock_grad = electrostatic_interactions.compute_electronic_electrostatic_fock_gradient(

@@ -346,7 +346,8 @@ class ScfHessianDriver(HessianDriver):
                 molecule=molecule,
                 ao_basis=ao_basis,
                 options=self.scf_driver.embedding_options,
-                comm=self.comm)
+                comm=self.comm,
+                density= density)
 
         # TODO: double check propagation of cphf settings
         profiler_keywords = {
@@ -772,6 +773,7 @@ class ScfHessianDriver(HessianDriver):
                     molecule=molecule,
                     ao_basis=ao_basis,
                     options=self.scf_driver.embedding_options,
+                    density=density,
                     comm=self.comm)
                 self.hessian += embedding_drv.compute_pe_energy_hess_contributions(density_matrix=density)
 
