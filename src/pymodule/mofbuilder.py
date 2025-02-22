@@ -1,8 +1,9 @@
-import time
 import numpy as np
+import time
 import os
-from mofbuilder_prepare import prepare
-from mofbuilder_utils import (
+
+from .mofpreparer import MofPreparer
+from .mofutils import (
     net_optimizer,
     nn,
     extract_node_name_from_gro_resindex,
@@ -19,8 +20,7 @@ class MofBuilder:
         # call preparation driver
         # find database path which should be decided later
         # load the MOF_topology_dict flie in database folder
-        preparation = prepare()
-        self.preparation = preparation
+        self.preparation = MofPreparer()
 
     def show_available_mof_families(self):
         # show available mof families and hints for preparation

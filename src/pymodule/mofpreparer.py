@@ -1,10 +1,11 @@
 import os
-import veloxchem as vlx
-from mofbuilder_utils import nodepdb2G,add_dummy_atoms_nodepdb,process_linker_molecule,fetch_pdbfile,read_mof_top_dict,find_data_folder,copy_file
+
+from .molecule import Molecule
+from .mofutils import (nodepdb2G,add_dummy_atoms_nodepdb,process_linker_molecule,fetch_pdbfile,read_mof_top_dict,find_data_folder,copy_file)
 
 
+class MofPreparer:
 
-class prepare:
     def __init__(self):
         # clean up
         if hasattr(self, "mof_top_dict"):
@@ -183,7 +184,7 @@ class prepare:
 
 
         
-        molecule = vlx.Molecule.read_xyz_file(linker_file)
+        molecule = Molecule.read_xyz_file(linker_file)
 
         (self.linker_center_frag_nodes_num, 
          self.linker_center_Xs, 

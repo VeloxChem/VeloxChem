@@ -1,23 +1,30 @@
+import sys
 import re
 import time
 import numpy as np
 import networkx as nx
-from scipy.optimize import linear_sum_assignment
+# TODO
 from Bio.SVDSuperimposer import SVDSuperimposer
 import itertools
 import os
-import veloxchem as vlx
+# TODO
 import glob
+# TODO
 import shutil
 
-from mofbuilder_optimizer import (
-    optimize_rotations_pre,
-    optimize_rotations_after,
-    apply_rotations_to_atom_positions,
-    apply_rotations_to_Xatoms_positions,
-    update_ccoords_by_optimized_cell_params,
-    optimize_cell_parameters,
-)
+from .molecule import Molecule
+from .mofoptimizer import (optimize_rotations_pre,
+                           optimize_rotations_after,
+                           apply_rotations_to_atom_positions,
+                           apply_rotations_to_Xatoms_positions,
+                           update_ccoords_by_optimized_cell_params,
+                           optimize_cell_parameters)
+from .errorhandler import assert_msg_critical
+
+try:
+    from scipy.optimize import linear_sum_assignment
+except ImportError:
+    pass
 
 
 def nn(s):
@@ -503,7 +510,7 @@ def nodepdb2G(pdbfile, metal):
             type=n[1],
         )
 
-    node_mol = vlx.Molecule.read_xyz_string(xyzlines)
+    node_mol = Molecule.read_xyz_string(xyzlines)
     con_matrix = node_mol.get_connectivity_matrix()
     for i in range(len(node_data)):
         for j in range(i, len(node_data)):
@@ -1659,6 +1666,10 @@ def update_node_ccoords(G, edge_lengths, start_node, new_edge_length):
 
 ###below are from multiedge_bundling.py#######
 def find_pair_x_edge(x_matrix, edge_matrix):
+
+    assert_msg_critical('scipy' in sys.modules,
+                        'scipy is required for find_pair_x_edge.')
+
     dist_matrix = np.zeros((len(x_matrix), len(edge_matrix)))
     for i in range(len(x_matrix)):
         for j in range(len(edge_matrix)):
