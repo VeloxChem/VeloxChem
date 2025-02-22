@@ -552,6 +552,21 @@ class LinearResponseEigenSolver(LinearSolver):
             velo_trans_dipoles = np.zeros((self.nstates, 3))
             magn_trans_dipoles = np.zeros((self.nstates, 3))
 
+            if self.sra:
+                orbital_details = {
+                    'nstates': self.nstates,
+                    'num_core': self.num_core_orbitals,
+                    'num_val': self.num_val_orbitals,
+                    'num_vir': self.num_vir_orbitals
+                }
+            else:
+                orbital_details = {
+                    'nstates': self.nstates,
+                    'num_core': self.num_core_orbitals,
+                    'num_val': nocc,
+                    'num_vir': norb - nocc
+                }
+
             if self.rank == mpi_master():
                 # create h5 file for response solutions
                 if (self.save_solutions and self.checkpoint_file is not None):
@@ -559,7 +574,9 @@ class LinearResponseEigenSolver(LinearSolver):
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
                     create_hdf5(final_h5_fname, molecule, basis,
                                 dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
+                                pe_dict['potfile_text'],
+                                orbital_details,
+                                eigvals)
 
             nto_lambdas = []
             nto_h5_files = []
@@ -759,6 +776,9 @@ class LinearResponseEigenSolver(LinearSolver):
                         'oscillator_strengths': osc,
                         'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
+                        'num_core': orbital_details['num_core'],
+                        'num_val': orbital_details['num_val'],
+                        'num_vir': orbital_details['num_vir']
                     }
 
                     if self.nto:

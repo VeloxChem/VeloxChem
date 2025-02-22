@@ -31,7 +31,7 @@ from .veloxchemlib import mpi_master
 from .distributedarray import DistributedArray
 
 
-def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
+def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text, orbital_details=None, eigenvals=None):
     """
     Creates HDF5 file for a calculation.
 
@@ -80,6 +80,14 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf.create_dataset('dft_func_label', data=np.bytes_([dft_func_label]))
 
         hf.create_dataset('potfile_text', data=np.bytes_([potfile_text]))
+
+        if eigenvals is not None:
+            hf.create_dataset('eigenvalues', data=eigenvals)
+        
+        if orbital_details is not None:
+            #grp = hf.create_group('orbital_details')
+            for key, val in orbital_details.items():
+                hf.create_dataset(key, data=np.array([val]))
 
         hf.close()
 
