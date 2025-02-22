@@ -1,6 +1,6 @@
+from pathlib import Path
 import numpy as np
 import time
-import os
 
 from .mofpreparer import MofPreparer
 from .mofutils import (
@@ -109,7 +109,7 @@ class MofBuilder:
     def set_use_saved_optimized_rotations_npy(self, saved_optimized_rotations):
         saved_optimized_rotations = saved_optimized_rotations + ".npy"
 
-        if os.path.exists(saved_optimized_rotations):
+        if Path(saved_optimized_rotations).exists():
             self.saved_optimized_rotations = np.load(
                 saved_optimized_rotations, allow_pickle=True
             )
@@ -194,9 +194,9 @@ class MofBuilder:
                 self.net.set_node_terminamtion(self.node_termination)
             # default termination is methyl in data folder
             self.net.set_node_terminamtion(
-                os.path.join(
-                    self.preparation.data_path, "terminations_database/methyl.pdb"
-                )
+                str(Path(
+                    self.preparation.data_path, "terminations_database", "methyl.pdb"
+                ))
             )
             self.net.add_terminations_to_unsaturated_node()
             self.net.remove_xoo_from_node()
@@ -270,9 +270,9 @@ class MofBuilder:
                 self.net.set_node_terminamtion(self.node_termination)
             # default termination is methyl in data folder
             self.net.set_node_terminamtion(
-                os.path.join(
-                    self.preparation.data_path, "terminations_database/methyl.pdb"
-                )
+                str(Path(
+                    self.preparation.data_path, "terminations_database", "methyl.pdb"
+                ))
             )
             self.net.add_terminations_to_unsaturated_node()
             self.net.remove_xoo_from_node()
@@ -294,7 +294,7 @@ class MofBuilder:
                 "mof_"
                 + str(self.mof_family.split(".")[0])
                 + "_"
-                + os.path.basename(self.linker_xyz.strip(".xyz"))
+                + Path(self.linker_xyz.strip(".xyz")).name
             )
             print("gro_name is not set, will be saved as: ", self.gro_name + ".gro")
         print("writing gro file")
@@ -419,7 +419,7 @@ class MofBuilder:
                 "defective_mof_"
                 + str(self.mof_family.split(".")[0])
                 + "_"
-                + os.path.basename(self.linker_xyz.strip(".xyz"))
+                + Path(self.linker_xyz.strip(".xyz")).name
             )
             print(
                 "defect_gro_name is not set, will be saved as: ",
