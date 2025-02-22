@@ -1,7 +1,8 @@
 import os
 
 from .molecule import Molecule
-from .mofutils import (nodepdb2G,add_dummy_atoms_nodepdb,process_linker_molecule,fetch_pdbfile,read_mof_top_dict,find_data_folder,copy_file)
+from .mofutils import (nodepdb2G,add_dummy_atoms_nodepdb,process_linker_molecule,fetch_pdbfile,read_mof_top_dict,copy_file)
+from .environment import get_data_path
 
 
 class MofPreparer:
@@ -13,7 +14,7 @@ class MofPreparer:
         if hasattr(self, "data_path"):
             del self.data_path
 
-        data_path = find_data_folder()
+        data_path = get_data_path()
         mof_top_dict = read_mof_top_dict(data_path)
         self.mof_top_dict = mof_top_dict
         self.data_path = data_path

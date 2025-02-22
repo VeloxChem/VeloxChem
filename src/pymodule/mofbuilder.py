@@ -513,26 +513,3 @@ class MofBuilder:
         print("o_res_num: ", len(o_list))
         print("edge_res_num: ", len(edges_eG))
         print("term_res_num: ", len(terms_eG))
-
-
-if __name__ == "__main__":
-    mof = MofBuilder()
-    mof.preparation.select_mof_family("UiO-67")
-    mof.preparation.select_node_metal("Zr")
-    mof.preparation.use_dummy_node(True)
-    mof.preparation.fetch_node()
-    mof.preparation.fetch_linker("database/linker4test/ndi.xyz")
-    mof.preparation_check()
-    mof.set_rotation_optimizer_display(True)
-
-    mof.set_use_saved_optimized_rotations_npy("rota")
-    mof.set_use_saved_rotations_as_initial_guess(True)
-    # save or update optimized rotations to numpy file for later use
-    mof.save_optimized_rotations("rota")
-    mof.set_supercell([1, 1, 1])
-    mof.build()
-    mof.write_gro()
-    mof.set_remove_edge_list([30, 31, 32])
-    mof.set_remove_node_list([])
-    mof.make_defects_missing()
-    mof.write_defect_gro()

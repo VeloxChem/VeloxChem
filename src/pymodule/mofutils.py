@@ -94,23 +94,6 @@ def fetch_pdbfile(dir, keywords, nokeywords):
         return candidates
 
 
-def find_data_folder():
-    i = 0
-    current_p = os.path.abspath("")
-    for i in range(5):
-        if (
-            os.path.basename(current_p) == "VeloxChem"
-        ):  # TODO: need to ask Xin about this
-            data_path_exist = os.path.exists(os.path.join(current_p, "database"))
-            if data_path_exist:
-                data_path = os.path.join(current_p, "database")
-                return data_path
-        parent_p = os.path.dirname(current_p)
-        current_p = parent_p
-        i += 1
-    raise ValueError("cannot locate data folder")
-
-
 def read_mof_top_dict(data_path):
     if os.path.exists(os.path.join(data_path, "MOF_topology_dict")):
         mof_top_dict_path = os.path.join(data_path, "MOF_topology_dict")
@@ -135,7 +118,7 @@ def read_mof_top_dict(data_path):
 
 #####below are from _process_cifstr.py####################
 def remove_blank_space(value):
-    return re.sub("\s", "", value)
+    return re.sub(r"\s", "", value)
 
 
 def remove_empty_lines(lines):
@@ -147,12 +130,12 @@ def remove_empty_lines(lines):
 
 
 def remove_bracket(value):
-    value_float = float(re.sub("\(.*?\)", "", value))
+    value_float = float(re.sub(r"\(.*?\)", "", value))
     return value_float
 
 
 def remove_tail_number(value):
-    return re.sub("\d", "", value)
+    return re.sub(r"\d", "", value)
 
 
 def add_quotes(value):
@@ -282,7 +265,7 @@ def read_cif(cif_file):
         nonempty_lines = [line for line in lines if line.strip()]
     # nonempty_lines=lines
     keyword1 = "loop_"
-    keyword2 = "x,\s*y,\s*z"
+    keyword2 = r"x,\s*y,\s*z"
     keyword3 = "-x"
     # find the symmetry sector begin with x,y,z, beteen can have space or tab and comma,but just x start, not '-x'
     # keyword2 = "x,\s*y,\s*z"
@@ -346,7 +329,7 @@ def read_cif(cif_file):
             symmetry_sector = cif_sectors[i]
 
         if len(cif_sectors[i]) > 1:
-            if re.search("_atom_site_label\s+", cif_sectors[i][1]):  # line0 is _loop
+            if re.search(r"_atom_site_label\s+", cif_sectors[i][1]):  # line0 is _loop
                 atom_site_sector = cif_sectors[i]
 
     return cell_info, symmetry_sector, atom_site_sector
@@ -2968,7 +2951,7 @@ def convert_node_array_to_gro_lines(array, line_num_start, res_num_start):
         ind_inres = i + 1
         name = line[1]
         value_atom_number_in_gro = int(ind_inres + line_num_start)  # atom_number
-        value_label = re.sub("\d", "", line[2]) + str(ind_inres)  # atom_label
+        value_label = re.sub(r"\d", "", line[2]) + str(ind_inres)  # atom_label
         value_resname = str(name)[0:3]  # +str(eG.nodes[n]['index'])  # residue_name
         value_resnumber = int(res_num_start + int(line[0]))  # residue number
         value_x = 0.1 * float(line[3])  # x
@@ -4096,33 +4079,3 @@ class net_optimizer:
         self.edge_res_num = edge_res_num
         self.term_res_num = term_res_num
         self.merged_node_edge_term = merged_node_edge_term
-
-
-if __name__ == "__main__":
-    start_time = time.time()
-    linker_pdb = "edges/diedge.pdb"
-    # in database by calling MOF family name and node metal type, dummy node True or False
-    template_cif = "data/template_database/fcu.cif"
-    node_pdb = "data/nodes_database/12c_Zr.pdb"
-    node_target_type = "Zr"
-
-    fcu = net_optimizer()
-    fcu.analyze_template_ditopic(template_cif)
-    fcu.node_info(node_pdb)
-    fcu.linker_info(linker_pdb)
-    fcu.optimize()
-    fcu.set_supercell([1, 1, 1])
-    print("--- %s seconds ---" % (time.time() - start_time))
-    fcu.place_edge_in_net()
-    fcu.make_supercell_ditopic()
-    fcu.make_eG_from_supereG_ditopic()
-    fcu.main_frag_eG()
-    fcu.make_supercell_range_cleaved_eG()
-    fcu.add_xoo_to_edge_ditopic()
-    fcu.find_unsaturated_node_eG()
-    fcu.set_node_terminamtion("data/terminations_database/methyl.pdb")
-    fcu.add_terminations_to_unsaturated_node()
-    fcu.remove_xoo_from_node()
-    fcu.write_node_edge_node_gro("fcu_ditopic")
-    print("--- %s seconds ---" % (time.time() - start_time))
-    # temp_save_eGterm_gro(fcu.eG,fcu.sc_unit_cell) #debug
