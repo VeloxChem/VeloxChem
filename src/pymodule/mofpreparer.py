@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 from .molecule import Molecule
 from .mofutils import (nodepdb2G,add_dummy_atoms_nodepdb,process_linker_molecule,fetch_pdbfile,read_mof_top_dict,copy_file)
@@ -38,12 +38,12 @@ class MofPreparer:
         print(f"available metal nodes: {self.mof_top_dict[mof_family]['metal']}")
         print('please select a metal node')
         if not hasattr (self,'set_template_dir'):
-            self.set_template_dir = os.path.join(self.data_path,'template_database') #default
+            self.set_template_dir = str(Path(self.data_path,'template_database')) #default
             print(f'will search template cif files in {self.set_template_dir}')
         
-        template_cif_file = os.path.join(self.set_template_dir,self.template_cif)
+        template_cif_file = str(Path(self.set_template_dir,self.template_cif))
 
-        if not os.path.exists(template_cif_file):
+        if not Path(template_cif_file).exists():
             print(f'{self.template_cif} not found in template_database')
             print('please download the template cif file and put it in template_database folder, and try again')
             print('or select another MOF family, or upload the template cif file with submit_template method')
@@ -56,7 +56,7 @@ class MofPreparer:
     def submit_template(self,template_cif,mof_family,template_mof_node_connectivity,template_node_metal,template_linker_topic):
         #add this item to mof_top_dict in data path
         #check if template cif exists
-        if not os.path.exists(template_cif):
+        if not Path(template_cif).exists():
             print(f'{template_cif} not found')
             print('please upload the template cif file and try again')
             return
@@ -85,7 +85,7 @@ class MofPreparer:
             print(f'{mof_family} is added to the database')
             print(f'{mof_family} will be used for MOF building')
             #rewrite mof_top_dict file
-            with open(os.path.join(self.data_path,'MOF_topology_dict'), 'w') as fp:
+            with open(str(Path(self.data_path,'MOF_topology_dict')), 'w') as fp:
                 head = 'MOF            node_connectivity    metal     linker_topic     topology \n'
                 fp.write(head)
                 for key in self.mof_top_dict.keys():
@@ -98,7 +98,7 @@ class MofPreparer:
                                                                         self.mof_top_dict[key]['topology'])
                         fp.write(line+'\n')
             print('mof_top_dict file is updated')
-            return os.path.join(self.data_path,'template_database',template_cif)     
+            return str(Path(self.data_path,'template_database',template_cif))
     
     def select_node_metal(self,node_metal):
         self.node_metal = node_metal
@@ -120,26 +120,26 @@ class MofPreparer:
             self.dummy_node = False
 
         data_path = self.data_path
-        nodes_database_path = os.path.join(data_path,"nodes_database")
+        nodes_database_path = str(Path(data_path,"nodes_database"))
         node_pdb = fetch_pdbfile(nodes_database_path, [str(self.node_connectivity)+'c',self.node_metal],['dummy'])
         #if node_termination == 'methyl' :
         # n_term_file = '../data/terminations_database/methyl.pdb'
         for i in range(len(node_pdb)):
-            node_pdb_database = os.path.join(data_path,'nodes_database/'+node_pdb[i])
-            target_node_path = os.path.join('nodes',node_pdb[i])
+            node_pdb_database = str(Path(data_path,'nodes_database',node_pdb[i]))
+            target_node_path = str(Path('nodes',node_pdb[i]))
             copy_file(node_pdb_database,target_node_path)
 
         if self.dummy_node:
             nodeG = nodepdb2G(target_node_path,self.node_metal)
             all_lines,dummy_node_file = add_dummy_atoms_nodepdb(target_node_path,self.node_metal,nodeG)
-            os.remove(target_node_path)
+            Path(target_node_path).unlink()
             print(target_node_path,'removed')
             print(f'new dummy node file {dummy_node_file} created')
         else:
             print(f'{target_node_path} is fetched')
             print(f'default node without dummy atoms will be used{target_node_path}')
         
-        nodes_dir = os.path.dirname(target_node_path)#'nodes' #default  #NOTE: this is the path to the nodes 
+        nodes_dir = str(Path(target_node_path).parent)#'nodes' #default  #NOTE: this is the path to the nodes 
         print(f'nodes will be saved in {nodes_dir}')
 
 
@@ -151,7 +151,7 @@ class MofPreparer:
             nokeywords = ['dummy']
 
         selected_node_pdb_file = fetch_pdbfile(nodes_dir,keywords, nokeywords)[0]
-        self.selected_node_pdb_file = os.path.join(nodes_dir,selected_node_pdb_file)
+        self.selected_node_pdb_file = str(Path(nodes_dir,selected_node_pdb_file))
         self.save_nodes_dir = nodes_dir
         return self.selected_node_pdb_file
     
@@ -170,7 +170,7 @@ class MofPreparer:
 
 
         #check if path exists
-        if not os.path.exists(linker_file):
+        if not Path(linker_file).exists():
             raise FileNotFoundError(f'{linker_file} not found')
         if not hasattr(self,'split_linker_topic'):
             split_linker_topic = self.linker_topic
@@ -199,13 +199,13 @@ class MofPreparer:
 
 
         if self.selected_linker_center_pdb:
-            if os.path.exists(self.selected_linker_center_pdb):
+            if Path(self.selected_linker_center_pdb).exists():
                 print(f'linker center fragment {self.selected_linker_center_pdb} is saved and will be used for MOF building')
         else:
             if self.linker_topic >2:
                 print('Warning: linker center fragment is not saved')
 
-        if os.path.exists(self.selected_linker_edge_pdb):
+        if Path(self.selected_linker_edge_pdb).exists():
             print(f'linker edge fragment {self.selected_linker_edge_pdb} is saved and will be used for MOF building')
         else:
             print('Warning: linker edge fragment is not saved')
