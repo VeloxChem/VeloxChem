@@ -342,12 +342,12 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         if self.scf_driver._pe:
             from .embedding import PolarizableEmbeddingHess
-            cphf_solver._embedding_drv =  PolarizableEmbeddingHess(
+            cphf_solver._embedding_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
                 ao_basis=ao_basis,
                 options=self.scf_driver.embedding_options,
                 comm=self.comm,
-                density= density)
+                density=density)
 
         # TODO: double check propagation of cphf settings
         profiler_keywords = {
@@ -764,9 +764,10 @@ class ScfHessianDriver(HessianDriver):
 
             if self.scf_driver.point_charges is not None:
                 self.hessian += hessian_point_charges.transpose(0, 2, 1, 3)
-            # add pe contr to hessian
+
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 
+            # add pe contr to hessian
             if self.scf_driver._pe:
                 from .embedding import PolarizableEmbeddingHess
                 embedding_drv = PolarizableEmbeddingHess(
@@ -775,7 +776,8 @@ class ScfHessianDriver(HessianDriver):
                     options=self.scf_driver.embedding_options,
                     density=density,
                     comm=self.comm)
-                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(density_matrix=density)
+                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
+                    density_matrix=density)
 
             if self._dft:
                 self.hessian += hessian_dft_xc

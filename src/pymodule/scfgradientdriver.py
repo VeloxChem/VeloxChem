@@ -465,7 +465,8 @@ class ScfGradientDriver(GradientDriver):
                     options=self.scf_driver.embedding_options,
                     comm=self.comm)
 
-                self.gradient += self._embedding_drv.compute_pe_contributions(density_matrix=2.0 * D)
+                self.gradient += self._embedding_drv.compute_pe_contributions(
+                    density_matrix=2.0 * D)
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
@@ -786,7 +787,8 @@ class ScfGradientDriver(GradientDriver):
                     options=self.scf_driver.embedding_options,
                     comm=self.comm)
 
-                self.gradient += self._embedding_drv.compute_pe_contributions(density_matrix=Da + Db)
+                self.gradient += self._embedding_drv.compute_pe_contributions(
+                    density_matrix=Da + Db)
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI

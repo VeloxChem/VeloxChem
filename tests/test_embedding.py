@@ -16,6 +16,7 @@ except ImportError:
     pass
 
 
+@pytest.mark.solvers
 class TestPolarizableEmbedding:
 
     @staticmethod
