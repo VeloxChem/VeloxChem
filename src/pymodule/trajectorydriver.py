@@ -212,7 +212,7 @@ class TrajectoryDriver:
 
         try:
             import MDAnalysis as mda
-            from MDAnalysis.topology.guessers import guess_atom_element
+            from MDAnalysis.guesser.default_guesser import DefaultGuesser
         except ImportError:
             raise ImportError(
                 'Unable to import MDAnalysis. Please install ' +
@@ -246,6 +246,8 @@ class TrajectoryDriver:
         local_sampling_time = self.sampling_time[self.rank::self.nodes]
 
         local_result = []
+
+        default_guesser = DefaultGuesser(u)
 
         # go through frames in trajectory
         for ts in u.trajectory:
@@ -293,7 +295,10 @@ class TrajectoryDriver:
                 mm_nonpol.positions -= box_center
 
                 # create molecule
-                qm_elems = [guess_atom_element(name) for name in qm.names]
+                qm_elems = [
+                    default_guesser.guess_atom_element(name)
+                    for name in qm.names
+                ]
                 qm_mol = Molecule(qm_elems, qm.positions, 'angstrom')
                 qm_charge = int(round(qm.total_charge()))
                 qm_mol.set_charge(qm_charge)
@@ -328,8 +333,12 @@ class TrajectoryDriver:
                     qm_nuclei.append({
                         'index': atom_idx + 1,
                         'element': qm_mol_labels[atom_idx].capitalize(),
-                        'charge': qm_mol_nuc_charges[atom_idx],
-                        'coordinate': list(qm_mol_coords[atom_idx]),
+                        'charge': float(qm_mol_nuc_charges[atom_idx]),
+                        'coordinate': [
+                            float(qm_mol_coords[atom_idx, 0]),
+                            float(qm_mol_coords[atom_idx, 1]),
+                            float(qm_mol_coords[atom_idx, 2]),
+                        ],
                     })
 
                 embedding_json = {
@@ -378,16 +387,17 @@ class TrajectoryDriver:
                         + f'{res_name}')
 
                     for atom_idx, atom in enumerate(res.atoms):
-                        # TODO: check MDAnalysis.guesser.default_guesser
-                        atom_label = guess_atom_element(atom.name)
+                        atom_label = default_guesser.guess_atom_element(
+                            atom.name)
 
                         classical_fragments[-1]["atoms"].append({
-                            "index": (res_count - 1) * len(res.atoms) + atom_idx + 1,
+                            "index":
+                                (res_count - 1) * len(res.atoms) + atom_idx + 1,
                             "element": atom_label.capitalize(),
                             "coordinate": [
-                                atom.position[0] / bohr_in_angstroms(),
-                                atom.position[1] / bohr_in_angstroms(),
-                                atom.position[2] / bohr_in_angstroms(),
+                                float(atom.position[0]) / bohr_in_angstroms(),
+                                float(atom.position[1]) / bohr_in_angstroms(),
+                                float(atom.position[2]) / bohr_in_angstroms(),
                             ],
                             "multipoles": {
                                 "elements": [res_charges[atom_idx]],
@@ -396,8 +406,8 @@ class TrajectoryDriver:
                                 range((res_count - 1) * len(res.atoms) + 1,
                                       res_count * len(res.atoms) + 1)),
                             "polarizabilities": {
-                                "elements": [0.0, 0.0, 0.0, 0.0] +
-                                            res_polarizabilities[atom_idx],
+                                "elements": ([0.0, 0.0, 0.0, 0.0] +
+                                             res_polarizabilities[atom_idx]),
                                 "order": [1, 1],
                             },
                         })
@@ -443,8 +453,6 @@ class TrajectoryDriver:
             abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
 
             if local_rank == mpi_master():
-                #abs_spec.print_property(ostream)
-
                 excitation_energies = abs_spec.get_property('eigenvalues')
                 oscillator_strengths = abs_spec.get_property(
                     'oscillator_strengths')

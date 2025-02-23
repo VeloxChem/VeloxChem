@@ -12,6 +12,7 @@ from veloxchem.veloxchemlib import mpi_master
     'ignore:Using the last letter of the segid:DeprecationWarning:MDAnalysis')
 @pytest.mark.filterwarnings(
     'ignore:TPR files index residues from 0:DeprecationWarning:MDAnalysis')
+@pytest.mark.solvers
 class TestTrajectoryDriver:
 
     def run_trajectory(self, filename, ref_exc_energies, ref_osc_strengths):
