@@ -342,7 +342,7 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         if self.scf_driver._pe:
             from .embedding import PolarizableEmbeddingHess
-            cphf_solver._embedding_drv = PolarizableEmbeddingHess(
+            cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
                 ao_basis=ao_basis,
                 options=self.scf_driver.embedding,

@@ -433,7 +433,7 @@ class LinearSolver:
 
             # TODO: print PyFraME info
 
-            pot_info = 'Reading polarizable embedding potential: {}'.format(
+            pot_info = 'Reading polarizable embedding: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()

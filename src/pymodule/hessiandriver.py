@@ -93,6 +93,8 @@ class HessianDriver:
         self.grid_level = None
         self.xcfun = None
 
+        self.potfile = None
+
         # Timing and profiling
         self.timing = False
         self.profiling = False

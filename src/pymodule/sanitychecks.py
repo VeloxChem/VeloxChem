@@ -253,6 +253,12 @@ def pe_sanity_check(obj, method_dict=None):
             obj.embedding = {
                 'settings': {
                     'embedding_method': 'PE',
+                    'induced_dipoles': {
+                        'solver': 'jacobi',
+                        'mic': False,
+                        'threshold': 1e-8,
+                        'max_iterations': 100,
+                    },
                 },
                 'inputs': {
                     'json_file': potfile,

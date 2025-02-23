@@ -66,7 +66,7 @@ class HessianOrbitalResponse(CphfSolver):
         super().__init__(comm, ostream)
 
         self.orbrsp_type = 'hessian'
-        self._embedding_drv = None
+        self._embedding_hess_drv = None
 
     def update_settings(self, cphf_dict, method_dict=None):
         """
@@ -572,8 +572,8 @@ class HessianOrbitalResponse(CphfSolver):
 
             gmats_100 = Matrices()
 
-        if self._embedding_drv is not None:
-            pe_fock_grad_contr = self._embedding_drv.compute_pe_fock_gradient_contributions(i=i)
+        if self._embedding_hess_drv is not None:
+            pe_fock_grad_contr = self._embedding_hess_drv.compute_pe_fock_gradient_contributions(i=i)
             for x in range(3):
                 fmat_deriv[x] += pe_fock_grad_contr[x]
 
