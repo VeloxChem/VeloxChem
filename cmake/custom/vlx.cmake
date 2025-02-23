@@ -22,20 +22,20 @@ if(DEFINED EXTRA_CXXFLAGS)
 endif()
 
 # option for using higher order geometric derivatives
-option(USE_4TH_GEOM_DERIV "Use 4th-order geometric derivatives" ON)
-option(USE_3RD_GEOM_DERIV "Use 3rd-order geometric derivatives" ON)
+option(USE_4TH_GEOM_DERIV "Use 4th-order geometric derivatives" OFF)
+option(USE_3RD_GEOM_DERIV "Use 3rd-order geometric derivatives" OFF)
 option(USE_2ND_GEOM_DERIV "Use 2nd-order geometric derivatives" ON)
 if(USE_4TH_GEOM_DERIV)
-  print_option(USE_4TH_GEOM_DERIV "${USE_4TH_GEOM_DERIV}")
+  # print_option(USE_4TH_GEOM_DERIV "${USE_4TH_GEOM_DERIV}")
   add_compile_definitions(USE_4TH_GEOM_DERIV)
   add_compile_definitions(USE_3RD_GEOM_DERIV)
   add_compile_definitions(USE_2ND_GEOM_DERIV)
 elseif(USE_3RD_GEOM_DERIV)
-  print_option(USE_3RD_GEOM_DERIV "${USE_3RD_GEOM_DERIV}")
+  # print_option(USE_3RD_GEOM_DERIV "${USE_3RD_GEOM_DERIV}")
   add_compile_definitions(USE_3RD_GEOM_DERIV)
   add_compile_definitions(USE_2ND_GEOM_DERIV)
 elseif(USE_2ND_GEOM_DERIV)
-  print_option(USE_2ND_GEOM_DERIV "${USE_2ND_GEOM_DERIV}")
+  # print_option(USE_2ND_GEOM_DERIV "${USE_2ND_GEOM_DERIV}")
   add_compile_definitions(USE_2ND_GEOM_DERIV)
 endif()
 
@@ -61,6 +61,11 @@ message(STATUS "Setting PYMOD_INSTALL_FULLDIR: ${PYMOD_INSTALL_FULLDIR}")
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR})
 
 add_subdirectory(src)
+
+# handle folder with data files
+install(DIRECTORY   ${PROJECT_SOURCE_DIR}/database
+        DESTINATION ${PYMOD_INSTALL_FULLDIR}
+        FILES_MATCHING PATTERN "*")
 
 # handle folder with basis sets
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis)

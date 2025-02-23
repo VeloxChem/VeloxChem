@@ -7,6 +7,7 @@ on:
       - simd_master_test
       - multipsi_newcore
       - embedding_test
+      - c_pcm
 
 jobs:
   vlx_ci:
@@ -17,7 +18,7 @@ jobs:
         shell: bash -l {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-1aa36de
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-468ec9b
 
     env:
       VLX_NUM_BUILD_JOBS: 4
@@ -59,7 +60,9 @@ jobs:
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
           CXX=g++ python -m pip install \
             git+https://gitlab.com/FraME-projects/PyFraME.git@84a356bfe3b9af17345ec754383a38792291dbbb
+          python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="
+          export DFTD4_HOME=/usr/local
           export XTBHOME=/usr/local
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
           SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++" \

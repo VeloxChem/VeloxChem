@@ -2,7 +2,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 import h5py
-import sys
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
@@ -160,6 +159,7 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
+    @pytest.mark.timeconsuming
     def test_hf_polarizabilitygradient(self):
         h2o_xyz = """3
 

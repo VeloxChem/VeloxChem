@@ -209,6 +209,32 @@ serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> void
 }
 
 auto
+serialSolve(const CDenseMatrix& mat, const std::vector<double>& vec) -> std::vector<double>
+{
+    auto narow = mat.getNumberOfRows();
+    auto nacol = mat.getNumberOfColumns();
+
+    auto nbsize = static_cast<int>(vec.size());
+
+    errors::assertMsgCritical((narow == nacol) && (narow == nbsize),
+                              "denblas::serialSolve: Inconsistent sizes in matrix and vector");
+
+    std::vector<double> sol(nbsize);
+
+    auto A = mat.values();
+    auto B = vec.data();
+    auto C = sol.data();
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    Eigen::Map<const Eigen::VectorXd, Eigen::Unaligned> evecB(B, nbsize);
+    Eigen::Map<Eigen::VectorXd, Eigen::Unaligned> evecC(C, nbsize);
+
+    evecC = ematA.colPivHouseholderQr().solve(evecB);
+
+    return sol;
+}
+
+auto
 multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A

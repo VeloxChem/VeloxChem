@@ -42,7 +42,7 @@ from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import make_matrix, mat_t
-from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kjpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .griddriver import GridDriver
@@ -743,7 +743,7 @@ class ScfHessianDriver(HessianDriver):
                             coef_I * np.eye(3))
 
                         # convert hessian to atomic unit
-                        hess_ii /= (4.184 * hartree_in_kcalpermol() *
+                        hess_ii /= (hartree_in_kjpermol() *
                                     (10.0 / bohr_in_angstrom())**2)
 
                         hessian_point_charges[i, i, :, :] += hess_ii
