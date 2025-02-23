@@ -4,10 +4,6 @@ import networkx as nx
 import itertools
 import sys
 import re
-# TODO
-from Bio.SVDSuperimposer import SVDSuperimposer
-# TODO
-import glob
 
 from .molecule import Molecule
 from .mofoptimizer import (optimize_rotations_pre,
@@ -574,7 +570,7 @@ def order_ccoords(d_ccoords, template_Zr_D, target_metal_coords):
     d_ccoords = d_ccoords - target_metal_coords  # centering to origin
 
     # template_center is already at origin
-    min_dist, rot, tran = superimpose(template_Zr_D, d_ccoords)
+    min_dist, rot = superimpose(template_Zr_D, d_ccoords)
     ordered_ccoords = np.dot(template_Zr_D, rot) + target_metal_coords
     return ordered_ccoords
 
@@ -1526,33 +1522,55 @@ def match_vectors(arr1, arr2, num):
 
 
 def superimpose(arr1, arr2, min_rmsd=1e6):
-    sup = SVDSuperimposer()
+
     arr1 = np.asarray(arr1)
     arr2 = np.asarray(arr2)
-    best_rot, best_tran = np.eye(3), np.zeros(3)
 
     if len(arr1) < 7:
         for perm in itertools.permutations(arr1):
-            perm = np.asarray(perm)
-            sup.set(arr2, perm)
-            sup.run()
-            rmsd = sup.get_rms()
+            rmsd, best_rot = svd_superimpose(np.asarray(perm), arr2)
             if rmsd < min_rmsd:
                 min_rmsd = rmsd
-                best_rot, best_tran = sup.get_rotran()
 
     else:
-        arr1, arr2 = match_vectors(arr1, arr2, 6)
-        for perm in itertools.permutations(arr1):
-            perm = np.asarray(perm)
-            sup.set(arr2, perm)
-            sup.run()
-            rmsd = sup.get_rms()
+        m_arr1, m_arr2 = match_vectors(arr1, arr2, 6)
+        for perm in itertools.permutations(m_arr1):
+            rmsd, best_rot = svd_superimpose(np.asarray(perm), m_arr2)
             if rmsd < min_rmsd:
                 min_rmsd = rmsd
-                best_rot, best_tran = sup.get_rotran()
 
-    return min_rmsd, best_rot, best_tran
+    return min_rmsd, best_rot
+
+
+def svd_superimpose(inp_arr1, inp_arr2):
+    """
+    Calculates RMSD and rotation matrix for superimposing two sets of points,
+    using SVD. Ref.: "Least-Squares Fitting of Two 3-D Point Sets", IEEE
+    Transactions on Pattern Analysis and Machine Intelligence, 1987, PAMI-9(5),
+    698-700. DOI: 10.1109/TPAMI.1987.4767965
+    """
+
+    arr1 = np.array(inp_arr1)
+    arr2 = np.array(inp_arr2)
+
+    com1 = np.sum(arr1, axis=0) / arr1.shape[0]
+    com2 = np.sum(arr2, axis=0) / arr2.shape[0]
+
+    arr1 -= com1
+    arr2 -= com2
+
+    cov_mat = np.matmul(arr1.T, arr2)
+    U, s, Vt = np.linalg.svd(cov_mat)
+
+    rot_mat = np.matmul(U, Vt)
+    if np.linalg.det(rot_mat) < 0:
+        Vt[-1, :] *= -1.0
+        rot_mat = np.matmul(U, Vt)
+
+    diff = arr2 - np.matmul(arr1, rot_mat)
+    rmsd = np.sqrt(np.sum(diff**2) / diff.shape[0])
+
+    return rmsd, rot_mat
 
 
 ##########below are from _place_node_edge.py#####################
@@ -2835,7 +2853,7 @@ def replace_edges_by_callname(
             new_linker_ccoords, sc_unit_cell_inv
         )
 
-        _, rot, trans = superimpose(new_linker_x_fcoords, edge_x_fcoords)
+        rmsd, rot = superimpose(new_linker_x_fcoords, edge_x_fcoords)
         replaced_linker_fcoords = np.dot(new_linker_fcoords, rot) + edge_com
         replaced_linker_f_points = np.hstack(
             (new_linker_atoms, replaced_linker_fcoords)
@@ -3663,7 +3681,7 @@ class NetOptimizer:
                 rot = rot_record[indices[0]]
                 # rot = reorthogonalize_matrix(rot)
             else:
-                _, rot, _ = superimpose(extended_linker_xx_vec, xx_vector)
+                rmsd, rot = superimpose(extended_linker_xx_vec, xx_vector)
                 # rot = reorthogonalize_matrix(rot)
                 norm_xx_vector_record.append(norm_xx_vector)
                 # the rot may be opposite, so we need to check the angle between the two vectors
@@ -4007,7 +4025,7 @@ class NetOptimizer:
             if len(indices) == 1:
                 rot = node_oovecs_record[indices[0]][1]
             else:
-                _, rot, _ = superimpose(self.term_xoovecs, node_xoo_cvecs)
+                rmsd, rot = superimpose(self.term_xoovecs, node_xoo_cvecs)
                 node_oovecs_record.append((node_xoo_cvecs, rot))
             adjusted_term_vecs = np.dot(self.term_coords, rot) + node_oo_center_cvec
             adjusted_term = np.hstack(
