@@ -345,7 +345,7 @@ class ScfHessianDriver(HessianDriver):
             cphf_solver._embedding_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
                 ao_basis=ao_basis,
-                options=self.scf_driver.embedding_options,
+                options=self.scf_driver.embedding,
                 comm=self.comm,
                 density=density)
 
@@ -773,7 +773,7 @@ class ScfHessianDriver(HessianDriver):
                 embedding_drv = PolarizableEmbeddingHess(
                     molecule=molecule,
                     ao_basis=ao_basis,
-                    options=self.scf_driver.embedding_options,
+                    options=self.scf_driver.embedding,
                     density=density,
                     comm=self.comm)
                 self.hessian += embedding_drv.compute_pe_energy_hess_contributions(

@@ -120,7 +120,7 @@ class LinearSolver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-        self.embedding_options = None
+        self.embedding = None
         self._embedding_drv = None
 
         # static electric field
@@ -212,8 +212,6 @@ class LinearSolver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
-                'embedding_options':
-                    ('dict', 'dictionary to set the embedding options'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -421,7 +419,7 @@ class LinearSolver:
 
         if self._pe:
             assert_msg_critical(
-                self.embedding_options['settings']['embedding_method'] == 'PE',
+                self.embedding['settings']['embedding_method'] == 'PE',
                 'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
             )
 
@@ -430,7 +428,7 @@ class LinearSolver:
             self._embedding_drv = PolarizableEmbeddingLRS(
                 molecule=molecule,
                 ao_basis=basis,
-                options=self.embedding_options,
+                options=self.embedding,
                 comm=self.comm)
 
             # TODO: print PyFraME info

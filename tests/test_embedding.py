@@ -49,7 +49,7 @@ class TestPolarizableEmbedding:
         options_file = str(here / 'data' / f'{name}.json')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.embedding_options = {
+        scf_drv.embedding = {
             'settings': {
                 'embedding_method': 'PE',
                 'induced_dipoles': {
@@ -77,7 +77,7 @@ class TestPolarizableEmbedding:
         options_file = str(here / 'data' / f'{name}.json')
 
         lrsolver = LinearResponseSolver()
-        lrsolver.embedding_options = {
+        lrsolver.embedding = {
             'settings': {
                 'embedding_method': 'PE',
                 'induced_dipoles': {

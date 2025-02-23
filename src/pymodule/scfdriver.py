@@ -212,7 +212,7 @@ class ScfDriver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-        self.embedding_options = None
+        self.embedding = None
         self._embedding_drv = None
 
         # solvation model
@@ -633,18 +633,18 @@ class ScfDriver:
             self.ostream.print_blank()
 
             assert_msg_critical(
-                self.embedding_options['settings']['embedding_method'] == 'PE',
+                self.embedding['settings']['embedding_method'] == 'PE',
                 'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
             )
 
-            settings = self.embedding_options['settings']
+            settings = self.embedding['settings']
 
             from .embedding import PolarizableEmbeddingSCF
 
             self._embedding_drv = PolarizableEmbeddingSCF(
                 molecule=molecule,
                 ao_basis=ao_basis,
-                options=self.embedding_options,
+                options=self.embedding,
                 comm=self.comm)
 
             emb_info = 'Embedding settings:'
