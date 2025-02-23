@@ -340,6 +340,12 @@ class ScfHessianDriver(HessianDriver):
 
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+
+        # TODO: double check analytical Hessian with PE
+        assert_msg_critical(not self.scf_driver._pe,
+                            'ScfHessianDriver: Analytical Hessian with ' +
+                            'polarizable embedding (PE) not yet ''available')
+
         if self.scf_driver._pe:
             from .embedding import PolarizableEmbeddingHess
             cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
