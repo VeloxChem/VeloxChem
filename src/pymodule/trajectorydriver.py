@@ -236,6 +236,8 @@ class TrajectoryDriver:
         u.add_TopologyAttr('icodes')
         u.add_TopologyAttr('occupancies')
         u.add_TopologyAttr('tempfactors')
+        u.add_TopologyAttr('record_types')
+        u.add_TopologyAttr('formalcharges')
 
         grps = [p for p in range(self.nodes)]
         subcomm = SubCommunicators(self.comm, grps)
@@ -330,6 +332,8 @@ class TrajectoryDriver:
 
                 qm_nuclei = []
                 for atom_idx in range(qm_mol.number_of_atoms()):
+                    # Note: make sure all elements in qm_nuclei are
+                    # serializable by json
                     qm_nuclei.append({
                         'index': atom_idx + 1,
                         'element': qm_mol_labels[atom_idx].capitalize(),
@@ -390,6 +394,8 @@ class TrajectoryDriver:
                         atom_label = default_guesser.guess_atom_element(
                             atom.name)
 
+                        # Note: make sure all elements in classical_fragments
+                        # are serializable by json
                         classical_fragments[-1]["atoms"].append({
                             "index":
                                 (res_count - 1) * len(res.atoms) + atom_idx + 1,

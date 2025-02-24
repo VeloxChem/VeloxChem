@@ -1,17 +1,17 @@
 from pathlib import Path
 import pytest
+import sys
 
 from veloxchem.mpitask import MpiTask
 from veloxchem.trajectorydriver import TrajectoryDriver
 from veloxchem.veloxchemlib import mpi_master
 
+try:
+    import pyframe
+except ImportError:
+    pass
 
-@pytest.mark.filterwarnings(
-    'ignore:.*distutils Version classes:DeprecationWarning')
-@pytest.mark.filterwarnings(
-    'ignore:Using the last letter of the segid:DeprecationWarning:MDAnalysis')
-@pytest.mark.filterwarnings(
-    'ignore:TPR files index residues from 0:DeprecationWarning:MDAnalysis')
+
 @pytest.mark.solvers
 class TestTrajectoryDriver:
 
@@ -64,6 +64,8 @@ class TestTrajectoryDriver:
                 assert abs(e - ref_e) < 0.05
                 assert abs(f - ref_f) < 0.01
 
+    @pytest.mark.skipif('pyframe' not in sys.modules,
+                        reason='pyframe not available')
     def test_trajectory_bithio(self):
 
         here = Path(__file__).parent
