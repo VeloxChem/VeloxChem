@@ -67,41 +67,7 @@ install(DIRECTORY   ${PROJECT_SOURCE_DIR}/database
         DESTINATION ${PYMOD_INSTALL_FULLDIR}
         FILES_MATCHING PATTERN "*")
 
-# handle folder with basis sets
-file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis)
-# we glob the basis set files in basis and let CMake add a rule such that
-# the glob is repeated every time we rebuild.
-# This is NOT RECOMMENDED by CMake
-# (https://cmake.org/cmake/help/v3.16/command/file.html#filesystem) but you only
-# live once!
-file(
-  GLOB
-    _vlx_basis_sets
-  LIST_DIRECTORIES
-    FALSE
-  CONFIGURE_DEPENDS
-  ${PROJECT_SOURCE_DIR}/basis/*
-  )
-# 1. symlink under the build tree
-foreach(_basis IN LISTS _vlx_basis_sets)
- get_filename_component(__basis ${_basis} NAME)
- file(
-   CREATE_LINK
-     ${_basis}
-     ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis/${__basis}
-   COPY_ON_ERROR
-   SYMBOLIC
-   )
-endforeach()
-# 2. install rules for basis sets folder
-install(
-  DIRECTORY
-    ${PROJECT_SOURCE_DIR}/basis
-  DESTINATION
-    ${PYMOD_INSTALL_FULLDIR}
-  )
-
-enable_testing()
-include(CTest)
-# this add_subdirectory command must come last!!
-add_subdirectory(tests)
+# handle folder with basis files
+install(DIRECTORY   ${PROJECT_SOURCE_DIR}/basis
+        DESTINATION ${PYMOD_INSTALL_FULLDIR}
+        FILES_MATCHING PATTERN "*")
