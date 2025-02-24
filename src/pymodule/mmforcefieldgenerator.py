@@ -49,6 +49,7 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
+from .environment import get_data_path
 
 
 class MMForceFieldGenerator:
@@ -901,7 +902,8 @@ class MMForceFieldGenerator:
             'fudgeLJ': None,
         }
 
-        gaff_path = Path(__file__).parent / 'tests' / 'data' / 'gaff-2.11.xml'
+        data_path = get_data_path()
+        gaff_path = Path(data_path) / 'gaff-2.11.xml'
         tree = ET.parse(str(gaff_path))
         root = tree.getroot()
 
