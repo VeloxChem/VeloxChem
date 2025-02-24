@@ -1,5 +1,7 @@
 #include "T3CGeomX00Distributor.hpp"
 
+#include <iostream>
+
 #include "TensorComponents.hpp"
 
 CT3CGeomX00Distributor::CT3CGeomX00Distributor(CT3FlatBuffer<double>* values)
@@ -52,6 +54,8 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
         for (int i = 0; i < acomps; i++)
         {
             auto ptr_values = _t3_values->data(n * grows + _local_index + i * adim + ibra_gto);
+            
+            std::cout << "n, i, ibra = " << n << " , " << " i " << ", " << ibra_gto << " final index" << n * grows + _local_index + i * adim + ibra_gto << std::endl;
             
             for (int k = 0; k < ccomps; k++)
             {

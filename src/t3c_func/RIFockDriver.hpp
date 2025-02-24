@@ -67,6 +67,11 @@ class CRIFockDriver
     auto compute(const CMatrix     &density,
                  const std::string &label) const -> CMatrix;
     
+    /// @brief Computes transformed Gamma vector with J metric for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @return The transformed Gamma vector.
+    auto compute_bq_vector(const CMatrix &density) const -> std::vector<double>;
+    
     private:
     /// @brief Pointer to metric matrix for J fitting.
     CSubMatrix* _j_metric;

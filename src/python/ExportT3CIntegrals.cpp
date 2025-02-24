@@ -8,6 +8,7 @@
 #include "ThreeCenterElectronRepulsionGeom0X0Driver.hpp"
 #include "T3FlatBuffer.hpp"
 #include "RIFockDriver.hpp"
+#include "RIFockGradDriver.hpp"
 
 namespace vlx_t3cintegrals {
 
@@ -31,7 +32,13 @@ export_t3cintegrals(py::module& m)
         .def(py::init<>())
         .def(py::init<const CSubMatrix&>())
         .def("prepare_buffers", &CRIFockDriver::prepare_buffers, "Computes three center electron repulsion integral buffers.")
-        .def("compute", &CRIFockDriver::compute, "Computes Coulomb Fock matrix for given density.");
+        .def("compute", &CRIFockDriver::compute, "Computes Coulomb Fock matrix for given density.")
+        .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.");
+    
+    // CRIFockGradDriver class
+    PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")
+        .def(py::init<>())
+        .def("compute", &CRIFockGradDriver::compute, "Computes Coulomb Fock contribution to atom gradient.");
     
     // ThreeCenterElectronRepulsionGeom100Driver class
     PyClass<CThreeCenterElectronRepulsionGeomX00Driver<1>>(m, "ThreeCenterElectronRepulsionGeom100Driver")

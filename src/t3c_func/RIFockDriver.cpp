@@ -62,6 +62,12 @@ CRIFockDriver::compute(const CMatrix     &density,
 }
 
 auto
+CRIFockDriver::compute_bq_vector(const CMatrix &density) const -> std::vector<double>
+{
+    return _trafo_gamma_vector(_comp_gamma_vector(density));
+}
+
+auto
 CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<double>
 {
     const auto ndim = _eri_buffer.aux_width();
