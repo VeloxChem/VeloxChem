@@ -44,8 +44,6 @@ class EvbForceFieldBuilder():
 
         self.reactant: MMForceFieldGenerator = None
         self.products: list[MMForceFieldGenerator] = None
-        self.gaff_path = None
-        pass
 
     def build_forcefields(
         self,
@@ -129,8 +127,6 @@ class EvbForceFieldBuilder():
                 molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
 
             forcefield = MMForceFieldGenerator()
-            if self.gaff_path is not None:
-                forcefield.force_field_data = self.gaff_path
 
             #Load or calculate the charges
             

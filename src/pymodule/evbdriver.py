@@ -737,7 +737,6 @@ class EvbDriver():
         dp = EvbDataProcessing()
         dp.print_results(results, self.ostream)
         self.ostream.flush()
-        pass
 
     def plot_results(self, results: dict = None, file_name: str = None):
         """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
@@ -757,7 +756,6 @@ class EvbDriver():
         dp = EvbDataProcessing()
         dp.plot_results(results)
         self.ostream.flush()
-        pass
 
     def _load_output_from_folders(self, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample) -> dict:
         reference_folder = self.system_confs[0]["data_folder"]

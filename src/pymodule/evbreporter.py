@@ -10,7 +10,6 @@ except ImportError:
     pass
 
 
-
 class EvbReporter():
     #todo do this with force groups instead of different systems
     def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, outputstream, append = False):
