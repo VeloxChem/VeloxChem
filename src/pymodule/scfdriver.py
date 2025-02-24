@@ -663,10 +663,10 @@ class ScfDriver:
             if 'induced_dipoles' in settings:
                 self.ostream.print_info(f'- {"induced_dipoles":<15s}')
                 default_values = {
-                    'solver': 'jidiis',
+                    'solver': 'jacobi',
                     'threshold': 1e-8,
                     'max_iterations': 100,
-                    'mic': True,
+                    'mic': False,
                 }
                 for key, default in default_values.items():
                     value = settings['induced_dipoles'].get(key, default)

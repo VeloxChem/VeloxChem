@@ -446,8 +446,8 @@ class PolarizableEmbedding:
         self._threshold = induced_dipoles_options.get('threshold', 1e-8)
         self._max_iterations = induced_dipoles_options.get(
             'max_iterations', 100)
-        self._solver = induced_dipoles_options.get('solver', 'jidiis')
-        self._mic = induced_dipoles_options.get('mic', True)
+        self._solver = induced_dipoles_options.get('solver', 'jacobi')
+        self._mic = induced_dipoles_options.get('mic', False)
         # FIXME temporary update coords
         self.quantum_subsystem.coordinates = molecule.get_coordinates_in_bohr()
 

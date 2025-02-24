@@ -1,4 +1,5 @@
 from pathlib import Path
+import numpy as np
 import pytest
 import sys
 
@@ -58,11 +59,12 @@ class TestTrajectoryDriver:
             if npzfile.is_file():
                 npzfile.unlink()
 
-            for (e, f, ref_e, ref_f) in zip(exc_energies, osc_strengths,
-                                            ref_exc_energies,
-                                            ref_osc_strengths):
-                assert abs(e - ref_e) < 0.05
-                assert abs(f - ref_f) < 0.01
+            assert np.max(
+                np.abs(np.array(exc_energies) -
+                       np.array(ref_exc_energies))) < 0.03
+            assert np.max(
+                np.abs(np.array(osc_strengths) -
+                       np.array(ref_osc_strengths))) < 0.01
 
     @pytest.mark.skipif('pyframe' not in sys.modules,
                         reason='pyframe not available')
