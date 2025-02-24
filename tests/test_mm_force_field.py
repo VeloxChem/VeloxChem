@@ -12,8 +12,6 @@ except ImportError:
     pass
 
 
-@pytest.mark.filterwarnings(
-    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestForceField:
 
     @pytest.mark.skipif('scipy' not in sys.modules,
