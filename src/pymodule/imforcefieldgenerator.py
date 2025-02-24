@@ -138,8 +138,6 @@ class IMForceFieldGenerator:
 
         - solvent: Specifies the solvent environment for the dynamics. Default: 'gas'. (Should always be gas for the construction)
 
-        - FF_datafile: Specifies the file path for a force field data file, defaulting to a specific location.
-
         - qm_energies: A list to store QM energy from individual simulations or calculations (kj/mol).
 
         - total_energies: A list to store total energy (kj/mol).
@@ -209,8 +207,6 @@ class IMForceFieldGenerator:
         self.start_collect = 0
         self.solvent = 'gas'
 
-        self.FF_datafile = '/home/vlind06/phd_work/interpolation/gaff-2.11.dat'
-
         # individual run
         self.qm_energies = []
         self.total_energies = []
@@ -242,8 +238,7 @@ class IMForceFieldGenerator:
                                     'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
                                     'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
                                     'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
-                                    'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect,
-                                    'FF_datafile':self.FF_datafile}
+                                    'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect}
 
 
     def set_up_the_system(self, molecule, target_dihedrals=None, sampling_structures=1):
@@ -324,8 +319,7 @@ class IMForceFieldGenerator:
                                     'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
                                     'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
                                     'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
-                                    'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect,
-                                    'FF_datafile':self.FF_datafile}
+                                    'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect}
         
 
         self.set_up_the_system(molecule, self.dihedrals, self.sampling_structures)
@@ -341,7 +335,6 @@ class IMForceFieldGenerator:
                 
 
                 forcefield_generator = MMForceFieldGenerator()
-                forcefield_generator.force_field_data = self.dynamics_settings['FF_datafile']
                 self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}.pdb'
                 forcefield_generator.partial_charges = mol.get_partial_charges(mol.get_charge())
                 
@@ -698,7 +691,6 @@ class IMForceFieldGenerator:
 
         # For all Methods a ForceField of the molecule is requiered
         forcefield_generator = MMForceFieldGenerator()
-        forcefield_generator.force_field_data = self.FF_datafile
         forcefield_generator.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         forcefield_generator.create_topology(molecule)
         

@@ -173,7 +173,6 @@ class ImDatabaseDriver:
                 #structure = structure * bohr_in_angstrom()
                 #current_molecule = Molecule(self.molecule.get_labels(), structure, units="angstrom")
                 forcefield_generator = MMForceFieldGenerator()
-                forcefield_generator.force_field_data = self.dynamics_settings['FF_datafile']
                 self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}.pdb'
                 forcefield_generator.partial_charges = mol.get_partial_charges(mol.get_charge())
                 

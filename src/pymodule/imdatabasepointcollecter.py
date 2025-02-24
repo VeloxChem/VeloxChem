@@ -195,7 +195,6 @@ class IMDatabasePointCollecter:
 
         self.qm_datafile = None
 
-        self.ff_datafile = None
         self.starting_temperature = None
 
         self.current_state = None
@@ -609,9 +608,6 @@ class IMDatabasePointCollecter:
         if 'ensemble' in dynamics_settings:
             self.ensemble = dynamics_settings['ensemble']
         
-        if 'FF_datafile' in dynamics_settings:
-            self.ff_datafile = dynamics_settings['FF_datafile']
-
         #################################### DATABASE construciton inputs #############################
 
         if 'imforcefield_file' in impes_dict:
