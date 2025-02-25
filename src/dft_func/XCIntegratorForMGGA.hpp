@@ -67,6 +67,13 @@ auto integrateVxcFockForMetaGgaClosedShell(const CMolecule&                  mol
                                            const double                      screeningThresholdForGTOValues,
                                            const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
 
+auto integrateVxcFockForMetaGgaOpenShell(const CMolecule&                  molecule,
+                                         const CMolecularBasis&            basis,
+                                         const std::vector<const double*>& gsDensityPointers,
+                                         const CMolecularGrid&             molecularGrid,
+                                         const double                      screeningThresholdForGTOValues,
+                                         const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
+
 /**
  Integrates meta-GGA contribution to AO Kohn-Sham matrix.
 

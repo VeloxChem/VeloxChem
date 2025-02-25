@@ -844,7 +844,7 @@ generateDensityGridForGGA(const CDenseMatrix&     gtoValues,
     return dengrid;
 }
 
-void
+auto
 serialGenerateDensityForMGGA(double*             rho,
                              double*             rhograd,
                              double*             sigma,
@@ -854,7 +854,7 @@ serialGenerateDensityForMGGA(double*             rho,
                              const CDenseMatrix& gtoValuesX,
                              const CDenseMatrix& gtoValuesY,
                              const CDenseMatrix& gtoValuesZ,
-                             const CDenseMatrix& densityMatrix)
+                             const CDenseMatrix& densityMatrix) -> void
 {
     auto nthreads = omp_get_max_threads();
 
@@ -951,6 +951,132 @@ serialGenerateDensityForMGGA(double*             rho,
         {
             // simga_aa, sigma_ab, sigma_bb
 
+            // clang-format off
+            sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
+                               rhograd[6 * g + 1] * rhograd[6 * g + 1] +
+                               rhograd[6 * g + 2] * rhograd[6 * g + 2];
+
+            sigma[3 * g + 1] = rhograd[6 * g + 0] * rhograd[6 * g + 3] +
+                               rhograd[6 * g + 1] * rhograd[6 * g + 4] +
+                               rhograd[6 * g + 2] * rhograd[6 * g + 5];
+
+            sigma[3 * g + 2] = rhograd[6 * g + 3] * rhograd[6 * g + 3] +
+                               rhograd[6 * g + 4] * rhograd[6 * g + 4] +
+                               rhograd[6 * g + 5] * rhograd[6 * g + 5];
+            // clang-format on
+        }
+    }
+}
+
+auto
+serialGenerateDensityForMGGA(double*             rho,
+                             double*             rhograd,
+                             double*             sigma,
+                             double*             lapl,
+                             double*             tau,
+                             const CDenseMatrix& gtoValues,
+                             const CDenseMatrix& gtoValuesX,
+                             const CDenseMatrix& gtoValuesY,
+                             const CDenseMatrix& gtoValuesZ,
+                             const CDenseMatrix& densityMatrixAlpha,
+                             const CDenseMatrix& densityMatrixBeta) -> void
+{
+    auto nthreads = omp_get_max_threads();
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    CDenseMatrix symmetricDensityMatrixAlpha(densityMatrixAlpha);
+    CDenseMatrix symmetricDensityMatrixBeta(densityMatrixBeta);
+
+    symmetricDensityMatrixAlpha.symmetrizeAndScale(0.5);
+    symmetricDensityMatrixBeta.symmetrizeAndScale(0.5);
+
+    auto mat_F_a = denblas::serialMultAB(symmetricDensityMatrixAlpha, gtoValues);
+    auto mat_F_b = denblas::serialMultAB(symmetricDensityMatrixBeta, gtoValues);
+
+    auto mat_F_a_x = denblas::serialMultAB(symmetricDensityMatrixAlpha, gtoValuesX);
+    auto mat_F_a_y = denblas::serialMultAB(symmetricDensityMatrixAlpha, gtoValuesY);
+    auto mat_F_a_z = denblas::serialMultAB(symmetricDensityMatrixAlpha, gtoValuesZ);
+
+    auto mat_F_b_x = denblas::serialMultAB(symmetricDensityMatrixBeta, gtoValuesX);
+    auto mat_F_b_y = denblas::serialMultAB(symmetricDensityMatrixBeta, gtoValuesY);
+    auto mat_F_b_z = denblas::serialMultAB(symmetricDensityMatrixBeta, gtoValuesZ);
+
+    auto F_a_val = mat_F_a.values();
+    auto F_b_val = mat_F_b.values();
+
+    auto F_a_x_val = mat_F_a_x.values();
+    auto F_a_y_val = mat_F_a_y.values();
+    auto F_a_z_val = mat_F_a_z.values();
+
+    auto F_b_x_val = mat_F_b_x.values();
+    auto F_b_y_val = mat_F_b_y.values();
+    auto F_b_z_val = mat_F_b_z.values();
+
+    auto chi_val = gtoValues.values();
+
+    auto chi_x_val = gtoValuesX.values();
+    auto chi_y_val = gtoValuesY.values();
+    auto chi_z_val = gtoValuesZ.values();
+
+    {
+#pragma omp simd
+        for (int g = 0; g < npoints; g++)
+        {
+            rho[2 * g + 0] = 0.0;
+            rho[2 * g + 1] = 0.0;
+
+            rhograd[6 * g + 0] = 0.0;
+            rhograd[6 * g + 1] = 0.0;
+            rhograd[6 * g + 2] = 0.0;
+            rhograd[6 * g + 3] = 0.0;
+            rhograd[6 * g + 4] = 0.0;
+            rhograd[6 * g + 5] = 0.0;
+
+            lapl[2 * g + 0] = 0.0;
+            lapl[2 * g + 1] = 0.0;
+
+            tau[2 * g + 0] = 0.0;
+            tau[2 * g + 1] = 0.0;
+        }
+
+        for (int nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+#pragma omp simd
+            for (int g = 0; g < npoints; g++)
+            {
+                rho[2 * g + 0] += F_a_val[nu_offset + g] * chi_val[nu_offset + g];
+                rho[2 * g + 1] += F_b_val[nu_offset + g] * chi_val[nu_offset + g];
+
+                rhograd[6 * g + 0] += 2.0 * F_a_val[nu_offset + g] * chi_x_val[nu_offset + g];
+                rhograd[6 * g + 1] += 2.0 * F_a_val[nu_offset + g] * chi_y_val[nu_offset + g];
+                rhograd[6 * g + 2] += 2.0 * F_a_val[nu_offset + g] * chi_z_val[nu_offset + g];
+
+                rhograd[6 * g + 3] += 2.0 * F_b_val[nu_offset + g] * chi_x_val[nu_offset + g];
+                rhograd[6 * g + 4] += 2.0 * F_b_val[nu_offset + g] * chi_y_val[nu_offset + g];
+                rhograd[6 * g + 5] += 2.0 * F_b_val[nu_offset + g] * chi_z_val[nu_offset + g];
+
+                // TODO implement Laplacian dependence
+
+                // clang-format off
+                tau[2 * g + 0] += 0.5 * (F_a_x_val[nu_offset + g] * chi_x_val[nu_offset + g] +
+                                         F_a_y_val[nu_offset + g] * chi_y_val[nu_offset + g] +
+                                         F_a_z_val[nu_offset + g] * chi_z_val[nu_offset + g]);
+
+                tau[2 * g + 1] += 0.5 * (F_b_x_val[nu_offset + g] * chi_x_val[nu_offset + g] +
+                                         F_b_y_val[nu_offset + g] * chi_y_val[nu_offset + g] +
+                                         F_b_z_val[nu_offset + g] * chi_z_val[nu_offset + g]);
+                // clang-format on
+            }
+        }
+
+#pragma omp simd
+        for (int g = 0; g < npoints; g++)
+        {
             // clang-format off
             sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
                                rhograd[6 * g + 1] * rhograd[6 * g + 1] +

@@ -112,7 +112,7 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
         }
         else
         {
-            return xcintmgga::integrateVxcFockForMGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+            return xcintmgga::integrateVxcFockForMetaGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
     }
 
