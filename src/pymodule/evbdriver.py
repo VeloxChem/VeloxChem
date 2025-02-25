@@ -672,13 +672,13 @@ class EvbDriver():
         """Run the the FEP calculations for all configurations in self.system_confs.
 
         Args:
-            equil_steps (int, optional): The amount of timesteps to equiliberate at the beginning af each Lambda frame. Equiliberation is done with frozen H-bonds. Defaults to 5000.
+            equil_steps (int, optional): The amount of timesteps to equilibrate at the beginning af each Lambda frame. equilibration is done with frozen H-bonds. Defaults to 5000.
             sample_steps (int, optional): The amount of steps to sample. Defaults to 100000.
             write_step (int, optional): Per how many steps to take a sample and save its data as well as the trajectory point. Defaults to 1000.
-            initial_equil_steps (int, optional): The amount of timesteps to add to the equiliberation at the first Lambda frame. Defaults to 5000.
+            initial_equil_steps (int, optional): The amount of timesteps to add to the equilibration at the first Lambda frame. Defaults to 5000.
             step_size (float, optional): The step size during the sampling in picoseconds. Defaults to 0.001.
-            equil_step_size (float, optional): The step size during the equiliberation in picoseconds. Is typically larger then step_size as equiliberation is done with frozen H-bonds. Defaults to 0.002.
-            initial_equil_step_size (float, optional): The step size during initial equiliberation in picoseconds. Defaults to 0.002.
+            equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
+            initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
         if self.debug:
             self.ostream.print_warning("Debugging enabled, using low number of steps. Do not use for production")
@@ -701,10 +701,10 @@ class EvbDriver():
             self.ostream.flush()
             FEP = EvbFepDriver()
             FEP.run_FEP(
-                equiliberation_steps=equil_steps,
+                equilibration_steps=equil_steps,
                 total_sample_steps=sample_steps,
                 write_step=write_step,
-                lambda_0_equiliberation_steps=initial_equil_steps,
+                lambda_0_equilibration_steps=initial_equil_steps,
                 step_size=step_size,
                 equil_step_size=equil_step_size,
                 initial_equil_step_size=initial_equil_step_size,
