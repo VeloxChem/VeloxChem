@@ -90,8 +90,8 @@ serialGenerateDensityForLDA(double*             rho,
 
     auto npoints = gtoValues.getNumberOfColumns();
 
-    auto mat_F_a = denblas::multAB(densityMatrixAlpha, gtoValues);
-    auto mat_F_b = denblas::multAB(densityMatrixBeta, gtoValues);
+    auto mat_F_a = denblas::serialMultAB(densityMatrixAlpha, gtoValues);
+    auto mat_F_b = denblas::serialMultAB(densityMatrixBeta, gtoValues);
 
     auto F_a_val = mat_F_a.values();
     auto F_b_val = mat_F_b.values();
