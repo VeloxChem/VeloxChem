@@ -8,6 +8,7 @@ on:
       - multipsi_newcore
       - embedding_test
       - c_pcm
+      - dft-update
 
 jobs:
   vlx_ci:
