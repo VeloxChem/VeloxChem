@@ -946,6 +946,8 @@ serialGenerateDensityForMGGA(double*             rho,
             tau[2 * g + 1] = tau[2 * g + 0];
         }
 
+        if (sigma != nullptr)
+        {
 #pragma omp simd
         for (int g = 0; g < npoints; g++)
         {
@@ -964,6 +966,7 @@ serialGenerateDensityForMGGA(double*             rho,
                                rhograd[6 * g + 4] * rhograd[6 * g + 4] +
                                rhograd[6 * g + 5] * rhograd[6 * g + 5];
             // clang-format on
+        }
         }
     }
 }
@@ -1074,6 +1077,8 @@ serialGenerateDensityForMGGA(double*             rho,
             }
         }
 
+        if (sigma != nullptr)
+        {
 #pragma omp simd
         for (int g = 0; g < npoints; g++)
         {
@@ -1090,6 +1095,7 @@ serialGenerateDensityForMGGA(double*             rho,
                                rhograd[6 * g + 4] * rhograd[6 * g + 4] +
                                rhograd[6 * g + 5] * rhograd[6 * g + 5];
             // clang-format on
+        }
         }
     }
 }

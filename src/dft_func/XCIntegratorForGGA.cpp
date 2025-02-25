@@ -1109,8 +1109,6 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
 
                 omptimers[thread_id].stop("Fxc matrix G");
 
-                // eq.(31), JCTC 2021, 17, 1512-1521
-
                 omptimers[thread_id].start("Fxc matmul and symm.");
 
                 auto partial_mat_Fxc = denblas::serialMultABt(mat_chi, mat_G);

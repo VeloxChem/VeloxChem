@@ -117,14 +117,14 @@ auto integratePartialVxcFockForMGGA(const double*       weights,
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
  */
-auto integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
-                             const CMolecule&                  molecule,
-                             const CMolecularBasis&            basis,
-                             const std::vector<const double*>& rwDensityPointers,
-                             const std::vector<const double*>& gsDensityPointers,
-                             const CMolecularGrid&             molecularGrid,
-                             const double                      screeningThresholdForGTOValues,
-                             const CXCFunctional&              xcFunctional) -> void;
+auto integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoFockPointers,
+                                           const CMolecule&                  molecule,
+                                           const CMolecularBasis&            basis,
+                                           const std::vector<const double*>& rwDensityPointers,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&             molecularGrid,
+                                           const double                      screeningThresholdForGTOValues,
+                                           const CXCFunctional&              xcFunctional) -> void;
 
 /**
  Integrates meta-GGA contribution to (second-order) Fxc matrix.

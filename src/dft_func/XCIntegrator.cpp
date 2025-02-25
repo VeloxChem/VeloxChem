@@ -162,7 +162,7 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateFxcFockForMGGA(
+            xcintmgga::integrateFxcFockForMetaGgaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else

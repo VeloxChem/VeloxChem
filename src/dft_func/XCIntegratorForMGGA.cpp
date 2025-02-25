@@ -907,14 +907,14 @@ integratePartialVxcFockForMGGA(const double*       weights,
 }
 
 auto
-integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
-                        const CMolecule&                  molecule,
-                        const CMolecularBasis&            basis,
-                        const std::vector<const double*>& rwDensityPointers,
-                        const std::vector<const double*>& gsDensityPointers,
-                        const CMolecularGrid&             molecularGrid,
-                        const double                      screeningThresholdForGTOValues,
-                        const CXCFunctional&              xcFunctional) -> void
+integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoFockPointers,
+                                      const CMolecule&                  molecule,
+                                      const CMolecularBasis&            basis,
+                                      const std::vector<const double*>& rwDensityPointers,
+                                      const std::vector<const double*>& gsDensityPointers,
+                                      const CMolecularGrid&             molecularGrid,
+                                      const double                      screeningThresholdForGTOValues,
+                                      const CXCFunctional&              xcFunctional) -> void
 {
     CMultiTimer timer;
 
@@ -936,76 +936,48 @@ integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
+    auto omp_max_npoints = max_npoints_per_box / nthreads;
+    if (max_npoints_per_box % nthreads != 0) omp_max_npoints++;
+
     // density and functional derivatives
 
     auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
     const auto dim      = &(mggafunc->dim);
 
-    std::vector<double> local_weights_data(max_npoints_per_box);
+    std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
+
+    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
     // ground-state
-    std::vector<double> rho_data(dim->rho * max_npoints_per_box);
-    std::vector<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
-    std::vector<double> sigma_data(dim->sigma * max_npoints_per_box);
-    std::vector<double> lapl_data(dim->lapl * max_npoints_per_box);
-    std::vector<double> tau_data(dim->tau * max_npoints_per_box);
+    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_lapl_data(nthreads, std::vector<double>(dim->lapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_tau_data(nthreads, std::vector<double>(dim->tau * omp_max_npoints));
 
     // perturbed
-    std::vector<double> rhow_data(dim->rho * max_npoints_per_box);
-    std::vector<double> rhowgrad_data(dim->rho * 3 * max_npoints_per_box);
-    std::vector<double> laplw_data(dim->lapl * max_npoints_per_box);
-    std::vector<double> tauw_data(dim->tau * max_npoints_per_box);
+    std::vector<std::vector<double>> omp_rhow_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhowgrad_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_laplw_data(nthreads, std::vector<double>(dim->lapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_tauw_data(nthreads, std::vector<double>(dim->tau * omp_max_npoints));
 
     // First-order
-    std::vector<double> vrho_data(dim->vrho * max_npoints_per_box);
-    std::vector<double> vsigma_data(dim->vsigma * max_npoints_per_box);
-    std::vector<double> vlapl_data(dim->vlapl * max_npoints_per_box);
-    std::vector<double> vtau_data(dim->vtau * max_npoints_per_box);
+    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vlapl_data(nthreads, std::vector<double>(dim->vlapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vtau_data(nthreads, std::vector<double>(dim->vtau * omp_max_npoints));
 
     // Second-order
-    std::vector<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
-    std::vector<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
-    std::vector<double> v2rholapl_data(dim->v2rholapl * max_npoints_per_box);
-    std::vector<double> v2rhotau_data(dim->v2rhotau * max_npoints_per_box);
-    std::vector<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
-    std::vector<double> v2sigmalapl_data(dim->v2sigmalapl * max_npoints_per_box);
-    std::vector<double> v2sigmatau_data(dim->v2sigmatau * max_npoints_per_box);
-    std::vector<double> v2lapl2_data(dim->v2lapl2 * max_npoints_per_box);
-    std::vector<double> v2lapltau_data(dim->v2lapltau * max_npoints_per_box);
-    std::vector<double> v2tau2_data(dim->v2tau2 * max_npoints_per_box);
-
-    auto local_weights = local_weights_data.data();
-
-    // Ground-state
-    auto rho     = rho_data.data();
-    auto rhograd = rhograd_data.data();
-    auto sigma   = sigma_data.data();
-    auto lapl    = lapl_data.data();
-    auto tau     = tau_data.data();
-
-    // Perturbed
-    auto rhow     = rhow_data.data();
-    auto rhowgrad = rhowgrad_data.data();
-    auto laplw    = laplw_data.data();
-    auto tauw     = tauw_data.data();
-
-    // First-order
-    auto vrho   = vrho_data.data();
-    auto vsigma = vsigma_data.data();
-    auto vlapl  = vlapl_data.data();
-    auto vtau   = vtau_data.data();
-
-    // Second-order
-    auto v2rho2      = v2rho2_data.data();
-    auto v2rhosigma  = v2rhosigma_data.data();
-    auto v2rholapl   = v2rholapl_data.data();
-    auto v2rhotau    = v2rhotau_data.data();
-    auto v2sigma2    = v2sigma2_data.data();
-    auto v2sigmalapl = v2sigmalapl_data.data();
-    auto v2sigmatau  = v2sigmatau_data.data();
-    auto v2lapl2     = v2lapl2_data.data();
-    auto v2lapltau   = v2lapltau_data.data();
-    auto v2tau2      = v2tau2_data.data();
+    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rholapl_data(nthreads, std::vector<double>(dim->v2rholapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rhotau_data(nthreads, std::vector<double>(dim->v2rhotau * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigmalapl_data(nthreads, std::vector<double>(dim->v2sigmalapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigmatau_data(nthreads, std::vector<double>(dim->v2sigmatau * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2lapl2_data(nthreads, std::vector<double>(dim->v2lapl2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2lapltau_data(nthreads, std::vector<double>(dim->v2lapltau * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2tau2_data(nthreads, std::vector<double>(dim->v2tau2 * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -1035,7 +1007,7 @@ integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
 
         auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
-        // pre-screening of GTOs
+        // pre-screening
 
         timer.start("GTO pre-screening");
 
@@ -1064,14 +1036,24 @@ integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
 
         if (aocount == 0) continue;
 
+        timer.start("Density matrix slicing");
+
+        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
+
+        std::vector<CDenseMatrix> rw_sub_dens_mat_vec(rwDensityPointers.size());
+
+        for (size_t idensity = 0; idensity < rwDensityPointers.size(); idensity++)
+        {
+            rw_sub_dens_mat_vec[idensity] = dftsubmat::getSubDensityMatrix(rwDensityPointers[idensity], aoinds, naos);
+        }
+
+        timer.stop("Density matrix slicing");
+
         // GTO values on grid points
 
-        timer.start("OMP GTO evaluation");
+        timer.start("OMP Fxc calc.");
 
-        CDenseMatrix mat_chi(aocount, npoints);
-        CDenseMatrix mat_chi_x(aocount, npoints);
-        CDenseMatrix mat_chi_y(aocount, npoints);
-        CDenseMatrix mat_chi_z(aocount, npoints);
+        std::vector<CDenseMatrix> sum_partial_mat_Fxc(rwDensityPointers.size(), CDenseMatrix(aocount, aocount));
 
 #pragma omp parallel
         {
@@ -1082,6 +1064,11 @@ integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
             auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            CDenseMatrix mat_chi(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_x(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_y(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_z(aocount, grid_batch_size);
 
             const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
             const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
@@ -1117,96 +1104,302 @@ integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
 
                 for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(mat_chi.row(idx) + grid_batch_offset, submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_x.row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_y.row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_z.row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx), submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_x.row(idx), submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_y.row(idx), submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_z.row(idx), submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
 
             omptimers[thread_id].stop("gtoeval");
+
+            omptimers[thread_id].start("Generate density grid");
+
+            auto local_weights = omp_local_weights_data[thread_id].data();
+
+            // ground-state
+            auto rho     = omp_rho_data[thread_id].data();
+            auto rhograd = omp_rhograd_data[thread_id].data();
+            auto sigma   = omp_sigma_data[thread_id].data();
+            auto lapl    = omp_lapl_data[thread_id].data();
+            auto tau     = omp_tau_data[thread_id].data();
+
+            // perturbed
+            auto rhow     = omp_rhow_data[thread_id].data();
+            auto rhowgrad = omp_rhowgrad_data[thread_id].data();
+            auto laplw    = omp_laplw_data[thread_id].data();
+            auto tauw     = omp_tauw_data[thread_id].data();
+
+            // First-order
+            auto vrho   = omp_vrho_data[thread_id].data();
+            auto vsigma = omp_vsigma_data[thread_id].data();
+            auto vlapl  = omp_vlapl_data[thread_id].data();
+            auto vtau   = omp_vtau_data[thread_id].data();
+
+            // Second-order
+            auto v2rho2      = omp_v2rho2_data[thread_id].data();
+            auto v2rhosigma  = omp_v2rhosigma_data[thread_id].data();
+            auto v2rholapl   = omp_v2rholapl_data[thread_id].data();
+            auto v2rhotau    = omp_v2rhotau_data[thread_id].data();
+            auto v2sigma2    = omp_v2sigma2_data[thread_id].data();
+            auto v2sigmalapl = omp_v2sigmalapl_data[thread_id].data();
+            auto v2sigmatau  = omp_v2sigmatau_data[thread_id].data();
+            auto v2lapl2     = omp_v2lapl2_data[thread_id].data();
+            auto v2lapltau   = omp_v2lapltau_data[thread_id].data();
+            auto v2tau2      = omp_v2tau2_data[thread_id].data();
+
+            dengridgen::serialGenerateDensityForMGGA(rho, rhograd, sigma, lapl, tau, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat);
+
+            omptimers[thread_id].stop("Generate density grid");
+
+            omptimers[thread_id].start("XC functional eval.");
+
+            omp_xcfuncs[thread_id].compute_vxc_for_mgga(grid_batch_size, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
+
+            omp_xcfuncs[thread_id].compute_fxc_for_mgga(
+                grid_batch_size, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
+
+            omptimers[thread_id].stop("XC functional eval.");
+
+            omptimers[thread_id].start("Copy grid weights");
+
+            std::memcpy(local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
+
+            omptimers[thread_id].stop("Copy grid weights");
+
+            // go through rhow density matrices
+
+            for (size_t idensity = 0; idensity < rwDensityPointers.size(); idensity++)
+            {
+                omptimers[thread_id].start("Generate density grid");
+
+                dengridgen::serialGenerateDensityForMGGA(rhow, rhowgrad, nullptr, laplw, tauw, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat_vec[idensity]);
+
+                omptimers[thread_id].stop("Generate density grid");
+
+                omptimers[thread_id].start("Fxc matrix G");
+
+                // LDA contribution
+                CDenseMatrix mat_G(aocount, grid_batch_size);
+
+                // GGA contribution
+                CDenseMatrix mat_G_gga(aocount, grid_batch_size);
+
+                // tau contribution
+                CDenseMatrix mat_G_gga_x(aocount, grid_batch_size);
+                CDenseMatrix mat_G_gga_y(aocount, grid_batch_size);
+                CDenseMatrix mat_G_gga_z(aocount, grid_batch_size);
+
+                auto G_val = mat_G.values();
+
+                auto G_gga_val = mat_G_gga.values();
+
+                auto G_gga_x_val = mat_G_gga_x.values();
+                auto G_gga_y_val = mat_G_gga_y.values();
+                auto G_gga_z_val = mat_G_gga_z.values();
+
+                auto chi_val   = mat_chi.values();
+                auto chi_x_val = mat_chi_x.values();
+                auto chi_y_val = mat_chi_y.values();
+                auto chi_z_val = mat_chi_z.values();
+
+                auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+                const auto dim      = &(mggafunc->dim);
+
+                for (int nu = 0; nu < aocount; nu++)
+                {
+                    auto nu_offset = nu * grid_batch_size;
+
+#pragma omp simd
+                    for (int g = 0; g < grid_batch_size; g++)
+                    {
+                        double w = local_weights[g];
+
+                        // ground-state gardients
+                        double grada_x_g = rhograd[6 * g + 0];
+                        double grada_y_g = rhograd[6 * g + 1];
+                        double grada_z_g = rhograd[6 * g + 2];
+
+                        // perturbed density and its gradients
+                        double rwa   = rhow[2 * g + 0];
+                        double tauwa = tauw[2 * g + 0];
+                        // double laplwa = laplw[2 * g + 0];
+
+                        double rwa_x = rhowgrad[6 * g + 0];
+                        double rwa_y = rhowgrad[6 * g + 1];
+                        double rwa_z = rhowgrad[6 * g + 2];
+
+                        // functional derivatives
+
+                        // first-order
+
+                        auto vsigma_a = vsigma[dim->vsigma * g + 0];
+                        auto vsigma_c = vsigma[dim->vsigma * g + 1];
+
+                        // second-order
+
+                        auto v2rho2_aa = v2rho2[dim->v2rho2 * g + 0];
+                        auto v2rho2_ab = v2rho2[dim->v2rho2 * g + 1];
+
+                        auto v2rhosigma_aa = v2rhosigma[dim->v2rhosigma * g + 0];
+                        auto v2rhosigma_ac = v2rhosigma[dim->v2rhosigma * g + 1];
+                        auto v2rhosigma_ab = v2rhosigma[dim->v2rhosigma * g + 2];
+                        auto v2rhosigma_ba = v2rhosigma[dim->v2rhosigma * g + 3];
+                        auto v2rhosigma_bc = v2rhosigma[dim->v2rhosigma * g + 4];
+
+                        // auto v2rholapl_aa = v2rholapl[dim->v2rholapl * g + 0];
+                        // auto v2rholapl_ab = v2rholapl[dim->v2rholapl * g + 1];
+
+                        auto v2rhotau_aa = v2rhotau[dim->v2rhotau * g + 0];
+                        auto v2rhotau_ab = v2rhotau[dim->v2rhotau * g + 1];
+                        auto v2rhotau_ba = v2rhotau[dim->v2rhotau * g + 2];
+
+                        auto v2sigma2_aa = v2sigma2[dim->v2sigma2 * g + 0];
+                        auto v2sigma2_ac = v2sigma2[dim->v2sigma2 * g + 1];
+                        auto v2sigma2_ab = v2sigma2[dim->v2sigma2 * g + 2];
+                        auto v2sigma2_cc = v2sigma2[dim->v2sigma2 * g + 3];
+                        auto v2sigma2_cb = v2sigma2[dim->v2sigma2 * g + 4];
+
+                        // auto v2sigmalapl_aa = v2sigmalapl[dim->v2sigmalapl * g + 0];
+                        // auto v2sigmalapl_ab = v2sigmalapl[dim->v2sigmalapl * g + 1];
+                        // auto v2sigmalapl_ca = v2sigmalapl[dim->v2sigmalapl * g + 2];
+                        // auto v2sigmalapl_cb = v2sigmalapl[dim->v2sigmalapl * g + 3];
+
+                        auto v2sigmatau_aa = v2sigmatau[dim->v2sigmatau * g + 0];
+                        auto v2sigmatau_ab = v2sigmatau[dim->v2sigmatau * g + 1];
+                        auto v2sigmatau_ca = v2sigmatau[dim->v2sigmatau * g + 2];
+                        auto v2sigmatau_cb = v2sigmatau[dim->v2sigmatau * g + 3];
+                        auto v2sigmatau_ba = v2sigmatau[dim->v2sigmatau * g + 4];
+
+                        // auto v2lapl2_aa = v2lapl2[dim->v2lapl2 * g + 0];
+                        // auto v2lapl2_ab = v2lapl2[dim->v2lapl2 * g + 1];
+
+                        // auto v2lapltau_aa = v2lapltau[dim->v2lapltau * g + 0];
+                        // auto v2lapltau_ba = v2lapltau[dim->v2lapltau * g + 2];
+
+                        auto v2tau2_aa = v2tau2[dim->v2tau2 * g + 0];
+                        auto v2tau2_ab = v2tau2[dim->v2tau2 * g + 1];
+
+                        // sums of functional derivatives that can be used in the restricted case
+
+                        // first-order
+                        double x = vsigma_c + 2.0 * vsigma_a;
+                        // second-order
+                        double rr = v2rho2_aa + v2rho2_ab;
+                        double rx = 2.0 * v2rhosigma_ac + 2.0 * v2rhosigma_ab + 2.0 * v2rhosigma_aa;
+                        double rt = v2rhotau_aa + v2rhotau_ab;
+                        // double rl = v2rholapl_aa + v2rholapl_ab;
+
+                        // sigma and gamma
+                        double xr = v2rhosigma_bc + 2.0 * v2rhosigma_ba + v2rhosigma_ac + 2.0 * v2rhosigma_aa;
+                        double xt = v2sigmatau_cb + 2.0 * v2sigmatau_ab + v2sigmatau_ca + 2.0 * v2sigmatau_aa;
+                        // double xl = v2sigmalapl_cb + 2.0*v2sigmalapl_ab + v2sigmalapl_ca + 2.0 * v2sigmalapl_aa;
+                        double xx = 2.0 * v2sigma2_cc + 2.0 * v2sigma2_cb + 6.0 * v2sigma2_ac + 4.0 * v2sigma2_ab + 4.0 * v2sigma2_aa;
+
+                        // tau
+                        double tt = v2tau2_aa + v2tau2_ab;
+                        double tx = 2.0 * v2sigmatau_ca + 2.0 * v2sigmatau_ba + 2.0 * v2sigmatau_aa;
+                        double tr = v2rhotau_aa + v2rhotau_ba;
+                        // double tl = v2lapltau_aa + v2lapltau_ba;
+
+                        // lapl
+                        // double ll = v2lapl2_aa + v2lapl2_ab;
+                        // double lx = 2.0 * v2sigmalapl_ca + 2.0 * v2sigmalapl_ba + 2.0 * v2sigmalapl_aa;
+                        // double lr = v2rholapl_aa + v2rholapl_ba;
+                        // double lt = v2lapltau_aa + v2lapltau_ab;
+
+                        // contraction of perturbed density for restricted case
+                        double contract = grada_x_g * rwa_x + grada_y_g * rwa_y + grada_z_g * rwa_z;
+
+                        // rho-operator
+                        double r_0 = rr * rwa + rx * contract + rt * tauwa;
+                        //+ rl * laplwa;
+
+                        G_val[nu_offset + g] = w * r_0 * chi_val[nu_offset + g];
+
+                        // GGA contribution (will be scaled by 2 later)
+
+                        // vector contribution
+
+                        double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
+
+                        // grad-operator
+
+                        // xcomp +=  grada_x_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                        xcomp += grada_x_g * (xr * rwa + xt * tauwa) + x * rwa_x + xx * grada_x_g * contract;
+
+                        // ycomp += grada_y_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                        ycomp += grada_y_g * (xr * rwa + xt * tauwa) + x * rwa_y + xx * grada_y_g * contract;
+
+                        // zcomp += grada_z_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                        zcomp += grada_z_g * (xr * rwa + xt * tauwa) + x * rwa_z + xx * grada_z_g * contract;
+
+                        G_gga_val[nu_offset + g] =
+                            w * (xcomp * chi_x_val[nu_offset + g] + ycomp * chi_y_val[nu_offset + g] + zcomp * chi_z_val[nu_offset + g]);
+
+                        // TODO implement Laplacian dependence
+
+                        // double lap_0 =    lr * rwa
+                        //                 + lx * contract
+                        //                 + lt * tauwa
+                        //                 + ll * laplwa;
+                        // G_gga_val[nu_offset + g] += w * lap_0 * (chi_xx_val[nu_offset + g] +
+                        //                                          chi_yy_val[nu_offset + g] +
+                        //                                          chi_zz_val[nu_offset + g]);
+
+                        // tau contribution (will be scaled by 0.5 later)
+                        double tau_0 = tr * rwa + tx * contract + tt * tauwa;
+                        //+ tl * laplwa;
+
+                        G_gga_x_val[nu_offset + g] = w * tau_0 * chi_x_val[nu_offset + g];
+                        G_gga_y_val[nu_offset + g] = w * tau_0 * chi_y_val[nu_offset + g];
+                        G_gga_z_val[nu_offset + g] = w * tau_0 * chi_z_val[nu_offset + g];
+                    }
+                }
+
+                omptimers[thread_id].stop("Fxc matrix G");
+
+                omptimers[thread_id].start("Fxc matmul and symm.");
+
+                // LDA and GGA contribution
+                auto partial_mat_Fxc = denblas::serialMultABt(mat_chi, mat_G);
+
+                auto partial_mat_Fxc_gga = denblas::serialMultABt(mat_chi, mat_G_gga);
+
+                partial_mat_Fxc_gga.symmetrize();  // (matrix + matrix.T)
+
+                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_gga, 1.0);
+
+                // tau contribution
+                auto partial_mat_Fxc_x = denblas::serialMultABt(mat_chi_x, mat_G_gga_x);
+                auto partial_mat_Fxc_y = denblas::serialMultABt(mat_chi_y, mat_G_gga_y);
+                auto partial_mat_Fxc_z = denblas::serialMultABt(mat_chi_z, mat_G_gga_z);
+
+                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_x, 0.5);
+                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_y, 0.5);
+                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_z, 0.5);
+
+                omptimers[thread_id].stop("Fxc matmul and symm.");
+
+                omptimers[thread_id].start("Fxc local matrix dist.");
+
+#pragma omp critical
+                denblas::serialInPlaceAddAB(sum_partial_mat_Fxc[idensity], partial_mat_Fxc);
+
+                omptimers[thread_id].stop("Fxc local matrix dist.");
+            }
         }
 
-        timer.stop("OMP GTO evaluation");
+        timer.stop("OMP Fxc calc.");
 
-        // generate sub density matrix and density grid
-
-        timer.start("Density matrix slicing");
-
-        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
-
-        timer.stop("Density matrix slicing");
-
-        // generate density grid
-
-        dengridgen::generateDensityForMGGA(rho, rhograd, sigma, lapl, tau, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, timer);
-
-        // compute exchange-correlation functional derivative
-
-        timer.start("XC functional eval.");
-
-        xcFunctional.compute_vxc_for_mgga(npoints, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
-
-        xcFunctional.compute_fxc_for_mgga(
-            npoints, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
-
-        std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
-
-        timer.stop("XC functional eval.");
-
-        // go through rhow density matrices
+        timer.start("Fxc matrix dist.");
 
         for (size_t idensity = 0; idensity < rwDensityPointers.size(); idensity++)
         {
-            // generate sub density matrix
-
-            timer.start("Density matrix slicing");
-
-            auto sub_dens_mat = dftsubmat::getSubDensityMatrix(rwDensityPointers[idensity], aoinds, naos);
-
-            timer.stop("Density matrix slicing");
-
-            // generate density grid
-
-            dengridgen::generateDensityForMGGA(rhow, rhowgrad, sigma, laplw, tauw, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, timer);
-
-            // compute partial contribution to Fxc matrix
-
-            auto partial_mat_Fxc = integratePartialFxcFockForMGGA(xcFunctional,
-                                                                  local_weights,
-                                                                  mat_chi,
-                                                                  mat_chi_x,
-                                                                  mat_chi_y,
-                                                                  mat_chi_z,
-                                                                  rhow,
-                                                                  rhograd,
-                                                                  rhowgrad,
-                                                                  tauw,
-                                                                  laplw,
-                                                                  vrho,
-                                                                  vsigma,
-                                                                  vlapl,
-                                                                  vtau,
-                                                                  v2rho2,
-                                                                  v2lapl2,
-                                                                  v2tau2,
-                                                                  v2rholapl,
-                                                                  v2rhotau,
-                                                                  v2lapltau,
-                                                                  v2rhosigma,
-                                                                  v2sigmalapl,
-                                                                  v2sigmatau,
-                                                                  v2sigma2,
-                                                                  timer);
-
-            // distribute partial Fxc to full Fock matrix
-
-            timer.start("Fxc matrix dist.");
-
-            dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity, partial_mat_Fxc, aoinds, naos);
-
-            timer.stop("Fxc matrix dist.");
+            dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity, sum_partial_mat_Fxc[idensity], aoinds, naos);
         }
+
+        timer.stop("Fxc matrix dist.");
     }
 
     timer.stop("Total timing");
