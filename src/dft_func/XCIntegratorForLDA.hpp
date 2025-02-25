@@ -61,6 +61,13 @@ auto integrateVxcFockForLDA(const CMolecule&                  molecule,
                             const CXCFunctional&              xcFunctional,
                             const std::string&                flag = std::string("closedshell")) -> CAOKohnShamMatrix;
 
+auto integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
+                                       const CMolecularBasis&            basis,
+                                       const std::vector<const double*>& gsDensityPointers,
+                                       const CMolecularGrid&             molecularGrid,
+                                       const double                      screeningThresholdForGTOValues,
+                                       const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
+
 /**
  Integrates LDA contribution to (first-order) Vxc matrix.
 

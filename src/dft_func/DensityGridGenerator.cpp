@@ -35,6 +35,50 @@
 namespace dengridgen {  // dengridgen namespace
 
 auto
+serialGenerateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix) -> void
+{
+    auto nthreads = omp_get_max_threads();
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    auto mat_F = denblas::serialMultAB(densityMatrix, gtoValues);
+
+    auto F_val = mat_F.values();
+
+    auto chi_val = gtoValues.values();
+
+    {
+#pragma omp simd
+        for (int g = 0; g < npoints; g++)
+        {
+            // rho_alpha
+            rho[2 * g + 0] = 0.0;
+        }
+
+        for (int nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+#pragma omp simd
+            for (int g = 0; g < npoints; g++)
+            {
+                // rho_alpha
+                rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+            }
+        }
+
+#pragma omp simd
+        for (int g = 0; g < npoints; g++)
+        {
+            // rho_beta
+            rho[2 * g + 1] = rho[2 * g + 0];
+        }
+    }
+}
+
+auto
 generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix, CMultiTimer& timer) -> void
 {
     auto nthreads = omp_get_max_threads();

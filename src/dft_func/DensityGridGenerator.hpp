@@ -58,6 +58,8 @@ auto generateDensityForLDA(double*             rho,
                            const CDenseMatrix& densityMatrixBeta,
                            CMultiTimer&        timer) -> void;
 
+auto serialGenerateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix) -> void;
+
 /**
  Generates density grid (multiple density matrices) for LDA.
 
