@@ -193,6 +193,17 @@ auto generateDensityForMGGA(double*             rho,
                             const CDenseMatrix& densityMatrix,
                             CMultiTimer&        timer) -> void;
 
+void serialGenerateDensityForMGGA(double*             rho,
+                                  double*             rhograd,
+                                  double*             sigma,
+                                  double*             lapl,
+                                  double*             tau,
+                                  const CDenseMatrix& gtoValues,
+                                  const CDenseMatrix& gtoValuesX,
+                                  const CDenseMatrix& gtoValuesY,
+                                  const CDenseMatrix& gtoValuesZ,
+                                  const CDenseMatrix& densityMatrix);
+
 /**
  Generates density for meta-GGA.
 

@@ -106,7 +106,14 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
 
     if (xcfuntype == xcfun::mgga)
     {
-        return xcintmgga::integrateVxcFockForMGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintmgga::integrateVxcFockForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintmgga::integrateVxcFockForMGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+        }
     }
 
     std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
