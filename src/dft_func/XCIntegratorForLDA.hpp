@@ -111,24 +111,6 @@ auto integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockP
                             const CXCFunctional&              xcFunctional) -> void;
 
 /**
- Integrates LDA contribution to (second-order) Fxc matrix.
-
- @param xcFunctional the exchange-correlation functional.
- @param weights the weights of grid points.
- @param gtoValues the GTO values on grid points.
- @param rhow the pointer to perturbed density.
- @param v2rho2 the 2nd-order functional derivative wrt density.
- @param timer the timer.
- @return the contribution as a CDenseMatrix object.
- */
-auto integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
-                                   const double*        weights,
-                                   const CDenseMatrix&  gtoValues,
-                                   const double*        rhow,
-                                   const double*        v2rho2,
-                                   CMultiTimer&         timer) -> CDenseMatrix;
-
-/**
  Integrates third-order LDA exchange-correlation functional contribution
  to AO Fock matrix.
 

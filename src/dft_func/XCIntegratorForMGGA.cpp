@@ -700,7 +700,7 @@ integrateFxcFockForMGGA(const std::vector<double*>&       aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -1304,7 +1304,7 @@ integrateKxcFockForMGGA(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -2463,7 +2463,7 @@ integrateKxcLxcFockForMGGA(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 

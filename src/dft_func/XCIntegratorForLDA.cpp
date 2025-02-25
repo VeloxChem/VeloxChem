@@ -950,80 +950,6 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
 }
 
 auto
-integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
-                              const double*        weights,
-                              const CDenseMatrix&  gtoValues,
-                              const double*        rhow,
-                              const double*        v2rho2,
-                              CMultiTimer&         timer) -> CDenseMatrix
-{
-    const auto npoints = gtoValues.getNumberOfColumns();
-
-    // GTO values on grid points
-
-    auto chi_val = gtoValues.values();
-
-    // eq.(30), JCTC 2021, 17, 1512-1521
-
-    timer.start("Fxc matrix G");
-
-    auto naos = gtoValues.getNumberOfRows();
-
-    CDenseMatrix mat_G(naos, npoints);
-
-    auto G_val = mat_G.values();
-
-    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
-    const auto dim     = &(ldafunc->dim);
-
-#pragma omp parallel
-    {
-        auto thread_id = omp_get_thread_num();
-
-        auto nthreads = omp_get_max_threads();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
-        for (int nu = 0; nu < naos; nu++)
-        {
-            auto nu_offset = nu * npoints;
-
-#pragma omp simd
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-            {
-                auto rhow_a = rhow[2 * g + 0];
-                auto rhow_b = rhow[2 * g + 1];
-
-                // functional derivatives
-
-                // first-order
-
-                // second-order
-
-                auto v2rho2_aa = v2rho2[dim->v2rho2 * g + 0];
-                auto v2rho2_ab = v2rho2[dim->v2rho2 * g + 1];
-
-                G_val[nu_offset + g] = weights[g] * (v2rho2_aa * rhow_a + v2rho2_ab * rhow_b) * chi_val[nu_offset + g];
-            }
-        }
-    }
-
-    timer.stop("Fxc matrix G");
-
-    // eq.(31), JCTC 2021, 17, 1512-1521
-
-    timer.start("Fxc matrix matmul");
-
-    auto mat_Fxc = denblas::multABt(gtoValues, mat_G);
-
-    timer.stop("Fxc matrix matmul");
-
-    return mat_Fxc;
-}
-
-auto
 integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
                        const CMolecule&        molecule,
                        const CMolecularBasis&  basis,
@@ -1090,7 +1016,7 @@ integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -1441,7 +1367,7 @@ integrateKxcLxcFockForLDA(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
