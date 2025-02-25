@@ -79,6 +79,48 @@ serialGenerateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CD
 }
 
 auto
+serialGenerateDensityForLDA(double*             rho,
+                            const CDenseMatrix& gtoValues,
+                            const CDenseMatrix& densityMatrixAlpha,
+                            const CDenseMatrix& densityMatrixBeta) -> void
+{
+    auto nthreads = omp_get_max_threads();
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    auto mat_F_a = denblas::multAB(densityMatrixAlpha, gtoValues);
+    auto mat_F_b = denblas::multAB(densityMatrixBeta, gtoValues);
+
+    auto F_a_val = mat_F_a.values();
+    auto F_b_val = mat_F_b.values();
+
+    auto chi_val = gtoValues.values();
+
+    {
+#pragma omp simd
+        for (int g = 0; g < npoints; g++)
+        {
+            rho[2 * g + 0] = 0.0;
+            rho[2 * g + 1] = 0.0;
+        }
+
+        for (int nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+#pragma omp simd
+            for (int g = 0; g < npoints; g++)
+            {
+                rho[2 * g + 0] += F_a_val[nu_offset + g] * chi_val[nu_offset + g];
+                rho[2 * g + 1] += F_b_val[nu_offset + g] * chi_val[nu_offset + g];
+            }
+        }
+    }
+}
+
+auto
 generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix, CMultiTimer& timer) -> void
 {
     auto nthreads = omp_get_max_threads();

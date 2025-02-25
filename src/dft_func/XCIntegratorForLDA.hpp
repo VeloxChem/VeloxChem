@@ -53,6 +53,8 @@ namespace xcintlda {  // xcintlda namespace
  @param flag the flag for closed/open shell.
  @return the AO Kohn-Sham matrix.
  */
+
+/*
 auto integrateVxcFockForLDA(const CMolecule&                  molecule,
                             const CMolecularBasis&            basis,
                             const std::vector<const double*>& gsDensityPointers,
@@ -60,6 +62,7 @@ auto integrateVxcFockForLDA(const CMolecule&                  molecule,
                             const double                      screeningThresholdForGTOValues,
                             const CXCFunctional&              xcFunctional,
                             const std::string&                flag = std::string("closedshell")) -> CAOKohnShamMatrix;
+*/
 
 auto integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
                                        const CMolecularBasis&            basis,
@@ -67,6 +70,13 @@ auto integrateVxcFockForLdaClosedShell(const CMolecule&                  molecul
                                        const CMolecularGrid&             molecularGrid,
                                        const double                      screeningThresholdForGTOValues,
                                        const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
+
+auto integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
+                                     const CMolecularBasis&            basis,
+                                     const std::vector<const double*>& gsDensityPointers,
+                                     const CMolecularGrid&             molecularGrid,
+                                     const double                      screeningThresholdForGTOValues,
+                                     const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
 
 /**
  Integrates LDA contribution to (first-order) Vxc matrix.

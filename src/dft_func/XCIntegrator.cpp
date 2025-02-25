@@ -88,7 +88,7 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
         }
         else
         {
-            return xcintlda::integrateVxcFockForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+            return xcintlda::integrateVxcFockForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
     }
 

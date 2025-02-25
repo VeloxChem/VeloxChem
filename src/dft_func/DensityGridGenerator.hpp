@@ -60,6 +60,11 @@ auto generateDensityForLDA(double*             rho,
 
 auto serialGenerateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix) -> void;
 
+auto serialGenerateDensityForLDA(double*             rho,
+                                 const CDenseMatrix& gtoValues,
+                                 const CDenseMatrix& densityMatrixAlpha,
+                                 const CDenseMatrix& densityMatrixBeta) -> void;
+
 /**
  Generates density grid (multiple density matrices) for LDA.
 
