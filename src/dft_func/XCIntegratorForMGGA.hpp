@@ -127,65 +127,6 @@ auto integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoF
                                            const CXCFunctional&              xcFunctional) -> void;
 
 /**
- Integrates meta-GGA contribution to (second-order) Fxc matrix.
-
- @param xcFunctional the exchange-correlation functional.
- @param weights the weights of grid points.
- @param gtoValues the GTO values on grid points.
- @param gtoValuesX the GTO gradient X values on grid points.
- @param gtoValuesY the GTO gradient Y values on grid points.
- @param gtoValuesZ the GTO gradient Z values on grid points.
- @param rhow the pointer to perturbed density.
- @param rhograd the pointer to density gradient.
- @param rhowgrad the pointer to perturbed density gradient.
- @param tauw ,
- @param laplw ,
- @param vrho ,
- @param vsigma ,
- @param vlapl ,
- @param vtau ,
- @param v2rho2 the 2nd-order functional derivative wrt density.
- @param v2lapl2 ,
- @param v2tau2 ,
- @param v2rholapl ,
- @param v2rhotau ,
- @param v2lapltau ,
- @param v2rhosigma the 2nd-order functional derivative wrt density and
-        density gradient.
- @param v2sigmalapl ,
- @param v2sigmatau ,
- @param v2sigma2 the 2nd-order functional derivative wrt density gradient.
- @param timer the timer.
- @return the contribution as a CDenseMatrix object.
- */
-auto integratePartialFxcFockForMGGA(const CXCFunctional& xcFunctional,
-                                    const double*        weights,
-                                    const CDenseMatrix&  gtoValues,
-                                    const CDenseMatrix&  gtoValuesX,
-                                    const CDenseMatrix&  gtoValuesY,
-                                    const CDenseMatrix&  gtoValuesZ,
-                                    const double*        rhow,
-                                    const double*        rhograd,
-                                    const double*        rhowgrad,
-                                    const double*        tauw,
-                                    const double*        laplw,
-                                    const double*        vrho,
-                                    const double*        vsigma,
-                                    const double*        vlapl,
-                                    const double*        vtau,
-                                    const double*        v2rho2,
-                                    const double*        v2lapl2,
-                                    const double*        v2tau2,
-                                    const double*        v2rholapl,
-                                    const double*        v2rhotau,
-                                    const double*        v2lapltau,
-                                    const double*        v2rhosigma,
-                                    const double*        v2sigmalapl,
-                                    const double*        v2sigmatau,
-                                    const double*        v2sigma2,
-                                    CMultiTimer&         timer) -> CDenseMatrix;
-
-/**
  Integrates third-order meta-GGA exchange-correlation functional
  contribution to AO Fock matrix.
 
