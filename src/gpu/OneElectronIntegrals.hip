@@ -234,28 +234,12 @@ computeOverlapAndKineticEnergySD(double*         mat_S,
                                  const uint32_t* sd_second_inds_local,
                                  const uint32_t  sd_prim_pair_count_local)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < sd_prim_pair_count_local)
     {
@@ -333,20 +317,11 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
                                  const uint32_t* pp_second_inds_local,
                                  const uint32_t  pp_prim_pair_count_local)
 {
-    __shared__ double   delta[3][3];
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -425,28 +400,12 @@ computeOverlapAndKineticEnergyPD(double*         mat_S,
                                  const uint32_t* pd_second_inds_local,
                                  const uint32_t  pd_prim_pair_count_local)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -548,28 +507,12 @@ computeOverlapAndKineticEnergyDD(double*         mat_S,
                                  const uint32_t* dd_second_inds_local,
                                  const uint32_t  dd_prim_pair_count_local)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -849,28 +792,12 @@ computeNuclearPotentialSD(double*         mat_V,
                           const double*   boys_func_table,
                           const double*   boys_func_ft)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < sd_prim_pair_count_local)
     {
@@ -978,20 +905,11 @@ computeNuclearPotentialPP(double*         mat_V,
                           const double*   boys_func_table,
                           const double*   boys_func_ft)
 {
-    __shared__ double   delta[3][3];
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};      
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -1102,28 +1020,12 @@ computeNuclearPotentialPD(double*         mat_V,
                           const double*   boys_func_table,
                           const double*   boys_func_ft)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};      
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -1262,28 +1164,12 @@ computeNuclearPotentialDD(double*         mat_V,
                           const double*   boys_func_table,
                           const double*   boys_func_ft)
 {
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};          
 
     // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
@@ -1611,25 +1497,10 @@ computeQMatrixSD(double*         mat_Q,
 {
     // each thread computes a primitive Q matrix element
 
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};          
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < sd_prim_pair_count_local)
     {
@@ -1728,19 +1599,9 @@ computeQMatrixPP(double*         mat_Q,
                  const double*   boys_func_ft)
 {
     // each thread computes a primitive Q matrix element
-
-    __shared__ double   delta[3][3];
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};          
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < pp_prim_pair_count_local)
     {
@@ -1843,25 +1704,10 @@ computeQMatrixPD(double*         mat_Q,
 {
     // each thread computes a primitive Q matrix element
 
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};          
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < pd_prim_pair_count_local)
     {
@@ -2022,25 +1868,10 @@ computeQMatrixDD(double*         mat_Q,
 {
     // each thread computes a primitive Q matrix element
 
-    __shared__ uint32_t d_cart_inds[6][2];
-    __shared__ double   delta[3][3];
+    static constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
+    static constexpr double   delta[3][3] = {{ 1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};          
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (threadIdx.x == 0)
-    {
-        d_cart_inds[0][0] = 0; d_cart_inds[0][1] = 0;
-        d_cart_inds[1][0] = 0; d_cart_inds[1][1] = 1;
-        d_cart_inds[2][0] = 0; d_cart_inds[2][1] = 2;
-        d_cart_inds[3][0] = 1; d_cart_inds[3][1] = 1;
-        d_cart_inds[4][0] = 1; d_cart_inds[4][1] = 2;
-        d_cart_inds[5][0] = 2; d_cart_inds[5][1] = 2;
-        delta[0][0] = 1.0; delta[0][1] = 0.0; delta[0][2] = 0.0;
-        delta[1][0] = 0.0; delta[1][1] = 1.0; delta[1][2] = 0.0;
-        delta[2][0] = 0.0; delta[2][1] = 0.0; delta[2][2] = 1.0;
-    }
-
-    __syncthreads();
 
     if (ij < dd_prim_pair_count_local)
     {
