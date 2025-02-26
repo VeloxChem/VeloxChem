@@ -100,11 +100,13 @@ CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis &ba
         auto bra_bfs = gblock.number_of_basis_functions();
         auto bra_range = std::pair<size_t, size_t>{size_t{0}, bra_bfs};
         bra_bfs *= tensor::number_of_spherical_components(std::array<int, 1>({bra_mom, }));
+        std::cout << "*** BLOCK = " << bra_mom << std::endl; 
         std::ranges::for_each(gto_pair_blocks, [&](const auto& gp_pairs) {
             if constexpr (N == 1)
             {
                 t3cerifunc::compute_geom_100(distributor, gblock, gp_pairs, bra_range);
             }
+            std::cout << "----" << std::endl; 
         });
         block_start += bra_bfs;
         distributor.set_index(block_start); 

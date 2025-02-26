@@ -23,6 +23,14 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
                                    const size_t                     ibra_gto,
                                    const std::pair<size_t, size_t>& ket_range) -> void
 {
+    // reference indexes on bra side
+
+    const auto refp = a_indices[ibra_gto + 1];
+    
+    // dimensions of bra and ket orbital indexes
+
+    const auto pdim = a_indices[0];
+    
     // set up size of buffer
     
     const auto nrows = _t3_values->width();
@@ -55,7 +63,7 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
         {
             auto ptr_values = _t3_values->data(n * grows + _local_index + i * adim + ibra_gto);
             
-            std::cout << "n, i, ibra = " << n << " , " << " i " << ", " << ibra_gto << " final index" << n * grows + _local_index + i * adim + ibra_gto << std::endl;
+            std::cout << "n, i, ibra = " << n << " , " << i << ", " << ibra_gto << " final index = " << n * grows + _local_index + i * adim + ibra_gto << " : aref = " <<  i * pdim + refp << std::endl;
             
             for (int k = 0; k < ccomps; k++)
             {

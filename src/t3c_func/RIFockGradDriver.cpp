@@ -51,6 +51,13 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
     
     std::cout << "*** NINDICES " << indices.size() << std::endl;
     
+    for (const auto idx : indices)
+    {
+        std::cout << idx << " ";
+    }
+    
+    std::cout << std::endl; 
+    
     for (size_t i = 0; i < gints.aux_blocks(); i++)
     {
         std::ranges::fill(gvec, 0.0);
