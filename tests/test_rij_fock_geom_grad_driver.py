@@ -1,4 +1,5 @@
 from pathlib import Path
+import math as mt
 import numpy as np
 
 from veloxchem import MolecularBasis
@@ -50,8 +51,7 @@ class TestRIJFockGeomGradDriver:
         grady = np.trace(np.matmul(fmaty, density))
         fmatz = fmats.matrix('Z').full_matrix().to_numpy()
         gradz = np.trace(np.matmul(fmatz, density))
-        
-        print("Ref. gradient: x = ", gradx, " y = ", grady, " z =", gradz)
+        ref_grad = [gradx, grady, gradz]
         
         # compute J metric
         t2c_drv = TwoCenterElectronRepulsionDriver()
@@ -66,8 +66,7 @@ class TestRIJFockGeomGradDriver:
         
         ri_grad_drv = RIFockGradDriver()
         g = ri_grad_drv.compute(bas_sto3g, bas_aux, mol_h2o, gv, den_mat, 2)
-        print(g.coordinates())
-        
-        
-        
-        assert False
+        grad = g.coordinates()
+    
+        for i in range(3):
+            assert mt.isclose(ref_grad[i], grad[i], rel_tol=1.0e-5, abs_tol=1.0e-5)

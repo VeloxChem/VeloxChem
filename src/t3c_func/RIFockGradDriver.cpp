@@ -45,61 +45,25 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
 
     std::vector<double> gvec(nelems, 0.0);
     
-    std::cout << "*** NELEMS " << nelems << std::endl;
-    
-    auto indices = gints.indices();
-    
-    std::cout << "*** NINDICES " << indices.size() << std::endl;
-    
-    for (const auto idx : indices)
-    {
-        std::cout << idx << " ";
-    }
-    
-    std::cout << std::endl; 
-    
+    auto mask_indices = gints.mask_indices();
+
     for (size_t i = 0; i < gints.aux_blocks(); i++)
     {
         std::ranges::fill(gvec, 0.0);
         
-        std::cout << " INITIAL GVEC for component = " << i << std::endl;
-        
-        for (const auto g : gvec)
-        {
-            std::cout << g << std::endl;
-        }
-        
         auto gvec_ptr = gvec.data();
      
-        for (size_t j = 0; j < indices.size(); j++)
+        for (const auto [gidx, lidx] : mask_indices)
         {
-            const double fact = gamma[indices[j]];
-            
-            std::cout << "Gamma(" << j << " -> "<< indices[j] <<") = " << fact << std::endl; 
-            
-            auto eri_ptr = gints.data(i * indices.size() + j);
+            const double fact = gamma[gidx];
+
+            auto eri_ptr = gints.data(i * mask_indices.size() + lidx);
         
             #pragma omp simd
             for (size_t k = 0; k < nelems; k++)
             {
                 gvec_ptr[k] += fact * eri_ptr[k];
             }
-            
-            double gsum = 0.0;
-            
-            for (size_t j = 0; j < nelems; j++)
-            {
-                gsum += eri_ptr[j];
-            }
-            
-            std::cout << "SUM " << i * indices.size() + j << " = " << gsum << std::endl;
-        }
-        
-        std::cout << "GVEC for component = " << i << std::endl;
-        
-        for (const auto g : gvec)
-        {
-            std::cout << g << std::endl;
         }
         
         double gsum = 0.0;
@@ -109,9 +73,7 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
             gsum += dvec_ptr[j] * gvec_ptr[j];
         }
         
-        g_xyz[i] = 2.0 * gsum;
-        
-        std::cout << " I was here..." << std::endl;
+        g_xyz[i] = 4.0 * gsum;
     }
     
     // set up accumulation of basis derivatives contribution
@@ -120,11 +82,11 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
     
     const auto tints = t3ck_drv.compute(basis, aux_basis, molecule, iatom);
     
-    indices = tints.indices();
+    const auto indices = tints.indices();
     
     auto width = tints.width();
     
-    const auto mask_indices = tints.mask_indices();
+    mask_indices = tints.mask_indices();
     
     nelems = mask_indices.size() * width;
 
@@ -138,7 +100,7 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
         
         for (size_t j = 0; j < indices.size(); j++)
         {
-            const double fact = gamma[indices[j]];
+            const double fact = gamma[j];
             
             auto eri_ptr = tints.data(i * indices.size() + j);
         
@@ -159,6 +121,10 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
                 {
                     gsum += gvec_ptr[lidx * width + j] * dvec_ptr[mathfunc::uplo_rm_index(gidx, j, width)];
                 }
+                else if (gidx == j)
+                {
+                    gsum += 2.0 * gvec_ptr[lidx * width + j] * dvec_ptr[mathfunc::uplo_rm_index(gidx, j, width)];
+                }
                 else
                 {
                     gsum += gvec_ptr[lidx * width + j] * dvec_ptr[mathfunc::uplo_rm_index(j, gidx, width)];
@@ -166,9 +132,7 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
             }
         }
         
-        g_xyz[i] += 2.0 * gsum;
-        
-        std::cout << " I am here..." << std::endl;
+        g_xyz[i] += 4.0 * gsum;
     }
     
     // set up accumulation of basis derivatives contribution
@@ -191,11 +155,11 @@ CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
         {
             for (size_t k = 0; k < width; k++)
             {
-                gsum += gamma[i] * gamma[j] * (gmat.at({i, j}) + gmat.at({j, i}));
+                gsum += gamma[j] * gamma[k] * (gmat.at({j, k}) + gmat.at({k, j}));
             }
         }
         
-        g_xyz[i] += gsum;
+        g_xyz[i] -=  2.0 * gsum;
     }
     
     return g_xyz;

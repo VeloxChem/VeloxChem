@@ -6,6 +6,7 @@
 #include "CustomViews.hpp"
 #include "TensorComponents.hpp"
 
+#include <iostream>
 
 namespace t3cfunc {  // t3cfunc namespace
 

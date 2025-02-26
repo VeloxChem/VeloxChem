@@ -83,9 +83,9 @@ CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis &ba
     
     // set up composite flat tensor for integrals
     
-    const auto red_indices = t3cfunc::unique_indices(bra_gto_blocks);
+    const auto mask_indices = t3cfunc::mask_indices(bra_gto_blocks);
     
-    CT3FlatBuffer<double> buffer(red_indices, basis.dimensions_of_basis(), 3);
+    CT3FlatBuffer<double> buffer(mask_indices, basis.dimensions_of_basis(), 3);
     
     // set up distributor
     
@@ -93,23 +93,14 @@ CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis &ba
     
     // main compute loop
     
-    size_t block_start = 0;
-    
     std::ranges::for_each(bra_gto_blocks, [&](const auto& gblock) {
-        auto bra_mom = gblock.angular_momentum();
-        auto bra_bfs = gblock.number_of_basis_functions();
-        auto bra_range = std::pair<size_t, size_t>{size_t{0}, bra_bfs};
-        bra_bfs *= tensor::number_of_spherical_components(std::array<int, 1>({bra_mom, }));
-        std::cout << "*** BLOCK = " << bra_mom << std::endl; 
+        auto bra_range = std::pair<size_t, size_t>{size_t{0}, gblock.number_of_basis_functions()};
         std::ranges::for_each(gto_pair_blocks, [&](const auto& gp_pairs) {
             if constexpr (N == 1)
             {
                 t3cerifunc::compute_geom_100(distributor, gblock, gp_pairs, bra_range);
             }
-            std::cout << "----" << std::endl; 
         });
-        block_start += bra_bfs;
-        distributor.set_index(block_start); 
     });
     
     return buffer;

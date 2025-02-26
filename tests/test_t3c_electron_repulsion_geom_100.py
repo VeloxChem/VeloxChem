@@ -38,13 +38,13 @@ class TestThreeCenterElectronRepulsionGeom100Driver:
         ref_buf = -np.load(npyfile)
         
         indexes = np.triu_indices(24)
-        bra_ids = eri_buf.indices()
-        
+        bra_mask = eri_buf.mask_indices()
+       
         for i in range(3):
-            for j in range(14):
+            for j in bra_mask.keys():
                 for k, l in zip(indexes[0], indexes[1]):
-                    assert mt.isclose(eri_buf.value(14 * i + j, k, l),
-                                      ref_buf[i, k, l, bra_ids[j]],
+                    assert mt.isclose(eri_buf.value(14 * i + bra_mask[j], k, l),
+                                      ref_buf[i, k, l, j],
                                       rel_tol=1.0e-12,
                                       abs_tol=1.0e-12)
 

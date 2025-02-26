@@ -27,17 +27,13 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
 
     const auto refp = a_indices[ibra_gto + 1];
     
-    // dimensions of bra and ket orbital indexes
-
-    const auto pdim = a_indices[0];
-    
     // set up size of buffer
     
     const auto nrows = _t3_values->width();
     
     // dimensions of bra and ket orbital indexes
 
-    const auto adim = a_indices.size() - 1;
+    const auto adim = a_indices[0];
 
     const auto cdim = c_indices[0];
 
@@ -51,6 +47,10 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
 
     const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
     
+    // mask indices
+    
+    const auto mask_indices = _t3_values->mask_indices();
+    
     // set up geom. deriv. blocks data
     
     const auto gblocks = _t3_values->aux_blocks();
@@ -61,9 +61,7 @@ CT3CGeomX00Distributor::distribute(const CSimdArray<double>&        buffer,
     {
         for (int i = 0; i < acomps; i++)
         {
-            auto ptr_values = _t3_values->data(n * grows + _local_index + i * adim + ibra_gto);
-            
-            std::cout << "n, i, ibra = " << n << " , " << i << ", " << ibra_gto << " final index = " << n * grows + _local_index + i * adim + ibra_gto << " : aref = " <<  i * pdim + refp << std::endl;
+            auto ptr_values = _t3_values->data(n * grows + mask_indices.at(i * adim + refp));
             
             for (int k = 0; k < ccomps; k++)
             {
