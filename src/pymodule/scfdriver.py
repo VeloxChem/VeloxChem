@@ -54,7 +54,7 @@ from .cpcmdriver import CpcmDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .dftutils import get_default_grid_level, print_libxc_reference
+from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -562,7 +562,7 @@ class ScfDriver:
 
         # generate integration grid
         if self._dft:
-            print_libxc_reference(self.xcfun, self.ostream)
+            print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
