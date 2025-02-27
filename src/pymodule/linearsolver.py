@@ -1501,14 +1501,19 @@ class LinearSolver:
             True if a graceful exit is needed, False otherwise.
         """
 
+        need_exit = False
+
         if self.program_end_time is not None:
             remaining_hours = (self.program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < next_iter_in_hours * 1.25:
-                return True
-        return False
+                need_exit = True
+
+        need_exit = self.comm.bcast(need_exit, root=mpi_master())
+
+        return need_exit
 
     def _print_header(self, title, nstates=None, n_freqs=None, n_points=None):
         """
