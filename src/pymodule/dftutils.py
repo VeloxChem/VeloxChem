@@ -102,7 +102,7 @@ def get_default_grid_level(xc_func):
             False, 'get_default_grid_level: Invalid XC functional type')
 
 
-def print_libxc_reference(xcfun, ostream):
+def print_xc_reference(xcfun, ostream):
     """
     Prints libxc reference.
 
