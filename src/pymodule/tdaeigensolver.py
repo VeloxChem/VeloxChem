@@ -99,7 +99,7 @@ class TdaEigenSolver(LinearSolver):
         self.core_excitation = False
         self.num_core_orbitals = 0
 
-        # subspace restricted (TDA) approx.
+        # subspace restricted approx. (SRA)
         self.sra = False
         self.num_vir_orbitals = 0
         self.num_val_orbitals = 0
@@ -289,7 +289,7 @@ class TdaEigenSolver(LinearSolver):
         # start TDA iteration
 
         for i in range(self.max_iter):
-            print(f'ITERATION: {i}')
+
             profiler.set_timing_key(f'Iteration {i + 1}')
 
             # perform linear transformation of trial vectors
@@ -478,6 +478,22 @@ class TdaEigenSolver(LinearSolver):
         # results
 
         if self.rank == mpi_master() and self._is_converged:
+
+            if self.sra:
+                orbital_details = {
+                    'nstates': self.nstates,
+                    'num_core': self.num_core_orbitals,
+                    'num_val': self.num_val_orbitals,
+                    'num_vir': self.num_vir_orbitals
+                }
+            else:
+                orbital_details = {
+                    'nstates': self.nstates,
+                    'num_core': self.num_core_orbitals,
+                    'num_val': nocc,
+                    'num_vir': norb - nocc
+                }
+
             ret_dict = {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
@@ -487,6 +503,9 @@ class TdaEigenSolver(LinearSolver):
                 'oscillator_strengths': oscillator_strengths,
                 'rotatory_strengths': rotatory_strengths,
                 'excitation_details': excitation_details,
+                'num_core': orbital_details['num_core'],
+                'num_val': orbital_details['num_val'],
+                'num_vir': orbital_details['num_vir'],
             }
 
             if self.nto:
@@ -499,7 +518,8 @@ class TdaEigenSolver(LinearSolver):
                 ret_dict['density_cubes'] = dens_cube_files
 
             self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
-                                   pe_dict['potfile_text'], eigvecs)
+                                   pe_dict['potfile_text'], eigvecs, orbital_details, 
+                                   eigvals)
 
             self._print_results(ret_dict)
 
@@ -823,7 +843,7 @@ class TdaEigenSolver(LinearSolver):
         self.ostream.flush()
 
     def _write_final_hdf5(self, molecule, basis, dft_func_label, potfile_text,
-                          eigvecs):
+                          eigvecs, orbital_details, eigvals):
         """
         Writes final HDF5 that contains TDA solution vectors.
 
@@ -846,7 +866,7 @@ class TdaEigenSolver(LinearSolver):
             Path(self.checkpoint_file).with_suffix('.solutions.h5'))
 
         create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
-                    potfile_text)
+                    potfile_text, orbital_details, eigvals)
 
         for s in range(eigvecs.shape[1]):
             write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
