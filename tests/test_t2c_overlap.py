@@ -31,6 +31,32 @@ class TestOverlapDriver:
         ket_bas = MolecularBasis.read(mol, 'def2-svpd', ostream=None)
 
         return mol, bra_bas, ket_bas
+        
+    def get_data_sto3g(self):
+
+        costr = """
+            C   0.100  -0.400  -1.000
+            O   0.300   1.400  -2.100
+        """
+        mol = Molecule.read_str(costr, 'au')
+        bas = MolecularBasis.read(mol, 'cc-pV5Z')
+
+        return mol, bas
+        
+    def test_overlap_co_sto3g(self):
+
+        mol_co, bas_sto3g = self.get_data_sto3g()
+
+        # compute overlap matrix
+        ovl_drv = OverlapDriver()
+        ovl_mat = ovl_drv.compute(mol_co, bas_sto3g)
+
+        # check full overlap matrix
+        fmat = ovl_mat.full_matrix().to_numpy()
+        for i in range(11):
+            for j in range(11):
+                print("(", i, ",", j, ") = ", fmat[160 + 2 * i, 160 + 2 *j])
+        assert False
 
     def test_overlap_co_qzvp(self):
 

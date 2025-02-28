@@ -70,6 +70,8 @@ class TestBasisFunction:
         # testing normalization for d functions
         bf_a = self.basis_funtion(2)
         bf_a.normalize()
+        print(bf_a.get_exponents())
+        print(bf_a.get_normalization_factors())
         bf_b = BasisFunction(
             [0.800000000000000, 1.50000000000000, 2.700000000000000],
             [0.490395036432180, 0.429719528168190, -0.858586268491259], 2)
