@@ -71,10 +71,11 @@ class TestOverlapDriver:
             # load computed submatrix
             cmat = ovl_mat.submatrix((i, j))
             # load reference submatrix
-            print(i, j)
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
                                                          sket:eket]))
+            print(i, j)
+            print(np.max(np.abs(rmat.to_numpy() - cmat.to_numpy())))
             # compare submatrices
             assert cmat == rmat
 
