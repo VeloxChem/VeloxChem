@@ -403,7 +403,12 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-            basis_ri_j = MolecularBasis.read(molecule, 'def2-universal-jkfit')
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule,
+                                                 'def2-universal-jkfit')
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
             ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
                 den_mat_for_fock)

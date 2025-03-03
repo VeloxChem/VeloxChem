@@ -1377,7 +1377,7 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
-        if self.ri_coulomb and self.rank == mpi_master():
+        if self.ri_coulomb:
             assert_msg_critical(
                 ao_basis.get_label().lower().startswith('def2-'),
                 'SCF Driver: Invalid basis set for RI-J')
@@ -1387,31 +1387,40 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            basis_ri_j = MolecularBasis.read(molecule, 'def2-universal-jkfit')
-
-            ri_prep_t0 = tm.time()
-
-            t2c_drv = TwoCenterElectronRepulsionDriver()
-            mat_j = t2c_drv.compute(molecule, basis_ri_j)
-            mat_j_np = mat_j.to_numpy()
-
-            self.ostream.print_info(
-                f'Two-center integrals for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
-            )
-            self.ostream.print_blank()
-
-            ri_prep_t0 = tm.time()
-
-            if 'scipy' in sys.modules:
-                lu, piv = lu_factor(mat_j_np)
-                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule,
+                                                 'def2-universal-jkfit')
             else:
-                inv_mat_j_np = np.linalg.inv(mat_j_np)
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            self.ostream.print_info(
-                f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
-            )
-            self.ostream.print_blank()
+            if self.rank == mpi_master():
+                ri_prep_t0 = tm.time()
+
+                t2c_drv = TwoCenterElectronRepulsionDriver()
+                mat_j = t2c_drv.compute(molecule, basis_ri_j)
+                mat_j_np = mat_j.to_numpy()
+
+                self.ostream.print_info('Two-center integrals for RI done in ' +
+                                        f'{tm.time() - ri_prep_t0:.2f} sec.')
+                self.ostream.print_blank()
+
+                ri_prep_t0 = tm.time()
+
+                if 'scipy' in sys.modules:
+                    lu, piv = lu_factor(mat_j_np)
+                    inv_mat_j_np = lu_solve((lu, piv),
+                                            np.eye(mat_j_np.shape[0]))
+                else:
+                    inv_mat_j_np = np.linalg.inv(mat_j_np)
+
+                self.ostream.print_info(
+                    f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+                )
+                self.ostream.print_blank()
+            else:
+                inv_mat_j_np = None
+            inv_mat_j_np = self.comm.bcast(inv_mat_j_np, root=mpi_master())
 
             ri_prep_t0 = tm.time()
 
