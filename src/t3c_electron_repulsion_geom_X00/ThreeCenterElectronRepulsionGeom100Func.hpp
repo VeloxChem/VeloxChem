@@ -89,6 +89,38 @@
 #include "ThreeCenterElectronRepulsionGeom100RecGFG.hpp"
 #include "ThreeCenterElectronRepulsionGeom100RecGGG.hpp"
 
+#include "ThreeCenterElectronRepulsionGeom100RecHSS.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHSP.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHSD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHPP.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHSF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHPD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHSG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHPF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHDD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHPG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHDF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHDG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHFF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHFG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecHGG.hpp"
+
+#include "ThreeCenterElectronRepulsionGeom100RecISS.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecISP.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecISD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIPP.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecISF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIPD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecISG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIPF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIDD.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIPG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIDF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIDG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIFF.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIFG.hpp"
+#include "ThreeCenterElectronRepulsionGeom100RecIGG.hpp"
+
 namespace t3cerifunc {
 
 /// @brief Computes electron repulsion integrals for given of pair basis functions blocks.
@@ -630,6 +662,216 @@ compute_geom_100(T&                               distributor,
     if ((aux_angmom == 4) && (ket_angmoms == std::pair<int, int>({4, 4})))
     {
         t3ceri::comp_electron_repulsion_geom100_ggg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({0, 0})))
+    {
+         t3ceri::comp_electron_repulsion_geom100_hss(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({0, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hsp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({0, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hsd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hpp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hsf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hpd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hsg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hpf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hdd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({1, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hpg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hdf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({2, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hdg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hff(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({3, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hfg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 5) && (ket_angmoms == std::pair<int, int>({4, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_hgg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({0, 0})))
+    {
+         t3ceri::comp_electron_repulsion_geom100_iss(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({0, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_isp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({0, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_isd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({1, 1})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_ipp(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({0, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_isf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({1, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_ipd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({0, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_isg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({1, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_ipf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({2, 2})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_idd(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({1, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_ipg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({2, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_idf(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({2, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_idg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({3, 3})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_iff(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({3, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_ifg(distributor, aux_gto_block, gto_pair_block, aux_indices);
+
+        return;
+    }
+    
+    if ((aux_angmom == 6) && (ket_angmoms == std::pair<int, int>({4, 4})))
+    {
+        t3ceri::comp_electron_repulsion_geom100_igg(distributor, aux_gto_block, gto_pair_block, aux_indices);
 
         return;
     }
