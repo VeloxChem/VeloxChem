@@ -9,6 +9,7 @@ on:
       - embedding_test
       - c_pcm
       - dft-update
+      - ri-test
 
 jobs:
   vlx_ci:

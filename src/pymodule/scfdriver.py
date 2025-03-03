@@ -33,6 +33,8 @@ import re
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import RIFockDriver, SubMatrix
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
@@ -59,6 +61,11 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
+
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
 
 
 class ScfDriver:
@@ -202,6 +209,10 @@ class ScfDriver:
         # for open-shell system: unpaired electrons for initial guess
         self.guess_unpaired_electrons = ''
 
+        # RI-J
+        self.ri_coulomb = False
+        self._ri_drv = None
+
         # dft
         self.xcfun = None
         self.grid_level = None
@@ -262,6 +273,7 @@ class ScfDriver:
         # input keywords
         self._input_keywords = {
             'scf': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
@@ -513,6 +525,12 @@ class ScfDriver:
             else:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
+
+        # check RI-J
+        # for now, force DIIS for RI-J
+        # TODO: double check
+        if self.ri_coulomb:
+            self.acc_type = 'DIIS'
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -1359,6 +1377,57 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
+        if self.ri_coulomb and self.rank == mpi_master():
+            assert_msg_critical(
+                ao_basis.get_label().lower().startswith('def2-'),
+                'SCF Driver: Invalid basis set for RI-J')
+
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            basis_ri_j = MolecularBasis.read(molecule, 'def2-universal-jkfit')
+
+            ri_prep_t0 = tm.time()
+
+            t2c_drv = TwoCenterElectronRepulsionDriver()
+            mat_j = t2c_drv.compute(molecule, basis_ri_j)
+            mat_j_np = mat_j.to_numpy()
+
+            self.ostream.print_info(
+                f'Two-center integrals for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            if 'scipy' in sys.modules:
+                lu, piv = lu_factor(mat_j_np)
+                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            else:
+                inv_mat_j_np = np.linalg.inv(mat_j_np)
+
+            self.ostream.print_info(
+                f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            inv_mat_j = SubMatrix(
+                [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
+            inv_mat_j.set_values(inv_mat_j_np)
+
+            self._ri_drv = RIFockDriver(inv_mat_j)
+            self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j)
+
+            self.ostream.print_info(
+                f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+            self.ostream.flush()
+
         e_grad = None
 
         if self.rank == mpi_master():
@@ -1977,13 +2046,27 @@ class ScfDriver:
         if self.scf_type == 'restricted':
             # restricted SCF
             self._print_debug_info('before rest Fock build')
-            fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
-                                        exchange_scaling_factor, 0.0,
-                                        thresh_int)
-            self._print_debug_info('after  rest Fock build')
 
-            fock_mat_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'SCF driver: RI is only applicable to pure DFT functional')
+
+            if self.ri_coulomb and fock_type == 'j':
+                if self.rank == mpi_master():
+                    fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
+                    fock_mat_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
+                else:
+                    fock_mat_np = np.zeros(den_mat[0].shape)
+            else:
+                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
+                fock_mat_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            self._print_debug_info('after  rest Fock build')
 
             if fock_type == 'j':
                 # for pure functional
@@ -2011,16 +2094,31 @@ class ScfDriver:
 
         else:
             # unrestricted SCF or restricted open-shell SCF
+
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'SCF driver: RI is only applicable to pure DFT functional')
+
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_Jab is D_total
                 self._print_debug_info('before unrest Fock J build')
-                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
-                                            0.0, thresh_int)
-                self._print_debug_info('after  unrest Fock J build')
 
-                J_ab_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
+                if self.ri_coulomb:
+                    if self.rank == mpi_master():
+                        fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+                        J_ab_np = fock_mat.to_numpy()
+                        fock_mat = Matrix()
+                    else:
+                        J_ab_np = np.zeros(den_mat[0].shape)
+                else:
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                                0.0, 0.0, thresh_int)
+                    J_ab_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
+
+                self._print_debug_info('after  unrest Fock J build')
 
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
