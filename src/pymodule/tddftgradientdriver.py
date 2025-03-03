@@ -82,6 +82,8 @@ class TddftGradientDriver(GradientDriver):
         self._debug = scf_drv._debug
         self._scf_drv = scf_drv
 
+        self._rsp_results = None
+
         # TODO: double check _block_size_factor
         self._block_size_factor = 4
 
@@ -228,12 +230,14 @@ class TddftGradientDriver(GradientDriver):
         """
 
         scf_tensors = self._scf_drv.scf_tensors
+        if self._rsp_results is None:
+            self._rsp_results = rsp_results
 
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
         orbrsp_drv.compute(molecule, basis, scf_tensors,
-                           rsp_results)
+                           self._rsp_results)
 
         orbrsp_results = orbrsp_drv.cphf_results
         omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
@@ -517,6 +521,8 @@ class TddftGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += gs_grad_drv.get_gradient()
 
+            self.ostream.print_info(f'x-y, {x_minus_y_ao}')
+
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
         if self.timing and self.rank == mpi_master():
@@ -550,11 +556,13 @@ class TddftGradientDriver(GradientDriver):
         scf_results = scf_drv.compute(molecule, basis)
         assert_msg_critical(scf_drv.is_converged,
                             'TddftGradientDriver: SCF did not converge')
+        self._scf_drv = scf_drv
 
         rsp_drv.restart = False
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
         assert_msg_critical(rsp_drv.is_converged,
                             'TddftGradientDriver: response did not converge')
+        self._rsp_results = rsp_results
 
         if self.rank == mpi_master():
             scf_ene = scf_results['scf_energy']
