@@ -87,6 +87,8 @@ class GradientDriver:
         self.grid_level = None
         self.xcfun = None
 
+        self.potfile = None
+
         self.checkpoint_file = None
 
         self._input_keywords = {

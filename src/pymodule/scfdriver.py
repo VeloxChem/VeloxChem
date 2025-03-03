@@ -37,7 +37,7 @@ from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .veloxchemlib import xcfun
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
@@ -212,7 +212,7 @@ class ScfDriver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-        self.embedding_options = None
+        self.embedding = None
         self._embedding_drv = None
 
         # solvation model
@@ -586,7 +586,7 @@ class ScfDriver:
                 disp.compute(molecule, xc_label)
                 self._d4_energy = disp.get_energy()
 
-                dftd4_info = 'Using D4 dispersion correction.'
+                dftd4_info = 'Using the D4 dispersion correction.'
                 self.ostream.print_info(dftd4_info)
                 self.ostream.print_blank()
                 for dftd4_ref in disp.get_references():
@@ -627,24 +627,24 @@ class ScfDriver:
 
             # TODO: print PyFraME info
 
-            pot_info = 'Reading polarizable embedding potential: {}'.format(
+            pot_info = 'Reading polarizable embedding: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
             assert_msg_critical(
-                self.embedding_options['settings']['embedding_method'] == 'PE',
+                self.embedding['settings']['embedding_method'] == 'PE',
                 'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
             )
 
-            settings = self.embedding_options['settings']
+            settings = self.embedding['settings']
 
             from .embedding import PolarizableEmbeddingSCF
 
             self._embedding_drv = PolarizableEmbeddingSCF(
                 molecule=molecule,
                 ao_basis=ao_basis,
-                options=self.embedding_options,
+                options=self.embedding,
                 comm=self.comm)
 
             emb_info = 'Embedding settings:'
@@ -655,16 +655,22 @@ class ScfDriver:
                     self.ostream.print_info(f'- {key:<15s} : {settings[key]}')
 
             if 'vdw' in settings:
-                self.ostream.print_info('{- "vdw":<15s}')
+                self.ostream.print_info(f'- {"vdw":<15s}')
                 for key in ['method', 'combination_rule']:
                     self.ostream.print_info(
                         f'  - {key:<15s} : {settings["vdw"][key]}')
 
             if 'induced_dipoles' in settings:
-                self.ostream.print_info('{- "induced_dipoles":<15s}')
-                for key in ['solver', 'threshold', 'max_iterations']:
-                    self.ostream.print_info(
-                        f'  - {key:<15s} : {settings["induced_dipoles"][key]}')
+                self.ostream.print_info(f'- {"induced_dipoles":<15s}')
+                default_values = {
+                    'solver': 'jacobi',
+                    'threshold': 1e-8,
+                    'max_iterations': 100,
+                    'mic': False,
+                }
+                for key, default in default_values.items():
+                    value = settings['induced_dipoles'].get(key, default)
+                    self.ostream.print_info(f'  - {key:<15s} : {value}')
 
             self.ostream.print_blank()
 
@@ -781,7 +787,7 @@ class ScfDriver:
                         vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
 
                 # kJ/mol to Hartree
-                vdw_ene /= (4.184 * hartree_in_kcalpermol())
+                vdw_ene /= hartree_in_kjpermol()
 
                 self._nuc_mm_energy += vdw_ene
 

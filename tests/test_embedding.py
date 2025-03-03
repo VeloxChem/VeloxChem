@@ -16,6 +16,7 @@ except ImportError:
     pass
 
 
+@pytest.mark.solvers
 class TestPolarizableEmbedding:
 
     @staticmethod
@@ -48,9 +49,15 @@ class TestPolarizableEmbedding:
         options_file = str(here / 'data' / f'{name}.json')
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.embedding_options = {
+        scf_drv.embedding = {
             'settings': {
                 'embedding_method': 'PE',
+                'induced_dipoles': {
+                    'solver': 'jacobi',
+                    'mic': False,
+                    'threshold': 1e-8,
+                    'max_iterations': 100,
+                },
             },
             'inputs': {
                 'json_file': options_file,
@@ -70,9 +77,15 @@ class TestPolarizableEmbedding:
         options_file = str(here / 'data' / f'{name}.json')
 
         lrsolver = LinearResponseSolver()
-        lrsolver.embedding_options = {
+        lrsolver.embedding = {
             'settings': {
                 'embedding_method': 'PE',
+                'induced_dipoles': {
+                    'solver': 'jacobi',
+                    'mic': False,
+                    'threshold': 1e-8,
+                    'max_iterations': 100,
+                },
             },
             'inputs': {
                 'json_file': options_file,

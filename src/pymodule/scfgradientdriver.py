@@ -36,7 +36,7 @@ from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .matrices import Matrices
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -454,6 +454,20 @@ class ScfGradientDriver(GradientDriver):
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
 
+            # Embedding contribution to the gradient
+            if self.scf_driver._pe:
+                from .embedding import PolarizableEmbeddingGrad
+
+                # pass along emb object from scf, or make a new one? -> for ind dipoles.
+                self._embedding_drv = PolarizableEmbeddingGrad(
+                    molecule=molecule,
+                    ao_basis=basis,
+                    options=self.scf_driver.embedding,
+                    comm=self.comm)
+
+                self.gradient += self._embedding_drv.compute_pe_contributions(
+                    density_matrix=2.0 * D)
+
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
             if self.scf_driver._cpcm:
@@ -513,8 +527,7 @@ class ScfGradientDriver(GradientDriver):
                         vdw_grad[a] += -g * n_ij
 
                 # convert gradient to atomic unit
-                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                             bohr_in_angstrom())
+                vdw_grad /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
                 self.gradient += vdw_grad
 
@@ -763,6 +776,20 @@ class ScfGradientDriver(GradientDriver):
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
 
+            # Embedding contribution to the gradient
+            if self.scf_driver._pe:
+                from .embedding import PolarizableEmbeddingGrad
+
+                # pass along emb object from scf, or make a new one? -> for ind dipoles.
+                self._embedding_drv = PolarizableEmbeddingGrad(
+                    molecule=molecule,
+                    ao_basis=basis,
+                    options=self.scf_driver.embedding,
+                    comm=self.comm)
+
+                self.gradient += self._embedding_drv.compute_pe_contributions(
+                    density_matrix=Da + Db)
+
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
             if self.scf_driver._cpcm:
@@ -822,8 +849,7 @@ class ScfGradientDriver(GradientDriver):
                         vdw_grad[a] += -g * n_ij
 
                 # convert gradient to atomic unit
-                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                             bohr_in_angstrom())
+                vdw_grad /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
                 self.gradient += vdw_grad
 
