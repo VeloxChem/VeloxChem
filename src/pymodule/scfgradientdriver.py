@@ -404,8 +404,8 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.flush()
 
             if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(molecule,
-                                                 'def2-universal-jkfit')
+                basis_ri_j = MolecularBasis.read(
+                    molecule, self.scf_driver.ri_auxiliary_basis)
             else:
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
