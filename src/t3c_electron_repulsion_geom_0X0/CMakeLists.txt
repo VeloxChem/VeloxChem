@@ -1,0 +1,43 @@
+target_sources(vlxobjs
+  PRIVATE
+    ThreeCenterElectronRepulsionGeom010ContrRecXDD.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXDF.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXDG.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXDH.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXDI.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXDP.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXDS.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXFD.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXFF.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXFG.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXFH.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXFP.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXFS.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXGD.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXGF.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXGG.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXGP.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXGS.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPD.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPF.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPG.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPH.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPI.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPK.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPP.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXPS.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSD.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSF.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSG.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSH.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSI.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSK.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSL.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSP.cpp
+    ThreeCenterElectronRepulsionGeom010ContrRecXSS.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

@@ -5,17 +5,28 @@ target_sources(vlxobjs
     ThreeCenterElectronRepulsionContrRecXDG.cpp
     ThreeCenterElectronRepulsionContrRecXDH.cpp
     ThreeCenterElectronRepulsionContrRecXDI.cpp
+    ThreeCenterElectronRepulsionContrRecXDP.cpp
+    ThreeCenterElectronRepulsionContrRecXDS.cpp
+    ThreeCenterElectronRepulsionContrRecXFD.cpp
     ThreeCenterElectronRepulsionContrRecXFF.cpp
     ThreeCenterElectronRepulsionContrRecXFG.cpp
     ThreeCenterElectronRepulsionContrRecXFH.cpp
+    ThreeCenterElectronRepulsionContrRecXFP.cpp
+    ThreeCenterElectronRepulsionContrRecXFS.cpp
+    ThreeCenterElectronRepulsionContrRecXGD.cpp
+    ThreeCenterElectronRepulsionContrRecXGF.cpp
     ThreeCenterElectronRepulsionContrRecXGG.cpp
+    ThreeCenterElectronRepulsionContrRecXGP.cpp
+    ThreeCenterElectronRepulsionContrRecXGS.cpp
     ThreeCenterElectronRepulsionContrRecXPD.cpp
     ThreeCenterElectronRepulsionContrRecXPF.cpp
     ThreeCenterElectronRepulsionContrRecXPG.cpp
     ThreeCenterElectronRepulsionContrRecXPH.cpp
     ThreeCenterElectronRepulsionContrRecXPI.cpp
     ThreeCenterElectronRepulsionContrRecXPK.cpp
+    ThreeCenterElectronRepulsionContrRecXPL.cpp
     ThreeCenterElectronRepulsionContrRecXPP.cpp
+    ThreeCenterElectronRepulsionContrRecXPS.cpp
     ThreeCenterElectronRepulsionDriver.cpp
     ThreeCenterElectronRepulsionPrimRecDSD.cpp
     ThreeCenterElectronRepulsionPrimRecDSF.cpp
@@ -24,6 +35,7 @@ target_sources(vlxobjs
     ThreeCenterElectronRepulsionPrimRecDSI.cpp
     ThreeCenterElectronRepulsionPrimRecDSK.cpp
     ThreeCenterElectronRepulsionPrimRecDSL.cpp
+    ThreeCenterElectronRepulsionPrimRecDSM.cpp
     ThreeCenterElectronRepulsionPrimRecDSP.cpp
     ThreeCenterElectronRepulsionPrimRecDSS.cpp
     ThreeCenterElectronRepulsionPrimRecFSD.cpp
@@ -33,6 +45,7 @@ target_sources(vlxobjs
     ThreeCenterElectronRepulsionPrimRecFSI.cpp
     ThreeCenterElectronRepulsionPrimRecFSK.cpp
     ThreeCenterElectronRepulsionPrimRecFSL.cpp
+    ThreeCenterElectronRepulsionPrimRecFSM.cpp
     ThreeCenterElectronRepulsionPrimRecFSP.cpp
     ThreeCenterElectronRepulsionPrimRecFSS.cpp
     ThreeCenterElectronRepulsionPrimRecGSD.cpp
@@ -42,8 +55,36 @@ target_sources(vlxobjs
     ThreeCenterElectronRepulsionPrimRecGSI.cpp
     ThreeCenterElectronRepulsionPrimRecGSK.cpp
     ThreeCenterElectronRepulsionPrimRecGSL.cpp
+    ThreeCenterElectronRepulsionPrimRecGSM.cpp
     ThreeCenterElectronRepulsionPrimRecGSP.cpp
     ThreeCenterElectronRepulsionPrimRecGSS.cpp
+    ThreeCenterElectronRepulsionPrimRecHSD.cpp
+    ThreeCenterElectronRepulsionPrimRecHSF.cpp
+    ThreeCenterElectronRepulsionPrimRecHSG.cpp
+    ThreeCenterElectronRepulsionPrimRecHSH.cpp
+    ThreeCenterElectronRepulsionPrimRecHSI.cpp
+    ThreeCenterElectronRepulsionPrimRecHSK.cpp
+    ThreeCenterElectronRepulsionPrimRecHSL.cpp
+    ThreeCenterElectronRepulsionPrimRecHSP.cpp
+    ThreeCenterElectronRepulsionPrimRecHSS.cpp
+    ThreeCenterElectronRepulsionPrimRecISD.cpp
+    ThreeCenterElectronRepulsionPrimRecISF.cpp
+    ThreeCenterElectronRepulsionPrimRecISG.cpp
+    ThreeCenterElectronRepulsionPrimRecISH.cpp
+    ThreeCenterElectronRepulsionPrimRecISI.cpp
+    ThreeCenterElectronRepulsionPrimRecISK.cpp
+    ThreeCenterElectronRepulsionPrimRecISL.cpp
+    ThreeCenterElectronRepulsionPrimRecISP.cpp
+    ThreeCenterElectronRepulsionPrimRecISS.cpp
+    ThreeCenterElectronRepulsionPrimRecKSD.cpp
+    ThreeCenterElectronRepulsionPrimRecKSF.cpp
+    ThreeCenterElectronRepulsionPrimRecKSG.cpp
+    ThreeCenterElectronRepulsionPrimRecKSH.cpp
+    ThreeCenterElectronRepulsionPrimRecKSI.cpp
+    ThreeCenterElectronRepulsionPrimRecKSK.cpp
+    ThreeCenterElectronRepulsionPrimRecKSL.cpp
+    ThreeCenterElectronRepulsionPrimRecKSP.cpp
+    ThreeCenterElectronRepulsionPrimRecKSS.cpp
     ThreeCenterElectronRepulsionPrimRecPSD.cpp
     ThreeCenterElectronRepulsionPrimRecPSF.cpp
     ThreeCenterElectronRepulsionPrimRecPSG.cpp
@@ -51,6 +92,7 @@ target_sources(vlxobjs
     ThreeCenterElectronRepulsionPrimRecPSI.cpp
     ThreeCenterElectronRepulsionPrimRecPSK.cpp
     ThreeCenterElectronRepulsionPrimRecPSL.cpp
+    ThreeCenterElectronRepulsionPrimRecPSM.cpp
     ThreeCenterElectronRepulsionPrimRecPSP.cpp
     ThreeCenterElectronRepulsionPrimRecPSS.cpp
     ThreeCenterElectronRepulsionPrimRecSSD.cpp
@@ -60,6 +102,7 @@ target_sources(vlxobjs
     ThreeCenterElectronRepulsionPrimRecSSI.cpp
     ThreeCenterElectronRepulsionPrimRecSSK.cpp
     ThreeCenterElectronRepulsionPrimRecSSL.cpp
+    ThreeCenterElectronRepulsionPrimRecSSM.cpp
     ThreeCenterElectronRepulsionPrimRecSSP.cpp
     ThreeCenterElectronRepulsionPrimRecSSS.cpp
   )
