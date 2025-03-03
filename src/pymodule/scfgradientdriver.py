@@ -33,10 +33,12 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
+from .molecularbasis import MolecularBasis
 from .matrices import Matrices
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -391,6 +393,22 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
+        if self.scf_driver.ri_coulomb:
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
+
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            basis_ri_j = MolecularBasis.read(molecule, 'def2-universal-jkfit')
+
+            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
+                den_mat_for_fock)
+            ri_grad_drv = RIFockGradDriver()
+
         for iatom in local_atoms:
 
             t0 = time.time()
@@ -402,15 +420,24 @@ class ScfGradientDriver(GradientDriver):
 
             t0 = time.time()
 
-            atomgrad = fock_grad_drv.compute(basis, screener_atom, screener,
-                                             den_mat_for_fock,
-                                             den_mat_for_fock2, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+            if self.scf_driver.ri_coulomb:
+                ri_grad = ri_grad_drv.compute(basis, basis_ri_j, molecule,
+                                              ri_gvec, den_mat_for_fock, iatom)
+                atomgrad = ri_grad.coordinates()
+            else:
+                atomgrad = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                 den_mat_for_fock,
+                                                 den_mat_for_fock2, iatom,
+                                                 fock_type,
+                                                 exchange_scaling_factor, 0.0,
+                                                 thresh_int)
 
             grad_timing['Fock_grad'] += time.time() - t0
 
-            factor = 2.0 if fock_type == 'j' else 1.0
+            if self.scf_driver.ri_coulomb:
+                factor = 1.0
+            else:
+                factor = 2.0 if fock_type == 'j' else 1.0
 
             self.gradient[iatom, :] += np.array(atomgrad) * factor
 

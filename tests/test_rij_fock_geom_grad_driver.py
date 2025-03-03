@@ -44,13 +44,13 @@ class TestRIJFockGeomGradDriver:
 
 
         fock_drv = FockGeom1000Driver()
-        fmats = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, 2, "2jkx", 0.0, 0.0)
+        fmats = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, 2, "j", 0.0, 0.0)
         fmatx = fmats.matrix('X').full_matrix().to_numpy()
-        gradx = np.trace(np.matmul(fmatx, density))
+        gradx = 2.0 * np.trace(np.matmul(fmatx, density))
         fmaty = fmats.matrix('Y').full_matrix().to_numpy()
-        grady = np.trace(np.matmul(fmaty, density))
+        grady = 2.0 * np.trace(np.matmul(fmaty, density))
         fmatz = fmats.matrix('Z').full_matrix().to_numpy()
-        gradz = np.trace(np.matmul(fmatz, density))
+        gradz = 2.0 * np.trace(np.matmul(fmatz, density))
         ref_grad = [gradx, grady, gradz]
         
         # compute J metric
