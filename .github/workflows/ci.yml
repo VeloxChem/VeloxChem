@@ -10,6 +10,7 @@ on:
       - c_pcm
       - dft-update
       - ri-test
+      - ri-grad-test
 
 jobs:
   vlx_ci:
