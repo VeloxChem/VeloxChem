@@ -393,7 +393,7 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb:
+        if self.scf_driver.ri_coulomb and self.rank == mpi_master():
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
@@ -403,18 +403,19 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-            if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(
-                    molecule, self.scf_driver.ri_auxiliary_basis)
-            else:
-                basis_ri_j = None
-            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+            basis_ri_j = MolecularBasis.read(molecule,
+                                             self.scf_driver.ri_auxiliary_basis)
 
             ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
                 den_mat_for_fock)
             ri_grad_drv = RIFockGradDriver()
 
-        for iatom in local_atoms:
+        if self.scf_driver.ri_coulomb:
+            atom_inds_list = list(range(molecule.number_of_atoms()))
+        else:
+            atom_inds_list = list(local_atoms)
+
+        for iatom in atom_inds_list:
 
             t0 = time.time()
 
@@ -426,9 +427,13 @@ class ScfGradientDriver(GradientDriver):
             t0 = time.time()
 
             if self.scf_driver.ri_coulomb:
-                ri_grad = ri_grad_drv.compute(basis, basis_ri_j, molecule,
-                                              ri_gvec, den_mat_for_fock, iatom)
-                atomgrad = ri_grad.coordinates()
+                if self.rank == mpi_master():
+                    ri_grad = ri_grad_drv.compute(basis, basis_ri_j, molecule,
+                                                  ri_gvec, den_mat_for_fock,
+                                                  iatom)
+                    atomgrad = ri_grad.coordinates()
+                else:
+                    atomgrad = np.zeros(3)
             else:
                 atomgrad = fock_grad_drv.compute(basis, screener_atom, screener,
                                                  den_mat_for_fock,

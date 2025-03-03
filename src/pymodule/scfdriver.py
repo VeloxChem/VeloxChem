@@ -1378,7 +1378,7 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
-        if self.ri_coulomb:
+        if self.ri_coulomb and self.rank == mpi_master():
             assert_msg_critical(
                 ao_basis.get_label().lower().startswith('def2-'),
                 'SCF Driver: Invalid basis set for RI-J')
@@ -1388,12 +1388,7 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(molecule,
-                                                 self.ri_auxiliary_basis)
-            else:
-                basis_ri_j = None
-            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+            basis_ri_j = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
 
             self.ostream.print_info('Dimension of RI auxiliary basis set ' +
                                     f'({self.ri_auxiliary_basis.upper()}): ' +
