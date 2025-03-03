@@ -39,7 +39,7 @@ class TestOverlapDriver:
             O   0.300   1.400  -2.100
         """
         mol = Molecule.read_str(costr, 'au')
-        bas = MolecularBasis.read(mol, 'cc-pV6Z')
+        bas = MolecularBasis.read(mol, 'cc-pV6Z-no-opt-gc')
 
         return mol, bas
         
@@ -74,8 +74,8 @@ class TestOverlapDriver:
             rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
                                                          sket:eket]))
-            print(i, j)
-            print(np.max(np.abs(rmat.to_numpy() - cmat.to_numpy())))
+            #print(i, j)
+            #print(np.max(np.abs(rmat.to_numpy() - cmat.to_numpy())))
             # compare submatrices
             assert cmat == rmat
 
