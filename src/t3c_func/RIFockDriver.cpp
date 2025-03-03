@@ -62,6 +62,12 @@ CRIFockDriver::compute(const CMatrix     &density,
 }
 
 auto
+CRIFockDriver::compute_bq_vector(const CMatrix &density) const -> std::vector<double>
+{
+    return _trafo_gamma_vector(_comp_gamma_vector(density));
+}
+
+auto
 CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<double>
 {
     const auto ndim = _eri_buffer.aux_width();
@@ -78,6 +84,8 @@ CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<d
     
     auto buff_ptr = &_eri_buffer;
     
+    auto gvec_ptr = gvec.data();
+    
     for (size_t i = 0; i < ndim; i++)
     {
         auto tint_ptr = buff_ptr->data(i);
@@ -90,7 +98,7 @@ CRIFockDriver::_comp_gamma_vector(const CMatrix &density) const -> std::vector<d
             fsum += dvec_ptr[j] * tint_ptr[j];
         }
         
-        gvec[i] = fsum;
+        gvec_ptr[i] = fsum;
     }
     
     return gvec;
@@ -150,13 +158,13 @@ CRIFockDriver::_comp_j_vector(const std::vector<double>& gvector) const -> std::
         
         const auto fact = gvec_ptr[i];
          
-#pragma omp simd 
+#pragma omp simd
         for (size_t j = 0; j < nelems; j++)
         {
             jvec_ptr[j] += tint_ptr[j] * fact;
         }
     }
-    
+        
     return jvec;
 }
 

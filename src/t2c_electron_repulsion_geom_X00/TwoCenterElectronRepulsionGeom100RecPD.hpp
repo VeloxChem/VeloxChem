@@ -18,6 +18,7 @@
 #include "T2CUtils.hpp"
 #include "T2CTransform.hpp"
 #include "BatchFunc.hpp"
+#include "BoysFunc.hpp"
 
 namespace t2ceri { // t2ceri namespace
 

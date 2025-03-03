@@ -3,6 +3,7 @@
 
 #include <set>
 #include <vector>
+#include <map>
 
 #include "CustomConstrains.hpp"
 #include "Matrices.hpp"
@@ -10,9 +11,19 @@
 #include "SphericalMomentum.hpp"
 #include "SubMatrix.hpp"
 #include "TensorComponents.hpp"
+#include "GtoBlock.hpp"
 
 namespace t3cfunc {  // t3cfunc namespace
 
+/// @brief Generates unique linear orbital indices vector for the given basis functions blocks.
+/// @param gto_blocks The vector of basis functions blocks.
+/// @return The vector of unique orbital indices.
+auto unique_indices(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<size_t>;
+
+/// @brief Generates unique linear orbital indices vector for the given basis functions blocks.
+/// @param gto_blocks The vector of basis functions blocks.
+/// @return The vector of unique orbital indices.
+auto mask_indices(const std::vector<CGtoBlock>& gto_blocks) -> std::map<size_t, size_t>;
 
 /// @brief Computes Cartesian W center coordinates.
 /// @param buffer The SIMD array containing factors data.

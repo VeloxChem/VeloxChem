@@ -13,7 +13,7 @@
 #include "T2CDistributor.hpp"
 #include "TwoCenterElectronRepulsionGeom100Func.hpp"
 
-/// @brief Class  CTwoCenterElectronRepulsionX00Driver provides methods for computing arbitrary order two-center
+/// @brief Class  CTwoCenterElectronRepulsionGeomX00Driver provides methods for computing arbitrary order two-center
 /// electron repulsion integral derivatives with respect bra side.
 template <int N>
 class CTwoCenterElectronRepulsionGeomX00Driver

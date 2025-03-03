@@ -50,6 +50,8 @@ from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import ThreeCenterOverlapDriver
 from .veloxchemlib import ThreeCenterElectronRepulsionDriver
+from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
+from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import T4CScreener
@@ -58,6 +60,7 @@ from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import RIFockDriver
+from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCMolecularGradient

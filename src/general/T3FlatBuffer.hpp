@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <vector>
+#include <map>
 #include <ranges>
 
 /// @brief Class CT3FlatBuffer stores general semi-symmetric rank-3 tensor as 2D flattened data structure.
@@ -31,6 +32,69 @@ class CT3FlatBuffer
         {
             std::ranges::for_each(_indices, [&](const auto& index) {
                 _data.push_back(std::vector<T>(nelems, T{0.0}));
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
+    /// @param mask_indices The map of indices along x axis of tensor.
+    /// @param width The width of tensor along  y,z axes.
+    CT3FlatBuffer(const std::map<size_t, size_t>& mask_indices, const size_t width)
+    {
+        _mask_indices = mask_indices;
+        
+        _width = width;
+        
+        _data.reserve(_indices.size());
+        
+        if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
+        {
+            std::ranges::for_each(_mask_indices, [&](const auto& index) {
+                _data.push_back(std::vector<T>(nelems, T{0.0}));
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
+    /// @param indices The vector of indices along x axis of tensor.
+    /// @param width The width of tensor along  y,z axes.
+    /// @param nbatches The number of batches.
+    CT3FlatBuffer(const std::vector<size_t>& indices, const size_t width, const size_t nbatches)
+    {
+        _indices = indices;
+        
+        _width = width;
+        
+        _data.reserve(_indices.size() * nbatches);
+        
+        if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, nbatches), [&] (const auto index) {
+                std::ranges::for_each(_indices, [&](const auto& index) {
+                    _data.push_back(std::vector<T>(nelems, T{0.0}));
+                });
+            });
+        }
+    }
+    
+    /// @brief The default constructor.
+    /// @param mask_indices The mask of indices along x axis of tensor.
+    /// @param width The width of tensor along  y,z axes.
+    /// @param nbatches The number of batches.
+    CT3FlatBuffer(const std::map<size_t, size_t>& mask_indices, const size_t width, const size_t nbatches)
+    {
+        _mask_indices = mask_indices;
+        
+        _width = width;
+        
+        _data.reserve(_indices.size() * nbatches);
+        
+        if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, nbatches), [&] (const auto index) {
+                std::ranges::for_each(_mask_indices, [&](const auto& index) {
+                    _data.push_back(std::vector<T>(nelems, T{0.0}));
+                });
             });
         }
     }
@@ -74,6 +138,14 @@ class CT3FlatBuffer
         return _indices;
     }
     
+    /// @brief The gets map of masked indices along y axis.
+    /// @return The map of masked indices.
+    inline auto
+    mask_indices() const -> std::map<size_t, size_t>
+    {
+        return _mask_indices;
+    }
+    
     /// @brief Gets the pointer to slice of tensor data.
     /// @param index The index of tensor slice.
     /// @return The pointer to slice of tensor.
@@ -105,7 +177,30 @@ class CT3FlatBuffer
     inline auto
     aux_width() const -> size_t
     {
-        return _indices.size();
+        if (!_indices.empty())
+        {
+            return _indices.size();
+        }
+        else
+        {
+            return _mask_indices.size();
+        }
+        
+    }
+    
+    /// @brief Gets number of blocks in tensor  width along x axis.
+    /// @return The number of blocks in tensor.
+    inline auto
+    aux_blocks() const -> size_t
+    {
+        if (!_indices.empty())
+        {
+            return _data.size() / _indices.size();
+        }
+        else
+        {
+            return _data.size() / _mask_indices.size();
+        }
     }
     
    private:
@@ -115,6 +210,9 @@ class CT3FlatBuffer
 
     /// @brief The indices of compound tensor along x axis.
     std::vector<size_t> _indices;
+    
+    /// @brief The indices of compound tensor along z axis.
+    std::map<size_t, size_t> _mask_indices;
     
     /// @brief The width of tensor along y,z axes.
     size_t _width;

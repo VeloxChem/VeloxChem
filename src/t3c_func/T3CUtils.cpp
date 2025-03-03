@@ -1,8 +1,52 @@
 #include "T3CUtils.hpp"
 
+#include <ranges>
+
 #include "MathConst.hpp"
+#include "CustomViews.hpp"
+#include "TensorComponents.hpp"
+
+#include <iostream>
 
 namespace t3cfunc {  // t3cfunc namespace
+
+
+auto
+unique_indices(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<size_t>
+{
+    std::vector<size_t> indices;
+    
+    std::ranges::for_each(gto_blocks, [&] (const auto& gblock) {
+        const size_t ngtos = gblock.number_of_basis_functions();
+        const size_t comps = tensor::number_of_spherical_components(std::array<int, 1>({gblock.angular_momentum(), }));
+        const auto orb_ids = gblock.orbital_indices();
+        std::ranges::for_each(views::rectangular(ngtos, comps), [&](const auto& index) {
+            indices.push_back(orb_ids[index.first + 1] + orb_ids[0] * index.second);
+        });
+    });
+    
+    return indices;
+}
+
+auto
+mask_indices(const std::vector<CGtoBlock>& gto_blocks) -> std::map<size_t, size_t>
+{
+    std::map<size_t, size_t> mask;
+    
+    size_t loc_idx = 0;
+    
+    std::ranges::for_each(gto_blocks, [&] (const auto& gblock) {
+        const size_t ngtos = gblock.number_of_basis_functions();
+        const size_t comps = tensor::number_of_spherical_components(std::array<int, 1>({gblock.angular_momentum(), }));
+        const auto orb_ids = gblock.orbital_indices();
+        std::ranges::for_each(views::rectangular(comps, ngtos), [&](const auto& index) {
+            mask.insert({orb_ids[index.second + 1] + orb_ids[0] * index.first, loc_idx});
+            loc_idx++;
+        });
+    });
+    
+    return mask;
+}
 
 auto
 comp_coordinates_w(CSimdArray<double>&   buffer,
