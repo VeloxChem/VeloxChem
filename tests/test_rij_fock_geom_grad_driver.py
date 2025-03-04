@@ -2,6 +2,8 @@ from pathlib import Path
 import math as mt
 import numpy as np
 
+from mpi4py import MPI
+
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import FockGeom1000Driver
@@ -13,7 +15,6 @@ from veloxchem import Matrix
 from veloxchem import Matrices
 from veloxchem import make_matrix
 from veloxchem import mat_t
-
 
 class TestRIJFockGeomGradDriver:
 
@@ -82,7 +83,6 @@ class TestRIJFockGeomGradDriver:
         den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
         den_mat.set_values(density)
 
-
         # convectional gradient
         fock_drv = FockGeom1000Driver()
         ref_grad = []
@@ -120,3 +120,45 @@ class TestRIJFockGeomGradDriver:
             grad = g[i].coordinates()
             for j in range(3):
                 assert mt.isclose(ref_grad[3 * i + j], grad[j], rel_tol=1.0e-5, abs_tol=1.0e-5)
+                
+    def test_h2o_mpi_fock_2j_grad_h2o_sto3g(self):
+
+        comm = MPI.COMM_WORLD
+
+        mol_h2o, bas_sto3g, bas_aux = self.get_data_h2o()
+        
+        # distribute density matrix
+                    
+        den_mat = None
+        if comm.Get_rank() == 0:
+            here = Path(__file__).parent
+            npyfile = str(here / 'data' / 'h2o.sto3g.density.npy')
+            density = np.load(npyfile)
+            den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
+            den_mat.set_values(density)
+        den_mat = comm.bcast(den_mat, 0)
+        
+        # compute RI gradients for all atoms
+        ri_grad_drv = RIFockGradDriver()
+        g = ri_grad_drv.mpi_compute(comm, mol_h2o, bas_sto3g, bas_aux, den_mat)
+        
+        if comm.Get_rank() == 0:
+            fock_drv = FockGeom1000Driver()
+            ref_grad = []
+        
+            for i in range(3):
+                fmats = fock_drv.compute(bas_sto3g, mol_h2o, den_mat, i, "2jkx", 0.0, 0.0)
+                fmatx = fmats.matrix('X').full_matrix().to_numpy()
+                gradx = np.trace(np.matmul(fmatx, density))
+                fmaty = fmats.matrix('Y').full_matrix().to_numpy()
+                grady = np.trace(np.matmul(fmaty, density))
+                fmatz = fmats.matrix('Z').full_matrix().to_numpy()
+                gradz = np.trace(np.matmul(fmatz, density))
+                ref_grad.append(gradx)
+                ref_grad.append(grady)
+                ref_grad.append(gradz)
+                
+            # check results
+            for i in range(3):
+                for j in range(3):
+                    assert mt.isclose(ref_grad[3 * i + j], g[i, j], rel_tol=1.0e-5, abs_tol=1.0e-5)

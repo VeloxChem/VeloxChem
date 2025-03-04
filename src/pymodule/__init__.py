@@ -38,7 +38,6 @@ from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import RIFockDriver
-from .veloxchemlib import RIFockGradDriver
 
 # C++ functions
 from .veloxchemlib import upper_case
@@ -94,6 +93,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .fockdriver import FockDriver
 from .moleculargradientdriver import MolecularGradientDriver
+from .rigradientdriver import RIFockGradDriver
 
 # Environment variable: basis set path
 from .environment import (set_vlxbasispath, get_basis_path)
