@@ -1,20 +1,19 @@
+from mpi4py import MPI
 from pathlib import Path
 import math as mt
 import numpy as np
-
-from mpi4py import MPI
 
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
 from veloxchem import FockGeom1000Driver
 from veloxchem import RIFockDriver
-from veloxchem import RIFockGradDriver
 from veloxchem import TwoCenterElectronRepulsionDriver
 from veloxchem import SubMatrix
 from veloxchem import Matrix
 from veloxchem import Matrices
 from veloxchem import make_matrix
 from veloxchem import mat_t
+from veloxchem.rigradientdriver import RIFockGradDriver
 
 class TestRIJFockGeomGradDriver:
 
