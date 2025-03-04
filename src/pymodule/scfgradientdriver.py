@@ -393,7 +393,7 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        if self.scf_driver.ri_coulomb and self.rank == mpi_master():
+        if self.scf_driver.ri_coulomb:
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
                 'ScfGradientDriver: Invalid basis set for RI-J')
@@ -403,11 +403,17 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-            basis_ri_j = MolecularBasis.read(molecule,
-                                             self.scf_driver.ri_auxiliary_basis)
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(
+                    molecule, self.scf_driver.ri_auxiliary_basis)
+                ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
+                    den_mat_for_fock)
+            else:
+                basis_ri_j = None
+                ri_gvec = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+            ri_gvec = self.comm.bcast(ri_gvec, root=mpi_master())
 
-            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
-                den_mat_for_fock)
             ri_grad_drv = RIFockGradDriver()
 
         if self.scf_driver.ri_coulomb:
@@ -416,16 +422,13 @@ class ScfGradientDriver(GradientDriver):
 
             natoms = molecule.number_of_atoms()
 
-            if self.rank == mpi_master():
-                ri_grad = ri_grad_drv.compute(basis, basis_ri_j, molecule,
-                                              ri_gvec, den_mat_for_fock,
-                                              list(range(natoms)))
+            ri_grad = ri_grad_drv.compute(basis, basis_ri_j, molecule, ri_gvec,
+                                          den_mat_for_fock, local_atoms)
 
-                for iatom in range(natoms):
-                    atomgrad = ri_grad[iatom].coordinates()
-                    # Note: RI gradient already contains factor of 2 for
-                    # closed-shell
-                    self.gradient[iatom, :] += np.array(atomgrad)
+            for iatom, atomgrad in zip(local_atoms, ri_grad):
+                # Note: RI gradient already contains factor of 2 for
+                # closed-shell
+                self.gradient[iatom, :] += np.array(atomgrad.coordinates())
 
             grad_timing['Fock_grad'] += time.time() - t0
 
