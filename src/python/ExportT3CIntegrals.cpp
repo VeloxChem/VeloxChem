@@ -38,7 +38,30 @@ export_t3cintegrals(py::module& m)
     // CRIFockGradDriver class
     PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")
         .def(py::init<>())
-        .def("compute", &CRIFockGradDriver::compute, "Computes Coulomb Fock contribution to atom gradient.");
+        .def("compute",
+             [] (const CRIFockGradDriver&   grad_drv,
+                 const CMolecularBasis&     basis,
+                 const CMolecularBasis&     aux_basis,
+                 const CMolecule&           molecule,
+                 const std::vector<double>& gamma,
+                 const CMatrix&             density,
+                 const int                  iatom) -> TPoint<double>
+             {
+                return grad_drv.compute(basis, aux_basis, molecule, gamma, density, iatom);
+             },
+          "Computes Coulomb Fock contribution to atom's gradient.")
+        .def("compute",
+             [] (const CRIFockGradDriver&   grad_drv,
+                 const CMolecularBasis&     basis,
+                 const CMolecularBasis&     aux_basis,
+                 const CMolecule&           molecule,
+                 const std::vector<double>& gamma,
+                 const CMatrix&             density,
+                 const std::vector<int>&    atoms) -> std::vector<TPoint<double>>
+             {
+                return grad_drv.compute(basis, aux_basis, molecule, gamma, density, atoms);
+             },
+          "Computes Coulomb Fock contribution to atoms gradient.");
     
     // ThreeCenterElectronRepulsionGeom100Driver class
     PyClass<CThreeCenterElectronRepulsionGeomX00Driver<1>>(m, "ThreeCenterElectronRepulsionGeom100Driver")

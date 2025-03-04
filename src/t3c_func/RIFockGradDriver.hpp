@@ -64,6 +64,22 @@ class CRIFockGradDriver
                  const CMatrix&             density,
                  const int                  iatom) const -> TPoint<double>;
     
+    
+    /// @brief Computes Fock matrix gradient.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
+    /// @param molecule The molecule.
+    /// @param gamma The transformed Gamma vector.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param atoms The indices of requested atoms.
+    /// @return The Fock contribution to atom's gradient.
+    auto compute(const CMolecularBasis&     basis,
+                 const CMolecularBasis&     aux_basis,
+                 const CMolecule&           molecule,
+                 const std::vector<double>& gamma,
+                 const CMatrix&             density,
+                 const std::vector<int>     atoms) const -> std::vector<TPoint<double>>;
+    
     private:
     
     /// @brief Computes Coulomb contribution to atom's gradient from resolution of identity integrals.

@@ -14,9 +14,53 @@ CRIFockGradDriver::compute(const CMolecularBasis&     basis,
                            const CMatrix&             density,
                            const int                  iatom) const -> TPoint<double>
 {
-    auto geri = _comp_eri_grad(basis, aux_basis, molecule, gamma, density, iatom);
+    return TPoint<double>(_comp_eri_grad(basis, aux_basis, molecule, gamma, density, iatom));
+}
+
+auto
+CRIFockGradDriver::compute(const CMolecularBasis&     basis,
+                           const CMolecularBasis&     aux_basis,
+                           const CMolecule&           molecule,
+                           const std::vector<double>& gamma,
+                           const CMatrix&             density,
+                           const std::vector<int>     atoms) const -> std::vector<TPoint<double>>
+{
+    std::vector<TPoint<double>> grads(atoms.size(), TPoint<double>({0.0, 0.0, 0.0}));
     
-    return TPoint<double>(geri);
+    // prepare pointers for OMP parallel region
+
+    auto ptr_gamma = &gamma;
+
+    auto ptr_density = &density;
+
+    auto ptr_molecule = &molecule;
+    
+    auto ptr_basis = &basis;
+    
+    auto ptr_aux_basis = &aux_basis;
+    
+    auto ptr_atoms = atoms.data();
+    
+    auto ptr_grads = grads.data();
+
+    // execute OMP tasks with static scheduling
+    
+    const auto natoms = atoms.size();
+
+#pragma omp parallel shared(ptr_gamma, ptr_density, ptr_molecule, ptr_basis, ptr_aux_basis, ptr_grads, ptr_atoms, natoms)
+    {
+#pragma omp single nowait
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, natoms), [&] (const auto index) {
+#pragma omp task firstprivate(index)
+                {
+                    ptr_grads[index] = TPoint<double>(_comp_eri_grad(*ptr_basis, *ptr_aux_basis, *ptr_molecule, *ptr_gamma, *ptr_density, ptr_atoms[index])); 
+                }
+            });
+        }
+    }
+    
+    return grads;
 }
 
 auto
