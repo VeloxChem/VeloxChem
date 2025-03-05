@@ -1,6 +1,31 @@
-from .errorhandler import assert_msg_critical
-import sys
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from importlib.metadata import version
+import sys
+
+from .errorhandler import assert_msg_critical
 
 try:
     import openmm.app as mmapp
@@ -9,12 +34,11 @@ except ImportError:
     pass
 
 
-
 class EvbReporter():
     #todo do this with force groups instead of different systems
     def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, outputstream, append = False):
 
-        assert_msg_critical('openmm' in sys.modules and version('openmm') >= '8.2', 'openmm >8.2 is required for EvbReporter.')
+        assert_msg_critical('openmm' in sys.modules and version('openmm') >= '8.2', 'openmm >=8.2 is required for EvbReporter.')
 
         # # OpenMM HIP version is slighly older and uses a different format for reporters
         # if version('openmm') < '8.2':

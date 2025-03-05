@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import math as mt
 
 from mpi4py import MPI
 
@@ -385,6 +386,30 @@ class TestMatrix:
                 (1, 1): self.get_mat_pp()
             }, mat_t.general)
         assert mat_a == mat_b
+
+    def test_flat_values_symm(self):
+
+        mat = Matrix(
+            {
+                (0, 0): self.get_mat_ss(),
+                (0, 1): self.get_mat_sp(),
+                (1, 1): self.get_mat_pp()
+            }, mat_t.symmetric)
+
+        mat_vals = mat.flat_values()
+
+        ref_vals = [
+            1.0, 4.0, 6.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 2.1, 6.2, 2.2, 4.2,
+            6.2, 8.2, 10.2, 12.2, 3.2, 2.4, 4.4, 6.4, 8.4, 10.4, 12.4, 2.0,
+            6.0, 8.0, 10.0, 12.0, 14.0, 3.1, 8.2, 10.2, 12.2, 14.2, 4.2, 10.4,
+            12.4, 14.4, 5.3, 12.6, 14.6, 6.4, 14.8, 7.5
+        ]
+
+        for i in range(45):
+            assert mt.isclose(ref_vals[i],
+                              mat_vals[i],
+                              rel_tol=1.0e-12,
+                              abs_tol=1.0e-12)
 
     def test_mpi_reduce(self):
 

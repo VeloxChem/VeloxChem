@@ -32,7 +32,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from collections import defaultdict
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kjpermol
 from .atomtypeidentifier import AtomTypeIdentifier
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -49,6 +49,7 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
+from .environment import get_data_path
 
 
 class MMForceFieldGenerator:
@@ -293,8 +294,8 @@ class MMForceFieldGenerator:
             for i, dih in enumerate(self.target_dihedrals):
                 dih_central_bond = [dih[1] + 1, dih[2] + 1]
                 scan_file = str(Path(inp_dir) / self.scan_xyz_files[i])
-                self.reparametrize_dihedrals(
-                    dih_central_bond, scan_file=scan_file, fit_extremes=False)
+                self.reparameterize_dihedrals(
+                    dih_central_bond, scan_file=scan_file, fit_extrema=False)
 
         # save output files
 
@@ -320,7 +321,7 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparametrize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_result=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extremes=False, initial_validation=True):
+    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_results=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extrema=False, initial_validation=True):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -333,24 +334,25 @@ class MMForceFieldGenerator:
             The SCF driver. If None is provided it will use HF.
         :param basis:
             The AO basis set. If None is provided it will use 6-31G*.
+        :param scf_results:
+            The dictionary containing converged SCF results.
         :param scan_range:
             List with the range of dihedral angles. Default is [0, 360].
         :param n_points:
             The number of points to be calculated. Default is 19.
         :param scan_verbose:
-            If the QM scan should be print all the information.
+            Whether the QM scan should print all the information.
         :param visualize:
-            If the dihedral scans should be visualized.
-        :param fit_extremes:
-            If the dihedral parameters should be fitted to the QM scan extremes
+            Whether the dihedral scans should be visualized.
+        :param fit_extrema:
+            Whether the dihedral parameters should be fitted to the QM scan extrema.
         """
 
         try:
             from scipy.optimize import least_squares
             from scipy.signal import argrelextrema
-
         except ImportError:
-            error_msg = 'Scipy is required for fitting dihedral potentials.'
+            error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
         # If scan file is provided, read it
@@ -395,7 +397,7 @@ class MMForceFieldGenerator:
         dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
         
         # Print a header
-        header = 'VeloxChem Dihedral Reparametrization'
+        header = 'VeloxChem Dihedral Reparameterization'
         self.ostream.print_header(header)
         self.ostream.print_header('=' * len(header))
         self.ostream.print_blank()
@@ -435,10 +437,10 @@ class MMForceFieldGenerator:
                 self.ostream.flush()
 
             # Perform the reference SCF calculation
-            if scf_result is None:
+            if scf_results is None:
                 self.ostream.print_info('Performing SCF calculation...')
                 self.ostream.flush()
-                scf_result = scf_drv.compute(self.molecule, basis)
+                scf_results = scf_drv.compute(self.molecule, basis)
             
             # Take one of the dihedrals to perform the scan
             reference_dih = dihedral_indices[0]
@@ -458,7 +460,7 @@ class MMForceFieldGenerator:
             self.ostream.print_info(f'Number of points: {n_points}')
             self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
             self.ostream.flush()
-            opt_drv.compute(self.molecule, basis, scf_result)
+            opt_drv.compute(self.molecule, basis, scf_results)
             self.ostream.print_info('Scan completed.')
             self.ostream.flush()
 
@@ -507,7 +509,7 @@ class MMForceFieldGenerator:
                 periodicities.append(periodicity)
 
         # Make a copy of the original dihedrals dictionary
-        original_dihedrals_dict = self.dihedrals.copy()
+        # original_dihedrals_dict = self.dihedrals.copy()
 
         # Convert to NumPy arrays
         barriers = np.array(barriers, dtype=float)
@@ -515,21 +517,6 @@ class MMForceFieldGenerator:
         periodicities_array = np.array(periodicities, dtype=float)
         phases_array_rad = np.deg2rad(phases_array)
         dihedral_angles_rad = np.deg2rad(self.scan_dih_angles[0])
-
-        # Print initial barriers
-        self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
-        self.ostream.flush()
-
-        # Store the original barriers and perform the initial validation
-        original_barriers = barriers.copy()
-
-        if initial_validation:
-            self.ostream.print_info('Validating initial force field...')
-            self.ostream.print_blank()
-            self.ostream.flush()
-            gaff_dihedral = self.validate_force_field(0, print_summary=True)
-            if visualize:
-                self.visualize(gaff_dihedral)
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
@@ -540,7 +527,9 @@ class MMForceFieldGenerator:
                 self.dihedrals[(i, j, k, l)]['barrier'] = 0.0
 
         # Scan the dihedral
-        self.ostream.print_info('Performing dihedral scan for MM baseline...')
+        self.ostream.print_info(
+            'Performing dihedral scan for MM baseline ' +
+            'by excluding the involved dihedral barriers...')
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -567,12 +556,12 @@ class MMForceFieldGenerator:
             qm_minima_indices = argrelextrema(qm_energies, np.less)[0]
 
             # Use first and last points as maxima (usual behavior for cosine dihedrals)
-            qm_extremes = [0, len(qm_energies) - 1]
+            qm_extrema = [0, len(qm_energies) - 1]
 
             # Build the arrays with the maxima and minima
             qm_maxima_indices = (list(qm_maxima_indices) +
                                  list(qm_minima_indices) +
-                                 qm_extremes)
+                                 qm_extrema)
 
             qm_maxima_indices = sorted(list(set(qm_maxima_indices)))
 
@@ -593,7 +582,7 @@ class MMForceFieldGenerator:
             mm_energies_fit_rel = np.array(mm_energies_fit) - np.min(mm_energies_fit)
             qm_energies_rel = np.array(qm_energies) - np.min(qm_energies)
 
-            if fit_extremes:
+            if fit_extrema:
 
                 # Match QM and MM maxima using nearest x-axis values
                 matched_qm_maxima = []
@@ -614,8 +603,40 @@ class MMForceFieldGenerator:
             # Return the squared residuals for optimization
             return residuals**2
 
+        # Print initial barriers
+        self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
+        self.ostream.flush()
+
+        # Store the original barriers and perform the initial validation
+        original_barriers = barriers.copy()
+
+        if initial_validation:
+            self.ostream.print_info('Validating the initial force field...')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            mm_energies = dihedral_potential(
+                dihedral_angles_rad,
+                original_barriers,
+                phases_array_rad,
+                periodicities_array
+            )
+            mm_energies += mm_baseline
+
+            fitted_dihedral_results = {
+                'dihedral_indices': list(initial_data['dihedral_indices']),
+                'dihedral_angles': list(initial_data['dihedral_angles']),
+                'mm_scan_kJpermol': np.copy(mm_energies) - np.min(mm_energies),
+                'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
+            }
+
+            self.print_validation_summary(fitted_dihedral_results)
+
+            if visualize:
+                self.visualize(fitted_dihedral_results)
+
         self.ostream.print_info('Fitting the dihedral parameters...')
-        if fit_extremes:
+        if fit_extrema:
             self.ostream.print_info('Only minimum/maximum points are used for fitting.')
         self.ostream.flush()
 
@@ -626,7 +647,7 @@ class MMForceFieldGenerator:
         initial_guess[:-1] = original_barriers[:]
         
         # Extract maxima for QM and MM energies
-        if fit_extremes:
+        if fit_extrema:
             qm_maxima_indices = extract_maxima(barriers, qm_energies)
             args = (qm_maxima_indices,)
         else:
@@ -724,13 +745,19 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        fitted_dihedral_results = self.validate_force_field(0, print_summary=True)
+        fitted_dihedral_results = {
+            'dihedral_indices': list(initial_data['dihedral_indices']),
+            'dihedral_angles': list(initial_data['dihedral_angles']),
+            'mm_scan_kJpermol': np.copy(fitted_dihedral_energies),
+            'qm_scan_kJpermol': np.copy(qm_energies) - np.min(qm_energies),
+        }
 
-        # Visualize the fitted dihedral using a spline
+        self.print_validation_summary(fitted_dihedral_results)
+
         if visualize:
             self.visualize(fitted_dihedral_results)
 
-        self.ostream.print_info('Dihedral MM parameters have been reparametrized and updated in the topology.')
+        self.ostream.print_info('Dihedral MM parameters have been reparameterized and updated in the topology.')
         self.ostream.flush()
    
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
@@ -875,7 +902,8 @@ class MMForceFieldGenerator:
             'fudgeLJ': None,
         }
 
-        gaff_path = Path(__file__).parent / 'tests' / 'data' / 'gaff-2.11.xml'
+        data_path = get_data_path()
+        gaff_path = Path(data_path) / 'gaff-2.11.xml'
         tree = ET.parse(str(gaff_path))
         root = tree.getroot()
 
@@ -931,7 +959,7 @@ class MMForceFieldGenerator:
 
         return data
 
-    def create_topology(self, molecule, basis=None, scf_result=None, resp=True, use_xml=True):
+    def create_topology(self, molecule, basis=None, scf_results=None, resp=True, use_xml=True):
         """
         Analyzes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
@@ -940,7 +968,7 @@ class MMForceFieldGenerator:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_result:
+        :param scf_results:
             A converged SCF result.
         :param resp:
             If RESP charges should be computed.
@@ -1016,7 +1044,7 @@ class MMForceFieldGenerator:
             self.ostream.flush()
 
         if self.partial_charges is None:
-            if scf_result is None:
+            if scf_results is None:
                 # compute RESP charges from scratch
                 if basis is None:
                     if self.rank == mpi_master():
@@ -1059,7 +1087,7 @@ class MMForceFieldGenerator:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                        scf_result, 'resp')
+                                                        scf_results, 'resp')
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 
@@ -2126,21 +2154,21 @@ class MMForceFieldGenerator:
                 return True
         return False
 
-    def reparametrize(self,
+    def reparameterize(self,
                        hessian=None,
-                       reparametrize_all=False,
-                       reparametrize_keys=None):
+                       reparameterize_all=False,
+                       reparameterize_keys=None):
         """
-        Reparametrizes all unknown parameters with the Seminario method using
+        Reparameterizes all unknown parameters with the Seminario method using
         the given Hessian matrix.
 
         :param hessian:
             The Hessian matrix, or the method to generate Hessian.
-        :param reparametrize_all:
-            If True, all parameters are reparametrized. If False, only unknown
-            parameters are reparametrized.
-        :param reparametrize_keys:
-            List of specific keys to reparametrize, can be bonds and angles.
+        :param reparameterize_all:
+            If True, all parameters are reparameterized. If False, only unknown
+            parameters are reparameterized.
+        :param reparameterize_keys:
+            List of specific keys to reparameterize, can be bonds and angles.
         """
 
         # Hessian matrix
@@ -2148,12 +2176,12 @@ class MMForceFieldGenerator:
         if hessian is None:
             # TODO: generate Hessian using VeloxChem
             assert_msg_critical(
-                False, 'MMForceFieldGenerator.reparametrize: expecting Hessian')
+                False, 'MMForceFieldGenerator.reparameterize: expecting Hessian')
 
         elif isinstance(hessian, str):
             assert_msg_critical(
                 hessian.lower() == 'xtb',
-                'ForceFieldGenerator.reparametrize: invalid Hessian option')
+                'ForceFieldGenerator.reparameterize: invalid Hessian option')
 
             # XTB optimization
             self.ostream.print_info('Optimizing molecule using XTB...')
@@ -2188,17 +2216,14 @@ class MMForceFieldGenerator:
             natoms = self.molecule.number_of_atoms()
             assert_msg_critical(
                 hessian.shape == (natoms * 3, natoms * 3),
-                'MMForceFieldGenerator.reparametrize: invalid Hessian matrix')
+                'MMForceFieldGenerator.reparameterize: invalid Hessian matrix')
 
         else:
             assert_msg_critical(
                 False,
-                'MMForceFieldGenerator.reparametrize: invalid Hessian option')
+                'MMForceFieldGenerator.reparameterize: invalid Hessian option')
 
-        angstrom_to_nm = 0.1  # 1 angstrom is 0.1 nm
-        bohr_to_nm = bohr_in_angstrom() * angstrom_to_nm
-        cal_to_joule = 4.184  # 1 calorie is 4.184 joule
-        hartree_to_kJmol = hartree_in_kcalpermol() * cal_to_joule
+        bohr_to_nm = bohr_in_angstrom() * 0.1
 
         coords_in_au = self.molecule.get_coordinates_in_bohr()
 
@@ -2212,22 +2237,22 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        # Reparametrize bonds
+        # Reparameterize bonds
 
         for i, j in self.bonds:
 
-            if not reparametrize_all:
-                if reparametrize_keys is None:
+            if not reparameterize_all:
+                if reparameterize_keys is None:
                     if self.bonds[(i, j)]['comment'].capitalize() != 'Guessed':
                         continue
-                elif (i, j) not in reparametrize_keys:
+                elif (i, j) not in reparameterize_keys:
                     continue
 
             new_equilibrium = np.linalg.norm(coords_in_au[i] -
                                              coords_in_au[j]) * bohr_to_nm
 
             new_force_constant = seminario.calculate_bond_force_constant(i, j)
-            new_force_constant *= hartree_to_kJmol / (bohr_to_nm**2)
+            new_force_constant *= hartree_in_kjpermol() / (bohr_to_nm**2)
 
             self.bonds[(i, j)]['equilibrium'] = new_equilibrium
             self.bonds[(i, j)]['force_constant'] = new_force_constant
@@ -2264,16 +2289,16 @@ class MMForceFieldGenerator:
                 self.bonds[(i, j)]['equilibrium'] = aver_r
                 self.bonds[(i, j)]['force_constant'] = aver_k_r
 
-        # Reparametrize angles
+        # Reparameterize angles
 
         for i, j, k in self.angles:
 
-            if not reparametrize_all:
-                if reparametrize_keys is None:
+            if not reparameterize_all:
+                if reparameterize_keys is None:
                     if (self.angles[(i, j, k)]['comment'].capitalize()
                             != 'Guessed'):
                         continue
-                elif (i, j, k) not in reparametrize_keys:
+                elif (i, j, k) not in reparameterize_keys:
                     continue
 
             a = coords_in_au[i] - coords_in_au[j]
@@ -2284,7 +2309,7 @@ class MMForceFieldGenerator:
 
             new_force_constant = seminario.calculate_angle_force_constant(
                 i, j, k)
-            new_force_constant *= hartree_to_kJmol
+            new_force_constant *= hartree_in_kjpermol()
 
             self.angles[(i, j, k)]['equilibrium'] = new_equilibrium
             self.angles[(i, j, k)]['force_constant'] = new_force_constant
@@ -2923,7 +2948,7 @@ class MMForceFieldGenerator:
 
         if self.rank == mpi_master():
             rel_e_qm = np.array(qm_scan) - min(qm_scan)
-            rel_e_qm *= hartree_in_kcalpermol() * 4.184
+            rel_e_qm *= hartree_in_kjpermol()
             rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
 
             difference = rel_e_qm - rel_e_mm
@@ -2971,7 +2996,7 @@ class MMForceFieldGenerator:
         mm_scan = np.array(mm_scan) - min(mm_scan)
 
         qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
-        qm_scan *= hartree_in_kcalpermol() * 4.184
+        qm_scan *= hartree_in_kjpermol()
 
         self.ostream.print_blank()
         self.ostream.print_info(
@@ -3044,7 +3069,7 @@ class MMForceFieldGenerator:
             ]
             pot_energy = self.minimize_mm_energy(geom, constraints)
             # convert to kJ/mol
-            pot_energy *= 4.184 * hartree_in_kcalpermol()
+            pot_energy *= hartree_in_kjpermol()
             energies.append(pot_energy)
 
             if print_energies:
@@ -3110,6 +3135,31 @@ class MMForceFieldGenerator:
                 dih_keys_to_remove.append((i, j, k, l))
         for dih_key in dih_keys_to_remove:
             del self.dihedrals[dih_key]
+
+    def print_validation_summary(self, fitted_dihedral_results):
+        """
+        Prints validation summary.
+
+        :param validation_result:
+            The dictionary containing the result of validation.
+        """
+
+        self.ostream.print_info('Summary of validation')
+        self.ostream.print_info('---------------------')
+
+        scan_diff = (fitted_dihedral_results['mm_scan_kJpermol'] -
+                     fitted_dihedral_results['qm_scan_kJpermol'])
+        max_diff = np.max(np.abs(scan_diff))
+        std_diff = np.std(scan_diff)
+        self.fitting_summary = {
+            'maximum_difference': max_diff,
+            'standard_deviation': std_diff,
+        }
+
+        self.ostream.print_info(f'Maximum difference: {max_diff:.3f} kJ/mol')
+        self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def visualize(self, validation_result):
         """

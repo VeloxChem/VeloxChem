@@ -171,6 +171,12 @@ CBasisFunction::number_of_primitive_functions() const -> size_t
 auto
 CBasisFunction::_rescale() -> void
 {
+    // NOTE: Primitive Gaussians are normalized using standard solid harmonic
+    // formula (Supporting Info Eq. A13):
+    // N_eta = 1 / sqrt(integral |S^l_m(r)exp(-eta r^2)| dr)
+    //       = (2 eta / pi)^3/4 sqrt[(4 eta)^l / (2l - 1)!!]
+    // J. Chem. Theory Comput. 2020, https://doi.org/10.1021/acs.jctc.9b01296
+    
     constexpr auto fpi = 2.0 / mathconst::pi_value();
 
     std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= std::pow(_exponents[i] * fpi, 0.75); });
@@ -181,34 +187,34 @@ CBasisFunction::_rescale() -> void
     }
     else if (_angular_momentum == 2)
     {
-        const double fact = 2.0 / std::sqrt(3.0);
+        const double fact = 4.0 / std::sqrt(3.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= fact * _exponents[i]; });
     }
     else if (_angular_momentum == 3)
     {
-        const double fact = 4.0 / std::sqrt(15.0);
+        const double fact = 8.0 / std::sqrt(15.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * std::sqrt(_exponents[i]); });
     }
     else if (_angular_momentum == 4)
     {
-        const double fact = 2.0 / std::sqrt(105.0);
+        const double fact = 16.0 / std::sqrt(105.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i]; });
     }
     else if (_angular_momentum == 5)
     {
-        const double fact = 4.0 / std::sqrt(945.0);
+        const double fact = 32.0 / std::sqrt(945.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * std::sqrt(_exponents[i]); });
     }
     else if (_angular_momentum == 6)
     {
-        const double fact = 4.0 / std::sqrt(10395.0);
+        const double fact = 64.0 / std::sqrt(10395.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * _exponents[i]; });
@@ -242,23 +248,23 @@ CBasisFunction::_overlap(const std::pair<size_t, size_t> &index) const -> double
     }
     else if (_angular_momentum == 2)
     {
-        return 3.0 * fab * fab * fovl;
+        return 0.75 * fab * fab * fovl;
     }
     else if (_angular_momentum == 3)
     {
-        return 7.5 * fab * fab * fab * fovl;
+        return 1.875 * fab * fab * fab * fovl;
     }
     else if (_angular_momentum == 4)
     {
-        return 420.0 * fab * fab * fab * fab * fovl;
+        return 6.5625 * fab * fab * fab * fab * fovl;
     }
     else if (_angular_momentum == 5)
     {
-        return 1890.0 * fab * fab * fab * fab * fab * fovl;
+        return 29.53125 * fab * fab * fab * fab * fab * fovl;
     }
     else if (_angular_momentum == 6)
     {
-        return 41580.0 * fab * fab * fab * fab * fab * fab * fovl;
+        return 162.421875 * fab * fab * fab * fab * fab * fab * fovl;
     }
     else
     {

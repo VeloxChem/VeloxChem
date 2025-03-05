@@ -17,6 +17,7 @@ pybind11_add_module(veloxchemlib
     ExportVisualization.cpp
     ExportXtb.cpp
     ExportT2CIntegrals.cpp
+    ExportT3CIntegrals.cpp
     ExportT4CIntegrals.cpp
     ExportVeloxChemLib.cpp
   )
