@@ -59,6 +59,7 @@ class SolvationFepDriver:
     Instance variables:
         - padding: The padding for the solvation box.
         - solvent_name: The name of the solvent.
+        - resname: The residue name for the solute. Only needed when using input files where solute is not at top of (i.e., index 0) .pdb/.gro.
         - temperature: The temperature for the simulation.
         - pressure: The pressure for the simulation.
         - timestep: The timestep for the simulation.
@@ -116,6 +117,7 @@ class SolvationFepDriver:
         # Options for the SolvationBuilder
         self.padding = 2.0
         self.solvent_name = 'spce'
+        self.resname = None
         
         # Ensemble and MD options
         self.temperature = 298.15 * unit.kelvin
@@ -757,13 +759,23 @@ class SolvationFepDriver:
         """
         alchemical_region = []
         chemical_region = []
+        
+        if self.resname:
+            for res in topology.residues():
+                if res.name == self.resname:
+                    for atom in res.atoms():
+                        alchemical_region.append(atom.index)
+                else:
+                    for atom in res.atoms():
+                        chemical_region.append(atom.index)
+        else:
+            for res in topology.residues():
+                if res.index == 0:
+                    for atom in res.atoms():
+                        alchemical_region.append(atom.index)
+                else:
+                    for atom in res.atoms():
+                        chemical_region.append(atom.index)
 
-        for res in topology.residues():
-            if res.index == 0:
-                for atom in res.atoms():
-                    alchemical_region.append(atom.index)
-            else:
-                for atom in res.atoms():
-                    chemical_region.append(atom.index)
         return alchemical_region, chemical_region
 
