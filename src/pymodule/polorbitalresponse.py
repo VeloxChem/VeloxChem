@@ -68,7 +68,6 @@ class PolOrbitalResponse(CphfSolver):
 
         self.frequencies = (0,)
         self.vector_components = 'xyz'
-        self.cphf_results = None
 
         #self.sqrt2 = np.sqrt(2.0)
 
@@ -1734,8 +1733,7 @@ class PolOrbitalResponse(CphfSolver):
                     DistributedArray(polorb_omega_xy, self.comm, root=mpi_master())
                 )
 
-        if self.rank == mpi_master():
-            self.cphf_results['dist_omega_ao'] = dist_polorb_omega
+        self.cphf_results['dist_omega_ao'] = dist_polorb_omega
            
         if self.rank == mpi_master():
             self.ostream.print_blank()
@@ -2039,8 +2037,7 @@ class PolOrbitalResponse(CphfSolver):
                 )
             dist_polorb_omega.extend(dist_polorb_omega_re + dist_polorb_omega_im)
 
-        if self.rank == mpi_master():
-            self.cphf_results['dist_omega_ao'] = dist_polorb_omega
+        self.cphf_results['dist_omega_ao'] = dist_polorb_omega
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '

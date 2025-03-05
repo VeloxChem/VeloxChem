@@ -916,12 +916,10 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
-            # merge the rhs dict with the solution
-            cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
+        # merge the rhs dict with the solution
+        cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
 
-            return cphf_ov_dict
-
-        return None
+        return cphf_ov_dict
 
     def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs):
         """
