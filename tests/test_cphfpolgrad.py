@@ -8,24 +8,18 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-#from veloxchem.cphfsolver import CphfSolver
 from veloxchem.lrsolver import LinearResponseSolver
 from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polorbitalresponse import PolOrbitalResponse
 
+
+@pytest.mark.solvers
 class TestCphfPolgrad:
 
     def run_cphfpolgrad_cg_real(self, molecule, basis, xcfun=None, label1=None, label2=None):
         # conjugate gradient solver
         scf_drv = ScfRestrictedDriver()
-        scf_dict = {}
-        method_settings = {}
-        if xcfun is not None:
-            scf_drv._dft = True
-            scf_drv.xcfun = xcfun
-            method_settings = {'xcfun': xcfun}
-
-        scf_drv.update_settings(scf_dict, method_settings)
+        scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
@@ -34,7 +28,7 @@ class TestCphfPolgrad:
         lr_drv = LinearResponseSolver()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
-        lr_drv.update_settings(rsp_settings, method_settings)
+        lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
@@ -42,7 +36,7 @@ class TestCphfPolgrad:
         cphfpolgrad_solver = PolOrbitalResponse()
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
                                 'use_subspace_solver': 'no'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
         cphfpolgrad_solver.compute_omega(molecule, basis, scf_tensors, lr_results)
@@ -76,17 +70,10 @@ class TestCphfPolgrad:
             assert np.max(np.abs(cphfpolgrad_omega_coefficients)
                                    - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6 
 
-    def run_cphfpolgrad_ss_real(self, molecule, basis, xcfun=None, label1=None, label2=None):
+    def run_cphfpolgrad_subspace_real(self, molecule, basis, xcfun=None, label1=None, label2=None):
         # subspace solver
         scf_drv = ScfRestrictedDriver()
-        scf_dict = {}
-        method_settings = {}
-        if xcfun is not None:
-            scf_drv._dft = True
-            scf_drv.xcfun = xcfun
-            method_settings = {'xcfun': xcfun}
-
-        scf_drv.update_settings(scf_dict, method_settings)
+        scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
@@ -95,7 +82,7 @@ class TestCphfPolgrad:
         lr_drv = LinearResponseSolver()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
-        lr_drv.update_settings(rsp_settings, method_settings)
+        lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
@@ -103,7 +90,7 @@ class TestCphfPolgrad:
         cphfpolgrad_solver = PolOrbitalResponse()
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
                                 'use_subspace_solver': 'yes'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
         cphfpolgrad_solver.compute_omega(molecule, basis, scf_tensors, lr_results)
@@ -152,14 +139,7 @@ class TestCphfPolgrad:
     def run_cphfpolgrad_cg_complex(self, molecule, basis, xcfun=None, label1=None, label2=None):
         # conjugate gradient solver
         scf_drv = ScfRestrictedDriver()
-        scf_dict = {}
-        method_settings = {}
-        if xcfun is not None:
-            scf_drv._dft = True
-            scf_drv.xcfun = xcfun
-            method_settings = {'xcfun': xcfun}
-
-        scf_drv.update_settings(scf_dict, method_settings)
+        scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
@@ -169,7 +149,7 @@ class TestCphfPolgrad:
         lr_drv = ComplexResponse()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
-        lr_drv.update_settings(rsp_settings, method_settings)
+        lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
@@ -178,7 +158,7 @@ class TestCphfPolgrad:
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
                                 'is_complex': 'yes', 'damping': 0.5,
                                 'use_subspace_solver': 'no'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
         cphfpolgrad_solver.compute_omega(molecule, basis, scf_tensors, lr_results)
@@ -212,16 +192,9 @@ class TestCphfPolgrad:
             assert np.max(np.abs(cphfpolgrad_omega_coefficients)
                                    - np.abs(cphfpolgrad_omega_reference)) < 1.0e-6 
 
-    def run_cphfpolgrad_ss_complex(self, molecule, basis, xcfun=None, label1=None, label2=None):
+    def run_cphfpolgrad_subspace_complex(self, molecule, basis, xcfun=None, label1=None, label2=None):
         scf_drv = ScfRestrictedDriver()
-        scf_dict = {}
-        method_settings = {}
-        if xcfun is not None:
-            scf_drv._dft = True
-            scf_drv.xcfun = xcfun
-            method_settings = {'xcfun': xcfun}
-
-        scf_drv.update_settings(scf_dict, method_settings)
+        scf_drv.xcfun = xcfun
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
@@ -231,7 +204,7 @@ class TestCphfPolgrad:
         lr_drv = ComplexResponse()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
-        lr_drv.update_settings(rsp_settings, method_settings)
+        lr_drv.update_settings(rsp_settings)
         lr_drv.ostream.mute()
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
@@ -240,7 +213,7 @@ class TestCphfPolgrad:
         cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
                                 'is_complex': 'yes', 'damping': 0.5,
                                 'use_subspace_solver': 'yes'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
         cphfpolgrad_solver.compute_omega(molecule, basis, scf_tensors, lr_results)
@@ -300,7 +273,7 @@ class TestCphfPolgrad:
 
         self.run_cphfpolgrad_cg_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real",
                                   "cphfpolgrad_omega_coefficients_red_real")
-        self.run_cphfpolgrad_ss_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real",
+        self.run_cphfpolgrad_subspace_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real",
                                   "cphfpolgrad_omega_coefficients_red_real")
 
     def test_cphfpolgrad_coefficients_complex(self):
@@ -317,7 +290,7 @@ class TestCphfPolgrad:
 
         self.run_cphfpolgrad_cg_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex",
                                      "cphfpolgrad_omega_coefficients_red_complex")
-        self.run_cphfpolgrad_ss_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex",
+        self.run_cphfpolgrad_subspace_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex",
                                      "cphfpolgrad_omega_coefficients_red_complex")
 
     def test_cpkspolgrad_coefficients_real(self):
@@ -335,7 +308,7 @@ class TestCphfPolgrad:
 
         self.run_cphfpolgrad_cg_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real",
                                   "cpkspolgrad_omega_coefficients_red_b3lyp_real")
-        self.run_cphfpolgrad_ss_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real",
+        self.run_cphfpolgrad_subspace_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real",
                                   "cpkspolgrad_omega_coefficients_red_b3lyp_real")
 
     def test_cpkspolgrad_coefficients_complex(self):
@@ -352,5 +325,5 @@ class TestCphfPolgrad:
 
         self.run_cphfpolgrad_cg_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex",
                                      "cpkspolgrad_omega_coefficients_red_b3lyp_complex")
-        self.run_cphfpolgrad_ss_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex",
+        self.run_cphfpolgrad_subspace_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex",
                                      "cpkspolgrad_omega_coefficients_red_b3lyp_complex")

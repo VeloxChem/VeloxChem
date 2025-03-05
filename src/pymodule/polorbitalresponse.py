@@ -33,8 +33,6 @@ from .inputparser import parse_input
 from .sanitychecks import polgrad_sanity_check
 from .oneeints import compute_electric_dipole_integrals
 from .distributedarray import DistributedArray
-from .batchsize import get_batch_size
-from .batchsize import get_number_of_batches
 from .profiler import Profiler
 
 
@@ -1259,115 +1257,6 @@ class PolOrbitalResponse(CphfSolver):
 
         return (perturbed_dm_ao_rere, perturbed_dm_ao_imim,
                perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
-
-    def set_dft_fmat_factor_and_type_real(self, fock_ao_rhs, zero_dm_ao):#fock_gxc_ao):
-        """
-        Sets of scale factor and fock type for Fock matrices to compute DFT E[3] term
-        for real RHS.
-
-        :param fock_ao_rhs:
-            The general Fock matrix in AO basis.
-        :param zero_dm_ao:
-            Empty AODensityMatrix in same dimensions as the Fock matrices.
-        :param fock_gxc_ao:
-            Fock matrix for g^xc term in AO basis.
-
-        :return fock_ao_rhs:
-            Input param modified with set scale factor and fock type.
-        :return fock_gxc_ao:
-            Input param modified with set scale factor and fock type.
-        """
-
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        # Fock matrix for computing the DFT E[3] term g^xc
-        fock_gxc_ao = AOFockMatrix(zero_dm_ao)
-
-        if self.xcfun.is_hybrid():
-            fact_xc = self.xcfun.get_frac_exact_exchange()
-            for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
-                fock_ao_rhs.set_scale_factor(fact_xc, ifock)
-            for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                fock_gxc_ao.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
-            for ifock in range(dof**2):
-                fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
-        else:
-            for ifock in range(dof**2):
-                fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
-            for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
-
-        return fock_ao_rhs, fock_gxc_ao
-
-    def set_dft_fmat_factor_and_type_complex(self, fock_ao_rhs_real, fock_ao_rhs_imag,
-                                          zero_dm_ao):
-        """
-        Sets of scale factor and fock type for Fock matrices to compute DFT E[3] term
-        for complex RHS.
-
-        :param fock_ao_rhs_real/imag:
-            The general Fock matrix in AO basis.
-        :param zero_dm_ao:
-            Empty AODensityMatrix in same dimensions as the Fock matrices.
-        :param fock_gxc_ao:
-            Fock matrix for g^xc term in AO basis.
-
-        :return fock_ao_rhs_real/imag:
-            Input param modified with set scale factor and fock type.
-        :return fock_gxc_ao_rere/imim/reim/imre:
-            Input param modified with set scale factor and fock type.
-        """
-
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        # Fock matrix for computing the DFT E[3] term g^xc
-        fock_gxc_ao_rere = AOFockMatrix(zero_dm_ao)
-        fock_gxc_ao_imim = AOFockMatrix(zero_dm_ao)
-        fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
-        fock_gxc_ao_imre = AOFockMatrix(zero_dm_ao)
-
-        if self.xcfun.is_hybrid():
-            fact_xc = self.xcfun.get_frac_exact_exchange()
-            for ifock in range(fock_ao_rhs_real.number_of_fock_matrices()):
-                fock_ao_rhs_real.set_scale_factor(fact_xc, ifock)
-                fock_ao_rhs_imag.set_scale_factor(fact_xc, ifock)
-            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                fock_gxc_ao_rere.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_imim.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_reim.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_imre.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_rere.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_gxc_ao_imim.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_gxc_ao_reim.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_gxc_ao_imre.set_fock_type(fockmat.rgenjkx, ifock)
-            for ifock in range(dof**2):
-                fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs_real.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.rgenjkx, ifock)
-        else:
-            for ifock in range(dof**2):
-                fock_ao_rhs_real.set_fock_type(fockmat.restj, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.restj, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs_real.set_fock_type(fockmat.rgenj, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.rgenj, ifock)
-            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                fock_gxc_ao_rere.set_fock_type(fockmat.rgenj, ifock)
-                fock_gxc_ao_imim.set_fock_type(fockmat.rgenj, ifock)
-                fock_gxc_ao_reim.set_fock_type(fockmat.rgenj, ifock)
-                fock_gxc_ao_imre.set_fock_type(fockmat.rgenj, ifock)
-
-        return (fock_ao_rhs_real, fock_ao_rhs_imag, fock_gxc_ao_rere,
-                fock_gxc_ao_imim, fock_gxc_ao_reim, fock_gxc_ao_imre)
 
     def integrate_gxc_real(self, molecule, basis, molgrid, gs_density,
                            zero_dm_ao, perturbed_dm_ao, fock_gxc_ao):
