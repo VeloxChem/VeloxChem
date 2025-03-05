@@ -28,6 +28,8 @@ from io import StringIO
 import numpy as np
 import h5py
 import sys
+from .profiler import Profiler
+import multiprocessing as mp
 from mpi4py import MPI
 
 from .outputstream import OutputStream
@@ -77,14 +79,14 @@ class InterpolationDatapoint:
         :param z_matrix: a list of tuples with atom indices (starting at 0)
         that define bonds, bond angles, and dihedral angles.
         """
-        if comm is None:
-            comm = MPI.COMM_WORLD
+        # if comm is None:
+        #     comm = MPI.COMM_WORLD
 
-        if ostream is None:
-            ostream = OutputStream(sys.stdout)
+        # if ostream is None:
+        #     ostream = OutputStream(sys.stdout)
 
-        self.comm = None
-        self.ostream = ostream
+        # self.comm = None
+        # self.ostream = ostream
 
         self.point_label = None
 
@@ -471,7 +473,6 @@ class InterpolationDatapoint:
         # vice-versa.
         self.calculate_b_matrix()
         self.calculate_b2_matrix()
-        self.ostream.flush()
         self.compute_internal_coordinates_values()
 
         # The gradient and Hessian are reset to None.
