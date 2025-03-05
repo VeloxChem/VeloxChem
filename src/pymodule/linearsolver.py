@@ -48,7 +48,7 @@ from .sanitychecks import dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .dftutils import get_default_grid_level, print_libxc_reference
+from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
@@ -369,7 +369,7 @@ class LinearSolver:
         """
 
         if self._dft:
-            print_libxc_reference(self.xcfun, self.ostream)
+            print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
@@ -1501,14 +1501,19 @@ class LinearSolver:
             True if a graceful exit is needed, False otherwise.
         """
 
+        need_exit = False
+
         if self.program_end_time is not None:
             remaining_hours = (self.program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < next_iter_in_hours * 1.25:
-                return True
-        return False
+                need_exit = True
+
+        need_exit = self.comm.bcast(need_exit, root=mpi_master())
+
+        return need_exit
 
     def _print_header(self, title, nstates=None, n_freqs=None, n_points=None):
         """

@@ -1466,7 +1466,7 @@ class VibrationalAnalysis:
             raise ImportError("py3Dmol is required for this functionality")
 
         assert_msg_critical(
-            mode <= len(vib_results['normal_modes']),
+            1 <= mode and mode <= len(vib_results['normal_modes']),
             "Your asking to animate the " + str(mode) +
             "th mode but the molecule only has " +
             str(len(vib_results['normal_modes'])) + " normal modes.")

@@ -8,6 +8,9 @@ on:
       - multipsi_newcore
       - embedding_test
       - c_pcm
+      - dft-update
+      - ri-test
+      - ri-grad-test
 
 jobs:
   vlx_ci:

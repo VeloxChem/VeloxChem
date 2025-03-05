@@ -84,6 +84,18 @@ void comp_boys_args(CSimdArray<double>& bf_data,
                     const double        a_exp,
                     const double        omega);
 
+/// Computes Boys function arguments.
+/// @param bf_data The Boys function data.
+/// @param index_args The primary row index of arguments in Boys function data.
+/// @param buffer The SIMD array containing R(AB) distances.
+/// @param index_ab The primary row index of R(AB) distances in SIMD array.
+/// @param a_exp The exponent on A center.
+void comp_boys_args_with_rho(CSimdArray<double>& bf_data,
+                             const size_t index_args,
+                             CSimdArray<double>& buffer,
+                             const size_t index_ab,
+                             const double a_exp);
+
 /// @brief Reduces primitive array to contracted array.
 /// @param cbuffer The contracted array.
 /// @param pbuffer The primitive array.

@@ -31,6 +31,9 @@
 #include "DftFunc.hpp"
 #include "MathFunc.hpp"
 #include "MatrixFunc.hpp"
+#include "SphericalMomentum.hpp"
+
+#define ANGULAR_MOMENTUM_D 2
 
 namespace gtoval {  // gtoval namespace
 
@@ -40,10 +43,17 @@ auto get_lda_values_rec_d(const CGtoBlock&            gto_block,
                           const std::vector<double>&  grid_coords_z,
                           const std::vector<int>& gtos_mask) -> CMatrix
 {
-    // spherical transformation factors
+    // spherical-Cartesian transformation factors
 
-    const double f2_3 = 2.0 * std::sqrt(3.0);
-    
+    auto nsph = ANGULAR_MOMENTUM_D * 2 + 1;
+
+    std::vector<std::vector<std::pair<int, double>>> sph_cart_coefs(nsph);
+
+    for (int isph = 0; isph < nsph; isph++)
+    {
+        sph_cart_coefs[isph] = spher_mom::transformation_factors<ANGULAR_MOMENTUM_D>(isph);
+    }
+
     // set up GTO values storage
 
     if (const size_t nrows = static_cast<size_t>(std::ranges::count(gtos_mask, 1)); nrows > 0)
@@ -95,6 +105,8 @@ auto get_lda_values_rec_d(const CGtoBlock&            gto_block,
         std::vector<double> buffer_yz(ncols);
 
         std::vector<double> buffer_zz(ncols);
+
+        std::vector<std::vector<double>*> buffer_refs({&buffer_xx, &buffer_xy, &buffer_xz, &buffer_yy, &buffer_yz, &buffer_zz});
 
         auto ptr_buffer_xx = buffer_xx.data();
 
@@ -171,22 +183,17 @@ auto get_lda_values_rec_d(const CGtoBlock&            gto_block,
         
                 // distribute GTO values into submatrix
         
-                gtoval::distribute(submat, buffer_xx, -1.0, 2 * nrows + irow);
+                for (int isph = 0; isph < nsph; isph++)
+                {
+                    for (int icomp = 0; icomp < static_cast<int>(sph_cart_coefs[isph].size()); icomp++)
+                    {
+                        auto icart = sph_cart_coefs[isph][icomp].first;
+                        auto fcart = sph_cart_coefs[isph][icomp].second;
 
-                gtoval::distribute(submat, buffer_xx, 0.5 * f2_3, 4 * nrows + irow);
+                        gtoval::distribute(submat, *(buffer_refs[icart]), fcart, isph * nrows + irow);
+                    }
+                }
 
-                gtoval::distribute(submat, buffer_xy, f2_3, irow);
-
-                gtoval::distribute(submat, buffer_xz, f2_3, 3 * nrows + irow);
-
-                gtoval::distribute(submat, buffer_yy, -1.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat, buffer_yy, -0.5 * f2_3, 4 * nrows + irow);
-
-                gtoval::distribute(submat, buffer_yz, f2_3, nrows + irow);
-
-                gtoval::distribute(submat, buffer_zz, 2.0, 2 * nrows + irow);
-    
                 irow++;
             }
         }
@@ -206,9 +213,16 @@ get_gga_values_rec_d(const CGtoBlock&            gto_block,
                      const std::vector<double>&  grid_coords_z,
                      const std::vector<int>&     gtos_mask) -> CMatrix
 {
-    // spherical transformation factors
+    // spherical-Cartesian transformation factors
 
-    const double f2_3 = 2.0 * std::sqrt(3.0);
+    auto nsph = ANGULAR_MOMENTUM_D * 2 + 1;
+
+    std::vector<std::vector<std::pair<int, double>>> sph_cart_coefs(nsph);
+
+    for (int isph = 0; isph < nsph; isph++)
+    {
+        sph_cart_coefs[isph] = spher_mom::transformation_factors<ANGULAR_MOMENTUM_D>(isph);
+    }
 
     // set up GTO values storage
 
@@ -303,6 +317,11 @@ get_gga_values_rec_d(const CGtoBlock&            gto_block,
         std::vector<double> buffer_z_yz(ncols);
         
         std::vector<double> buffer_z_zz(ncols);
+
+        std::vector<std::vector<double>*> buffer_0_refs({&buffer_0_xx, &buffer_0_xy, &buffer_0_xz, &buffer_0_yy, &buffer_0_yz, &buffer_0_zz});
+        std::vector<std::vector<double>*> buffer_x_refs({&buffer_x_xx, &buffer_x_xy, &buffer_x_xz, &buffer_x_yy, &buffer_x_yz, &buffer_x_zz});
+        std::vector<std::vector<double>*> buffer_y_refs({&buffer_y_xx, &buffer_y_xy, &buffer_y_xz, &buffer_y_yy, &buffer_y_yz, &buffer_y_zz});
+        std::vector<std::vector<double>*> buffer_z_refs({&buffer_z_xx, &buffer_z_xy, &buffer_z_xz, &buffer_z_yy, &buffer_z_yz, &buffer_z_zz});
 
         auto ptr_buffer_0_xx = buffer_0_xx.data();
         
@@ -495,70 +514,20 @@ get_gga_values_rec_d(const CGtoBlock&            gto_block,
         
                 // distribute GTO values into submatrix
         
-                gtoval::distribute(submat_0, buffer_0_xx, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_0, buffer_0_xx, 0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_0, buffer_0_xy, f2_3, irow);
-                
-                gtoval::distribute(submat_0, buffer_0_xz, f2_3, 3 * nrows + irow);
-                
-                gtoval::distribute(submat_0, buffer_0_yy, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_0, buffer_0_yy, -0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_0, buffer_0_yz, f2_3, nrows + irow);
-                
-                gtoval::distribute(submat_0, buffer_0_zz, 2.0, 2 * nrows + irow);
+                for (int isph = 0; isph < nsph; isph++)
+                {
+                    for (int icomp = 0; icomp < static_cast<int>(sph_cart_coefs[isph].size()); icomp++)
+                    {
+                        auto icart = sph_cart_coefs[isph][icomp].first;
+                        auto fcart = sph_cart_coefs[isph][icomp].second;
 
-                gtoval::distribute(submat_x, buffer_x_xx, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_x, buffer_x_xx, 0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_x, buffer_x_xy, f2_3, irow);
-                
-                gtoval::distribute(submat_x, buffer_x_xz, f2_3, 3 * nrows + irow);
-                
-                gtoval::distribute(submat_x, buffer_x_yy, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_x, buffer_x_yy, -0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_x, buffer_x_yz, f2_3, nrows + irow);
-                
-                gtoval::distribute(submat_x, buffer_x_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_0, *(buffer_0_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_x, *(buffer_x_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_y, *(buffer_y_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_z, *(buffer_z_refs[icart]), fcart, isph * nrows + irow);
+                    }
+                }
 
-                gtoval::distribute(submat_y, buffer_y_xx, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_y, buffer_y_xx, 0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_y, buffer_y_xy, f2_3, irow);
-                
-                gtoval::distribute(submat_y, buffer_y_xz, f2_3, 3 * nrows + irow);
-                
-                gtoval::distribute(submat_y, buffer_y_yy, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_y, buffer_y_yy, -0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_y, buffer_y_yz, f2_3, nrows + irow);
-                
-                gtoval::distribute(submat_y, buffer_y_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_z, buffer_z_xx, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_z, buffer_z_xx, 0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_z, buffer_z_xy, f2_3, irow);
-                
-                gtoval::distribute(submat_z, buffer_z_xz, f2_3, 3 * nrows + irow);
-                
-                gtoval::distribute(submat_z, buffer_z_yy, -1.0, 2 * nrows + irow);
-                
-                gtoval::distribute(submat_z, buffer_z_yy, -0.5 * f2_3, 4 * nrows + irow);
-                
-                gtoval::distribute(submat_z, buffer_z_yz, f2_3, nrows + irow);
-                
-                gtoval::distribute(submat_z, buffer_z_zz, 2.0, 2 * nrows + irow);
-    
                 irow++;
             }
         }
@@ -578,9 +547,16 @@ get_mgga_values_rec_d(const CGtoBlock&            gto_block,
                      const std::vector<double>&  grid_coords_z,
                      const std::vector<int>&     gtos_mask) -> CMatrix
 {
-    // spherical transformation factors
+    // spherical-Cartesian transformation factors
 
-    const double f2_3 = 2.0 * std::sqrt(3.0);
+    auto nsph = ANGULAR_MOMENTUM_D * 2 + 1;
+
+    std::vector<std::vector<std::pair<int, double>>> sph_cart_coefs(nsph);
+
+    for (int isph = 0; isph < nsph; isph++)
+    {
+        sph_cart_coefs[isph] = spher_mom::transformation_factors<ANGULAR_MOMENTUM_D>(isph);
+    }
 
     // set up GTO values storage
 
@@ -702,6 +678,19 @@ get_mgga_values_rec_d(const CGtoBlock&            gto_block,
         std::vector<double> buffer_zz_yy(ncols);
         std::vector<double> buffer_zz_yz(ncols);
         std::vector<double> buffer_zz_zz(ncols);
+
+        std::vector<std::vector<double>*> buffer_0_refs({&buffer_0_xx, &buffer_0_xy, &buffer_0_xz, &buffer_0_yy, &buffer_0_yz, &buffer_0_zz});
+
+        std::vector<std::vector<double>*> buffer_x_refs({&buffer_x_xx, &buffer_x_xy, &buffer_x_xz, &buffer_x_yy, &buffer_x_yz, &buffer_x_zz});
+        std::vector<std::vector<double>*> buffer_y_refs({&buffer_y_xx, &buffer_y_xy, &buffer_y_xz, &buffer_y_yy, &buffer_y_yz, &buffer_y_zz});
+        std::vector<std::vector<double>*> buffer_z_refs({&buffer_z_xx, &buffer_z_xy, &buffer_z_xz, &buffer_z_yy, &buffer_z_yz, &buffer_z_zz});
+
+        std::vector<std::vector<double>*> buffer_xx_refs({&buffer_xx_xx, &buffer_xx_xy, &buffer_xx_xz, &buffer_xx_yy, &buffer_xx_yz, &buffer_xx_zz});
+        std::vector<std::vector<double>*> buffer_xy_refs({&buffer_xy_xx, &buffer_xy_xy, &buffer_xy_xz, &buffer_xy_yy, &buffer_xy_yz, &buffer_xy_zz});
+        std::vector<std::vector<double>*> buffer_xz_refs({&buffer_xz_xx, &buffer_xz_xy, &buffer_xz_xz, &buffer_xz_yy, &buffer_xz_yz, &buffer_xz_zz});
+        std::vector<std::vector<double>*> buffer_yy_refs({&buffer_yy_xx, &buffer_yy_xy, &buffer_yy_xz, &buffer_yy_yy, &buffer_yy_yz, &buffer_yy_zz});
+        std::vector<std::vector<double>*> buffer_yz_refs({&buffer_yz_xx, &buffer_yz_xy, &buffer_yz_xz, &buffer_yz_yy, &buffer_yz_yz, &buffer_yz_zz});
+        std::vector<std::vector<double>*> buffer_zz_refs({&buffer_zz_xx, &buffer_zz_xy, &buffer_zz_xz, &buffer_zz_yy, &buffer_zz_yz, &buffer_zz_zz});
 
         auto ptr_buffer_0_xx = buffer_0_xx.data();
         auto ptr_buffer_0_xy = buffer_0_xy.data();
@@ -972,96 +961,28 @@ get_mgga_values_rec_d(const CGtoBlock&            gto_block,
         
                 // distribute GTO values into submatrix
         
-                gtoval::distribute(submat_0, buffer_0_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_xy, f2_3, irow);
-                gtoval::distribute(submat_0, buffer_0_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_zz, 2.0, 2 * nrows + irow);
+                for (int isph = 0; isph < nsph; isph++)
+                {
+                    for (int icomp = 0; icomp < static_cast<int>(sph_cart_coefs[isph].size()); icomp++)
+                    {
+                        auto icart = sph_cart_coefs[isph][icomp].first;
+                        auto fcart = sph_cart_coefs[isph][icomp].second;
 
-                gtoval::distribute(submat_x, buffer_x_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_xy, f2_3, irow);
-                gtoval::distribute(submat_x, buffer_x_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_0, *(buffer_0_refs[icart]), fcart, isph * nrows + irow);
 
-                gtoval::distribute(submat_y, buffer_y_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_xy, f2_3, irow);
-                gtoval::distribute(submat_y, buffer_y_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_x, *(buffer_x_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_y, *(buffer_y_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_z, *(buffer_z_refs[icart]), fcart, isph * nrows + irow);
 
-                gtoval::distribute(submat_z, buffer_z_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_xy, f2_3, irow);
-                gtoval::distribute(submat_z, buffer_z_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_zz, 2.0, 2 * nrows + irow);
-    
-                gtoval::distribute(submat_xx, buffer_xx_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_xy, f2_3, irow);
-                gtoval::distribute(submat_xx, buffer_xx_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_xx, *(buffer_xx_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xy, *(buffer_xy_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xz, *(buffer_xz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_yy, *(buffer_yy_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_yz, *(buffer_yz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_zz, *(buffer_zz_refs[icart]), fcart, isph * nrows + irow);
+                    }
+                }
 
-                gtoval::distribute(submat_xy, buffer_xy_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_xy, f2_3, irow);
-                gtoval::distribute(submat_xy, buffer_xy_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_xz, buffer_xz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_xy, f2_3, irow);
-                gtoval::distribute(submat_xz, buffer_xz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_zz, 2.0, 2 * nrows + irow);
-    
-                gtoval::distribute(submat_yy, buffer_yy_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_xy, f2_3, irow);
-                gtoval::distribute(submat_yy, buffer_yy_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_yz, buffer_yz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_xy, f2_3, irow);
-                gtoval::distribute(submat_yz, buffer_yz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_zz, buffer_zz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_xy, f2_3, irow);
-                gtoval::distribute(submat_zz, buffer_zz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_zz, 2.0, 2 * nrows + irow);
-    
                 irow++;
             }
         }
@@ -1081,9 +1002,16 @@ get_3rd_order_values_rec_d(const CGtoBlock&            gto_block,
                            const std::vector<double>&  grid_coords_z,
                            const std::vector<int>&     gtos_mask) -> CMatrix
 {
-    // spherical transformation factors
+    // spherical-Cartesian transformation factors
 
-    const double f2_3 = 2.0 * std::sqrt(3.0);
+    auto nsph = ANGULAR_MOMENTUM_D * 2 + 1;
+
+    std::vector<std::vector<std::pair<int, double>>> sph_cart_coefs(nsph);
+
+    for (int isph = 0; isph < nsph; isph++)
+    {
+        sph_cart_coefs[isph] = spher_mom::transformation_factors<ANGULAR_MOMENTUM_D>(isph);
+    }
 
     // set up GTO values storage
 
@@ -1286,6 +1214,30 @@ get_3rd_order_values_rec_d(const CGtoBlock&            gto_block,
         std::vector<double> buffer_zzz_yy(ncols);
         std::vector<double> buffer_zzz_yz(ncols);
         std::vector<double> buffer_zzz_zz(ncols);
+
+        std::vector<std::vector<double>*> buffer_0_refs({&buffer_0_xx, &buffer_0_xy, &buffer_0_xz, &buffer_0_yy, &buffer_0_yz, &buffer_0_zz});
+
+        std::vector<std::vector<double>*> buffer_x_refs({&buffer_x_xx, &buffer_x_xy, &buffer_x_xz, &buffer_x_yy, &buffer_x_yz, &buffer_x_zz});
+        std::vector<std::vector<double>*> buffer_y_refs({&buffer_y_xx, &buffer_y_xy, &buffer_y_xz, &buffer_y_yy, &buffer_y_yz, &buffer_y_zz});
+        std::vector<std::vector<double>*> buffer_z_refs({&buffer_z_xx, &buffer_z_xy, &buffer_z_xz, &buffer_z_yy, &buffer_z_yz, &buffer_z_zz});
+
+        std::vector<std::vector<double>*> buffer_xx_refs({&buffer_xx_xx, &buffer_xx_xy, &buffer_xx_xz, &buffer_xx_yy, &buffer_xx_yz, &buffer_xx_zz});
+        std::vector<std::vector<double>*> buffer_xy_refs({&buffer_xy_xx, &buffer_xy_xy, &buffer_xy_xz, &buffer_xy_yy, &buffer_xy_yz, &buffer_xy_zz});
+        std::vector<std::vector<double>*> buffer_xz_refs({&buffer_xz_xx, &buffer_xz_xy, &buffer_xz_xz, &buffer_xz_yy, &buffer_xz_yz, &buffer_xz_zz});
+        std::vector<std::vector<double>*> buffer_yy_refs({&buffer_yy_xx, &buffer_yy_xy, &buffer_yy_xz, &buffer_yy_yy, &buffer_yy_yz, &buffer_yy_zz});
+        std::vector<std::vector<double>*> buffer_yz_refs({&buffer_yz_xx, &buffer_yz_xy, &buffer_yz_xz, &buffer_yz_yy, &buffer_yz_yz, &buffer_yz_zz});
+        std::vector<std::vector<double>*> buffer_zz_refs({&buffer_zz_xx, &buffer_zz_xy, &buffer_zz_xz, &buffer_zz_yy, &buffer_zz_yz, &buffer_zz_zz});
+
+        std::vector<std::vector<double>*> buffer_xxx_refs({&buffer_xxx_xx, &buffer_xxx_xy, &buffer_xxx_xz, &buffer_xxx_yy, &buffer_xxx_yz, &buffer_xxx_zz});
+        std::vector<std::vector<double>*> buffer_xxy_refs({&buffer_xxy_xx, &buffer_xxy_xy, &buffer_xxy_xz, &buffer_xxy_yy, &buffer_xxy_yz, &buffer_xxy_zz});
+        std::vector<std::vector<double>*> buffer_xxz_refs({&buffer_xxz_xx, &buffer_xxz_xy, &buffer_xxz_xz, &buffer_xxz_yy, &buffer_xxz_yz, &buffer_xxz_zz});
+        std::vector<std::vector<double>*> buffer_xyy_refs({&buffer_xyy_xx, &buffer_xyy_xy, &buffer_xyy_xz, &buffer_xyy_yy, &buffer_xyy_yz, &buffer_xyy_zz});
+        std::vector<std::vector<double>*> buffer_xyz_refs({&buffer_xyz_xx, &buffer_xyz_xy, &buffer_xyz_xz, &buffer_xyz_yy, &buffer_xyz_yz, &buffer_xyz_zz});
+        std::vector<std::vector<double>*> buffer_xzz_refs({&buffer_xzz_xx, &buffer_xzz_xy, &buffer_xzz_xz, &buffer_xzz_yy, &buffer_xzz_yz, &buffer_xzz_zz});
+        std::vector<std::vector<double>*> buffer_yyy_refs({&buffer_yyy_xx, &buffer_yyy_xy, &buffer_yyy_xz, &buffer_yyy_yy, &buffer_yyy_yz, &buffer_yyy_zz});
+        std::vector<std::vector<double>*> buffer_yyz_refs({&buffer_yyz_xx, &buffer_yyz_xy, &buffer_yyz_xz, &buffer_yyz_yy, &buffer_yyz_yz, &buffer_yyz_zz});
+        std::vector<std::vector<double>*> buffer_yzz_refs({&buffer_yzz_xx, &buffer_yzz_xy, &buffer_yzz_xz, &buffer_yzz_yy, &buffer_yzz_yz, &buffer_yzz_zz});
+        std::vector<std::vector<double>*> buffer_zzz_refs({&buffer_zzz_xx, &buffer_zzz_xy, &buffer_zzz_xz, &buffer_zzz_yy, &buffer_zzz_yz, &buffer_zzz_zz});
 
         auto ptr_buffer_0_xx = buffer_0_xx.data();
         auto ptr_buffer_0_xy = buffer_0_xy.data();
@@ -1764,186 +1716,39 @@ get_3rd_order_values_rec_d(const CGtoBlock&            gto_block,
         
                 // distribute GTO values into submatrix
         
-                gtoval::distribute(submat_0, buffer_0_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_xy, f2_3, irow);
-                gtoval::distribute(submat_0, buffer_0_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_0, buffer_0_zz, 2.0, 2 * nrows + irow);
+                for (int isph = 0; isph < nsph; isph++)
+                {
+                    for (int icomp = 0; icomp < static_cast<int>(sph_cart_coefs[isph].size()); icomp++)
+                    {
+                        auto icart = sph_cart_coefs[isph][icomp].first;
+                        auto fcart = sph_cart_coefs[isph][icomp].second;
 
-                gtoval::distribute(submat_x, buffer_x_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_xy, f2_3, irow);
-                gtoval::distribute(submat_x, buffer_x_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_x, buffer_x_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_0, *(buffer_0_refs[icart]), fcart, isph * nrows + irow);
 
-                gtoval::distribute(submat_y, buffer_y_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_xy, f2_3, irow);
-                gtoval::distribute(submat_y, buffer_y_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_y, buffer_y_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_x, *(buffer_x_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_y, *(buffer_y_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_z, *(buffer_z_refs[icart]), fcart, isph * nrows + irow);
 
-                gtoval::distribute(submat_z, buffer_z_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_xy, f2_3, irow);
-                gtoval::distribute(submat_z, buffer_z_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_z, buffer_z_zz, 2.0, 2 * nrows + irow);
-    
-                gtoval::distribute(submat_xx, buffer_xx_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_xy, f2_3, irow);
-                gtoval::distribute(submat_xx, buffer_xx_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xx, buffer_xx_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_xx, *(buffer_xx_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xy, *(buffer_xy_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xz, *(buffer_xz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_yy, *(buffer_yy_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_yz, *(buffer_yz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_zz, *(buffer_zz_refs[icart]), fcart, isph * nrows + irow);
 
-                gtoval::distribute(submat_xy, buffer_xy_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_xy, f2_3, irow);
-                gtoval::distribute(submat_xy, buffer_xy_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xy, buffer_xy_zz, 2.0, 2 * nrows + irow);
+                        gtoval::distribute(submat_xxx, *(buffer_xxx_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xxy, *(buffer_xxy_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xxz, *(buffer_xxz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xyy, *(buffer_xyy_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xyz, *(buffer_xyz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_xzz, *(buffer_xzz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_yyy, *(buffer_yyy_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_yyz, *(buffer_yyz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_yzz, *(buffer_yzz_refs[icart]), fcart, isph * nrows + irow);
+                        gtoval::distribute(submat_zzz, *(buffer_zzz_refs[icart]), fcart, isph * nrows + irow);
+                    }
+                }
 
-                gtoval::distribute(submat_xz, buffer_xz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_xy, f2_3, irow);
-                gtoval::distribute(submat_xz, buffer_xz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xz, buffer_xz_zz, 2.0, 2 * nrows + irow);
-    
-                gtoval::distribute(submat_yy, buffer_yy_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_xy, f2_3, irow);
-                gtoval::distribute(submat_yy, buffer_yy_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_yy, buffer_yy_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_yz, buffer_yz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_xy, f2_3, irow);
-                gtoval::distribute(submat_yz, buffer_yz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_yz, buffer_yz_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_zz, buffer_zz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_xy, f2_3, irow);
-                gtoval::distribute(submat_zz, buffer_zz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_zz, buffer_zz_zz, 2.0, 2 * nrows + irow);
-    
-                gtoval::distribute(submat_xxx, buffer_xxx_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xxx, buffer_xxx_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xxx, buffer_xxx_xy, f2_3, irow);
-                gtoval::distribute(submat_xxx, buffer_xxx_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xxx, buffer_xxx_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xxx, buffer_xxx_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xxx, buffer_xxx_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xxx, buffer_xxx_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_xxy, buffer_xxy_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xxy, buffer_xxy_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xxy, buffer_xxy_xy, f2_3, irow);
-                gtoval::distribute(submat_xxy, buffer_xxy_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xxy, buffer_xxy_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xxy, buffer_xxy_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xxy, buffer_xxy_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xxy, buffer_xxy_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_xxz, buffer_xxz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xxz, buffer_xxz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xxz, buffer_xxz_xy, f2_3, irow);
-                gtoval::distribute(submat_xxz, buffer_xxz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xxz, buffer_xxz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xxz, buffer_xxz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xxz, buffer_xxz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xxz, buffer_xxz_zz, 2.0, 2 * nrows + irow);
-    
-                gtoval::distribute(submat_xyy, buffer_xyy_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xyy, buffer_xyy_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xyy, buffer_xyy_xy, f2_3, irow);
-                gtoval::distribute(submat_xyy, buffer_xyy_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xyy, buffer_xyy_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xyy, buffer_xyy_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xyy, buffer_xyy_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xyy, buffer_xyy_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_xyz, buffer_xyz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xyz, buffer_xyz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xyz, buffer_xyz_xy, f2_3, irow);
-                gtoval::distribute(submat_xyz, buffer_xyz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xyz, buffer_xyz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xyz, buffer_xyz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xyz, buffer_xyz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xyz, buffer_xyz_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_xzz, buffer_xzz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xzz, buffer_xzz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xzz, buffer_xzz_xy, f2_3, irow);
-                gtoval::distribute(submat_xzz, buffer_xzz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_xzz, buffer_xzz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_xzz, buffer_xzz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_xzz, buffer_xzz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_xzz, buffer_xzz_zz, 2.0, 2 * nrows + irow);
-    
-                gtoval::distribute(submat_yyy, buffer_yyy_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yyy, buffer_yyy_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yyy, buffer_yyy_xy, f2_3, irow);
-                gtoval::distribute(submat_yyy, buffer_yyy_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_yyy, buffer_yyy_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yyy, buffer_yyy_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yyy, buffer_yyy_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_yyy, buffer_yyy_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_yyz, buffer_yyz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yyz, buffer_yyz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yyz, buffer_yyz_xy, f2_3, irow);
-                gtoval::distribute(submat_yyz, buffer_yyz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_yyz, buffer_yyz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yyz, buffer_yyz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yyz, buffer_yyz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_yyz, buffer_yyz_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_yzz, buffer_yzz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yzz, buffer_yzz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yzz, buffer_yzz_xy, f2_3, irow);
-                gtoval::distribute(submat_yzz, buffer_yzz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_yzz, buffer_yzz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_yzz, buffer_yzz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_yzz, buffer_yzz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_yzz, buffer_yzz_zz, 2.0, 2 * nrows + irow);
-
-                gtoval::distribute(submat_zzz, buffer_zzz_xx, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_zzz, buffer_zzz_xx, 0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_zzz, buffer_zzz_xy, f2_3, irow);
-                gtoval::distribute(submat_zzz, buffer_zzz_xz, f2_3, 3 * nrows + irow);
-                gtoval::distribute(submat_zzz, buffer_zzz_yy, -1.0, 2 * nrows + irow);
-                gtoval::distribute(submat_zzz, buffer_zzz_yy, -0.5 * f2_3, 4 * nrows + irow);
-                gtoval::distribute(submat_zzz, buffer_zzz_yz, f2_3, nrows + irow);
-                gtoval::distribute(submat_zzz, buffer_zzz_zz, 2.0, 2 * nrows + irow);
-    
                 irow++;
             }
         }
