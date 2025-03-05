@@ -62,7 +62,7 @@ class CThreeCenterElectronRepulsionGeom0X0Driver
     /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
     /// @param molecule The molecule.
     /// @param iatom The index of atom.
-    /// @return The nuclear potential matrix.
+    /// @return The electron repulsion integrals tensor.
     auto compute(const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
                  const CMolecule       &molecule,
