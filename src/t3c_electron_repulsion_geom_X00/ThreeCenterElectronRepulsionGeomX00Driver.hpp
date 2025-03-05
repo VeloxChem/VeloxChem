@@ -13,6 +13,7 @@
 #include "T3CUtils.hpp"
 #include "T3CGeomX00Distributor.hpp"
 #include "ThreeCenterElectronRepulsionGeom100Func.hpp"
+#include "T4CScreener.hpp"
 
 #include <iostream>
 
@@ -66,6 +67,20 @@ class CThreeCenterElectronRepulsionGeomX00Driver
                  const CMolecularBasis &aux_basis,
                  const CMolecule       &molecule,
                  const int             iatom) const -> CT3FlatBuffer<double>;
+    
+    /// @brief Computes electron repulsion matrix derivative fro molecule and molecular basis.
+    /// @param screener The screener with basis function pairs data.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
+    /// @param molecule The molecule.
+    /// @param iatom The index of atom.
+    /// @return The nuclear potential matrix.
+    auto compute(const CT4CScreener    &screener,
+                 const CMolecularBasis &basis,
+                 const CMolecularBasis &aux_basis,
+                 const CMolecule       &molecule,
+                 const int             iatom,
+                 const int             ithreshold) const -> CT3FlatBuffer<double>;
 };
 
 template <int N>
@@ -105,5 +120,52 @@ CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis &ba
     
     return buffer;
 }
+
+template <int N>
+auto
+CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CT4CScreener    &screener,
+                                                       const CMolecularBasis &basis,
+                                                       const CMolecularBasis &aux_basis,
+                                                       const CMolecule       &molecule,
+                                                       const int             iatom,
+                                                       const int             ithreshold) const -> CT3FlatBuffer<double>
+{
+    // set up GTOs data
+    
+    const auto bra_gto_blocks = gtofunc::make_gto_blocks(aux_basis, molecule, {iatom, });
+    
+    // set up composite flat tensor for integrals
+    
+    const auto mask_indices = t3cfunc::mask_indices(bra_gto_blocks);
+    
+    CT3FlatBuffer<double> buffer(mask_indices, basis.dimensions_of_basis(), 3);
+    
+    // set up distributor
+    
+    CT3CGeomX00Distributor distributor(&buffer);
+    
+    // main compute loop
+    
+    std::ranges::for_each(bra_gto_blocks, [&](const auto& gblock) {
+        auto bra_range = std::pair<size_t, size_t>{size_t{0}, gblock.number_of_basis_functions()};
+        for (const auto& gto_pair_block : screener.gto_pair_blocks())
+        {
+            for (int i = 0; i <= ithreshold; i++)
+            {
+                if (gto_pair_block.is_empty_gto_pair_block(i)) continue;
+                
+                const auto gp_pairs = gto_pair_block.gto_pair_block(i);
+                
+                if constexpr (N == 1)
+                {
+                    t3cerifunc::compute_geom_100(distributor, gblock, gp_pairs, bra_range);
+                }
+            }
+        }
+    });
+    
+    return buffer;
+}
+
 
 #endif /* ThreeCenterElectronRepulsionGeomX00Driver_hpp */
