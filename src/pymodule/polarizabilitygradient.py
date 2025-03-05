@@ -277,22 +277,22 @@ class PolarizabilityGradient:
 
             # number of input frequencies
             n_freqs = len(self.frequencies)
-
-            # if Lagr. multipliers not available as dist. array,
-            # read it from dict into variable on master
-            if 'dist_cphf_ov' not in all_orbrsp_results.keys():
-                all_cphf_red = all_orbrsp_results['cphf_ov']
-
-                if self.is_complex:
-                    all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
-                else:
-                    all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
         else:
             nocc = None
             nvir = None
+            n_freqs = None
 
-        nocc = self.comm.bcast(nocc, root=mpi_master())
-        nvir = self.comm.bcast(nvir, root=mpi_master())
+        nocc, nvir, n_freqs = self.comm.bcast((nocc, nvir, n_freqs), root=mpi_master())
+
+        # if Lagr. multipliers not available as dist. array,
+        # read it from dict into variable on master
+        if 'dist_cphf_ov' not in all_orbrsp_results.keys():
+            all_cphf_red = all_orbrsp_results['cphf_ov']
+
+            if self.is_complex:
+                all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
+            else:
+                all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
 
         for f, w in enumerate(self.frequencies):
 
@@ -377,9 +377,11 @@ class PolarizabilityGradient:
                 orbrsp_results = all_orbrsp_results[w]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
-                # Lagrange multipliers
-                omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
+            # Lagrange multipliers
+            omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
                
+            if self.rank == mpi_master():
+
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
                 lambda_ao = np.array([
