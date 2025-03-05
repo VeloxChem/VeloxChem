@@ -43,10 +43,10 @@ class TestPolgrad:
         polgrad_settings = {'frequencies': (0.0, 0.4)}
         an_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         an_polgrad_drv.ostream.mute()
-        an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
+        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
 
         if scf_drv.rank == mpi_master():
-            polgrad_results = an_polgrad_drv.polgradient
+            #polgrad_results = an_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
@@ -68,10 +68,10 @@ class TestPolgrad:
         cphf_settings = {}
         num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         num_polgrad_drv.ostream.mute()
-        num_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results=None)
+        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results=None)
 
         if scf_drv.rank == mpi_master():
-            polgrad_results = num_polgrad_drv.polgradient
+            #polgrad_results = num_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
@@ -116,10 +116,10 @@ class TestPolgrad:
                             'damping': 0.5}
         an_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         an_polgrad_drv.ostream.mute()
-        an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
+        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
 
         if scf_drv.rank == mpi_master():
-            polgrad_results = an_polgrad_drv.polgradient
+            #polgrad_results = an_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
@@ -141,10 +141,10 @@ class TestPolgrad:
                             'damping': 0.5, 'numerical': 'yes', 'do_four_point': 'yes'}
         num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         num_polgrad_drv.ostream.mute()
-        num_polgrad_drv.compute(molecule, basis, scf_tensors)
+        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_tensors)
 
         if scf_drv.rank == mpi_master():
-            polgrad_results = num_polgrad_drv.polgradient
+            #polgrad_results = num_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)

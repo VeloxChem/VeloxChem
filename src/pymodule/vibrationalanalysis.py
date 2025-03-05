@@ -660,10 +660,10 @@ class VibrationalAnalysis:
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
         # compute polarizability gradient
-        polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
 
         # save the gradient
-        self.polarizability_gradient = polgrad_drv.polgradient
+        self.polarizability_gradient = polgrad
 
     def print_vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
         """
