@@ -2,16 +2,18 @@ import numpy as np
 
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
-from veloxchem.veloxchemlib import compute_electric_field_integrals
-from veloxchem.veloxchemlib import compute_electric_field_potential_gradient
-from veloxchem.veloxchemlib import compute_electric_field_values
+from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import mpi_master
+from veloxchem.oneeints import compute_electric_field_integrals
+from veloxchem.oneeints import compute_electric_field_potential_gradient
+from veloxchem.oneeints import compute_electric_field_values
 from veloxchem.oneeints import compute_electric_field_fock_gradient
 from veloxchem.oneeints import compute_electric_field_potential_gradient_for_mm
 
 
 class TestOneElecIntsElectricField:
 
-    def get_molecule_and_basis(self):
+    def get_molecule_and_basis(self, basis_label):
 
         xyz_string = """3
         xyz
@@ -19,8 +21,6 @@ class TestOneElecIntsElectricField:
         H    0.5104418   0.8944555   0.5514190
         H    1.9926927   1.1973129   0.4956931
         """
-        basis_label = 'def2-svp'
-
         mol = Molecule.read_xyz_string(xyz_string)
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
@@ -523,7 +523,7 @@ class TestOneElecIntsElectricField:
 
     def test_electric_field_integrals(self):
 
-        mol, bas = self.get_molecule_and_basis()
+        mol, bas = self.get_molecule_and_basis('def2-svp')
         dipole_coords = self.get_dipole_coords()
         dipole_moments = self.get_dipole_moments()
 
@@ -561,7 +561,7 @@ class TestOneElecIntsElectricField:
 
     def test_electric_field_values(self):
 
-        mol, bas = self.get_molecule_and_basis()
+        mol, bas = self.get_molecule_and_basis('def2-svp')
         dipole_coords = self.get_dipole_coords()
         D = self.get_density_matrix()
 
@@ -569,3 +569,39 @@ class TestOneElecIntsElectricField:
         ref_ef_vals = self.get_ref_efield_values()
 
         assert np.max(np.abs(ef_vals - ref_ef_vals)) < 1.0e-7
+
+    def test_electric_field_def2tzvp(self):
+
+        mol, bas = self.get_molecule_and_basis('def2-tzvp')
+        dipole_coords = self.get_dipole_coords()
+        dipole_moments = self.get_dipole_moments()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            D = scf_results['D_alpha'] + scf_results['D_beta']
+        else:
+            D = None
+        D = scf_drv.comm.bcast(D, root=mpi_master())
+
+        ef_vals = compute_electric_field_values(mol, bas, dipole_coords, D)
+        ef_pot_grad = compute_electric_field_potential_gradient(
+            mol, bas, dipole_coords, dipole_moments, D)
+
+        ref_ef_vals = np.array(
+            [[0.309715361824, 0.141906715269, -0.170625297598],
+             [0.159337681902, 0.095001729925, -0.109176125518],
+             [0.319808147807, 0.224736469898, -0.058824195945],
+             [0.189067708934, 0.262044221637, 0.154275681358],
+             [0.325555449146, 0.568481863897, 0.404328413465],
+             [0.135943326227, 0.144452502538, 0.164480253099]])
+
+        ref_ef_pot_grad = np.array(
+            [[-0.012094417841, 0.027485947892, 0.052250181684],
+             [-0.003129538137, -0.00060841351, 0.003160702822],
+             [-0.000657150687, 0.000458545183, 0.001496181131]])
+
+        assert np.max(np.abs(ef_vals - ref_ef_vals)) < 1.0e-8
+        assert np.max(np.abs(ef_pot_grad - ref_ef_pot_grad)) < 1.0e-8
