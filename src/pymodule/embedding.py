@@ -26,13 +26,13 @@ from io import StringIO
 from contextlib import redirect_stdout
 import numpy as np
 
-from .veloxchemlib import (compute_electric_field_integrals,
-                           compute_electric_field_values,
-                           compute_electric_field_integrals_gradient)
 from .oneeints import (compute_nuclear_potential_integrals,
                        compute_nuclear_potential_gradient_bfs,
                        compute_electrostatic_potential_hessian,
                        compute_electrostatic_integrals_gradient,
+                       compute_electric_field_integrals,
+                       compute_electric_field_values,
+                       compute_electric_field_potential_gradient,
                        compute_electric_field_fock_gradient,
                        compute_electric_field_potential_gradient_for_mm,
                        compute_electric_field_potential_hessian)
@@ -196,7 +196,7 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64
         """
 
-        return compute_electric_field_integrals_gradient(
+        return compute_electric_field_potential_gradient(
             self.molecule, self.basis, coordinates, induced_dipoles, density_matrix)
 
     def electronic_induction_fock_gradient(self,
@@ -391,11 +391,11 @@ class EmbeddingIntegralDriver:
                 Shape: (3 * number of atoms, 3 * number of atoms)
                 Dtype: np.float64
         """
-        return compute_electric_field_potential_hessian(self.molecule,
-                                                        self.basis,
-                                                        coordinates,
-                                                        induced_dipoles,
-                                                        density_matrix)
+        return compute_electric_field_potential_hessian(molecule=self.molecule,
+                                                        basis=self.basis,
+                                                        dipole_coords=coordinates,
+                                                        dipole_moments=induced_dipoles,
+                                                        density=density_matrix)
 
 
 

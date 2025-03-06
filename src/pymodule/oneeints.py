@@ -33,6 +33,9 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
+from .veloxchemlib import compute_electric_field_integrals
+from .veloxchemlib import compute_electric_field_values
+from .veloxchemlib import compute_electric_field_potential_gradient
 from .veloxchemlib import compute_electric_field_fock_gradient
 from .veloxchemlib import compute_electric_field_potential_gradient_for_mm
 from .veloxchemlib import compute_electric_field_potential_hessian
