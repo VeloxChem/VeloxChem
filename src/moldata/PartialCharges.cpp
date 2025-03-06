@@ -40,7 +40,7 @@
 namespace parchg {  // parchg namespace
 
 auto
-getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vector<double>
+getPartialCharges(const CMolecule& molecule, const double netcharge, const int numGpuPerNode) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -172,7 +172,18 @@ getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vec
     auto Adim = Amat.getNumberOfRows();
     std::vector<double> Aevals(Adim);
     CDenseMatrix Aevecs(Amat);
-    gpu::diagonalizeMatrix(Aevecs.values(), Aevals.data(), Adim);
+
+    const auto numIndicesPerGpu = Aevecs.getNumberOfRows() / numGpuPerNode;
+
+    // empirical chosen cutoff, desired to have at least 1024 per GPU before using multi GPU version
+    if (numIndicesPerGpu < 1024)
+    {
+	gpu::diagonalizeMatrix(Aevecs.values(), Aevals.data(), Adim);
+    }
+    else
+    {
+	gpu::diagonalizeMatrixMultiGPU(Aevecs.values(), Aevals.data(), Adim, numGpuPerNode);
+    }
 
     CDenseMatrix Aevals_inv_diag(Adim, Adim);
     Aevals_inv_diag.zero();

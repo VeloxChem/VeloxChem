@@ -1,7 +1,8 @@
 from mpi4py import MPI
 import numpy as np
+import os
 
-from veloxchem.veloxchemlib import OverlapDriver
+from veloxchem.veloxchemlib import OverlapDriver, GpuDevices
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.sadguessdriver import SadGuessDriver
@@ -27,8 +28,14 @@ class TestInitialGuess:
             ovl_mat = ovl_drv.compute(mol, bas)
             S = ovl_mat.get_full_matrix().to_numpy()
 
+            if 'VLX_NUM_GPUS_PER_NODE' in os.environ:
+                num_gpus_per_node = int(os.environ['VLX_NUM_GPUS_PER_NODE'])
+            else:
+                devices = GpuDevices()
+                num_gpus_per_node = devices.get_number_devices()
+
             saddrv = SadGuessDriver()
-            D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, 'restricted', num_gpus_per_node)
 
             assert D.ndim == 2
             assert D.shape[0] == 24
@@ -50,7 +57,7 @@ class TestInitialGuess:
             mol.set_charge(charge + 2)
             mol.set_multiplicity(multiplicity)
 
-            D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, 'restricted', num_gpus_per_node)
 
             assert mol.number_of_electrons() == 8
             assert mol.number_of_alpha_electrons() == 4
@@ -63,7 +70,7 @@ class TestInitialGuess:
             mol.set_charge(charge - 2)
             mol.set_multiplicity(multiplicity)
 
-            D = saddrv.compute(mol, min_bas, bas, 'restricted')
+            D = saddrv.compute(mol, min_bas, bas, 'restricted', num_gpus_per_node)
 
             assert mol.number_of_electrons() == 12
             assert mol.number_of_alpha_electrons() == 6
@@ -76,7 +83,7 @@ class TestInitialGuess:
             mol.set_charge(charge + 1)
             mol.set_multiplicity(multiplicity + 1)
 
-            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted', num_gpus_per_node)
 
             assert mol.number_of_electrons() == 9
             assert mol.number_of_alpha_electrons() == 5
@@ -90,7 +97,7 @@ class TestInitialGuess:
             mol.set_charge(charge - 1)
             mol.set_multiplicity(multiplicity + 1)
 
-            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted', num_gpus_per_node)
 
             assert mol.number_of_electrons() == 11
             assert mol.number_of_alpha_electrons() == 6
@@ -104,7 +111,7 @@ class TestInitialGuess:
             mol.set_charge(charge)
             mol.set_multiplicity(multiplicity + 2)
 
-            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted')
+            Da, Db = saddrv.compute(mol, min_bas, bas, 'unrestricted', num_gpus_per_node)
 
             assert mol.number_of_electrons() == 10
             assert mol.number_of_alpha_electrons() == 6

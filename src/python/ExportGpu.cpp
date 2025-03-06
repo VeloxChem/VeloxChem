@@ -244,7 +244,9 @@ export_gpu(py::module& m)
 
             // diagonalize matrix
 
-            if (dim < 8192)
+	    const auto numIndicesPerGpu = dim / num_gpus_per_node;
+
+            if (numIndicesPerGpu < 1024)
             {
                 gpu::diagonalizeMatrix(evecs, evals, static_cast<int64_t>(nrows_A));
             }

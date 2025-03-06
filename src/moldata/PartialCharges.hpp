@@ -38,9 +38,10 @@ namespace parchg {  // parchg namespace
 
  @param molecule the molecule.
  @param netcharge net charge of the molecule.
+ @param numGpuPerNode Number of available gpus for multi gpu operations
  @return a vector of atomic partial charges for a molecule.
  */
-auto getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vector<double>;
+auto getPartialCharges(const CMolecule& molecule, const double netcharge, const int numGpuPerNode) -> std::vector<double>;
 
 }  // namespace parchg
 
