@@ -1,3 +1,27 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 from io import StringIO
 from contextlib import redirect_stderr
@@ -5,16 +29,17 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import boltzmann_in_hartreeperkelvin, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
     try:
         import pymbar
+    except ImportError:
+        pass
+    try:
         import scipy
-        import matplotlib.pyplot as plt
-        import matplotlib.colors as mcolors
-        from matplotlib.lines import Line2D
     except ImportError:
         pass
 
@@ -54,7 +79,8 @@ class EvbDataProcessing:
         self.alpha_guess: float = 0
         self.H12_guess: float = 10
 
-        self.kb = 8.3144621e-3 # kJ/molK #todo use vlx, but where can I find it?
+        # Boltzmann constant: ca 8.314e-3 kJ/mol/K
+        self.kb = boltzmann_in_hartreeperkelvin() * hartree_in_kjpermol()
         self.verbose: bool = True
 
         self.calculate_discrete = True
@@ -275,7 +301,7 @@ class EvbDataProcessing:
     def _get_FEP_and_EVB(self):
 
         for result in self.results.values():
-            Temp = result["Temp_step"]
+            # Temp = result["Temp_step"]
             E1_ref = result["E1_ref"]
             E2_ref = result["E2_ref"]
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12)
@@ -416,9 +442,9 @@ class EvbDataProcessing:
     @staticmethod
     def plot_dE_density(results):
 
-        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
+        import matplotlib.pyplot as plt
 
-        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+        assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
 
         result_count = len(results["configuration_results"])
         coordinate_bins = results["coordinate_bins"]
@@ -504,7 +530,9 @@ class EvbDataProcessing:
     @staticmethod
     def plot_results(results, plot_analytical=True, plot_discrete=True):
 
-        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        from matplotlib.lines import Line2D
 
         coordinate_bins = results["coordinate_bins"]
         Lambda = results["Lambda"]
@@ -573,7 +601,8 @@ class EvbDataProcessing:
     @staticmethod
     def plot_evb_details(results):
 
-        assert_msg_critical('matplotlib' in sys.modules, 'matplotlib is required for EvbDataProcessing.')
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
 
         result_count = len(results["configuration_results"])
         fig, ax = plt.subplots(1, result_count, figsize=(5 * result_count, 5))

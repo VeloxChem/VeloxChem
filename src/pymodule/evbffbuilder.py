@@ -1,3 +1,27 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 import numpy as np
 import networkx as nx
@@ -38,14 +62,12 @@ class EvbForceFieldBuilder():
         self.nodes = self.comm.Get_size()
 
         self.optimise: bool = False
-        self.reparameterise: bool = True
+        self.reparameterize: bool = True
 
         self.input_folder: str = "input_files"
 
         self.reactant: MMForceFieldGenerator = None
         self.products: list[MMForceFieldGenerator] = None
-        self.gaff_path = None
-        pass
 
     def build_forcefields(
         self,
@@ -63,7 +85,7 @@ class EvbForceFieldBuilder():
             reactant_input,
             reactant_charge,
             reactant_multiplicity,
-            self.reparameterise,
+            self.reparameterize,
             self.optimise,
         )
         self.reactant.ostream.flush()
@@ -78,7 +100,7 @@ class EvbForceFieldBuilder():
                     input,
                     product_charge[i],
                     product_multiplicity[i],  # type:ignore
-                    self.reparameterise,
+                    self.reparameterize,
                     self.optimise
                 ))
 
@@ -108,7 +130,7 @@ class EvbForceFieldBuilder():
         input: dict,
         charge: int,
         multiplicity: int,
-        reparameterise: bool,
+        reparameterize: bool,
         optimise: bool,
     ) -> MMForceFieldGenerator:
 
@@ -133,8 +155,6 @@ class EvbForceFieldBuilder():
                 molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
 
             forcefield = MMForceFieldGenerator()
-            if self.gaff_path is not None:
-                forcefield.force_field_data = self.gaff_path
 
             #Load or calculate the charges
             
@@ -148,7 +168,6 @@ class EvbForceFieldBuilder():
                 self.ostream.flush()
                 forcefield.create_topology(molecule)
             else:
-                
                 if max(molecule.get_masses()) > 84:
                     basis = MolecularBasis.read(molecule, "STO-6G", ostream=None)
                     self.ostream.print_info(
@@ -174,7 +193,7 @@ class EvbForceFieldBuilder():
                 forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
                 self.ostream.flush()
                 self.ostream.print_info("Creating topology")
-                forcefield.create_topology(molecule, basis, scf_result=scf_results)
+                forcefield.create_topology(molecule, basis, scf_results=scf_results)
 
             # The atomtypeidentifier returns water with no Lennard-Jones on the hydrogens, which leads to unstable simulations
             for atom in forcefield.atoms.values():
@@ -194,8 +213,8 @@ class EvbForceFieldBuilder():
                     atom['epsilon'] = epsilon
                     atom['comment'] = "Reaction-water hydrogen"         
 
-            #Reparameterise the forcefield if necessary and requested
-            if reparameterise:
+            #Reparameterize the forcefield if necessary and requested
+            if reparameterize:
                 self.ostream.print_info("Reparameterising force field.")
                 
                 if input["hessian"] is not None:
@@ -207,7 +226,7 @@ class EvbForceFieldBuilder():
                     xtb_hessian_drv.compute(molecule)
                     hessian = np.copy(xtb_hessian_drv.hessian)  # type: ignore
                 self.ostream.flush()
-                forcefield.reparametrize(hessian=hessian)
+                forcefield.reparameterize(hessian=hessian)
         return forcefield
 
     #Match the indices of the reactant and product forcefield generators

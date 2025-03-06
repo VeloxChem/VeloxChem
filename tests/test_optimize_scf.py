@@ -12,8 +12,6 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
 
-@pytest.mark.filterwarnings(
-    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 @pytest.mark.solvers
 class TestOptimizeSCF:
 

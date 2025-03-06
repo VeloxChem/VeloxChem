@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -32,18 +31,18 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
 from .xtbdriver import XtbDriver
-from .scfdriver import ScfDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
+from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
 
 try:
@@ -893,6 +892,7 @@ class OpenMMDynamics:
             opt_coordinates = qm_opt_coordinates
 
         # Convert the opt_coordinates to molecule objects
+
         opt_molecules = [Molecule.from_xyz_string(coords) for coords in opt_coordinates]
 
         return energies, opt_molecules
@@ -1139,6 +1139,9 @@ class OpenMMDynamics:
             self.driver_flag = 'USCF Driver'
         elif isinstance(self.qm_driver, ScfRestrictedOpenDriver):
             self.driver_flag = 'ROSCF Driver'
+        elif isinstance(self.qm_driver, InterpolationDriver):
+            self.driver_flag = 'IM Driver'
+        
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')
 
@@ -1149,6 +1152,7 @@ class OpenMMDynamics:
         self.kinetic_energies = []
         self.temperatures = []
         self.total_energies = []
+        self.dynamic_molecules = []
         
         save_freq = nsteps // snapshots if snapshots else nsteps
 
@@ -1183,7 +1187,7 @@ class OpenMMDynamics:
         # Set up reporting
         self.simulation.reporters.clear()
         self.simulation.reporters.append(app.PDBReporter(traj_file, save_freq))
-
+        
         # Print header
         print('QM/MM Simulation Parameters')
         print('=' * 60)
@@ -1222,7 +1226,8 @@ class OpenMMDynamics:
             pot = qm * unit.kilojoules_per_mole + qm_mm + mm
             self.total_potentials.append(pot.value_in_unit(unit.kilojoules_per_mole))
 
-            # Kinetic energy
+            # Kinetic energyex
+            
             kinetic = self.simulation.context.getState(getEnergy=True).getKineticEnergy()
             self.kinetic_energies.append(kinetic.value_in_unit(unit.kilojoules_per_mole))
 
@@ -2103,23 +2108,26 @@ class OpenMMDynamics:
                 positions_ang[atom1] = positions_ang[atom2] - direction * self.linking_atom_distance
 
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            self.dynamic_molecules.append(new_molecule)
 
         else:
             # Atom labels for the QM region
             atom_labels = [atom.element.symbol for atom in self.topology.atoms()]
             qm_atom_labels = [atom_labels[i] for i in self.qm_atoms]
             new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
+            self.dynamic_molecules.append(new_molecule)
 
         if self.basis is not None:
             basis = MolecularBasis.read(new_molecule, self.basis)
-            scf_result = self.qm_driver.compute(new_molecule, basis)
-            gradient = self.grad_driver.compute(new_molecule, basis, scf_result)
-            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+            scf_results = self.qm_driver.compute(new_molecule, basis)
+            gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
+            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
         else:
             self.qm_driver.compute(new_molecule)
-            self.grad_driver.compute(new_molecule)
-            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+            if self.driver_flag != 'IM Driver':
+                self.grad_driver.compute(new_molecule)
+            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
 
         return gradient, potential_kjmol
@@ -2158,7 +2166,7 @@ class OpenMMDynamics:
             context: The OpenMM context object.
         """
 
-        conversion_factor = (4.184 * hartree_in_kcalpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
+        conversion_factor = (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
         new_positions = context.getState(getPositions=True).getPositions()
 
         # Update the forces of the QM region
@@ -2185,9 +2193,9 @@ class OpenMMDynamics:
             The potential energy of the QM region.
         """
         if self.basis is not None:
-            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
         else:
-            potential_energy = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+            potential_energy = self.qm_driver.get_energy() * hartree_in_kjpermol()
 
         return potential_energy
     

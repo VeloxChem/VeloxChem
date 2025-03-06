@@ -92,36 +92,38 @@ make_diag_work_group(const std::vector<CGtoPairBlock>& gto_pair_blocks) -> std::
     if (const auto nblocks = gto_pair_blocks.size(); nblocks > 0)
     {
         const auto nthreads = omp::get_number_of_threads();
-        
+
         for (size_t i = 0; i < nblocks; i++)
         {
             const auto gp_size = gto_pair_blocks[i].number_of_contracted_pairs();
-            
+
             auto bsize = gp_size / nthreads;
-            
+
             if (bsize < simd::width<double>()) bsize = simd::width<double>();
-            
-            //if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize; 
-            
+
+            //if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize;
+
             const auto bblocks = batch::number_of_batches(gp_size, bsize);
-            
+
             for (size_t j = 0; j < bblocks; j++)
             {
                 const auto bindices = batch::batch_range(j, gp_size, bsize);
-                
+
                 wtasks.push_back(std::array<size_t, 3>({i, bindices.first, bindices.second}));
             }
         }
     }
-   
+
     return wtasks;
 }
 
 auto
-make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const int ithreshold, const int block_size_factor) -> std::vector<std::array<size_t, 8>>
+make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
+                const int                                ithreshold,
+                const int                                block_size_factor) -> std::vector<std::array<size_t, 8>>
 {
     auto wtasks = std::vector<std::array<size_t, 8>>();
-   
+
     if (const auto nblocks = gto_pair_blocks.size(); nblocks > 0)
     {
         for (size_t i = 0; i < nblocks; i++)
@@ -133,39 +135,39 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                 if (gto_pair_blocks[i].is_empty_gto_pair_block(bra_idx)) continue;
 
                 const auto bra_block = gto_pair_blocks[i].gto_pair_block(bra_idx);
-                
+
                 const auto bra_angpair = bra_block.angular_momentums();
 
                 const auto bra_size = bra_block.number_of_contracted_pairs();
-                
+
                 auto bra_bsize = std::max(
                     simd::width<double>(),
                     omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor
                 );
-                
+
                 //if (const auto mbsize = omp::max_block_size(); bra_bsize > mbsize) bra_bsize = mbsize;
-                
+
                 const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
-                
+
                 for (int ket_idx = bra_idx; ket_idx < 16; ket_idx++)
                 {
                     if (gto_pair_blocks[i].is_empty_gto_pair_block(ket_idx)) continue;
-                    
+
                     const auto ket_block = gto_pair_blocks[i].gto_pair_block(ket_idx);
-                    
+
                     const auto ket_angpair = ket_block.angular_momentums();
 
                     const auto ket_size = ket_block.number_of_contracted_pairs();
-                    
+
                     auto ket_bsize = std::max(
                         simd::width<double>(),
                         omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor
                     );
 
-                    //if (const auto mbsize = omp::max_block_size(); ket_bsize > mbsize) ket_bsize = mbsize; 
-                    
+                    //if (const auto mbsize = omp::max_block_size(); ket_bsize > mbsize) ket_bsize = mbsize;
+
                     const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
-                    
+
                     // create task graph
 
                     if ((bra_idx + ket_idx) <= ithreshold)
@@ -173,9 +175,9 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                         for (size_t itask = 0; itask < bra_blocks; itask++)
                         {
                             const auto bindices = batch::batch_range(itask, bra_size, bra_bsize);
-                            
+
                             const auto jstart = (bra_idx == ket_idx) ? itask : size_t{0};
-                                              
+
                             for (size_t jtask = jstart; jtask < ket_blocks; jtask++)
                             {
                                 const auto kindices = batch::batch_range(jtask, ket_size, ket_bsize);
@@ -198,37 +200,37 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                 for (int bra_idx = 0; bra_idx < 16; bra_idx++)
                 {
                     if (gto_pair_blocks[i].is_empty_gto_pair_block(bra_idx)) continue;
-                    
+
                     const auto bra_block = gto_pair_blocks[i].gto_pair_block(bra_idx);
-                    
+
                     const auto bra_angpair = bra_block.angular_momentums();
 
                     const auto bra_size = bra_block.number_of_contracted_pairs();
-                
+
                     auto bra_bsize = std::max(
                         simd::width<double>(),
                         omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor
                     );
-                    
+
                     const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
 
                     for (int ket_idx = 0; ket_idx < 16; ket_idx++)
                     {
                         if (gto_pair_blocks[j].is_empty_gto_pair_block(ket_idx)) continue;
-                        
+
                         const auto ket_block = gto_pair_blocks[j].gto_pair_block(ket_idx);
-                        
+
                         const auto ket_angpair = ket_block.angular_momentums();
 
                         const auto ket_size = ket_block.number_of_contracted_pairs();
-                        
+
                         auto ket_bsize = std::max(
                             simd::width<double>(),
                             omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor
                         );
 
                         const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
-                    
+
                         // create task graph
 
                         if ((bra_idx + ket_idx) <= ithreshold)
@@ -236,7 +238,7 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                             for (size_t itask = 0; itask < bra_blocks; itask++)
                             {
                                 const auto bindices = batch::batch_range(itask, bra_size, bra_bsize);
-                                
+
                                 for (size_t jtask = 0; jtask < ket_blocks; jtask++)
                                 {
                                     const auto kindices = batch::batch_range(jtask, ket_size, ket_bsize);
@@ -251,6 +253,183 @@ make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks, const 
                         }
                     }
                 }
+            }
+        }
+    }
+
+    return wtasks;
+}
+
+auto
+make_work_group(const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
+                const int                                min_threshold,
+                const int                                max_threshold,
+                const int                                block_size_factor) -> std::vector<std::array<size_t, 8>>
+{
+    auto wtasks = std::vector<std::array<size_t, 8>>();
+
+    if (const auto nblocks = gto_pair_blocks.size(); nblocks > 0)
+    {
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            // apply threshold to blocked GTOs pair blocks on bra side
+
+            for (int bra_idx = 0; bra_idx < 16; bra_idx++)
+            {
+                if (gto_pair_blocks[i].is_empty_gto_pair_block(bra_idx)) continue;
+
+                const auto bra_block = gto_pair_blocks[i].gto_pair_block(bra_idx);
+
+                const auto bra_angpair = bra_block.angular_momentums();
+
+                const auto bra_size = bra_block.number_of_contracted_pairs();
+
+                auto bra_bsize = std::max(
+                    simd::width<double>(),
+                    omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor
+                );
+
+                //if (const auto mbsize = omp::max_block_size(); bra_bsize > mbsize) bra_bsize = mbsize;
+
+                const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
+
+                for (int ket_idx = bra_idx; ket_idx < 16; ket_idx++)
+                {
+                    if (gto_pair_blocks[i].is_empty_gto_pair_block(ket_idx)) continue;
+
+                    const auto ket_block = gto_pair_blocks[i].gto_pair_block(ket_idx);
+
+                    const auto ket_angpair = ket_block.angular_momentums();
+
+                    const auto ket_size = ket_block.number_of_contracted_pairs();
+
+                    auto ket_bsize = std::max(
+                        simd::width<double>(),
+                        omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor
+                    );
+
+                    //if (const auto mbsize = omp::max_block_size(); ket_bsize > mbsize) ket_bsize = mbsize;
+
+                    const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
+
+                    // create task graph
+
+                    if (((bra_idx + ket_idx) > min_threshold)  && ((bra_idx + ket_idx) <= max_threshold))
+                    {
+                        for (size_t itask = 0; itask < bra_blocks; itask++)
+                        {
+                            const auto bindices = batch::batch_range(itask, bra_size, bra_bsize);
+
+                            const auto jstart = (bra_idx == ket_idx) ? itask : size_t{0};
+
+                            for (size_t jtask = jstart; jtask < ket_blocks; jtask++)
+                            {
+                                const auto kindices = batch::batch_range(jtask, ket_size, ket_bsize);
+
+                                wtasks.push_back({i, i,
+                                                  static_cast<size_t>(bra_idx),
+                                                  static_cast<size_t>(ket_idx),
+                                                  bindices.first, bindices.second,
+                                                  kindices.first, kindices.second});
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (size_t j = i + 1; j < nblocks; j++)
+            {
+                // apply threshold to blocked GTOs pair blocks on bra and ket side
+
+                for (int bra_idx = 0; bra_idx < 16; bra_idx++)
+                {
+                    if (gto_pair_blocks[i].is_empty_gto_pair_block(bra_idx)) continue;
+
+                    const auto bra_block = gto_pair_blocks[i].gto_pair_block(bra_idx);
+
+                    const auto bra_angpair = bra_block.angular_momentums();
+
+                    const auto bra_size = bra_block.number_of_contracted_pairs();
+
+                    auto bra_bsize = std::max(
+                        simd::width<double>(),
+                        omp::angular_momentum_scale(bra_angpair) * simd::width<double>() / block_size_factor
+                    );
+
+                    const auto bra_blocks = batch::number_of_batches(bra_size, bra_bsize);
+
+                    for (int ket_idx = 0; ket_idx < 16; ket_idx++)
+                    {
+                        if (gto_pair_blocks[j].is_empty_gto_pair_block(ket_idx)) continue;
+
+                        const auto ket_block = gto_pair_blocks[j].gto_pair_block(ket_idx);
+
+                        const auto ket_angpair = ket_block.angular_momentums();
+
+                        const auto ket_size = ket_block.number_of_contracted_pairs();
+
+                        auto ket_bsize = std::max(
+                            simd::width<double>(),
+                            omp::angular_momentum_scale(ket_angpair) * simd::width<double>() / block_size_factor
+                        );
+
+                        const auto ket_blocks = batch::number_of_batches(ket_size, ket_bsize);
+
+                        // create task graph
+
+                        if (((bra_idx + ket_idx) > min_threshold)  && ((bra_idx + ket_idx) <= max_threshold))
+                        {
+                            for (size_t itask = 0; itask < bra_blocks; itask++)
+                            {
+                                const auto bindices = batch::batch_range(itask, bra_size, bra_bsize);
+
+                                for (size_t jtask = 0; jtask < ket_blocks; jtask++)
+                                {
+                                    const auto kindices = batch::batch_range(jtask, ket_size, ket_bsize);
+
+                                    wtasks.push_back({i, j,
+                                                      static_cast<size_t>(bra_idx),
+                                                      static_cast<size_t>(ket_idx),
+                                                      bindices.first, bindices.second,
+                                                      kindices.first, kindices.second});
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return wtasks;
+}
+
+auto
+make_aux_work_tasks(const std::vector<CGtoBlock>& gto_blocks) -> std::vector<std::array<size_t, 3>>
+{
+    auto wtasks = std::vector<std::array<size_t, 3>>();
+
+    if (const auto nblocks = gto_blocks.size(); nblocks > 0)
+    {
+        const auto nthreads = omp::get_number_of_threads();
+
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            const auto gp_size = static_cast<size_t>(gto_blocks[i].number_of_basis_functions());
+
+            auto bsize = gp_size / nthreads;
+
+            if (bsize < simd::width<double>()) bsize = simd::width<double>();
+
+            if (const auto mbsize = omp::max_block_size(); bsize > mbsize) bsize = mbsize;
+
+            const auto bblocks = batch::number_of_batches(gp_size, bsize);
+
+            for (size_t j = 0; j < bblocks; j++)
+            {
+                const auto bindices = batch::batch_range(j, gp_size, bsize);
+
+                wtasks.push_back(std::array<size_t, 3>({i, bindices.first, bindices.second}));
             }
         }
     }
@@ -344,7 +523,7 @@ auto
 angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
 {
     const auto angmom = ang_pair.first + ang_pair.second;
-    
+
     if (angmom > 8) return 128;
 
     if (angmom > 6) return 256;
@@ -352,17 +531,18 @@ angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
     if (angmom > 4) return 512;
 
     if (angmom > 2) return 1024;
-    
+
     return 2048;
 }
+
 
 auto
 partition_atoms(const int natoms, const int rank, const int nodes) -> std::vector<int>
 {
     std::vector<int> atoms(natoms);
-    
+
     std::iota(atoms.begin(), atoms.end(), 0);
-    
+
     return omp::partition_tasks(atoms, rank, nodes);
 }
 

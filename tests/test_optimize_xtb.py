@@ -10,8 +10,6 @@ from veloxchem.xtbdriver import XtbDriver
 from veloxchem.xtbgradientdriver import XtbGradientDriver
 
 
-@pytest.mark.filterwarnings(
-    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 @pytest.mark.solvers
 class TestOptimizeXTB:
 
