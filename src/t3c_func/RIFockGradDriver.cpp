@@ -177,7 +177,7 @@ CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
     
     for (int i = 0; i < natoms; i++)
     {
-        grads[i] = direct_compute(screener, basis, aux_basis, molecule, gamma, density, i, ithreshold);
+        grads[i] = direct_compute(screener, basis, aux_basis, molecule, gamma, density, atoms[i], ithreshold);
     }
     
     return grads;
