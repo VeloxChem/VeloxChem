@@ -155,9 +155,9 @@ comp_sum_erf_nuclear_potential_geom_010_ps(T& distributor,
 
                     npotrec::comp_prim_nuclear_potential_ss(pbuffer, 2, 0, bf_data, 2, factors, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 3, 1, factors, 14, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 3, 1, factors, 14, a_exp);
 
-                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 6, 2, factors, 14, omegas[l], a_exp);
+                    npotrec::comp_prim_nuclear_potential_geom_010_ss(pbuffer, 6, 2, factors, 14, a_exp);
 
                     npotrec::comp_prim_nuclear_potential_geom_010_ps(pbuffer, 9, 1, 3, 6, factors, 11, 14);
 

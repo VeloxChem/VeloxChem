@@ -42,7 +42,7 @@ from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import make_matrix, mat_t
-from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kjpermol
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .griddriver import GridDriver
@@ -97,6 +97,11 @@ class ScfHessianDriver(HessianDriver):
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
 
         self.use_subcomms = False
+
+        # option dictionaries from input
+        # TODO: cleanup
+        self.method_dict = {}
+        self.cphf_dict = {}
 
         self._input_keywords['hessian'].update({
             'orbrsp_only':
@@ -288,6 +293,15 @@ class ScfHessianDriver(HessianDriver):
             The profiler.
         """
 
+        assert_msg_critical(
+            self.scf_driver.scf_type == 'restricted',
+            'ScfHessianDriver: Analytical Hessian only implemented ' +
+            'for restricted case')
+
+        assert_msg_critical(
+            self.scf_driver.solvation_model is None,
+            'ScfHessianDriver: Solvation model not implemented')
+
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_tensors)
@@ -325,6 +339,21 @@ class ScfHessianDriver(HessianDriver):
         # CPHF equations
 
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+
+        # TODO: double check analytical Hessian with PE
+        assert_msg_critical(not self.scf_driver._pe,
+                            'ScfHessianDriver: Analytical Hessian with ' +
+                            'polarizable embedding (PE) not yet ''available')
+
+        if self.scf_driver._pe:
+            from .embedding import PolarizableEmbeddingHess
+            cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
+                molecule=molecule,
+                ao_basis=ao_basis,
+                options=self.scf_driver.embedding,
+                comm=self.comm,
+                density=density)
 
         # TODO: double check propagation of cphf settings
         profiler_keywords = {
@@ -720,7 +749,7 @@ class ScfHessianDriver(HessianDriver):
                             coef_I * np.eye(3))
 
                         # convert hessian to atomic unit
-                        hess_ii /= (4.184 * hartree_in_kcalpermol() *
+                        hess_ii /= (hartree_in_kjpermol() *
                                     (10.0 / bohr_in_angstrom())**2)
 
                         hessian_point_charges[i, i, :, :] += hess_ii
@@ -743,6 +772,18 @@ class ScfHessianDriver(HessianDriver):
                 self.hessian += hessian_point_charges.transpose(0, 2, 1, 3)
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
+
+            # add pe contr to hessian
+            if self.scf_driver._pe:
+                from .embedding import PolarizableEmbeddingHess
+                embedding_drv = PolarizableEmbeddingHess(
+                    molecule=molecule,
+                    ao_basis=ao_basis,
+                    options=self.scf_driver.embedding,
+                    density=density,
+                    comm=self.comm)
+                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
+                    density_matrix=density)
 
             if self._dft:
                 self.hessian += hessian_dft_xc

@@ -46,15 +46,14 @@ class TestXCMolHess:
                                                         xcfun_label)
         exc_deriv_2 = scf_drv.comm.reduce(exc_deriv_2, root=mpi_master())
 
-        vxc_deriv_1 = []
-        for iatom in range(molecule.number_of_atoms()):
-            vxc_deriv_atom = xc_mol_hess.integrate_vxc_fock_gradient(
-                molecule, basis, [gs_dm], mol_grid, xcfun_label, iatom)
-            vxc_deriv_1.append(vxc_deriv_atom)
+        atom_list = list(range(molecule.number_of_atoms()))
+        vxc_deriv_1 = xc_mol_hess.integrate_vxc_fock_gradient(
+            molecule, basis, [gs_dm], mol_grid, xcfun_label, atom_list)
         vxc_deriv_1 = np.array(vxc_deriv_1)
         vxc_deriv_1 = scf_drv.comm.reduce(vxc_deriv_1, root=mpi_master())
 
         if scf_drv.rank == mpi_master():
+            vxc_deriv_1 = vxc_deriv_1.reshape(ref_vxc_deriv_1.shape)
             assert np.max(np.abs(ref_exc_deriv_2 - exc_deriv_2)) < 1.0e-4
             assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
 

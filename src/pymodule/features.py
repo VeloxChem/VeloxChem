@@ -90,8 +90,7 @@ def _known_aliases_for_keywords():
         'uv-vis': 'absorption',
         'cd': ('ecd',),
         'spectrum': ('absorption', 'ecd'),
-        'force field': 'force_field_generation',
-        'force-field': 'force_field_generation',
+        'mm force field': 'mm_force_field_generation',
         'resp': 'resp_charges',
         'esp': ('esp_charges', 'esp_on_points'),
     }

@@ -69,7 +69,7 @@ class CNuclearPotentialErfGeom0X0Driver
     /// @brief Computes nuclear potential matrix for given set of external charges,  molecule and molecular basis.
     /// @param basis The molecular basis.
     /// @param molecule The molecule.
-    /// @param omegas The range-separation factor.
+    /// @param omega The range-separation factor.
     /// @param iatom The index of selected atom.
     /// @return The nuclear potential matrix.
     auto compute(const CMolecularBasis &basis, const CMolecule &molecule, const double omega, const int iatom) const -> CMatrices;

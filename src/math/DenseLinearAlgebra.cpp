@@ -30,6 +30,8 @@
 #include <cblas.h>
 #endif
 
+#include "Eigen/Dense"
+
 #include "ErrorHandler.hpp"
 
 namespace denblas {  // denblas namespace
@@ -77,6 +79,159 @@ multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
                 nbcol_int32);
 
     return mat;
+}
+
+auto
+serialMultAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
+{
+    // set up dimensions of matrix A
+
+    auto narow = matrixA.getNumberOfRows();
+    auto nacol = matrixA.getNumberOfColumns();
+
+    // set up dimensions of matrix B
+
+    auto nbrow = matrixB.getNumberOfRows();
+    auto nbcol = matrixB.getNumberOfColumns();
+
+    errors::assertMsgCritical(nacol == nbrow, "denblas::serialMultAB: Inconsistent sizes in matrix multiplication");
+
+    // allocate dense matrix
+
+    CDenseMatrix mat(narow, nbcol);
+
+    if ((narow == 0) || (nbcol == 0)) return mat;
+
+    // compute matrix-matrix multiplication
+
+    auto A = matrixA.values();
+    auto B = matrixB.values();
+
+    mat.zero();
+    auto C = mat.values();
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, narow, nbcol);
+
+    ematC.noalias() = ematA * ematB;
+
+    return mat;
+}
+
+auto
+serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
+{
+    // set up dimensions of matrix A
+
+    auto narow = matrixA.getNumberOfRows();
+    auto nacol = matrixA.getNumberOfColumns();
+
+    // set up dimensions of matrix B
+
+    auto nbrow = matrixB.getNumberOfRows();
+    auto nbcol = matrixB.getNumberOfColumns();
+
+    errors::assertMsgCritical(nacol == nbcol, "denblas::serialMultABt: Inconsistent sizes in matrix multiplication");
+
+    // allocate dense matrix
+
+    CDenseMatrix mat(narow, nbrow);
+
+    if ((narow == 0) || (nbrow == 0)) return mat;
+
+    // compute matrix-matrix multiplcation
+
+    auto A = matrixA.values();
+    auto B = matrixB.values();
+
+    mat.zero();
+    auto C = mat.values();
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, narow, nbrow);
+
+    ematC.noalias() = ematA * ematB.transpose();
+
+    return mat;
+}
+
+auto
+serialAddAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix
+{
+    auto narow = matrixA.getNumberOfRows();
+    auto nacol = matrixA.getNumberOfColumns();
+
+    auto nbrow = matrixB.getNumberOfRows();
+    auto nbcol = matrixB.getNumberOfColumns();
+
+    errors::assertMsgCritical((narow == nbrow) && (nacol == nbcol),
+                              "denblas::serialAddAB: Inconsistent sizes in matrix addition");
+
+    auto A = matrixA.values();
+    auto B = matrixB.values();
+
+    CDenseMatrix mat(narow, nacol);
+    mat.zero();
+    auto C = mat.values();
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, narow, nacol);
+
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, narow, nacol);
+
+    ematC = ematA + factor * ematB;
+
+    return mat;
+}
+
+auto
+serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> void
+{
+    auto narow = matrixA.getNumberOfRows();
+    auto nacol = matrixA.getNumberOfColumns();
+
+    auto nbrow = matrixB.getNumberOfRows();
+    auto nbcol = matrixB.getNumberOfColumns();
+
+    errors::assertMsgCritical((narow == nbrow) && (nacol == nbcol),
+                              "denblas::serialInPlaceAddAB: Inconsistent sizes in matrix addition");
+
+    auto A = matrixA.values();
+    auto B = matrixB.values();
+
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, narow, nacol);
+
+    ematA += factor * ematB;
+}
+
+auto
+serialSolve(const CDenseMatrix& mat, const std::vector<double>& vec) -> std::vector<double>
+{
+    auto narow = mat.getNumberOfRows();
+    auto nacol = mat.getNumberOfColumns();
+
+    auto nbsize = static_cast<int>(vec.size());
+
+    errors::assertMsgCritical((narow == nacol) && (narow == nbsize),
+                              "denblas::serialSolve: Inconsistent sizes in matrix and vector");
+
+    std::vector<double> sol(nbsize);
+
+    auto A = mat.values();
+    auto B = vec.data();
+    auto C = sol.data();
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    Eigen::Map<const Eigen::VectorXd, Eigen::Unaligned> evecB(B, nbsize);
+    Eigen::Map<Eigen::VectorXd, Eigen::Unaligned> evecC(C, nbsize);
+
+    evecC = ematA.colPivHouseholderQr().solve(evecB);
+
+    return sol;
 }
 
 auto

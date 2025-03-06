@@ -5,6 +5,10 @@
 
 #include "ErrorHandler.hpp"
 #include "MathFunc.hpp"
+#include "SphericalMomentum.hpp"
+
+#define ANGULAR_MOMENTUM_D 2
+#define ANGULAR_MOMENTUM_F 3
 
 CGtoBlock::CGtoBlock()
 
@@ -402,24 +406,27 @@ CGtoBlock::getCartesianToSphericalMappingForD() const -> std::unordered_map<int,
 {
     errors::assertMsgCritical(_angular_momentum == 2, std::string("GtoBlock: getCartesianToSphericalMappingForD only works for d-orbitals"));
 
-    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_d;
-
-    const double f2_3 = 2.0 * std::sqrt(3.0);
-
-    // d-2 (0) <- dxy(1) * f2_3
-    // d-1 (1) <- dyz(4) * f2_3
-    // d_0 (2) <- dzz(5) * 2.0 - dxx(0) - dyy(3)
-    // d+1 (3) <- dxz(2) * f2_3
-    // d+2 (4) <- (dxx(0) - dyy(3)) * 0.5 * f2_3
-
     std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
 
-    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{2, -1.0}, {4, 0.5 * f2_3}});
-    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, f2_3}});
-    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{3, f2_3}});
-    cart_sph_comp_map[3] = std::vector<std::pair<int, double>>({{2, -1.0}, {4, -0.5 * f2_3}});
-    cart_sph_comp_map[4] = std::vector<std::pair<int, double>>({{1, f2_3}});
-    cart_sph_comp_map[5] = std::vector<std::pair<int, double>>({{2, 2.0}});
+    for (int isph = 0; isph < ANGULAR_MOMENTUM_D * 2 + 1; isph++)
+    {
+        auto sphmom = spher_mom::transformation_factors<ANGULAR_MOMENTUM_D>(isph);
+
+        for (int icomp = 0; icomp < static_cast<int>(sphmom.size()); icomp++)
+        {
+            auto icart = sphmom[icomp].first;
+            auto fcart = sphmom[icomp].second;
+
+            if (cart_sph_comp_map.find(icart) == cart_sph_comp_map.end())
+            {
+                cart_sph_comp_map[icart] = std::vector<std::pair<int, double>>();
+            }
+
+            cart_sph_comp_map[icart].push_back(std::pair<int, double>({isph, fcart}));
+        }
+    }
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_d;
 
     for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
     {
@@ -454,43 +461,27 @@ CGtoBlock::getCartesianToSphericalMappingForF(const int ncgtos_d) const -> std::
 {
     errors::assertMsgCritical(_angular_momentum == 3, std::string("GtoBlock: getCartesianToSphericalMappingForF only works for f-orbitals"));
 
-    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_f;
-
-    const double f3_5 = std::sqrt(2.5);
-    const double f3_15 = 2.0 * std::sqrt(15.0);
-    const double f3_3 = std::sqrt(1.5);
-
-    // xxx : 0
-    // xxy : 1
-    // xxz : 2
-    // xyy : 3
-    // xyz : 4
-    // xzz : 5
-    // yyy : 6
-    // yyz : 7
-    // yzz : 8
-    // zzz : 9
-
-    // f-3 (0) <- fxxy(1) * 3.0 * f3_5  + fyyy(6) * (-f3_5)
-    // f-2 (1) <- fxyz(4) * f3_15
-    // f-1 (2) <- fxxy(1) * (-f3_3)     + fyyy(6) * (-f3_3)        + fyzz(8) * 4.0 * f3_3
-    // f_0 (3) <- fxxz(2) * (-3.0)      + fyyz(7) * (-3.0)         + fzzz(9) * 2.0
-    // f+1 (4) <- fxxx(0) * (-f3_3)     + fxyy(3) * (-f3_3)        + fxzz(5) * 4.0 * f3_3
-    // f+2 (5) <- fxxz(2) * 0.5 * f3_15 + fyyz(7) * (-0.5) * f3_15
-    // f+3 (6) <- fxxx(0) * f3_5        + fxyy(3) * (-3.0) * f3_5
-
     std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_comp_map;
 
-    cart_sph_comp_map[0] = std::vector<std::pair<int, double>>({{4, -f3_3}, {6, f3_5}});
-    cart_sph_comp_map[1] = std::vector<std::pair<int, double>>({{0, 3.0 * f3_5}, {2, -f3_3}});
-    cart_sph_comp_map[2] = std::vector<std::pair<int, double>>({{3, -3.0}, {5, 0.5 * f3_15}});
-    cart_sph_comp_map[3] = std::vector<std::pair<int, double>>({{4, -f3_3}, {6, -3.0 * f3_5}});
-    cart_sph_comp_map[4] = std::vector<std::pair<int, double>>({{1, f3_15}});
-    cart_sph_comp_map[5] = std::vector<std::pair<int, double>>({{4, 4.0 * f3_3}});
-    cart_sph_comp_map[6] = std::vector<std::pair<int, double>>({{0, -f3_5}, {2, -f3_3}});
-    cart_sph_comp_map[7] = std::vector<std::pair<int, double>>({{3, -3.0}, {5, -0.5 * f3_15}});
-    cart_sph_comp_map[8] = std::vector<std::pair<int, double>>({{2, 4.0 * f3_3}});
-    cart_sph_comp_map[9] = std::vector<std::pair<int, double>>({{3, 2.0}});
+    for (int isph = 0; isph < ANGULAR_MOMENTUM_F * 2 + 1; isph++)
+    {
+        auto sphmom = spher_mom::transformation_factors<ANGULAR_MOMENTUM_F>(isph);
+
+        for (int icomp = 0; icomp < static_cast<int>(sphmom.size()); icomp++)
+        {
+            auto icart = sphmom[icomp].first;
+            auto fcart = sphmom[icomp].second;
+
+            if (cart_sph_comp_map.find(icart) == cart_sph_comp_map.end())
+            {
+                cart_sph_comp_map[icart] = std::vector<std::pair<int, double>>();
+            }
+
+            cart_sph_comp_map[icart].push_back(std::pair<int, double>({isph, fcart}));
+        }
+    }
+
+    std::unordered_map<int, std::vector<std::pair<int, double>>> cart_sph_f;
 
     for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
     {

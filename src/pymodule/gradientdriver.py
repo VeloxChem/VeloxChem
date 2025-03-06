@@ -87,6 +87,8 @@ class GradientDriver:
         self.grid_level = None
         self.xcfun = None
 
+        self.potfile = None
+
         self.checkpoint_file = None
 
         self._input_keywords = {
@@ -168,7 +170,15 @@ class GradientDriver:
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
 
-        for i in range(molecule.number_of_atoms()):
+        natoms = molecule.number_of_atoms()
+
+        for i in range(natoms):
+
+            self.ostream.unmute()
+            self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            self.ostream.flush()
+            self.ostream.mute()
+
             for d in range(3):
                 coords[i, d] += self.delta_h
                 new_mol = Molecule(labels, coords, 'au', atom_basis_labels)

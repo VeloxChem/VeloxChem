@@ -28,8 +28,9 @@ from io import StringIO
 import numpy as np
 import time as tm
 import tempfile
+import math
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -75,39 +76,21 @@ class OptimizationDriver:
         Initializes optimization driver.
         """
 
-        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
-                            ScfRestrictedOpenDriver)):
-            grad_drv = ScfGradientDriver(drv)
-
-        elif isinstance(drv, XtbDriver):
-            grad_drv = XtbGradientDriver(drv)
-
-        elif isinstance(drv, OpenMMDriver):
-            grad_drv = OpenMMGradientDriver(drv)
-
-        elif isinstance(drv, MMDriver):
-            grad_drv = MMGradientDriver(drv)
-
-        elif (isinstance(drv, ScfGradientDriver) or
-              isinstance(drv, XtbGradientDriver) or
-              isinstance(drv, OpenMMGradientDriver) or
-              isinstance(drv, MMGradientDriver)):
-            grad_drv = drv
-
-        else:
-            assert_msg_critical(
-                False,
-                'OptimizationDriver: Invalid argument for initialization')
+        grad_drv = self._pick_driver(drv)
 
         self.comm = grad_drv.comm
         self.rank = grad_drv.comm.Get_rank()
         self.ostream = grad_drv.ostream
 
+        self.grad_drv = grad_drv
+
         self.coordsys = 'tric'
         self.constraints = None
         self.check_interval = 0
-        self.trust = 0.1
+        self.trust = None
+        self.tmax = None
         self.max_iter = 300
+        self.conv_maxiter = False
 
         self.conv_energy = None
         self.conv_grms = None
@@ -123,7 +106,6 @@ class OptimizationDriver:
         self.keep_files = False
 
         self.filename = None
-        self.grad_drv = grad_drv
 
         self._debug = False
 
@@ -135,11 +117,14 @@ class OptimizationDriver:
                 'check_interval':
                     ('int', 'interval for checking coordinate system'),
                 'trust': ('float', 'trust radius to begin with'),
+                'tmax': ('float', 'maximum value of trust radius'),
                 'max_iter': ('int', 'maximum number of optimization steps'),
                 'transition': ('bool', 'transition state search'),
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
+                'conv_maxiter':
+                    ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
                 'conv_grms': ('float', ''),
                 'conv_gmax': ('float', ''),
@@ -192,6 +177,40 @@ class OptimizationDriver:
         # update hessian option for transition state search
         if ('hessian' not in opt_dict) and self.transition:
             self.hessian = 'first'
+
+    def _pick_driver(self, drv):
+        """
+        Chooses the gradient driver.
+
+        :param drv:
+            The energy or gradient driver.
+        """
+
+        if isinstance(drv, (ScfRestrictedDriver, ScfUnrestrictedDriver,
+                            ScfRestrictedOpenDriver)):
+            grad_drv = ScfGradientDriver(drv)
+
+        elif isinstance(drv, XtbDriver):
+            grad_drv = XtbGradientDriver(drv)
+
+        elif isinstance(drv, OpenMMDriver):
+            grad_drv = OpenMMGradientDriver(drv)
+
+        elif isinstance(drv, MMDriver):
+            grad_drv = MMGradientDriver(drv)
+
+        elif (isinstance(drv, ScfGradientDriver) or
+              isinstance(drv, XtbGradientDriver) or
+              isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, MMGradientDriver)):
+            grad_drv = drv
+
+        else:
+            assert_msg_critical(
+                False,
+                'OptimizationDriver: Invalid argument for initialization')
+
+        return grad_drv
 
     def compute(self, molecule, *args):
         """
@@ -259,6 +278,13 @@ class OptimizationDriver:
             name_string = get_random_string_parallel(self.comm)
             base_fname = 'vlx_' + name_string
 
+        if self.is_scf and self.grad_drv.scf_driver.checkpoint_file is None:
+            # make sure that the scfdriver has checkpoint_file
+            fpath = Path(base_fname)
+            fpath = fpath.with_name(f'{fpath.stem}_scf{fpath.suffix}')
+            fpath = fpath.with_suffix('.h5')
+            self.grad_drv.scf_driver.checkpoint_file = str(fpath)
+
         if self.rank == mpi_master() and self.keep_files:
             filename = base_fname
         else:
@@ -288,6 +314,7 @@ class OptimizationDriver:
         optinp_filename = Path(filename + '.optinp').as_posix()
 
         # pre-compute Hessian
+
         if self.is_scf and self.hessian == 'first':
             hessian_drv = ScfHessianDriver(self.grad_drv.scf_driver)
             hessian_drv.compute(molecule, args[0])
@@ -303,6 +330,20 @@ class OptimizationDriver:
             np.savetxt(hessian_filename, hess_data)
             self.hessian = f'file:{hessian_filename}'
 
+        # determine trust radius
+
+        if self.trust is None:
+            # from geomeTRIC params.py
+            default_trust = 0.01 if self.transition else 0.1
+        else:
+            default_trust = self.trust
+
+        if self.tmax is None:
+            # from geomeTRIC params.py
+            default_tmax = 0.03 if self.transition else 0.3
+        else:
+            default_tmax = self.tmax
+
         # redirect geomeTRIC stdout/stderr
 
         with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
@@ -312,7 +353,8 @@ class OptimizationDriver:
                     customengine=opt_engine,
                     coordsys=self.coordsys,
                     check=self.check_interval,
-                    trust=self.trust,
+                    trust=default_trust,
+                    tmax=default_tmax,
                     maxiter=self.max_iter,
                     converge=self.conv_flags(),
                     constraints=constr_filename,
@@ -432,19 +474,21 @@ class OptimizationDriver:
         opt_flags = []
         if self.conv_energy is not None:
             opt_flags.append('energy')
-            opt_flags.append(self.conv_energy)
+            opt_flags.append(str(self.conv_energy))
         if self.conv_grms is not None:
             opt_flags.append('grms')
-            opt_flags.append(self.conv_grms)
+            opt_flags.append(str(self.conv_grms))
         if self.conv_gmax is not None:
             opt_flags.append('gmax')
-            opt_flags.append(self.conv_gmax)
+            opt_flags.append(str(self.conv_gmax))
         if self.conv_drms is not None:
             opt_flags.append('drms')
-            opt_flags.append(self.conv_drms)
+            opt_flags.append(str(self.conv_drms))
         if self.conv_dmax is not None:
             opt_flags.append('dmax')
-            opt_flags.append(self.conv_dmax)
+            opt_flags.append(str(self.conv_dmax))
+        if self.conv_maxiter:
+            opt_flags.append('maxiter')
         return opt_flags
 
     @staticmethod
@@ -621,12 +665,12 @@ class OptimizationDriver:
 
         line = '{:>5s}{:>20s}  {:>25s}{:>30s}'.format(
             'Scan', 'Energy (a.u.)', 'Relative Energy (a.u.)',
-            'Relative Energy (kcal/mol)')
+            'Relative Energy (kJ/mol)')
         self.ostream.print_header(line)
         self.ostream.print_header('-' * len(line))
         for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
             line = '{:>5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
-                i + 1, e, rel_e, rel_e * hartree_in_kcalpermol())
+                i + 1, e, rel_e, rel_e * hartree_in_kjpermol())
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
@@ -766,3 +810,81 @@ class OptimizationDriver:
         """
 
         return 'L.-P. Wang and C.C. Song, J. Chem. Phys. 2016, 144, 214108'
+
+    def show_convergence(self, opt_results, atom_indices=False):
+        """
+        Plot the convergence of the optimization
+
+        :param opt_results:
+            The dictionary of optimize results.
+        """
+
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+
+        energies = opt_results['opt_energies']
+        geometries = opt_results['opt_geometries']
+        total_steps = len(energies) - 1
+        ipywidgets.interact(self.show_iteration,
+                            energies=ipywidgets.fixed(energies),
+                            geometries=ipywidgets.fixed(geometries),
+                            step=ipywidgets.IntSlider(min=0,
+                                                      max=total_steps,
+                                                      step=1,
+                                                      value=total_steps),
+                            atom_indices=ipywidgets.fixed(atom_indices))
+
+    def show_iteration(self, energies, geometries, step=0, atom_indices=False):
+        """
+        Show the geometry at a specific iteration.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('matplotlib is required for this functionality.')
+
+        min_energy = np.min(energies)
+        rel_energies = energies - min_energy
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
+
+        xyz_data_i = geometries[step]
+        steps = range(len(rel_energies_kJ))
+        total_steps = len(rel_energies_kJ) - 1
+        x = np.linspace(0, total_steps, 100)
+        y = np.interp(x, steps, rel_energies_kJ)
+        plt.figure(figsize=(6.5, 4))
+        plt.plot(x,
+                 y,
+                 color='black',
+                 alpha=0.9,
+                 linewidth=2.5,
+                 ls='-',
+                 zorder=0)
+        plt.scatter(steps,
+                    rel_energies_kJ,
+                    color='black',
+                    alpha=0.7,
+                    s=120 / math.log(total_steps, 10),
+                    facecolors="none",
+                    edgecolor="darkcyan",
+                    zorder=1)
+        plt.scatter(step,
+                    rel_energies_kJ[step],
+                    marker='o',
+                    color='darkcyan',
+                    alpha=1.0,
+                    s=120 / math.log(total_steps, 10),
+                    zorder=2)
+        plt.xlabel('Iteration')
+        plt.ylabel('Relative energy [kJ/mol]')
+        plt.title("Geometry optimization")
+        # Ensure x-axis displays as integers
+        plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))
+        plt.tight_layout()
+        plt.show()
+
+        mol = Molecule.read_xyz_string(xyz_data_i)
+        mol.show(atom_indices=atom_indices, width=640, height=360)

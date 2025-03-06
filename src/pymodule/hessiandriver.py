@@ -23,25 +23,14 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from contextlib import redirect_stderr
-from io import StringIO
 import numpy as np
 import sys
 
-#from .veloxchemlib import XCMolecularHessian
-from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
-                           fine_structure_constant, electron_mass_in_amu,
-                           amu_in_kg, speed_of_light_in_vacuum_in_SI)
-from .veloxchemlib import parse_xc_func
+from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
-from .griddriver import GridDriver
-from .errorhandler import assert_msg_critical
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check
-
-with redirect_stderr(StringIO()) as fg_err:
-    import geometric
 
 
 class HessianDriver:
@@ -103,6 +92,8 @@ class HessianDriver:
         self._dft = False
         self.grid_level = None
         self.xcfun = None
+
+        self.potfile = None
 
         # Timing and profiling
         self.timing = False
@@ -226,77 +217,6 @@ class HessianDriver:
                                 nuc_contrib[i, i, k, l] -= z_a * z_b / r**3
 
         return nuc_contrib
-
-    def hess_xc_contrib(self, molecule, basis, gs_density, xcfun_label):
-        """
-        Calculates the exchange-correlation contribution to the analytical
-        nuclear Hessian.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param gs_density:
-            The ground state AO density matrix object.
-        :param xcfun_label:
-            The name of the exchange-correlation functional.
-
-        :return:
-            The exchange-correlation contribution to the Hessian.
-        """
-
-        xc_mol_hess = XCMolecularHessian(self.comm)
-
-        grid_drv = GridDriver(self.comm)
-        grid_level = (get_default_grid_level(self.xcfun)
-                      if self.grid_level is None else self.grid_level)
-        grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
-
-        exc_hessian = xc_mol_hess.integrate_vxc_hessian(molecule, basis,
-                                                        gs_density, mol_grid,
-                                                        xcfun_label)
-        exc_hessian += xc_mol_hess.integrate_fxc_hessian(
-            molecule, basis, gs_density, mol_grid, xcfun_label)
-        exc_hessian = self.comm.reduce(exc_hessian, root=mpi_master())
-
-        return exc_hessian
-
-    def vxc_fock_grad_xc_contrib(self, molecule, basis, gs_density, xcfun_label,
-                                 atom_idx):
-        """
-        Calculates the exchange-correlation contribution to the analytical
-        nuclear gradient of Vxc Fock matrix element w.r.t. a given atom.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param gs_density:
-            The ground state AO density matrix object.
-        :param xcfun_label:
-            The name of the exchange-correlation functional.
-        :param atom_idx:
-            The index (0-based) of the atom.
-
-        :return:
-            The exchange-correlation contribution to the nuclear gradient of
-            Vxc Fock matrix element w.r.t. a given atom.
-        """
-
-        xc_mol_hess = XCMolecularHessian(self.comm)
-
-        grid_drv = GridDriver(self.comm)
-        grid_level = (get_default_grid_level(self.xcfun)
-                      if self.grid_level is None else self.grid_level)
-        grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
-
-        vxc_grad_atom = xc_mol_hess.integrate_vxc_fock_gradient(
-            molecule, basis, gs_density, mol_grid, xcfun_label, atom_idx)
-        vxc_grad_atom = self.comm.reduce(vxc_grad_atom, root=mpi_master())
-
-        return vxc_grad_atom
 
     def get_hessian(self):
         """

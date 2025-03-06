@@ -34,6 +34,30 @@ from .errorhandler import assert_msg_critical, safe_arccos
 
 
 @staticmethod
+def _Molecule_smiles_formal_charge(smiles_str):
+    """
+    Gets formal charge from SMILES string.
+
+    :param smiles_str:
+        The SMILES string.
+
+    :return:
+        The formal charge.
+    """
+
+    try:
+        from rdkit import Chem
+
+        mol_bare = Chem.MolFromSmiles(smiles_str)
+        mol_chg = Chem.GetFormalCharge(mol_bare)
+
+        return mol_chg
+
+    except ImportError:
+        raise ImportError('Unable to import rdkit.')
+
+
+@staticmethod
 def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
     Converts SMILES string to xyz string.
@@ -50,25 +74,25 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
 
     try:
-        from openbabel import pybel as pb
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
 
-        mol = pb.readstring('smiles', smiles_str)
-        mol.make3D()
+        mol_bare = Chem.MolFromSmiles(smiles_str)
+        mol_full = Chem.AddHs(mol_bare)
+
+        use_random_coords = (mol_full.GetNumConformers() == 0)
+        AllChem.EmbedMolecule(mol_full, useRandomCoords=use_random_coords)
 
         if optimize:
-            # TODO: Double check if UFF is needed
-            mol.localopt(forcefield="mmff94", steps=300)
+            AllChem.UFFOptimizeMolecule(mol_full)
 
-        if not hydrogen:
-            # remove hydrogens
-            mol.removeh()
-            return mol.write(format="xyz")
-
+        if hydrogen:
+            return Chem.MolToXYZBlock(mol_full)
         else:
-            return mol.write(format="xyz")
+            return Chem.RemoveHs(mol_full)
 
     except ImportError:
-        raise ImportError('Unable to import openbabel')
+        raise ImportError('Unable to import rdkit.')
 
 
 @staticmethod
@@ -84,8 +108,12 @@ def _Molecule_read_smiles(smiles_str):
     """
 
     xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
+    mol = Molecule.read_xyz_string(xyz)
 
-    return Molecule.read_xyz_string(xyz)
+    mol_chg = Molecule.smiles_formal_charge(smiles_str)
+    mol.set_charge(mol_chg)
+
+    return mol
 
 
 def _element_guesser(atom_name, residue_name):
@@ -319,6 +347,9 @@ def _Molecule_read_xyz_file(xyzfile):
         The molecule.
     """
 
+    assert_msg_critical(
+        Path(xyzfile).is_file(), f'Molecule: xyzfile {xyzfile} does not exist')
+
     with Path(xyzfile).open('r') as fh:
         xyzstr = fh.read()
 
@@ -397,9 +428,7 @@ def _Molecule_from_dict(mol_dict):
     assert_msg_critical(
         mol.check_multiplicity(),
         'Molecule: Incompatible multiplicity and number of electrons')
-    assert_msg_critical(
-        mol.check_proximity(0.1),
-        'Molecule: Corrupted geometry with closely located atoms')
+    assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
     return mol
 
@@ -923,35 +952,36 @@ def _Molecule_show(self,
         raise ImportError('Unable to import py3Dmol')
 
 
-def _Molecule_draw_2d(self, width=400, height=300):
+@staticmethod
+def _Molecule_draw_2d(smiles_str, width=400, height=300):
     """
-    Generates 2D representation of the molecule.
+    Draw 2D representation for SMILES string.
 
+    :param smiles_str:
+        The SMILES string.
     :param width:
-        The width.
+        The width of the drawing area.
     :param height:
-        The height.
+        The height of the drawing area.
     """
 
     try:
-        from openbabel import pybel as pb
-        from IPython.display import SVG, display
+        from rdkit import Chem
+        from IPython.display import SVG
+        from IPython.display import display
 
-        molecule = self.get_xyz_string()
+        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
+                                                 optimize=True,
+                                                 hydrogen=False)
 
-        mol = pb.readstring('xyz', molecule)
+        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
+        drawer.DrawMolecule(mol_no_hydrogen)
+        drawer.FinishDrawing()
 
-        mol.make2D()
-        mol.removeh()
-
-        # Convert to SVG using pybel's drawing method
-        svg_string = mol.write(format='svg', opt={'w': width, 'h': height})
-
-        # Display SVG
-        display(SVG(svg_string))
+        display(SVG(drawer.GetDrawingText()))
 
     except ImportError:
-        raise ImportError('Unable to import openbabel and/or IPython.display.')
+        raise ImportError('Unable to import rdkit.Chem and/or IPython.display.')
 
 
 def _Molecule_moments_of_inertia(self, principal_axes=False):
@@ -1139,6 +1169,7 @@ Molecule._get_input_keywords = _Molecule_get_input_keywords
 Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
+Molecule.smiles_formal_charge = _Molecule_smiles_formal_charge
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
 Molecule.read_pdb_file = _Molecule_read_pdb_file

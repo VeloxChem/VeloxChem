@@ -22,16 +22,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 import numpy as np
 import time as tm
-import sys
 import math
-from mpi4py import MPI
+import sys
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCMolecularGradient
+from .veloxchemlib import T4CScreener
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver, NuclearPotentialGeom010Driver,
+                           FockGeom1000Driver, ElectricDipoleMomentGeom100Driver)
 from .veloxchemlib import mpi_master, hartree_in_wavenumber, denmat
+from .veloxchemlib import partition_atoms, make_matrix, mat_t
 
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
@@ -41,17 +46,10 @@ from .outputstream import OutputStream
 from .matrices import Matrices
 from .griddriver import GridDriver
 from .inputparser import parse_input
-from .sanitychecks import dft_sanity_check, polgrad_sanity_check
 from .dftutils import get_default_grid_level
-from .profiler import Profiler
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check, polgrad_sanity_check)
 
-# VLX integrals
-from .veloxchemlib import ElectricDipoleMomentGeom100Driver
-from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
-                           NuclearPotentialGeom100Driver, NuclearPotentialGeom010Driver,
-                           FockGeom1000Driver, ElectricDipoleMomentGeom100Driver)
-from .veloxchemlib import partition_atoms, make_matrix, mat_t
-from .veloxchemlib import T4CScreener
 
 class PolarizabilityGradient:
     """
@@ -167,9 +165,6 @@ class PolarizabilityGradient:
 
         self.frequencies = list(self.frequencies)
 
-        if self._dft and (self.grid_level is None):
-            self.grid_level = get_default_grid_level(self.xcfun) 
-
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
 
@@ -195,14 +190,16 @@ class PolarizabilityGradient:
         if self.is_complex:
             self.grad_dt = np.dtype('complex128')
 
-        # sanity check
+        # sanity checks
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, self._scf_drv.scf_tensors)
         dft_sanity_check(self, 'compute')
 
         start_time = tm.time()
 
         if self.numerical:
             # compute
-            self.compute_numerical(molecule, basis, self._scf_drv)
+            self.polgradient = self.compute_numerical(molecule, basis, self._scf_drv)
         else:
             # sanity checks linear response input
             if (self.rank == mpi_master()) and (lr_results is None):
@@ -213,10 +210,10 @@ class PolarizabilityGradient:
                 polgrad_sanity_check(self, self.flag, lr_results)
                 self._check_real_or_complex_input(lr_results)
             # compute
-            self.compute_analytical(molecule, basis, scf_tensors, lr_results)
+            self.polgradient = self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
-            self.print_geometry(molecule)
+            # self.print_geometry(molecule)
             if self.do_print_polgrad:
                 self.print_polarizability_gradient(molecule)
 
@@ -225,6 +222,8 @@ class PolarizabilityGradient:
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+
+        return self.polgradient
 
     def compute_analytical(self, molecule, basis, scf_tensors, lr_results):
         """
@@ -259,47 +258,158 @@ class PolarizabilityGradient:
         # operator components and permutation pairs
         dof = len(self.vector_components)
         xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        dof_red  = len(xy_pairs)
 
         # number of atomic orbitals
         nao = basis.get_dimensions_of_basis()
 
+        if self.rank == mpi_master():
+            mo = scf_tensors['C_alpha']  # only alpha part
+
+            # MO coefficients
+            nocc = molecule.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+            # number of input frequencies
+            n_freqs = len(self.frequencies)
+        else:
+            nocc = None
+            nvir = None
+            n_freqs = None
+
+        nocc, nvir, n_freqs = self.comm.bcast((nocc, nvir, n_freqs), root=mpi_master())
+
+        # if Lagr. multipliers not available as dist. array,
+        # read it from dict into variable on master
+        if 'dist_cphf_ov' not in all_orbrsp_results.keys():
+            all_cphf_red = all_orbrsp_results['cphf_ov']
+
+            if self.is_complex:
+                all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
+            else:
+                all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
+
         for f, w in enumerate(self.frequencies):
-            info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
-            self.ostream.print_info(info_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
+
+            full_vec = [
+                self.get_full_solution_vector(lr_results['solutions'][x, w])
+                for x in self.vector_components
+            ]
+
+            if 'dist_cphf_ov' in all_orbrsp_results.keys():
+                # get lambda multipliers from distributed arrays
+                cphf_ov = self.get_lambda_response_vector(
+                    molecule, scf_tensors, all_orbrsp_results['dist_cphf_ov'], f)
+
+            else:
+                # TODO get conj. gradient solver to also return dist. array
+                # get lambda multipliers from array in orbrsp dict
+                cphf_ov_red = all_cphf_red[f]
+
+                if self.is_complex:
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+
+                    tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
+
+                    for idx, xy in enumerate(xy_pairs):
+                        x = xy[0]
+                        y = xy[1]
+
+                        cphf_ov[x, y] = tmp_cphf_ov[idx]
+
+                        if (y != x):
+                            cphf_ov[y, x] += cphf_ov[x, y]
+                else:
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
+
+                    for idx, xy in enumerate(xy_pairs):
+                        x = xy[0]
+                        y = xy[1]
+
+                        cphf_ov[x, y] = cphf_ov_red[idx]
+
+                        if (y != x):
+                            cphf_ov[y, x] += cphf_ov[x, y]
 
             if self.rank == mpi_master():
+
+                info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
+                self.ostream.print_info(info_msg)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+                # Note: polorbitalresponse uses r instead of mu for dipole operator
+                for idx in range(len(full_vec)):
+                    full_vec[idx] *= -1.0
+
+                # extract the excitation and de-excitation components
+                # from the full solution vector.
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
+                           np.array(full_vec)[:, :nocc * nvir].reshape(
+                               dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 *
+                             np.array(full_vec)[:, nocc * nvir:].reshape(
+                                 dof, nocc, nvir))
+
+                # construct plus/minus combinations of excitation and
+                # de-excitation part
+                x_plus_y_mo = exc_vec + deexc_vec
+                x_minus_y_mo = exc_vec - deexc_vec
+
+                # transform to AO basis: mi,xia,na->xmn
+                # TODO rename to _ao for clarity
+                x_plus_y = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
+                    for x in range(dof)
+                ])
+                x_minus_y = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
+                    for x in range(dof)
+                ])
+                del x_plus_y_mo, x_minus_y_mo
+
                 orbrsp_results = all_orbrsp_results[w]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
-                x_plus_y = orbrsp_results['x_plus_y_ao']
-                x_minus_y = orbrsp_results['x_minus_y_ao']
+            # Lagrange multipliers
+            omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
+               
+            if self.rank == mpi_master():
 
-                # Lagrange multipliers
-                omega_ao = orbrsp_results['omega_ao'].reshape(
-                    dof, dof, nao, nao)
-                lambda_ao = orbrsp_results['lambda_ao'].reshape(dof, dof, nao, nao)
-                lambda_ao += lambda_ao.transpose(0, 1, 3, 2)  # vir-occ
+                cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+
+                lambda_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
+                    for xy in range(dof**2)
+                ])
+
+                lambda_ao = lambda_ao.reshape(dof, dof, nao, nao)
+                lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
 
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
+
+                del cphf_ov, lambda_ao
             else:
-                orbrsp_results = None
+                #orbrsp_results = None
                 gs_dm = None
                 x_plus_y = None
                 x_minus_y = None
                 omega_ao = None
                 rel_dm_ao = None
 
-            orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
+            #orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
             gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
-            x_plus_y= self.comm.bcast(x_plus_y, root=mpi_master())
+            x_plus_y = self.comm.bcast(x_plus_y, root=mpi_master())
             x_minus_y = self.comm.bcast(x_minus_y, root=mpi_master())
             omega_ao = self.comm.bcast(omega_ao, root=mpi_master())
             rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
 
             # initiate polarizability gradient variable with data type set in init()
+            # TODO distributed ?
             pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
             # kinetic energy gradient driver
@@ -325,6 +435,7 @@ class PolarizabilityGradient:
 
                     # loop over operator components
                     for x, y in xy_pairs:
+                        # TODO distributed ?
                         pol_gradient[x, y, iatom, icoord] += (
                                 np.linalg.multi_dot([ # xymn,amn->xya
                                     2.0 * rel_dm_ao[x, y].reshape(nao**2),
@@ -345,9 +456,10 @@ class PolarizabilityGradient:
                     gmat_ovlp += gmat_ovlp.T
                     # loop over operator components
                     for x, y in xy_pairs:
+                        # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                                2.0 * omega_ao[x, y].reshape(nao**2),
+                                    2.0 * omega_ao[x, y],
                                       gmat_ovlp.reshape(nao**2)]))
 
                 gmats_ovlp = Matrices()
@@ -378,6 +490,7 @@ class PolarizabilityGradient:
                 for icoord in range(3):
                     # loop over operator components
                     for x, y in xy_pairs:
+                        # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
                                 - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
                                     x_minus_y[x].reshape(nao**2),
@@ -389,44 +502,50 @@ class PolarizabilityGradient:
 
                 gmats_dip = Matrices()
 
+            # TODO do not compute separate array for eri_contrib -- add
+            # on-the-fly to pol_gradient
             # ERI contribution
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                     rel_dm_ao, x_plus_y, x_minus_y, local_atoms)
 
-            if self.rank == mpi_master():
-                pol_gradient += eri_contrib
-
+            # TODO distributed ?
+            pol_gradient += eri_contrib
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
+
+            del eri_contrib
 
             if self.rank == mpi_master():
                 for x in range(dof):
                     for y in range(x + 1, dof):
+                        # TODO distributed ?
                         pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
-                xcfun_label = self.xcfun.get_func_label()
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
-                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y, xcfun_label)
+                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y)
 
                 # add contribution to the SCF polarizability gradient
                 if self.rank == mpi_master():
+                    # TODO distributed?
                     pol_gradient += polgrad_xc_contrib
+
+                del polgrad_xc_contrib
 
             if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
         if self.rank == mpi_master():
-            self.polgradient = dict(polgrad_results)
-
-            n_freqs = len(self.frequencies)
-
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += '{:d} frequencies: {:.6f} sec **'.format(
                 n_freqs, tm.time() - loop_start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
+
+            return polgrad_results
+        else:
+            return {}
 
     def compute_eri_contrib(self, molecule, basis, gs_dm, rel_dm_ao,
                                          x_plus_y, x_minus_y, local_atoms):
@@ -593,8 +712,6 @@ class PolarizabilityGradient:
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy) * factor
                 eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx) * factor
 
-        eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
-
         return eri_deriv_contrib
 
     def compute_eri_contrib_complex(self, molecule, basis, gs_dm, rel_dm_ao,
@@ -649,7 +766,7 @@ class PolarizabilityGradient:
         dof = len(self.vector_components)
 
         # operator component combinations
-        xy_pairs = [(x,y) for x in range(dof) for y in range(x,dof)]
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
 
         eri_deriv_contrib = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
@@ -868,9 +985,190 @@ class PolarizabilityGradient:
                 # add to complex variable
                 eri_deriv_contrib[x, y, iatom] += erigrad_real + 1j * erigrad_imag
 
-        eri_deriv_contrib = self.comm.reduce(eri_deriv_contrib, root=mpi_master())
-
         return eri_deriv_contrib
+
+    def get_full_solution_vector(self, solution):
+        """ Gets a full solution vector from a general distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector
+        """
+
+        if self.is_complex:
+            return self.get_full_solution_vector_complex(solution)
+        else:
+            return self.get_full_solution_vector_real(solution)
+
+    @staticmethod
+    def get_full_solution_vector_complex(solution):
+        """
+        Gets a full complex solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The real and imaginary parts of the full solution vector.
+        """
+        x_realger = solution.get_full_vector(0)
+        x_realung = solution.get_full_vector(1)
+        x_imagung = solution.get_full_vector(2)
+        x_imagger = solution.get_full_vector(3)
+
+        if solution.rank == mpi_master():
+            x_real = np.hstack((x_realger, x_realger)) + np.hstack(
+                (x_realung, -x_realung))
+            x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
+                (x_imagger, x_imagger))
+            return x_real + 1j * x_imag
+        else:
+            return None
+
+    @staticmethod
+    def get_full_solution_vector_real(solution):
+        """
+        Gets a full solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector.
+        """
+
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
+
+        if solution.rank == mpi_master():
+            x_ger_full = np.hstack((x_ger, x_ger))
+            x_ung_full = np.hstack((x_ung, -x_ung))
+            return x_ger_full + x_ung_full
+        else:
+            return None
+
+    def get_lambda_response_vector(self, molecule, scf_tensors, lambda_list, fdx):
+        """
+        Gets the full lambda multipliers vector from distributed array.
+
+        :param lambda_list:
+            The list with distributed arrays.
+        :param fdx:
+            The frequency index.
+
+        :return:
+            The orbital response lambda vector.
+        """
+
+        dof = len(self.vector_components)
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        dof_red = len(xy_pairs)
+
+        if self.rank == mpi_master():
+            mo = scf_tensors['C_alpha']  # only alpha part
+            nocc = molecule.number_of_alpha_electrons()
+            mo_vir = mo[:, nocc:].copy()
+            nvir = mo_vir.shape[1]
+
+        if self.is_complex:
+            if self.rank == mpi_master():
+                lambda_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
+            else:
+                lambda_ov = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_lambda_re = lambda_list[
+                    2 * dof_red * fdx + idx].get_full_vector()
+                tmp_lambda_im = lambda_list[
+                    2 * dof_red * fdx + dof_red + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+
+                    lambda_ov[x, y] += tmp_lambda_re + 1j * tmp_lambda_im
+
+                    if (y != x):
+                        lambda_ov[y, x] += lambda_ov[x, y]
+        else:
+            if self.rank == mpi_master():
+                lambda_ov = np.zeros((dof, dof, nocc * nvir))
+            else:
+                lambda_ov = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_lambda_ov = lambda_list[dof_red * fdx + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+                    lambda_ov[x, y] += tmp_lambda_ov
+
+                    if (y != x):
+                        lambda_ov[y, x] += lambda_ov[x, y]
+
+        return lambda_ov
+
+    def get_omega_response_vector(self, basis, omega_list, fdx):
+        """
+        Gets the full omega multipliers vector from distributed array.
+
+        :param omega_list:
+            The list with distributed arrays.
+        :param fdx:
+            The frequency index.
+
+        :return:
+            The orbital response omega vector.
+        """
+
+        dof = len(self.vector_components)
+        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+        dof_red = len(xy_pairs)
+
+        if self.rank == mpi_master():
+            nao = basis.get_dimensions_of_basis()
+
+        if self.is_complex:
+            if self.rank == mpi_master():
+                omega_ao = np.zeros((dof, dof, nao * nao), dtype = np.dtype('complex128'))
+            else:
+                omega_ao = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_omega_re = omega_list[
+                    2 * dof_red * fdx + idx].get_full_vector()
+                tmp_omega_im = omega_list[
+                    2 * dof_red * fdx + dof_red + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+
+                    omega_ao[x, y] += tmp_omega_re + 1j * tmp_omega_im
+
+                    if (y != x):
+                        omega_ao[y, x] += omega_ao[x, y]
+        else:
+            if self.rank == mpi_master():
+                omega_ao = np.zeros((dof, dof, nao * nao))
+            else:
+                omega_ao = None
+
+            for idx, xy in enumerate(xy_pairs):
+                tmp_omega_ao = omega_list[dof_red * fdx + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    x = xy[0]
+                    y = xy[1]
+                    omega_ao[x, y] += tmp_omega_ao
+
+                    if (y != x):
+                        omega_ao[y, x] += omega_ao[x, y]
+
+        return omega_ao
 
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
@@ -894,20 +1192,17 @@ class PolarizabilityGradient:
         scf_drv.ostream.mute()
         lr_drv.ostream.mute()
 
-        # dictionary for results
-        polgrad_results = {}
-
         # construct polarizability gradient
         num_polgradient = self.construct_numerical_gradient(molecule, ao_basis, scf_drv, lr_drv)
-
-        if self.rank == mpi_master():
-            for f, w in enumerate(self.frequencies):
-                polgrad_results[w] = num_polgradient[f]
-            self.polgradient = dict(polgrad_results)
 
         # unmute the output streams
         scf_drv.ostream.unmute()
         lr_drv.ostream.unmute()
+
+        if self.rank == mpi_master():
+            return num_polgradient
+        else:
+            return {}
 
     def set_lr_driver(self):
         """
@@ -967,7 +1262,7 @@ class PolarizabilityGradient:
         return orbrsp_drv.cphf_results
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y, xcfun_label):
+                                    x_minus_y):
         """
         Directs the calculation of the exchange-correlation contribution to the DFT
         polarizability gradient.
@@ -982,12 +1277,12 @@ class PolarizabilityGradient:
             The relaxed density matric in AO basis.
         :param x_minus_y:
             The X-Y response vector.
-        :param xcfun_label:
-            The label for the XC functional
 
         :return xc_contrib:
             The XC-contribution to the polarizability gradient
         """
+
+        xcfun_label = self.xcfun.get_func_label()
 
         if self.is_complex:
             xc_contrib = self.compute_polgrad_xc_contrib_complex(
@@ -1164,7 +1459,9 @@ class PolarizabilityGradient:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xcgrad_drv = XCMolecularGradient()
@@ -1216,7 +1513,9 @@ class PolarizabilityGradient:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xcgrad_drv = XCMolecularGradient()
@@ -1359,6 +1658,9 @@ class PolarizabilityGradient:
         # timings
         loop_start_time = tm.time()
 
+        # dictionary for polarizability gradients
+        polgrad_results = {}
+
         for i in range(natm):
             for d in range(3):
                 coords[i, d] += self.delta_h
@@ -1413,17 +1715,23 @@ class PolarizabilityGradient:
                                     ) / (12.0 * self.delta_h))
                 else:
                     for f, w in enumerate(self.frequencies):
+                        tmp_polgradient = np.zeros((3, 3, 3 * natm), dtype=self.grad_dt)
                         for aop, acomp in enumerate('xyz'):
                             for bop, bcomp in enumerate('xyz'):
                                 key = (acomp, bcomp, w)
                                 if self.rank == mpi_master():
-                                    num_polgradient[f, aop, bop, 3 * i + d] = (
-                                        (lr_results_p1['response_functions'][key]
+                                    num_polgradient[f, aop, bop, 3 * i + d] = ((
+                                         lr_results_p1['response_functions'][key]
                                          -
                                          lr_results_m1['response_functions'][key]
                                          ) / (2.0 * self.delta_h))
 
         if self.rank == mpi_master():
+
+            # convert array to dict
+            for f, w in enumerate(self.frequencies):
+                polgrad_results[w] = num_polgradient[f]
+
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += '{:d} frequencies: {:.6f} sec **'.format(
                 n_freqs, tm.time() - loop_start_time)
@@ -1431,7 +1739,7 @@ class PolarizabilityGradient:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return num_polgradient
+        return polgrad_results
 
     def _init_dft(self, molecule, scf_tensors):
         """
@@ -1449,7 +1757,9 @@ class PolarizabilityGradient:
         # generate integration grid
         if self._dft:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
@@ -1639,27 +1949,3 @@ class PolarizabilityGradient:
             error_text = 'Mismatch between LR results and polgrad settings!'
             error_text += 'One is complex, the other is not.'
             raise ValueError(error_text)
-
-    def _freq_sanity_check(self):
-        """
-       Checks if a zero frequency has been input together with resonance Raman.
-
-       This check is due to convergence/singularity issues in the cphf
-       subspace solver for some molecules.
-       """
-
-        if self.is_complex:
-            try:
-                idx0 = self.frequencies.index(0.0)
-                warn_msg = 'Zero in frequency list for resonance Raman!\n'
-                if len(self.frequencies) == 1:
-                    error_msg += 'No other frequencies requested.'
-                    erro_msg += 'Will continue with normal Raman.'
-                else:
-                    self.frequencies.pop(idx0)
-                    warn_msg += 'It has been removed from the list.'
-                    warn_msg += 'Complex pol. gradient will be calculated for:\n'
-                    warn_msg += str(obj.frequencies)
-                    self.ostream.print_warning(warn_msg)
-            except ValueError:
-                pass
