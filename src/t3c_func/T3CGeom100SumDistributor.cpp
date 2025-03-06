@@ -49,6 +49,8 @@ CT3CGeom100SumDistributor::distribute(const CSimdArray<double>&        buffer,
     
     for (size_t n = 0; n < 3; n++)
     {
+        //std::cout << " *** n = " << n << std::endl;
+        
         for (int i = 0; i < acomps; i++)
         {
             // auto ptr_values = _t3_values->data(n * grows + mask_indices.at(i * adim + refp));
@@ -74,15 +76,23 @@ CT3CGeom100SumDistributor::distribute(const CSimdArray<double>&        buffer,
                         const auto r = k * cdim + refr;
                     
                         const auto s = l * ddim + refs;
+                        
+                        //std::cout << "(r,s) = " << r << " , " << s << std::endl;
                     
                         // assign integrals
                     
                         if (r <= s)
                         {
+                            //std::cout << "(r,s) = " << r << " , " << s << " : " << mathfunc::uplo_rm_index(r, s, _nrows) << std::endl;
+                            
                             _grad_values[n] += fact * _ptr_density[mathfunc::uplo_rm_index(r, s, _nrows)] * curr_buffer[m - ket_range.first];
                         }
                         else
                         {
+                            if (c_angmom == d_angmom) continue;
+                            
+                            //std::cout << "(r,s) = " << r << " , " << s << " : " << mathfunc::uplo_rm_index(s, r, _nrows) << std::endl;
+                            
                             _grad_values[n] += fact * _ptr_density[mathfunc::uplo_rm_index(s, r, _nrows)]  * curr_buffer[m - ket_range.first];
                         }
                     }

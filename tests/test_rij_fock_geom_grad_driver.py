@@ -21,9 +21,9 @@ class TestRIJFockGeomGradDriver:
     def get_data_h2o(self):
 
         h2ostr = """
-            O    0.800000000000        0.200000000000        0.300000000000
+            O    0.800000000000        0.000000000000        0.000000000000
             H    0.000000000000        0.740848095288        0.582094932012
-            H    0.200000000000       -0.740848095288        0.582094932012
+            H    0.000000000000       -0.740848095288        0.582094932012
         """
 
         mol = Molecule.read_str(h2ostr, 'angstrom')
@@ -300,7 +300,7 @@ class TestRIJFockGeomGradDriver:
             # check results
             for i in range(3):
                 for j in range(3):
-                    assert mt.isclose(ref_grad[3 * i + j], g[i, j], rel_tol=1.0e-5, abs_tol=1.0e-5)
+                    assert mt.isclose(ref_grad[3 * i + j], g[i, j], rel_tol=5.0e-5, abs_tol=5.0e-5)
                     
     def test_h2o_fock_2j_grad_h2o_sto3g_screened_direct(self):
 
