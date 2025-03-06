@@ -534,11 +534,11 @@ make_aux_work_tasks(const std::vector<CGtoBlock>&            gto_blocks,
             {
                 for (size_t j = 0; j < ngpblocks; j++)
                 {
-                    for (int k = 0; k < ithreshold; k++)
+                    for (size_t k = 0; k < ithreshold; k++)
                     {
-                        if (gto_pair_blocks[j].is_empty_gto_pair_block(k)) continue;
+                        if (gto_pair_blocks[j].is_empty_gto_pair_block(static_cast<int>(k))) continue;
 
-                        wtasks.push_back(std::array<size_t, 3>({i, j, (size_t)k}));
+                        wtasks.push_back(std::array<size_t, 3>({i, j, k}));
                     }
                 }
             }

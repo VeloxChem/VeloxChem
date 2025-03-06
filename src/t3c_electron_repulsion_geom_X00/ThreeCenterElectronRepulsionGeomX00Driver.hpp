@@ -246,7 +246,7 @@ CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CT4CScreener&      
                 {
                     auto gblock = ptr_aux_gto_blocks[aux_idx];
                     
-                    auto gp_pairs = ptr_gto_pair_blocks[ket_idx].gto_pair_block((int)gp_idx);
+                    auto gp_pairs = ptr_gto_pair_blocks[ket_idx].gto_pair_block(static_cast<int>(gp_idx));
                               
                     CT3CGeom100SumDistributor distributor(ptr_gvec_xyz[index].data(), ptr_gamma, ptr_density, nrows);
                     
