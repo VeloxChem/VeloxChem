@@ -3,7 +3,9 @@ target_sources(vlxobjs
     RIFockDriver.cpp
     RIFockGradDriver.cpp
     T3CDistributor.cpp
+    T3CGeom010SumDistributor.cpp
     T3CGeom0X0Distributor.cpp
+    T3CGeom100SumDistributor.cpp
     T3CGeomX00Distributor.cpp
     T3CUtils.cpp
   )

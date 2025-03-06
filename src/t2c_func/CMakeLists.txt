@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    T2CGeom10SumDistributor.cpp
     T2CUtils.cpp
   )
 
