@@ -920,18 +920,10 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
-            dist_cphf_ov = []
-            for ivec in range(dof):
-                cphf_ov_vec = cphf_ov[ivec].reshape(nocc*nvir)
-                dist_array = DistributedArray(cphf_ov_vec, self.comm)
-                dist_cphf_ov.append(dist_array)
+        # merge the rhs dict with the solution
+        cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
 
-            # merge the rhs dict with the solution
-            cphf_ov_dict = {**cphf_rhs_dict, 'dist_cphf_ov': dist_cphf_ov}
-
-            return cphf_ov_dict
-
-        return None
+        return cphf_ov_dict
 
     def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs):
         """

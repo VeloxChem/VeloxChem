@@ -295,7 +295,7 @@ class ScfHessianDriver(HessianDriver):
 
         assert_msg_critical(
             self.scf_driver.scf_type == 'restricted',
-            'ScfHessianDriver: Analytical gradient only implemented ' +
+            'ScfHessianDriver: Analytical Hessian only implemented ' +
             'for restricted case')
 
         assert_msg_critical(

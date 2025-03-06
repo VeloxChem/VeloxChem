@@ -216,7 +216,8 @@ class ScfGradientDriver(GradientDriver):
             'Point_charges_grad': 0.0,
             'Fock_grad': 0.0,
             'XC_grad': 0.0,
-            'classical': 0.0,
+            'PE_grad': 0.0,
+            'Classical': 0.0,
         }
 
         if self.rank == mpi_master():
@@ -484,6 +485,28 @@ class ScfGradientDriver(GradientDriver):
 
         grad_timing['XC_grad'] += time.time() - t0
 
+        # Embedding contribution to the gradient
+
+        t0 = time.time()
+
+        if self.scf_driver._pe:
+            from .embedding import PolarizableEmbeddingGrad
+
+            # pass along emb object from scf, or make a new one? -> for ind dipoles.
+            self._embedding_drv = PolarizableEmbeddingGrad(
+                molecule=molecule,
+                ao_basis=basis,
+                options=self.scf_driver.embedding,
+                comm=self.comm)
+
+            pe_grad = self._embedding_drv.compute_pe_contributions(
+                density_matrix=2.0 * D)
+
+            if self.rank == mpi_master():
+                self.gradient += pe_grad
+
+        grad_timing['PE_grad'] += time.time() - t0
+
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
         # (only added on master rank)
@@ -497,20 +520,6 @@ class ScfGradientDriver(GradientDriver):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
-
-            # Embedding contribution to the gradient
-            if self.scf_driver._pe:
-                from .embedding import PolarizableEmbeddingGrad
-
-                # pass along emb object from scf, or make a new one? -> for ind dipoles.
-                self._embedding_drv = PolarizableEmbeddingGrad(
-                    molecule=molecule,
-                    ao_basis=basis,
-                    options=self.scf_driver.embedding,
-                    comm=self.comm)
-
-                self.gradient += self._embedding_drv.compute_pe_contributions(
-                    density_matrix=2.0 * D)
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
@@ -575,7 +584,7 @@ class ScfGradientDriver(GradientDriver):
 
                 self.gradient += vdw_grad
 
-        grad_timing['classical'] += time.time() - t0
+        grad_timing['Classical'] += time.time() - t0
 
         # collect gradient
 
@@ -808,6 +817,23 @@ class ScfGradientDriver(GradientDriver):
         else:
             xcfun_label = 'hf'
 
+        # Embedding contribution to the gradient
+        if self.scf_driver._pe:
+            from .embedding import PolarizableEmbeddingGrad
+
+            # pass along emb object from scf, or make a new one? -> for ind dipoles.
+            self._embedding_drv = PolarizableEmbeddingGrad(
+                molecule=molecule,
+                ao_basis=basis,
+                options=self.scf_driver.embedding,
+                comm=self.comm)
+
+            pe_grad = self._embedding_drv.compute_pe_contributions(
+                density_matrix=Da + Db)
+
+            if self.rank == mpi_master():
+                self.gradient += pe_grad
+
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
         # (only added on master rank)
@@ -819,20 +845,6 @@ class ScfGradientDriver(GradientDriver):
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
-
-            # Embedding contribution to the gradient
-            if self.scf_driver._pe:
-                from .embedding import PolarizableEmbeddingGrad
-
-                # pass along emb object from scf, or make a new one? -> for ind dipoles.
-                self._embedding_drv = PolarizableEmbeddingGrad(
-                    molecule=molecule,
-                    ao_basis=basis,
-                    options=self.scf_driver.embedding,
-                    comm=self.comm)
-
-                self.gradient += self._embedding_drv.compute_pe_contributions(
-                    density_matrix=Da + Db)
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
