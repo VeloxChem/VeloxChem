@@ -423,8 +423,10 @@ class ScfGradientDriver(GradientDriver):
 
             natoms = molecule.number_of_atoms()
 
-            ri_grad = ri_grad_drv.compute(basis, basis_ri_j, molecule, ri_gvec,
-                                          den_mat_for_fock, local_atoms)
+            ri_grad = ri_grad_drv.direct_compute(screener, basis, basis_ri_j,
+                                                 molecule, ri_gvec,
+                                                 den_mat_for_fock, local_atoms,
+                                                 thresh_int)
 
             for iatom, atomgrad in zip(local_atoms, ri_grad):
                 # Note: RI gradient already contains factor of 2 for
