@@ -31,6 +31,41 @@ CRIFockGradDriver::compute(const CT4CScreener&        screener,
 }
 
 auto
+CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
+                                  const CMolecularBasis&     basis,
+                                  const CMolecularBasis&     aux_basis,
+                                  const CMolecule&           molecule,
+                                  const std::vector<double>& gamma,
+                                  const CMatrix&             density,
+                                  const int                  iatom,
+                                  const int                  ithreshold) const -> TPoint<double>
+{
+    auto tg_xyz = std::array<double, 3>({0.0, 0.0, 0.0});
+    
+    const auto dvec = density.flat_values();
+            
+    const auto t3cb_drv = CThreeCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g1_xyz = t3cb_drv.compute(screener, basis, aux_basis, molecule, gamma, dvec, iatom, ithreshold);
+    
+    tg_xyz[0] += g1_xyz[0]; tg_xyz[1] += g1_xyz[1]; tg_xyz[2] += g1_xyz[2];
+    
+    const auto t3ck_drv = CThreeCenterElectronRepulsionGeom0X0Driver<1>();
+    
+    const auto g2_xyz = t3ck_drv.compute(basis, aux_basis, molecule, gamma, dvec, iatom);
+    
+    tg_xyz[0] += g2_xyz[0]; tg_xyz[1] += g2_xyz[1]; tg_xyz[2] += g2_xyz[2];
+    
+    const auto t2c_drv = CTwoCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g3_xyz = t2c_drv.compute(aux_basis, molecule, gamma, iatom);
+    
+    tg_xyz[0] -= g3_xyz[0]; tg_xyz[1] -= g3_xyz[1]; tg_xyz[2] -= g3_xyz[2];
+    
+    return TPoint<double>(tg_xyz);
+}
+
+auto
 CRIFockGradDriver::compute(const CMolecularBasis&     basis,
                            const CMolecularBasis&     aux_basis,
                            const CMolecule&           molecule,
@@ -121,6 +156,28 @@ CRIFockGradDriver::compute(const CT4CScreener&        screener,
                 }
             });
         }
+    }
+    
+    return grads;
+}
+
+auto
+CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
+                                  const CMolecularBasis&     basis,
+                                  const CMolecularBasis&     aux_basis,
+                                  const CMolecule&           molecule,
+                                  const std::vector<double>& gamma,
+                                  const CMatrix&             density,
+                                  const std::vector<int>     atoms,
+                                  const int                  ithreshold) const -> std::vector<TPoint<double>>
+{
+    const auto natoms = atoms.size();
+    
+    std::vector<TPoint<double>> grads(natoms, TPoint<double>({0.0, 0.0, 0.0}));
+    
+    for (int i = 0; i < natoms; i++)
+    {
+        grads[i] = direct_compute(screener, basis, aux_basis, molecule, gamma, density, i, ithreshold);
     }
     
     return grads;
