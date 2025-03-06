@@ -127,9 +127,10 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64.
         """
 
-        return compute_electric_field_values(self.molecule, self.basis,
-                                                    coordinates, density_matrix)
-
+        return compute_electric_field_values(molecule=self.molecule,
+                                             basis=self.basis,
+                                             dipole_coords=coordinates,
+                                             density=density_matrix)
 
     def electronic_electrostatic_energy_gradients(self,
             multipole_coordinates: np.ndarray,
@@ -169,7 +170,7 @@ class EmbeddingIntegralDriver:
             basis=self.basis,
             coordinates=charge_coordinates,
             charges=charges,
-            D=density_matrix)
+            density=density_matrix)
         return op
 
 
@@ -196,8 +197,11 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64
         """
 
-        return compute_electric_field_potential_gradient(
-            self.molecule, self.basis, coordinates, induced_dipoles, density_matrix)
+        return compute_electric_field_potential_gradient(molecule=self.molecule,
+                                                         basis=self.basis,
+                                                         dipole_coords=coordinates,
+                                                         dipole_moments=induced_dipoles,
+                                                         density=density_matrix)
 
     def electronic_induction_fock_gradient(self,
                                              induced_dipoles:np.ndarray,

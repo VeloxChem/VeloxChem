@@ -132,7 +132,7 @@ def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):
 
 
 def compute_nuclear_potential_gradient_bfs(molecule, basis, charges,
-                                           coordinates, D):
+                                           coordinates, density):
     """
     Computes nuclear potential integrals contribution from point charges to
     molecular gradient.
@@ -163,7 +163,7 @@ def compute_nuclear_potential_gradient_bfs(molecule, basis, charges,
         for i, label in enumerate(['X', 'Y', 'Z']):
             gmat_100 = gmats_100.matrix_to_numpy(label)
 
-            grad[iatom, i] += np.sum((gmat_100 + gmat_100.T) * D)
+            grad[iatom, i] += np.sum((gmat_100 + gmat_100.T) * density)
 
         gmats_100 = Matrices()
 

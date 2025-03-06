@@ -193,7 +193,7 @@ export_oneeints(py::module& m)
              "molecule"_a,
              "basis"_a,
              "dipole_coords"_a,
-             "D"_a);
+             "density"_a);
 
     m.def("compute_electric_field_potential_gradient",
             [](const CMolecule&           molecule,
@@ -220,7 +220,7 @@ export_oneeints(py::module& m)
              "basis"_a,
              "dipole_coords"_a,
              "dipole_moments"_a,
-             "D"_a);
+             "density"_a);
 
     m.def("compute_electric_field_fock_gradient",
             [](const CMolecule&           molecule,
