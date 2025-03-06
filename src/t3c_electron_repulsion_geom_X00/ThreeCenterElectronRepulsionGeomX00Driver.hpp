@@ -242,6 +242,7 @@ CThreeCenterElectronRepulsionGeomX00Driver<N>::compute(const CT4CScreener&      
                 auto aux_idx = task[0];
                 auto ket_idx = task[1];
                 auto gp_idx  = task[2];
+                //std::cout << "*** data " << index << " " << aux_idx << " " << ket_idx << " " << gp_idx << std::endl; 
 #pragma omp task firstprivate(index, aux_idx, ket_idx, gp_idx)
                 {
                     auto gblock = ptr_aux_gto_blocks[aux_idx];

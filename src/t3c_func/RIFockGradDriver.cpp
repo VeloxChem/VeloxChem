@@ -50,17 +50,23 @@ CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
     
     tg_xyz[0] += g1_xyz[0]; tg_xyz[1] += g1_xyz[1]; tg_xyz[2] += g1_xyz[2];
     
+    //std::cout << " First : " << tg_xyz[0] << " , " << tg_xyz[1] << " , " << tg_xyz[2] << std::endl;
+    
     const auto t3ck_drv = CThreeCenterElectronRepulsionGeom0X0Driver<1>();
     
     const auto g2_xyz = t3ck_drv.compute(basis, aux_basis, molecule, gamma, dvec, iatom);
     
     tg_xyz[0] += g2_xyz[0]; tg_xyz[1] += g2_xyz[1]; tg_xyz[2] += g2_xyz[2];
     
+    //std::cout << " Second : " << tg_xyz[0] << " , " << tg_xyz[1] << " , " << tg_xyz[2] << std::endl;
+    
     const auto t2c_drv = CTwoCenterElectronRepulsionGeomX00Driver<1>();
     
     const auto g3_xyz = t2c_drv.compute(aux_basis, molecule, gamma, iatom);
     
     tg_xyz[0] -= g3_xyz[0]; tg_xyz[1] -= g3_xyz[1]; tg_xyz[2] -= g3_xyz[2];
+    
+    //std::cout << " Total : " << tg_xyz[0] << " , " << tg_xyz[1] << " , " << tg_xyz[2] << std::endl;
     
     return TPoint<double>(tg_xyz);
 }
@@ -388,6 +394,8 @@ CRIFockGradDriver::_comp_eri_grad(const CT4CScreener&        screener,
         g_xyz[i] = 4.0 * gsum;
     }
     
+    //std::cout << " First : " << g_xyz[0] << " , " << g_xyz[1] << " , " << g_xyz[2] << std::endl;
+    
     // set up accumulation of basis derivatives contribution
     
     const auto t3ck_drv = CThreeCenterElectronRepulsionGeom0X0Driver<1>();
@@ -447,6 +455,8 @@ CRIFockGradDriver::_comp_eri_grad(const CT4CScreener&        screener,
         g_xyz[i] += 4.0 * gsum;
     }
     
+    //std::cout << " Second : " << g_xyz[0] << " , " << g_xyz[1] << " , " << g_xyz[2] << std::endl;
+    
     // set up accumulation of basis derivatives contribution
     
     const auto labels = std::vector<std::string>({"X", "Y", "Z"});
@@ -473,6 +483,8 @@ CRIFockGradDriver::_comp_eri_grad(const CT4CScreener&        screener,
         
         g_xyz[i] -=  2.0 * gsum;
     }
+    
+    //std::cout << " Total : " << g_xyz[0] << " , " << g_xyz[1] << " , " << g_xyz[2] << std::endl;
     
     return g_xyz;
 }
