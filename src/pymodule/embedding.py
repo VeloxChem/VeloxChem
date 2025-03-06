@@ -204,10 +204,10 @@ class EmbeddingIntegralDriver:
                                                          density=density_matrix)
 
     def electronic_induction_fock_gradient(self,
-                                             induced_dipoles:np.ndarray,
-                                             coordinates: np.ndarray,
-                                             i: int) -> np.ndarray:
-        """Calculate the electronic induction energy hessian.
+                                           induced_dipoles:np.ndarray,
+                                           coordinates: np.ndarray,
+                                           i: int) -> np.ndarray:
+        """Calculate the electronic induction Fock gradient.
 
         Args:
             induced_dipoles: Induced dipoles
@@ -258,13 +258,12 @@ class EmbeddingIntegralDriver:
                                                 induced_dipoles)
 
     def electronic_electrostatic_energy_hessian(self,
-                                                   multipole_coordinates: np.ndarray,
-                                                   multipole_orders: np.ndarray,
-                                                   multipoles: list[np.ndarray],
-                                                   density_matrix: np.ndarray,
-                                                   nuc_i: int,
-                                                   nuc_j: int
-                                                   ):
+                                                multipole_coordinates: np.ndarray,
+                                                multipole_orders: np.ndarray,
+                                                multipoles: list[np.ndarray],
+                                                density_matrix: np.ndarray,
+                                                nuc_i: int,
+                                                nuc_j: int):
         """Calculate the electronic electrostatic energy Hessian.
 
         Args:
@@ -813,17 +812,19 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
 
     def compute_pe_energy_hess_contributions(self, density_matrix):
         nuc_list = np.arange(self.quantum_subsystem.num_nuclei, dtype=np.int64)
+        # TODO: double check density_matrix
         e_es_elec_hess = electrostatic_interactions.compute_electronic_electrostatic_energy_hessian(
             nuc_list=nuc_list,
-            density_matrix=density_matrix,
+            density_matrix=0.5 * density_matrix,
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver
             )
         e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem= self.classical_subsystem)
+        # TODO: double check density_matrix
         e_ind_hess = induction_interactions.compute_induction_energy_hessian(
-            density_matrix=density_matrix,
+            density_matrix=(-1.0) * density_matrix,
             classical_subsystem=self.classical_subsystem,
             quantum_subsystem=self.quantum_subsystem,
             integral_driver=self._integral_driver,
