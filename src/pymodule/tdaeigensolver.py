@@ -352,8 +352,9 @@ class TdaEigenSolver(LinearSolver):
             self._print_convergence('{:d} excited states'.format(self.nstates))
             # Final checkpoint file to save response results, solution vectors, NTOs, etc.
             # replace the suffix _rsp.h5 of the checkpoint_file name by .h5
-            final_h5_fname = str(
-                    Path(self.checkpoint_file))[:-7] + '.h5'
+            if self.checkpoint_file is not None:
+                final_h5_fname = str(
+                        Path(self.checkpoint_file))[:-7] + '.h5'
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)

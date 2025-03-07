@@ -521,8 +521,6 @@ class TddftGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += gs_grad_drv.get_gradient()
 
-            self.ostream.print_info(f'x-y, {x_minus_y_ao}')
-
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
         if self.timing and self.rank == mpi_master():
