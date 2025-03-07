@@ -439,21 +439,19 @@ class EvbDriver():
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
 
         if Lambda is None:
-            if not self.debug:
-                if self.fast_run:
-                    Lambda = np.linspace(0, 0.1, 6)
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
-                else:
-                    Lambda = np.linspace(0, 0.1, 11)
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
-                Lambda = np.round(Lambda, 3)
-            else:
+            if self.fast_run:
+                Lambda = np.linspace(0, 0.1, 6)
+                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
+                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
+            if self.debug:
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+            else:
+                Lambda = np.linspace(0, 0.1, 11)
+                Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
+                Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
         assert (Lambda[0] == 0 and Lambda[-1] == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(np.diff(Lambda) > 0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
-        Lambda = [round(lam, 3) for lam in Lambda]
+        Lambda = np.round(Lambda, 3)
         self.Lambda = Lambda
 
         if all(isinstance(conf, str) for conf in configurations):
@@ -520,7 +518,7 @@ class EvbDriver():
                     json.dump(
                         {
                             "temperature": conf.get("temperature", self.temperature),
-                            "Lambda": Lambda,
+                            "Lambda": list(Lambda),
                         },
                         file,
                     )

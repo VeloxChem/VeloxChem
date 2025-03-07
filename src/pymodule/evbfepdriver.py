@@ -32,6 +32,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .evbreporter import EvbReporter
 from .errorhandler import assert_msg_critical
+from .evbsystembuilder import EvbForceGroup
 
 try:
     import openmm as mm
@@ -83,7 +84,8 @@ class EvbFepDriver():
         equil_step_size,
         initial_equil_step_size,
         Lambda,
-        configuration
+        configuration,
+        calculate_forces=False,
     ):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbFepDriver.')
@@ -108,10 +110,12 @@ class EvbFepDriver():
         self.ostream.print_info(f"Total lambda points: {len(self.Lambda)}")
         self.ostream.print_info(f"Snapshots per lambda: {total_sample_steps / write_step}")
         self.ostream.print_info(f"Snapshots to be recorded: {self.total_snapshots}")
-        self.ostream.print_info(f"Total simulation steps: {(total_sample_steps + equilibration_steps) * len(self.Lambda) + lambda_0_equilibration_steps}")
+        self.ostream.print_info(
+            f"Total simulation steps: {(total_sample_steps + equilibration_steps) * len(self.Lambda) + lambda_0_equilibration_steps}"
+        )
         self.ostream.print_info(f"System time per snapshot: {step_size * write_step} ps")
         self.ostream.print_info(f"System time per frame: {step_size * total_sample_steps} ps")
-        self.ostream.print_info(f"Total system time: {step_size * total_sample_steps * len(self.Lambda)} ps",)
+        self.ostream.print_info(f"Total system time: {step_size * total_sample_steps * len(self.Lambda)} ps", )
         self.ostream.flush()
         integrator_temperature = temperature * mmunit.kelvin  #type: ignore
         integrator_friction_coeff = 1 / mmunit.picosecond
@@ -130,26 +134,25 @@ class EvbFepDriver():
                 integrator_friction_coeff,
                 equil_step_size * mmunit.picoseconds,
             )
+            integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
 
-            if l>0:
+            if l > 0:
                 estimated_time_remaining = timer.calculate_remaining(i)
                 time_estimate_str = ", " + timer.get_time_str(estimated_time_remaining)
                 self.ostream.print_info(f"lambda = {l}" + time_estimate_str)
             else:
                 self.ostream.print_info(f"lambda = {l}")
-            
+
             constrained_H_bonds = []
             if self.constrain_H:
-                harm_bond_forces = [
-                    force for force in system.getForces() if isinstance(force, mm.HarmonicBondForce)
-                ]
+                harm_bond_forces = [force for force in system.getForces() if isinstance(force, mm.HarmonicBondForce)]
 
                 count = 0
                 for harmbond in harm_bond_forces:
                     for i in range(harmbond.getNumBonds()):
                         particle1, particle2, length, k = harmbond.getBondParameters(i)
-                        if (system.getParticleMass(particle1).value_in_unit(mmunit.dalton) - 1.007947 < 0.01 or
-                                system.getParticleMass(particle2).value_in_unit(mmunit.dalton) - 1.007947 < 0.01):
+                        if (system.getParticleMass(particle1).value_in_unit(mmunit.dalton) - 1.007947 < 0.01
+                                or system.getParticleMass(particle2).value_in_unit(mmunit.dalton) - 1.007947 < 0.01):
                             H_bond = sorted((particle1, particle2))
                             if H_bond not in constrained_H_bonds:
                                 constrained_H_bonds.append(H_bond)
@@ -175,7 +178,8 @@ class EvbFepDriver():
 
             if l == 0:
                 simulation.integrator.setStepSize(initial_equil_step_size * mmunit.picoseconds)
-                self.ostream.print_info(f"Running initial equilibration with step size {simulation.integrator.getStepSize()}")
+                self.ostream.print_info(
+                    f"Running initial equilibration with step size {simulation.integrator.getStepSize()}")
                 self.ostream.flush()
                 simulation.step(lambda_0_equilibration_steps)
                 timer.start()
@@ -189,7 +193,7 @@ class EvbFepDriver():
             equil_positions = simulation.context.getState(getPositions=True).getPositions()
 
             if self.constrain_H:
-                self.ostream.print_info("Removing constraints")
+                self.ostream.print_info("Removing constraints involving H atoms")
                 for i in range(system.getNumConstraints()):
                     system.removeConstraint(0)
 
@@ -199,6 +203,7 @@ class EvbFepDriver():
                 integrator_friction_coeff,
                 step_size * mmunit.picoseconds,
             )
+            integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
             runsimulation = mmapp.Simulation(
                 topology,
                 system,
@@ -211,18 +216,17 @@ class EvbFepDriver():
                 append = False
             else:
                 append = True
-            runsimulation.reporters.append(EvbReporter(
-                str(self.data_folder / "Energies.dat"),
-                write_step,
-                systems["reactant"],
-                systems["product"],
-                systems[0],
-                systems[1],
-                topology,
-                l,
-                self.ostream,
-                append=append,
-            ))
+            runsimulation.reporters.append(
+                EvbReporter(
+                    str(self.data_folder / "Energies.dat"),
+                    write_step,
+                    systems[0],
+                    systems[1],
+                    topology,
+                    l,
+                    self.ostream,
+                    append=append,
+                ))
 
             runsimulation.reporters.append(
                 mmapp.StateDataReporter(
@@ -238,7 +242,7 @@ class EvbFepDriver():
                 ))
 
             self.ostream.print_info(f"Running sampling with step size {runsimulation.integrator.getStepSize()}")
-            self.ostream.flush()    
+            self.ostream.flush()
             runsimulation.step(total_sample_steps)
             state = runsimulation.context.getState(getPositions=True)
             positions = state.getPositions()
@@ -247,6 +251,7 @@ class EvbFepDriver():
 
         self.ostream.print_info("Merging output files")
         self.ostream.flush()
+
 
 #?Utility class for predicting approximate runtime of the simulation, do we already have dependencies for this so that this can be scrapped?
 class Timer:
