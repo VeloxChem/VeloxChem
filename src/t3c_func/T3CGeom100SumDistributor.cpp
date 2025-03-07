@@ -70,6 +70,13 @@ CT3CGeom100SumDistributor::distribute(const CSimdArray<double>&        buffer,
                         const auto refr = c_indices[m + 1];
                     
                         const auto refs = d_indices[m + 1];
+                        
+                        // impose angular symmetry on ket side
+
+                        if (refr == refs)
+                        {
+                            if (l < k) continue;
+                        }
                     
                         // compute r and s indexes
                     
@@ -89,8 +96,6 @@ CT3CGeom100SumDistributor::distribute(const CSimdArray<double>&        buffer,
                         }
                         else
                         {
-                            if (c_angmom == d_angmom) continue;
-                            
                             //std::cout << "(r,s) = " << r << " , " << s << " : " << mathfunc::uplo_rm_index(s, r, _nrows) << std::endl;
                             
                             _grad_values[n] += fact * _ptr_density[mathfunc::uplo_rm_index(s, r, _nrows)]  * curr_buffer[m - ket_range.first];

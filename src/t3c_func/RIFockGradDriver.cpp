@@ -168,28 +168,6 @@ CRIFockGradDriver::compute(const CT4CScreener&        screener,
 }
 
 auto
-CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
-                                  const CMolecularBasis&     basis,
-                                  const CMolecularBasis&     aux_basis,
-                                  const CMolecule&           molecule,
-                                  const std::vector<double>& gamma,
-                                  const CMatrix&             density,
-                                  const std::vector<int>     atoms,
-                                  const int                  ithreshold) const -> std::vector<TPoint<double>>
-{
-    const auto natoms = atoms.size();
-    
-    std::vector<TPoint<double>> grads(natoms, TPoint<double>({0.0, 0.0, 0.0}));
-    
-    for (int i = 0; i < natoms; i++)
-    {
-        grads[i] = direct_compute(screener, basis, aux_basis, molecule, gamma, density, atoms[i], ithreshold);
-    }
-    
-    return grads;
-}
-
-auto
 CRIFockGradDriver::_comp_eri_grad(const CMolecularBasis&     basis,
                                   const CMolecularBasis&     aux_basis,
                                   const CMolecule&           molecule,
