@@ -839,9 +839,8 @@ class TdaEigenSolver(LinearSolver):
             write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
                                eigvecs[:, s])
 
-        checkpoint_text = 'Response solution vectors written to file: '
-        checkpoint_text += final_h5_fname
-        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_info('Response solution vectors written to file: ' +
+                                final_h5_fname)
         self.ostream.print_blank()
 
     def _print_results(self, results):

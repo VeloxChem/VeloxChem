@@ -55,6 +55,7 @@ from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
+from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -176,8 +177,8 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     #     rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
-        assert_msg_critical(
-            False, f'Response: invalid response property {prop_type}')
+        assert_msg_critical(False,
+                            f'Response: invalid response property {prop_type}')
 
     return rsp_prop
 
