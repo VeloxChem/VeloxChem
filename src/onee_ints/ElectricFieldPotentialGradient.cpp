@@ -22,7 +22,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "ElectricFieldValues.hpp"
+#include "ElectricFieldPotentialGradient.hpp"
 
 #include <omp.h>
 
@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "BoysFuncTable.hpp"
-#include "ElectricFieldRec.hpp"
+#include "ElectricFieldRecGrad.hpp"
 #include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
@@ -46,23 +46,25 @@
 namespace onee {  // onee namespace
 
 auto
-computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const int ndipoles, const double* D, const int naos) -> CDenseMatrix
+computeElectricFieldPotentialGradient(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const double* dipole_moments, const int ndipoles, const double* D, const int naos) -> CDenseMatrix
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computeElectricFieldValues: Inconsistent number of AOs"));
+            std::string("computeElectricFieldPotentialGradient: Inconsistent number of AOs"));
+
+    auto natoms = molecule.number_of_atoms();
 
     auto nthreads = omp_get_max_threads();
 
-    std::vector<CDenseMatrix> efield_values_omp(nthreads);
+    std::vector<CDenseMatrix> V_grad_omp(nthreads);
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
-        efield_values_omp[thread_id] = CDenseMatrix(ndipoles, 3);
+        V_grad_omp[thread_id] = CDenseMatrix(natoms, 3);
 
-        efield_values_omp[thread_id].zero();
+        V_grad_omp[thread_id].zero();
     }
 
     // Boys function
@@ -73,13 +75,16 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
     // dipoles info
 
-    std::vector<double> dipoles_info(ndipoles * 3);
+    std::vector<double> dipoles_info(ndipoles * 6);
 
     for (int c = 0; c < ndipoles; c++)
     {
         dipoles_info[c + ndipoles * 0] = dipole_coords[c * 3 + 0];
         dipoles_info[c + ndipoles * 1] = dipole_coords[c * 3 + 1];
         dipoles_info[c + ndipoles * 2] = dipole_coords[c * 3 + 2];
+        dipoles_info[c + ndipoles * 3] = dipole_moments[c * 3 + 0];
+        dipoles_info[c + ndipoles * 4] = dipole_moments[c * 3 + 1];
+        dipoles_info[c + ndipoles * 5] = dipole_moments[c * 3 + 2];
     }
 
     // gto blocks
@@ -90,6 +95,7 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
     int f_prim_count = 0;
 
     int ncgtos_d = 0;
+    int naos_cart = 0;
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -101,24 +107,32 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         if (gto_ang == 0)
         {
             s_prim_count += npgtos * ncgtos;
+
+            naos_cart += ncgtos;
         }
         else if (gto_ang == 1)
         {
             p_prim_count += npgtos * ncgtos;
+
+            naos_cart += ncgtos * 3;
         }
         else if (gto_ang == 2)
         {
             d_prim_count += npgtos * ncgtos;
 
             ncgtos_d += ncgtos;
+
+            naos_cart += ncgtos * 6;
         }
         else if (gto_ang == 3)
         {
             f_prim_count += npgtos * ncgtos;
+
+            naos_cart += ncgtos * 10;
         }
         else
         {
-            std::string errangmom("computeElectricFieldValues: Only implemented up to f-orbitals");
+            std::string errangmom("computeElectricFieldPotentialGradient: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
@@ -159,6 +173,27 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
             for (const auto& [cart_ind, sph_ind_coef] : f_map)
             {
                 cart_sph_f[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // Cartesian AO to atom mapping
+
+    std::vector<int> cart_ao_to_atom_ids(naos_cart);
+
+    for (int iatom = 0; iatom < natoms; iatom++)
+    {
+        std::vector<int> atomidx({iatom});
+
+        const auto atom_gto_blocks = gtofunc::make_gto_blocks(basis, molecule, atomidx);
+
+        for (const auto& atom_gto_block : atom_gto_blocks)
+        {
+            const auto gto_ao_inds = atom_gto_block.getAtomicOrbitalsIndexesForCartesian(ncgtos_d);
+
+            for (const auto aoidx : gto_ao_inds)
+            {
+                cart_ao_to_atom_ids[aoidx] = iatom;
             }
         }
     }
@@ -404,6 +439,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = s_prim_aoinds[j];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -415,11 +453,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -427,14 +478,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F1_t[2];
+            double F2_t[3];
 
-            onee::computeBoysFunction(F1_t, (a_i + a_j) * r2_PC, 1, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecSS(F1_t, a_i, a_j, PC, m);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSSGradA(F2_t, a_i, a_j, PC, m, n, PA_n, delta);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSSGradB(F2_t, a_i, a_j, PC, m, n, PB_n, delta);
 
                 {
                     auto i_cgto_sph = i_cgto;
@@ -451,10 +505,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -487,6 +546,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -499,11 +561,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -511,14 +586,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F2_t[3];
+            double F3_t[4];
 
-            onee::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F3_t, (a_i + a_j) * r2_PC, 3, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecSP(F2_t, a_i, a_j, PC, m, delta, b0, PB_0);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSPGradA(F3_t, a_i, a_j, PC, m, n, PA_n, delta, b0, PB_0);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSPGradB(F3_t, a_i, a_j, PC, m, n, PB_n, delta, b0, PB_0);
 
                 {
                     auto i_cgto_sph = i_cgto;
@@ -536,10 +614,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = (Dij + Dji);
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -573,6 +656,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -586,11 +672,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -598,14 +697,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F3_t[4];
+            double F4_t[5];
 
-            onee::computeBoysFunction(F3_t, (a_i + a_j) * r2_PC, 3, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecSD(F3_t, a_i, a_j, PC, m, delta, b0, b1, PB_0, PB_1);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSDGradA(F4_t, a_i, a_j, PC, m, n, PA_n, delta, b0, b1, PB_0, PB_1);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSDGradB(F4_t, a_i, a_j, PC, m, n, PB_n, delta, b0, b1, PB_0, PB_1);
 
                 {
                     auto i_cgto_sph = i_cgto;
@@ -623,10 +725,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = (Dij + Dji);
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -661,6 +768,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -675,11 +785,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -687,14 +810,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F4_t[5];
+            double F5_t[6];
 
-            onee::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F5_t, (a_i + a_j) * r2_PC, 5, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecSF(F4_t, a_i, a_j, PC, m, delta, b0, b1, b2, PB_0, PB_1, PB_2);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSFGradA(F5_t, a_i, a_j, PC, m, n, PA_n, delta, b0, b1, b2, PB_0, PB_1, PB_2);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecSFGradB(F5_t, a_i, a_j, PC, m, n, PB_n, delta, b0, b1, b2, PB_0, PB_1, PB_2);
 
                 {
                     auto i_cgto_sph = i_cgto;
@@ -712,10 +838,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = (Dij + Dji);
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -749,6 +880,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
         const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -762,11 +896,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -774,14 +921,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F3_t[4];
+            double F4_t[5];
 
-            onee::computeBoysFunction(F3_t, (a_i + a_j) * r2_PC, 3, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecPP(F3_t, a_i, a_j, PC, m, delta, a0, PA_0, b0, PB_0);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecPPGradA(F4_t, a_i, a_j, PC, m, n, PA_n, delta, a0, PA_0, b0, PB_0);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecPPGradB(F4_t, a_i, a_j, PC, m, n, PB_n, delta, a0, PA_0, b0, PB_0);
 
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
                 {
@@ -800,10 +950,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -838,6 +993,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
         const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -852,11 +1010,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -864,14 +1035,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F4_t[5];
+            double F5_t[6];
 
-            onee::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F5_t, (a_i + a_j) * r2_PC, 5, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecPD(F4_t, a_i, a_j, PC, m, delta, a0, PA_0, b0, b1, PB_0, PB_1);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecPDGradA(F5_t, a_i, a_j, PC, m, n, PA_n, delta, a0, PA_0, b0, b1, PB_0, PB_1);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecPDGradB(F5_t, a_i, a_j, PC, m, n, PB_n, delta, a0, PA_0, b0, b1, PB_0, PB_1);
 
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
                 {
@@ -890,10 +1064,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = (Dij + Dji);
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -929,6 +1108,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -944,11 +1126,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -956,15 +1151,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F5_t[6];
+            double F6_t[7];
 
-            onee::computeBoysFunction(F5_t, (a_i + a_j) * r2_PC, 5, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F6_t, (a_i + a_j) * r2_PC, 6, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecPF(F5_t, a_i, a_j, PC, m, delta, a0, PA_0,
-                                                    b0, b1, b2, PB_0, PB_1, PB_2);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecPFGradA(F6_t, a_i, a_j, PC, m, n, PA_n, delta, a0, PA_0, b0, b1, b2, PB_0, PB_1, PB_2);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecPFGradB(F6_t, a_i, a_j, PC, m, n, PB_n, delta, a0, PA_0, b0, b1, b2, PB_0, PB_1, PB_2);
 
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
                 {
@@ -983,10 +1180,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = (Dij + Dji);
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -1022,6 +1224,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
         const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -1037,11 +1242,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1049,15 +1267,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F5_t[6];
+            double F6_t[7];
 
-            onee::computeBoysFunction(F5_t, (a_i + a_j) * r2_PC, 5, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F6_t, (a_i + a_j) * r2_PC, 6, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecDD(F5_t, a_i, a_j, PC, m, delta, a0, a1, PA_0, PA_1,
-                                                    b0, b1, PB_0, PB_1);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecDDGradA(F6_t, a_i, a_j, PC, m, n, PA_n, delta, a0, a1, PA_0, PA_1, b0, b1, PB_0, PB_1);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecDDGradB(F6_t, a_i, a_j, PC, m, n, PB_n, delta, a0, a1, PA_0, PA_1, b0, b1, PB_0, PB_1);
 
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
                 {
@@ -1076,10 +1296,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -1116,6 +1341,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -1132,11 +1360,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1144,15 +1385,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F6_t[7];
+            double F7_t[8];
 
-            onee::computeBoysFunction(F6_t, (a_i + a_j) * r2_PC, 6, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F7_t, (a_i + a_j) * r2_PC, 7, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecDF(F6_t, a_i, a_j, PC, m, delta, a0, a1, PA_0, PA_1,
-                                                    b0, b1, b2, PB_0, PB_1, PB_2);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecDFGradA(F7_t, a_i, a_j, PC, m, n, PA_n, delta, a0, a1, PA_0, PA_1, b0, b1, b2, PB_0, PB_1, PB_2);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecDFGradB(F7_t, a_i, a_j, PC, m, n, PB_n, delta, a0, a1, PA_0, PA_1, b0, b1, b2, PB_0, PB_1, PB_2);
 
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
                 {
@@ -1171,10 +1414,15 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = (Dij + Dji);
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
@@ -1212,6 +1460,9 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
         const auto i_cgto = f_prim_aoinds[(i / 10) + f_prim_count * (i % 10)];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
@@ -1229,11 +1480,24 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
+        double V_const = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
+
+        // loop over gradient components
+        for (int n = 0; n < 3; n++)
+        {
+            const auto PA_n = (a_j / (a_i + a_j)) * rij[n];
+            const auto PB_n = (-a_i / (a_i + a_j)) * rij[n];
+
         for (int c = 0; c < ndipoles; c++)
         {
             const auto x_c   = dipoles_info[c + ndipoles * 0];
             const auto y_c   = dipoles_info[c + ndipoles * 1];
             const auto z_c   = dipoles_info[c + ndipoles * 2];
+            const auto x_dip = dipoles_info[c + ndipoles * 3];
+            const auto y_dip = dipoles_info[c + ndipoles * 4];
+            const auto z_dip = dipoles_info[c + ndipoles * 5];
+
+            const double dip[3] = {x_dip, y_dip, z_dip};
 
             const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
                                   (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
@@ -1241,16 +1505,17 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
-            double F7_t[8];
+            double F8_t[9];
 
-            onee::computeBoysFunction(F7_t, (a_i + a_j) * r2_PC, 7, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F8_t, (a_i + a_j) * r2_PC, 8, boys_func_table.data(), boys_func_ft.data());
 
             for (int m = 0; m < 3; m++)
             {
-                double ef_val = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 *
-                    onee::computeElectricFieldRecFF(F7_t, a_i, a_j, PC, m, delta,
-                                                    a0, a1, a2, PA_0, PA_1, PA_2,
-                                                    b0, b1, b2, PB_0, PB_1, PB_2);
+                // Note: minus sign from electric field - electric dipole interaction
+
+                double V_grad_i = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecFFGradA(F8_t, a_i, a_j, PC, m, n, PA_n, delta, a0, a1, a2, PA_0, PA_1, PA_2, b0, b1, b2, PB_0, PB_1, PB_2);
+
+                double V_grad_j = (-1.0) * V_const * dip[m] * onee::computeElectricFieldRecFFGradB(F8_t, a_i, a_j, PC, m, n, PB_n, delta, a0, a1, a2, PA_0, PA_1, PA_2, b0, b1, b2, PB_0, PB_1, PB_2);
 
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_f[i_cgto])
                 {
@@ -1269,31 +1534,36 @@ computeElectricFieldValues(const CMolecule& molecule, const CMolecularBasis& bas
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        efield_values_omp[thread_id].row(c)[m] += ef_val * coef_sph * D_sym;
+                        double grad_i = V_grad_i * coef_sph * D_sym;
+                        double grad_j = V_grad_j * coef_sph * D_sym;
+
+                        V_grad_omp[thread_id].row(i_atom)[n] += grad_i;
+                        V_grad_omp[thread_id].row(j_atom)[n] += grad_j;
                     }
                 }
             }
+        }
         }
     }
 
     // auto-generated code ends here
 
-    CDenseMatrix efield_values(ndipoles, 3);
+    CDenseMatrix V_grad(natoms, 3);
 
-    efield_values.zero();
+    V_grad.zero();
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
-        for (int c = 0; c < ndipoles; c++)
+        for (int a = 0; a < natoms; a++)
         {
-            for (int m = 0; m < 3; m++)
+            for (int d = 0; d < 3; d++)
             {
-                efield_values.row(c)[m] += efield_values_omp[thread_id].row(c)[m];
+                V_grad.row(a)[d] += V_grad_omp[thread_id].row(a)[d];
             }
         }
     }
 
-    return efield_values;
+    return V_grad;
 }
 
 }  // namespace onee

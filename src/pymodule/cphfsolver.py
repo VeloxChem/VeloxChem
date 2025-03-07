@@ -1077,13 +1077,24 @@ class CphfSolver(LinearSolver):
         b = cphf_rhs.reshape(dof * nocc * nvir)
         x0 = cphf_guess.reshape(dof * nocc * nvir)
 
-        cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
-                                                  b=b,
-                                                  x0=x0,
-                                                  M=PrecondOp,
-                                                  rtol=self.conv_thresh,
-                                                  atol=0,
-                                                  maxiter=self.max_iter)
+        try:
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      rtol=self.conv_thresh,
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
+        except TypeError:
+            # workaround for scipy < 1.11
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      tol=(self.conv_thresh *
+                                                           np.linalg.norm(b)),
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
 
         self._is_converged = (cg_conv == 0)
 
