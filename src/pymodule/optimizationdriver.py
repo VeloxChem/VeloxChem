@@ -423,14 +423,12 @@ class OptimizationDriver:
                     ]
 
                     opt_results['scan_geometries'] = []
-                    opt_results['scan_coordinates_au'] = []
                     labels = molecule.get_labels()
                     for opt_coords_au in all_coords_au:
                         mol = Molecule(labels, opt_coords_au[-1], 'au',
                                        atom_basis_labels)
                         opt_results['scan_geometries'].append(
                             mol.get_xyz_string())
-                        opt_results['scan_coordinates_au'].append(opt_coords_au[-1])
 
                 else:
                     self.print_opt_result(m)
@@ -438,14 +436,12 @@ class OptimizationDriver:
                     opt_results['opt_energies'] = list(m.qm_energies)
 
                     opt_results['opt_geometries'] = []
-                    opt_results['opt_coordinates_au'] = []
                     labels = molecule.get_labels()
                     for xyz in m.xyzs:
                         mol = Molecule(labels, xyz / geometric.nifty.bohr2ang,
                                        'au', atom_basis_labels)
                         opt_results['opt_geometries'].append(
                             mol.get_xyz_string())
-                        opt_results['opt_coordinates_au'].append(xyz / geometric.nifty.bohr2ang) 
 
                     if self.ref_xyz:
                         self.print_ic_rmsd(final_mol, self.ref_xyz)
@@ -461,9 +457,9 @@ class OptimizationDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                # Write opt results to checkpoint file
-                final_checkpoint_file_name = filename + ".h5"
-                self._write_final_hdf5(final_checkpoint_file_name, final_mol, opt_results)
+                # Write opt results to final hdf5 file
+                final_h5_fname = filename + ".h5"
+                self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
 
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
 
@@ -912,58 +908,47 @@ class OptimizationDriver:
             The dictionary of optimzation results.
         """
 
-        valid_checkpoint = (fname and isinstance(fname, str) and
-                            Path(fname).is_file())
+        if (fname and isinstance(fname, str) and Path(fname).is_file()):
 
-        if valid_checkpoint:
             hf = h5py.File(fname, 'a')
 
             opt_group = 'opt/'
 
-            # atom ids
-            labels = molecule.get_labels()
-            atom_basis_labels = molecule.get_atom_basis_labels()
-
-            # charge and spin multiplicity
-            charge = molecule.get_charge()
-            multiplicity = molecule.get_multiplicity()
- 
             # Check if it is a scan job or not
             if 'scan_energies' in opt_results.keys():
                 hf.create_dataset(opt_group + 'scan_energies',
                                   data=opt_results['scan_energies'])
 
-                hf.create_dataset(opt_group + 'scan_coordinates_au',
-                               data=np.array(opt_results['scan_coordinates_au']))
-
-                # save nuclear repulsion for all geometries
-                # TODO: a better way to do this??
                 nuclear_repulsion_energies = []
-                for coords in opt_results['scan_coordinates_au']:
-                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
-                    new_mol.set_charge(charge)
-                    new_mol.set_multiplicity(multiplicity)
-                    nuclear_repulsion = new_mol.nuclear_repulsion_energy()
-                    nuclear_repulsion_energies.append(nuclear_repulsion)
+                scan_coordinates_au = []
+                for xyzstr in opt_results['scan_geometries']:
+                    mol = Molecule.read_xyz_string(xyzstr)
+                    nuclear_repulsion_energies.append(
+                        mol.nuclear_repulsion_energy())
+                    scan_coordinates_au.append(mol.get_coordinates_in_bohr())
+
+                hf.create_dataset(opt_group + 'scan_coordinates_au',
+                                  data=np.array(scan_coordinates_au))
 
             else:
                 hf.create_dataset(opt_group + 'opt_energies',
                                   data=opt_results['opt_energies'])
 
-                hf.create_dataset(opt_group + 'opt_coordinates_au',
-                                data=np.array(opt_results['opt_coordinates_au']))
-                # save nuclear repulsion for all geometries
-                # TODO: a better way to do this??
                 nuclear_repulsion_energies = []
-                for coords in opt_results['opt_coordinates_au']:
-                    new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
-                    new_mol.set_charge(charge)
-                    new_mol.set_multiplicity(multiplicity)
-                    nuclear_repulsion = new_mol.nuclear_repulsion_energy()
-                    nuclear_repulsion_energies.append(nuclear_repulsion)
+                opt_coordinates_au = []
+                for xyzstr in opt_results['opt_geometries']:
+                    mol = Molecule.read_xyz_string(xyzstr)
+                    nuclear_repulsion_energies.append(
+                        mol.nuclear_repulsion_energy())
+                    opt_coordinates_au.append(mol.get_coordinates_in_bohr())
 
+                hf.create_dataset(opt_group + 'opt_coordinates_au',
+                                  data=np.array(opt_coordinates_au))
+
+            # TODO: reconsider saving this
             hf.create_dataset(opt_group + 'nuclear_repulsion_energies',
                               data=np.array(nuclear_repulsion_energies))
+
             valstr = 'Optimization results written to file: '
             valstr += fname
             self.ostream.print_info(valstr)
