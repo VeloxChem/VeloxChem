@@ -831,8 +831,8 @@ class EvbDriver():
         common_results = []
         specific_results = {}
         for name, folder in zip([reference_name] + target_names, folders):
-            E_file = str(cwd / folder / "Energies.dat")
-            data_file = str(cwd / folder / "Data_combined.dat")
+            E_file = str(cwd / folder / "Energies.csv")
+            data_file = str(cwd / folder / "Data_combined.csv")
             options_file = str(cwd / folder / "options.json")
             specific, common = self._load_output_files(E_file, data_file, options_file, lambda_sub_sample,
                                                        lambda_sub_sample_ends, time_sub_sample)

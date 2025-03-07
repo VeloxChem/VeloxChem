@@ -218,7 +218,7 @@ class EvbFepDriver():
                 append = True
             runsimulation.reporters.append(
                 EvbReporter(
-                    str(self.data_folder / "Energies.dat"),
+                    str(self.data_folder / "Energies.csv"),
                     write_step,
                     systems[0],
                     systems[1],
@@ -230,7 +230,7 @@ class EvbFepDriver():
 
             runsimulation.reporters.append(
                 mmapp.StateDataReporter(
-                    str(self.data_folder / "Data_combined.dat"),
+                    str(self.data_folder / "Data_combined.csv"),
                     write_step,
                     step=True,
                     potentialEnergy=True,
@@ -248,12 +248,9 @@ class EvbFepDriver():
             positions = state.getPositions()
             if np.any(np.array(positions.value_in_unit(mmunit.nanometer)) > 100):
                 self.ostream.print_info("Warning: Some positions are larger than 100 nm, system is probably unstable")
-
-        self.ostream.print_info("Merging output files")
         self.ostream.flush()
 
 
-#?Utility class for predicting approximate runtime of the simulation, do we already have dependencies for this so that this can be scrapped?
 class Timer:
 
     def __init__(self, total_iterations):
@@ -274,12 +271,6 @@ class Timer:
         remaining_iterations = self.total_iterations - iteration
         estimated_time_remaining = avg_time_per_iteration * remaining_iterations
 
-        # print(f"Iteration: {iteration}")
-        # print(f"Elapsed time: {elapsed_time}")
-        # print(f"Avg time per iteration: {avg_time_per_iteration}")
-        # print(f"Remaining iterations: {remaining_iterations}")
-        # print(f"Estimated time remaining: {estimated_time_remaining}")
-        # print(f"Times list: {self.times}")
         self.start_time = time.time()  # reset start time for next iteration
         return estimated_time_remaining
 
