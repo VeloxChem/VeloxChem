@@ -111,8 +111,8 @@ class VibrationalAnalysis:
 
         # filenames
         self.filename = None
-        self.checkpoint_file = None
-        self.result_file = None
+        self.results_h5_file = None
+        self.vib_results_txt_file = None
 
         # option dictionaries from input
         # TODO: cleanup
@@ -122,9 +122,6 @@ class VibrationalAnalysis:
         self.cphf_dict = {}
         self.rsp_dict = {}
         self.polgrad_dict = {}
-
-        # dictionary of vibrational analysis results
-        self._results = {}
 
         # Hessian driver etc
         self.is_scf = False
@@ -250,10 +247,8 @@ class VibrationalAnalysis:
 
         if 'filename' in vib_dict:
             self.filename = vib_dict['filename']
-            self.checkpoint_file = f'{self.filename}.h5'
-            self.result_file = f'{self.filename}-vib-results.out'
-        else:
-            self.result_file = 'vib-results.out'
+            self.results_h5_file = f'{self.filename}.h5'
+            self.vib_results_txt_file = f'{self.filename}-vib-results.out'
 
         # settings for property modules
         if hessian_dict is None:
@@ -662,7 +657,8 @@ class VibrationalAnalysis:
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
         # compute polarizability gradient
-        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors,
+                                      lr_results)
 
         # save the gradient
         self.polarizability_gradient = polgrad
@@ -704,11 +700,12 @@ class VibrationalAnalysis:
                                                 filename, rsp_drv)
         self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
-        fulltxt_msg = 'Full vibrational analysis results written to: '
-        fulltxt_msg += f'{self.result_file}'
-        self.ostream.print_info(fulltxt_msg)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        if self.vib_results_txt_file is not None:
+            fulltxt_msg = 'Full vibrational analysis results written to: '
+            fulltxt_msg += f'{self.vib_results_txt_file}'
+            self.ostream.print_info(fulltxt_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def print_vibrational_analysis_ostream(self,
                                            molecule,
@@ -880,11 +877,12 @@ class VibrationalAnalysis:
         self.normed_normal_modes = self.normal_modes / np.linalg.norm(
             self.normal_modes, axis=1)[:, np.newaxis]
 
-        # set name of output file
-        if self.result_file is None:
-            self.result_file = 'vib-results.out'
+        # check output file
+        if self.vib_results_txt_file is None:
+            return
+
         # open output file
-        fout = open(self.result_file, 'w')
+        fout = open(self.vib_results_txt_file, 'w')
 
         title = 'Vibrational Analysis'
         fout.write(title.center(52))
@@ -1013,12 +1011,8 @@ class VibrationalAnalysis:
             The molecule.
         """
 
-        if self.checkpoint_file is None:
-            return
-
-        final_h5_fname = self.checkpoint_file
-
-        self.write_vib_results_to_hdf5(molecule, final_h5_fname)
+        if self.results_h5_file is not None:
+            self.write_vib_results_to_hdf5(molecule, self.results_h5_file)
 
     def write_vib_results_to_hdf5(self, molecule, fname):
         """
@@ -1030,12 +1024,8 @@ class VibrationalAnalysis:
             Name of the HDF5 file.
         """
 
-        valid_checkpoint = (fname and isinstance(fname, str) and
-                            Path(fname).is_file())
-
-        if not valid_checkpoint:
-            return False
-
+        if not (fname and isinstance(fname, str) and Path(fname).is_file()):
+            return
 
         hf = h5py.File(fname, 'a')
 
@@ -1076,8 +1066,6 @@ class VibrationalAnalysis:
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         hf.close()
-
-        return True
 
     def print_header(self):
         """
