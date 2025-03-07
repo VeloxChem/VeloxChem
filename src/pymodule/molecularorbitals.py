@@ -485,10 +485,8 @@ class MolecularOrbitals:
             Name of the basis set.
         """
 
-        valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+        if (fname and isinstance(fname, str) and Path(fname).is_file()):
 
-        if valid_checkpoint:
             hf = h5py.File(fname, 'a')
 
             if group is None:
@@ -496,18 +494,25 @@ class MolecularOrbitals:
             else:
                 group += '/'
 
-            hf.create_dataset(group + label + '_alpha_orbitals', data=self.alpha_to_numpy())
-            hf.create_dataset(group + label + '_alpha_energies', data=self.ea_to_numpy())
-            hf.create_dataset(group + label + '_alpha_occupations', data=self.occa_to_numpy())
-    
+            hf.create_dataset(group + label + '_alpha_orbitals',
+                              data=self.alpha_to_numpy())
+            hf.create_dataset(group + label + '_alpha_energies',
+                              data=self.ea_to_numpy())
+            hf.create_dataset(group + label + '_alpha_occupations',
+                              data=self.occa_to_numpy())
+
             if self._orbitals_type == molorb.unrest:
-                hf.create_dataset(group + label + '_beta_orbitals', data=self.beta_to_numpy())
-                hf.create_dataset(group + label + '_beta_energies', data=self.eb_to_numpy())
-                hf.create_dataset(group + label + '_beta_occupations', data=self.occb_to_numpy())
-    
+                hf.create_dataset(group + label + '_beta_orbitals',
+                                  data=self.beta_to_numpy())
+                hf.create_dataset(group + label + '_beta_energies',
+                                  data=self.eb_to_numpy())
+                hf.create_dataset(group + label + '_beta_occupations',
+                                  data=self.occb_to_numpy())
+
             elif self._orbitals_type == molorb.restopen:
-                hf.create_dataset(group + label + '_beta_occupations', data=self.occb_to_numpy())
-    
+                hf.create_dataset(group + label + '_beta_occupations',
+                                  data=self.occb_to_numpy())
+
             hf.close()
 
     @staticmethod
