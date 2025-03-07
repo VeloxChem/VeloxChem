@@ -233,7 +233,7 @@ class IMForceFieldGenerator:
         self.unique_molecules = []
 
         # In here I want to store Number_of_dp, exponent_p, exponent_q
-        self.results = {'n_datapoints': None, 'exponent_p': None, 'exponent_q': None} 
+        self.results = {'n_datapoints': None, 'RMSD': None, '|D|':None} 
 
 
         # confirm database quality
@@ -444,7 +444,7 @@ class IMForceFieldGenerator:
                 
                 entries = list(self.molecules_along_rp.values())
 
-                # self.confirm_database_quality(entries[0][0], self.imforcefieldfile, basis=basis, given_molecular_strucutres=self.molecules)
+                self.confirm_database_quality(entries[0][0], self.imforcefieldfile, basis=basis, given_molecular_strucutres=self.molecules)
     
                 counter += 1
         
@@ -873,28 +873,6 @@ class IMForceFieldGenerator:
             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
 
             for i, mol in enumerate(random_structure_choices):
-                
-                mol_xyz = '''16
-
-                C             -0.303105320911        -0.763405667784         2.669229047187
-                C             -1.523354034548        -0.354218210695         2.223816767571
-                S             -1.811432568470        -1.004001330501         0.663677614043
-                C             -0.262763762380        -1.737220044480         0.582999056432
-                C              0.414874007906        -1.523408759884         1.729804682037
-                C              0.152993168818        -2.498726060280        -0.596994850120
-                C             -0.604371647688        -2.954004515548        -1.604785437244
-                C              0.180191929099        -3.396725085762        -2.702703847064
-                C              1.526170915041        -3.331034653993        -2.471526420859
-                S              1.882467700682        -2.650764583496        -0.949644176772
-                H              0.078346032800        -0.439590480955         3.632605060450
-                H             -2.315953164227         0.252227767836         2.631154601126
-                H              1.363525968303        -2.020374394787         1.877011907636
-                H             -1.698458167845        -2.885515899983        -1.596094965929
-                H             -0.313124588419        -3.858897080794        -3.537217684797
-                H              2.281180394121        -3.743612616786        -3.101713204167'''
-
-                mol = Molecule.from_xyz_string(mol_xyz)
-
 
                 current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
                 impes_driver.compute(mol, labels=sorted_labels)
