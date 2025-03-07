@@ -516,7 +516,8 @@ class ExcitonModelDriver:
 
                 assert_msg_critical(
                     dimer.check_multiplicity(),
-                    'Molecule: Incompatible multiplicity and number of electrons')
+                    'Molecule: Incompatible multiplicity and number of electrons'
+                )
 
                 dimer_bas = basis.slice(monomer_atomlists[ind_A] +
                                         monomer_atomlists[ind_B])
@@ -939,8 +940,9 @@ class ExcitonModelDriver:
         # checkpoint file for SCF
         monomer_scf_h5 = f'monomer_{ind + 1}_scf.h5'
         if self.checkpoint_file is not None:
-            monomer_scf_h5 = str(Path(
-                self.checkpoint_file))[:-3] + "_" + monomer_scf_h5
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            monomer_scf_h5 = str(fpath) + '_' + monomer_scf_h5
 
         # SCF calculation
         scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
@@ -983,8 +985,9 @@ class ExcitonModelDriver:
         # checkpoint file for TDA
         monomer_rsp_h5 = f'monomer_{ind + 1}_rsp.h5'
         if self.checkpoint_file is not None:
-            monomer_rsp_h5 = str(Path(
-                self.checkpoint_file))[:-3] + "_" + monomer_rsp_h5
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            monomer_rsp_h5 = str(fpath) + '_' + monomer_rsp_h5
 
         # TDA calculation
         rsp_dict = {
