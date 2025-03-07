@@ -47,9 +47,8 @@ from .oneeints import (compute_electric_dipole_integrals,
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
-from .inputparser import get_random_string_parallel
-from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
-                         write_rsp_solution, write_lr_rsp_results_to_hdf5,
+from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, write_rsp_solution,
+                         write_lr_rsp_results_to_hdf5,
                          write_detach_attach_to_hdf5)
 
 
@@ -121,7 +120,8 @@ class TdaEigenSolver(LinearSolver):
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'nto_cubes': ('bool', 'write NTO cube files'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
-            'detach_attach_cubes': ('bool', 'write detachment/attachment density cube files'),
+            'detach_attach_cubes':
+                ('bool', 'write detachment/attachment density cube files'),
             'cube_origin': ('seq_fixed', 'origin of cubic grid points'),
             'cube_stepsize': ('seq_fixed', 'step size of cubic grid points'),
             'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
@@ -160,7 +160,8 @@ class TdaEigenSolver(LinearSolver):
                 'TdaEigenSolver: cube points needs 3 integers')
 
         # If the detachemnt and attachment cube files are requested,
-        # set the detach_attach flag to True to get the detachment and attachment densities.
+        # set the detach_attach flag to True to get the detachment and
+        # attachment densities.
         if self.detach_attach_cubes:
             self.detach_attach = True
 
@@ -350,11 +351,19 @@ class TdaEigenSolver(LinearSolver):
         # converged?
         if self.rank == mpi_master():
             self._print_convergence('{:d} excited states'.format(self.nstates))
-            # Final checkpoint file to save response results, solution vectors, NTOs, etc.
-            # replace the suffix _rsp.h5 of the checkpoint_file name by .h5
+
+            # Final hdf5 file to save response results
             if self.checkpoint_file is not None:
-                final_h5_fname = str(
-                        Path(self.checkpoint_file))[:-7] + '.h5'
+                if self.checkpoint_file.endswith('_rsp.h5'):
+                    final_h5_fname = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                      '.h5')
+                else:
+                    # TODO: reconsider the file name in this case
+                    fpath = Path(self.checkpoint_file)
+                    fpath = fpath.with_name(fpath.stem)
+                    final_h5_fname = str(fpath) + '_results.h5'
+            else:
+                final_h5_fname = None
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -420,12 +429,6 @@ class TdaEigenSolver(LinearSolver):
                     'Running NTO analysis for S{:d}...'.format(s + 1))
                 self.ostream.flush()
 
-                if self.filename is not None:
-                    base_fname = self.filename
-                else:
-                    name_string = get_random_string_parallel(self.comm)
-                    base_fname = 'vlx_' + name_string
-
                 if self.rank == mpi_master():
                     nto_mo = self.get_nto(t_mat, mo_occ, mo_vir)
 
@@ -434,9 +437,12 @@ class TdaEigenSolver(LinearSolver):
                     lam_end = lam_start + min(mo_occ.shape[1], mo_vir.shape[1])
                     nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                    # Add the NTO to the final checkpoint file.
+                    # Add the NTO to the final hdf5 file.
                     nto_label = f'NTO_S{s + 1}'
-                    nto_mo.write_orbital_to_hdf5(final_h5_fname, nto_label, group="rsp")
+                    if final_h5_fname is not None:
+                        nto_mo.write_orbital_to_hdf5(final_h5_fname,
+                                                     nto_label,
+                                                     group="rsp")
                 else:
                     nto_mo = MolecularOrbitals()
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -457,10 +463,13 @@ class TdaEigenSolver(LinearSolver):
                 if self.rank == mpi_master():
                     dens_D, dens_A = self.get_detach_attach_densities(
                         t_mat, None, mo_occ, mo_vir)
+
                     # Add the detachment and attachment density matrices
-                    # to the checkpoint file
+                    # to the final hdf5 file
                     state_label = f'S{s + 1}'
-                    write_detach_attach_to_hdf5(final_h5_fname, state_label, dens_D, dens_A)
+                    if final_h5_fname is not None:
+                        write_detach_attach_to_hdf5(final_h5_fname, state_label,
+                                                    dens_D, dens_A)
 
                 # Generate and save cube files
                 if self.detach_attach_cubes:
@@ -483,7 +492,7 @@ class TdaEigenSolver(LinearSolver):
         # results
 
         if self.rank == mpi_master() and self._is_converged:
-            number_of_states = self.nstates
+
             ret_dict = {
                 'eigenvalues': eigvals,
                 'eigenvectors': eigvecs,
@@ -493,7 +502,7 @@ class TdaEigenSolver(LinearSolver):
                 'oscillator_strengths': oscillator_strengths,
                 'rotatory_strengths': rotatory_strengths,
                 'excitation_details': excitation_details,
-                'number_of_states': number_of_states,
+                'number_of_states': self.nstates,
             }
 
             if self.nto:
@@ -504,11 +513,11 @@ class TdaEigenSolver(LinearSolver):
             if self.detach_attach_cubes:
                 ret_dict['density_cubes'] = dens_cube_files
 
-            self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
+            self._write_final_hdf5(final_h5_fname, molecule, basis,
+                                   dft_dict['dft_func_label'],
                                    pe_dict['potfile_text'], eigvecs)
 
-            if (self.save_solutions and
-                            self.checkpoint_file is not None):
+            if (self.save_solutions and final_h5_fname is not None):
                 # Write response results to final checkpoint file.
                 write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
@@ -804,11 +813,13 @@ class TdaEigenSolver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def _write_final_hdf5(self, molecule, basis, dft_func_label, potfile_text,
-                          eigvecs):
+    def _write_final_hdf5(self, final_h5_fname, molecule, basis, dft_func_label,
+                          potfile_text, eigvecs):
         """
         Writes final HDF5 that contains TDA solution vectors.
 
+        :param final_h5_fname:
+            The name of the final hdf5 file.
         :param molecule:
             The molecule.
         :param ao_basis:
@@ -821,12 +832,8 @@ class TdaEigenSolver(LinearSolver):
             The TDA eigenvectors (in columns).
         """
 
-        if (not self.save_solutions) or (self.checkpoint_file is None):
+        if (not self.save_solutions) or (final_h5_fname is None):
             return
-
-        # replace the suffix _rsp.h5 in the checkpoint file name by '_results.h5'
-        final_h5_fname = str(
-            Path(self.checkpoint_file))[:-7] + '.h5'
 
         for s in range(eigvecs.shape[1]):
             write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
