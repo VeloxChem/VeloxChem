@@ -22,7 +22,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import sys
@@ -80,7 +79,8 @@ class CphfSolver(LinearSolver):
             'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
             'print_residuals': ('bool', 'print iteration to output'),
             'max_iter': ('int', 'maximum number of iterations'),
-            'force_checkpoint': ('bool', 'write orbital response to checkpoiny file'),
+            'force_checkpoint':
+                ('bool', 'flag for writing checkpoint every iteration'),
         }
 
     def update_settings(self, cphf_dict, method_dict=None):
@@ -798,7 +798,6 @@ class CphfSolver(LinearSolver):
         self._is_converged = self.comm.bcast(self.is_converged,
                                              root=mpi_master())
 
-    # TODO: Currently not working!
     def compute_conjugate_gradient(self, molecule, basis, scf_tensors, *args):
         """
         Computes the coupled-perturbed Hartree-Fock (CPHF) coefficients.
@@ -854,9 +853,9 @@ class CphfSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        profiler.set_timing_key('CPHF RHS')
-        # TODO: double check use of profiler
-        profiler.start_timer('CPHF RHS')
+        profiler.set_timing_key('CPHF')
+
+        profiler.start_timer('RHS')
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E_alpha']
@@ -884,20 +883,16 @@ class CphfSolver(LinearSolver):
         cphf_rhs_dict = self.compute_rhs(molecule, basis, scf_tensors, eri_dict,
                                          dft_dict, pe_dict, *args)
 
-        dist_rhs = cphf_rhs_dict['dist_cphf_rhs']
-        dof = len(dist_rhs)
-
-        profiler.stop_timer('CPHF RHS')
-
         if self.rank == mpi_master():
-            cphf_rhs = np.zeros((dof, nocc, nvir))
-            for ivec, dist_array in enumerate(dist_rhs):
-                vec = dist_array.get_full_vector().reshape(nocc, nvir)
-                cphf_rhs[ivec] = vec
+            cphf_rhs = cphf_rhs_dict['cphf_rhs']
+            dof = cphf_rhs.shape[0]
+            cphf_rhs = cphf_rhs.reshape(dof, nocc, nvir)
         else:
             cphf_rhs = None
 
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
+
+        profiler.stop_timer('RHS')
 
         # Solve the CPHF equations using conjugate gradient (cg)
         cphf_ov = self.solve_cphf_cg(
