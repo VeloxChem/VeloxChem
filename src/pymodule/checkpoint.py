@@ -103,7 +103,7 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
 
         hf = h5py.File(fname, 'a')
 
-        scf_group = hf.create_group('scf')      
+        scf_group = hf.create_group('scf')
 
         # write SCF tensors
         keys = ['S'] + [
@@ -116,13 +116,14 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
                 scf_group.create_dataset(key, data=scf_results[key])
 
         # write dipole moment
-        scf_group.create_dataset('dipole_moment', data=scf_results['dipole_moment'])
+        scf_group.create_dataset('dipole_moment',
+                                 data=scf_results['dipole_moment'])
 
         # write SCF energy
         scf_group.create_dataset('scf_type',
-                          data=np.bytes_([scf_results['scf_type']]))
+                                 data=np.bytes_([scf_results['scf_type']]))
         scf_group.create_dataset('scf_energy',
-                          data=np.array([scf_results['scf_energy']]))
+                                 data=np.array([scf_results['scf_energy']]))
 
         # write SCF history
         keys = list(scf_history[0].keys())
@@ -178,6 +179,7 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
             hf[rsp_group + key] = dset
         hf.close()
 
+
 def write_lr_rsp_results_to_hdf5(fname, rsp_results):
     """
     Writes the results of a linear response calculation to HDF5 file.
@@ -188,10 +190,7 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
         The dictionary containing the linear response results.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
+    if (fname and isinstance(fname, str) and Path(fname).is_file()):
 
         hf = h5py.File(fname, 'a')
 
@@ -257,6 +256,7 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
 
     return True
 
+
 def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
     """
     Writes the detachment and attachment density matrices for a specific
@@ -271,10 +271,8 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
     :param dens_attach:
         The attachment density matrix.
     """
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
 
-    if valid_checkpoint:
+    if (fname and isinstance(fname, str) and Path(fname).is_file()):
 
         hf = h5py.File(fname, 'a')
 
@@ -289,6 +287,7 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
         hf.create_dataset(rsp_group + attach_label, data=dens_attach)
 
         hf.close()
+
 
 def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
     """

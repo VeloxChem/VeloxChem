@@ -189,7 +189,8 @@ class CphfSolver(LinearSolver):
             self.checkpoint_file = f'{self.filename}_orbrsp.h5'
         elif (self.checkpoint_file is not None and
               self.checkpoint_file.endswith('_rsp.h5')):
-            self.checkpoint = self.checkpoint_file[:-7] + '_orbrsp.h5'
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -1201,7 +1202,8 @@ class CphfSolver(LinearSolver):
             self.checkpoint_file = f'{self.filename}_orbrsp.h5'
         elif (self.checkpoint_file is not None and
               self.checkpoint_file.endswith('_rsp.h5')):
-            self.checkpoint_file = self.checkpoint_file[:-7] + '_orbrsp.h5'
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
 
         t0 = tm.time()
 
