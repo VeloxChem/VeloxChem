@@ -56,6 +56,9 @@ class EvbForceGroup(Enum):
     HARDLR = auto()  # Hard core long range potential
     SOFTLR = auto()  # Soft core long range potential
     CONSTRAINT = auto()
+
+    # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
+    PES_CONSTRAINT = auto()
     RESTRAINT = auto()
     SOLVENT = auto()  # All solvent-solvent interactions. Does not include the solute-solvent long range interaction
     CARBON = auto()  # Graphene and CNTs
@@ -69,6 +72,7 @@ class EvbForceGroup(Enum):
             cls.DEFAULT.value,
             cls.HARDLR.value,
             cls.CONSTRAINT.value,
+            cls.PES_CONSTRAINT.value,
             cls.RESTRAINT.value,
             cls.SOLVENT.value,
             cls.CARBON.value,
@@ -79,9 +83,25 @@ class EvbForceGroup(Enum):
     def pes_force_groups(cls):
         return set([
             cls.DEFAULT.value,
+            cls.PES_CONSTRAINT.value,
             cls.SOFTLR.value,
             cls.SOLVENT.value,
             cls.CARBON.value,
+            cls.PES.value,
+        ])
+
+    @classmethod
+    def all_force_groups(cls):
+        return set([
+            cls.DEFAULT.value,
+            cls.HARDLR.value,
+            cls.SOFTLR.value,
+            cls.CONSTRAINT.value,
+            cls.PES_CONSTRAINT.value,
+            cls.RESTRAINT.value,
+            cls.SOLVENT.value,
+            cls.CARBON.value,
+            cls.INTEGRATION.value,
             cls.PES.value,
         ])
 
@@ -309,7 +329,7 @@ class EvbSystemBuilder():
         if not no_reactant:
             for lam in Lambda:
                 self._add_reaction_forces(self.systems[lam], lam)
-            
+
         self.ostream.flush()
         return self.systems, self.topology, self.positions
 
@@ -897,10 +917,15 @@ class EvbSystemBuilder():
         system.addForce(softlj)
         system.addForce(softcoul)
 
-        constraints = self._create_constraint_forces(lam)
-        for constraint in constraints:
-            constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
-            system.addForce(constraint)
+        bond_constraint, constant_force, angle_constraint, torsion_constraint = self._create_constraint_forces(lam)
+        bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+        constant_force.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+        angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+        torsion_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
+        system.addForce(bond_constraint)
+        system.addForce(constant_force)
+        system.addForce(angle_constraint)
+        system.addForce(torsion_constraint)
 
         return system
 
@@ -1351,6 +1376,11 @@ class EvbSystemBuilder():
 
         bond_constraint = mm.HarmonicBondForce()
         bond_constraint.setName("Bond constraint")
+
+        constant_force = mm.CustomBondForce("-k*r")
+        constant_force.setName("Constant bond force constraint")
+        constant_force.addPerBondParameter("k")
+
         angle_constraint = mm.HarmonicAngleForce()
         angle_constraint.setName("Angle constraint")
         torsion_constraint = mm.CustomTorsionForce("0.5*k*(theta-theta0)^2")
@@ -1358,7 +1388,8 @@ class EvbSystemBuilder():
         torsion_constraint.addPerTorsionParameter("theta0")
         torsion_constraint.addPerTorsionParameter("k")
         if len(self.constraints) > 0:
-            self.ostream.print_info(f"Adding constraints: {self.constraints}")
+            if self.verbose:
+                self.ostream.print_info(f"Adding constraints: {self.constraints}")
 
         for constraint in self.constraints:
             key = list(constraint.keys())[0]
@@ -1374,7 +1405,16 @@ class EvbSystemBuilder():
 
             atomids = self._key_to_id(key, self.reaction_atoms)
             if len(key) == 2:
-                self._add_harm_bond(bond_constraint, constraint[key], atomids, scale)
+                if constraint[key]['type'] == 'harmonic':
+                    self._add_harm_bond(bond_constraint, constraint[key], atomids, scale)
+                elif constraint[key]['type'] == 'linear':
+                    constant_force.addBond(
+                        atomids[0],
+                        atomids[1],
+                        [constraint[key]["force_constant"] * scale],
+                    )
+                else:
+                    raise ValueError(f"Unknown constraint bond type {constraint[key]['type']}")
             if len(key) == 3:
                 self._add_angle(angle_constraint, constraint[key], atomids, scale)
             if len(key) == 4:
@@ -1388,7 +1428,7 @@ class EvbSystemBuilder():
                         constraint[key]["force_constant"] * scale,
                     ],
                 )
-        return [bond_constraint, angle_constraint, torsion_constraint]
+        return bond_constraint, constant_force, angle_constraint, torsion_constraint
 
     def _key_to_id(self, key: tuple[int, ...], atom_list: list) -> list[int]:
         return [atom_list[key[i]].index for i in range(len(key))]

@@ -107,15 +107,18 @@ class EvbFepDriver():
 
         self.total_snapshots = total_sample_steps / write_step * len(self.Lambda)
         self.ostream.print_info(f"Lambda: {self.Lambda}")
-        self.ostream.print_info(f"Total lambda points: {len(self.Lambda)}")
-        self.ostream.print_info(f"Snapshots per lambda: {total_sample_steps / write_step}")
-        self.ostream.print_info(f"Snapshots to be recorded: {self.total_snapshots}")
+        self.ostream.print_info(
+            f"Total lambda points: {len(self.Lambda)}, equilibration steps: {equilibration_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}"
+        )
+        self.ostream.print_info(
+            f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}"
+        )
         self.ostream.print_info(
             f"Total simulation steps: {(total_sample_steps + equilibration_steps) * len(self.Lambda) + lambda_0_equilibration_steps}"
         )
-        self.ostream.print_info(f"System time per snapshot: {step_size * write_step} ps")
-        self.ostream.print_info(f"System time per frame: {step_size * total_sample_steps} ps")
-        self.ostream.print_info(f"Total system time: {step_size * total_sample_steps * len(self.Lambda)} ps", )
+        self.ostream.print_info(
+            f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
+        )
         self.ostream.flush()
         integrator_temperature = temperature * mmunit.kelvin  #type: ignore
         integrator_friction_coeff = 1 / mmunit.picosecond

@@ -25,6 +25,7 @@
 from importlib.metadata import version
 
 import sys
+import numpy as np
 
 from .errorhandler import assert_msg_critical
 from .evbsystembuilder import EvbForceGroup
@@ -48,6 +49,7 @@ class EvbReporter():
         Lambda,
         outputstream,
         force_file=None,
+        force_groups=None,
         append=False,
     ):
 
@@ -99,15 +101,27 @@ class EvbReporter():
             ),
         })
 
+        if not append:
+            header = "Lambda, reactant PES, product PES, reactant integration, product integration, E_m, Constraints\n"
+            self.E_out.write(header)
+
         if force_file is not None:
             self.forces = True
             self.F_out = open(force_file, 'a' if append else 'w')
+            if force_groups is None:
+                self.force_groups = EvbForceGroup.all_force_groups()
+            else:
+                self.force_groups = force_groups
+            header = ""
+            for i, force_group in enumerate(self.force_groups):
+                for j in range(topology.getNumAtoms()):
+                    header += f"F{i+1}(x, {j}), F{i+1}(y, {j}), F{i+1}(z, {j}), "
+                header += f"F{i+1}(x), F{i+1}(y), F{i+1}(z), norm(F{i+1}), " * topology.getNumAtoms()
+            header = header[:-2] + '\n'
+            self.F_out.write(header)
+
         else:
             self.forces = False
-
-        if not append:
-            header = "Lambda, reactant PES, product PES, reactant integration, product integration, E_m, constraints\n"
-            self.E_out.write(header)
 
     def __del__(self):
         self.E_out.close()
@@ -131,10 +145,10 @@ class EvbReporter():
 
             return {'steps': steps, 'periodic': True, 'include': include}
 
-    def report(self, simulation, sim_state):
+    def report(self, simulation, state):
 
-        positions = sim_state.getPositions(asNumpy=True)
-        Em = sim_state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+        positions = state.getPositions(asNumpy=True)
+        Em = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
 
         E_pes_reactant = self._get_energy(
             self.simulations['reactant_pes'],
@@ -160,10 +174,11 @@ class EvbReporter():
         line = f"{self.Lambda}, {E_pes_reactant}, {E_pes_product}, {E_int_reactant}, {E_int_product}, {Em}"
         line += '\n'
 
-        # if self.forces:
-        #     forces = state.getForces(asNumpy=True)
-        #     for i in range(forces.shape[0]):
-        #         line += f", {forces[i][0]}, {forces[i][1]}, {forces[i][2]}"
+        if self.forces:
+            forces = state.getForces(asNumpy=True)
+            norms = np.linalg.norm(forces, axis=1)
+            for i in range(forces.shape[0]):
+                line += f", {forces[i][0]}, {forces[i][1]}, {forces[i][2]}, "
         self.E_out.write(line)
 
     def _get_energy(self, simulation, positions, forcegroups):
@@ -172,4 +187,9 @@ class EvbReporter():
             getEnergy=True,
             groups=forcegroups,
         )
+        E1 = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+
+        state = simulation.context.getState(getEnergy=True, )
+        E2 = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+
         return state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)

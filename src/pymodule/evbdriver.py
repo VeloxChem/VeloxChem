@@ -245,7 +245,8 @@ class EvbDriver():
         assert rea_atoms == sum(
             pro_atoms
         ), f"Number of atoms in reactant ({rea_atoms}) and products ({pro_atoms}, sum={sum(pro_atoms)}) must match"
-        self.name = reactant_name
+        if self.name is None:
+            self.name = reactant_name
 
         if rea_input["forcefield"] is not None and combined_product_path.exists():
             self.ostream.print_info(f"Loading combined forcefield data from {combined_product_path}")
@@ -439,12 +440,12 @@ class EvbDriver():
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
 
         if Lambda is None:
+            if self.debug:
+                Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
             if self.fast_run:
                 Lambda = np.linspace(0, 0.1, 6)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
-            if self.debug:
-                Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
             else:
                 Lambda = np.linspace(0, 0.1, 11)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
