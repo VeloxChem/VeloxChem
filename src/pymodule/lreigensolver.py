@@ -549,7 +549,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         Path(self.checkpoint_file))[:-7] + '.h5'
 
             nto_lambdas = []
-            nto_h5_files = []
             nto_cube_files = []
             dens_cube_files = []
 
@@ -751,7 +750,6 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
-                        ret_dict['nto_h5_files'] = nto_h5_files
                         if self.nto_cubes:
                             ret_dict['nto_cubes'] = nto_cube_files
 
