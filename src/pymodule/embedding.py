@@ -815,7 +815,7 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         # TODO: double check density_matrix
         e_es_elec_hess = electrostatic_interactions.compute_electronic_electrostatic_energy_hessian(
             nuc_list=nuc_list,
-            density_matrix=0.5 * density_matrix,
+            density_matrix=density_matrix,
             classical_subsystem=self.classical_subsystem,
             integral_driver=self._integral_driver
             )

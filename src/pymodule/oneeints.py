@@ -189,8 +189,8 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
             for y, label_y in enumerate('XYZ'):
                 npot_label = label_x + label_y if x <= y else label_y + label_x
                 npot_200_iixy = hmats_200.matrix_to_numpy(npot_label)
-                hess[x, y] += 2.0 * (np.sum(density *
-                                            (npot_200_iixy + npot_200_iixy.T)))
+                hess[x,
+                     y] += np.sum(density * (npot_200_iixy + npot_200_iixy.T))
 
         hmats_200 = Matrices()
 
@@ -203,8 +203,7 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
         for y, label_y in enumerate('XYZ'):
             npot_xy_label = f'{label_x}_{label_y}'
             npot_101_ijxy = hmats_101.matrix_to_numpy(npot_xy_label)
-            hess[x, y] += 2.0 * (np.sum(density *
-                                        (npot_101_ijxy + npot_101_ijxy.T)))
+            hess[x, y] += np.sum(density * (npot_101_ijxy + npot_101_ijxy.T))
 
     hmats_101 = Matrices()
 
