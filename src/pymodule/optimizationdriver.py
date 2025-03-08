@@ -90,6 +90,7 @@ class OptimizationDriver:
         self.trust = None
         self.tmax = None
         self.max_iter = 300
+        self.conv_maxiter = False
 
         self.conv_energy = None
         self.conv_grms = None
@@ -122,6 +123,8 @@ class OptimizationDriver:
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
+                'conv_maxiter':
+                    ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
                 'conv_grms': ('float', ''),
                 'conv_gmax': ('float', ''),
@@ -484,6 +487,8 @@ class OptimizationDriver:
         if self.conv_dmax is not None:
             opt_flags.append('dmax')
             opt_flags.append(str(self.conv_dmax))
+        if self.conv_maxiter:
+            opt_flags.append('maxiter')
         return opt_flags
 
     @staticmethod

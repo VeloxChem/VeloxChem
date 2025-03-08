@@ -210,6 +210,11 @@ def raman_sanity_check(obj):
                 obj.do_raman = True
                 obj.do_resonance_raman = False
             else:
+                # out-commented lines below left from a merge conflict,
+                # I don't remember why I made this list-trick
+                # but I am sure I had a good reason
+                #freq_list = list(obj.frequencies)
+                #freq_list.pop(idx0)
                 obj.frequencies.pop(idx0)
                 warn_msg += 'It has been removed from the list.\n'
                 warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
@@ -237,10 +242,10 @@ def pe_sanity_check(obj, method_dict=None):
         obj.pe_options['potfile'] = obj.potfile
 
     obj._pe = (('potfile' in obj.pe_options) or
-               (obj.embedding_options is not None))
+               (obj.embedding is not None))
 
     if obj._pe:
-        if obj.embedding_options is None:
+        if obj.embedding is None:
             potfile = None
             if obj.rank == mpi_master():
                 potfile = obj.pe_options['potfile']
@@ -250,22 +255,28 @@ def pe_sanity_check(obj, method_dict=None):
             potfile = obj.comm.bcast(potfile, root=mpi_master())
             obj.pe_options['potfile'] = potfile
             # TODO: include more options from pe_options
-            obj.embedding_options = {
+            obj.embedding = {
                 'settings': {
                     'embedding_method': 'PE',
+                    'induced_dipoles': {
+                        'solver': 'jacobi',
+                        'mic': False,
+                        'threshold': 1e-8,
+                        'max_iterations': 100,
+                    },
                 },
                 'inputs': {
                     'json_file': potfile,
                 },
             }
         else:
-            potfile = obj.embedding_options['inputs']['json_file']
+            potfile = obj.embedding['inputs']['json_file']
             obj.pe_options['potfile'] = potfile
 
-        embedding_options_sanity_check(obj.embedding_options)
+        embedding_sanity_check(obj.embedding)
 
 
-def embedding_options_sanity_check(options):
+def embedding_sanity_check(options):
     """
     Checks the validity of the given options dictionary.
 

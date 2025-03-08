@@ -58,6 +58,13 @@ auto generateDensityForLDA(double*             rho,
                            const CDenseMatrix& densityMatrixBeta,
                            CMultiTimer&        timer) -> void;
 
+auto serialGenerateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix) -> void;
+
+auto serialGenerateDensityForLDA(double*             rho,
+                                 const CDenseMatrix& gtoValues,
+                                 const CDenseMatrix& densityMatrixAlpha,
+                                 const CDenseMatrix& densityMatrixBeta) -> void;
+
 /**
  Generates density grid (multiple density matrices) for LDA.
 
@@ -185,6 +192,29 @@ auto generateDensityForMGGA(double*             rho,
                             const CDenseMatrix& gtoValuesZ,
                             const CDenseMatrix& densityMatrix,
                             CMultiTimer&        timer) -> void;
+
+auto serialGenerateDensityForMGGA(double*             rho,
+                                  double*             rhograd,
+                                  double*             sigma,
+                                  double*             lapl,
+                                  double*             tau,
+                                  const CDenseMatrix& gtoValues,
+                                  const CDenseMatrix& gtoValuesX,
+                                  const CDenseMatrix& gtoValuesY,
+                                  const CDenseMatrix& gtoValuesZ,
+                                  const CDenseMatrix& densityMatrix) -> void;
+
+auto serialGenerateDensityForMGGA(double*             rho,
+                                  double*             rhograd,
+                                  double*             sigma,
+                                  double*             lapl,
+                                  double*             tau,
+                                  const CDenseMatrix& gtoValues,
+                                  const CDenseMatrix& gtoValuesX,
+                                  const CDenseMatrix& gtoValuesY,
+                                  const CDenseMatrix& gtoValuesZ,
+                                  const CDenseMatrix& densityMatrixAlpha,
+                                  const CDenseMatrix& densityMatrixBeta) -> void;
 
 /**
  Generates density for meta-GGA.

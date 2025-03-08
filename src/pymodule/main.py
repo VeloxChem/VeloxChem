@@ -270,6 +270,24 @@ def main():
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
 
+    # Spectrum from trajectory
+
+    if task_type == 'trajectory':
+        traj_dict = (dict(task.input_dict['trajectory'])
+                     if 'trajectory' in task.input_dict else {})
+        spect_dict = (dict(task.input_dict['spectrum_settings'])
+                      if 'spectrum_settings' in task.input_dict else {})
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
+
+        traj_dict['filename'] = task.input_dict['filename']
+        traj_dict['charges'] = task.input_dict['charges']
+        traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
+
+        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
+        traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
+        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
     # Diatomic vibronic spectrum using Numerov
 
     if task_type == 'numerov':

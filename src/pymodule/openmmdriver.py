@@ -25,7 +25,7 @@
 from mpi4py import MPI
 import sys
 
-from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kjpermol
 from .outputstream import OutputStream
 
 
@@ -126,11 +126,10 @@ class OpenMMDriver:
                 asNumpy=True).value_in_unit_system(md_unit_system)
 
             # convert to a.u.
-            self.energy /= (4.184 * hartree_in_kcalpermol())
+            self.energy /= hartree_in_kjpermol()
 
             # convert to a.u.
-            self.gradient /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                              bohr_in_angstrom())
+            self.gradient /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
         self.energy = self.comm.bcast(self.energy, root=mpi_master())
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
