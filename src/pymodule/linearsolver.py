@@ -355,7 +355,7 @@ class LinearSolver:
             'screening': screening,
         }
 
-    def _init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors, silent=False):
         """
         Initializes DFT.
 
@@ -369,7 +369,8 @@ class LinearSolver:
         """
 
         if self._dft:
-            print_xc_reference(self.xcfun, self.ostream)
+            if not silent:
+                print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
@@ -379,11 +380,12 @@ class LinearSolver:
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
+            if not silent:
+                self.ostream.print_info(
+                    'Molecular grid with {0:d} points generated in {1:.2f} sec.'
+                    .format(n_grid_points,
+                            tm.time() - grid_t0))
+                self.ostream.print_blank()
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple

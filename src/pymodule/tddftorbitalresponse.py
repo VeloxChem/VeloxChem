@@ -23,18 +23,15 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
 from .profiler import Profiler
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
 from .distributedarray import DistributedArray
-from .inputparser import (parse_input, parse_seq_fixed)
-from .visualizationdriver import VisualizationDriver
+from .inputparser import parse_input
+
 
 class TddftOrbitalResponse(CphfSolver):
     """
@@ -463,7 +460,7 @@ class TddftOrbitalResponse(CphfSolver):
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 

@@ -242,11 +242,32 @@ class TddftGradientDriver(GradientDriver):
         # TODO: also check other options
         if 'state_deriv_index' not in self.orbrsp_dict:
             orbrsp_drv.state_deriv_index = self.state_deriv_index
+        if 'timing' not in self.orbrsp_dict:
+            orbrsp_drv.timing = self.timing
         orbrsp_drv.compute(molecule, basis, scf_tensors,
                            self._rsp_results)
 
-        orbrsp_results = orbrsp_drv.cphf_results
+        grad_timing = {
+            'Compute_omega': 0.0,
+            'Relaxed_density': 0.0,
+            'GS_grad': 0.0,
+            'Kinetic_energy_grad': 0.0,
+            'Nuclear_potential_grad': 0.0,
+            'Overlap_grad': 0.0,
+            'Screening': 0.0,
+            'Fock_grad': 0.0,
+            'XC_grad': 0.0,
+        }
+
+        t0 = time.time()
+
         omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
+
+        grad_timing['Compute_omega'] += time.time() - t0
+
+        t0 = time.time()
+
+        orbrsp_results = orbrsp_drv.cphf_results
 
         if self.rank == mpi_master():
             # only alpha part
@@ -307,30 +328,32 @@ class TddftGradientDriver(GradientDriver):
         omega_ao = self.comm.bcast(omega_ao,
                                    root=mpi_master())
 
+        grad_timing['Relaxed_density'] += time.time() - t0
+
         # ground state gradient
-        t1 = time.time()
+
+        self.ostream.print_info('Computing ground-state gradient...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        t0 = time.time()
+
         gs_grad_drv = ScfGradientDriver(self._scf_drv)
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
         gs_grad_drv.ostream.mute()
         gs_grad_drv.compute(molecule, basis, scf_tensors)
         gs_grad_drv.ostream.unmute()
-        t2 = time.time()
 
-        if self.rank == mpi_master():
-            if gs_grad_drv.numerical:
-                gs_gradient_type = "Numerical GS gradient"
-            else:
-                gs_gradient_type = "Analytical GS gradient"
-            self.ostream.print_info(gs_gradient_type
-                                    + ' computed in'
-                                    + ' {:.2f} sec.'.format(t2 - t1))
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-            gs_gradient = gs_grad_drv.get_gradient()
+        grad_timing['GS_grad'] += time.time() - t0
 
         self.gradient = np.zeros((dof, natm, 3))
+
+        self.ostream.print_info('Computing excited-state gradient...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        t0 = time.time()
 
         local_atoms = partition_atoms(natm, self.rank, self.nodes)
 
@@ -353,6 +376,10 @@ class TddftGradientDriver(GradientDriver):
             gmats = Matrices()
 
         self._print_debug_info('after  kin_grad')
+
+        grad_timing['Kinetic_energy_grad'] += time.time() - t0
+
+        t0 = time.time()
 
         # nuclear potential contribution to gradient
 
@@ -382,6 +409,10 @@ class TddftGradientDriver(GradientDriver):
             gmats_010 = Matrices()
 
         self._print_debug_info('after  npot_grad')
+
+        grad_timing['Nuclear_potential_grad'] += time.time() - t0
+
+        t0 = time.time()
         
         # orbital response contribution to gradient
 
@@ -400,6 +431,8 @@ class TddftGradientDriver(GradientDriver):
             gmats = Matrices()
 
         self._print_debug_info('after  ovl_grad')
+
+        grad_timing['Overlap_grad'] += time.time() - t0
 
         # ERI contribution to gradient
 
@@ -422,11 +455,6 @@ class TddftGradientDriver(GradientDriver):
                 False, 'ScfGradientDriver: Not implemented for' +
                 ' range-separated functional')
 
-        fock_timing = {
-            'Screening': 0.0,
-            'FockGrad': 0.0,
-            }
-
         self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
@@ -437,7 +465,9 @@ class TddftGradientDriver(GradientDriver):
         screener = T4CScreener()
         screener.partition(basis, molecule, 'eri')
 
-        fock_timing['Screening'] += time.time() - t0
+        grad_timing['Screening'] += time.time() - t0
+
+        t0 = time.time()
 
         thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
@@ -490,9 +520,11 @@ class TddftGradientDriver(GradientDriver):
                 self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xpy) * factor
                 self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xmy) * factor
 
-        fock_timing['FockGrad'] += time.time() - t0
-
         self._print_debug_info('after  fock_grad')
+
+        grad_timing['Fock_grad'] += time.time() - t0
+
+        t0 = time.time()
 
         # TODO: enable multiple DMs for DFT to avoid for-loops.
         if self._dft:
@@ -522,15 +554,17 @@ class TddftGradientDriver(GradientDriver):
                 if self.rank == mpi_master():
                     self.gradient[s] += tddft_xcgrad
 
+        grad_timing['XC_grad'] += time.time() - t0
+
         if self.rank == mpi_master():
             self.gradient += gs_grad_drv.get_gradient()
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
         if self.timing and self.rank == mpi_master():
-            self.ostream.print_info('Fock timing decomposition')
-            for key, val in fock_timing.items():
-                self.ostream.print_info(f'    {key:<10s}:  {val:.2f} sec')
+            self.ostream.print_info('Gradient timing decomposition')
+            for key, val in grad_timing.items():
+                self.ostream.print_info(f'    {key:<25s}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
