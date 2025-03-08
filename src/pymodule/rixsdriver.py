@@ -133,8 +133,8 @@ class RixsDriver:
             print(f'\nMO indices (core, valence, virtual): ({mo_c_ind}, {mo_val_ind}, {mo_vir_ind})')
             print(f'\nState indices (intermediate, final): ({ce_states}, {ve_states})')
     
-    def scattering_amplitude_tensor(self, omega, eigenvalues, intermediate_tdens,
-                             final_tdens, dipole_integrals, elastic=False):
+    def scattering_amplitude_tensor(self, omega, core_eigenvalues, val_eigenvalues,
+                                    intermediate_tdens, final_tdens, dipole_integrals, elastic=False):
         """
         The RIXS scattering amptlitude (sum-over-states transition amplitude).
         
@@ -158,15 +158,16 @@ class RixsDriver:
             The scattering amplitude tensor; shape: (3,3)
         """
 
-        e_n = 1 / (omega - (eigenvalues + 1j * self.gamma_n))
+        e_n = 1 / (omega - (core_eigenvalues + 1j * self.gamma_n))
+        omega_product = (val_eigenvalues[:, np.newaxis] - core_eigenvalues) * core_eigenvalues
 
         if elastic:
-            # TODO: addd missing term (F.T_f) in eq.7 
-            # ref. Gel'mukhanov, F., & Ågren, H. (1999). Physics Reports, 312(3-6), 87-330.
-            scatt_amp = np.einsum('n, xij, ijn, yab, abn -> nxy', e_n, dipole_integrals, intermediate_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
+            core_eigvals_2 = core_eigenvalues**2
+            scatt_amp = np.einsum('n, xij, ijn, yab, abn -> nxy', core_eigvals_2 * e_n, dipole_integrals, intermediate_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
 
         else:
-            scatt_amp = np.einsum('n, xij, ijfn, yab, abn -> fxy', e_n, dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
+            #scatt_amp = np.einsum('n, xij, ijfn, yab, abn -> fxy', e_n, dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
+            scatt_amp = np.einsum('n, fn, xij, ijfn, yab, abn -> fxy', e_n, omega_product, dipole_integrals, final_tdens, dipole_integrals, intermediate_tdens, optimize='greedy')
 
         return scatt_amp
 
@@ -401,9 +402,9 @@ class RixsDriver:
             energy_loss = valence_eigvals #omega - emission_ene # independent of intermediate state, but 
             ene_losses[..., w_ind] = energy_loss # keeping it like this for consistency
             
-            F = self.scattering_amplitude_tensor(omega, core_eigvals, gs_to_core_tdens,
+            F = self.scattering_amplitude_tensor(omega, core_eigvals, valence_eigvals, gs_to_core_tdens,
                                                     core_to_val_tdens, dipole_integrals)
-            F_elastic = self.scattering_amplitude_tensor(omega, core_eigvals, gs_to_core_tdens,
+            F_elastic = self.scattering_amplitude_tensor(omega, core_eigvals, valence_eigvals, gs_to_core_tdens,
                                                     core_to_val_tdens, dipole_integrals, elastic=True)
             
             sigma = self.cross_section(F, prefactor_ratio)
@@ -444,17 +445,5 @@ class RixsDriver:
             return x_ger_full + x_ung_full
         else:
             return None
-
-    @staticmethod
-    def get_transition_density(scf_tensors, rsp_tensors, cvs_rsp_tensors=None):
-        
-        #mo_occ_expanded  = mo_occ[np.newaxis, :, :]
-        #mo_vir_expanded = mo_vir[:, :, np.newaxis] 
-
-        # want a + sign here but
-        #difference_mat  = core_z_mat - core_y_mat
-        #gs_to_state = mo_occ_expanded @ difference_mat @ mo_vir_expanded.T  
-        #return gs_to_state
-        pass
 
 
