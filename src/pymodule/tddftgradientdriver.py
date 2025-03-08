@@ -23,8 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from copy import deepcopy
-from os import environ
 import numpy as np
 import time
 import math
@@ -33,20 +31,18 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import mpi_master, mat_t
-from .veloxchemlib import denmat
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import partition_atoms, make_matrix
 from .matrices import Matrices
 from .profiler import Profiler
 from .tddftorbitalresponse import TddftOrbitalResponse
-from .molecule import Molecule
-from .lrsolver import LinearResponseSolver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import (parse_input, parse_seq_fixed)
-from .sanitychecks import dft_sanity_check
+from .inputparser import parse_input
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
+
 
 class TddftGradientDriver(GradientDriver):
     """
@@ -84,7 +80,6 @@ class TddftGradientDriver(GradientDriver):
 
         self._rsp_results = None
 
-        # TODO: double check _block_size_factor
         self._block_size_factor = 4
 
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
@@ -102,6 +97,12 @@ class TddftGradientDriver(GradientDriver):
 
         self.do_first_order_prop = False
         self.relaxed_dipole_moment = None
+
+        # option dictionaries from input
+        # TODO: cleanup
+        self.method_dict = {}
+        self.orbrsp_dict = {}
+        self.grad_dict = {}
 
         # TODO: remove relaxed_dipole_moment (not input variable)
         self._input_keywords['gradient'].update({
@@ -174,6 +175,8 @@ class TddftGradientDriver(GradientDriver):
         """
 
         # sanity checks
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, self._scf_drv.scf_tensors)
         dft_sanity_check(self, 'compute')
 
         if self.rank == mpi_master():
@@ -236,6 +239,9 @@ class TddftGradientDriver(GradientDriver):
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        # TODO: also check other options
+        if 'state_deriv_index' not in self.orbrsp_dict:
+            orbrsp_drv.state_deriv_index = self.state_deriv_index
         orbrsp_drv.compute(molecule, basis, scf_tensors,
                            self._rsp_results)
 
@@ -422,12 +428,10 @@ class TddftGradientDriver(GradientDriver):
             }
 
         self._print_debug_info('before fock_grad')
-        fock_grad_drv = FockGeom1000Driver()
 
-        extra_factor = self._get_extra_block_size_factor(
-            basis.get_dimensions_of_basis())
-        fock_grad_drv._set_block_size_factor(self._block_size_factor *
-                                             extra_factor)
+        fock_grad_drv = FockGeom1000Driver()
+        fock_grad_drv._set_block_size_factor(self._block_size_factor)
+
         t0 = time.time()
 
         screener = T4CScreener()
@@ -644,23 +648,3 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
                                     profiler.get_available_memory())
             self.ostream.flush()
-
-    # TODO: this routine is used by both ScfGradientDriver and
-    # TddftGradientDriver. It can be moved to the parent class.
-    def _get_extra_block_size_factor(self, naos):
-
-        total_cores = self.nodes * int(environ['OMP_NUM_THREADS'])
-
-        if total_cores >= 2048:
-            if naos >= 4500:
-                extra_factor = 4
-            else:
-                extra_factor = 2
-
-        elif total_cores >= 1024:
-            extra_factor = 2
-
-        else:
-            extra_factor = 1
-
-        return extra_factor
