@@ -215,7 +215,7 @@ class ScfUnrestrictedDriver(ScfDriver):
     def _get_scaled_fock(self, weights):
         """
         Computes effective spin unrestricted open shell Fock/Kohn-Sham matrix
-        by summing Fock/Kohn-Sham matrices scalwd with weigths.
+        by summing Fock/Kohn-Sham matrices scaled with weigths.
 
         :param weights:
             The weights of Fock/Kohn-Sham matrices.
