@@ -159,8 +159,9 @@ class EvbReporter():
         forces = state.getForces(asNumpy=True)
         norms = np.linalg.norm(forces, axis=1)
         line = f"{self.Lambda}"
+        kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
         for i in range(forces.shape[0]):
-            line += f", {forces[i][0]}, {forces[i][1]}, {forces[i][2]}, {norms[i]}"
+            line += f", {forces[i][0].value_in_unit(kjpermolenm)}, {forces[i][1].value_in_unit(kjpermolenm)}, {forces[i][2].value_in_unit(kjpermolenm)}, {norms[i]}"
         line += '\n'
         self.F_out.write(line)
 
