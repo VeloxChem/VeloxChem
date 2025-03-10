@@ -1,9 +1,11 @@
 import os
+from tracemalloc import start
 import numpy as np
 import veloxchem as vlx
 import py3Dmol as p3d
 from collections import defaultdict
 from scipy import optimize
+import time
 
 
 class MolecularPropertyCalculator:
@@ -32,6 +34,7 @@ class MolecularPropertyCalculator:
             raise FileNotFoundError(f"Error: The file {file_path} does not exist.")
     
     def run_scf(self, functional='BLYP', solvation_model=None):
+        start_time = time.perf_counter()
         self.scf_drv = vlx.ScfRestrictedDriver()
         self.scf_drv.xcfun = functional
         self.scf_drv.solvation_model = solvation_model
@@ -39,7 +42,7 @@ class MolecularPropertyCalculator:
         self.scf_drv.grid_level = 2
         self.scf_drv.conv_thresh = 1e-4
         self.scf_drv.cpcm_epsilon = 78.4
-        self.scf_drv.ostream.mute()
+        # self.scf_drv.ostream.mute()
         self.scf_drv.cpcm_grid_per_sphere = 194 # valid grid numbers are [50, 110, 194, 302, 434, 590, 770, 974, 2030]
         self.scf_drv.dispersion = True
 
@@ -48,13 +51,16 @@ class MolecularPropertyCalculator:
         else:
             self.scf_drv.ri_coulomb = True
         self.scf_results = self.scf_drv.compute(self.molecule, self.basis)
+        end_time = time.perf_counter()
+        print(f"Time taken to run SCF: {end_time - start_time:.2f} seconds")
     
     def optimize_geometry(self):
+        start_time = time.perf_counter()
         # Run geometry optimization using BLYP functional
         self.run_scf(functional='BLYP')
 
         opt_drv = vlx.OptimizationDriver(self.scf_drv)
-        opt_drv.ostream.mute()
+        # opt_drv.ostream.mute()
         opt_drv.conv_energy = 1e-04
         opt_drv.conv_drms = 5e-03
         opt_drv.conv_dmax = 1e-02
@@ -65,12 +71,14 @@ class MolecularPropertyCalculator:
 
         # Use B3LYP functional for further calculations
         self.run_scf(functional='B3LYP', solvation_model='CPCM')
-
+        end_time = time.perf_counter()
+        print(f"Time taken to optimize geometry: {end_time - start_time:.2f} seconds")
 
     def get_xyz_string(self):
         return self.molecule.get_xyz_string()
     
     def compute_electron_density(self):
+        start_time = time.perf_counter()
         grid_drv = vlx.GridDriver()
         grid_drv.set_level(4)
         molgrid = grid_drv.generate(self.molecule)
@@ -85,7 +93,13 @@ class MolecularPropertyCalculator:
         self.surface_points = np.column_stack((molgrid.x_to_numpy()[indices],
                                                molgrid.y_to_numpy()[indices],
                                                molgrid.z_to_numpy()[indices]))
-        return n_g
+        
+
+        end_time = time.perf_counter()
+        print(f"Time taken to compute electron density: {end_time - start_time:.2f} seconds")
+        print(f"The length of electron density array n_g: {len(n_g)}")
+        return
+    
         
     def _get_surface_point_atom_indices(self):
 
@@ -110,14 +124,13 @@ class MolecularPropertyCalculator:
         # generate AOs on the grid points
         chi_g = xc_drv.compute_gto_values(self.molecule, self.basis, molgrid) # Computes the values of atomic orbitals (GTOs) at grid points
 
-
-
-
         mol_orb_coeff = self.scf_results["C_alpha"]
         occ_mo_val, unocc_mo_val = [], []
         
         occ_orb = sum(self.scf_results['occ_alpha'])
         tot_orb = len(self.scf_results['occ_alpha'])
+        print(f"Number of occupied orbitals: {occ_orb}")
+        print(f"Total number of orbitals: {tot_orb}")
         
         for i in range(int(occ_orb)):
             mo_val = np.dot(chi_g.T, mol_orb_coeff[:, i])
@@ -130,38 +143,45 @@ class MolecularPropertyCalculator:
         return occ_mo_val, unocc_mo_val
     
     def compute_local_properties(self):
+        print(f'The total amount of surface points is {len(self.surface_points)}')
+        start_time = time.perf_counter()
+
         occ_mo_val, unocc_mo_val = self.compute_molecular_orbitals()
         energy_occ = self.scf_results['E_alpha'][:len(occ_mo_val)]
-        energy_unocc = self.scf_results['E_alpha'][len(occ_mo_val):]
+        energy_unocc = self.scf_results['E_alpha'][len(occ_mo_val):]              
 
         EA, IE = [], []
         for idx, point in enumerate(self.surface_points):
+
             ea_point_val, ie_point_val = 0, 0 # Initialize EA and IE values for this point
 
             for j in range(len(unocc_mo_val)):
+              
                 unocc_mo_val_squared = unocc_mo_val[j][idx]**2
                 ea_point_val += unocc_mo_val_squared * energy_unocc[j] # Sum over all unoccupied MOs
 
             ea_point_val /= sum(unocc_mo_val[j][idx]**2 for j in range(len(unocc_mo_val))) * (-1)
 
+
             for j in range(len(occ_mo_val)):
+                
                 occ_mo_val_squared = occ_mo_val[j][idx]**2
                 ie_point_val += occ_mo_val_squared * abs(energy_occ[j]) # Sum over all occupied MOs
+
+            ie_point_val /= sum(occ_mo_val[j][idx]**2 for j in range(len(occ_mo_val)))
             
-            den_val = self.compute_electron_density()
-            ie_point_val /= den_val[idx]
-
-            # Previously wrong code:
-            # ea_val = sum(unocc_mo_val[j][idx]**2 * energy_unocc[j] for j in range(len(unocc_mo_val)))
-            # ie_val = sum(occ_mo_val[j][idx]**2 * energy_occ[j] for j in range(len(occ_mo_val)))
-
             EA.append(ea_point_val)
             IE.append(ie_point_val)
+        
+        end_time = time.perf_counter()
+        print(f"Time taken to compute EA and IE values: {end_time - start_time:.2f} seconds")
+       
         
         self.ea_values = EA
         self.ie_values = IE
     
         data_bank = [{'atom': int(self.atom_indices[idx]), 'IE': IE[idx], 'EA': EA[idx]} for idx in range(len(IE))]
+        print(f"Data bank: {data_bank}")
 
 	    # Organize data into a dictionary where keys are atoms and values are lists of (EA, index) tuples
         self.EA_data = defaultdict(lambda: {"EA": [], "indices": []})
@@ -227,7 +247,7 @@ class MolecularPropertyCalculator:
         resp_drv.ostream.mute()
         self.resp_charges = resp_drv.compute(self.molecule, self.basis, self.scf_results, 'resp')
         
-
+        # Remove this when cpcm is added in LoPropDriver
         if 'solvation_model' in self.scf_results:
             del self.scf_results['solvation_model']
 
