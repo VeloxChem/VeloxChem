@@ -772,33 +772,68 @@ class ScfGradientDriver(GradientDriver):
         screener.partition(basis, molecule, 'eri')
 
         thresh_int = int(-math.log10(self.eri_thresh))
+        
+        if self.scf_driver.ri_coulomb:
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
 
-        for iatom in local_atoms:
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-            screener_atom = T4CScreener()
-            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(
+                    molecule, self.scf_driver.ri_auxiliary_basis)
+                ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
+                    Dab_for_fock)
+            else:
+                basis_ri_j = None
+                ri_gvec = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+            ri_gvec = self.comm.bcast(ri_gvec, root=mpi_master())
 
-            atomgrad_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                 Dab_for_fock, Dab_for_fock_2,
-                                                 iatom, 'j', 0.0, 0.0,
-                                                 thresh_int)
+            ri_grad_drv = RIFockGradDriver()
+            
+        if self.scf_driver.ri_coulomb:
+            for iatom in local_atoms:
+                atomgrad = ri_grad_drv.direct_compute(screener, basis,
+                                                      basis_ri_j, molecule,
+                                                      ri_gvec, Dab_for_fock,
+                                                      iatom, thresh_int)
+                # Note: RI gradient already contains factor of 2 for
+                # closed-shell, so for unrestricted factor becomes 0.25
+                self.gradient[iatom, :] += 0.25 * np.array(atomgrad.coordinates())
 
-            self.gradient[iatom, :] += 0.5 * np.array(atomgrad_Jab)
+        else:
 
-            if fock_type != 'j':
-                atomgrad_Ka = fock_grad_drv.compute(basis, screener_atom,
-                                                    screener, Da_for_fock,
-                                                    Da_for_fock_2, iatom, 'kx',
-                                                    exchange_scaling_factor,
-                                                    0.0, thresh_int)
-                atomgrad_Kb = fock_grad_drv.compute(basis, screener_atom,
-                                                    screener, Db_for_fock,
-                                                    Db_for_fock_2, iatom, 'kx',
-                                                    exchange_scaling_factor,
-                                                    0.0, thresh_int)
+            for iatom in local_atoms:
 
-                self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
-                self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
+                screener_atom = T4CScreener()
+                screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+                atomgrad_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                    Dab_for_fock, Dab_for_fock_2,
+                                                    iatom, 'j', 0.0, 0.0,
+                                                    thresh_int)
+
+                self.gradient[iatom, :] += 0.5 * np.array(atomgrad_Jab)
+
+                if fock_type != 'j':
+                    atomgrad_Ka = fock_grad_drv.compute(basis, screener_atom,
+                                                        screener, Da_for_fock,
+                                                        Da_for_fock_2, iatom, 'kx',
+                                                        exchange_scaling_factor,
+                                                        0.0, thresh_int)
+                    atomgrad_Kb = fock_grad_drv.compute(basis, screener_atom,
+                                                        screener, Db_for_fock,
+                                                        Db_for_fock_2, iatom, 'kx',
+                                                        exchange_scaling_factor,
+                                                        0.0, thresh_int)
+
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
 
         # XC contribution to gradient
 
