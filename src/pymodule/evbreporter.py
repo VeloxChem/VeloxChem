@@ -41,7 +41,7 @@ class EvbReporter():
 
     def __init__(
         self,
-        file,
+        energy_file,
         report_interval,
         reactant_ff,
         product_ff,
@@ -49,7 +49,6 @@ class EvbReporter():
         Lambda,
         outputstream,
         force_file=None,
-        force_groups=None,
         append=False,
     ):
 
@@ -62,39 +61,39 @@ class EvbReporter():
         else:
             self.use_tuple = False
 
-        self.E_out = open(file, 'a' if append else 'w')
+        self.E_out = open(energy_file, 'a' if append else 'w')
         self.report_interval = report_interval
 
         self.Lambda = Lambda
-        self.simulations = {}
+        self.simulation_dicts = {}
 
-        self.simulations.update({
+        self.simulation_dicts.update({
             'reactant_pes':
-            self._get_simulation(
+            self._get_simulation_dict(
                 topology,
                 reactant_ff,
                 EvbForceGroup.pes_force_groups(),
             ),
             'product_pes':
-            self._get_simulation(
+            self._get_simulation_dict(
                 topology,
                 product_ff,
                 EvbForceGroup.pes_force_groups(),
             ),
             'reactant_integrator':
-            self._get_simulation(
+            self._get_simulation_dict(
                 topology,
                 reactant_ff,
                 EvbForceGroup.integration_force_groups(),
             ),
             'product_integrator':
-            self._get_simulation(
+            self._get_simulation_dict(
                 topology,
                 product_ff,
                 EvbForceGroup.integration_force_groups(),
             ),
             'constraints':
-            self._get_simulation(
+            self._get_simulation_dict(
                 topology,
                 reactant_ff,
                 EvbForceGroup.CONSTRAINT.value,
@@ -105,32 +104,29 @@ class EvbReporter():
             header = "Lambda, reactant PES, product PES, reactant integration, product integration, E_m, Constraints\n"
             self.E_out.write(header)
 
-        if force_file is not None:
-            self.forces = True
-            self.F_out = open(force_file, 'a' if append else 'w')
-            if force_groups is None:
-                self.force_groups = EvbForceGroup.all_force_groups()
-            else:
-                self.force_groups = force_groups
-            header = ""
-            for i, force_group in enumerate(self.force_groups):
-                for j in range(topology.getNumAtoms()):
-                    header += f"F{i+1}(x, {j}), F{i+1}(y, {j}), F{i+1}(z, {j}), "
-                header += f"F{i+1}(x), F{i+1}(y), F{i+1}(z), norm(F{i+1}), " * topology.getNumAtoms()
+        if force_file is None:
+            self.forces = False
+            return
+
+        self.forces = True
+        self.F_out = open(force_file, 'a' if append else 'w')
+
+        if not append:
+            header = "Lambda, "
+            for j in range(topology.getNumAtoms()):
+                header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
             header = header[:-2] + '\n'
             self.F_out.write(header)
-
-        else:
-            self.forces = False
 
     def __del__(self):
         self.E_out.close()
 
     @staticmethod
-    def _get_simulation(topology, ff, forcegroups):
+    def _get_simulation_dict(topology, ff, forcegroups):
         integrator = mm.VerletIntegrator(1)
         integrator.setIntegrationForceGroups(forcegroups)
-        return mmapp.Simulation(topology, ff, integrator)
+        simulation = mmapp.Simulation(topology, ff, integrator)
+        return {"simulation": simulation, "forcegroups": forcegroups}
 
     def describeNextReport(self, simulation):
         steps = self.report_interval - simulation.currentStep % self.report_interval
@@ -148,48 +144,32 @@ class EvbReporter():
     def report(self, simulation, state):
 
         positions = state.getPositions(asNumpy=True)
+        line = f"{self.Lambda}"
+        for simulation_dict in self.simulation_dicts.values():
+            E = self._get_energy(simulation_dict, positions)
+            line += f", {E}"
+
         Em = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
-
-        E_pes_reactant = self._get_energy(
-            self.simulations['reactant_pes'],
-            positions,
-            EvbForceGroup.pes_force_groups(),
-        )
-        E_pes_product = self._get_energy(
-            self.simulations['product_pes'],
-            positions,
-            EvbForceGroup.pes_force_groups(),
-        )
-        E_int_reactant = self._get_energy(
-            self.simulations['reactant_integrator'],
-            positions,
-            EvbForceGroup.integration_force_groups(),
-        )
-        E_int_product = self._get_energy(
-            self.simulations['product_integrator'],
-            positions,
-            EvbForceGroup.integration_force_groups(),
-        )
-
-        line = f"{self.Lambda}, {E_pes_reactant}, {E_pes_product}, {E_int_reactant}, {E_int_product}, {Em}"
-        line += '\n'
-
-        if self.forces:
-            forces = state.getForces(asNumpy=True)
-            norms = np.linalg.norm(forces, axis=1)
-            for i in range(forces.shape[0]):
-                line += f", {forces[i][0]}, {forces[i][1]}, {forces[i][2]}, "
+        line += f", {Em}\n"
         self.E_out.write(line)
 
-    def _get_energy(self, simulation, positions, forcegroups):
+        if not self.forces:
+            return
+
+        forces = state.getForces(asNumpy=True)
+        norms = np.linalg.norm(forces, axis=1)
+        line = f"{self.Lambda}"
+        for i in range(forces.shape[0]):
+            line += f", {forces[i][0]}, {forces[i][1]}, {forces[i][2]}, {norms[i]}"
+        line += '\n'
+        self.F_out.write(line)
+
+    def _get_energy(self, simulation_dict, positions):
+        simulation = simulation_dict['simulation']
+        forcegroups = simulation_dict['forcegroups']
         simulation.context.setPositions(positions)
         state = simulation.context.getState(
             getEnergy=True,
             groups=forcegroups,
         )
-        E1 = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
-
-        state = simulation.context.getState(getEnergy=True, )
-        E2 = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
-
         return state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)

@@ -85,6 +85,7 @@ class EvbDriver():
         self.system_confs: list[dict] = []
         self.debug = False
         self.fast_run = False
+        self.calculate_forces = False
 
         self.t_label = int(time.time())
 
@@ -129,6 +130,7 @@ class EvbDriver():
 
     def build_forcefields(
         self,
+        
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
         reactant_partial_charges: list[float] = None,
@@ -442,7 +444,7 @@ class EvbDriver():
         if Lambda is None:
             if self.debug:
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-            if self.fast_run:
+            elif self.fast_run:
                 Lambda = np.linspace(0, 0.1, 6)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
@@ -745,22 +747,27 @@ class EvbDriver():
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver()
-            FEP.run_FEP(equilibration_steps=equil_steps,
-                        total_sample_steps=sample_steps,
-                        write_step=write_step,
-                        lambda_0_equilibration_steps=initial_equil_steps,
-                        step_size=step_size,
-                        equil_step_size=equil_step_size,
-                        initial_equil_step_size=initial_equil_step_size,
-                        Lambda=self.Lambda,
-                        configuration=conf)
+            FEP.run_FEP(
+                equilibration_steps=equil_steps,
+                total_sample_steps=sample_steps,
+                write_step=write_step,
+                lambda_0_equilibration_steps=initial_equil_steps,
+                step_size=step_size,
+                equil_step_size=equil_step_size,
+                initial_equil_step_size=initial_equil_step_size,
+                Lambda=self.Lambda,
+                configuration=conf,
+                calculate_forces=self.calculate_forces,
+            )
 
-    def compute_energy_profiles(self,
-                                barrier,
-                                free_energy,
-                                lambda_sub_sample=1,
-                                lambda_sub_sample_ends=False,
-                                time_sub_sample=1):
+    def compute_energy_profiles(
+            self,
+            barrier,
+            free_energy,
+            lambda_sub_sample=1,
+            lambda_sub_sample_ends=False,
+            time_sub_sample=1,
+        ):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:

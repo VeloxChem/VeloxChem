@@ -228,6 +228,7 @@ class EvbFepDriver():
                     topology,
                     l,
                     self.ostream,
+                    force_file= str(self.data_folder / "Forces.csv"),
                     append=append,
                 ))
 
