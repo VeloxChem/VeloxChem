@@ -56,7 +56,7 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           dft_sanity_check, pe_sanity_check)
 
 
 class ScfHessianDriver(HessianDriver):
@@ -347,6 +347,11 @@ class ScfHessianDriver(HessianDriver):
                             'polarizable embedding (PE) not yet ''available')
 
         if self.scf_driver._pe:
+
+            # TODO: double check
+            cphf_solver.embedding = self.scf_driver.embedding
+            pe_sanity_check(cphf_solver)
+
             from .embedding import PolarizableEmbeddingHess
             cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
