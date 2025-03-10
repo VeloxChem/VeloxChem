@@ -60,6 +60,16 @@ class CRIFockDriver
                          const CMolecularBasis &basis,
                          const CMolecularBasis &aux_basis) -> void;
     
+    /// @brief Computes three center electron repulsion integral buffers.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxilary molecular  basis.
+    /// @param atoms The vector of atoms to compute three-center electron repulsion integrals.
+    auto prepare_buffers(const CMolecule&        molecule,
+                         const CMolecularBasis&  basis,
+                         const CMolecularBasis&  aux_basis,
+                         const std::vector<int>& atoms) -> void;
+    
     /// @brief Computes Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.

@@ -39,6 +39,17 @@ CRIFockDriver::prepare_buffers(const CMolecule       &molecule,
 }
 
 auto
+CRIFockDriver::prepare_buffers(const CMolecule&        molecule,
+                               const CMolecularBasis&  basis,
+                               const CMolecularBasis&  aux_basis,
+                               const std::vector<int>& atoms) -> void
+{
+    CThreeCenterElectronRepulsionDriver eri_drv;
+    
+    _eri_buffer = eri_drv.compute(basis, aux_basis, molecule, atoms);
+}
+
+auto
 CRIFockDriver::compute(const CMatrix     &density,
                        const std::string &label) const -> CMatrix
 {
