@@ -752,7 +752,7 @@ class CphfSolver(LinearSolver):
                                  distribute=False)
             norm = np.sqrt(v.squared_norm())
 
-            if norm > 1e-10:  # small_thresh of lrsolver
+            if norm > self.norm_thresh:
                 trials.append(v.data[:])
 
         dist_trials = DistributedArray(np.array(trials).T,
