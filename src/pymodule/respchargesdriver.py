@@ -1177,6 +1177,65 @@ class RespChargesDriver:
             return esp
         else:
             return None
+        
+    def get_electrostatic_potential_with_maximum_values(self, grid, molecule, basis, scf_results, Atom_indices):
+        """
+        Gets the QM ESP on the grid points and assigns them to atoms.
+
+        :param grid: The grid points.
+        :param molecule: The molecule.
+        :param basis: The AO basis set.
+        :param scf_results: The dictionary containing SCF results.
+        :param Atom_indices: Array that tells which atom each surface point belongs to.
+        
+        :return: A dictionary with maximum ESP values for each atom.
+        """
+        
+        if self.rank == mpi_master():
+            D = scf_results['D_alpha'] + scf_results['D_beta']
+        else:
+            D = None
+        D = self.comm.bcast(D, root=mpi_master())
+
+        esp = np.zeros(grid.shape[0])
+
+        # classical electrostatic potential
+        coords = molecule.get_coordinates_in_bohr()
+        elem_ids = molecule.get_element_ids()
+
+        if self.rank == mpi_master():
+            for i in range(esp.size):
+                for j in range(molecule.number_of_atoms()):
+                    esp[i] += elem_ids[j] / np.linalg.norm(coords[j] - grid[i])
+
+        # electrostatic potential integrals
+        ave, res = divmod(grid.shape[0], self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        elec_esp = compute_nuclear_potential_values(molecule, basis, grid[start:end, :], D)
+
+        elec_esp_arrays = self.comm.gather(elec_esp, root=mpi_master())
+
+        if self.rank == mpi_master():
+            elec_esp_arrays = [arr for arr in elec_esp_arrays if arr.size > 0]
+            esp += np.hstack(elec_esp_arrays)
+
+            # Assign ESP values to atoms based on Atom_indices
+            atom_esp = defaultdict(list)
+
+            for i, atom_idx in enumerate(Atom_indices):
+                atom_esp[atom_idx].append(esp[i])
+
+            # Get the maximum ESP value for each atom
+            max_esp_per_atom = {atom: max(esp_values) for atom, esp_values in atom_esp.items()}
+
+            return max_esp_per_atom
+
+        else:
+            return None
 
     def get_rrms(self, molecules, grids, esp, weights, q):
         """
