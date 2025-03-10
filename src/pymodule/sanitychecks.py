@@ -60,6 +60,11 @@ def scf_results_sanity_check(obj, scf_results):
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
 
+        if scf_results.get('ri_coulomb', None) is not None:
+            updated_scf_info['ri_coulomb'] = scf_results['ri_coulomb']
+            updated_scf_info['ri_auxiliary_basis'] = scf_results[
+                'ri_auxiliary_basis']
+
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint
             if not scf_results['restart']:
@@ -241,8 +246,7 @@ def pe_sanity_check(obj, method_dict=None):
     if obj.potfile:
         obj.pe_options['potfile'] = obj.potfile
 
-    obj._pe = (('potfile' in obj.pe_options) or
-               (obj.embedding is not None))
+    obj._pe = (('potfile' in obj.pe_options) or (obj.embedding is not None))
 
     if obj._pe:
         if obj.embedding is None:

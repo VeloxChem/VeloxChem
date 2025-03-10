@@ -274,8 +274,6 @@ class ScfDriver:
         # input keywords
         self._input_keywords = {
             'scf': {
-                'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
@@ -307,6 +305,8 @@ class ScfDriver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -1698,6 +1698,12 @@ class ScfDriver:
 
                 # for backward compatibility only
                 self._scf_tensors['F'] = (F_alpha, F_beta)
+
+                if self.ri_coulomb:
+                    # RI info
+                    self._scf_tensors['ri_coulomb'] = self.ri_coulomb
+                    self._scf_tensors[
+                        'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
                 if self._dft:
                     # dft info

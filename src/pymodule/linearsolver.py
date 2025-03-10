@@ -29,6 +29,8 @@ import math
 import sys
 
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import RIFockDriver, SubMatrix
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -36,6 +38,7 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
+from .molecularbasis import MolecularBasis
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -52,6 +55,11 @@ from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
 
 
 class LinearSolver:
@@ -110,6 +118,11 @@ class LinearSolver:
         # ERI settings
         self.eri_thresh = 1.0e-15
         self.batch_size = None
+
+        # RI-J
+        self.ri_coulomb = False
+        self.ri_auxiliary_basis = 'def2-universal-jkfit'
+        self._ri_drv = None
 
         # dft
         self.xcfun = None
@@ -209,6 +222,8 @@ class LinearSolver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
@@ -350,6 +365,62 @@ class LinearSolver:
         self._print_mem_debug_info('after  screener')
         screening = self.comm.bcast(screening, root=mpi_master())
         self._print_mem_debug_info('after  bcast screener')
+
+        if self.ri_coulomb and self.rank == mpi_master():
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'SCF Driver: Invalid basis set for RI-J')
+
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            basis_ri_j = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+
+            self.ostream.print_info('Dimension of RI auxiliary basis set ' +
+                                    f'({self.ri_auxiliary_basis.upper()}): ' +
+                                    f'{basis_ri_j.get_dimensions_of_basis()}')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            ri_prep_t0 = tm.time()
+
+            t2c_drv = TwoCenterElectronRepulsionDriver()
+            mat_j = t2c_drv.compute(molecule, basis_ri_j)
+            mat_j_np = mat_j.to_numpy()
+
+            self.ostream.print_info('Two-center integrals for RI done in ' +
+                                    f'{tm.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            if 'scipy' in sys.modules:
+                lu, piv = lu_factor(mat_j_np)
+                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            else:
+                inv_mat_j_np = np.linalg.inv(mat_j_np)
+
+            self.ostream.print_info(
+                f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            inv_mat_j = SubMatrix(
+                [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
+            inv_mat_j.set_values(inv_mat_j_np)
+
+            self._ri_drv = RIFockDriver(inv_mat_j)
+            self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j)
+
+            self.ostream.print_info(
+                f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         return {
             'screening': screening,
@@ -1340,17 +1411,34 @@ class LinearSolver:
         fock_arrays = []
 
         for idx in range(num_densities):
-            den_mat_for_fock = make_matrix(basis, mat_t.general)
-            den_mat_for_fock.set_values(dens[idx])
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'LinearSolver: RI is only applicable to pure DFT functional')
 
-            self._print_mem_debug_info('before restgen Fock build')
-            fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
-                                        exchange_scaling_factor, 0.0,
-                                        thresh_int)
-            self._print_mem_debug_info('after  restgen Fock build')
+            if self.ri_coulomb and fock_type == 'j':
+                # symmetrize density for RI-J
+                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
 
-            fock_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
+                if self.rank == mpi_master():
+                    fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+                    fock_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
+                else:
+                    fock_np = np.zeros(dens[idx].shape)
+            else:
+                den_mat_for_fock = make_matrix(basis, mat_t.general)
+                den_mat_for_fock.set_values(dens[idx])
+
+                self._print_mem_debug_info('before restgen Fock build')
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
+                                            exchange_scaling_factor, 0.0,
+                                            thresh_int)
+                self._print_mem_debug_info('after  restgen Fock build')
+
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             if fock_type == 'j':
                 # for pure functional
