@@ -434,6 +434,305 @@ class CpcmDriver:
         v.zoomTo()
         v.show()
 
+    def visualize_cpcm_grid_EA_points(self, molecule, grid, min_EA_points, Electron_affinity_values):
+        """
+        Visualizes grid for surface discretization and highlights max EA points.
+
+        :param molecule: The molecule.
+        :param grid: The grid (N x 6 array where first three columns are coordinates, 
+                 fourth column contains EA values).
+        :param min_EA_points: List of indices corresponding to min EA points.
+        """
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        # assert grid.shape[1] >= 3, 'CpcmDriver.visualize_grid: Grid should have at least 3 columns (x, y, z).'
+
+        grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
+        # ea_values = grid[:, 3]  # Extract EA values from the fourth column
+
+        grid_xyz_string = f'{grid_in_angstrom.shape[0]}\n\n'
+        labels = []  # List to store annotation data
+
+        for i in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f'He {x} {y} {z}\n'
+
+            # If the point is a max EA point, store its EA value and atom index
+            if i in min_EA_points:
+                ea_value = Electron_affinity_values[i]
+                atom_index = int(grid[i, -1])
+                labels.append({
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "text": f"EA: {ea_value*27.2107:.3f} eV, Atom {atom_index +1}"  # Display EA value with 3 decimal precision
+                })
+
+        v = p3d.view(width=500, height=500)
+
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+
+        # Add normal grid points (red)
+        v.addModel(grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'He'}, 
+                {'sphere': {
+                    'radius': 0.05,
+                    'color': 'red',
+                    'opacity': 0.5
+                }})
+
+        # Highlight max EA points with larger blue spheres
+        for idx in min_EA_points:
+            x, y, z = grid_in_angstrom[idx]
+            v.addSphere({
+                'center': {'x': x, 'y': y, 'z': z},
+                'radius': 0.1,  # Larger sphere for visibility
+                'color': 'blue',
+                'opacity': 1.0
+            })
+
+        # Add labels for max EA points
+        for label in labels:
+            v.addLabel(label["text"], {
+                "position": {"x": label["x"], "y": label["y"], "z": label["z"]},
+                "fontSize": 10,
+                "fontColor": "black",
+                "backgroundColor": "white"
+            })
+
+        v.zoomTo()
+        v.show()
+
+    def test_visualize_cpcm_grid_EA_points(self, molecule, grid, min_EA_points, Electron_affinity_values, Atom_idx_list):
+        """
+        Visualizes grid for surface discretization and highlights max EA points.
+
+        :param molecule: The molecule.
+        :param grid: The grid (N x 6 array where first three columns are coordinates, 
+                 fourth column contains EA values).
+        :param min_EA_points: List of indices corresponding to min EA points.
+        """
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        # assert grid.shape[1] >= 3, 'CpcmDriver.visualize_grid: Grid should have at least 3 columns (x, y, z).'
+
+        grid_in_angstrom = grid[:, :] * bohr_in_angstrom()
+        # ea_values = grid[:, 3]  # Extract EA values from the fourth column
+
+        grid_xyz_string = f'{grid_in_angstrom.shape[0]}\n\n'
+        labels = []  # List to store annotation data
+
+        for i in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f'He {x} {y} {z}\n'
+
+            # If the point is a max EA point, store its EA value and atom index
+            if i in min_EA_points:
+                ea_value = Electron_affinity_values[i]
+                # atom_index = int(grid[i, -1])
+                atom_index = Atom_idx_list[i]
+                labels.append({
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "text": f"EA: {ea_value*27.2107:.3f} eV, Atom {atom_index +1}"  # Display EA value with 3 decimal precision
+                })
+
+        v = p3d.view(width=500, height=500)
+
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+
+        # Add normal grid points (red)
+        v.addModel(grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'He'}, 
+                {'sphere': {
+                    'radius': 0.05,
+                    'color': 'red',
+                    'opacity': 0.5
+                }})
+
+        # Highlight max EA points with larger blue spheres
+        for idx in min_EA_points:
+            x, y, z = grid_in_angstrom[idx]
+            v.addSphere({
+                'center': {'x': x, 'y': y, 'z': z},
+                'radius': 0.1,  # Larger sphere for visibility
+                'color': 'blue',
+                'opacity': 1.0
+            })
+
+        # Add labels for max EA points
+        for label in labels:
+            v.addLabel(label["text"], {
+                "position": {"x": label["x"], "y": label["y"], "z": label["z"]},
+                "fontSize": 10,
+                "fontColor": "black",
+                "backgroundColor": "white"
+            })
+
+        v.zoomTo()
+        v.show()
+
+    def visualize_cpcm_grid_IE_points(self, molecule, grid, min_IE_points, Ionization_energy_values):
+        """
+        Visualizes grid for surface discretization and highlights max EA points.
+
+        :param molecule: The molecule.
+        :param grid: The grid (N x 6 array where first three columns are coordinates, 
+                    fourth column contains EA values).
+        :para min_IE_points: List of indices corresponding to max EA points.
+        """
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        # assert grid.shape[1] >= 3, 'CpcmDriver.visualize_grid: Grid should have at least 3 columns (x, y, z).'
+
+        grid_in_angstrom = grid[:, :3] * bohr_in_angstrom()
+        # ie_values = grid[:, 3]  # Extract IE values from the fourth column
+
+        grid_xyz_string = f'{grid_in_angstrom.shape[0]}\n\n'
+        labels = []  # List to store annotation data
+
+        for i in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f'He {x} {y} {z}\n'
+
+            # If the point is a max EA point, store its EA value and atom index
+            if i in min_IE_points:
+                ie_value = Ionization_energy_values[i]
+                atom_index = int(grid[i, -1])
+                labels.append({
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "text": f"IE: {ie_value*27.2107:.3f} eV, Atom {atom_index +1}"  # Display IE value with 3 decimal precision
+                })
+
+        v = p3d.view(width=500, height=500)
+
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+
+        # Add normal grid points (red)
+        v.addModel(grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'He'}, 
+                {'sphere': {
+                    'radius': 0.05,
+                    'color': 'red',
+                    'opacity': 0.5
+                }})
+
+        # Highlight min IE points with larger blue spheres
+        for idx in min_IE_points:
+            x, y, z = grid_in_angstrom[idx]
+            v.addSphere({
+                'center': {'x': x, 'y': y, 'z': z},
+                'radius': 0.1,  # Larger sphere for visibility
+                'color': 'blue',
+                'opacity': 1.0
+            })
+
+        # Add labels for min IE points
+        for label in labels:
+            v.addLabel(label["text"], {
+                "position": {"x": label["x"], "y": label["y"], "z": label["z"]},
+                "fontSize": 10,
+                "fontColor": "black",
+                "backgroundColor": "white"
+            })
+
+        v.zoomTo()
+        v.show()
+
+    def test_visualize_cpcm_grid_IE_points(self, molecule, grid, min_IE_points, Ionization_energy_values, Atom_idx_list):
+        """
+        Visualizes grid for surface discretization and highlights max EA points.
+
+        :param molecule: The molecule.
+        :param grid: The grid (N x 6 array where first three columns are coordinates, 
+                    fourth column contains EA values).
+        :para min_IE_points: List of indices corresponding to max EA points.
+        """
+
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
+        # assert grid.shape[1] >= 3, 'CpcmDriver.visualize_grid: Grid should have at least 3 columns (x, y, z).'
+
+        grid_in_angstrom = grid[:, :] * bohr_in_angstrom()
+        # ie_values = grid[:, 3]  # Extract IE values from the fourth column
+
+        grid_xyz_string = f'{grid_in_angstrom.shape[0]}\n\n'
+        labels = []  # List to store annotation data
+
+        for i in range(grid_in_angstrom.shape[0]):
+            x, y, z = grid_in_angstrom[i]
+            grid_xyz_string += f'He {x} {y} {z}\n'
+
+            # If the point is a max EA point, store its EA value and atom index
+            if i in min_IE_points:
+                ie_value = Ionization_energy_values[i]
+                # atom_index = int(grid[i, -1])
+                atom_index = Atom_idx_list[i]
+                labels.append({
+                    "x": x,
+                    "y": y,
+                    "z": z,
+                    "text": f"IE: {ie_value*27.2107:.3f} eV, Atom {atom_index +1}"  # Display IE value with 3 decimal precision
+                })
+
+        v = p3d.view(width=500, height=500)
+
+        v.addModel(molecule.get_xyz_string(), 'xyz')
+        v.setStyle({'stick': {}})
+
+        # Add normal grid points (red)
+        v.addModel(grid_xyz_string, 'xyz')
+        v.setStyle({'elem': 'He'}, 
+                {'sphere': {
+                    'radius': 0.05,
+                    'color': 'red',
+                    'opacity': 0.5
+                }})
+
+        # Highlight min IE points with larger blue spheres
+        for idx in min_IE_points:
+            x, y, z = grid_in_angstrom[idx]
+            v.addSphere({
+                'center': {'x': x, 'y': y, 'z': z},
+                'radius': 0.1,  # Larger sphere for visibility
+                'color': 'blue',
+                'opacity': 1.0
+            })
+
+        # Add labels for min IE points
+        for label in labels:
+            v.addLabel(label["text"], {
+                "position": {"x": label["x"], "y": label["y"], "z": label["z"]},
+                "fontSize": 10,
+                "fontColor": "black",
+                "backgroundColor": "white"
+            })
+
+        v.zoomTo()
+        v.show()
+
+
     def grad_Aij(self, molecule, grid, q, eps, x):
         """
         Calculates the (off-diagonal) cavity-cavity gradient contribution.
