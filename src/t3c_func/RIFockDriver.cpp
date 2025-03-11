@@ -73,9 +73,59 @@ CRIFockDriver::compute(const CMatrix     &density,
 }
 
 auto
+CRIFockDriver::compute(const CMatrix     &density,
+                       const std::vector<double>& gvector,
+                       const std::string &label) const -> CMatrix
+{
+    CMatrix fmat(density);
+    
+    // compute Coulomb contribution to Fock matrix
+    
+    if ((label == "2jk") || (label == "2jkx") || (label == "j") || (label == "j_rs"))
+    {
+        fmat.assign_flat_values(_comp_j_vector(gvector));
+        
+        if ((label == "2jk") || (label == "2jkx"))
+        {
+            fmat.scale(2.0);
+        }
+    }
+    
+    return fmat;
+}
+
+auto
+CRIFockDriver::local_compute(const CMatrix&             density,
+                             const std::vector<double>& gvector,
+                             const std::string&         label) const -> CMatrix
+{
+    CMatrix fmat(density);
+    
+    // compute Coulomb contribution to Fock matrix
+    
+    if ((label == "2jk") || (label == "2jkx") || (label == "j") || (label == "j_rs"))
+    {
+        fmat.assign_flat_values(_comp_local_j_vector(gvector));
+        
+        if ((label == "2jk") || (label == "2jkx"))
+        {
+            fmat.scale(2.0);
+        }
+    }
+    
+    return fmat;
+}
+
+auto
 CRIFockDriver::compute_bq_vector(const CMatrix &density) const -> std::vector<double>
 {
     return _trafo_gamma_vector(_comp_gamma_vector(density));
+}
+
+auto
+CRIFockDriver::compute_local_bq_vector(const CMatrix &density) const -> std::vector<double>
+{
+    return _trafo_local_gamma_vector(_comp_gamma_vector(density));
 }
 
 auto
@@ -147,6 +197,38 @@ CRIFockDriver::_trafo_gamma_vector(const std::vector<double>& gvector) const -> 
 }
 
 auto
+CRIFockDriver::_trafo_local_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>
+{
+    const auto ndim = _j_metric->number_of_rows();
+    
+    std::vector<double> tvec(ndim, 0.0);
+    
+    auto gvec_ptr = gvector.data();
+    
+    auto tvec_ptr = tvec.data();
+    
+    auto tmat_ptr = _j_metric->data();
+    
+    const auto mask_indices = _eri_buffer.mask_indices();
+    
+    for (size_t i = 0; i < ndim; i++)
+    {
+        auto row_ptr = &tmat_ptr[i * ndim];
+        
+        double fsum = 0.0;
+        
+        for (const auto [gidx, lidx] : mask_indices)
+        {
+            fsum += row_ptr[gidx] * gvec_ptr[lidx];
+        }
+        
+        tvec_ptr[i] = fsum;
+    }
+    
+    return tvec;
+}
+
+auto
 CRIFockDriver::_comp_j_vector(const std::vector<double>& gvector) const -> std::vector<double>
 {
     const auto ndim = _eri_buffer.aux_width();
@@ -179,3 +261,35 @@ CRIFockDriver::_comp_j_vector(const std::vector<double>& gvector) const -> std::
     return jvec;
 }
 
+auto
+CRIFockDriver::_comp_local_j_vector(const std::vector<double>& gvector) const -> std::vector<double>
+{
+    const auto nrows = _eri_buffer.width();
+    
+    const auto nelems = nrows * (nrows + 1) / 2;
+    
+    std::vector<double> jvec(nelems, 0.0);
+    
+    auto jvec_ptr = jvec.data();
+    
+    auto gvec_ptr = gvector.data();
+    
+    auto buff_ptr = &_eri_buffer;
+    
+    const auto mask_indices = _eri_buffer.mask_indices();
+    
+    for (const auto [gidx, lidx] : mask_indices)
+    {
+        auto tint_ptr = buff_ptr->data(lidx);
+        
+        const auto fact = gvec_ptr[gidx];
+         
+#pragma omp simd
+        for (size_t j = 0; j < nelems; j++)
+        {
+            jvec_ptr[j] += tint_ptr[j] * fact;
+        }
+    }
+        
+    return jvec;
+}

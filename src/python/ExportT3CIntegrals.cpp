@@ -49,8 +49,15 @@ export_t3cintegrals(py::module& m)
                                                   const std::vector<int>&>
              (&CRIFockDriver::prepare_buffers),
              "Computes three center electron repulsion integral buffers.")
-        .def("compute", &CRIFockDriver::compute, "Computes Coulomb Fock matrix for given density.")
-        .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.");
+        .def("compute",  py::overload_cast<const CMatrix&, const std::string&>
+             (&CRIFockDriver::compute, py::const_),
+             "Computes Coulomb Fock matrix for given density.")
+        .def("compute",  py::overload_cast<const CMatrix&, const std::vector<double>&, const std::string&>
+             (&CRIFockDriver::compute, py::const_),
+             "Computes Coulomb Fock matrix for given density.")
+        .def("local_compute", &CRIFockDriver::local_compute, "Computes local Coulomb Fock matrix for given density.")
+        .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.")
+        .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.");
     
     // CRIFockGradDriver class
     PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")

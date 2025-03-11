@@ -4,6 +4,7 @@ import numpy as np
 from .veloxchemlib import RIFockDriver
 from .veloxchemlib import partition_atoms
 from .veloxchemlib import mpi_master
+from .veloxchemlib import Matrix
 
 def _RIFockDriver_mpi_prepare_buffers(self, comm, molecule, basis, aux_basis):
     """
@@ -26,10 +27,65 @@ def _RIFockDriver_mpi_prepare_buffers(self, comm, molecule, basis, aux_basis):
 
     # select three-center integrals computation method
     
+    natoms = molecule.number_of_atoms()
+    
     if nodes > 1:
         atoms = partition_atoms(natoms, rank, nodes)
         self.prepare_buffers(molecule, basis, aux_basis, atoms)
     else:
         self.prepare_buffers(molecule, basis, aux_basis)
+        
+def _RIFockDriver_mpi_compute_bq_vector(self, comm, density):
+    """
+    Computes distributed Bq vector.
+
+    :param comm:
+        The MPI communicator.
+    :param density:
+        The density to compute Bq vector.
+        
+    :return:
+        The Bq vector.
+    """
+
+    # set up rank, node data
+    
+    nodes = comm.Get_size()
+    if nodes == 1:
+        return self.compute_bq_vector(density)
+    
+    gv = np.array(self.compute_local_bq_vector(density))
+    tv = np.zeros(gv.shape)
+    comm.Allreduce([gv, MPI.DOUBLE], [tv, MPI.DOUBLE], op=MPI.SUM)
+    return list(tv)
+
+def _RIFockDriver_mpi_compute(self, comm, gamma, density, label):
+    """
+    Computes Fock matrix.
+
+    :param comm:
+        The MPI communicator.
+    :param gamma:
+        The Bq vector.    
+    :param density:
+        The density to compute Fock matrix.
+    :param label:
+        The type of Fock matrix.
+        
+    :return:
+        The Fock matrix.
+    """
+
+    # set up rank, node data
+    
+    nodes = comm.Get_size()
+    if nodes == 1:
+        return self.compute(density, gamma, label)
+
+    fmat = self.local_compute(density, gamma, label)
+    rfmat = Matrix.reduce(fmat, comm, mpi_master())
+    return rfmat
 
 RIFockDriver.mpi_prepare_buffers = _RIFockDriver_mpi_prepare_buffers
+RIFockDriver.mpi_compute_bq_vector = _RIFockDriver_mpi_compute_bq_vector
+RIFockDriver.mpi_compute = _RIFockDriver_mpi_compute
