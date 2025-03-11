@@ -176,7 +176,7 @@ class CphfSolver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         if self.rank == mpi_master():
             if self._dft:
@@ -837,7 +837,7 @@ class CphfSolver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         if self.rank == mpi_master():
             if self._dft:

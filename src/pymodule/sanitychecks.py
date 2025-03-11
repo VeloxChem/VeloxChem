@@ -28,6 +28,7 @@ from .veloxchemlib import parse_xc_func
 from .veloxchemlib import mpi_master
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
+from .embedding import write_pe_jsonfile
 
 
 def molecule_sanity_check(mol):
@@ -229,7 +230,7 @@ def raman_sanity_check(obj):
             pass
 
 
-def pe_sanity_check(obj, method_dict=None):
+def pe_sanity_check(obj, method_dict=None, molecule=None):
     """
     Checks PE settings and updates relevant attributes.
 
@@ -256,8 +257,13 @@ def pe_sanity_check(obj, method_dict=None):
                 if not Path(potfile).is_file():
                     potfile = str(
                         Path(obj.filename).parent / Path(potfile).name)
+                assert_msg_critical(
+                    Path(potfile).is_file(),
+                    'PE sanity check: potfile does not exist')
+
             potfile = obj.comm.bcast(potfile, root=mpi_master())
             obj.pe_options['potfile'] = potfile
+
             # TODO: include more options from pe_options
             obj.embedding = {
                 'settings': {
@@ -276,6 +282,17 @@ def pe_sanity_check(obj, method_dict=None):
         else:
             potfile = obj.embedding['inputs']['json_file']
             obj.pe_options['potfile'] = potfile
+
+        # update potfile in case it is not in json format
+
+        if Path(potfile).suffix != '.json' and molecule is not None:
+            if obj.rank == mpi_master():
+                new_potfile = write_pe_jsonfile(molecule, potfile)
+                potfile = new_potfile
+
+            potfile = obj.comm.bcast(potfile, root=mpi_master())
+            obj.pe_options['potfile'] = potfile
+            obj.embedding['inputs']['json_file'] = potfile
 
         embedding_sanity_check(obj.embedding)
 

@@ -351,7 +351,7 @@ class ScfHessianDriver(HessianDriver):
 
             # TODO: double check
             cphf_solver.embedding = self.scf_driver.embedding
-            pe_sanity_check(cphf_solver)
+            pe_sanity_check(cphf_solver, molecule=molecule)
 
             from .embedding import PolarizableEmbeddingHess
             cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
