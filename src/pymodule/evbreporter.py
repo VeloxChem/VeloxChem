@@ -23,12 +23,9 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from importlib.metadata import version
-
 import sys
-import numpy as np
 
 from .errorhandler import assert_msg_critical
-from .evbsystembuilder import EvbForceGroup
 
 try:
     import openmm.app as mmapp
@@ -38,139 +35,56 @@ except ImportError:
 
 
 class EvbReporter():
+    #todo do this with force groups instead of different systems
+    def __init__(self, file, report_interval, reference_reactant, reference_product, run_reactant, run_product, topology, Lambda, outputstream, append = False):
 
-    def __init__(
-        self,
-        energy_file,
-        report_interval,
-        reactant_ff,
-        product_ff,
-        topology,
-        Lambda,
-        outputstream,
-        force_file=None,
-        append=False,
-    ):
+        assert_msg_critical('openmm' in sys.modules and version('openmm') >= '8.2', 'openmm >=8.2 is required for EvbReporter.')
 
-        # OpenMM HIP version is slighly older and uses a different format for reporters
-        if version('openmm') < '8.2':
-            outputstream.print_info(
-                'Older version of OpenMM detected. Using tuple format for returning reporter information.')
-            outputstream.flush()
-            self.use_tuple = True
-        else:
-            self.use_tuple = False
+        # # OpenMM HIP version is slighly older and uses a different format for reporters
+        # if version('openmm') < '8.2':
+        #     outputstream.print_info('Older version of OpenMM detected. Using tuple format for returning reporter information.')
+        #     outputstream.flush()
+        #     self.use_tuple = True
+        # else:
+        self.use_tuple = False
+        
 
-        self.E_out = open(energy_file, 'a' if append else 'w')
+        self.out = open(file, 'a' if append else 'w')
         self.report_interval = report_interval
+        
+        self.reference_product = reference_product
+        self.run_reactant = run_reactant
+        self.run_product = run_product
 
         self.Lambda = Lambda
-        self.simulation_dicts = {}
 
-        self.simulation_dicts.update({
-            'reactant_pes':
-            self._get_simulation_dict(
-                topology,
-                reactant_ff,
-                EvbForceGroup.pes_force_groups(),
-            ),
-            'product_pes':
-            self._get_simulation_dict(
-                topology,
-                product_ff,
-                EvbForceGroup.pes_force_groups(),
-            ),
-            'reactant_integrator':
-            self._get_simulation_dict(
-                topology,
-                reactant_ff,
-                EvbForceGroup.integration_force_groups(),
-            ),
-            'product_integrator':
-            self._get_simulation_dict(
-                topology,
-                product_ff,
-                EvbForceGroup.integration_force_groups(),
-            ),
-            'constraints':
-            self._get_simulation_dict(
-                topology,
-                reactant_ff,
-                EvbForceGroup.CONSTRAINT.value,
-            ),
-        })
-
+        self.simulations = []
+        for system in [reference_reactant, reference_product, run_reactant, run_product]:
+            integrator = mm.VerletIntegrator(1)
+            self.simulations.append(mmapp.Simulation(topology, system,integrator))
         if not append:
-            header = "Lambda, reactant PES, product PES, reactant integration, product integration, E_m, Constraints\n"
-            self.E_out.write(header)
-
-        if force_file is None:
-            self.forces = False
-            return
-
-        self.forces = True
-        self.F_out = open(force_file, 'a' if append else 'w')
-
-        if not append:
-            header = "Lambda, "
-            for j in range(topology.getNumAtoms()):
-                header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
-            header = header[:-2] + '\n'
-            self.F_out.write(header)
+            header = "Lambda, E_ref_reactant, E_ref_product, E_run_reactant, E_run_product, E_m\n"
+            self.out.write(header)
 
     def __del__(self):
-        self.E_out.close()
-
-    @staticmethod
-    def _get_simulation_dict(topology, ff, forcegroups):
-        integrator = mm.VerletIntegrator(1)
-        integrator.setIntegrationForceGroups(forcegroups)
-        simulation = mmapp.Simulation(topology, ff, integrator)
-        return {"simulation": simulation, "forcegroups": forcegroups}
+        self.out.close()
 
     def describeNextReport(self, simulation):
-        steps = self.report_interval - simulation.currentStep % self.report_interval
-
+        steps = self.report_interval - simulation.currentStep%self.report_interval
         if self.use_tuple:
-            return (steps, True, False, self.forces, True, True)  #steps, positions, velocities, forces, energy, pbc
+            return (steps, True, False, False, True, True) #steps, positions, velocities, forces, energy, pbc
         else:
-            if self.forces:
-                include = ['forces', 'positions', 'energy']
-            else:
-                include = ['positions', 'energy']
-
-            return {'steps': steps, 'periodic': True, 'include': include}
-
+            return {'steps': steps, 'periodic': True, 'include':['positions','energy']}
+        
     def report(self, simulation, state):
 
         positions = state.getPositions(asNumpy=True)
-        line = f"{self.Lambda}"
-        for simulation_dict in self.simulation_dicts.values():
-            E = self._get_energy(simulation_dict, positions)
-            line += f", {E}"
-
-        Em = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
-        line += f", {Em}\n"
-        self.E_out.write(line)
-
-        if not self.forces:
-            return
-
-        forces = state.getForces(asNumpy=True)
-        norms = np.linalg.norm(forces, axis=1)
-        line = f"{self.Lambda}"
-        kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
-        for i in range(forces.shape[0]):
-            line += f", {forces[i][0].value_in_unit(kjpermolenm)}, {forces[i][1].value_in_unit(kjpermolenm)}, {forces[i][2].value_in_unit(kjpermolenm)}, {norms[i]}"
-        line += '\n'
-        self.F_out.write(line)
-
-    def _get_energy(self, simulation_dict, positions):
-        simulation = simulation_dict['simulation']
-        forcegroups = simulation_dict['forcegroups']
-        simulation.context.setPositions(positions)
-        state = simulation.context.getState(
-            getEnergy=True,
-            groups=forcegroups,
-        )
-        return state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+        E = [state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)]
+        for sim in self.simulations:
+            sim.context.setPositions(positions)
+            state = sim.context.getState(getEnergy=True)
+            E.append(state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole))
+        line = f"{self.Lambda}, {E[1]}, {E[2]}, {E[3]}, {E[4]}, {E[0]}\n"
+        self.out.write(line)
+        
+            
