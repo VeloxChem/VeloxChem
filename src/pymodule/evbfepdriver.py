@@ -27,7 +27,6 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-import os
 
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
@@ -72,7 +71,6 @@ class EvbFepDriver():
         self.systems: dict = None
         self.topology: mmapp.Topology = None
         self.Lambda: list = None
-        self.crash_reporting_interval: int = 1
 
         self.constrain_H: bool = True
 
@@ -148,77 +146,54 @@ class EvbFepDriver():
             else:
                 self.ostream.print_info(f"lambda = {l}")
 
+            constrained_H_bonds = []
             if self.constrain_H:
-                system = self._constrain_H_bonds(system)
+                harm_bond_forces = [force for force in system.getForces() if isinstance(force, mm.HarmonicBondForce)]
 
-            equil_simulation = mmapp.Simulation(
+                count = 0
+                for harmbond in harm_bond_forces:
+                    for i in range(harmbond.getNumBonds()):
+                        particle1, particle2, length, k = harmbond.getBondParameters(i)
+                        if (system.getParticleMass(particle1).value_in_unit(mmunit.dalton) - 1.007947 < 0.01
+                                or system.getParticleMass(particle2).value_in_unit(mmunit.dalton) - 1.007947 < 0.01):
+                            H_bond = sorted((particle1, particle2))
+                            if H_bond not in constrained_H_bonds:
+                                constrained_H_bonds.append(H_bond)
+                                system.addConstraint(particle1, particle2, length)
+                                count += 1
+                self.ostream.print_info(f"Constrained {count} bonds involving H atoms ")
+
+            simulation = mmapp.Simulation(
                 topology,
                 system,
                 integrator,
             )
-            equil_simulation.context.setPositions(initial_positions)
-            equil_simulation.reporters.append(
-                mmapp.XTCReporter(
-                    str(self.run_folder / f"traj_minim_{l:.3f}.xtc"),
-                    write_step,
-                ))
+
+            simulation.context.setPositions(initial_positions)
+            simulation.reporters.append(mmapp.XTCReporter(
+                str(self.run_folder / f"minim_{l:.3f}.xtc"),
+                write_step,
+            ))
 
             self.ostream.print_info("Minimizing energy")
             self.ostream.flush()
-            equil_simulation.minimizeEnergy()
+            simulation.minimizeEnergy()
 
-            minim_positions = equil_simulation.context.getState(getPositions=True).getPositions()
+            if l == 0:
+                simulation.integrator.setStepSize(initial_equil_step_size * mmunit.picoseconds)
+                self.ostream.print_info(
+                    f"Running initial equilibration with step size {simulation.integrator.getStepSize()}")
+                self.ostream.flush()
+                simulation.step(lambda_0_equilibration_steps)
+                timer.start()
 
-            equil_crashed = False
-            finished_equil = False
-            while not finished_equil:
-                try:
-                    if l == 0:
-                        equil_simulation.integrator.setStepSize(initial_equil_step_size * mmunit.picoseconds)
-                        self.ostream.print_info(
-                            f"Running initial equilibration with step size {equil_simulation.integrator.getStepSize()}")
-                        self.ostream.flush()
-                        equil_simulation.step(lambda_0_equilibration_steps)
-                        timer.start()
+            # equilibrate
+            simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
+            self.ostream.print_info(f"Running equilibration with step size {simulation.integrator.getStepSize()}")
+            self.ostream.flush()
+            simulation.step(equilibration_steps)
 
-                    # equilibrate
-                    equil_simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
-                    self.ostream.print_info(
-                        f"Running equilibration with step size {equil_simulation.integrator.getStepSize()}")
-                    self.ostream.flush()
-                    # if it crashes, try again with more writing steps for debugging purposes
-                    equil_simulation.step(equilibration_steps)
-                    finished_equil = True
-                except mm.OpenMMException as e:
-                    if equil_crashed:
-                        self.ostream.print_warning("Equilibration crashed again, exiting")
-                        self.ostream.flush()
-                        raise e
-                    else:
-                        equil_crashed = True
-                        mimin_reporter = mmapp.XTCReporter(
-                            str(self.run_folder / f"traj_minim_detail_{l:.3f}.xtc"),
-                            self.crash_reporting_interval,
-                        )
-                        evb_repertor = EvbReporter(
-                            str(self.run_folder / f"energies_equil_{l:.3f}.csv"),
-                            self.crash_reporting_interval,
-                            systems[0],
-                            systems[1],
-                            topology,
-                            l,
-                            self.ostream,
-                            force_file=str(self.run_folder / f"forces_equil_{l:.3f}.csv"),
-                            append=False,
-                        )
-                        equil_simulation.reporters.append(mimin_reporter)
-                        equil_simulation.reporters.append(evb_repertor)
-                        equil_simulation.context.setPositions(minim_positions)
-                        self.ostream.print_warning(
-                            "Equilibration crashed, trying again to equilibrate and writing more detailed data")
-                        self.ostream.flush()
-
-            equil_positions = equil_simulation.context.getState(getPositions=True).getPositions()
+            equil_positions = simulation.context.getState(getPositions=True).getPositions()
 
             if self.constrain_H:
                 self.ostream.print_info("Removing constraints involving H atoms")
@@ -232,114 +207,52 @@ class EvbFepDriver():
                 step_size * mmunit.picoseconds,
             )
             integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
-            run_simulation = mmapp.Simulation(
+            runsimulation = mmapp.Simulation(
                 topology,
                 system,
                 integrator,
             )
-            run_simulation.reporters.append(traj_roporter)
+            runsimulation.context.setPositions(equil_positions)
+            runsimulation.reporters.append(traj_roporter)
 
             if l == 0:
                 append = False
             else:
                 append = True
-            if calculate_forces:
-                force_file = str(self.data_folder / f"Forces.csv")
-            else:
-                force_file = None
+            runsimulation.reporters.append(
+                EvbReporter(
+                    str(self.data_folder / "Energies.csv"),
+                    write_step,
+                    systems[0],
+                    systems[1],
+                    topology,
+                    l,
+                    self.ostream,
+                    force_file= str(self.data_folder / "Forces.csv"),
+                    append=append,
+                ))
 
-            #todo remove the reports from the last lambda in case of a crash
-            evb_reporter = EvbReporter(
-                str(self.data_folder / "Energies.csv"),
-                write_step,
-                systems[0],
-                systems[1],
-                topology,
-                l,
-                self.ostream,
-                force_file=force_file,
-                append=append,
-            )
-            run_simulation.reporters.append(evb_reporter)
+            runsimulation.reporters.append(
+                mmapp.StateDataReporter(
+                    str(self.data_folder / "Data_combined.csv"),
+                    write_step,
+                    step=True,
+                    potentialEnergy=True,
+                    kineticEnergy=True,
+                    temperature=True,
+                    volume=True,
+                    density=True,
+                    append=append,
+                ))
 
-            state_reporter = mmapp.StateDataReporter(
-                str(self.data_folder / "Data_combined.csv"),
-                write_step,
-                step=True,
-                potentialEnergy=True,
-                kineticEnergy=True,
-                temperature=True,
-                volume=True,
-                density=True,
-                append=append,
-            )
-            run_simulation.reporters.append(state_reporter)
-
-            self.ostream.print_info(f"Running sampling with step size {run_simulation.integrator.getStepSize()}")
+            self.ostream.print_info(f"Running sampling with step size {runsimulation.integrator.getStepSize()}")
             self.ostream.flush()
-            #todo try to run
-            #if it crashes, attach extra trajectory reporter and force reporter with small reporting interval
-            #if it crashes again, exit
-            run_crashed = False
-            finished_run = False
-            while not finished_run:
-                try:
-                    run_simulation.context.setPositions(equil_positions)
-                    run_simulation.step(total_sample_steps)
-                    finished_run = True
-                except mm.OpenMMException as e:
-                    if run_crashed:
-                        self.ostream.print_warning("Sampling crashed again, exiting")
-                        self.ostream.flush()
-                        raise e
-                    else:
-                        run_crashed = True
-                        traj_detail_roporter = mmapp.XTCReporter(
-                            str(self.run_folder / f"traj_run_{l:.3f}.xtc"),
-                            self.crash_reporting_interval,
-                        )
-                        evb_detail_repertor = EvbReporter(
-                            str(self.run_folder / f"energies_run_{l:.3f}.csv"),
-                            self.crash_reporting_interval,
-                            systems[0],
-                            systems[1],
-                            topology,
-                            l,
-                            self.ostream,
-                            force_file=str(self.run_folder / f"forces_run_{l:.3f}.csv"),
-                            append=False,
-                        )
-                        run_simulation.reporters.append(traj_detail_roporter)
-                        run_simulation.reporters.append(evb_detail_repertor)
-                        self.ostream.print_warning(
-                            "Sampling crashed, trying again to sample and writing more detailed data")
-                        self.ostream.print_warning(
-                            "Generated data is unreliable, make sure to complete a run without generating these warnings"
-                        )
-                        self.ostream.flush()
-
-            state = run_simulation.context.getState(getPositions=True)
+            runsimulation.step(total_sample_steps)
+            state = runsimulation.context.getState(getPositions=True)
             positions = state.getPositions()
             if np.any(np.array(positions.value_in_unit(mmunit.nanometer)) > 100):
                 self.ostream.print_info("Warning: Some positions are larger than 100 nm, system is probably unstable")
         self.ostream.flush()
-
-    def _constrain_H_bonds(self, system):
-        harm_bond_forces = [force for force in system.getForces() if isinstance(force, mm.HarmonicBondForce)]
-        constrained_H_bonds = []
-        count = 0
-        for harmbond in harm_bond_forces:
-            for i in range(harmbond.getNumBonds()):
-                particle1, particle2, length, k = harmbond.getBondParameters(i)
-                if (system.getParticleMass(particle1).value_in_unit(mmunit.dalton) - 1.007947 < 0.01
-                        or system.getParticleMass(particle2).value_in_unit(mmunit.dalton) - 1.007947 < 0.01):
-                    H_bond = sorted((particle1, particle2))
-                    if H_bond not in constrained_H_bonds:
-                        constrained_H_bonds.append(H_bond)
-                        system.addConstraint(particle1, particle2, length)
-                        count += 1
-        self.ostream.print_info(f"Constrained {count} bonds involving H atoms")
-        return system
 
 
 class Timer:
