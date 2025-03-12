@@ -1052,6 +1052,9 @@ class SolvationBuilder:
             density = 786
             smiles_code = 'CC#N'
 
+        else:
+            return None
+
         return mols_per_nm3, density, smiles_code
 
     def _counterion_molecules(self):

@@ -39,6 +39,7 @@ from .evbfepdriver import EvbFepDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
 from .errorhandler import assert_msg_critical
+from .solvationbuilder import SolvationBuilder
 
 try:
     import openmm as mm
@@ -555,16 +556,6 @@ class EvbDriver():
                 "padding": 1,
                 "ion_count": 0,
             }
-        elif name == "benzene":
-            conf = {
-                "name": "benzene",
-                "solvent": "benzene",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "padding": 1,
-                "ion_count": 0,
-            }
         # elif name == "CNT":
         #     conf = {
         #         "name": "water_CNT",
@@ -611,7 +602,19 @@ class EvbDriver():
                 "no_reactant": True,
             }
         else:
-            raise ValueError(f"Unknown system configuration {name}")
+            if SolvationBuilder()._solvent_properties(name) is not None:
+                self.ostream.print_info(f"Using default solvent {name} in solvationbuilder")
+                conf = {
+                    "name": name,
+                    "solvent": name,
+                    "temperature": self.temperature,
+                    "NPT": True,
+                    "pressure": 1,
+                    "padding": 1,
+                    "ion_count": 0,
+                }
+            else:
+                raise ValueError(f"Unknown system configuration {name}")
 
         return conf
 
