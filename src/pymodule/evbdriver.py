@@ -85,6 +85,7 @@ class EvbDriver():
         self.system_confs: list[dict] = []
         self.debug = False
         self.fast_run = False
+        self.demo = False
         self.calculate_forces = False
 
         self.t_label = int(time.time())
@@ -130,7 +131,6 @@ class EvbDriver():
 
     def build_forcefields(
         self,
-        
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
         reactant_partial_charges: list[float] = None,
@@ -304,6 +304,7 @@ class EvbDriver():
                         self.ostream.print_info(f"Could not read line {line} from {charge_path}. Continuing")
             print_charge = sum([round(charge, 3) for charge in charges])
             self.ostream.print_info(f"Loading charges from {charge_path} file, total charge: {print_charge}")
+        self.ostream.flush()
 
         forcefield = None
         json_path = cwd / self.input_folder / f"{filename}_ff_data.json"
@@ -316,6 +317,7 @@ class EvbDriver():
         else:
             self.ostream.print_info(
                 f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json.")
+        self.ostream.flush()
 
         hessian = None
         hessian_path = cwd / self.input_folder / f"{filename}_hess.np"
@@ -325,7 +327,7 @@ class EvbDriver():
         else:
             self.ostream.print_info(
                 f"Could not find hessian file at {hessian_path}, calculating hessian with xtb and saving it")
-
+        self.ostream.flush()
         return {
             "molecule": molecule,
             "optimise": optimise,
@@ -448,10 +450,13 @@ class EvbDriver():
                 Lambda = np.linspace(0, 0.1, 6)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
+            elif self.demo:
+                Lambda = np.linspace(0, 0.1, 51)
             else:
                 Lambda = np.linspace(0, 0.1, 11)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
+
         assert (Lambda[0] == 0 and Lambda[-1] == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(np.diff(Lambda) > 0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
         Lambda = np.round(Lambda, 3)
@@ -571,17 +576,17 @@ class EvbDriver():
         #         "CNT": True,
         #         "CNT_radius": 0.5,
         #     }
-        elif name == "graphene":
-            conf = {
-                "name": "water_graphene",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "ion_count": 0,
-                "graphene": True,
-                "graphene_size": 2,
-            }
+        # elif name == "graphene":
+        #     conf = {
+        #         "name": "water_graphene",
+        #         "solvent": "spce",
+        #         "temperature": self.temperature,
+        #         "NPT": True,
+        #         "pressure": 1,
+        #         "ion_count": 0,
+        #         "graphene": True,
+        #         "graphene_size": 2,
+        #     }
         elif name == "E_field":
             conf = {
                 "name": "water_E_field",
@@ -676,14 +681,6 @@ class EvbDriver():
             with open(file_path, mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(systems[lam]))
 
-        file_path = str(path / "reactant.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems["reactant"]))
-
-        file_path = str(path / "product.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems["product"]))
-
     def load_systems_from_xml(self, folder: str):
         """Load the systems from xml files in the given folder.
 
@@ -700,10 +697,6 @@ class EvbDriver():
         for lam in self.Lambda:
             with open(path / f"{lam:.3f}_sys.xml", mode="r", encoding="utf-8") as input:
                 systems[lam] = mm.XmlSerializer.deserialize(input.read())
-        with open(path / "reactant.xml", mode="r", encoding="utf-8") as input:
-            systems["reactant"] = mm.XmlSerializer.deserialize(input.read())
-        with open(path / "product.xml", mode="r", encoding="utf-8") as input:
-            systems["product"] = mm.XmlSerializer.deserialize(input.read())
         return systems
 
     def run_FEP(
@@ -737,10 +730,17 @@ class EvbDriver():
             step_size = 0.001
             equil_step_size = 0.001
             initial_equil_step_size = 0.001
-
-        if self.fast_run:
+        elif self.fast_run:
             self.ostream.print_warning("Fast run enabled, using modest number of steps. Be careful with using results")
             sample_steps = 25000
+        elif self.demo:
+            sample_steps = 50
+            equil_steps = 0
+            initial_equil_steps = 0
+            write_step = 5
+            step_size = 0.001
+            equil_step_size = 0.001
+            initial_equil_step_size = 0.001
 
         for conf in self.system_confs:
             self.ostream.print_blank()
@@ -761,13 +761,13 @@ class EvbDriver():
             )
 
     def compute_energy_profiles(
-            self,
-            barrier,
-            free_energy,
-            lambda_sub_sample=1,
-            lambda_sub_sample_ends=False,
-            time_sub_sample=1,
-        ):
+        self,
+        barrier,
+        free_energy,
+        lambda_sub_sample=1,
+        lambda_sub_sample_ends=False,
+        time_sub_sample=1,
+    ):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
@@ -894,7 +894,13 @@ class EvbDriver():
 
         sub_indices = l_sub_indices[::time_sub_sample]
 
-        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = E_data[:, sub_indices]
+        E = E_data[:, sub_indices]
+        Lambda_frame = E[:, 0]
+        E1_ref = E[:, 1]
+        E2_ref = E[:, 2]
+        E1_run = E[:, 3]
+        E2_run = E[:, 4]
+        E_m = E[:, 5]
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file, skiprows=1, delimiter=',').T[:, sub_indices]
 
         specific_result = {
