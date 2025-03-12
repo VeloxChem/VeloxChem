@@ -23,22 +23,22 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-import sys
 from pathlib import Path
 import numpy as np
 import time
 import json
 import h5py
+import sys
 
 from .veloxchemlib import mpi_master
-from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
 from .molecule import Molecule
+from .outputstream import OutputStream
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
+from .errorhandler import assert_msg_critical
 
 try:
     import openmm as mm
@@ -85,6 +85,7 @@ class EvbDriver():
         self.system_confs: list[dict] = []
         self.debug = False
         self.fast_run = False
+        self.demo = False
         self.calculate_forces = False
 
         self.t_label = int(time.time())
@@ -130,7 +131,6 @@ class EvbDriver():
 
     def build_forcefields(
         self,
-        
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
         reactant_partial_charges: list[float] = None,
@@ -247,7 +247,8 @@ class EvbDriver():
         assert rea_atoms == sum(
             pro_atoms
         ), f"Number of atoms in reactant ({rea_atoms}) and products ({pro_atoms}, sum={sum(pro_atoms)}) must match"
-        self.name = reactant_name
+        if self.name is None:
+            self.name = reactant_name
 
         if rea_input["forcefield"] is not None and combined_product_path.exists():
             self.ostream.print_info(f"Loading combined forcefield data from {combined_product_path}")
@@ -303,6 +304,7 @@ class EvbDriver():
                         self.ostream.print_info(f"Could not read line {line} from {charge_path}. Continuing")
             print_charge = sum([round(charge, 3) for charge in charges])
             self.ostream.print_info(f"Loading charges from {charge_path} file, total charge: {print_charge}")
+        self.ostream.flush()
 
         forcefield = None
         json_path = cwd / self.input_folder / f"{filename}_ff_data.json"
@@ -315,6 +317,7 @@ class EvbDriver():
         else:
             self.ostream.print_info(
                 f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json.")
+        self.ostream.flush()
 
         hessian = None
         hessian_path = cwd / self.input_folder / f"{filename}_hess.np"
@@ -324,7 +327,7 @@ class EvbDriver():
         else:
             self.ostream.print_info(
                 f"Could not find hessian file at {hessian_path}, calculating hessian with xtb and saving it")
-
+        self.ostream.flush()
         return {
             "molecule": molecule,
             "optimise": optimise,
@@ -423,6 +426,7 @@ class EvbDriver():
         configurations: list[str] | list[dict],  # type: ignore
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
+        neutralize: bool = True,
         save_output=True,
     ):
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
@@ -433,6 +437,8 @@ class EvbDriver():
                 Defaults to None, in which case default values will be assigned depending on if debugging is enabled or not.
                 If a string is given, the return value of default_system_configurations() will be used. See this function for default configurations.
             constraints (dict | list[dict] | None, optional): Dictionary of harmonic bond, angle or (improper) torsion forces to apply over in every FEP frame. Defaults to None.
+            neutralise (bool, optional): If any solvated systems should be neutralised by adding ions. Defaults to True.
+            save_output (bool, optional): If the systems should be saved to disk. Defaults to True.
         """
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbDriver.')
@@ -444,13 +450,16 @@ class EvbDriver():
                 Lambda = np.linspace(0, 0.1, 6)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
+            elif self.demo:
+                Lambda = np.linspace(0, 0.1, 51)
             else:
                 Lambda = np.linspace(0, 0.1, 11)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
+
         assert (Lambda[0] == 0 and Lambda[-1] == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(np.diff(Lambda) > 0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
-        Lambda = [round(lam, 3) for lam in Lambda]
+        Lambda = np.round(Lambda, 3)
         self.Lambda = Lambda
 
         if all(isinstance(conf, str) for conf in configurations):
@@ -493,6 +502,7 @@ class EvbDriver():
                 Lambda=self.Lambda,
                 configuration=conf,
                 constraints=constraints,
+                neutralize=neutralize,
             )
 
             conf["systems"] = systems
@@ -516,7 +526,7 @@ class EvbDriver():
                     json.dump(
                         {
                             "temperature": conf.get("temperature", self.temperature),
-                            "Lambda": Lambda,
+                            "Lambda": list(Lambda),
                         },
                         file,
                     )
@@ -545,6 +555,16 @@ class EvbDriver():
                 "padding": 1,
                 "ion_count": 0,
             }
+        elif name == "benzene":
+            conf = {
+                "name": "benzene",
+                "solvent": "benzene",
+                "temperature": self.temperature,
+                "NPT": True,
+                "pressure": 1,
+                "padding": 1,
+                "ion_count": 0,
+            }
         # elif name == "CNT":
         #     conf = {
         #         "name": "water_CNT",
@@ -556,17 +576,17 @@ class EvbDriver():
         #         "CNT": True,
         #         "CNT_radius": 0.5,
         #     }
-        elif name == "graphene":
-            conf = {
-                "name": "water_graphene",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "ion_count": 0,
-                "graphene": True,
-                "graphene_size": 2,
-            }
+        # elif name == "graphene":
+        #     conf = {
+        #         "name": "water_graphene",
+        #         "solvent": "spce",
+        #         "temperature": self.temperature,
+        #         "NPT": True,
+        #         "pressure": 1,
+        #         "ion_count": 0,
+        #         "graphene": True,
+        #         "graphene_size": 2,
+        #     }
         elif name == "E_field":
             conf = {
                 "name": "water_E_field",
@@ -661,14 +681,6 @@ class EvbDriver():
             with open(file_path, mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(systems[lam]))
 
-        file_path = str(path / "reactant.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems["reactant"]))
-
-        file_path = str(path / "product.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems["product"]))
-
     def load_systems_from_xml(self, folder: str):
         """Load the systems from xml files in the given folder.
 
@@ -685,10 +697,6 @@ class EvbDriver():
         for lam in self.Lambda:
             with open(path / f"{lam:.3f}_sys.xml", mode="r", encoding="utf-8") as input:
                 systems[lam] = mm.XmlSerializer.deserialize(input.read())
-        with open(path / "reactant.xml", mode="r", encoding="utf-8") as input:
-            systems["reactant"] = mm.XmlSerializer.deserialize(input.read())
-        with open(path / "product.xml", mode="r", encoding="utf-8") as input:
-            systems["product"] = mm.XmlSerializer.deserialize(input.read())
         return systems
 
     def run_FEP(
@@ -722,34 +730,44 @@ class EvbDriver():
             step_size = 0.001
             equil_step_size = 0.001
             initial_equil_step_size = 0.001
-
-        if self.fast_run:
+        elif self.fast_run:
             self.ostream.print_warning("Fast run enabled, using modest number of steps. Be careful with using results")
             sample_steps = 25000
+        elif self.demo:
+            sample_steps = 50
+            equil_steps = 0
+            initial_equil_steps = 0
+            write_step = 5
+            step_size = 0.001
+            equil_step_size = 0.001
+            initial_equil_step_size = 0.001
 
         for conf in self.system_confs:
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver()
-            FEP.run_FEP(equilibration_steps=equil_steps,
-                        total_sample_steps=sample_steps,
-                        write_step=write_step,
-                        lambda_0_equilibration_steps=initial_equil_steps,
-                        step_size=step_size,
-                        equil_step_size=equil_step_size,
-                        initial_equil_step_size=initial_equil_step_size,
-                        Lambda=self.Lambda,
-                        configuration=conf)
+            FEP.run_FEP(
+                equilibration_steps=equil_steps,
+                total_sample_steps=sample_steps,
+                write_step=write_step,
+                lambda_0_equilibration_steps=initial_equil_steps,
+                step_size=step_size,
+                equil_step_size=equil_step_size,
+                initial_equil_step_size=initial_equil_step_size,
+                Lambda=self.Lambda,
+                configuration=conf,
+                calculate_forces=self.calculate_forces,
+            )
 
     def compute_energy_profiles(
-            self,
-            barrier,
-            free_energy,
-            lambda_sub_sample=1,
-            lambda_sub_sample_ends=False,
-            time_sub_sample=1,
-        ):
+        self,
+        barrier,
+        free_energy,
+        lambda_sub_sample=1,
+        lambda_sub_sample_ends=False,
+        time_sub_sample=1,
+    ):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
@@ -821,8 +839,8 @@ class EvbDriver():
         common_results = []
         specific_results = {}
         for name, folder in zip([reference_name] + target_names, folders):
-            E_file = str(cwd / folder / "Energies.dat")
-            data_file = str(cwd / folder / "Data_combined.dat")
+            E_file = str(cwd / folder / "Energies.csv")
+            data_file = str(cwd / folder / "Data_combined.csv")
             options_file = str(cwd / folder / "options.json")
             specific, common = self._load_output_files(E_file, data_file, options_file, lambda_sub_sample,
                                                        lambda_sub_sample_ends, time_sub_sample)
@@ -876,7 +894,13 @@ class EvbDriver():
 
         sub_indices = l_sub_indices[::time_sub_sample]
 
-        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = E_data[:, sub_indices]
+        E = E_data[:, sub_indices]
+        Lambda_frame = E[:, 0]
+        E1_ref = E[:, 1]
+        E2_ref = E[:, 2]
+        E1_run = E[:, 3]
+        E2_run = E[:, 4]
+        E_m = E[:, 5]
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file, skiprows=1, delimiter=',').T[:, sub_indices]
 
         specific_result = {

@@ -92,8 +92,6 @@ class EvbForceFieldBuilder():
 
         products: list[MMForceFieldGenerator] = []
 
-        
-
         for i, input in enumerate(product_input):
             products.append(
                 self.get_forcefield(
