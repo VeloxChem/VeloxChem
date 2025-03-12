@@ -29,17 +29,21 @@ class TestInputUVVis:
             if input_file.is_file():
                 input_file.unlink()
 
-            final_h5 = Path(str(input_file).replace('.inp', '.h5'))
-            if final_h5.is_file():
-                final_h5.unlink()
-
-            scf_h5 = Path(str(input_file).replace('.inp', '_scf.h5'))
+            scf_h5 = input_file.with_suffix('.scf.h5')
             if scf_h5.is_file():
                 scf_h5.unlink()
 
-            rsp_h5 = Path(str(input_file).replace('.inp', '_rsp.h5'))
+            scf_final_h5 = scf_h5.with_suffix('.results.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
+
+            rsp_h5 = input_file.with_suffix('.rsp.h5')
             if rsp_h5.is_file():
                 rsp_h5.unlink()
+
+            rsp_solutions_h5 = rsp_h5.with_suffix('.solutions.h5')
+            if rsp_solutions_h5.is_file():
+                rsp_solutions_h5.unlink()
 
         MPI.COMM_WORLD.barrier()
 

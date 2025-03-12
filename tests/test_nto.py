@@ -5,6 +5,7 @@ import pytest
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
+from veloxchem.molecularorbitals import MolecularOrbitals
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -38,7 +39,6 @@ class TestNTO:
             'nto': 'yes',
             'nto_cubes': 'yes',
             'detach_attach': 'yes',
-            'detach_attach_cubes': 'yes',
             'cube_origin': '-0.1, -0.1, -0.1',
             'cube_stepsize': '0.3, 0.3, 0.2',
             'cube_points': '2, 2, 3',
@@ -62,7 +62,15 @@ class TestNTO:
                 lam_diag = rsp_results['nto_lambdas'][s]
                 nto_lambdas.append(lam_diag[0])
 
+                nto_h5_fname = rsp_results['nto_h5_files'][s]
                 nto_cube_fnames = rsp_results['nto_cubes'][s]
+                assert Path(
+                    nto_cube_fnames[0]).stem == Path(nto_h5_fname).stem + '_H1'
+                assert Path(
+                    nto_cube_fnames[1]).stem == Path(nto_h5_fname).stem + '_P1'
+
+                nto_mo = MolecularOrbitals.read_hdf5(nto_h5_fname)
+                assert nto_mo.is_nto()
 
                 for fname in nto_cube_fnames[:2]:
                     read_grid = CubicGrid.read_cube(fname)
@@ -97,19 +105,28 @@ class TestNTO:
 
             # clean up
 
-            final_h5 = Path(str(inpfile).replace('.inp', '.h5'))
-            if final_h5.is_file():
-                final_h5.unlink()
-
-            scf_h5 = Path(str(inpfile).replace('.inp', '_scf.h5'))
+            scf_h5 = inpfile.with_suffix('.scf.h5')
             if scf_h5.is_file():
                 scf_h5.unlink()
 
-            rsp_h5 = Path(str(inpfile).replace('.inp', '_rsp.h5'))
+            scf_final_h5 = scf_h5.with_suffix('.results.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
+
+            rsp_h5 = inpfile.with_suffix('.rsp.h5')
             if rsp_h5.is_file():
                 rsp_h5.unlink()
 
+            rsp_solutions_h5 = rsp_h5.with_suffix('.solutions.h5')
+            if rsp_solutions_h5.is_file():
+                rsp_solutions_h5.unlink()
+
             for s in range(ref_eig_vals.shape[0]):
+                nto_h5_fname = rsp_results['nto_h5_files'][s]
+                nto_h5 = Path(nto_h5_fname)
+                if nto_h5.is_file():
+                    nto_h5.unlink()
+
                 nto_cube_fnames = rsp_results['nto_cubes'][s]
                 dens_cube_fnames = rsp_results['density_cubes'][s]
                 for fname in (nto_cube_fnames + dens_cube_fnames):

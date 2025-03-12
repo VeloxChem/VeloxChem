@@ -397,7 +397,7 @@ class SolvationBuilder:
             self.ostream.print_blank()
             start = time.time()
             self.perform_equilibration()
-            self.ostream.print_info("Equilibration completed, system saved")
+            self.ostream.print_info("Equilibration completed, system saved as 'equilibrated_system.pdb'")
             self.ostream.flush()
             end = time.time()
             self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")

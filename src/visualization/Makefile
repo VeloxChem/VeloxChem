@@ -1,5 +1,5 @@
 
-# Makefile for internal Velox Chem library
+# Makefile for internal VeloxChem library
 
 LOCAL_LIB := visualization.a
 LOCAL_SCR := $(wildcard *.cpp)

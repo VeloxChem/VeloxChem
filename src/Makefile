@@ -8,7 +8,7 @@ VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 
-LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)
+LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD)
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -52,10 +52,6 @@ VLX_LIBS_DIR += t3c_electron_repulsion
 VLX_LIBS_DIR += t3c_func
 VLX_LIBS_DIR += t3c_electron_repulsion_geom_X00
 VLX_LIBS_DIR += t3c_electron_repulsion_geom_0X0
-VLX_LIBS_DIR += visualization
-VLX_LIBS_DIR +=	onee_ints
-VLX_LIBS_DIR +=	pdft_func
-VLX_LIBS_DIR +=	xtb
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
@@ -74,8 +70,6 @@ debug: $(VLX_LIBS)
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
-	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
-	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 
 # Release
 release: $(VLX_LIBS)
@@ -87,8 +81,6 @@ release: $(VLX_LIBS)
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
-	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
-	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 
 # Clean up
 clean:

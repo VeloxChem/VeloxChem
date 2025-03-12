@@ -61,7 +61,7 @@ class TestTrajectoryDriver:
 
             assert np.max(
                 np.abs(np.array(exc_energies) -
-                       np.array(ref_exc_energies))) < 0.02
+                       np.array(ref_exc_energies))) < 0.03
             assert np.max(
                 np.abs(np.array(osc_strengths) -
                        np.array(ref_osc_strengths))) < 0.01

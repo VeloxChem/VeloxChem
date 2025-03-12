@@ -29,29 +29,29 @@ class TestInputExcitonModel:
             if input_file.is_file():
                 input_file.unlink()
 
-            exmod_h5 = Path(str(input_file).replace('.inp', '_exciton.h5'))
+            exmod_h5 = input_file.with_suffix('.exciton.h5')
             if exmod_h5.is_file():
                 exmod_h5.unlink()
 
             for idx in [1, 2]:
 
-                final_h5 = Path(
-                    str(exmod_h5).replace('_exciton.h5',
-                                          f'_exciton_monomer_{idx}.h5'))
-                if final_h5.is_file():
-                    final_h5.unlink()
-
-                scf_h5 = Path(
-                    str(exmod_h5).replace('_exciton.h5',
-                                          f'_exciton_monomer_{idx}_scf.h5'))
+                scf_h5 = input_file.with_suffix(
+                    f'.exciton.monomer_{idx}.scf.h5')
                 if scf_h5.is_file():
                     scf_h5.unlink()
 
-                rsp_h5 = Path(
-                    str(exmod_h5).replace('_exciton.h5',
-                                          f'_exciton_monomer_{idx}_rsp.h5'))
+                scf_final_h5 = scf_h5.with_suffix('.results.h5')
+                if scf_final_h5.is_file():
+                    scf_final_h5.unlink()
+
+                rsp_h5 = input_file.with_suffix(
+                    f'.exciton.monomer_{idx}.rsp.h5')
                 if rsp_h5.is_file():
                     rsp_h5.unlink()
+
+                rsp_solutions_h5 = rsp_h5.with_suffix('.solutions.h5')
+                if rsp_solutions_h5.is_file():
+                    rsp_solutions_h5.unlink()
 
         MPI.COMM_WORLD.barrier()
 

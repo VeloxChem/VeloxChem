@@ -35,14 +35,13 @@ class TestRespCharges:
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
             if pdb_file.is_file():
                 pdb_file.unlink()
-
-            final_h5_file = Path(chg_drv.filename).with_suffix('.h5')
-            if final_h5_file.is_file():
-                final_h5_file.unlink()
-
-            scf_h5_file = Path(chg_drv.filename + '_scf.h5')
+            scf_h5_file = Path(chg_drv.filename).with_suffix('.scf.h5')
             if scf_h5_file.is_file():
                 scf_h5_file.unlink()
+            scf_final_h5_file = Path(
+                chg_drv.filename).with_suffix('.scf.results.h5')
+            if scf_final_h5_file.is_file():
+                scf_final_h5_file.unlink()
 
     def test_resp_methanol(self):
 

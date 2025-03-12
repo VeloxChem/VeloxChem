@@ -56,7 +56,7 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_sanity_check)
 
 
 class ScfHessianDriver(HessianDriver):
@@ -295,7 +295,7 @@ class ScfHessianDriver(HessianDriver):
 
         assert_msg_critical(
             self.scf_driver.scf_type == 'restricted',
-            'ScfHessianDriver: Analytical Hessian only implemented ' +
+            'ScfHessianDriver: Analytical gradient only implemented ' +
             'for restricted case')
 
         assert_msg_critical(
@@ -342,24 +342,18 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # TODO: double check analytical Hessian with PE
-        assert_msg_critical(
-            not self.scf_driver._pe,
-            'ScfHessianDriver: Analytical Hessian with ' +
-            'polarizable embedding (PE) not yet available')
+        assert_msg_critical(not self.scf_driver._pe,
+                            'ScfHessianDriver: Analytical Hessian with ' +
+                            'polarizable embedding (PE) not yet ''available')
 
         if self.scf_driver._pe:
-
-            # TODO: double check
-            cphf_solver.embedding = self.scf_driver.embedding
-            pe_sanity_check(cphf_solver, molecule=molecule)
-
             from .embedding import PolarizableEmbeddingHess
             cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
                 molecule=molecule,
                 ao_basis=ao_basis,
                 options=self.scf_driver.embedding,
                 comm=self.comm,
-                density=density * 2)
+                density=density)
 
         # TODO: double check propagation of cphf settings
         profiler_keywords = {
@@ -786,10 +780,10 @@ class ScfHessianDriver(HessianDriver):
                     molecule=molecule,
                     ao_basis=ao_basis,
                     options=self.scf_driver.embedding,
-                    density=density * 2,
+                    density=density,
                     comm=self.comm)
                 self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
-                    density_matrix=density * 2)
+                    density_matrix=density)
 
             if self._dft:
                 self.hessian += hessian_dft_xc

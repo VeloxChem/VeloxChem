@@ -58,11 +58,12 @@ class TestOptimizeSCF:
             if logfile.is_file():
                 logfile.unlink()
 
-            h5file = inpfile.with_suffix('.h5')
-            if h5file.is_file():
-                h5file.unlink()
-
             scffile = Path(str(inpfile.with_name(inpfile.stem)) + '_scf.h5')
+            if scffile.is_file():
+                scffile.unlink()
+
+            scffile = Path(
+                str(inpfile.with_name(inpfile.stem)) + '_scf.results.h5')
             if scffile.is_file():
                 scffile.unlink()
 

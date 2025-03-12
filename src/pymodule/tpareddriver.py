@@ -241,9 +241,8 @@ class TpaReducedDriver(TpaDriver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + '_tpa_fock_1_red.h5'
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.tpa_fock_1_red.h5'))
         else:
             fock_file = None
 
@@ -347,9 +346,8 @@ class TpaReducedDriver(TpaDriver):
             setattr(N_total_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            N_total_drv.checkpoint_file = str(fpath) + '_tpa_2_red.h5'
+            N_total_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.tpa_2_red.h5'))
 
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
@@ -684,9 +682,8 @@ class TpaReducedDriver(TpaDriver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + '_tpa_fock_2_red.h5'
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.tpa_fock_2_red.h5'))
         else:
             fock_file = None
 

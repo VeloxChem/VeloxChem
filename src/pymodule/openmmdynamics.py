@@ -447,7 +447,7 @@ class OpenMMDynamics:
                 forcefield_files = [f'{filename}.xml', self.parent_ff, solvent_ff]
 
             # Load the PDB from the SolvationBuilder
-            self.pdb = app.PDBFile('system.pdb')
+            self.pdb = app.PDBFile('equilibrated_system.pdb')
 
         # Create the ForceField object        
         forcefield = app.ForceField(*forcefield_files)

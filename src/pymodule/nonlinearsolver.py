@@ -249,7 +249,7 @@ class NonlinearSolver:
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}_rsp.h5'
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         method_keywords = {
             key: val[0]

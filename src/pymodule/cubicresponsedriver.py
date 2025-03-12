@@ -331,9 +331,8 @@ class CubicResponseDriver(NonlinearSolver):
             setattr(N_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            N_drv.checkpoint_file = str(fpath) + '_crf_1.h5'
+            N_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.crf_1.h5'))
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABCD)
 
@@ -968,9 +967,8 @@ class CubicResponseDriver(NonlinearSolver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + '_crf_fock_1.h5'
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.crf_fock_1.h5'))
         else:
             fock_file = None
 
@@ -1062,9 +1060,8 @@ class CubicResponseDriver(NonlinearSolver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + '_crf_fock_2.h5'
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.crf_fock_2.h5'))
         else:
             fock_file = None
 
@@ -1344,9 +1341,8 @@ class CubicResponseDriver(NonlinearSolver):
             setattr(Nxy_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            Nxy_drv.checkpoint_file = str(fpath) + '_crf_2.h5'
+            Nxy_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.crf_2.h5'))
 
         Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
 

@@ -3,8 +3,6 @@ target_sources(vlxobjs
     GeometricalDerivatives1X0ForDY.cpp
     GeometricalDerivatives1X0ForFY.cpp
     GeometricalDerivatives1X0ForGY.cpp
-    GeometricalDerivatives1X0ForHY.cpp
-    GeometricalDerivatives1X0ForIY.cpp
     GeometricalDerivatives1X0ForPY.cpp
     GeometricalDerivatives1X0ForSY.cpp
     GeometricalDerivatives1X1ForDD.cpp
