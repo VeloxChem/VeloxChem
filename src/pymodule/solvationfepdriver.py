@@ -61,6 +61,7 @@ class SolvationFepDriver:
     Instance variables:
         - padding: The padding for the solvation box.
         - solvent_name: The name of the solvent.
+        - resname: The residue name for the solute. Only needed when using input files where solute is not at top of (i.e., index 0) .pdb/.gro.
         - temperature: The temperature for the simulation.
         - pressure: The pressure for the simulation.
         - timestep: The timestep for the simulation.
@@ -118,6 +119,7 @@ class SolvationFepDriver:
         # Options for the SolvationBuilder
         self.padding = 2.0
         self.solvent_name = 'spce'
+        self.resname = None
         
         # Ensemble and MD options
         self.temperature = 298.15 * unit.kelvin
@@ -155,7 +157,7 @@ class SolvationFepDriver:
 
         # Final energies
         self.final_free_energy = 0.0
-        self.delta_f = []
+        self.delta_f = None
 
     def compute_solvation(self, molecule, ff_gen_solute=None, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None):
         """
@@ -176,7 +178,7 @@ class SolvationFepDriver:
         :param target_density:
             The target density for the solvent. Mandatory for 'other' or 'itself' solvent options.
         :return:
-            A list containing the free energy calculations for each stage.
+            A dictionary containing the free energy calculations and the uncertainty for each stage, and the final free energy.
         """
         
         sol_builder = SolvationBuilder()
@@ -192,7 +194,6 @@ class SolvationFepDriver:
         self.solvent_name = solvent
         self.output_folder.mkdir(parents=True, exist_ok=True)
         # Note: GROMACS files will be used instead of OpenMM files.
-        # For some reason, the results are more consistent. (?)
         sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
 
         if not ff_gen_solute:
@@ -201,9 +202,8 @@ class SolvationFepDriver:
             self.solute_ff = ff_gen_solute
 
         delta_f, final_free_energy = self._run_stages()
-        u_kln = self.u_kln_matrices
 
-        return delta_f, final_free_energy, u_kln
+        return delta_f, final_free_energy
         
     def compute_solvation_from_omm_files(self, system_pdb, solute_pdb, solute_xml, other_xml_files):
         """
@@ -217,7 +217,7 @@ class SolvationFepDriver:
         :param other_xml_files:
             A list with the XML files needed for the rest of the system.
         :return:
-            A list containing the free energy calculations for each stage.
+            A dictionary containing the free energy calculations and the uncertainty for each stage, and the final free energy.
         """
 
         # Special name for the solvent
@@ -230,9 +230,8 @@ class SolvationFepDriver:
         self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
-        u_kln = self.u_kln_matrices
 
-        return delta_f, final_free_energy, u_kln
+        return delta_f, final_free_energy
         
     def compute_solvation_from_gromacs_files(self, system_gro, system_top, solute_gro, solute_top):
         """
@@ -247,7 +246,7 @@ class SolvationFepDriver:
         :param solute_top:
             The TOP file with the solute topology.
         :return:
-            A list containing the free energy calculations for each stage.
+            A dictionary containing the free energy calculations and the uncertainty for each stage, and the final free energy.
         """
 
         # Special name for the solvent
@@ -260,9 +259,8 @@ class SolvationFepDriver:
         self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
-        u_kln = self.u_kln_matrices
 
-        return delta_f, final_free_energy, u_kln
+        return delta_f, final_free_energy
 
     def _run_stages(self):
         """
@@ -317,13 +315,18 @@ class SolvationFepDriver:
 
         # Calculate the final free energy
         final_free_energy = free_en_s1 + free_en_s2 - (free_en_s3 + free_en_s4)
-        self.ostream.print_line(f"Final free energy: {final_free_energy} kJ/mol")
+        self.ostream.print_line(f"Final free energy: {final_free_energy:.4f} kJ/mol")
         self.ostream.flush()
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
+        
+        delta_f = {i+1: {'Delta_f': self.delta_f[i]['Delta_f'][-1,0],
+                'Uncertainty': self.delta_f[i]['dDelta_f'][-1,0]}
+          for i in range(4)}
+        
         self.final_free_energy = final_free_energy
 
-        return [delta_f_1, delta_f_2, delta_f_3, delta_f_4], final_free_energy
+        return delta_f, final_free_energy
 
     def _run_lambda_simulations(self, stage, vacuum=False):
         """
@@ -740,8 +743,15 @@ class SolvationFepDriver:
             for l in range(n_states):
                 u_kln_reduced[k, l, :int(N_k[k])] = u_kln[k, l, subsample_indices[k]]
 
-        mbar = MBAR(u_kln_reduced, N_k, solver_protocol='robust')
-        delta_f = mbar.compute_free_energy_differences()
+        if any(n <= self.number_of_snapshots // 4 for n in N_k):
+            self.ostream.print_warning("MBAR may not converge due to insufficient sampling. Consider increasing the number of steps per lambda.")
+            self.ostream.flush()
+            mbar = MBAR(u_kln_reduced, N_k, solver_protocol='robust', n_bootstraps=50)
+            delta_f = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
+
+        else:
+            mbar = MBAR(u_kln_reduced, N_k, solver_protocol='robust')
+            delta_f = mbar.compute_free_energy_differences()
 
         return delta_f
 
@@ -751,13 +761,23 @@ class SolvationFepDriver:
         """
         alchemical_region = []
         chemical_region = []
+        
+        if self.resname:
+            for res in topology.residues():
+                if res.name == self.resname:
+                    for atom in res.atoms():
+                        alchemical_region.append(atom.index)
+                else:
+                    for atom in res.atoms():
+                        chemical_region.append(atom.index)
+        else:
+            for res in topology.residues():
+                if res.index == 0:
+                    for atom in res.atoms():
+                        alchemical_region.append(atom.index)
+                else:
+                    for atom in res.atoms():
+                        chemical_region.append(atom.index)
 
-        for res in topology.residues():
-            if res.index == 0:
-                for atom in res.atoms():
-                    alchemical_region.append(atom.index)
-            else:
-                for atom in res.atoms():
-                    chemical_region.append(atom.index)
         return alchemical_region, chemical_region
 

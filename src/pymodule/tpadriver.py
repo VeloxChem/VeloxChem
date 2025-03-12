@@ -225,8 +225,9 @@ class TpaDriver(NonlinearSolver):
             setattr(Nb_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            Nb_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpa_1.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
 
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 

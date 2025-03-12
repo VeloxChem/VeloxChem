@@ -39,8 +39,7 @@ from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, create_hdf5,
-                         write_rsp_solution_with_multiple_keys)
+from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
 
 class ComplexResponse(LinearSolver):
@@ -120,7 +119,7 @@ class ComplexResponse(LinearSolver):
         """
 
         assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
-                            'ComplexResponse: invalide CPP flag')
+                            'ComplexResponse: invalid CPP flag')
 
         self.cpp_flag = flag.lower()
 
@@ -313,7 +312,7 @@ class ComplexResponse(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         if self.rank == mpi_master():
@@ -772,15 +771,18 @@ class ComplexResponse(LinearSolver):
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
 
-                    # create h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                        final_h5_fname = str(
-                            Path(self.checkpoint_file).with_suffix(
-                                '.solutions.h5'))
-                        create_hdf5(final_h5_fname, molecule, basis,
-                                    dft_dict['dft_func_label'],
-                                    pe_dict['potfile_text'])
+                    # final h5 file for response solutions
+                    if self.checkpoint_file is not None:
+                        if self.checkpoint_file.endswith('_rsp.h5'):
+                            final_h5_fname = (
+                                self.checkpoint_file[:-len('_rsp.h5')] + '.h5')
+                        else:
+                            # TODO: reconsider the file name in this case
+                            fpath = Path(self.checkpoint_file)
+                            fpath = fpath.with_name(fpath.stem)
+                            final_h5_fname = str(fpath) + '_results.h5'
+                    else:
+                        final_h5_fname = None
 
                 for bop, w in solutions:
                     x = self.get_full_solution_vector(solutions[(bop, w)])
@@ -790,8 +792,7 @@ class ComplexResponse(LinearSolver):
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
                         # write to h5 file for response solutions
-                        if (self.save_solutions and
-                                self.checkpoint_file is not None):
+                        if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
                                 for aop in self.a_components
@@ -801,11 +802,10 @@ class ComplexResponse(LinearSolver):
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                        checkpoint_text = 'Response solution vectors written to file: '
-                        checkpoint_text += final_h5_fname
-                        self.ostream.print_info(checkpoint_text)
+                    if (self.save_solutions and final_h5_fname is not None):
+                        self.ostream.print_info(
+                            'Response solution vectors written to file: ' +
+                            final_h5_fname)
                         self.ostream.print_blank()
 
                     ret_dict = {
