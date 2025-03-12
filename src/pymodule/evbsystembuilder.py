@@ -314,10 +314,10 @@ class EvbSystemBuilder():
                     f"Warning: total charge for lambda {lam} is {total_charge} and is not a whole number")
 
             self.systems[lam] = copy.deepcopy(system)
-            if lam == 0.0:
-                self.systems["reactant"] = copy.deepcopy(system)
-            if lam == 1.0:
-                self.systems["product"] = copy.deepcopy(system)
+            # if lam == 0.0:
+            #     self.systems["reactant"] = copy.deepcopy(system)
+            # if lam == 1.0:
+            #     self.systems["product"] = copy.deepcopy(system)
 
         self.reactant = reactant
         self.product = product
@@ -666,25 +666,25 @@ class EvbSystemBuilder():
                             'charge': -0.8476,
                             'sigma': 0.31657195050398818,
                             'epsilon': 0.6497752,
-                            'equivalent_atom': 'SPCE water'
+                            'equivalent_atom': 'SPCE water with solid hydrogen'
                         },
                         1: {
                             'type': 'hw',
                             'name': 'H1',
                             'mass': 1.007825,
                             'charge': 0.4238,
-                            'sigma': 1.0,
-                            'epsilon': 0.0,
-                            'equivalent_atom': 'SPCE water'
+                            'sigma': 0.3019 * 2**(-1 / 6) * 2 / 10,
+                            'epsilon': 0.0047 * 4.184,
+                            'equivalent_atom': 'SPCE water with solid hydrogen'
                         },
                         2: {
                             'type': 'hw',
                             'name': 'H2',
                             'mass': 1.007825,
                             'charge': 0.4238,
-                            'sigma': 1.0,
-                            'epsilon': 0.0,
-                            'equivalent_atom': 'SPCE water'
+                            'sigma': 0.3019 * 2**(-1 / 6) * 2 / 10,
+                            'epsilon': 0.0047 * 4.184,
+                            'equivalent_atom': 'SPCE water with solid hydrogen'
                         }
                     }
                     solvent_ff.dihedrals = {}
