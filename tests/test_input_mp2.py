@@ -29,13 +29,13 @@ class TestInputMp2:
             if input_file.is_file():
                 input_file.unlink()
 
-            scf_h5 = input_file.with_suffix('.scf.h5')
+            final_h5 = Path(str(input_file).replace('.inp', '.h5'))
+            if final_h5.is_file():
+                final_h5.unlink()
+
+            scf_h5 = Path(str(input_file).replace('.inp', '_scf.h5'))
             if scf_h5.is_file():
                 scf_h5.unlink()
-
-            scf_final_h5 = scf_h5.with_suffix('.results.h5')
-            if scf_final_h5.is_file():
-                scf_final_h5.unlink()
 
         MPI.COMM_WORLD.barrier()
 

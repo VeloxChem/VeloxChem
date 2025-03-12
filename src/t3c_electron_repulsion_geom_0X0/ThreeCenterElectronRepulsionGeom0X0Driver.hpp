@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <ranges>
+#include <array>
 
 #include "GtoFunc.hpp"
 #include "GtoPairBlockFunc.hpp"
@@ -13,7 +14,9 @@
 #include "T3CUtils.hpp"
 #include "T3RectFlatBuffer.hpp"
 #include "T3CGeom0X0Distributor.hpp"
+#include "T3CGeom010SumDistributor.hpp"
 #include "ThreeCenterElectronRepulsionGeom010Func.hpp"
+#include "OpenMPFunc.hpp"
 
 #include <iostream>
 
@@ -62,11 +65,26 @@ class CThreeCenterElectronRepulsionGeom0X0Driver
     /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
     /// @param molecule The molecule.
     /// @param iatom The index of atom.
-    /// @return The nuclear potential matrix.
+    /// @return The electron repulsion integrals tensor.
     auto compute(const CMolecularBasis &basis,
                  const CMolecularBasis &aux_basis,
                  const CMolecule       &molecule,
                  const int             iatom) const -> CT3RectFlatBuffer<double>;
+    
+    /// @brief Computes electron repulsion matrix derivative fro molecule and molecular basis.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
+    /// @param molecule The molecule.
+    /// @param gamma The transformed Gamma vector.
+    /// @param density The flat density matrix values.
+    /// @param iatom The index of atom.
+    /// @return The electron repulsion integrals tensor.
+    auto compute(const CMolecularBasis&     basis,
+                 const CMolecularBasis&     aux_basis,
+                 const CMolecule&           molecule,
+                 const std::vector<double>& gamma,
+                 const std::vector<double>& density,
+                 const int                  iatom) const -> std::array<double, 3>;
 };
 
 template <int N>
@@ -119,6 +137,101 @@ CThreeCenterElectronRepulsionGeom0X0Driver<N>::compute(const CMolecularBasis &ba
     });
     
     return buffer;
+}
+
+template <int N>
+auto
+CThreeCenterElectronRepulsionGeom0X0Driver<N>::compute(const CMolecularBasis&     basis,
+                                                       const CMolecularBasis&     aux_basis,
+                                                       const CMolecule&           molecule,
+                                                       const std::vector<double>& gamma,
+                                                       const std::vector<double>& density,
+                                                       const int                  iatom) const -> std::array<double, 3>
+{
+    // set up number of rows
+    
+    const auto nrows = basis.dimensions_of_basis();
+    
+    // set up GTOs data
+    
+    const auto bra_gto_blocks = gtofunc::make_gto_blocks(aux_basis, molecule);
+    
+    const auto ketr_gto_blocks = gtofunc::make_gto_blocks(basis, molecule, {iatom, });
+    
+    const auto ketf_gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    const auto gto_pair_blocks = gtofunc::make_gto_pair_blocks(ketr_gto_blocks, ketf_gto_blocks);
+    
+    // set up accumalation vector
+    
+    const auto nblocks = bra_gto_blocks.size();
+    
+    const auto ngpblocks = gto_pair_blocks.size();
+    
+    auto gvec_xyz = std::vector<std::array<double, 3>>(nblocks * ngpblocks, {0.0, 0.0, 0.0});
+    
+    // prepare pointers for OMP parallel region
+    
+    auto ptr_bra_gto_blocks = bra_gto_blocks.data();
+    
+    auto ptr_gto_pair_blocks = gto_pair_blocks.data();
+    
+    auto ptr_gamma = gamma.data();
+    
+    auto ptr_density = density.data();
+    
+    auto ptr_gvec_xyz = gvec_xyz.data();
+    
+    // execute OMP tasks with static scheduling
+
+    omp::set_static_scheduler();
+
+#pragma omp parallel shared(ptr_gto_pair_blocks, ptr_bra_gto_blocks, ptr_gamma, ptr_density, ptr_gvec_xyz, nrows, nblocks, ngpblocks)
+    {
+#pragma omp single nowait
+        {
+            size_t index = 0;
+            
+            for (size_t i = 0; i < nblocks; i++)
+            {
+                for (size_t j = 0; j < ngpblocks; j++)
+                {
+#pragma omp task firstprivate(index, i, j)
+                    {
+                        auto gblock = ptr_bra_gto_blocks[i];
+                        
+                        auto gp_pairs = ptr_gto_pair_blocks[j];
+                        
+                        CT3CGeom010SumDistributor distributor(ptr_gvec_xyz[index].data(), ptr_gamma, ptr_density, nrows);
+                        
+                        auto bra_range = std::pair<size_t, size_t>{size_t{0}, gblock.number_of_basis_functions()};
+                        
+                        if constexpr (N == 1)
+                        {
+                            t3cerifunc::compute_geom_010(distributor, gblock, gp_pairs, bra_range);
+                        }
+                    }
+                    
+                    index++;
+                }
+            }
+        }
+    }
+    
+    // sum up contributions from accumulation vector
+    
+    auto g_xyz = std::array<double, 3>({0.0, 0.0, 0.0});
+    
+    for (const auto& t_xyz : gvec_xyz)
+    {
+        g_xyz[0] += t_xyz[0];
+        
+        g_xyz[1] += t_xyz[1];
+        
+        g_xyz[2] += t_xyz[2];
+    }
+    
+    return g_xyz;
 }
 
 #endif /* ThreeCenterElectronRepulsionGeom0X0Driver_hpp */

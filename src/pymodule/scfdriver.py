@@ -211,7 +211,7 @@ class ScfDriver:
 
         # RI-J
         self.ri_coulomb = False
-        self.ri_auxiliary_basis = 'def2-universal-jkfit'
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
         self._ri_drv = None
 
         # dft
@@ -274,8 +274,6 @@ class ScfDriver:
         # input keywords
         self._input_keywords = {
             'scf': {
-                'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
@@ -307,6 +305,8 @@ class ScfDriver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -471,7 +471,7 @@ class ScfDriver:
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}_scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -541,7 +541,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -1228,7 +1228,7 @@ class ScfDriver:
             else:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
-            self.checkpoint_file = f'{base_fname}.scf.h5'
+            self.checkpoint_file = f'{base_fname}_scf.h5'
         self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
 
         self.comm.barrier()
@@ -1248,9 +1248,8 @@ class ScfDriver:
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 self.ostream.print_blank()
-                checkpoint_text = 'Checkpoint written to file: '
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
+                self.ostream.print_info('Checkpoint written to file: ' +
+                                        self.checkpoint_file)
 
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
@@ -1699,6 +1698,12 @@ class ScfDriver:
 
                 # for backward compatibility only
                 self._scf_tensors['F'] = (F_alpha, F_beta)
+
+                if self.ri_coulomb:
+                    # RI info
+                    self._scf_tensors['ri_coulomb'] = self.ri_coulomb
+                    self._scf_tensors[
+                        'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
                 if self._dft:
                     # dft info
@@ -3007,8 +3012,14 @@ class ScfDriver:
         if self.checkpoint_file is None:
             return
 
-        final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.results.h5'))
+        # Final hdf5 file to save scf results
+        if self.checkpoint_file.endswith('_scf.h5'):
+            final_h5_fname = self.checkpoint_file[:-len('_scf.h5')] + '.h5'
+        else:
+            # TODO: reconsider the file name in this case
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            final_h5_fname = str(fpath) + '_results.h5'
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
@@ -3026,6 +3037,5 @@ class ScfDriver:
                                   self.history)
 
         self.ostream.print_blank()
-        checkpoint_text = 'SCF results written to file: '
-        checkpoint_text += final_h5_fname
-        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_info('SCF results written to file: ' +
+                                final_h5_fname)

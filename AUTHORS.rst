@@ -34,9 +34,9 @@ Contributors
 * Mathieu Linares
 * Noah Deveaux
 * Magnus Ringholm
+* Julia Rune
 * Valentin LindFeld
 * Thomas Fransson
-* Julia Rune
 * Gabriel L. S. Rodrigues
 * Mikael T. Scott
 * Maximilian Scheurer
@@ -45,4 +45,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2025-02-23 by ``git shortlog -sn``
+The list of contributors was obtained 2025-03-05 by ``git shortlog -sn``

@@ -26,13 +26,13 @@ from io import StringIO
 from contextlib import redirect_stdout
 import numpy as np
 
-from .veloxchemlib import (compute_electric_field_integrals,
-                           compute_electric_field_values,
-                           compute_electric_field_integrals_gradient)
 from .oneeints import (compute_nuclear_potential_integrals,
                        compute_nuclear_potential_gradient_bfs,
                        compute_electrostatic_potential_hessian,
                        compute_electrostatic_integrals_gradient,
+                       compute_electric_field_integrals,
+                       compute_electric_field_values,
+                       compute_electric_field_potential_gradient,
                        compute_electric_field_fock_gradient,
                        compute_electric_field_potential_gradient_for_mm,
                        compute_electric_field_potential_hessian)
@@ -127,9 +127,10 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64.
         """
 
-        return compute_electric_field_values(self.molecule, self.basis,
-                                                    coordinates, density_matrix)
-
+        return compute_electric_field_values(molecule=self.molecule,
+                                             basis=self.basis,
+                                             dipole_coords=coordinates,
+                                             density=density_matrix)
 
     def electronic_electrostatic_energy_gradients(self,
             multipole_coordinates: np.ndarray,
@@ -169,7 +170,7 @@ class EmbeddingIntegralDriver:
             basis=self.basis,
             coordinates=charge_coordinates,
             charges=charges,
-            D=density_matrix)
+            density=density_matrix)
         return op
 
 
@@ -196,14 +197,17 @@ class EmbeddingIntegralDriver:
                 Dtype: np.float64
         """
 
-        return compute_electric_field_integrals_gradient(
-            self.molecule, self.basis, coordinates, induced_dipoles, density_matrix)
+        return compute_electric_field_potential_gradient(molecule=self.molecule,
+                                                         basis=self.basis,
+                                                         dipole_coords=coordinates,
+                                                         dipole_moments=induced_dipoles,
+                                                         density=density_matrix)
 
     def electronic_induction_fock_gradient(self,
-                                             induced_dipoles:np.ndarray,
-                                             coordinates: np.ndarray,
-                                             i: int) -> np.ndarray:
-        """Calculate the electronic induction energy hessian.
+                                           induced_dipoles:np.ndarray,
+                                           coordinates: np.ndarray,
+                                           i: int) -> np.ndarray:
+        """Calculate the electronic induction Fock gradient.
 
         Args:
             induced_dipoles: Induced dipoles
@@ -254,13 +258,12 @@ class EmbeddingIntegralDriver:
                                                 induced_dipoles)
 
     def electronic_electrostatic_energy_hessian(self,
-                                                   multipole_coordinates: np.ndarray,
-                                                   multipole_orders: np.ndarray,
-                                                   multipoles: list[np.ndarray],
-                                                   density_matrix: np.ndarray,
-                                                   nuc_i: int,
-                                                   nuc_j: int
-                                                   ):
+                                                multipole_coordinates: np.ndarray,
+                                                multipole_orders: np.ndarray,
+                                                multipoles: list[np.ndarray],
+                                                density_matrix: np.ndarray,
+                                                nuc_i: int,
+                                                nuc_j: int):
         """Calculate the electronic electrostatic energy Hessian.
 
         Args:
@@ -391,11 +394,11 @@ class EmbeddingIntegralDriver:
                 Shape: (3 * number of atoms, 3 * number of atoms)
                 Dtype: np.float64
         """
-        return compute_electric_field_potential_hessian(self.molecule,
-                                                        self.basis,
-                                                        coordinates,
-                                                        induced_dipoles,
-                                                        density_matrix)
+        return compute_electric_field_potential_hessian(molecule=self.molecule,
+                                                        basis=self.basis,
+                                                        dipole_coords=coordinates,
+                                                        dipole_moments=induced_dipoles,
+                                                        density=density_matrix)
 
 
 
@@ -809,6 +812,7 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
 
     def compute_pe_energy_hess_contributions(self, density_matrix):
         nuc_list = np.arange(self.quantum_subsystem.num_nuclei, dtype=np.int64)
+        # TODO: double check density_matrix
         e_es_elec_hess = electrostatic_interactions.compute_electronic_electrostatic_energy_hessian(
             nuc_list=nuc_list,
             density_matrix=density_matrix,
@@ -818,8 +822,9 @@ class PolarizableEmbeddingHess(PolarizableEmbedding):
         e_es_nuc_hess = electrostatic_interactions.compute_electrostatic_nuclear_hessian(
             quantum_subsystem=self.quantum_subsystem,
             classical_subsystem= self.classical_subsystem)
+        # TODO: double check density_matrix
         e_ind_hess = induction_interactions.compute_induction_energy_hessian(
-            density_matrix=density_matrix,
+            density_matrix=(-1.0) * density_matrix,
             classical_subsystem=self.classical_subsystem,
             quantum_subsystem=self.quantum_subsystem,
             integral_driver=self._integral_driver,
