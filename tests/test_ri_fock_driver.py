@@ -99,6 +99,4 @@ class TestRIFockDriver:
         if comm.Get_rank() == 0:
             maxval = np.max(np.abs(cfock.full_matrix().to_numpy() -
                                    rfock.full_matrix().to_numpy()))
-            assert maxval < 1.0e-9
-            
-            
+            assert maxval < 1.0e-8

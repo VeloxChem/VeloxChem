@@ -1433,7 +1433,10 @@ class ScfDriver:
 
             self._ri_drv = RIFockDriver(inv_mat_j)
 
-            local_atoms = self.partition_atoms(molecule)
+            local_atoms = molecule.partition_atoms(self.comm)
+            # TODO: update prepare_buffers so that local_atoms does not need to
+            #       be in ascending order
+            local_atoms = sorted(local_atoms)
             self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j,
                                          local_atoms)
 
@@ -2138,7 +2141,7 @@ class ScfDriver:
 
                     fock_mat = self._ri_drv.local_compute(
                         den_mat_for_Jab, gvec, 'j')
-                    fock_mat_np = fock_mat.to_numpy()
+                    J_ab_np = fock_mat.to_numpy()
                     fock_mat = Matrix()
                 else:
                     fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
@@ -3055,42 +3058,3 @@ class ScfDriver:
         self.ostream.print_blank()
         self.ostream.print_info('SCF results written to file: ' +
                                 final_h5_fname)
-
-    def partition_atoms(self, molecule):
-        """
-        Partition atoms for parallel computation of gradient.
-
-        :param molecule:
-            The molecule.
-
-        :return:
-            The list of atom indices for the current MPI rank.
-        """
-
-        if self.rank == mpi_master():
-            elem_ids = molecule.get_identifiers()
-            coords = molecule.get_coordinates_in_bohr()
-            mol_com = molecule.center_of_mass_in_bohr()
-
-            r2_array = np.sum((coords - mol_com)**2, axis=1)
-            sorted_r2_list = sorted([
-                (r2, nchg, i)
-                for i, (r2, nchg) in enumerate(zip(r2_array, elem_ids))
-            ])
-
-            dict_atoms = {}
-            for r2, nchg, i in sorted_r2_list:
-                if nchg not in dict_atoms:
-                    dict_atoms[nchg] = []
-                dict_atoms[nchg].append(i)
-
-            list_atoms = []
-            for nchg in sorted(dict_atoms.keys(), reverse=True):
-                list_atoms += dict_atoms[nchg]
-
-        else:
-            list_atoms = None
-
-        list_atoms = self.comm.bcast(list_atoms, root=mpi_master())
-
-        return list_atoms[self.rank::self.nodes]

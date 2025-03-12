@@ -97,45 +97,6 @@ class ScfGradientDriver(GradientDriver):
                                     profiler.get_available_memory())
             self.ostream.flush()
 
-    def partition_atoms(self, molecule):
-        """
-        Partition atoms for parallel computation of gradient.
-
-        :param molecule:
-            The molecule.
-
-        :return:
-            The list of atom indices for the current MPI rank.
-        """
-
-        if self.rank == mpi_master():
-            elem_ids = molecule.get_identifiers()
-            coords = molecule.get_coordinates_in_bohr()
-            mol_com = molecule.center_of_mass_in_bohr()
-
-            r2_array = np.sum((coords - mol_com)**2, axis=1)
-            sorted_r2_list = sorted([
-                (r2, nchg, i)
-                for i, (r2, nchg) in enumerate(zip(r2_array, elem_ids))
-            ])
-
-            dict_atoms = {}
-            for r2, nchg, i in sorted_r2_list:
-                if nchg not in dict_atoms:
-                    dict_atoms[nchg] = []
-                dict_atoms[nchg].append(i)
-
-            list_atoms = []
-            for nchg in sorted(dict_atoms.keys(), reverse=True):
-                list_atoms += dict_atoms[nchg]
-
-        else:
-            list_atoms = None
-
-        list_atoms = self.comm.bcast(list_atoms, root=mpi_master())
-
-        return list_atoms[self.rank::self.nodes]
-
     def compute(self, molecule, basis, scf_results=None):
         """
         Performs calculation of gradient.
@@ -237,7 +198,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = np.zeros((natoms, 3))
 
-        local_atoms = self.partition_atoms(molecule)
+        local_atoms = molecule.partition_atoms(self.comm)
 
         # kinetic energy contribution to gradient
 
@@ -407,17 +368,17 @@ class ScfGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
                     molecule, self.scf_driver.ri_auxiliary_basis)
-                ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
-                    den_mat_for_fock)
             else:
                 basis_ri_j = None
-                ri_gvec = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
-            ri_gvec = self.comm.bcast(ri_gvec, root=mpi_master())
+
+            local_ri_gvec = np.array(
+                self.scf_driver._ri_drv.compute_local_bq_vector(
+                    den_mat_for_fock))
+            ri_gvec = np.zeros(local_ri_gvec.shape)
+            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
 
             ri_grad_drv = RIFockGradDriver()
-
-        if self.scf_driver.ri_coulomb:
 
             t0 = time.time()
 
@@ -638,7 +599,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = np.zeros((natoms, 3))
 
-        local_atoms = self.partition_atoms(molecule)
+        local_atoms = molecule.partition_atoms(self.comm)
 
         # kinetic energy contribution to gradient
 
@@ -786,17 +747,17 @@ class ScfGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
                     molecule, self.scf_driver.ri_auxiliary_basis)
-                ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
-                    Dab_for_fock)
             else:
                 basis_ri_j = None
-                ri_gvec = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
-            ri_gvec = self.comm.bcast(ri_gvec, root=mpi_master())
+
+            local_ri_gvec = np.array(
+                self.scf_driver._ri_drv.compute_local_bq_vector(Dab_for_fock))
+            ri_gvec = np.zeros(local_ri_gvec.shape)
+            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
 
             ri_grad_drv = RIFockGradDriver()
 
-        if self.scf_driver.ri_coulomb:
             for iatom in local_atoms:
                 atomgrad = ri_grad_drv.direct_compute(screener, basis,
                                                       basis_ri_j, molecule,
