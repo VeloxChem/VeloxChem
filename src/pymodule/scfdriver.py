@@ -211,7 +211,7 @@ class ScfDriver:
 
         # RI-J
         self.ri_coulomb = False
-        self.ri_auxiliary_basis = 'def2-universal-jkfit'
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
         self._ri_drv = None
 
         # dft
