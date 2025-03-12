@@ -85,7 +85,6 @@ class EvbDriver():
         self.system_confs: list[dict] = []
         self.debug = False
         self.fast_run = False
-        self.demo = False
         self.calculate_forces = False
 
         self.t_label = int(time.time())
@@ -131,6 +130,7 @@ class EvbDriver():
 
     def build_forcefields(
         self,
+        
         reactant: str | Molecule,
         product: str | list[str] | Molecule | list[Molecule],
         reactant_partial_charges: list[float] = None,
@@ -444,13 +444,10 @@ class EvbDriver():
                 Lambda = np.linspace(0, 0.1, 6)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
-            elif self.demo:
-                Lambda = np.linspace(0, 0.1, 51)
             else:
                 Lambda = np.linspace(0, 0.1, 11)
                 Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
                 Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
-
         assert (Lambda[0] == 0 and Lambda[-1] == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(np.diff(Lambda) > 0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
         Lambda = [round(lam, 3) for lam in Lambda]
@@ -746,13 +743,13 @@ class EvbDriver():
                         configuration=conf)
 
     def compute_energy_profiles(
-        self,
-        barrier,
-        free_energy,
-        lambda_sub_sample=1,
-        lambda_sub_sample_ends=False,
-        time_sub_sample=1,
-    ):
+            self,
+            barrier,
+            free_energy,
+            lambda_sub_sample=1,
+            lambda_sub_sample_ends=False,
+            time_sub_sample=1,
+        ):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
