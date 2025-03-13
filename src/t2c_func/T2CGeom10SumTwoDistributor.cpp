@@ -45,8 +45,6 @@ CT2CGeom10SumTwoDistributor::distribute(const CSimdArray<double>&        buffer,
         {
             const auto p = i * adim + refp;
             
-            const auto fact = 2.0 * _ptr_bra_gamma[p];
-            
             for (int j = 0; j < bcomps; j++)
             {
                 auto curr_buffer = buffer.data(n * acomps * bcomps + i * bcomps + j);
@@ -57,7 +55,7 @@ CT2CGeom10SumTwoDistributor::distribute(const CSimdArray<double>&        buffer,
                     
                     const auto fval = curr_buffer[k - ket_range.first];
                     
-                    _grad_values[n] += fact * fval * _ptr_ket_gamma[q];
+                    _grad_values[n] += _ptr_bra_gamma[p] * fval * _ptr_ket_gamma[q] + _ptr_ket_gamma[p] * fval * _ptr_bra_gamma[q];
                 }
             }
         }
