@@ -22,6 +22,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -1379,7 +1380,7 @@ class ScfDriver:
 
         profiler.check_memory_usage('Initial guess')
 
-        if self.ri_coulomb and self.rank == mpi_master():
+        if self.ri_coulomb:
             assert_msg_critical(
                 ao_basis.get_label().lower().startswith('def2-'),
                 'SCF Driver: Invalid basis set for RI-J')
@@ -1389,7 +1390,12 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            basis_ri_j = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule,
+                                                 self.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
             self.ostream.print_info('Dimension of RI auxiliary basis set ' +
                                     f'({self.ri_auxiliary_basis.upper()}): ' +
@@ -1427,7 +1433,13 @@ class ScfDriver:
             inv_mat_j.set_values(inv_mat_j_np)
 
             self._ri_drv = RIFockDriver(inv_mat_j)
-            self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j)
+
+            local_atoms = molecule.partition_atoms(self.comm)
+            # TODO: update prepare_buffers so that local_atoms does not need to
+            #       be in ascending order
+            local_atoms = sorted(local_atoms)
+            self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j,
+                                         local_atoms)
 
             self.ostream.print_info(
                 f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
@@ -2060,12 +2072,16 @@ class ScfDriver:
                     'SCF driver: RI is only applicable to pure DFT functional')
 
             if self.ri_coulomb and fock_type == 'j':
-                if self.rank == mpi_master():
-                    fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
-                    fock_mat_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-                else:
-                    fock_mat_np = np.zeros(den_mat[0].shape)
+                local_gvec = np.array(
+                    self._ri_drv.compute_local_bq_vector(den_mat_for_fock))
+                gvec = np.zeros(local_gvec.shape)
+                self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                fock_mat = self._ri_drv.local_compute(den_mat_for_fock, gvec,
+                                                      'j')
+                fock_mat_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
             else:
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock,
                                             fock_type, exchange_scaling_factor,
@@ -2113,12 +2129,15 @@ class ScfDriver:
                 self._print_debug_info('before unrest Fock J build')
 
                 if self.ri_coulomb:
-                    if self.rank == mpi_master():
-                        fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
-                        J_ab_np = fock_mat.to_numpy()
-                        fock_mat = Matrix()
-                    else:
-                        J_ab_np = np.zeros(den_mat[0].shape)
+                    local_gvec = np.array(
+                        self._ri_drv.compute_local_bq_vector(den_mat_for_Jab))
+                    gvec = np.zeros(local_gvec.shape)
+                    self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                    fock_mat = self._ri_drv.local_compute(
+                        den_mat_for_Jab, gvec, 'j')
+                    J_ab_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
                 else:
                     fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                                 0.0, 0.0, thresh_int)

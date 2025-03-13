@@ -25,15 +25,38 @@ export_t3cintegrals(py::module& m)
             [](const CThreeCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularBasis& aux_basis) -> CT3FlatBuffer<double> {
                 return eri_drv.compute(basis, aux_basis, molecule);
             },
-            "Computes electron repulsion integrals for given molecule, basis and auxilary basis.");
+            "Computes electron repulsion integrals for given molecule, basis and auxilary basis.")
+        .def(
+            "compute",
+            [](const CThreeCenterElectronRepulsionDriver& eri_drv, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularBasis& aux_basis, const std::vector<int>& atoms) -> CT3FlatBuffer<double> {
+                return eri_drv.compute(basis, aux_basis, molecule, atoms);
+            },
+            "Computes electron repulsion integrals for given molecule, basis, auxilary basis, and list of atoms.");
     
     // CRIFockDriver class
     PyClass<CRIFockDriver>(m, "RIFockDriver")
         .def(py::init<>())
         .def(py::init<const CSubMatrix&>())
-        .def("prepare_buffers", &CRIFockDriver::prepare_buffers, "Computes three center electron repulsion integral buffers.")
-        .def("compute", &CRIFockDriver::compute, "Computes Coulomb Fock matrix for given density.")
-        .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.");
+        .def("prepare_buffers", py::overload_cast<const CMolecule&,
+                                                  const CMolecularBasis&,
+                                                  const CMolecularBasis&>
+             (&CRIFockDriver::prepare_buffers),
+             "Computes three center electron repulsion integral buffers.")
+        .def("prepare_buffers", py::overload_cast<const CMolecule&,
+                                                  const CMolecularBasis&,
+                                                  const CMolecularBasis&,
+                                                  const std::vector<int>&>
+             (&CRIFockDriver::prepare_buffers),
+             "Computes three center electron repulsion integral buffers.")
+        .def("compute",  py::overload_cast<const CMatrix&, const std::string&>
+             (&CRIFockDriver::compute, py::const_),
+             "Computes Coulomb Fock matrix for given density.")
+        .def("compute",  py::overload_cast<const CMatrix&, const std::vector<double>&, const std::string&>
+             (&CRIFockDriver::compute, py::const_),
+             "Computes Coulomb Fock matrix for given density.")
+        .def("local_compute", &CRIFockDriver::local_compute, "Computes local Coulomb Fock matrix for given density.")
+        .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.")
+        .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.");
     
     // CRIFockGradDriver class
     PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")

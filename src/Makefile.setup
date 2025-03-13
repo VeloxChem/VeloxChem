@@ -36,6 +36,29 @@ OPENMP_LD  := -L /usr/local/Cellar/libomp/18.1.8/lib -lomp
 CXX_REL_FLG += $(OPENMP_INC)
 CXX_DEB_FLG += $(OPENMP_INC)
 
+# OpenBLAS interface
+
+MATH_INC := -I /usr/local/opt/openblas/include
+MATH_LD  := -L /usr/local/opt/openblas/lib -lopenblas
+
+CXX_REL_FLG += $(MATH_INC)
+CXX_DEB_FLG += $(MATH_INC)
+
+# LibXC interface
+
+LIBXC_INC := -I /Users/rinkevic/Development/Frameworks/libxc/include
+LIBXC_LD  := -L /Users/rinkevic/Development/Frameworks/libxc/lib -lxc
+
+CXX_REL_FLG += $(LIBXC_INC)
+CXX_DEB_FLG += $(LIBXC_INC)
+
+# Eigen interface
+
+EIGEN_INC := -I /Users/rinkevic/Development/Frameworks/eigen
+
+CXX_REL_FLG += $(EIGEN_INC)
+CXX_DEB_FLG += $(EIGEN_INC)
+
 # Native shell commands
 
 CP := cp -f

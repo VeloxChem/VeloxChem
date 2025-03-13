@@ -22,6 +22,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -41,13 +42,11 @@ from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
 from .visualizationdriver import VisualizationDriver
 from .profiler import Profiler
-from .oneeints import (compute_electric_dipole_integrals,
-                       compute_linear_momentum_integrals,
+from .oneeints import (compute_electric_dipole_integrals, compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
 from .sanitychecks import dft_sanity_check, pe_sanity_check
 from .errorhandler import assert_msg_critical
-from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_random_string_parallel)
+from .inputparser import (parse_input, print_keywords, print_attributes, get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
@@ -196,8 +195,7 @@ class LinearSolver:
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
-                'force_checkpoint':
-                    ('bool', 'flag for writing checkpoint every iteration'),
+                'force_checkpoint': ('bool', 'flag for writing checkpoint every iteration'),
                 'save_solutions': ('bool', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
@@ -291,9 +289,7 @@ class LinearSolver:
         if method_dict is None:
             method_dict = {}
 
-        rsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['response'].items()
-        }
+        rsp_keywords = {key: val[0] for key, val in self._input_keywords['response'].items()}
 
         parse_input(self, rsp_keywords, rsp_dict)
 
@@ -304,10 +300,7 @@ class LinearSolver:
             if 'checkpoint_file' not in rsp_dict:
                 self.checkpoint_file = f'{self.filename}.rsp.h5'
 
-        method_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['method_settings'].items()
-        }
+        method_keywords = {key: val[0] for key, val in self._input_keywords['method_settings'].items()}
 
         parse_input(self, method_keywords, method_dict)
 
@@ -317,12 +310,9 @@ class LinearSolver:
 
         if self.electric_field is not None:
             assert_msg_critical(
-                len(self.electric_field) == 3,
-                'LinearSolver: Expecting 3 values in \'electric field\' input')
+                len(self.electric_field) == 3, 'LinearSolver: Expecting 3 values in \'electric field\' input')
             assert_msg_critical(
-                not self._pe,
-                'LinearSolver: \'electric field\' input is incompatible ' +
-                'with polarizable embedding')
+                not self._pe, 'LinearSolver: \'electric field\' input is incompatible ' + 'with polarizable embedding')
             # disable restart of calculation with static electric field since
             # checkpoint file does not contain information about the electric
             # field
@@ -351,6 +341,61 @@ class LinearSolver:
         screening = self.comm.bcast(screening, root=mpi_master())
         self._print_mem_debug_info('after  bcast screener')
 
+        if self.ri_coulomb:
+            assert_msg_critical(basis.get_label().lower().startswith('def2-'), 'SCF Driver: Invalid basis set for RI-J')
+
+            self.ostream.print_info('Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+
+            self.ostream.print_info('Dimension of RI auxiliary basis set ' + f'({self.ri_auxiliary_basis.upper()}): ' +
+                                    f'{basis_ri_j.get_dimensions_of_basis()}')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            ri_prep_t0 = tm.time()
+
+            t2c_drv = TwoCenterElectronRepulsionDriver()
+            mat_j = t2c_drv.compute(molecule, basis_ri_j)
+            mat_j_np = mat_j.to_numpy()
+
+            self.ostream.print_info('Two-center integrals for RI done in ' + f'{tm.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            if 'scipy' in sys.modules:
+                lu, piv = lu_factor(mat_j_np)
+                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            else:
+                inv_mat_j_np = np.linalg.inv(mat_j_np)
+
+            self.ostream.print_info(f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            inv_mat_j = SubMatrix([0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
+            inv_mat_j.set_values(inv_mat_j_np)
+
+            self._ri_drv = RIFockDriver(inv_mat_j)
+
+            local_atoms = molecule.partition_atoms(self.comm)
+            # TODO: update prepare_buffers so that local_atoms does not need to
+            #       be in ascending order
+            local_atoms = sorted(local_atoms)
+            self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j, local_atoms)
+
+            self.ostream.print_info(f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
         return {
             'screening': screening,
         }
@@ -372,22 +417,20 @@ class LinearSolver:
             print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
-            grid_level = (get_default_grid_level(self.xcfun)
-                          if self.grid_level is None else self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun) if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
+            self.ostream.print_info('Molecular grid with {0:d} points generated in {1:.2f} sec.'.format(
+                n_grid_points,
+                tm.time() - grid_t0))
             self.ostream.print_blank()
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
-                gs_density = (scf_tensors['D_alpha'].copy(),)
+                gs_density = (scf_tensors['D_alpha'].copy(), )
             else:
                 gs_density = None
             gs_density = self.comm.bcast(gs_density, root=mpi_master())
@@ -418,23 +461,19 @@ class LinearSolver:
         """
 
         if self._pe:
-            assert_msg_critical(
-                self.embedding['settings']['embedding_method'] == 'PE',
-                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
-            )
+            assert_msg_critical(self.embedding['settings']['embedding_method'] == 'PE',
+                                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.')
 
             from .embedding import PolarizableEmbeddingLRS
 
-            self._embedding_drv = PolarizableEmbeddingLRS(
-                molecule=molecule,
-                ao_basis=basis,
-                options=self.embedding,
-                comm=self.comm)
+            self._embedding_drv = PolarizableEmbeddingLRS(molecule=molecule,
+                                                          ao_basis=basis,
+                                                          options=self.embedding,
+                                                          comm=self.comm)
 
             # TODO: print PyFraME info
 
-            pot_info = 'Reading polarizable embedding: {}'.format(
-                self.pe_options['potfile'])
+            pot_info = 'Reading polarizable embedding: {}'.format(self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
@@ -456,18 +495,14 @@ class LinearSolver:
         """
 
         dist_arrays = [
-            DistributedArray.read_from_hdf5_file(self.checkpoint_file, label,
-                                                 self.comm)
-            for label in rsp_vector_labels
+            DistributedArray.read_from_hdf5_file(self.checkpoint_file, label, self.comm) for label in rsp_vector_labels
         ]
 
         if self.nonlinear:
-            (self._dist_bger, self._dist_bung, self._dist_e2bger,
-             self._dist_e2bung, self._dist_fock_ger,
+            (self._dist_bger, self._dist_bung, self._dist_e2bger, self._dist_e2bung, self._dist_fock_ger,
              self._dist_fock_ung) = dist_arrays
         else:
-            (self._dist_bger, self._dist_bung, self._dist_e2bger,
-             self._dist_e2bung) = dist_arrays
+            (self._dist_bger, self._dist_bung, self._dist_e2bger, self._dist_e2bung) = dist_arrays
 
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
@@ -485,16 +520,12 @@ class LinearSolver:
         """
 
         if self._dist_bger is None:
-            self._dist_bger = DistributedArray(bger.data,
-                                               self.comm,
-                                               distribute=False)
+            self._dist_bger = DistributedArray(bger.data, self.comm, distribute=False)
         else:
             self._dist_bger.append(bger, axis=1)
 
         if self._dist_bung is None:
-            self._dist_bung = DistributedArray(bung.data,
-                                               self.comm,
-                                               distribute=False)
+            self._dist_bung = DistributedArray(bung.data, self.comm, distribute=False)
         else:
             self._dist_bung.append(bung, axis=1)
 
@@ -509,16 +540,12 @@ class LinearSolver:
         """
 
         if self._dist_e2bger is None:
-            self._dist_e2bger = DistributedArray(e2bger.data,
-                                                 self.comm,
-                                                 distribute=False)
+            self._dist_e2bger = DistributedArray(e2bger.data, self.comm, distribute=False)
         else:
             self._dist_e2bger.append(e2bger, axis=1)
 
         if self._dist_e2bung is None:
-            self._dist_e2bung = DistributedArray(e2bung.data,
-                                                 self.comm,
-                                                 distribute=False)
+            self._dist_e2bung = DistributedArray(e2bung.data, self.comm, distribute=False)
         else:
             self._dist_e2bung.append(e2bung, axis=1)
 
@@ -533,16 +560,12 @@ class LinearSolver:
         """
 
         if self._dist_fock_ger is None:
-            self._dist_fock_ger = DistributedArray(fock_ger.data,
-                                                   self.comm,
-                                                   distribute=False)
+            self._dist_fock_ger = DistributedArray(fock_ger.data, self.comm, distribute=False)
         else:
             self._dist_fock_ger.append(fock_ger, axis=1)
 
         if self._dist_fock_ung is None:
-            self._dist_fock_ung = DistributedArray(fock_ung.data,
-                                                   self.comm,
-                                                   distribute=False)
+            self._dist_fock_ung = DistributedArray(fock_ung.data, self.comm, distribute=False)
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
@@ -556,8 +579,7 @@ class LinearSolver:
 
         if self._debug:
             profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
+            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' + profiler.get_available_memory())
             self.ostream.flush()
 
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
@@ -592,12 +614,10 @@ class LinearSolver:
                        profiler=None):
 
         if self.use_subcomms:
-            self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
-                                         scf_tensors, eri_dict, dft_dict,
-                                         pe_dict, profiler)
+            self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict,
+                                         profiler)
         else:
-            self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule, basis,
-                                            scf_tensors, eri_dict, dft_dict,
+            self._e2n_half_size_single_comm(vecs_ger, vecs_ung, molecule, basis, scf_tensors, eri_dict, dft_dict,
                                             pe_dict, profiler)
 
     def _e2n_half_size_subcomms(self,
@@ -648,14 +668,11 @@ class LinearSolver:
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
-            assert_msg_critical(
-                vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
-                'LinearSolver._e2n_half_size: '
-                'invalid shape of trial vectors')
+            assert_msg_critical(vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2, 'LinearSolver._e2n_half_size: '
+                                'invalid shape of trial vectors')
 
             assert_msg_critical(
-                vecs_ger.shape(0) == vecs_ung.shape(0),
-                'LinearSolver._e2n_half_size: '
+                vecs_ger.shape(0) == vecs_ung.shape(0), 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
@@ -665,8 +682,7 @@ class LinearSolver:
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
-                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
-                    range(nocc, norb))
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
             else:
@@ -691,12 +707,9 @@ class LinearSolver:
                 n_subcomms = self.nodes // subcomm_size
 
                 ave, res = divmod(n_total, n_subcomms)
-                counts = [
-                    ave + 1 if p < res else ave for p in range(n_subcomms)
-                ]
+                counts = [ave + 1 if p < res else ave for p in range(n_subcomms)]
 
-                time_per_fock = self.serial_ratio + (
-                    1 - self.serial_ratio) / subcomm_size
+                time_per_fock = self.serial_ratio + (1 - self.serial_ratio) / subcomm_size
                 dt = max(counts) * time_per_fock
 
                 dt_and_subcomm_size.append((dt, subcomm_size))
@@ -734,8 +747,7 @@ class LinearSolver:
             local_master_ranks = cross_comm.allgather(self.rank)
 
         subcomm_index = local_comm.bcast(subcomm_index, root=mpi_master())
-        local_master_ranks = local_comm.bcast(local_master_ranks,
-                                              root=mpi_master())
+        local_master_ranks = local_comm.bcast(local_master_ranks, root=mpi_master())
 
         # batch_size corresponds to the number of subcomms
         batch_size = self.nodes // subcomm_size
@@ -755,16 +767,14 @@ class LinearSolver:
             self.ostream.flush()
 
         if self._debug:
-            self.ostream.print_info(
-                '==DEBUG== batch_size: {}'.format(batch_size))
+            self.ostream.print_info('==DEBUG== batch_size: {}'.format(batch_size))
             self.ostream.print_blank()
             self.ostream.flush()
 
         for batch_ind in range(num_batches):
 
             if self._debug:
-                self.ostream.print_info('==DEBUG== batch {}/{}'.format(
-                    batch_ind + 1, num_batches))
+                self.ostream.print_info('==DEBUG== batch {}/{}'.format(batch_ind + 1, num_batches))
                 self.ostream.flush()
 
             # form density matrices
@@ -800,25 +810,21 @@ class LinearSolver:
                 # form full-size vec
 
                 if vec_type == 'general':
-                    v_ger = vecs_ger.get_full_vector(col,
-                                                     root=local_master_rank)
-                    v_ung = vecs_ung.get_full_vector(col,
-                                                     root=local_master_rank)
+                    v_ger = vecs_ger.get_full_vector(col, root=local_master_rank)
+                    v_ung = vecs_ung.get_full_vector(col, root=local_master_rank)
                     if self.rank == local_master_rank:
                         # full-size gerade trial vector
                         vec_list[idx] = np.hstack((v_ger, v_ger))
                         vec_list[idx] += np.hstack((v_ung, -v_ung))
 
                 elif vec_type == 'gerade':
-                    v_ger = vecs_ger.get_full_vector(col,
-                                                     root=local_master_rank)
+                    v_ger = vecs_ger.get_full_vector(col, root=local_master_rank)
                     if self.rank == local_master_rank:
                         # full-size gerade trial vector
                         vec_list[idx] = np.hstack((v_ger, v_ger))
 
                 elif vec_type == 'ungerade':
-                    v_ung = vecs_ung.get_full_vector(col,
-                                                     root=local_master_rank)
+                    v_ung = vecs_ung.get_full_vector(col, root=local_master_rank)
                     if self.rank == local_master_rank:
                         # full-size ungerade trial vector
                         vec_list[idx] = np.hstack((v_ung, -v_ung))
@@ -837,15 +843,11 @@ class LinearSolver:
                     # build density
 
                     if getattr(self, 'core_excitation', False):
-                        kn = self.lrvec2mat(vec, nocc, norb,
-                                            self.num_core_orbitals)
-                        dak = self.commut_mo_density(kn, nocc,
-                                                     self.num_core_orbitals)
-                        core_exc_orb_inds = list(range(
-                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        kn = self.lrvec2mat(vec, nocc, norb, self.num_core_orbitals)
+                        dak = self.commut_mo_density(kn, nocc, self.num_core_orbitals)
+                        core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(range(nocc, norb))
                         mo_core_exc = mo[:, core_exc_orb_inds]
-                        dak = np.linalg.multi_dot(
-                            [mo_core_exc, dak, mo_core_exc.T])
+                        dak = np.linalg.multi_dot([mo_core_exc, dak, mo_core_exc.T])
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
@@ -860,9 +862,7 @@ class LinearSolver:
 
                 self._print_mem_debug_info('before Fock build')
 
-                fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, profiler,
-                                          local_comm)
+                fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict, pe_dict, profiler, local_comm)
 
                 self._print_mem_debug_info('after  Fock build')
 
@@ -908,12 +908,9 @@ class LinearSolver:
                         fak = fock[ifock]
 
                         if getattr(self, 'core_excitation', False):
-                            core_exc_orb_inds = list(
-                                range(self.num_core_orbitals)) + list(
-                                    range(nocc, norb))
+                            core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(range(nocc, norb))
                             mo_core_exc = mo[:, core_exc_orb_inds]
-                            fak_mo = np.linalg.multi_dot(
-                                [mo_core_exc.T, fak, mo_core_exc])
+                            fak_mo = np.linalg.multi_dot([mo_core_exc.T, fak, mo_core_exc])
                         else:
                             fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
@@ -922,20 +919,15 @@ class LinearSolver:
                         fat_mo = fak_mo + kfa_mo
 
                         if getattr(self, 'core_excitation', False):
-                            gmo = -self.commut_mo_density(
-                                fat_mo, nocc, self.num_core_orbitals)
-                            gmo_vec_halfsize = self.lrmat2vec(
-                                gmo, nocc, norb,
-                                self.num_core_orbitals)[:half_size]
+                            gmo = -self.commut_mo_density(fat_mo, nocc, self.num_core_orbitals)
+                            gmo_vec_halfsize = self.lrmat2vec(gmo, nocc, norb, self.num_core_orbitals)[:half_size]
                         else:
                             gmo = -self.commut_mo_density(fat_mo, nocc)
-                            gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
-                                                              norb)[:half_size]
+                            gmo_vec_halfsize = self.lrmat2vec(gmo, nocc, norb)[:half_size]
 
                         # Note: fak_mo_vec uses full MO coefficients matrix since
                         # it is only for fock_ger/fock_ung in nonlinear response
-                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                          mo]).reshape(norb**2)
+                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak, mo]).reshape(norb**2)
 
                         if ifock < batch_ger:
                             e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -953,21 +945,13 @@ class LinearSolver:
                 if idx + batch_start >= batch_end:
                     break
 
-                vecs_e2_ger = DistributedArray(e2_ger,
-                                               self.comm,
-                                               root=local_master_rank)
-                vecs_e2_ung = DistributedArray(e2_ung,
-                                               self.comm,
-                                               root=local_master_rank)
+                vecs_e2_ger = DistributedArray(e2_ger, self.comm, root=local_master_rank)
+                vecs_e2_ung = DistributedArray(e2_ung, self.comm, root=local_master_rank)
                 self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
                 if self.nonlinear:
-                    dist_fock_ger = DistributedArray(fock_ger,
-                                                     self.comm,
-                                                     root=local_master_rank)
-                    dist_fock_ung = DistributedArray(fock_ung,
-                                                     self.comm,
-                                                     root=local_master_rank)
+                    dist_fock_ger = DistributedArray(fock_ger, self.comm, root=local_master_rank)
+                    dist_fock_ung = DistributedArray(fock_ung, self.comm, root=local_master_rank)
                     self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
         self._append_trial_vectors(vecs_ger, vecs_ung)
@@ -1020,14 +1004,11 @@ class LinearSolver:
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
-            assert_msg_critical(
-                vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
-                'LinearSolver._e2n_half_size: '
-                'invalid shape of trial vectors')
+            assert_msg_critical(vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2, 'LinearSolver._e2n_half_size: '
+                                'invalid shape of trial vectors')
 
             assert_msg_critical(
-                vecs_ger.shape(0) == vecs_ung.shape(0),
-                'LinearSolver._e2n_half_size: '
+                vecs_ger.shape(0) == vecs_ung.shape(0), 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
@@ -1037,8 +1018,7 @@ class LinearSolver:
             norb = mo.shape[1]
 
             if getattr(self, 'core_excitation', False):
-                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
-                    range(nocc, norb))
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
             else:
@@ -1064,16 +1044,14 @@ class LinearSolver:
             self.ostream.flush()
 
         if self._debug:
-            self.ostream.print_info(
-                '==DEBUG== batch_size: {}'.format(batch_size))
+            self.ostream.print_info('==DEBUG== batch_size: {}'.format(batch_size))
             self.ostream.print_blank()
             self.ostream.flush()
 
         for batch_ind in range(num_batches):
 
             if self._debug:
-                self.ostream.print_info('==DEBUG== batch {}/{}'.format(
-                    batch_ind + 1, num_batches))
+                self.ostream.print_info('==DEBUG== batch {}/{}'.format(batch_ind + 1, num_batches))
                 self.ostream.flush()
 
             # form density matrices
@@ -1126,15 +1104,11 @@ class LinearSolver:
                     half_size = vec.shape[0] // 2
 
                     if getattr(self, 'core_excitation', False):
-                        kn = self.lrvec2mat(vec, nocc, norb,
-                                            self.num_core_orbitals)
-                        dak = self.commut_mo_density(kn, nocc,
-                                                     self.num_core_orbitals)
-                        core_exc_orb_inds = list(range(
-                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        kn = self.lrvec2mat(vec, nocc, norb, self.num_core_orbitals)
+                        dak = self.commut_mo_density(kn, nocc, self.num_core_orbitals)
+                        core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(range(nocc, norb))
                         mo_core_exc = mo[:, core_exc_orb_inds]
-                        dak = np.linalg.multi_dot(
-                            [mo_core_exc, dak, mo_core_exc.T])
+                        dak = np.linalg.multi_dot([mo_core_exc, dak, mo_core_exc.T])
                     else:
                         kn = self.lrvec2mat(vec, nocc, norb)
                         dak = self.commut_mo_density(kn, nocc)
@@ -1147,8 +1121,7 @@ class LinearSolver:
 
             self._print_mem_debug_info('before Fock build')
 
-            fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, profiler)
+            fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict, pe_dict, profiler)
 
             self._print_mem_debug_info('after  Fock build')
 
@@ -1201,11 +1174,9 @@ class LinearSolver:
                     fak = fock[ifock]
 
                     if getattr(self, 'core_excitation', False):
-                        core_exc_orb_inds = list(range(
-                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(range(nocc, norb))
                         mo_core_exc = mo[:, core_exc_orb_inds]
-                        fak_mo = np.linalg.multi_dot(
-                            [mo_core_exc.T, fak, mo_core_exc])
+                        fak_mo = np.linalg.multi_dot([mo_core_exc.T, fak, mo_core_exc])
                     else:
                         fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
 
@@ -1214,19 +1185,15 @@ class LinearSolver:
                     fat_mo = fak_mo + kfa_mo
 
                     if getattr(self, 'core_excitation', False):
-                        gmo = -self.commut_mo_density(fat_mo, nocc,
-                                                      self.num_core_orbitals)
-                        gmo_vec_halfsize = self.lrmat2vec(
-                            gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                        gmo = -self.commut_mo_density(fat_mo, nocc, self.num_core_orbitals)
+                        gmo_vec_halfsize = self.lrmat2vec(gmo, nocc, norb, self.num_core_orbitals)[:half_size]
                     else:
                         gmo = -self.commut_mo_density(fat_mo, nocc)
-                        gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
-                                                          norb)[:half_size]
+                        gmo_vec_halfsize = self.lrmat2vec(gmo, nocc, norb)[:half_size]
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                      mo]).reshape(norb**2)
+                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak, mo]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -1250,15 +1217,7 @@ class LinearSolver:
 
         self.ostream.print_blank()
 
-    def _comp_lr_fock(self,
-                      dens,
-                      molecule,
-                      basis,
-                      eri_dict,
-                      dft_dict,
-                      pe_dict,
-                      profiler=None,
-                      comm=None):
+    def _comp_lr_fock(self, dens, molecule, basis, eri_dict, dft_dict, pe_dict, profiler=None, comm=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -1328,8 +1287,7 @@ class LinearSolver:
         # further determine exchange_scaling_factor, erf_k_coef and omega
         need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
-            exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
-                                       self.xcfun.get_rs_beta())
+            exchange_scaling_factor = (self.xcfun.get_rs_alpha() + self.xcfun.get_rs_beta())
             erf_k_coef = -self.xcfun.get_rs_beta()
             omega = self.xcfun.get_rs_omega()
         else:
@@ -1338,14 +1296,30 @@ class LinearSolver:
         fock_arrays = []
 
         for idx in range(num_densities):
-            den_mat_for_fock = make_matrix(basis, mat_t.general)
-            den_mat_for_fock.set_values(dens[idx])
+            if self.ri_coulomb:
+                assert_msg_critical(fock_type == 'j', 'LinearSolver: RI is only applicable to pure DFT functional')
 
-            self._print_mem_debug_info('before restgen Fock build')
-            fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
-                                        exchange_scaling_factor, 0.0,
-                                        thresh_int)
-            self._print_mem_debug_info('after  restgen Fock build')
+            if self.ri_coulomb and fock_type == 'j':
+                # symmetrize density for RI-J
+                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
+
+                local_gvec = np.array(self._ri_drv.compute_local_bq_vector(den_mat_for_ri_j))
+                gvec = np.zeros(local_gvec.shape)
+                self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                fock_mat = self._ri_drv.local_compute(den_mat_for_ri_j, gvec, 'j')
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            else:
+                den_mat_for_fock = make_matrix(basis, mat_t.general)
+                den_mat_for_fock.set_values(dens[idx])
+
+                self._print_mem_debug_info('before restgen Fock build')
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type, exchange_scaling_factor, 0.0,
+                                            thresh_int)
+                self._print_mem_debug_info('after  restgen Fock build')
 
             fock_np = fock_mat.to_numpy()
             fock_mat = Matrix()
@@ -1357,9 +1331,7 @@ class LinearSolver:
             if need_omega:
                 # for range-separated functional
                 self._print_mem_debug_info('before restgen erf Fock build')
-                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                            'kx_rs', erf_k_coef, omega,
-                                            thresh_int)
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock, 'kx_rs', erf_k_coef, omega, thresh_int)
                 self._print_mem_debug_info('after  restgen erf Fock build')
 
                 fock_np -= fock_mat.to_numpy()
@@ -1374,12 +1346,10 @@ class LinearSolver:
             t0 = tm.time()
 
             if redistribute_xc_molgrid:
-                molgrid.re_distribute_counts_and_displacements(
-                    comm.Get_rank(), comm.Get_size())
+                molgrid.re_distribute_counts_and_displacements(comm.Get_rank(), comm.Get_size())
 
             xc_drv = XCIntegrator()
-            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
-                                      gs_density, molgrid, self.xcfun)
+            xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens, gs_density, molgrid, self.xcfun)
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
@@ -1389,8 +1359,7 @@ class LinearSolver:
             for idx in range(num_densities):
                 # Note: only closed shell density for now
                 dm = dens[idx] * 2.0
-                V_emb = self._embedding_drv.compute_pe_contributions(
-                    density_matrix=dm)
+                V_emb = self._embedding_drv.compute_pe_contributions(density_matrix=dm)
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += V_emb
 
@@ -1430,8 +1399,7 @@ class LinearSolver:
         t0 = tm.time()
 
         if self.rank == mpi_master():
-            success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
-                                     basis, dft_dict, pe_dict, self.ostream)
+            success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule, basis, dft_dict, pe_dict, self.ostream)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -1439,14 +1407,11 @@ class LinearSolver:
         if success:
             if self.nonlinear:
                 dist_arrays = [
-                    self._dist_bger, self._dist_bung, self._dist_e2bger,
-                    self._dist_e2bung, self._dist_fock_ger, self._dist_fock_ung
+                    self._dist_bger, self._dist_bung, self._dist_e2bger, self._dist_e2bung, self._dist_fock_ger,
+                    self._dist_fock_ung
                 ]
             else:
-                dist_arrays = [
-                    self._dist_bger, self._dist_bung, self._dist_e2bger,
-                    self._dist_e2bung
-                ]
+                dist_arrays = [self._dist_bger, self._dist_bung, self._dist_e2bger, self._dist_e2bung]
 
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
@@ -1504,8 +1469,7 @@ class LinearSolver:
         need_exit = False
 
         if self.program_end_time is not None:
-            remaining_hours = (self.program_end_time -
-                               datetime.now()).total_seconds() / 3600
+            remaining_hours = (self.program_end_time - datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < next_iter_in_hours * 1.25:
@@ -1552,20 +1516,17 @@ class LinearSolver:
 
         cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : {:.1e}'.format(
-            self.conv_thresh)
+        cur_str = 'Convergence Threshold           : {:.1e}'.format(self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
-            self.eri_thresh)
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            grid_level = (get_default_grid_level(self.xcfun)
-                          if self.grid_level is None else self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun) if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
@@ -1612,8 +1573,7 @@ class LinearSolver:
             if max_residual < self.conv_thresh:
                 self._is_converged = True
 
-        self._is_converged = self.comm.bcast(self._is_converged,
-                                             root=mpi_master())
+        self._is_converged = self.comm.bcast(self._is_converged, root=mpi_master())
 
     def _decomp_grad(self, grad):
         """
@@ -1626,12 +1586,9 @@ class LinearSolver:
             A tuple containing gerade and ungerade parts of gradient.
         """
 
-        assert_msg_critical(grad.ndim == 1,
-                            'LinearSolver.decomp_grad: Expecting a 1D array')
+        assert_msg_critical(grad.ndim == 1, 'LinearSolver.decomp_grad: Expecting a 1D array')
 
-        assert_msg_critical(
-            grad.shape[0] % 2 == 0,
-            'LinearSolver.decomp_grad: size of array should be even')
+        assert_msg_critical(grad.shape[0] % 2 == 0, 'LinearSolver.decomp_grad: size of array should be even')
 
         half_size = grad.shape[0] // 2
 
@@ -1668,12 +1625,7 @@ class LinearSolver:
 
         return None, None
 
-    def _setup_trials(self,
-                      vectors,
-                      precond,
-                      dist_bger=None,
-                      dist_bung=None,
-                      renormalize=True):
+    def _setup_trials(self, vectors, precond, dist_bger=None, dist_bung=None, renormalize=True):
         """
         Computes orthonormalized trial vectors.
 
@@ -1714,23 +1666,18 @@ class LinearSolver:
 
         if renormalize:
             if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
-                dist_new_ger = self._remove_linear_dependence_half_size(
-                    dist_new_ger, self.lindep_thresh)
-                dist_new_ger = self._orthogonalize_gram_schmidt_half_size(
-                    dist_new_ger)
+                dist_new_ger = self._remove_linear_dependence_half_size(dist_new_ger, self.lindep_thresh)
+                dist_new_ger = self._orthogonalize_gram_schmidt_half_size(dist_new_ger)
                 dist_new_ger = self._normalize_half_size(dist_new_ger)
 
             if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
-                dist_new_ung = self._remove_linear_dependence_half_size(
-                    dist_new_ung, self.lindep_thresh)
-                dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
-                    dist_new_ung)
+                dist_new_ung = self._remove_linear_dependence_half_size(dist_new_ung, self.lindep_thresh)
+                dist_new_ung = self._orthogonalize_gram_schmidt_half_size(dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
 
         if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
-                'LinearSolver: trial vectors are empty')
+            assert_msg_critical(dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
+                                'LinearSolver: trial vectors are empty')
 
         return dist_new_ger, dist_new_ung
 
@@ -1757,15 +1704,13 @@ class LinearSolver:
 
         assert_msg_critical(
             operator in [
-                'dipole', 'electric dipole', 'electric_dipole',
-                'linear_momentum', 'linear momentum', 'angular_momentum',
-                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
+                'dipole', 'electric dipole', 'electric_dipole', 'linear_momentum', 'linear momentum',
+                'angular_momentum', 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
             ], f'LinearSolver.get_prop_grad: unsupported operator {operator}')
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             if self.rank == mpi_master():
-                dipole_mats = compute_electric_dipole_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
+                dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
                 integrals = tuple(dipole_mats)
             else:
                 integrals = tuple()
@@ -1783,8 +1728,7 @@ class LinearSolver:
 
         elif operator in ['angular_momentum', 'angular momentum']:
             if self.rank == mpi_master():
-                angmom_mats = compute_angular_momentum_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
+                angmom_mats = compute_angular_momentum_integrals(molecule, basis, [0.0, 0.0, 0.0])
                 integrals = (
                     -1.0 * angmom_mats[0],
                     -1.0 * angmom_mats[1],
@@ -1795,8 +1739,7 @@ class LinearSolver:
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             if self.rank == mpi_master():
-                angmom_mats = compute_angular_momentum_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
+                angmom_mats = compute_angular_momentum_integrals(molecule, basis, [0.0, 0.0, 0.0])
                 integrals = (
                     0.5 * angmom_mats[0],
                     0.5 * angmom_mats[1],
@@ -1818,33 +1761,26 @@ class LinearSolver:
             factor = np.sqrt(2.0)
 
             if getattr(self, 'core_excitation', False):
-                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
-                    range(nocc, norb))
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(range(nocc, norb))
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 matrices = [
-                    factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo_core_exc.T, P, mo_core_exc]),
-                        nocc, self.num_core_orbitals) for P in integral_comps
+                    factor * (-1.0) * self.commut_mo_density(np.linalg.multi_dot([mo_core_exc.T, P, mo_core_exc]), nocc,
+                                                             self.num_core_orbitals) for P in integral_comps
                 ]
-                gradients = tuple(
-                    self.lrmat2vec(m, nocc, norb, self.num_core_orbitals)
-                    for m in matrices)
+                gradients = tuple(self.lrmat2vec(m, nocc, norb, self.num_core_orbitals) for m in matrices)
             else:
                 matrices = [
-                    factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                    factor * (-1.0) * self.commut_mo_density(np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
                     for P in integral_comps
                 ]
-                gradients = tuple(
-                    self.lrmat2vec(m, nocc, norb) for m in matrices)
+                gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
 
             return gradients
 
         else:
             return tuple()
 
-    def get_complex_prop_grad(self, operator, components, molecule, basis,
-                              scf_tensors):
+    def get_complex_prop_grad(self, operator, components, molecule, basis, scf_tensors):
         """
         Computes complex property gradients for linear response equations.
 
@@ -1867,17 +1803,13 @@ class LinearSolver:
 
         assert_msg_critical(
             operator in [
-                'dipole', 'electric dipole', 'electric_dipole',
-                'linear_momentum', 'linear momentum', 'angular_momentum',
-                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
-            ],
-            f'LinearSolver.get_complex_prop_grad: unsupported operator {operator}'
-        )
+                'dipole', 'electric dipole', 'electric_dipole', 'linear_momentum', 'linear momentum',
+                'angular_momentum', 'angular momentum', 'magnetic dipole', 'magnetic_dipole'
+            ], f'LinearSolver.get_complex_prop_grad: unsupported operator {operator}')
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             if self.rank == mpi_master():
-                dipole_mats = compute_electric_dipole_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
+                dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
                 integrals = (
                     dipole_mats[0] + 0j,
                     dipole_mats[1] + 0j,
@@ -1899,8 +1831,7 @@ class LinearSolver:
 
         elif operator in ['angular_momentum', 'angular momentum']:
             if self.rank == mpi_master():
-                angmom_mats = compute_angular_momentum_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
+                angmom_mats = compute_angular_momentum_integrals(molecule, basis, [0.0, 0.0, 0.0])
                 integrals = (
                     -1j * angmom_mats[0],
                     -1j * angmom_mats[1],
@@ -1911,8 +1842,7 @@ class LinearSolver:
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             if self.rank == mpi_master():
-                angmom_mats = compute_angular_momentum_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
+                angmom_mats = compute_angular_momentum_integrals(molecule, basis, [0.0, 0.0, 0.0])
                 integrals = (
                     0.5j * angmom_mats[0],
                     0.5j * angmom_mats[1],
@@ -1933,8 +1863,7 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) * self.commut_mo_density(
-                    np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                factor * (-1.0) * self.commut_mo_density(np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
                 for P in integral_comps
             ]
 
@@ -1964,10 +1893,8 @@ class LinearSolver:
         mat = np.zeros(A.shape, dtype=A.dtype)
 
         if num_core_orbitals is not None and num_core_orbitals > 0:
-            mat[:num_core_orbitals,
-                num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
-            mat[num_core_orbitals:, :num_core_orbitals] = A[
-                num_core_orbitals:, :num_core_orbitals]
+            mat[:num_core_orbitals, num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
+            mat[num_core_orbitals:, :num_core_orbitals] = A[num_core_orbitals:, :num_core_orbitals]
 
         else:
             mat[:nocc, nocc:] = -A[:nocc, nocc:]
@@ -2011,13 +1938,10 @@ class LinearSolver:
 
         if num_core_orbitals is not None and num_core_orbitals > 0:
             n_ov = num_core_orbitals * nvir
-            mat = np.zeros((num_core_orbitals + nvir, num_core_orbitals + nvir),
-                           dtype=vec.dtype)
+            mat = np.zeros((num_core_orbitals + nvir, num_core_orbitals + nvir), dtype=vec.dtype)
             # excitation and de-excitation
-            mat[:num_core_orbitals, num_core_orbitals:] = vec[:n_ov].reshape(
-                num_core_orbitals, nvir)
-            mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(
-                num_core_orbitals, nvir).T
+            mat[:num_core_orbitals, num_core_orbitals:] = vec[:n_ov].reshape(num_core_orbitals, nvir)
+            mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(num_core_orbitals, nvir).T
 
         else:
             n_ov = nocc * nvir
@@ -2050,10 +1974,8 @@ class LinearSolver:
             n_ov = num_core_orbitals * nvir
             vec = np.zeros(n_ov * 2, dtype=mat.dtype)
             # excitation and de-excitation
-            vec[:n_ov] = mat[:num_core_orbitals,
-                             num_core_orbitals:].reshape(n_ov)
-            vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(
-                n_ov)
+            vec[:n_ov] = mat[:num_core_orbitals, num_core_orbitals:].reshape(n_ov)
+            vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(n_ov)
 
         else:
             n_ov = nocc * nvir
@@ -2130,8 +2052,7 @@ class LinearSolver:
 
             for i in range(1, tvecs.shape[1]):
                 for j in range(i):
-                    f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(
-                        tvecs[:, j], tvecs[:, j])
+                    f = np.dot(tvecs[:, i], tvecs[:, j]) / np.dot(tvecs[:, j], tvecs[:, j])
                     tvecs[:, i] -= f * tvecs[:, j]
                 f = 1.0 / np.linalg.norm(tvecs[:, i])
                 tvecs[:, i] *= f
@@ -2275,19 +2196,11 @@ class LinearSolver:
             nto_lam[nocc - 1 - i_nto] = -lam_diag[i_nto]
             nto_lam[nocc + i_nto] = lam_diag[i_nto]
 
-        nto_mo = MolecularOrbitals.create_nto([nto_orbs], [nto_lam],
-                                              molorb.rest)
+        nto_mo = MolecularOrbitals.create_nto([nto_orbs], [nto_lam], molorb.rest)
 
         return nto_mo
 
-    def write_nto_cubes(self,
-                        cubic_grid,
-                        molecule,
-                        basis,
-                        root,
-                        nto_mo,
-                        nto_pairs=None,
-                        nto_thresh=0.1):
+    def write_nto_cubes(self, cubic_grid, molecule, basis, root, nto_mo, nto_pairs=None, nto_thresh=0.1):
         """
         Writes cube files for natural transition orbitals.
 
@@ -2343,14 +2256,11 @@ class LinearSolver:
             vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_occ)
 
             if self.rank == mpi_master():
-                occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
-                    base_fname, root + 1, i_nto + 1)
-                vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
-                                   ind_occ, 'alpha')
+                occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(base_fname, root + 1, i_nto + 1)
+                vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto', ind_occ, 'alpha')
                 filenames.append(occ_cube_name)
 
-                self.ostream.print_info(
-                    '    Cube file (hole)     : {:s}'.format(occ_cube_name))
+                self.ostream.print_info('    Cube file (hole)     : {:s}'.format(occ_cube_name))
                 self.ostream.flush()
 
             # electron
@@ -2358,14 +2268,11 @@ class LinearSolver:
             vis_drv.compute(cubic_grid, molecule, basis, nto_coefs, ind_vir)
 
             if self.rank == mpi_master():
-                vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
-                    base_fname, root + 1, i_nto + 1)
-                vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
-                                   ind_vir, 'alpha')
+                vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(base_fname, root + 1, i_nto + 1)
+                vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto', ind_vir, 'alpha')
                 filenames.append(vir_cube_name)
 
-                self.ostream.print_info(
-                    '    Cube file (particle) : {:s}'.format(vir_cube_name))
+                self.ostream.print_info('    Cube file (particle) : {:s}'.format(vir_cube_name))
                 self.ostream.flush()
 
         self.ostream.print_blank()
@@ -2398,8 +2305,7 @@ class LinearSolver:
 
         return dens_D, dens_A
 
-    def write_detach_attach_cubes(self, cubic_grid, molecule, basis, root,
-                                  dens_DA):
+    def write_detach_attach_cubes(self, cubic_grid, molecule, basis, root, dens_DA):
         """
         Writes cube files for detachment and attachment densities.
 
@@ -2432,27 +2338,21 @@ class LinearSolver:
         vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 0, 'alpha')
 
         if self.rank == mpi_master():
-            detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
-                base_fname, root + 1)
-            vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
-                               'detachment', 0, 'alpha')
+            detach_cube_name = '{:s}_S{:d}_detach.cube'.format(base_fname, root + 1)
+            vis_drv.write_data(detach_cube_name, cubic_grid, molecule, 'detachment', 0, 'alpha')
             filenames.append(detach_cube_name)
 
-            self.ostream.print_info(
-                '  Cube file (detachment) : {:s}'.format(detach_cube_name))
+            self.ostream.print_info('  Cube file (detachment) : {:s}'.format(detach_cube_name))
             self.ostream.flush()
 
         vis_drv.compute(cubic_grid, molecule, basis, dens_DA, 1, 'alpha')
 
         if self.rank == mpi_master():
-            attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
-                base_fname, root + 1)
-            vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
-                               'attachment', 1, 'alpha')
+            attach_cube_name = '{:s}_S{:d}_attach.cube'.format(base_fname, root + 1)
+            vis_drv.write_data(attach_cube_name, cubic_grid, molecule, 'attachment', 1, 'alpha')
             filenames.append(attach_cube_name)
 
-            self.ostream.print_info(
-                '  Cube file (attachment) : {:s}'.format(attach_cube_name))
+            self.ostream.print_info('  Cube file (attachment) : {:s}'.format(attach_cube_name))
             self.ostream.flush()
 
         self.ostream.print_blank()
@@ -2477,9 +2377,8 @@ class LinearSolver:
         """
 
         n_ov = nocc * nvir
-        assert_msg_critical(
-            eigvec.size == n_ov or eigvec.size == n_ov * 2,
-            'LinearSolver.get_excitation_details: Inconsistent size')
+        assert_msg_critical(eigvec.size == n_ov or eigvec.size == n_ov * 2,
+                            'LinearSolver.get_excitation_details: Inconsistent size')
 
         excitations = []
         de_excitations = []

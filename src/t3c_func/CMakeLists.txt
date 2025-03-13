@@ -5,6 +5,7 @@ target_sources(vlxobjs
     T3CDistributor.cpp
     T3CGeom0X0Distributor.cpp
     T3CGeomX00Distributor.cpp
+    T3CLocalDistributor.cpp
     T3CUtils.cpp
   )
 
