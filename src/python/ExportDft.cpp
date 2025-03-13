@@ -118,6 +118,25 @@ CXCIntegrator_integrate_vxc_fock(const CXCIntegrator&                    self,
 }
 
 static auto
+CXCIntegrator_integrate_kx_fock(const CXCIntegrator&                    self,
+                                const CMolecule&                        molecule,
+                                const CMolecularBasis&                  basis,
+                                const std::vector<py::array_t<double>>& gsDensityArrays,
+                                const CMolecularGrid&                   molecularGrid,
+                                const double                            factor) -> CAOKohnShamMatrix
+{
+    auto        numdensities = static_cast<int>(gsDensityArrays.size());
+    std::string errsize("integrate_kx_fock: Expecting a list of 1 or 2 numpy arrays");
+    errors::assertMsgCritical((numdensities == 1) || (numdensities == 2), errsize);
+
+    auto nao = static_cast<int>(basis.dimensions_of_basis());
+    check_arrays("integrate_kx_fock", gsDensityArrays, nao);
+
+    auto gs_dens_pointers = arrays_to_const_pointers(gsDensityArrays);
+    return self.integrateKxFock(molecule, basis, gs_dens_pointers, molecularGrid, factor);
+}
+
+static auto
 CXCIntegrator_integrate_fxc_fock(const CXCIntegrator&                    self,
                                  std::vector<py::array_t<double>>&       aoFockArrays,
                                  const CMolecule&                        molecule,

@@ -48,6 +48,7 @@
 #include "XCIntegratorForLDA.hpp"
 #include "XCIntegratorForMGGA.hpp"
 #include "XCIntegratorForPDFT.hpp"
+#include "XCIntegratorForKx.hpp"
 
 CXCIntegrator::CXCIntegrator()
 
@@ -135,6 +136,28 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     return integrateFxcFock(aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, fvxc);
+}
+
+
+auto
+CXCIntegrator::integrateKxFock(const CMolecule&                  molecule,
+                               const CMolecularBasis&            basis,
+                               const std::vector<const double*>& gsDensityPointers,
+                               const CMolecularGrid&             molecularGrid,
+                               const double                      factor) const -> CAOKohnShamMatrix
+{
+    auto flag = (gsDensityPointers.size() == 1) ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
+
+    std::string erropenshell("XCIntegrator.integrateVxcFock: Only implemented for closed-shell");
+
+    if (flag == std::string("CLOSEDSHELL"))
+    {
+        return xcintkx::integrateKxFockForClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, factor);
+    }
+    else
+    {
+        return xcintkx::integrateKxFockForOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, factor);
+    }
 }
 
 auto
