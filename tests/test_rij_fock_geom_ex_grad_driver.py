@@ -61,6 +61,26 @@ class TestRIJFockGeomExGradDriver:
                                       2, 'j', 0.0, 0.0, 15)
         
         print(rgrad)
+        
+        bra_t4c = T4CScreener()
+        bra_t4c.partition_atom(bas_sto3g, mol_h2o, 'eri', 1)
+        
+        fock_grad_drv = FockGeom1000Driver()
+        rgrad = fock_grad_drv.compute(bas_sto3g, bra_t4c, ket_t4c,
+                                      gs_den_mat, rw_den_gen_mat,
+                                      1, 'j', 0.0, 0.0, 15)
+        
+        print(rgrad)
+        
+        bra_t4c = T4CScreener()
+        bra_t4c.partition_atom(bas_sto3g, mol_h2o, 'eri', 0)
+        
+        fock_grad_drv = FockGeom1000Driver()
+        rgrad = fock_grad_drv.compute(bas_sto3g, bra_t4c, ket_t4c,
+                                      gs_den_mat, rw_den_gen_mat,
+                                      0, 'j', 0.0, 0.0, 15)
+        
+        print(rgrad)
                 
         # compute J metric
         t2c_drv = TwoCenterElectronRepulsionDriver()
@@ -79,7 +99,21 @@ class TestRIJFockGeomExGradDriver:
         cg_xyz = cgrad.coordinates()
         
         print(cg_xyz)
+        
+        ri_grad_drv = RIFockGradDriver()
+        cgrad = ri_grad_drv.direct_compute(ket_t4c, bas_sto3g, bas_aux, mol_h2o, rw_bq, gs_bq, rw_den_sym_mat, gs_den_mat, 1, 15)
+        cg_xyz = cgrad.coordinates()
+        
+        print(cg_xyz)
+        
+        ri_grad_drv = RIFockGradDriver()
+        cgrad = ri_grad_drv.direct_compute(ket_t4c, bas_sto3g, bas_aux, mol_h2o, rw_bq, gs_bq, rw_den_sym_mat, gs_den_mat, 0, 15)
+        cg_xyz = cgrad.coordinates()
+        
+        print(cg_xyz)
     
+        assert False
+        
         for i in range(3):
             assert mt.isclose(rgrad[i], cg_xyz[i], rel_tol=1.0e-5, abs_tol=1.0e-5)
         
