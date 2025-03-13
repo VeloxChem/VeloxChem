@@ -45,7 +45,7 @@ class CT3FlatBuffer
         
         _width = width;
         
-        _data.reserve(_indices.size());
+        _data.reserve(_mask_indices.size());
         
         if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
         {
@@ -87,7 +87,7 @@ class CT3FlatBuffer
         
         _width = width;
         
-        _data.reserve(_indices.size() * nbatches);
+        _data.reserve(_mask_indices.size() * nbatches);
         
         if (const auto nelems = _width * (_width + 1) / 2;  nelems > 0)
         {

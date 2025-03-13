@@ -22,6 +22,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -366,17 +367,21 @@ class LinearSolver:
         screening = self.comm.bcast(screening, root=mpi_master())
         self._print_mem_debug_info('after  bcast screener')
 
-        if self.ri_coulomb and self.rank == mpi_master():
-            assert_msg_critical(
-                basis.get_label().lower().startswith('def2-'),
-                'SCF Driver: Invalid basis set for RI-J')
+        if self.ri_coulomb:
+            assert_msg_critical(basis.get_label().lower().startswith('def2-'),
+                                'SCF Driver: Invalid basis set for RI-J')
 
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')
             self.ostream.print_blank()
             self.ostream.flush()
 
-            basis_ri_j = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule,
+                                                 self.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
             self.ostream.print_info('Dimension of RI auxiliary basis set ' +
                                     f'({self.ri_auxiliary_basis.upper()}): ' +
@@ -414,7 +419,13 @@ class LinearSolver:
             inv_mat_j.set_values(inv_mat_j_np)
 
             self._ri_drv = RIFockDriver(inv_mat_j)
-            self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j)
+
+            local_atoms = molecule.partition_atoms(self.comm)
+            # TODO: update prepare_buffers so that local_atoms does not need to
+            #       be in ascending order
+            local_atoms = sorted(local_atoms)
+            self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j,
+                                         local_atoms)
 
             self.ostream.print_info(
                 f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
@@ -1414,27 +1425,32 @@ class LinearSolver:
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
-                    'LinearSolver: RI is only applicable to pure DFT functional')
+                    'LinearSolver: RI is only applicable to pure DFT functional'
+                )
 
             if self.ri_coulomb and fock_type == 'j':
                 # symmetrize density for RI-J
                 den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
                 den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
 
-                if self.rank == mpi_master():
-                    fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
-                    fock_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-                else:
-                    fock_np = np.zeros(dens[idx].shape)
+                local_gvec = np.array(
+                    self._ri_drv.compute_local_bq_vector(den_mat_for_ri_j))
+                gvec = np.zeros(local_gvec.shape)
+                self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                fock_mat = self._ri_drv.local_compute(den_mat_for_ri_j, gvec,
+                                                      'j')
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
             else:
                 den_mat_for_fock = make_matrix(basis, mat_t.general)
                 den_mat_for_fock.set_values(dens[idx])
 
                 self._print_mem_debug_info('before restgen Fock build')
-                fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
                 self._print_mem_debug_info('after  restgen Fock build')
 
                 fock_np = fock_mat.to_numpy()

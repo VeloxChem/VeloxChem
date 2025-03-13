@@ -58,6 +58,30 @@ class TestThreeCenterElectronRepulsionDriver:
                                   ref_buf[k, l, i],
                                   rel_tol=1.0e-12,
                                   abs_tol=1.0e-12)
+                                  
+    def test_electron_repulsion_h2o_svp_with_atoms(self):
+
+        mol, bas = self.get_data_svp()
+
+        # compute electron repulsion matrix
+        eri_drv = ThreeCenterElectronRepulsionDriver()
+        eri_buf = eri_drv.compute(mol, bas, bas, [0, 2])
+
+        # load reference kinetic energy data
+        here = Path(__file__).parent
+        npyfile = str(here / 'data' / 'h2o.svp.int3c2e.npy')
+        ref_buf = np.load(npyfile)
+
+        mask_indices = eri_buf.mask_indices()
+            
+        indexes = np.triu_indices(24)
+
+        for i in mask_indices.keys():
+            for k, l in zip(indexes[0], indexes[1]):
+                assert mt.isclose(eri_buf.value(mask_indices[i], k, l),
+                                  ref_buf[k, l, i],
+                                  rel_tol=1.0e-12,
+                                  abs_tol=1.0e-12)
 
     def test_electron_repulsion_h2o_qzvp(self):
 

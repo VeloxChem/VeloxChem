@@ -50,6 +50,14 @@ class CThreeCenterElectronRepulsionDriver
     /// @param molecule The molecule.
     /// @return The electron repulsion matrix.
     auto compute(const CMolecularBasis &basis, const CMolecularBasis &aux_basis, const CMolecule &molecule) const -> CT3FlatBuffer<double>;
+    
+    /// @brief Computes electron repulsion matrix for given molecule and molecular basis.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxilary molecular basis for fiting of four-center repulsion integrals.
+    /// @param molecule The molecule.
+    /// @param atoms The vector of atoms to compute three-center electron repulsion integrals.
+    /// @return The electron repulsion matrix.
+    auto compute(const CMolecularBasis &basis, const CMolecularBasis &aux_basis, const CMolecule &molecule, const std::vector<int>& atoms) const -> CT3FlatBuffer<double>;
 };
 
 

@@ -7,6 +7,7 @@ target_sources(vlxobjs
     T3CGeom0X0Distributor.cpp
     T3CGeom100SumDistributor.cpp
     T3CGeomX00Distributor.cpp
+    T3CLocalDistributor.cpp
     T3CUtils.cpp
   )
 
