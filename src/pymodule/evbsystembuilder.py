@@ -620,7 +620,7 @@ class EvbSystemBuilder():
             int(solvent_volume * solvent_mols_per_nm3 - charge_quantities[0] * Na_fac - charge_quantities[1] * Cl_fac),
             charge_quantities[0], charge_quantities[1]
         ]
-        quantities[0] = int(quantities[0] * 0.95)  # todo does this fix exploding organic solvents?
+        quantities[0] = int(quantities[0])  # todo does this fix exploding organic solvents?
         solvents: list[Molecule] = [solvent_molecule, na_mol, cl_mol]
         self.ostream.print_info(
             f"Solute volume: {solute_volume:.3f} nm^3, box valume: {box_volume:.3f} nm^3, solvent volume: {solvent_volume:.3f} nm^3"
