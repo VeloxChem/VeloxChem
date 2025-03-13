@@ -28,12 +28,8 @@ def _RIFockDriver_mpi_prepare_buffers(self, comm, molecule, basis, aux_basis):
     # select three-center integrals computation method
     
     natoms = molecule.number_of_atoms()
-    
-    if nodes > 1:
-        atoms = partition_atoms(natoms, rank, nodes)
-        self.prepare_buffers(molecule, basis, aux_basis, atoms)
-    else:
-        self.prepare_buffers(molecule, basis, aux_basis)
+    atoms = partition_atoms(natoms, rank, nodes)
+    self.prepare_buffers(molecule, basis, aux_basis, atoms)
         
 def _RIFockDriver_mpi_compute_bq_vector(self, comm, density):
     """
@@ -49,11 +45,6 @@ def _RIFockDriver_mpi_compute_bq_vector(self, comm, density):
     """
 
     # set up rank, node data
-    
-    nodes = comm.Get_size()
-    if nodes == 1:
-        return self.compute_bq_vector(density)
-    
     gv = np.array(self.compute_local_bq_vector(density))
     tv = np.zeros(gv.shape)
     comm.Allreduce([gv, MPI.DOUBLE], [tv, MPI.DOUBLE], op=MPI.SUM)
@@ -77,11 +68,6 @@ def _RIFockDriver_mpi_compute(self, comm, gamma, density, label):
     """
 
     # set up rank, node data
-    
-    nodes = comm.Get_size()
-    if nodes == 1:
-        return self.compute(density, gamma, label)
-
     fmat = self.local_compute(density, gamma, label)
     rfmat = Matrix.reduce(fmat, comm, mpi_master())
     return rfmat
