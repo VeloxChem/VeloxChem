@@ -249,7 +249,7 @@ class NonlinearSolver:
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}_rsp.h5'
+                self.checkpoint_file = f'{self.filename}.rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -465,17 +465,17 @@ class NonlinearSolver:
 
         mode_is_valid = mode.lower() in [
             'crf', 'tpa', 'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf',
-            'shg', 'shg_red', 'tpa_quad'
+            'shg', 'shg_red', 'tpa_quad', '3pa_cubic', '3pa_ii'
         ]
         assert_msg_critical(mode_is_valid,
                             'NonlinearSolver: Invalid mode ' + mode.lower())
 
-        mode_is_cubic = mode.lower() in ['crf', 'tpa']
+        mode_is_cubic = mode.lower() in ['crf', 'tpa','3pa_cubic']
+
         mode_is_quadratic = mode.lower() in [
             'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg',
-            'shg_red', 'tpa_quad'
+            'shg_red', 'tpa_quad', '3pa_ii'
         ]
-
         # determine number of batches
 
         if self.rank == mpi_master():
@@ -513,10 +513,23 @@ class NonlinearSolver:
                     # 6 third-order densities per frequency
                     size_1, size_2, size_3 = 12, 24, 6
 
+                elif mode.lower() == '3pa_cubic':
+                    # 4 first-order densities per frequency
+                    # 9 second-order densities per frequency
+                    # 6 third-order densities per frequency
+                    size_1, size_2, size_3 = 4, 9, 6
+
                 elif mode.lower() == 'crf_ii':
                     # 12 first-order densities per frequency
                     # 6 second-order densities per frequency
                     size_1, size_2 = 12, 2
+
+
+                elif mode.lower() == '3pa_ii':
+                    # 12 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 10, 15
+
 
                 elif mode.lower() == 'tpa_ii':
                     # 36 first-order densities per frequency
@@ -604,8 +617,7 @@ class NonlinearSolver:
             batch_size_first_order = self.comm.bcast(batch_size_first_order,
                                                      root=mpi_master())
             if mode_is_cubic:
-                batch_size_second_order = self.comm.bcast(
-                    batch_size_second_order, root=mpi_master())
+                batch_size_second_order = self.comm.bcast(batch_size_second_order, root=mpi_master())
 
         # go through batches
 
