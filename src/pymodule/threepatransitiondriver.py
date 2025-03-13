@@ -389,7 +389,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
                 for b_comp in 'xyz':
                     for c_comp in 'xyz':
 
-                        Na = ComplexResponse.get_full_solution_vector(Nx[(a_comp, w)])
+                        Na = self.flip_yz(ComplexResponse.get_full_solution_vector(Nx[(a_comp, w)]))
                         Nb = ComplexResponse.get_full_solution_vector(Nx[(b_comp, w)])
                         Nc = ComplexResponse.get_full_solution_vector(Nx[(c_comp, w)])
 
@@ -400,11 +400,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
                         except KeyError:
                             Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{c_comp}{b_comp}", w)])
 
-                        Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
+                        Nf = -LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
                         if self.rank == mpi_master():
-
-                            Na = self.flip_yz(Na)
 
                             op_A = X[a_comp]
                             op_B = X[b_comp]
@@ -412,17 +410,26 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
                             kb = LinearSolver.lrvec2mat(Nb, nocc, norb)
                             kc = LinearSolver.lrvec2mat(Nc, nocc, norb)
-                            ka = LinearSolver.lrvec2mat(Na, nocc, norb)
                             kf = LinearSolver.lrvec2mat(Nf, nocc, norb)
                             kbf = LinearSolver.lrvec2mat(Nbf, nocc, norb)
                             kcf = LinearSolver.lrvec2mat(Ncf, nocc, norb)
 
                             # A3 contraction
                             A3NbNcNf = np.dot(self._a3_contract(kb, kc, op_A, d_a_mo, nocc, norb), Nf)
+                            A3NcNbNf = np.dot(self._a3_contract(kb, kc, op_A, d_a_mo, nocc, norb), Nf)
 
+                            A3NfNbNc = np.dot(self._a3_contract(kf, kb, op_A, d_a_mo, nocc, norb), Nc)
+                            A3NfNcNb = np.dot(self._a3_contract(kf, kc, op_A, d_a_mo, nocc, norb), Nb)
+
+                            A3NcNbNf = np.dot(self._a3_contract(kc, kb, op_A, d_a_mo, nocc, norb), Nf)
+                            A3NcNfNb = np.dot(self._a3_contract(kc, kf, op_A, d_a_mo, nocc, norb), Nb)
+
+                            
                             # X3 contraction
                             NaB3NcNf = np.dot(Na.T, self._x3_contract(kc, kf, op_B, d_a_mo, nocc, norb))
+                            NaB3NfNc = np.dot(Na.T, self._x3_contract(kf, kc, op_B, d_a_mo, nocc, norb))
                             NaC3NbNf = np.dot(Na.T, self._x3_contract(kb, kf, op_C, d_a_mo, nocc, norb))
+                            NaC3NfNb = np.dot(Na.T, self._x3_contract(kf, kb, op_C, d_a_mo, nocc, norb))
 
                             # A2 contraction
                             NbA2Ncf = np.dot(self._a2_contract(kb, op_A, d_a_mo, nocc, norb), Ncf)
@@ -441,16 +448,16 @@ class ThreepaTransitionDriver(NonlinearSolver):
                             NaS4NbNcNd = np.dot(Na, s4_dict[(f"{b_comp}{c_comp}", w)])
 
                             # Check signs of the contractions
-                            T_abc = -A3NbNcNf 
-                            T_abc += - NaB3NcNf - NaC3NbNf 
+                            T_abc = (A3NbNcNf + A3NcNbNf + A3NfNbNc + A3NfNcNb + A3NcNbNf + A3NcNfNb) 
+                            T_abc +=  -(NaB3NcNf + NaB3NfNc + NaC3NbNf + NaC3NfNb)
                             T_abc +=  NbA2Ncf + NcA2Nbf + NfA2Nbc
                             T_abc +=  NaB2Ncf + NaC2Nbf 
                             T_abc += - NaE3NbNcf 
                             T_abc +=  NaE4NbNcNf + NaS4NbNcNd
 
                             T_tensors[(f"{a_comp}{b_comp}{c_comp}", w)] = T_abc
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"A3")] = -A3NbNcNf
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"X3")] = - NaB3NcNf - NaC3NbNf 
+                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"A3")] = (A3NbNcNf + A3NcNbNf + A3NfNbNc + A3NfNcNb + A3NcNbNf + A3NcNfNb)
+                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"X3")] =  -(NaB3NcNf + NaB3NfNc + NaC3NbNf + NaC3NfNb) 
                             debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"A2")] = NbA2Ncf + NcA2Nbf + NfA2Nbc 
                             debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"X2")] = NaB2Ncf + NaC2Nbf 
                             debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"E3")] = - NaE3NbNcf 
@@ -511,13 +518,17 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
             solution_vector_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
             solution_vector_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
+            solution_vector_ya = self.flip_yz(ComplexResponse.get_full_solution_vector(Nx[('y', w)]))
             solution_vector_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
-            solution_vector_f = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
+            solution_vector_f = -LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
             print("Nx")
             for element in solution_vector_x:
                 print(element.real)
             print("Ny")
             for element in solution_vector_y:
+                print(element.real)
+            print("Nya")
+            for element in solution_vector_ya:
                 print(element.real)
             print("Nz")
             for element in solution_vector_z:
