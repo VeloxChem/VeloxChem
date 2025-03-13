@@ -102,6 +102,21 @@ export_t3cintegrals(py::module& m)
                 return grad_drv.direct_compute(screener, basis, aux_basis, molecule, gamma, density, iatom, ithreshold);
              },
           "Computes Coulomb Fock contribution to atom's gradient.")
+        .def("direct_compute",
+             [] (const CRIFockGradDriver&   grad_drv,
+                 const CT4CScreener&        screener,
+                 const CMolecularBasis&     basis,
+                 const CMolecularBasis&     aux_basis,
+                 const CMolecule&           molecule,
+                 const std::vector<double>& bra_gamma,
+                 const std::vector<double>& ket_gamma,
+                 const CMatrix&             bra_density,
+                 const int                  iatom,
+                 const int                  ithreshold) -> TPoint<double>
+             {
+                return grad_drv.direct_compute(screener, basis, aux_basis, molecule, bra_gamma, ket_gamma, bra_density, iatom, ithreshold);
+             },
+          "Computes Coulomb Fock contribution to atom's gradient.")
         .def("compute",
              [] (const CRIFockGradDriver&   grad_drv,
                  const CMolecularBasis&     basis,
