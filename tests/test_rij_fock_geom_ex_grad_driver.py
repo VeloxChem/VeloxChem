@@ -42,6 +42,9 @@ class TestRIJFockGeomExGradDriver:
         density = np.load(npyfile)
         gs_den_mat = make_matrix(bas_sto3g, mat_t.symmetric)
         gs_den_mat.set_values(density)
+        dims = density.shape
+        density = np.random.rand(dims[0], dims[1])
+        density = density + density.T
         rw_den_sym_mat = make_matrix(bas_sto3g, mat_t.symmetric)
         rw_den_sym_mat.set_values(0.68 * density)
         rw_den_gen_mat = make_matrix(bas_sto3g, mat_t.general)
@@ -57,6 +60,8 @@ class TestRIJFockGeomExGradDriver:
                                       gs_den_mat, rw_den_gen_mat,
                                       2, 'j', 0.0, 0.0, 15)
         
+        print(rgrad)
+                
         # compute J metric
         t2c_drv = TwoCenterElectronRepulsionDriver()
         matj = t2c_drv.compute(mol_h2o, bas_aux)
@@ -72,6 +77,8 @@ class TestRIJFockGeomExGradDriver:
         ri_grad_drv = RIFockGradDriver()
         cgrad = ri_grad_drv.direct_compute(ket_t4c, bas_sto3g, bas_aux, mol_h2o, rw_bq, gs_bq, rw_den_sym_mat, gs_den_mat, 2, 15)
         cg_xyz = cgrad.coordinates()
+        
+        print(cg_xyz)
     
         for i in range(3):
             assert mt.isclose(rgrad[i], cg_xyz[i], rel_tol=1.0e-5, abs_tol=1.0e-5)
