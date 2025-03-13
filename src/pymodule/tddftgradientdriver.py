@@ -30,12 +30,14 @@ import math
 from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
+from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import mpi_master, mat_t
-from .veloxchemlib import partition_atoms, make_matrix
+from .veloxchemlib import make_matrix
 from .matrices import Matrices
 from .profiler import Profiler
+from .molecularbasis import MolecularBasis
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
@@ -262,7 +264,13 @@ class TddftGradientDriver(GradientDriver):
 
         t0 = time.time()
 
+        self.ostream.print_info('Computing the omega Lagrange multipliers...')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        orbrsp_drv.ostream.mute()
         omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
+        orbrsp_drv.ostream.unmute()
 
         grad_timing['Compute_omega'] += time.time() - t0
 
@@ -344,6 +352,8 @@ class TddftGradientDriver(GradientDriver):
         gs_grad_drv.compute(molecule, basis, scf_tensors)
         gs_grad_drv.ostream.unmute()
 
+        gs_grad = gs_grad_drv.get_gradient()
+
         grad_timing['Ground_state_grad'] += time.time() - t0
 
         self.gradient = np.zeros((dof, natm, 3))
@@ -352,7 +362,7 @@ class TddftGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-        local_atoms = partition_atoms(natm, self.rank, self.nodes)
+        local_atoms = molecule.partition_atoms(self.comm)
 
         # kinetic energy contribution to gradient
 
@@ -470,59 +480,147 @@ class TddftGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
-        factor = 2.0 if fock_type == 'j' else 1.0
-
         den_mat_for_fock_gs = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock_gs.set_values(gs_dm)
 
-        den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
+        if self._scf_drv.ri_coulomb:
 
-        den_mat_for_fock_xpy = make_matrix(basis, mat_t.general)
-        den_mat_for_fock_xpy_m_xpyT = make_matrix(basis, mat_t.general)
+            sym_den_mat_for_fock_rel = make_matrix(basis, mat_t.symmetric)
 
-        den_mat_for_fock_xmy = make_matrix(basis, mat_t.general)
-        den_mat_for_fock_xmy_p_xmyT = make_matrix(basis, mat_t.general)
+            # sym_den_mat_for_fock_xpy = make_matrix(basis, mat_t.symmetric)
+            # sym_den_mat_for_fock_xpy_m_xpyT = make_matrix(basis, mat_t.symmetric)
 
-        for iatom in local_atoms:
+            sym_den_mat_for_fock_xmy = make_matrix(basis, mat_t.symmetric)
+            sym_den_mat_for_fock_xmy_p_xmyT = make_matrix(basis, mat_t.symmetric)
 
-            screener_atom = T4CScreener()
-            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
+
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(
+                    molecule, self._scf_drv.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+
+            self._scf_drv._ri_drv.prepare_buffers(molecule, basis, basis_ri_j, local_atoms)
+
+            ri_grad_drv = RIFockGradDriver()
+
+            local_ri_gvec_gs = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(den_mat_for_fock_gs))
+            ri_gvec_gs = np.zeros(local_ri_gvec_gs.shape)
+            self.comm.Allreduce(local_ri_gvec_gs, ri_gvec_gs, op=MPI.SUM)
 
             for idx in range(dof):
-                den_mat_for_fock_rel.set_values(relaxed_density_ao[idx])
 
-                den_mat_for_fock_xpy.set_values(x_plus_y_ao[idx])
-                den_mat_for_fock_xpy_m_xpyT.set_values( x_plus_y_ao[idx]
-                                                      - x_plus_y_ao[idx].T)
+                sym_den_mat_for_fock_rel.set_values(self.get_sym_mat(relaxed_density_ao[idx]))
 
-                den_mat_for_fock_xmy.set_values(x_minus_y_ao[idx])
-                den_mat_for_fock_xmy_p_xmyT.set_values( x_minus_y_ao[idx]
-                                                      + x_minus_y_ao[idx].T)
+                # sym_den_mat_for_fock_xpy.set_values(self.get_sym_mat(x_plus_y_ao[idx]))
+                # sym_den_mat_for_fock_xpy_m_xpyT.set_values(self.get_sym_mat(x_plus_y_ao[idx] - x_plus_y_ao[idx].T))
 
-                atomgrad_rel = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_gs,
-                                             den_mat_for_fock_rel, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                sym_den_mat_for_fock_xmy.set_values(self.get_sym_mat(x_minus_y_ao[idx]))
+                sym_den_mat_for_fock_xmy_p_xmyT.set_values(self.get_sym_mat(x_minus_y_ao[idx] + x_minus_y_ao[idx].T))
 
-                atomgrad_xpy = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy,
-                                             den_mat_for_fock_xpy_m_xpyT, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                for iatom in local_atoms:
 
-                atomgrad_xmy = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy,
-                                             den_mat_for_fock_xmy_p_xmyT, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
-                
-                self.gradient[idx, iatom, :] += np.array(atomgrad_rel) * factor
-                self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xpy) * factor
-                self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xmy) * factor
+                    local_ri_gvec_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_rel))
+                    ri_gvec_2 = np.zeros(local_ri_gvec_2.shape)
+                    self.comm.Allreduce(local_ri_gvec_2, ri_gvec_2, op=MPI.SUM)
+
+                    atomgrad_rel = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule,
+                                                              ri_gvec_2, ri_gvec_gs, sym_den_mat_for_fock_rel,
+                                                              den_mat_for_fock_gs, iatom, thresh_int)
+
+                    # Note: RI gradient from direct_compute does NOT contain factor of 2
+                    self.gradient[idx, iatom, :] += np.array(atomgrad_rel.coordinates()) * 2.0
+
+                    # xpy has no contribution to J gradient
+                    """
+                    local_ri_gvec = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xpy))
+                    ri_gvec = np.zeros(local_ri_gvec.shape)
+                    self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
+
+                    local_ri_gvec_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xpy_m_xpyT))
+                    ri_gvec_2 = np.zeros(local_ri_gvec_2.shape)
+                    self.comm.Allreduce(local_ri_gvec_2, ri_gvec_2, op=MPI.SUM)
+
+                    atomgrad_xpy = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule,
+                                                              ri_gvec_2, ri_gvec, sym_den_mat_for_fock_xpy_m_xpyT,
+                                                              sym_den_mat_for_fock_xpy, iatom, thresh_int)
+
+                    # Note: RI gradient from direct_compute does NOT contain factor of 2
+                    self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xpy.coordinates()) * 2.0
+                    """
+
+                    local_ri_gvec = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy))
+                    ri_gvec = np.zeros(local_ri_gvec.shape)
+                    self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
+
+                    local_ri_gvec_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy_p_xmyT))
+                    ri_gvec_2 = np.zeros(local_ri_gvec_2.shape)
+                    self.comm.Allreduce(local_ri_gvec_2, ri_gvec_2, op=MPI.SUM)
+
+                    atomgrad_xmy = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule,
+                                                              ri_gvec_2, ri_gvec, sym_den_mat_for_fock_xmy_p_xmyT, 
+                                                              sym_den_mat_for_fock_xmy, iatom, thresh_int)
+
+                    # Note: RI gradient from direct_compute does NOT contain factor of 2
+                    self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xmy.coordinates()) * 2.0
+
+        else:
+
+            den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
+
+            den_mat_for_fock_xpy = make_matrix(basis, mat_t.general)
+            den_mat_for_fock_xpy_m_xpyT = make_matrix(basis, mat_t.general)
+
+            den_mat_for_fock_xmy = make_matrix(basis, mat_t.general)
+            den_mat_for_fock_xmy_p_xmyT = make_matrix(basis, mat_t.general)
+
+            factor = 2.0 if fock_type == 'j' else 1.0
+
+            for iatom in local_atoms:
+
+                screener_atom = T4CScreener()
+                screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+                for idx in range(dof):
+
+                    den_mat_for_fock_rel.set_values(relaxed_density_ao[idx])
+
+                    den_mat_for_fock_xpy.set_values(x_plus_y_ao[idx])
+                    den_mat_for_fock_xpy_m_xpyT.set_values( x_plus_y_ao[idx]
+                                                          - x_plus_y_ao[idx].T)
+
+                    den_mat_for_fock_xmy.set_values(x_minus_y_ao[idx])
+                    den_mat_for_fock_xmy_p_xmyT.set_values( x_minus_y_ao[idx]
+                                                          + x_minus_y_ao[idx].T)
+
+                    atomgrad_rel = fock_grad_drv.compute(basis, screener_atom,
+                                                 screener,
+                                                 den_mat_for_fock_gs,
+                                                 den_mat_for_fock_rel, iatom,
+                                                 fock_type, exchange_scaling_factor,
+                                                 0.0, thresh_int)
+
+                    atomgrad_xpy = fock_grad_drv.compute(basis, screener_atom,
+                                                 screener,
+                                                 den_mat_for_fock_xpy,
+                                                 den_mat_for_fock_xpy_m_xpyT, iatom,
+                                                 fock_type, exchange_scaling_factor,
+                                                 0.0, thresh_int)
+
+                    atomgrad_xmy = fock_grad_drv.compute(basis, screener_atom,
+                                                 screener,
+                                                 den_mat_for_fock_xmy,
+                                                 den_mat_for_fock_xmy_p_xmyT, iatom,
+                                                 fock_type, exchange_scaling_factor,
+                                                 0.0, thresh_int)
+
+                    self.gradient[idx, iatom, :] += np.array(atomgrad_rel) * factor
+                    self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xpy) * factor
+                    self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xmy) * factor
 
         self._print_debug_info('after  fock_grad')
 
@@ -567,7 +665,7 @@ class TddftGradientDriver(GradientDriver):
                 self.gradient[s] += tddft_xcgrad
 
         if self.rank == mpi_master():
-            self.gradient += gs_grad_drv.get_gradient()
+            self.gradient += gs_grad
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
@@ -694,3 +792,8 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
                                     profiler.get_available_memory())
             self.ostream.flush()
+
+    @staticmethod
+    def get_sym_mat(array):
+
+        return 0.5 * (array + array.T)
