@@ -75,6 +75,7 @@ class EvbFepDriver():
         self.crash_reporting_interval: int = 1
 
         self.constrain_H: bool = True
+        self.calculate_forces: bool = False
 
     def run_FEP(
         self,
@@ -87,7 +88,6 @@ class EvbFepDriver():
         initial_equil_step_size,
         Lambda,
         configuration,
-        calculate_forces=False,
     ):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbFepDriver.')
@@ -134,12 +134,6 @@ class EvbFepDriver():
         timer.start()
         for i, l in enumerate(self.Lambda):
             system = systems[l]
-            integrator = mm.LangevinMiddleIntegrator(
-                integrator_temperature,
-                integrator_friction_coeff,
-                equil_step_size * mmunit.picoseconds,
-            )
-            integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
 
             if l > 0:
                 estimated_time_remaining = timer.calculate_remaining(i)
@@ -148,20 +142,26 @@ class EvbFepDriver():
             else:
                 self.ostream.print_info(f"lambda = {l}")
 
-            if self.constrain_H:
-                system = self._constrain_H_bonds(system)
-
+            equil_integrator = mm.LangevinMiddleIntegrator(
+                integrator_temperature,
+                integrator_friction_coeff,
+                equil_step_size * mmunit.picoseconds,
+            )
+            equil_integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
             equil_simulation = mmapp.Simulation(
                 topology,
                 system,
-                integrator,
+                equil_integrator,
             )
             equil_simulation.context.setPositions(initial_positions)
             equil_simulation.reporters.append(
-                mmapp.XTCReporter(
-                    str(self.run_folder / f"traj_minim_{l:.3f}.xtc"),
+                mmapp.PDBReporter(
+                    str(self.run_folder / f"traj_minim_{l:.3f}.pdb"),
                     write_step,
+                    enforcePeriodicBox=True,
                 ))
+            if self.constrain_H:
+                system = self._constrain_H_bonds(system)
 
             self.ostream.print_info("Minimizing energy")
             self.ostream.flush()
@@ -169,18 +169,19 @@ class EvbFepDriver():
 
             minim_positions = equil_simulation.context.getState(getPositions=True).getPositions()
 
+            if l == 0:
+                self.ostream.print_info(
+                    f"Running initial equilibration with step size {equil_simulation.integrator.getStepSize()}")
+                self.ostream.flush()
+                timer.start()
+
             equil_crashed = False
             finished_equil = False
             while not finished_equil:
                 try:
                     if l == 0:
                         equil_simulation.integrator.setStepSize(initial_equil_step_size * mmunit.picoseconds)
-                        self.ostream.print_info(
-                            f"Running initial equilibration with step size {equil_simulation.integrator.getStepSize()}")
-                        self.ostream.flush()
                         equil_simulation.step(lambda_0_equilibration_steps)
-                        timer.start()
-
                     # equilibrate
                     equil_simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
                     self.ostream.print_info(
@@ -188,6 +189,7 @@ class EvbFepDriver():
                     self.ostream.flush()
                     # if it crashes, try again with more writing steps for debugging purposes
                     equil_simulation.step(equilibration_steps)
+                    equil_positions = equil_simulation.context.getState(getPositions=True).getPositions()
                     finished_equil = True
                 except mm.OpenMMException as e:
                     if equil_crashed:
@@ -196,9 +198,10 @@ class EvbFepDriver():
                         raise e
                     else:
                         equil_crashed = True
-                        mimin_reporter = mmapp.XTCReporter(
-                            str(self.run_folder / f"traj_minim_detail_{l:.3f}.xtc"),
+                        mimin_reporter = mmapp.PDBReporter(
+                            str(self.run_folder / f"traj_minim_detail_{l:.3f}.pdb"),
                             self.crash_reporting_interval,
+                            enforcePeriodicBox=True,
                         )
                         evb_repertor = EvbReporter(
                             str(self.run_folder / f"energies_equil_{l:.3f}.csv"),
@@ -218,24 +221,22 @@ class EvbFepDriver():
                             "Equilibration crashed, trying again to equilibrate and writing more detailed data")
                         self.ostream.flush()
 
-            equil_positions = equil_simulation.context.getState(getPositions=True).getPositions()
-
             if self.constrain_H:
                 self.ostream.print_info("Removing constraints involving H atoms")
                 for i in range(system.getNumConstraints()):
                     system.removeConstraint(0)
 
             # Updating the system requires recreating the simulation, and integrators can only be bound to one context
-            integrator = mm.LangevinMiddleIntegrator(
+            run_integrator = mm.LangevinMiddleIntegrator(
                 integrator_temperature,
                 integrator_friction_coeff,
                 step_size * mmunit.picoseconds,
             )
-            integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
+            run_integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
             run_simulation = mmapp.Simulation(
                 topology,
                 system,
-                integrator,
+                run_integrator,
             )
             run_simulation.reporters.append(traj_roporter)
 
@@ -243,7 +244,7 @@ class EvbFepDriver():
                 append = False
             else:
                 append = True
-            if calculate_forces:
+            if self.calculate_forces:
                 force_file = str(self.data_folder / f"Forces.csv")
             else:
                 force_file = None
@@ -294,9 +295,10 @@ class EvbFepDriver():
                         raise e
                     else:
                         run_crashed = True
-                        traj_detail_roporter = mmapp.XTCReporter(
-                            str(self.run_folder / f"traj_run_{l:.3f}.xtc"),
+                        traj_detail_roporter = mmapp.PDBReporter(
+                            str(self.run_folder / f"traj_run_{l:.3f}.pdb"),
                             self.crash_reporting_interval,
+                            enforcePeriodicBox=True,
                         )
                         evb_detail_repertor = EvbReporter(
                             str(self.run_folder / f"energies_run_{l:.3f}.csv"),

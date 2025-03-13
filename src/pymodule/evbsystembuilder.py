@@ -53,9 +53,16 @@ except ImportError:
 # Soft core long range potentials provide faster convergence for averages and are thus included in the PES potential. They cause unstable integration though.
 class EvbForceGroup(Enum):
     DEFAULT = auto()  # Default force group, included for both integration and energy calculations
+    # THERMOSTAT = auto()  # Thermostat
     HARDLR = auto()  # Hard core long range potential
     SOFTLR = auto()  # Soft core long range potential
     CONSTRAINT = auto()
+
+    CMM_REMOVER = auto()  # Center of mass motion remover
+    NB_FORCE = auto()  # Solvent-solvent and solvent-solute nb force
+    BAROSTAT = auto()  # Barostat
+    E_FIELD = auto()  # Electric field force
+    REACTION_BONDED = auto()  # Bonded forces for the reaction atoms
 
     # Constraints that also should be included in the PES calculations. Currently only used for the linear bond constraint
     PES_CONSTRAINT = auto()
@@ -70,6 +77,11 @@ class EvbForceGroup(Enum):
     def integration_force_groups(cls):
         return set([
             cls.DEFAULT.value,
+            cls.CMM_REMOVER.value,
+            cls.NB_FORCE.value,
+            cls.BAROSTAT.value,
+            cls.E_FIELD.value,
+            cls.REACTION_BONDED.value,
             cls.HARDLR.value,
             cls.CONSTRAINT.value,
             cls.PES_CONSTRAINT.value,
@@ -83,6 +95,11 @@ class EvbForceGroup(Enum):
     def pes_force_groups(cls):
         return set([
             cls.DEFAULT.value,
+            cls.CMM_REMOVER.value,
+            cls.NB_FORCE.value,
+            cls.BAROSTAT.value,
+            cls.E_FIELD.value,
+            cls.REACTION_BONDED.value,
             cls.PES_CONSTRAINT.value,
             cls.SOFTLR.value,
             cls.SOLVENT.value,
@@ -94,6 +111,11 @@ class EvbForceGroup(Enum):
     def all_force_groups(cls):
         return set([
             cls.DEFAULT.value,
+            cls.CMM_REMOVER.value,
+            cls.NB_FORCE.value,
+            cls.BAROSTAT.value,
+            cls.E_FIELD.value,
+            cls.REACTION_BONDED.value,
             cls.HARDLR.value,
             cls.SOFTLR.value,
             cls.CONSTRAINT.value,
@@ -242,7 +264,7 @@ class EvbSystemBuilder():
 
         cmm_remover = mm.CMMotionRemover()
         cmm_remover.setName("CMM remover")
-        cmm_remover.setForceGroup(EvbForceGroup.DEFAULT.value)
+        cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
         system.addForce(cmm_remover)
 
         nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
@@ -254,7 +276,7 @@ class EvbSystemBuilder():
         nb_force.setUseSwitchingFunction(True)
         self.ostream.print_info(f"Setting nonbonded cutoff to {cutoff:.3f} nm")
         nb_force.setSwitchingDistance(0.9 * cutoff)
-        nb_force.setForceGroup(EvbForceGroup.DEFAULT.value)
+        nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
         system.addForce(nb_force)
 
         if NPT:
@@ -262,12 +284,12 @@ class EvbSystemBuilder():
                 pressure * mmunit.bar,  # type: ignore
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
-            barostat.setForceGroup(EvbForceGroup.DEFAULT.value)
+            barostat.setForceGroup(EvbForceGroup.BAROSTAT.value)
             system.addForce(barostat)
 
         if np.any(np.array(E_field) > 0.001):
             E_field_force = self._create_E_field(system, E_field)
-            E_field_force.setForceGroup(EvbForceGroup.DEFAULT.value)
+            E_field_force.setForceGroup(EvbForceGroup.E_FIELD.value)
             system.addForce(E_field_force)
 
         #Add the reactant to the nonbonded force
@@ -598,10 +620,7 @@ class EvbSystemBuilder():
             int(solvent_volume * solvent_mols_per_nm3 - charge_quantities[0] * Na_fac - charge_quantities[1] * Cl_fac),
             charge_quantities[0], charge_quantities[1]
         ]
-        quantities = [
-            int(solvent_volume * solvent_mols_per_nm3 - charge_quantities[0] * Na_fac - charge_quantities[1] * Cl_fac),
-            charge_quantities[0], charge_quantities[1]
-        ]
+        quantities[0] = int(quantities[0] * 0.95)  # todo does this fix exploding organic solvents?
         solvents: list[Molecule] = [solvent_molecule, na_mol, cl_mol]
         self.ostream.print_info(
             f"Solute volume: {solute_volume:.3f} nm^3, box valume: {box_volume:.3f} nm^3, solvent volume: {solvent_volume:.3f} nm^3"
@@ -884,25 +903,25 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
         harmonic_force, morse_force, max_distance = self._create_bond_forces(lam)
 
-        harmonic_force.setForceGroup(EvbForceGroup.DEFAULT.value)
+        harmonic_force.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         system.addForce(harmonic_force)
 
-        morse_force.setForceGroup(EvbForceGroup.DEFAULT.value)
+        morse_force.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         system.addForce(morse_force)
 
         max_distance.setForceGroup(EvbForceGroup.RESTRAINT.value)
         system.addForce(max_distance)
 
         angle = self._create_angle_forces(lam)
-        angle.setForceGroup(EvbForceGroup.DEFAULT.value)
+        angle.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         system.addForce(angle)
 
         torsion = self._create_proper_torsion_forces(lam)
-        torsion.setForceGroup(EvbForceGroup.DEFAULT.value)
+        torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         system.addForce(torsion)
 
         improper = self._create_improper_torsion_forces(lam)
-        improper.setForceGroup(EvbForceGroup.DEFAULT.value)
+        improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         system.addForce(improper)
 
         hardlj, hardcoul = self._create_nonbonded_forces(lam, lj_soft_core=False, coul_soft_core=False)
@@ -1247,19 +1266,20 @@ class EvbSystemBuilder():
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
         coulomb_force = mm.CustomBondForce(self._get_couloumb_expression(coul_soft_core))
+        name = "Reaction internal coulomb"
         if coul_soft_core:
-            coulomb_force.setName("Reaction internal coulomb")
-        else:
-            coulomb_force.setName("Reaction internal coulomb")
+            name += " soft-core"
+
+        coulomb_force.setName(name)
         coulomb_force.addPerBondParameter("qqA")
         coulomb_force.addPerBondParameter("qqB")
         coulomb_force.addGlobalParameter("l", lam)
 
         lj_force = mm.CustomBondForce(self._get_lj_expression(lj_soft_core))
+        name = "Reaction internal lennard-jones"
         if lj_soft_core:
-            lj_force.setName("Reaction internal lennard-jones soft-core")
-        else:
-            lj_force.setName("Reaction internal lennard-jones")
+            name += " soft-core"
+        lj_force.setName(name)
         lj_force.addPerBondParameter("sigmaA")
         lj_force.addPerBondParameter("sigmaB")
         lj_force.addPerBondParameter("epsilonA")
