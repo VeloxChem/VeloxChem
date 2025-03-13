@@ -87,7 +87,6 @@ class EvbDriver():
         self.debug = False
         self.fast_run = False
         self.demo = False
-        self.calculate_forces = False
 
         self.t_label = int(time.time())
 
@@ -274,6 +273,8 @@ class EvbDriver():
                 ordered_input,
                 breaking_bonds,
             )
+
+        (cwd / self.input_folder).mkdir(parents=True, exist_ok=True)
         self.save_forcefield(self.reactant, str(reactant_path))
         self.save_forcefield(self.product, str(combined_product_path))
         self.ostream.flush()
@@ -323,11 +324,11 @@ class EvbDriver():
         hessian = None
         hessian_path = cwd / self.input_folder / f"{filename}_hess.np"
         if hessian_path.exists():
-            self.ostream.print_info(f"Found hessian file at {hessian_path}, using it to reparameterize.")
+            self.ostream.print_info(f"Found hessian file at {hessian_path}")
             hessian = np.loadtxt(hessian_path)
         else:
-            self.ostream.print_info(
-                f"Could not find hessian file at {hessian_path}, calculating hessian with xtb and saving it")
+
+            self.ostream.print_info(f"Could not find hessian file at {hessian_path}")
         self.ostream.flush()
         return {
             "molecule": molecule,
@@ -488,9 +489,6 @@ class EvbDriver():
 
             data_folder_path.mkdir(parents=True, exist_ok=True)
             run_folder_path.mkdir(parents=True, exist_ok=True)
-
-            self.save_forcefield(self.reactant, str(data_folder_path / "reactant_ff.json"))
-            self.save_forcefield(self.product, str(data_folder_path / "product_ff.json"))
 
             # build the system
             system_builder = EvbSystemBuilder()
@@ -711,6 +709,8 @@ class EvbDriver():
         step_size=0.001,
         equil_step_size=0.002,
         initial_equil_step_size=0.002,
+        calculate_forces=False,
+        constrain_H=True,
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
 
@@ -750,6 +750,8 @@ class EvbDriver():
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver()
+            FEP.constrain_H = constrain_H
+            FEP.calculate_forces = calculate_forces
             FEP.run_FEP(
                 equilibration_steps=equil_steps,
                 total_sample_steps=sample_steps,
@@ -760,7 +762,6 @@ class EvbDriver():
                 initial_equil_step_size=initial_equil_step_size,
                 Lambda=self.Lambda,
                 configuration=conf,
-                calculate_forces=self.calculate_forces,
             )
 
     def compute_energy_profiles(
