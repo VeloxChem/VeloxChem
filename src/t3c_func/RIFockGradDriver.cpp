@@ -72,6 +72,50 @@ CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
 }
 
 auto
+CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
+                                  const CMolecularBasis&     basis,
+                                  const CMolecularBasis&     aux_basis,
+                                  const CMolecule&           molecule,
+                                  const std::vector<double>& bra_gamma,
+                                  const std::vector<double>& ket_gamma,
+                                  const CMatrix&             bra_density,
+                                  const int                  iatom,
+                                  const int                  ithreshold) const -> TPoint<double>
+{
+    auto tg_xyz = std::array<double, 3>({0.0, 0.0, 0.0});
+    
+    const auto bra_dvec = bra_density.flat_values();
+            
+    const auto t3cb_drv = CThreeCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g1_xyz = t3cb_drv.compute(screener, basis, aux_basis, molecule,
+                                         ket_gamma, bra_dvec, iatom, ithreshold);
+    
+    tg_xyz[0] += g1_xyz[0]; tg_xyz[1] += g1_xyz[1]; tg_xyz[2] += g1_xyz[2];
+    
+    //std::cout << " First : " << tg_xyz[0] << " , " << tg_xyz[1] << " , " << tg_xyz[2] << std::endl;
+    
+    const auto t3ck_drv = CThreeCenterElectronRepulsionGeom0X0Driver<1>();
+    
+    const auto g2_xyz = t3ck_drv.compute(basis, aux_basis, molecule, ket_gamma, bra_dvec, iatom);
+    
+    tg_xyz[0] += g2_xyz[0]; tg_xyz[1] += g2_xyz[1]; tg_xyz[2] += g2_xyz[2];
+    
+    //std::cout << " Second : " << tg_xyz[0] << " , " << tg_xyz[1] << " , " << tg_xyz[2] << std::endl;
+    
+    const auto t2c_drv = CTwoCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g3_xyz = t2c_drv.compute(aux_basis, molecule, bra_gamma, ket_gamma, iatom);
+    
+    tg_xyz[0] -= g3_xyz[0]; tg_xyz[1] -= g3_xyz[1]; tg_xyz[2] -= g3_xyz[2];
+    
+    //std::cout << " Total : " << tg_xyz[0] << " , " << tg_xyz[1] << " , " << tg_xyz[2] << std::endl;
+    
+    return TPoint<double>(tg_xyz);
+    
+}
+
+auto
 CRIFockGradDriver::compute(const CMolecularBasis&     basis,
                            const CMolecularBasis&     aux_basis,
                            const CMolecule&           molecule,
