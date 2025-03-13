@@ -765,6 +765,7 @@ class EvbSystemBuilder():
                     solvent_ff.dihedrals = {}
                     solvent_ff.impropers = {}
                 else:
+                    #todo here there's something going teribly wrong
                     resname = "SOL"
                     solvent_ff = MMForceFieldGenerator()
                     solvent_ff.create_topology(vlx_solvent_molecule)
