@@ -110,6 +110,7 @@ class CRIFockGradDriver
     /// @param bra_gamma The transformed Gamma vector on bra side.
     /// @param ket_gamma The transformed Gamma vector on ket side.
     /// @param bra_density The density matrix to construct Fock matrix on bra side.
+    /// @param ket_density The density matrix to construct Fock matrix on ket side.
     /// @param iatom The index of requested atom.
     /// @return The Fock contribution to atom's gradient.
     auto direct_compute(const CT4CScreener&        screener,
@@ -119,6 +120,7 @@ class CRIFockGradDriver
                         const std::vector<double>& bra_gamma,
                         const std::vector<double>& ket_gamma,
                         const CMatrix&             bra_density,
+                        const CMatrix&             ket_density,
                         const int                  iatom,
                         const int                  ithreshold) const -> TPoint<double>;
     
