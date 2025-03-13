@@ -49,6 +49,7 @@ class EvbReporter():
         Lambda,
         outputstream,
         force_file=None,
+        velocity_file=None,
         append=False,
     ):
 
@@ -106,17 +107,27 @@ class EvbReporter():
 
         if force_file is None:
             self.forces = False
-            return
+        else:
+            self.forces = True
+            self.F_out = open(force_file, 'a' if append else 'w')
+            if not append:
+                header = "Lambda, "
+                for j in range(topology.getNumAtoms()):
+                    header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
+                header = header[:-2] + '\n'
+                self.F_out.write(header)
 
-        self.forces = True
-        self.F_out = open(force_file, 'a' if append else 'w')
-
-        if not append:
-            header = "Lambda, "
-            for j in range(topology.getNumAtoms()):
-                header += f"F(x, {j}), F(y, {j}), F(z, {j}), norm({j}), "
-            header = header[:-2] + '\n'
-            self.F_out.write(header)
+        if velocity_file is None:
+            self.velocities = False
+        else:
+            self.velocities = True
+            self.v_out = open(velocity_file, 'a' if append else 'w')
+            if not append:
+                header = "Lambda, "
+                for j in range(topology.getNumAtoms()):
+                    header += f"V(x, {j}), V(y, {j}), V(z, {j}), "
+                header = header[:-2] + '\n'
+                self.v_out.write(header)
 
     def __del__(self):
         self.E_out.close()
@@ -132,12 +143,14 @@ class EvbReporter():
         steps = self.report_interval - simulation.currentStep % self.report_interval
 
         if self.use_tuple:
-            return (steps, True, False, self.forces, True, True)  #steps, positions, velocities, forces, energy, pbc
+            return (steps, True, self.velocities, self.forces, True, True
+                    )  #steps, positions, velocities, forces, energy, pbc
         else:
+            include = ['positions', 'energy']
+            if self.velocities:
+                include.append('velocities')
             if self.forces:
-                include = ['forces', 'positions', 'energy']
-            else:
-                include = ['positions', 'energy']
+                include.append('forces')
 
             return {'steps': steps, 'periodic': True, 'include': include}
 
@@ -153,17 +166,23 @@ class EvbReporter():
         line += f", {Em}\n"
         self.E_out.write(line)
 
-        if not self.forces:
-            return
-
-        forces = state.getForces(asNumpy=True)
-        norms = np.linalg.norm(forces, axis=1)
-        line = f"{self.Lambda}"
-        kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
-        for i in range(forces.shape[0]):
-            line += f", {forces[i][0].value_in_unit(kjpermolenm)}, {forces[i][1].value_in_unit(kjpermolenm)}, {forces[i][2].value_in_unit(kjpermolenm)}, {norms[i]}"
-        line += '\n'
-        self.F_out.write(line)
+        if self.forces:
+            forces = state.getForces(asNumpy=True)
+            norms = np.linalg.norm(forces, axis=1)
+            line = f"{self.Lambda}"
+            kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
+            for i in range(forces.shape[0]):
+                line += f", {forces[i][0].value_in_unit(kjpermolenm)}, {forces[i][1].value_in_unit(kjpermolenm)}, {forces[i][2].value_in_unit(kjpermolenm)}, {norms[i]}"
+            line += '\n'
+            self.F_out.write(line)
+        if self.velocities:
+            velocities = state.getVelocities(asNumpy=True)
+            line = f"{self.Lambda}"
+            nmperps = mm.unit.nanometer / mm.unit.picosecond
+            for i in range(velocities.shape[0]):
+                line += f", {velocities[i][0].value_in_unit(nmperps)}, {velocities[i][1].value_in_unit(nmperps)}, {velocities[i][2].value_in_unit(nmperps)}"
+            line += '\n'
+            self.v_out.write(line)
 
     def _get_energy(self, simulation_dict, positions):
         simulation = simulation_dict['simulation']

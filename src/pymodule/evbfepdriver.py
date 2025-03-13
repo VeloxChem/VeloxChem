@@ -190,6 +190,8 @@ class EvbFepDriver():
                     # if it crashes, try again with more writing steps for debugging purposes
                     equil_simulation.step(equilibration_steps)
                     equil_positions = equil_simulation.context.getState(getPositions=True).getPositions()
+                    equil_velocities = equil_simulation.context.getState(getVelocities=True).getVelocities()
+                    self.ostream.print_info(str(equil_positions))
                     finished_equil = True
                 except mm.OpenMMException as e:
                     if equil_crashed:
@@ -285,12 +287,15 @@ class EvbFepDriver():
             finished_run = False
             while not finished_run:
                 try:
+                    # self.ostream.print_info(str(equil_positions))
                     run_simulation.context.setPositions(equil_positions)
+                    run_simulation.context.setVelocities(equil_velocities)
                     run_simulation.step(total_sample_steps)
                     finished_run = True
                 except mm.OpenMMException as e:
                     if run_crashed:
                         self.ostream.print_warning("Sampling crashed again, exiting")
+                        self.ostream.print_info(str(e))
                         self.ostream.flush()
                         raise e
                     else:
@@ -309,12 +314,14 @@ class EvbFepDriver():
                             l,
                             self.ostream,
                             force_file=str(self.run_folder / f"forces_run_{l:.3f}.csv"),
+                            velocity_file=str(self.run_folder / f"velocities_run_{l:.3f}.csv"),
                             append=False,
                         )
                         run_simulation.reporters.append(traj_detail_roporter)
                         run_simulation.reporters.append(evb_detail_repertor)
                         self.ostream.print_warning(
                             "Sampling crashed, trying again to sample and writing more detailed data")
+                        self.ostream.print_info(str(e))
                         self.ostream.print_warning(
                             "Generated data is unreliable, make sure to complete a run without generating these warnings"
                         )
