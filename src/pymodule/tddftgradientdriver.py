@@ -665,7 +665,8 @@ class TddftGradientDriver(GradientDriver):
                 self.gradient[s] += tddft_xcgrad
 
         if self.rank == mpi_master():
-            self.gradient += gs_grad
+            for s in range(dof):
+                self.gradient[s] += gs_grad
 
         self.gradient = self.comm.allreduce(self.gradient, op=MPI.SUM)
 
