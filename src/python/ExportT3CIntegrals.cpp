@@ -111,10 +111,11 @@ export_t3cintegrals(py::module& m)
                  const std::vector<double>& bra_gamma,
                  const std::vector<double>& ket_gamma,
                  const CMatrix&             bra_density,
+                 const CMatrix&             ket_density,
                  const int                  iatom,
                  const int                  ithreshold) -> TPoint<double>
              {
-                return grad_drv.direct_compute(screener, basis, aux_basis, molecule, bra_gamma, ket_gamma, bra_density, iatom, ithreshold);
+                return grad_drv.direct_compute(screener, basis, aux_basis, molecule, bra_gamma, ket_gamma, bra_density, ket_density, iatom, ithreshold);
              },
           "Computes Coulomb Fock contribution to atom's gradient.")
         .def("compute",
