@@ -37,6 +37,7 @@ from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
 from .errorhandler import assert_msg_critical
+from collections import defaultdict
 
 
 class RespChargesDriver:
