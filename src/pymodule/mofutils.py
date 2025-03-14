@@ -600,7 +600,7 @@ def order_ccoords(d_ccoords, template_Zr_D, target_metal_coords):
     d_ccoords = d_ccoords - target_metal_coords  # centering to origin
 
     # template_center is already at origin
-    min_dist, rot = superimpose(template_Zr_D, d_ccoords)
+    min_dist, rot, trans = superimpose(template_Zr_D, d_ccoords)
     ordered_ccoords = np.dot(template_Zr_D, rot) + target_metal_coords
     return ordered_ccoords
 
@@ -1594,65 +1594,88 @@ def superimpose(arr1, arr2, min_rmsd=1e6):
 
     if len(arr1) < 7:
         for perm in itertools.permutations(arr1):
-            rmsd, best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
+            rmsd, _,_ = svd_superimpose(np.asarray(perm), arr2)
             if rmsd < min_rmsd:
-                min_rmsd = rmsd
+                min_rmsd,best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
+                                                        
 
     else:
         m_arr1, m_arr2 = match_vectors(arr1, arr2, 6)
         for perm in itertools.permutations(m_arr1):
-            rmsd, best_rot, best_tran = svd_superimpose(np.asarray(perm), m_arr2)
+            rmsd,_,_= svd_superimpose(np.asarray(perm), m_arr2)
             if rmsd < min_rmsd:
-                min_rmsd = rmsd
+                min_rmsd,best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
 
     return min_rmsd, best_rot, best_tran
 
 
-def svd_superimpose(inp_arr1, inp_arr2):
+
+def svd_superimpose( coords,reference_coords):
     """
-    Calculates RMSD and rotation matrix for superimposing two sets of points,
-    using SVD. Ref.: "Least-Squares Fitting of Two 3-D Point Sets", IEEE
-    Transactions on Pattern Analysis and Machine Intelligence, 1987, PAMI-9(5),
-    698-700. DOI: 10.1109/TPAMI.1987.4767965
+    Superimpose two sets of 3D points using Singular Value Decomposition (SVD).
+
+    Parameters:
+        reference_coords (numpy.ndarray): Nx3 array representing the fixed reference coordinates.
+        coords (numpy.ndarray): Nx3 array representing the coordinates to be aligned.
+
+    Returns:
+        rmsd (float): Root Mean Square Deviation after superimposition.
+        rot (numpy.ndarray): The optimal 3x3 rotation matrix.
+        trans (numpy.ndarray): The optimal 1x3 translation vector.
     """
-
-    arr1 = np.array(inp_arr1)
-    arr2 = np.array(inp_arr2)
-
-    com1 = np.sum(arr1, axis=0)
-    com2 = np.sum(arr2, axis=0)
-
-    arr1 -= com1
-    arr2 -= com2
-    # correlation matrix
-    cov_mat = np.dot(arr1.T, arr2)
-    U, s, Vt = np.linalg.svd(cov_mat)
-
-    rot_mat = np.dot(Vt.T, U.T).T
-
-    if np.linalg.det(rot_mat) < 0:
-        Vt[2] *= -1.0
-        rot_mat = np.dot(Vt.T, U.T).T
-
-    transformed_arr1 = np.dot(arr1, rot_mat)
-    diff = arr1 - transformed_arr1
-    rmsd = np.sqrt(np.sum(np.sum(diff**2)) / arr1.shape[0])
-    trans_mat = com2 - np.dot(com1, rot_mat)
-
-    return rmsd, rot_mat, trans_mat
+    if reference_coords.shape != coords.shape or reference_coords.shape[1] != 3:
+        raise ValueError("Both input arrays must have the same shape (Nx3).")
 
 
-def svd_superimpose_rotation_only(arr1, arr2, min_rmsd=1e6):
+    # Compute centroids
+    centroid_ref = np.mean(reference_coords, axis=0)
+    centroid_coords = np.mean(coords, axis=0)
+
+    # Center the points
+    ref_centered = reference_coords - centroid_ref
+    coords_centered = coords - centroid_coords
+
+    # Compute the correlation matrix
+    H = np.dot( coords_centered.T,ref_centered)
+
+    # Compute SVD
+    U, S, Vt = np.linalg.svd(H)
+
+    # Compute rotation matrix
+    rot = np.dot( Vt.T,U.T).T
+
+    # Ensure a proper rotation (prevent reflection)
+    if np.linalg.det(rot) < 0:
+        Vt[2] *= -1
+        rot = np.dot(Vt.T, U.T).T
+
+
+    # Compute translation vector
+    trans = centroid_ref - np.dot(centroid_coords, rot)
+
+    # Apply transformation
+    transformed_coords = np.dot(coords, rot) + trans
+
+    # Compute RMSD
+    diff = transformed_coords - reference_coords
+    rmsd = np.sqrt(np.sum(np.sum(diff**2) )/ reference_coords.shape[0])
+
+    return rmsd, rot, trans
+
+
+def superimpose_rotation_only(arr1, arr2, min_rmsd=1e6):
     arr1 = np.asarray(arr1)
     arr2 = np.asarray(arr2)
     best_rot, best_tran = np.eye(3), np.zeros(3)
     if len(arr1) == len(arr2):
         if len(arr1) < 7:
             for perm in itertools.permutations(arr1):
-                rmsd, best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
+                rmsd, _,_ = svd_superimpose(np.asarray(perm), arr2)
                 if rmsd < min_rmsd:
                     min_rmsd = rmsd
+                    min_rmsd,best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
                     if np.allclose(np.dot(best_tran, np.zeros(3)), 1e-1):
+                        min_rmsd,best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
                         break
             return min_rmsd, best_rot, best_tran
 
@@ -1661,11 +1684,12 @@ def svd_superimpose_rotation_only(arr1, arr2, min_rmsd=1e6):
         rmsd, best_rot, best_tran = svd_superimpose(np.asarray(perm), m_arr2)
         if rmsd < min_rmsd:
             min_rmsd = rmsd
+            min_rmsd,best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
             if np.allclose(np.dot(best_tran, np.zeros(3)), 1e-1):
+                min_rmsd,best_rot, best_tran = svd_superimpose(np.asarray(perm), arr2)
                 break
 
     return min_rmsd, best_rot, best_tran
-
 
 ##########below are from _place_node_edge.py#####################
 def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
@@ -2244,7 +2268,7 @@ def get_rot_trans_matrix(node, G, sorted_nodes, Xatoms_positions_dict):
     vecsA, _ = recenter_and_norm_vectors(node_xvecs, extra_mass_center=None)
     v2, node_center = get_connected_nodes_vectors(node, G)
     vecsB, _ = recenter_and_norm_vectors(v2, extra_mass_center=node_center)
-    rmsd, rot, tran = svd_superimpose_rotation_only(vecsA, vecsB)
+    rmsd, rot, tran = superimpose_rotation_only(vecsA, vecsB)
     return rot, tran
 
 
@@ -3995,7 +4019,7 @@ class NetOptimizer:
                 rot = rot_record[indices[0]]
                 # rot = reorthogonalize_matrix(rot)
             else:
-                _, rot, _ = svd_superimpose_rotation_only(
+                _, rot, _ = superimpose_rotation_only(
                     extended_linker_xx_vec, xx_vector
                 )
                 # rot = reorthogonalize_matrix(rot)
