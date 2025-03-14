@@ -837,7 +837,7 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -1109,8 +1109,6 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
 
                 omptimers[thread_id].stop("Fxc matrix G");
 
-                // eq.(31), JCTC 2021, 17, 1512-1521
-
                 omptimers[thread_id].start("Fxc matmul and symm.");
 
                 auto partial_mat_Fxc = denblas::serialMultABt(mat_chi, mat_G);
@@ -1246,7 +1244,7 @@ integrateKxcFockForGGA(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -1845,7 +1843,7 @@ integrateKxcLxcFockForGGA(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Preparation");
 
-    for (int box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 

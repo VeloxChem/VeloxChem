@@ -373,7 +373,7 @@ def _MolecularBasis_read_dict(molecule,
 
 
 @staticmethod
-def _MolecularBasis_get_avail_basis(element_label):
+def _MolecularBasis_get_avail_basis(element_label=None):
     """
     Gets the names of available basis sets for an element.
 
@@ -394,10 +394,13 @@ def _MolecularBasis_get_avail_basis(element_label):
         basis = InputParser(str(x)).input_dict
         # check that the given element appears as key
         # and that its value is a non-empty list
-        elem = f'atombasis_{element_label.lower()}'
-        if elem in basis.keys():
-            if basis[elem]:
-                avail_basis.add(name)
+        if element_label is not None:
+            elem = f'atombasis_{element_label.lower()}'
+            if elem in basis.keys():
+                if basis[elem]:
+                    avail_basis.add(name)
+        else:
+            avail_basis.add(name)
 
     return sorted(list(avail_basis))
 

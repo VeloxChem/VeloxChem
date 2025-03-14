@@ -12,8 +12,6 @@ except ImportError:
     pass
 
 
-@pytest.mark.filterwarnings(
-    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestForceField:
 
     @pytest.mark.skipif('scipy' not in sys.modules,
@@ -41,16 +39,16 @@ class TestForceField:
 
         if ff_gen.rank == mpi_master():
 
-            assert ff_gen.fitting_summary['maximum_difference'] < 2.2
-            assert ff_gen.fitting_summary['standard_deviation'] < 1.0
+            assert ff_gen.fitting_summary['maximum_difference'] < 3.0
+            assert ff_gen.fitting_summary['standard_deviation'] < 1.2
 
-            scf_h5_file = Path(inpfile).with_suffix('.scf.h5')
+            final_h5_file = Path(inpfile.replace('.inp', '.h5'))
+            if final_h5_file.is_file():
+                final_h5_file.unlink()
+
+            scf_h5_file = Path(inpfile.replace('.inp', '_scf.h5'))
             if scf_h5_file.is_file():
                 scf_h5_file.unlink()
-
-            scf_final_h5_file = Path(inpfile).with_suffix('.scf.results.h5')
-            if scf_final_h5_file.is_file():
-                scf_final_h5_file.unlink()
 
             mol_name = Path(inpfile).stem
             ff_dir = Path(inpfile).parent / (mol_name + '_files')

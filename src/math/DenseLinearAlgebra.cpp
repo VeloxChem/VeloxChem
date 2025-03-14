@@ -187,7 +187,7 @@ serialAddAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const doub
 }
 
 auto
-serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> void
+serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> void
 {
     auto narow = matrixA.getNumberOfRows();
     auto nacol = matrixA.getNumberOfColumns();
@@ -205,7 +205,7 @@ serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> void
 
     Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, narow, nacol);
 
-    ematA += ematB;
+    ematA += factor * ematB;
 }
 
 auto

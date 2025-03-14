@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -398,7 +397,7 @@ class SolvationBuilder:
             self.ostream.print_blank()
             start = time.time()
             self.perform_equilibration()
-            self.ostream.print_info("Equilibration completed, system saved as 'equilibrated_system.pdb'")
+            self.ostream.print_info("Equilibration completed, system saved")
             self.ostream.flush()
             end = time.time()
             self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")

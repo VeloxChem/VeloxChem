@@ -22,16 +22,21 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 import numpy as np
 import time as tm
-import sys
 import math
-from mpi4py import MPI
+import sys
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import XCMolecularGradient
+from .veloxchemlib import T4CScreener
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver, NuclearPotentialGeom010Driver,
+                           FockGeom1000Driver, ElectricDipoleMomentGeom100Driver)
 from .veloxchemlib import mpi_master, hartree_in_wavenumber, denmat
+from .veloxchemlib import partition_atoms, make_matrix, mat_t
 
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
@@ -41,17 +46,10 @@ from .outputstream import OutputStream
 from .matrices import Matrices
 from .griddriver import GridDriver
 from .inputparser import parse_input
-from .sanitychecks import dft_sanity_check, polgrad_sanity_check
 from .dftutils import get_default_grid_level
-from .profiler import Profiler
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check, polgrad_sanity_check)
 
-# VLX integrals
-from .veloxchemlib import ElectricDipoleMomentGeom100Driver
-from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
-                           NuclearPotentialGeom100Driver, NuclearPotentialGeom010Driver,
-                           FockGeom1000Driver, ElectricDipoleMomentGeom100Driver)
-from .veloxchemlib import partition_atoms, make_matrix, mat_t
-from .veloxchemlib import T4CScreener
 
 class PolarizabilityGradient:
     """
@@ -167,9 +165,6 @@ class PolarizabilityGradient:
 
         self.frequencies = list(self.frequencies)
 
-        if self._dft and (self.grid_level is None):
-            self.grid_level = get_default_grid_level(self.xcfun) 
-
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
 
@@ -195,7 +190,9 @@ class PolarizabilityGradient:
         if self.is_complex:
             self.grad_dt = np.dtype('complex128')
 
-        # sanity check
+        # sanity checks
+        molecule_sanity_check(molecule)
+        scf_results_sanity_check(self, self._scf_drv.scf_tensors)
         dft_sanity_check(self, 'compute')
 
         start_time = tm.time()
@@ -277,22 +274,22 @@ class PolarizabilityGradient:
 
             # number of input frequencies
             n_freqs = len(self.frequencies)
-
-            # if Lagr. multipliers not available as dist. array,
-            # read it from dict into variable on master
-            if 'dist_cphf_ov' not in all_orbrsp_results.keys():
-                all_cphf_red = all_orbrsp_results['cphf_ov']
-
-                if self.is_complex:
-                    all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
-                else:
-                    all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
         else:
             nocc = None
             nvir = None
+            n_freqs = None
 
-        nocc = self.comm.bcast(nocc, root=mpi_master())
-        nvir = self.comm.bcast(nvir, root=mpi_master())
+        nocc, nvir, n_freqs = self.comm.bcast((nocc, nvir, n_freqs), root=mpi_master())
+
+        # if Lagr. multipliers not available as dist. array,
+        # read it from dict into variable on master
+        if 'dist_cphf_ov' not in all_orbrsp_results.keys():
+            all_cphf_red = all_orbrsp_results['cphf_ov']
+
+            if self.is_complex:
+                all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
+            else:
+                all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
 
         for f, w in enumerate(self.frequencies):
 
@@ -377,9 +374,11 @@ class PolarizabilityGradient:
                 orbrsp_results = all_orbrsp_results[w]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
-                # Lagrange multipliers
-                omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
+            # Lagrange multipliers
+            omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
                
+            if self.rank == mpi_master():
+
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
                 lambda_ao = np.array([
@@ -1459,7 +1458,9 @@ class PolarizabilityGradient:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xcgrad_drv = XCMolecularGradient()
@@ -1511,7 +1512,9 @@ class PolarizabilityGradient:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xcgrad_drv = XCMolecularGradient()
@@ -1753,7 +1756,9 @@ class PolarizabilityGradient:
         # generate integration grid
         if self._dft:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
@@ -1943,27 +1948,3 @@ class PolarizabilityGradient:
             error_text = 'Mismatch between LR results and polgrad settings!'
             error_text += 'One is complex, the other is not.'
             raise ValueError(error_text)
-
-    def _freq_sanity_check(self):
-        """
-       Checks if a zero frequency has been input together with resonance Raman.
-
-       This check is due to convergence/singularity issues in the cphf
-       subspace solver for some molecules.
-       """
-
-        if self.is_complex:
-            try:
-                idx0 = self.frequencies.index(0.0)
-                warn_msg = 'Zero in frequency list for resonance Raman!\n'
-                if len(self.frequencies) == 1:
-                    error_msg += 'No other frequencies requested.'
-                    erro_msg += 'Will continue with normal Raman.'
-                else:
-                    self.frequencies.pop(idx0)
-                    warn_msg += 'It has been removed from the list.'
-                    warn_msg += 'Complex pol. gradient will be calculated for:\n'
-                    warn_msg += str(obj.frequencies)
-                    self.ostream.print_warning(warn_msg)
-            except ValueError:
-                pass

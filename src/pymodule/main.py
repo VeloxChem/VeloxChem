@@ -53,9 +53,9 @@ from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
-#from .cphfsolver import CphfSolver
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
+from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -95,7 +95,7 @@ def select_scf_driver(task, scf_type):
     elif scf_type == 'restricted_openshell':
         scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
     else:
-        assert_msg_critical(False, f'SCF: invalide scf_type {scf_type}')
+        assert_msg_critical(False, f'SCF: invalid scf_type {scf_type}')
 
     return scf_drv
 
@@ -177,8 +177,8 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     #     rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
-        assert_msg_critical(
-            False, f'Response: invalide response property {prop_type}')
+        assert_msg_critical(False,
+                            f'Response: invalid response property {prop_type}')
 
     return rsp_prop
 
@@ -269,6 +269,24 @@ def main():
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
 
+    # Spectrum from trajectory
+
+    if task_type == 'trajectory':
+        traj_dict = (dict(task.input_dict['trajectory'])
+                     if 'trajectory' in task.input_dict else {})
+        spect_dict = (dict(task.input_dict['spectrum_settings'])
+                      if 'spectrum_settings' in task.input_dict else {})
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
+
+        traj_dict['filename'] = task.input_dict['filename']
+        traj_dict['charges'] = task.input_dict['charges']
+        traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
+
+        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
+        traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
+        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
     # Diatomic vibronic spectrum using Numerov
 
     if task_type == 'numerov':
@@ -283,12 +301,11 @@ def main():
         numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
-
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'pe force field', 'vibrational', 'freq', 'cphf', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient'
     ]
 
     scf_type = 'restricted'
@@ -364,6 +381,8 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
+            orbrsp_dict = dict(task.input_dict['orbital_response'])
+
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
                 'Invalid response property for gradient calculation')
@@ -371,9 +390,11 @@ def main():
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
-            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
+                                          method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                   rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
@@ -442,6 +463,8 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
+            orbrsp_dict = dict(task.input_dict['orbital_response'])
+
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
                 'Invalid response property for geometry optimization')
@@ -449,9 +472,11 @@ def main():
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
-            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
+                                          method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True

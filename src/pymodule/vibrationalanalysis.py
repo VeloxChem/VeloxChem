@@ -26,7 +26,6 @@ from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
 import numpy as np
-import sys
 import h5py
 import tempfile
 
@@ -49,12 +48,6 @@ from .sanitychecks import raman_sanity_check
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
-try:
-    import matplotlib.pyplot as plt
-    import matplotlib.lines as mlines
-except ImportError:
-    pass
-
 
 class VibrationalAnalysis:
     """
@@ -69,9 +62,9 @@ class VibrationalAnalysis:
         - reduced_masses: The reduced masses of the normal modes in amu.
         - force_constants: The force constants in mdyn/Angstrom.
         - vib_frequencies: The vibrational frequencies in cm**-1.
-        - normal_modes: The non-normalized vibrational normal modes in
+        - raw_normal_modes: The non-normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
-        - normed_normal_modes: The normalized vibrational normal modes in
+        - normal_modes: The normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
         - dipole_gradient: The gradient of the dipole moment.
         - ir_intensities: The IR intensities in km/mol.
@@ -118,8 +111,8 @@ class VibrationalAnalysis:
 
         # filenames
         self.filename = None
-        self.checkpoint_file = None
-        self.result_file = None
+        self.results_h5_file = None
+        self.vib_results_txt_file = None
 
         # option dictionaries from input
         # TODO: cleanup
@@ -254,10 +247,8 @@ class VibrationalAnalysis:
 
         if 'filename' in vib_dict:
             self.filename = vib_dict['filename']
-            self.checkpoint_file = f'{self.filename}-vib-results.h5'
-            self.result_file = f'{self.filename}-vib-results.out'
-        else:
-            self.result_file = 'vib-results.out'
+            self.results_h5_file = f'{self.filename}.h5'
+            self.vib_results_txt_file = f'{self.filename}-vib-results.out'
 
         # settings for property modules
         if hessian_dict is None:
@@ -339,7 +330,6 @@ class VibrationalAnalysis:
                 vib_results['raman_activities'] = self.raman_activities
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
-
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
                 self.do_raman = False
@@ -668,7 +658,8 @@ class VibrationalAnalysis:
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
         # compute polarizability gradient
-        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors,
+                                      lr_results)
 
         # save the gradient
         self.polarizability_gradient = polgrad
@@ -710,11 +701,12 @@ class VibrationalAnalysis:
                                                 filename, rsp_drv)
         self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
-        fulltxt_msg = 'Full vibrational analysis results written to: '
-        fulltxt_msg += f'{self.result_file}'
-        self.ostream.print_info(fulltxt_msg)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        if self.vib_results_txt_file is not None:
+            fulltxt_msg = 'Full vibrational analysis results written to: '
+            fulltxt_msg += f'{self.vib_results_txt_file}'
+            self.ostream.print_info(fulltxt_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def print_vibrational_analysis_ostream(self,
                                            molecule,
@@ -886,11 +878,12 @@ class VibrationalAnalysis:
         self.normal_modes = self.raw_normal_modes / np.linalg.norm(
             self.raw_normal_modes, axis=1)[:, np.newaxis]
 
-        # set name of output file
-        if self.result_file is None:
-            self.result_file = 'vib-results.out'
+        # check output file
+        if self.vib_results_txt_file is None:
+            return
+
         # open output file
-        fout = open(self.result_file, 'w')
+        fout = open(self.vib_results_txt_file, 'w')
 
         title = 'Vibrational Analysis'
         fout.write(title.center(52))
@@ -1019,12 +1012,8 @@ class VibrationalAnalysis:
             The molecule.
         """
 
-        if self.checkpoint_file is None:
-            return
-
-        final_h5_fname = self.checkpoint_file
-
-        self.write_vib_results_to_hdf5(molecule, final_h5_fname)
+        if self.results_h5_file is not None:
+            self.write_vib_results_to_hdf5(molecule, self.results_h5_file)
 
     def write_vib_results_to_hdf5(self, molecule, fname):
         """
@@ -1036,20 +1025,15 @@ class VibrationalAnalysis:
             Name of the HDF5 file.
         """
 
-        valid_checkpoint = (fname and isinstance(fname, str))
+        if not (fname and isinstance(fname, str) and Path(fname).is_file()):
+            return
 
-        if not valid_checkpoint:
-            return False
+        hf = h5py.File(fname, 'a')
 
-        # check if h5 file exists and deletes if True
-        file_path = Path(fname)
-        if file_path.is_file():
-            file_path.unlink()
-
-        hf = h5py.File(fname, 'w')
+        vib_group = 'vib/'
 
         nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset('nuclear_repulsion', data=nuc_rep)
+        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         natm = molecule.number_of_atoms()
 
@@ -1058,33 +1042,31 @@ class VibrationalAnalysis:
             normal_mode_grp.create_dataset(str(n),
                                            data=np.array([Q]).reshape(natm, 3))
 
-        hf.create_dataset('hessian', data=self.hessian)
-        hf.create_dataset('vib_frequencies',
+        hf.create_dataset(vib_group + 'hessian', data=self.hessian)
+        hf.create_dataset(vib_group + 'vib_frequencies',
                           data=np.array([self.vib_frequencies]))
-        hf.create_dataset('force_constants',
+        hf.create_dataset(vib_group + 'force_constants',
                           data=np.array([self.force_constants]))
-        hf.create_dataset('reduced_masses',
+        hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array([self.reduced_masses]))
         if self.do_ir:
-            hf.create_dataset('ir_intensities',
+            hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array([self.ir_intensities]))
         if self.do_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('raman_activity')
+            raman_grp = hf.create_group(vib_group + 'raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('resonance_raman_activity')
+            raman_grp = hf.create_group(vib_group + 'resonance_raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         hf.close()
-
-        return True
 
     def print_header(self):
         """
@@ -1138,8 +1120,8 @@ class VibrationalAnalysis:
             A Matplotlib axis object.
         """
 
-        assert_msg_critical('matplotlib' in sys.modules,
-                            'matplotlib is required.')
+        import matplotlib.pyplot as plt
+        import matplotlib.lines as mlines
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
@@ -1233,6 +1215,9 @@ class VibrationalAnalysis:
             A Matplotlib axis object.
         """
 
+        import matplotlib.pyplot as plt
+        import matplotlib.lines as mlines
+
         if ax is None:
             fig, ax = plt.subplots(figsize=(8, 5))
 
@@ -1323,6 +1308,8 @@ class VibrationalAnalysis:
         :return:
             A Matplotlib axis object.
         """
+
+        import matplotlib.pyplot as plt
 
         if plot_type.lower() == 'ir':
             self.plot_ir(vib_results,
@@ -1468,7 +1455,7 @@ class VibrationalAnalysis:
             raise ImportError("py3Dmol is required for this functionality")
 
         assert_msg_critical(
-            mode <= len(vib_results['normal_modes']),
+            1 <= mode and mode <= len(vib_results['normal_modes']),
             "Your asking to animate the " + str(mode) +
             "th mode but the molecule only has " +
             str(len(vib_results['normal_modes'])) + " normal modes.")

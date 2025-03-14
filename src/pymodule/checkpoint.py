@@ -103,6 +103,8 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
 
         hf = h5py.File(fname, 'a')
 
+        scf_group = hf.create_group('scf')
+
         # write SCF tensors
         keys = ['S'] + [
             f'{x}_{y}' for x in ['C', 'E', 'occ', 'D', 'F']
@@ -111,19 +113,23 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         for key in keys:
             # TODO: remove this if statement since all keys should be available
             if key in scf_results:
-                hf.create_dataset(key, data=scf_results[key])
+                scf_group.create_dataset(key, data=scf_results[key])
+
+        # write dipole moment
+        scf_group.create_dataset('dipole_moment',
+                                 data=scf_results['dipole_moment'])
 
         # write SCF energy
-        hf.create_dataset('scf_type',
-                          data=np.bytes_([scf_results['scf_type']]))
-        hf.create_dataset('scf_energy',
-                          data=np.array([scf_results['scf_energy']]))
+        scf_group.create_dataset('scf_type',
+                                 data=np.bytes_([scf_results['scf_type']]))
+        scf_group.create_dataset('scf_energy',
+                                 data=np.array([scf_results['scf_energy']]))
 
         # write SCF history
         keys = list(scf_history[0].keys())
         for key in keys:
             data = np.array([step[key] for step in scf_history])
-            hf.create_dataset(f'scf_history_{key}', data=data)
+            scf_group.create_dataset(f'scf_history_{key}', data=data)
 
         hf.close()
 
@@ -145,7 +151,8 @@ def write_rsp_solution(fname, key, vec):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'a')
-        hf.create_dataset(key, data=vec)
+        rsp_group = 'rsp/'
+        hf.create_dataset(rsp_group + key, data=vec)
         hf.close()
 
 
@@ -166,9 +173,38 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'a')
-        dset = hf.create_dataset(keys[0], data=vec)
+        rsp_group = 'rsp/'
+        dset = hf.create_dataset(rsp_group + keys[0], data=vec)
         for key in keys[1:]:
-            hf[key] = dset
+            hf[rsp_group + key] = dset
+        hf.close()
+
+
+def write_lr_rsp_results_to_hdf5(fname, rsp_results):
+    """
+    Writes the results of a linear response calculation to HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param rsp_results:
+        The dictionary containing the linear response results.
+    """
+
+    if (fname and isinstance(fname, str) and Path(fname).is_file()):
+
+        hf = h5py.File(fname, 'a')
+
+        keys = rsp_results.keys()
+
+        rsp_group = 'rsp/'
+
+        for key in keys:
+            # Do not write the eigenvectors, file names and excitation details
+            if "vector" in key or "cube" in key or "file" in key or "details" in key:
+                continue
+            else:
+                hf.create_dataset(rsp_group + key, data=rsp_results[key])
+
         hf.close()
 
 
@@ -219,6 +255,38 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     ostream.print_blank()
 
     return True
+
+
+def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
+    """
+    Writes the detachment and attachment density matrices for a specific
+    excited state to the checkpoint file.
+
+    :param fname:
+        The checkpoint file name.
+    :param state_label:
+        The excited state label.
+    :param dens_detach:
+        The detachment density matrix.
+    :param dens_attach:
+        The attachment density matrix.
+    """
+
+    if (fname and isinstance(fname, str) and Path(fname).is_file()):
+
+        hf = h5py.File(fname, 'a')
+
+        # Add the attachment and detachment densities to the
+        # rsp group.
+        rsp_group = 'rsp/'
+
+        detach_label = "detach_" + state_label
+        hf.create_dataset(rsp_group + detach_label, data=dens_detach)
+
+        attach_label = "attach_" + state_label
+        hf.create_dataset(rsp_group + attach_label, data=dens_attach)
+
+        hf.close()
 
 
 def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
