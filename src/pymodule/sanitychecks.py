@@ -60,6 +60,9 @@ def scf_results_sanity_check(obj, scf_results):
     updated_scf_info = {}
 
     if obj.rank == mpi_master():
+        if scf_results.get('filename', None) is not None:
+            updated_scf_info['filename'] = scf_results['filename']
+
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
 
