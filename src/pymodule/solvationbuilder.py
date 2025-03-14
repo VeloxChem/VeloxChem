@@ -412,7 +412,7 @@ class SolvationBuilder:
             self.ostream.print_blank()
             start = time.time()
             self.perform_equilibration()
-            self.ostream.print_info("Equilibration completed, system saved as 'equilibrated_system.pdb'")
+            self.ostream.print_info("Equilibration completed, system saved")
             self.ostream.flush()
             end = time.time()
             self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
@@ -1078,10 +1078,7 @@ class SolvationBuilder:
             mols_per_nm3 = 11.53
             density = 786
             smiles_code = 'CC#N'
-        elif solvent == 'dmf':
-            mols_per_nm3 = 7.7
-            density = 948
-            smiles_code = 'CN(C)C=O'
+
         else:
             return None
 
