@@ -1,5 +1,4 @@
 MOF            node_connectivity    metal     linker_topic     topology 
-TEST-MOF               6              Zr           3              spn        
 UiO-66                 12             Zr           2              fcu        
 UiO-66                 12             Hf           2              fcu        
 UiO-67                 12             Zr           2              fcu        
@@ -26,11 +25,11 @@ PCN-777                6              Zr           3              spn
 PCN-777                6              Hf           3              spn        
 NU-901                 6              Zr           3              scu        
 NU-901                 6              Hf           3              scu        
-MIL-100                6              Cr           3              mtn        
-MIL-101                6              Cr           3              moo        
+MIL-100                6              Cr           3              mtn              
 PCN-228                12             Zr           4              ftw        
 PCN-228                12             Hf           4              ftw        
 PCN-229                12             Zr           4              ftw        
 PCN-229                12             Hf           4              ftw        
 PCN-230                12             Zr           4              ftw        
-PCN-230                12             Hf           4              ftw        
+PCN-230                12             Hf           4              ftw
+MIL-101                6              Cr           2              mil101

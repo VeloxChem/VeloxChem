@@ -1,14 +1,15 @@
-data_fcu
-_audit_creation_date              2025-02-07
-_audit_creation_method            'MOF_builder'
+data_fcu_Fm-3m  hall_number: 523, V_con: 12
+_audit_creation_date              2025-03-05
+_audit_creation_method            'MOFbuilder_1.0'
 _symmetry_space_group_name_H-M    'P1'
 _symmetry_Int_Tables_number       1
+_symmetry_cell_setting            triclinic
 loop_
 _symmetry_equiv_pos_as_xyz
   x,y,z
-_cell_length_a                    30.0
-_cell_length_b                    30.0
-_cell_length_c                    30.0
+_cell_length_a                    14.1421
+_cell_length_b                    14.1421
+_cell_length_c                    14.1421
 _cell_angle_alpha                 90.0
 _cell_angle_beta                  90.0
 _cell_angle_gamma                 90.0
@@ -18,40 +19,32 @@ _atom_site_type_symbol
 _atom_site_fract_x
 _atom_site_fract_y
 _atom_site_fract_z
-V1     V     0.0   0.0   0.0
-V2     V     0.0   0.5   0.5
-V3     V     0.5   0.0   0.5
-V4     V     0.5   0.5   0.0
-E1     E     0.0   0.25  0.25
-E2     E     0.25  0.0   0.25
-E3     E     0.25  0.25  0.0
-E4     E     0.25  0.25  0.5
-E5     E     0.25  0.0   0.25
-E6     E     0.5   0.25  0.25
-E7     E     0.0   0.75  0.25
-E8     E     0.75  0.0   0.25
-E9     E     0.75  0.25  0.0
-E10    E     0.75  0.25  0.5
-E11    E     0.75  0.0   0.25
-E12    E     0.5   0.75  0.25
-E13    E     0.0   0.75  0.75
-E14    E     0.75  0.0   0.75
-E15    E     0.75  0.75  0.0
-E16    E     0.75  0.75  0.5
-E17    E     0.75  0.0   0.75
-E18    E     0.5   0.75  0.75
-E19    E     0.0   0.25  0.75
-E20    E     0.25  0.0   0.75
-E21    E     0.25  0.75  0.0
-E22    E     0.25  0.75  0.5
-E23    E     0.25  0.0   0.75
-E24    E     0.5   0.25  0.75
-E25    E     0.25  0.5   0.75
-E26    E     0.75  0.5   0.75
-E27    E     0.25  0.5   0.25
-E28    E     0.75  0.5   0.25
+V1    V   0.00000  0.00000  0.00000
+V2    V   0.00000  0.50000  0.50000
+V3    V   0.50000  0.00000  0.50000
+V4    V   0.50000  0.50000  0.00000
+E1    E   0.00000  0.25000  0.25000
+E2    E   0.00000  0.25000  0.75000
+E3    E   0.00000  0.75000  0.25000
+E4    E   0.00000  0.75000  0.75000
+E5    E   0.25000  0.00000  0.25000
+E6    E   0.25000  0.00000  0.75000
+E7    E   0.25000  0.25000  0.00000
+E8    E   0.25000  0.25000  0.50000
+E9    E   0.25000  0.50000  0.25000
+E10   E   0.25000  0.50000  0.75000
+E11   E   0.25000  0.75000  0.00000
+E12   E   0.25000  0.75000  0.50000
+E13   E   0.50000  0.25000  0.25000
+E14   E   0.50000  0.25000  0.75000
+E15   E   0.50000  0.75000  0.25000
+E16   E   0.50000  0.75000  0.75000
+E17   E   0.75000  0.00000  0.25000
+E18   E   0.75000  0.00000  0.75000
+E19   E   0.75000  0.25000  0.00000
+E20   E   0.75000  0.25000  0.50000
+E21   E   0.75000  0.50000  0.25000
+E22   E   0.75000  0.50000  0.75000
+E23   E   0.75000  0.75000  0.00000
+E24   E   0.75000  0.75000  0.50000
 loop_
-_geom_bond_atom_site_label_1
-_geom_bond_atom_site_label_2
-_geom_bond_distance
-_geom_bond_site_symmetry_2
