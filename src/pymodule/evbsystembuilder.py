@@ -238,11 +238,7 @@ class EvbSystemBuilder():
             x_size = 0.1 * (max(positions[:, 0]) - min(positions[:, 0]))
             y_size = 0.1 * (max(positions[:, 1]) - min(positions[:, 1]))
             z_size = 0.1 * (max(positions[:, 2]) - min(positions[:, 2]))
-            size = max(x_size, y_size, z_size)
-
-            box = 3 * [2 * padding + size]
-            # box = [2*padding + x_size, 2*padding + y_size, 2*padding + z_size]
-
+            box = [2 * padding + x_size, 2 * padding + y_size, 2 * padding + z_size]
             self.ostream.print_info(
                 f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f} nm and padding: {padding:.3f} nm.")
         else:
@@ -250,15 +246,15 @@ class EvbSystemBuilder():
             system_mol = Molecule()
             positions = np.array()
 
-        if CNT or Graphene:
-            # assert False, "Rethink CNT/graphene input"
-            box = self._add_CNT_graphene(system, CNT, Graphene, nb_force, topology, system_mol, positions, box,
-                                         graphene_size, CNT_radius)
+        # if CNT or Graphene:
+        #     assert False, "Rethink CNT/graphene input"
+        #     box = self._add_CNT_graphene(system, CNT, Graphene, nb_force, topology, system_mol, positions, box,
+        #                                  graphene_size, CNT_radius)
 
-        self.ostream.print_info(f"Building system in box with dimensions {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm")
+        # self.ostream.print_info(f"Building system in box with dimensions {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm")
 
         if solvent:
-            self._add_solvent(system, system_mol, solvent, box, reactant, ion_count, topology, nb_force, neutralize)
+            box = self._add_solvent(system, system_mol, solvent, topology, nb_force, neutralize, padding)
         else:
             self.positions = np.array(positions) * 0.1
 
@@ -268,7 +264,7 @@ class EvbSystemBuilder():
         system.addForce(cmm_remover)
 
         nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
-        # solvent_nb_force.setNonbondedMethod(mm.NonbondedForce.CutoffNonPeriodic)
+
         cutoff = min(1.0,
                      min(min(box[0], box[1]), box[2]) *
                      0.4)  # nm, 0.4 factor to accomodate for shrinkage of the box in NPT simulations
@@ -585,229 +581,50 @@ class EvbSystemBuilder():
 
         return box
 
-    def _add_solvent(self, system, system_mol, solvent, box, reactant, ion_count, topology, nb_force, neutralize):
+    def _add_solvent(self, system, system_mol, solvent, topology, nb_force, neutralize, padding):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
 
         vlxsysbuilder = SolvationBuilder()
-
-        box_volume: float = box[0] * box[1] * box[2]  # nm^3
-        box_A: list[float] = [10 * elem for elem in box]  # A
-
-        na_mol = Molecule.read_smiles("[Na+]")
-        cl_mol = Molecule.read_smiles("[Cl-]")
-
-        charge = reactant.molecule.get_charge()
-        charge_quantities = [0, 0]
-        self.ostream.print_info(f"Charge of the system: {charge}")
-        if neutralize:
-            if charge > 0:
-                charge_quantities = [ion_count, ion_count + charge]
-            elif charge < 0:
-                charge_quantities = [ion_count - charge, ion_count]
-        else:
-            self.ostream.print_info("Not neutralizing the system")
-
-        solute_volume: float = vlxsysbuilder._get_volume(system_mol) * 0.001  #nm^3
-        solvent_volume: float = box_volume - solute_volume
-        solvent_mols_per_nm3, solvent_density, solvent_smiles_code = vlxsysbuilder._solvent_properties(solvent)
-        solvent_molecule = Molecule.read_smiles(solvent_smiles_code)
-        Na_volume = (4.0 / 3.0) * np.pi * 0.332840**3
-        Na_fac = Na_volume / solvent_volume
-        Cl_volume = (4.0 / 3.0) * np.pi * 0.440104**3
-        Cl_fac = Cl_volume / solvent_volume
-        quantities = [
-            int(solvent_volume * solvent_mols_per_nm3 - charge_quantities[0] * Na_fac - charge_quantities[1] * Cl_fac),
-            charge_quantities[0], charge_quantities[1]
-        ]
-        quantities[0] = int(quantities[0])  # todo does this fix exploding organic solvents?
-        solvents: list[Molecule] = [solvent_molecule, na_mol, cl_mol]
-        self.ostream.print_info(
-            f"Solute volume: {solute_volume:.3f} nm^3, box valume: {box_volume:.3f} nm^3, solvent volume: {solvent_volume:.3f} nm^3"
+        mols_per_nm3, density, smiles_code = vlxsysbuilder._solvent_properties(solvent)
+        vlxsysbuilder.solvate(
+            solute=system_mol,
+            solvent=solvent,
+            padding=padding,
+            neutralize=neutralize,
+            target_density=density * 0.95,
         )
 
-        self.ostream.print_info(
-            f"Adding {quantities[0]} molecules of {solvent} with density {solvent_mols_per_nm3} mol/nm^3 to the system")
-        if charge != 0:
-            self.ostream.print_info(
-                f"Adding {quantities[1]} Na+ and {quantities[2]} Cl- ions to the system to neutralize the charge")
-
-        self.ostream.flush()
-        vlxsysbuilder.custom_solvate(
-            system_mol,
-            solvents,
-            quantities,
-            box_A,
-        )
+        num_solvent_molecules = vlxsysbuilder.added_solvent_counts
+        vlx_solvent_molecule = vlxsysbuilder.solvents[0]
+        solvent_ff = MMForceFieldGenerator()
+        solvent_ff.create_topology(vlx_solvent_molecule)
         self.positions = vlxsysbuilder.system_molecule.get_coordinates_in_angstrom() * 0.1
+        box = [side * 0.1 for side in vlxsysbuilder.box]
+        for atom in solvent_ff.atoms.values():
+            if atom['type'] == 'ow':
+                sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
+                epsilon = 0.0930 * 4.184
+                atom['type'] = 'oh'
+                atom['sigma'] = sigma
+                atom['epsilon'] = epsilon
+                atom['comment'] = "Reaction-water oxygen"
+            elif atom['type'] == 'hw':
 
-        # box: list[float] = [elem * 0.1 for elem in vlxsysbuilder.box]
+                sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
+                epsilon = 0.0047 * 4.184
+                atom['type'] = 'ho'
+                atom['sigma'] = sigma
+                atom['epsilon'] = epsilon
+                atom['comment'] = "Reaction-water hydrogen"
+
+        resname = "SOL"
+
         for i, (num_solvent_molecules,
                 vlx_solvent_molecule) in enumerate(zip(vlxsysbuilder.added_solvent_counts, vlxsysbuilder.solvents)):
 
             num_solvent_atoms_per_molecule = vlx_solvent_molecule.number_of_atoms()
             elements = vlx_solvent_molecule.get_labels()
-
-            self.ostream.print_info("Generating solvent forcefield")
-            solvent_ff = MMForceFieldGenerator()
-            if vlx_solvent_molecule == solvent_molecule:
-                if solvent == 'spce':
-                    resname = "HOH"
-                    #todo maybe don't hardcode this
-                    self.ostream.print_info('Using SPCE from amber03 FF')
-                    solvent_ff.bonds = {
-                        (0, 1): {
-                            'type': 'harmonic',
-                            'force_constant': 462750.4,
-                            'equilibrium': 0.1,
-                            'comment': 'SPCE water'
-                        },
-                        (0, 2): {
-                            'type': 'harmonic',
-                            'force_constant': 462750.4,
-                            'equilibrium': 0.1,
-                            'comment': 'SPCE water'
-                        }
-                    }
-                    solvent_ff.angles = {
-                        (1, 0, 2): {
-                            'type': 'harmonic',
-                            'force_constant': 836.8,
-                            'equilibrium': 1.91061193216 / self.deg_to_rad,
-                            'comment': 'SPCE water'
-                        }
-                    }
-                    solvent_ff.atoms = {
-                        0: {
-                            'type': 'ow',
-                            'name': 'O',
-                            'mass': 15.994915,
-                            'charge': -0.8476,
-                            'sigma': 0.31657195050398818,
-                            'epsilon': 0.6497752,
-                            'equivalent_atom': 'SPCE water with solid hydrogen'
-                        },
-                        1: {
-                            'type': 'hw',
-                            'name': 'H1',
-                            'mass': 1.007825,
-                            'charge': 0.4238,
-                            'sigma': 0.3019 * 2**(-1 / 6) * 2 / 10,
-                            'epsilon': 0.0047 * 4.184,
-                            'equivalent_atom': 'SPCE water with solid hydrogen'
-                        },
-                        2: {
-                            'type': 'hw',
-                            'name': 'H2',
-                            'mass': 1.007825,
-                            'charge': 0.4238,
-                            'sigma': 0.3019 * 2**(-1 / 6) * 2 / 10,
-                            'epsilon': 0.0047 * 4.184,
-                            'equivalent_atom': 'SPCE water with solid hydrogen'
-                        }
-                    }
-                    solvent_ff.dihedrals = {}
-                    solvent_ff.impropers = {}
-                elif solvent == 'tip3p':
-                    resname = "HOH"
-                    self.ostream.print_info('Using TIP3 from amber03 FF')
-                    solvent_ff.bonds = {
-                        (0, 1): {
-                            'type': 'harmonic',
-                            'force_constant': 462750.4,
-                            'equilibrium': 0.09572,
-                            'comment': 'TIP-3P water'
-                        },
-                        (0, 2): {
-                            'type': 'harmonic',
-                            'force_constant': 462750.4,
-                            'equilibrium': 0.09572,
-                            'comment': 'TIP-3P water'
-                        }
-                    }
-                    solvent_ff.angles = {
-                        (1, 0, 2): {
-                            'type': 'harmonic',
-                            'force_constant': 836.8000000000001,
-                            'equilibrium': 1.82421813418 / self.deg_to_rad,
-                            'comment': 'TIP-3P water'
-                        }
-                    }
-                    solvent_ff.atoms = {
-                        0: {
-                            'type': 'ow',
-                            'name': 'O',
-                            'mass': 15.994915,
-                            'charge': -0.834,
-                            'sigma': 0.31507524065751241,
-                            'epsilon': 0.635968,
-                            'equivalent_atom': 'TIP-3P water'
-                        },
-                        1: {
-                            'type': 'hw',
-                            'name': 'H1',
-                            'mass': 1.007825,
-                            'charge': 0.417,
-                            'sigma': 1.0,
-                            'epsilon': 0.0,
-                            'equivalent_atom': 'TIP-3P water'
-                        },
-                        2: {
-                            'type': 'hw',
-                            'name': 'H2',
-                            'mass': 1.007825,
-                            'charge': 0.417,
-                            'sigma': 1.0,
-                            'epsilon': 0.0,
-                            'equivalent_atom': 'TIP-3P water'
-                        }
-                    }
-                    solvent_ff.dihedrals = {}
-                    solvent_ff.impropers = {}
-                else:
-                    #todo here there's something going teribly wrong
-                    resname = "SOL"
-                    solvent_ff = MMForceFieldGenerator()
-                    solvent_ff.create_topology(vlx_solvent_molecule)
-            elif vlx_solvent_molecule == na_mol:
-                resname = "ION"
-                # https://github.com/gromacs/gromacs/blob/main/share/top/amber03.ff/ffnonbonded.itp
-                # solvent_ff.partial_charges = [1]
-                solvent_ff.atoms = {
-                    0: {
-                        'type': 'Na',
-                        'name': 'Na+',
-                        'mass': 22.99,
-                        'charge': 1,
-                        'sigma': 0.332840,
-                        'epsilon': 0.015897,
-                    }
-                }
-                solvent_ff.bonds = {}
-                solvent_ff.angles = {}
-                solvent_ff.dihedrals = {}
-                solvent_ff.impropers = {}
-            elif vlx_solvent_molecule == cl_mol:
-                resname = "ION"
-                # https://github.com/gromacs/gromacs/blob/main/share/top/amber03.ff/ffnonbonded.itp
-                # solvent_ff.partial_charges = [1]
-                solvent_ff.atoms = {
-                    0: {
-                        'type': 'Cl',
-                        'name': 'Cl-',
-                        'mass': 35.45,
-                        'charge': -1,
-                        'sigma': 0.440104,
-                        'epsilon': 0.418400,
-                    }
-                }
-                solvent_ff.bonds = {}
-                solvent_ff.angles = {}
-                solvent_ff.dihedrals = {}
-                solvent_ff.impropers = {}
-            else:
-                resname = "SOL"
-                self.ostream.print_warning("Could not find molecule")
 
             harmonic_bond_force = mm.HarmonicBondForce()
             harmonic_bond_force.setName(f"Solvent {i} harmonic bond")
@@ -898,6 +715,7 @@ class EvbSystemBuilder():
             self.ostream.print_info(
                 f"Added {solvent_nb_atom_count} atoms to the nonbonded force and {solvent_system_atom_count} atoms to the system"
             )
+        return box
 
     def _add_reaction_forces(self, system, lam):
 

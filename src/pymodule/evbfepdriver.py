@@ -154,12 +154,6 @@ class EvbFepDriver():
                 equil_integrator,
             )
             equil_simulation.context.setPositions(initial_positions)
-            equil_simulation.reporters.append(
-                mmapp.PDBReporter(
-                    str(self.run_folder / f"traj_minim_{l:.3f}.pdb"),
-                    write_step,
-                    enforcePeriodicBox=True,
-                ))
             if self.constrain_H:
                 system = self._constrain_H_bonds(system)
 
@@ -169,12 +163,25 @@ class EvbFepDriver():
 
             minim_positions = equil_simulation.context.getState(getPositions=True).getPositions()
 
+            # mmapp.PDBFile.writeFile(
+            #     topology,
+            #     np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
+            #     open(self.run_folder / f"minim_{l:.3f}.pdb", "w"),
+            # )
+            # equil_simulation.saveCheckpoint(str(self.run_folder / f"minim_state_{l:.3f}.chk"))
+            # equil_simulation.saveState(str(self.run_folder / f"minim_state_{l:.3f}.xml"))
             if l == 0:
                 self.ostream.print_info(
                     f"Running initial equilibration with step size {equil_simulation.integrator.getStepSize()}")
                 self.ostream.flush()
                 timer.start()
 
+            equil_simulation.reporters.append(
+                mmapp.PDBReporter(
+                    str(self.run_folder / f"traj_equil_{l:.3f}.pdb"),
+                    write_step,
+                    enforcePeriodicBox=True,
+                ))
             equil_crashed = False
             finished_equil = False
             while not finished_equil:
@@ -189,13 +196,18 @@ class EvbFepDriver():
                     self.ostream.flush()
                     # if it crashes, try again with more writing steps for debugging purposes
                     equil_simulation.step(equilibration_steps)
-                    equil_positions = equil_simulation.context.getState(getPositions=True).getPositions()
-                    equil_velocities = equil_simulation.context.getState(getVelocities=True).getVelocities()
-                    self.ostream.print_info(str(equil_positions))
+                    equil_state = equil_simulation.context.getState(
+                        getPositions=True,
+                        getVelocities=True,
+                    )
                     finished_equil = True
-                except mm.OpenMMException as e:
+                except (mm.OpenMMException, ValueError) as e:
                     if equil_crashed:
-                        self.ostream.print_warning("Equilibration crashed again, exiting")
+                        self.ostream.print_warning("Equilibration crashed again, saving data and exiting")
+                        equil_simulation.saveCheckpoint(str(self.run_folder / f"equil_state_{l:.3f}.chk"))
+                        equil_simulation.saveState(str(self.run_folder / f"equil_state_{l:.3f}.xml"))
+                        with open(self.run_folder / f"equil_sys_{l:.3f}.xml", mode="w", encoding="utf-8") as output:
+                            output.write(mm.XmlSerializer.serialize(system))
                         self.ostream.flush()
                         raise e
                     else:
@@ -288,13 +300,16 @@ class EvbFepDriver():
             while not finished_run:
                 try:
                     # self.ostream.print_info(str(equil_positions))
-                    run_simulation.context.setPositions(equil_positions)
-                    run_simulation.context.setVelocities(equil_velocities)
+                    run_simulation.context.setState(equil_state)
                     run_simulation.step(total_sample_steps)
                     finished_run = True
-                except mm.OpenMMException as e:
+                except (mm.OpenMMException, ValueError) as e:
                     if run_crashed:
-                        self.ostream.print_warning("Sampling crashed again, exiting")
+                        self.ostream.print_warning("Sampling crashed again, saving state and exiting")
+                        run_simulation.saveCheckpoint(str(self.run_folder / f"state_{l:.3f}.chk"))
+                        run_simulation.saveState(str(self.run_folder / f"state_{l:.3f}.xml"))
+                        with open(self.run_folder / f"run_sys_{l:.3f}.xml", mode="w", encoding="utf-8") as output:
+                            output.write(mm.XmlSerializer.serialize(system))
                         self.ostream.print_info(str(e))
                         self.ostream.flush()
                         raise e
