@@ -1,17 +1,13 @@
+from mpi4py import MPI
 import numpy as np
-import math
 
-from veloxchem import MolecularBasis
-from veloxchem import Molecule
+from veloxchem import Molecule, MolecularBasis
 from veloxchem import FockGeom1000Driver
-from veloxchem import RIFockDriver
-from veloxchem import TwoCenterElectronRepulsionDriver
-from veloxchem import T4CScreener
-from veloxchem import SubMatrix
-from veloxchem import make_matrix
-from veloxchem import mat_t
+from veloxchem import RIFockDriver, TwoCenterElectronRepulsionDriver
+from veloxchem import T4CScreener, SubMatrix
+from veloxchem import make_matrix, mat_t, mpi_master
+from veloxchem import ScfRestrictedDriver
 from veloxchem.rigradientdriver import RIFockGradDriver
-from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
 class TestRIJFockGeomExGradDriver:
@@ -37,17 +33,26 @@ class TestRIJFockGeomExGradDriver:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_res = scf_drv.compute(mol, bas)
-        density = scf_res['D_alpha']
 
-        mo = scf_res['C_alpha']
-        nocc = mol.number_of_alpha_electrons()
-        mo_occ = mo[:, :nocc]
-        mo_vir = mo[:, nocc:]
-        nvir = mo_vir.shape[1]
+        comm = scf_drv.comm
 
-        exc_mat = np.zeros((nocc, nvir))
-        exc_mat[nocc - 1, 0] = 1.0
-        exc_density = np.linalg.multi_dot([mo_occ, exc_mat, mo_vir.T])
+        if scf_drv.rank == mpi_master():
+            density = scf_res['D_alpha']
+
+            mo = scf_res['C_alpha']
+            nocc = mol.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            nvir = mo_vir.shape[1]
+
+            exc_mat = np.zeros((nocc, nvir))
+            exc_mat[nocc - 1, 0] = 1.0
+            exc_density = np.linalg.multi_dot([mo_occ, exc_mat, mo_vir.T])
+        else:
+            density = None
+            exc_density = None
+        density = comm.bcast(density, root=mpi_master())
+        exc_density = comm.bcast(exc_density, root=mpi_master())
         sym_exc_density = 0.5 * (exc_density + exc_density.T)
 
         gs_den_mat = make_matrix(bas, mat_t.symmetric)
@@ -71,15 +76,27 @@ class TestRIJFockGeomExGradDriver:
         invmatj = SubMatrix([0, 0, rmatj.shape[0], rmatj.shape[0]])
         invmatj.set_values(rmatj)
 
-        ri_fock_drv = RIFockDriver(invmatj)
-        ri_fock_drv.prepare_buffers(mol, bas, bas_aux)
+        local_atoms = mol.partition_atoms(comm)
 
-        gs_bq = ri_fock_drv.compute_bq_vector(gs_den_mat)
-        rw_bq = ri_fock_drv.compute_bq_vector(rw_den_sym_mat)
+        ri_fock_drv = RIFockDriver(invmatj)
+        ri_fock_drv.prepare_buffers(mol, bas, bas_aux, local_atoms)
+
+        local_gs_bq = np.array(ri_fock_drv.compute_local_bq_vector(gs_den_mat))
+        gs_bq = np.zeros(local_gs_bq.shape)
+        comm.Allreduce(local_gs_bq, gs_bq, op=MPI.SUM)
+
+        local_rw_bq = np.array(
+            ri_fock_drv.compute_local_bq_vector(rw_den_sym_mat))
+        rw_bq = np.zeros(local_rw_bq.shape)
+        comm.Allreduce(local_rw_bq, rw_bq, op=MPI.SUM)
 
         ri_grad_drv = RIFockGradDriver()
 
-        for iatom in range(mol.number_of_atoms()):
+        natoms = mol.number_of_atoms()
+        ref_grad = np.zeros((natoms, 3))
+        calc_grad = np.zeros((natoms, 3))
+
+        for iatom in local_atoms:
 
             bra_t4c = T4CScreener()
             bra_t4c.partition_atom(bas, mol, 'eri', iatom)
@@ -87,14 +104,14 @@ class TestRIJFockGeomExGradDriver:
             rgrad = fock_grad_drv.compute(bas, bra_t4c, ket_t4c, gs_den_mat,
                                           rw_den_gen_mat, iatom, 'j', 0.0, 0.0,
                                           12)
+            ref_grad[iatom, :] += np.array(rgrad)
 
             cgrad = ri_grad_drv.direct_compute(ket_t4c, bas, bas_aux, mol,
                                                rw_bq, gs_bq, rw_den_sym_mat,
                                                gs_den_mat, iatom, 12)
-            cg_xyz = cgrad.coordinates()
+            calc_grad[iatom, :] += np.array(cgrad.coordinates())
 
-            for i in range(3):
-                assert math.isclose(rgrad[i],
-                                    cg_xyz[i],
-                                    rel_tol=1.0e-4,
-                                    abs_tol=1.0e-4)
+        ref_grad = comm.allreduce(ref_grad)
+        calc_grad = comm.allreduce(calc_grad)
+
+        assert np.max(np.abs(ref_grad - calc_grad)) < 1.0e-4
