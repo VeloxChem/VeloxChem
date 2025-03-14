@@ -33,8 +33,8 @@ class MolecularPropertyCalculator:
         else:
             raise FileNotFoundError(f"Error: The file {file_path} does not exist.")
     
-    def run_scf(self, functional='BLYP', solvation_model=None):
-        start_time = time.perf_counter()
+    def run_scf(self, functional='BLYP', solvation_model='CPCM'):
+
         self.scf_drv = vlx.ScfRestrictedDriver()
         self.scf_drv.xcfun = functional
         self.scf_drv.solvation_model = solvation_model
@@ -51,11 +51,9 @@ class MolecularPropertyCalculator:
         else:
             self.scf_drv.ri_coulomb = True
         self.scf_results = self.scf_drv.compute(self.molecule, self.basis)
-        end_time = time.perf_counter()
-        print(f"Time taken to run SCF: {end_time - start_time:.2f} seconds")
+
     
     def optimize_geometry(self):
-        start_time = time.perf_counter()
         # Run geometry optimization using BLYP functional
         self.run_scf(functional='BLYP')
 
@@ -71,14 +69,12 @@ class MolecularPropertyCalculator:
 
         # Use B3LYP functional for further calculations
         self.run_scf(functional='B3LYP', solvation_model='CPCM')
-        end_time = time.perf_counter()
-        print(f"Time taken to optimize geometry: {end_time - start_time:.2f} seconds")
 
     def get_xyz_string(self):
         return self.molecule.get_xyz_string()
     
     def compute_electron_density(self):
-        start_time = time.perf_counter()
+
         grid_drv = vlx.GridDriver()
         grid_drv.set_level(4)
         molgrid = grid_drv.generate(self.molecule)
@@ -94,12 +90,6 @@ class MolecularPropertyCalculator:
                                                molgrid.y_to_numpy()[indices],
                                                molgrid.z_to_numpy()[indices]))
         
-
-        end_time = time.perf_counter()
-        print(f"Time taken to compute electron density: {end_time - start_time:.2f} seconds")
-        print(f"The length of electron density array n_g: {len(n_g)}")
-        return
-    
         
     def _get_surface_point_atom_indices(self):
 
@@ -144,7 +134,6 @@ class MolecularPropertyCalculator:
     
     def compute_local_properties(self):
         print(f'The total amount of surface points is {len(self.surface_points)}')
-        start_time = time.perf_counter()
 
         occ_mo_val, unocc_mo_val = self.compute_molecular_orbitals()
         energy_occ = self.scf_results['E_alpha'][:len(occ_mo_val)]
@@ -173,10 +162,7 @@ class MolecularPropertyCalculator:
             EA.append(ea_point_val)
             IE.append(ie_point_val)
         
-        end_time = time.perf_counter()
-        print(f"Time taken to compute EA and IE values: {end_time - start_time:.2f} seconds")
-       
-        
+
         self.ea_values = EA
         self.ie_values = IE
     
