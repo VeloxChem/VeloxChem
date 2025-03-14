@@ -239,9 +239,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
         freqs = [-1/3 * a for a in rpa_results['eigenvalues']]
         freqs_for_response_vectors = freqs + [0.0]
 
-        print("rpa_results['eigenvalues']",rpa_results['eigenvalues'])
-        print("freqs",freqs)
-
         # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
 
@@ -292,7 +289,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
                                                 scf_results, molecule, ao_basis,
                                                 profiler, Xf)
 
-        valstr = '*** Time spent in quadratic response calculation: '
+        valstr = '*** Time spent in 3PA response calculation: '
         valstr += '{:.2f} sec ***'.format(time.time() - start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
@@ -893,9 +890,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
             BC[('xy', 2 * w)] = E3NbNf_xy - B2Nc_xy
             BC[('xz', 2 * w)] = E3NbNf_xz - B2Nc_xz
             BC[('yz', 2 * w)] = E3NbNf_yz - B2Nc_yz
-
-            print("w", w)
-            print("- 2w", - 2* w)
 
             XY.update(BC)
 
@@ -1798,13 +1792,13 @@ class ThreepaTransitionDriver(NonlinearSolver):
             self.ostream.print_header('-' * len(header_str))
 
             for w_ind, w in enumerate(unique_freqs):  # Iterate over stored frequencies
-                row_values = [f'{w_ind + 1:<10d}', f'{-w * hartree_in_ev():>12.6f} eV']
+                row_values = [f'{w_ind + 1:<10d}', f'{- 3 * w * hartree_in_ev():>12.6f} eV']
 
                 for label in tensor_labels:
                     tensor_key = (label, w)  # Match stored key format
 
                     if tensor_key in T_tensors:
-                        row_values.append(f'{T_tensors[tensor_key].real:12.2f}')  # Fixed width for values
+                        row_values.append(f'{T_tensors[tensor_key].real:12.5f}')  # Fixed width for values
                     else:
                         row_values.append(f'{"N/A":>12s}')  # Align missing values correctly
 
@@ -1827,7 +1821,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
+            exec_str += '{:11.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
             exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
             self.ostream.print_header(exec_str.ljust(width))
@@ -1846,7 +1840,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
+            exec_str += '{:11.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
             exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
             self.ostream.print_header(exec_str.ljust(width))
