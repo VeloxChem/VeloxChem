@@ -392,7 +392,7 @@ def _MolecularBasis_get_avail_basis(element_label=None):
     avail_basis = set()
 
     basis_path = get_basis_path()
-    basis_files = [x for x in basis_path.iterdir() if x.is_file()]
+    basis_files = sorted((x for x in basis_path.iterdir() if x.is_file()))
 
     for x in basis_files:
         name = _basis_file_to_name(x.name)
