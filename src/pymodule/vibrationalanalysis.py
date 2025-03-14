@@ -699,7 +699,8 @@ class VibrationalAnalysis:
 
         self.print_vibrational_analysis_ostream(molecule, normal_mode_idx_lst,
                                                 filename, rsp_drv)
-        self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
+        if number_of_modes > n_dom_modes:
+            self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
         if self.vib_results_txt_file is not None:
             fulltxt_msg = 'Full vibrational analysis results written to: '
