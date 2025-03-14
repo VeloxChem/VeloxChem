@@ -34,6 +34,7 @@ from .veloxchemlib import MolecularBasis
 from .veloxchemlib import tensor_order
 from .veloxchemlib import chemical_element_name
 from .veloxchemlib import chemical_element_identifier
+from .environment import get_basis_path
 
 
 def _known_aliases_for_basis_sets():
@@ -191,6 +192,7 @@ def _read_basis_file(basis_name, basis_path, ostream):
     # 1. given basis_path
     # 2. current directory
     # 3. VLXBASISPATH
+    # 4. built-in basis path
 
     basis_file = Path(basis_path, fname)
 
@@ -199,6 +201,9 @@ def _read_basis_file(basis_name, basis_path, ostream):
 
     if not basis_file.is_file() and 'VLXBASISPATH' in environ:
         basis_file = Path(environ['VLXBASISPATH'], fname)
+
+    if not basis_file.is_file():
+        basis_file = get_basis_path() / fname
 
     assert_msg_critical(
         basis_file.is_file(),
@@ -386,8 +391,8 @@ def _MolecularBasis_get_avail_basis(element_label=None):
 
     avail_basis = set()
 
-    basis_path = Path(environ['VLXBASISPATH'])
-    basis_files = sorted((x for x in basis_path.iterdir() if x.is_file()))
+    basis_path = get_basis_path()
+    basis_files = [x for x in basis_path.iterdir() if x.is_file()]
 
     for x in basis_files:
         name = _basis_file_to_name(x.name)
