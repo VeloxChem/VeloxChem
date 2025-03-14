@@ -247,6 +247,10 @@ class C6Driver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -614,15 +618,8 @@ class C6Driver(LinearSolver):
                 rsp_funcs = {}
 
                 # final h5 file for response solutions
-                if self.checkpoint_file is not None:
-                    if self.checkpoint_file.endswith('_rsp.h5'):
-                        final_h5_fname = (
-                            self.checkpoint_file[:-len('_rsp.h5')] + '.h5')
-                    else:
-                        # TODO: reconsider the file name in this case
-                        fpath = Path(self.checkpoint_file)
-                        fpath = fpath.with_name(fpath.stem)
-                        final_h5_fname = str(fpath) + '_results.h5'
+                if self.filename is not None:
+                    final_h5_fname = f'{self.filename}.h5'
                 else:
                     final_h5_fname = None
 

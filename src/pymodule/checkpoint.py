@@ -167,15 +167,20 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         The solution vector.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
+    if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
-        rsp_group = 'rsp/'
-        dset = hf.create_dataset(rsp_group + keys[0], data=vec)
+
+        label = 'rsp/' + keys[0]
+        if label in hf:
+            del hf[label]
+        dset = hf.create_dataset(label, data=vec)
+
         for key in keys[1:]:
-            hf[rsp_group + key] = dset
+            label = 'rsp/' + key
+            if label in hf:
+                del hf[label]
+            hf[label] = dset
+
         hf.close()
 
 
