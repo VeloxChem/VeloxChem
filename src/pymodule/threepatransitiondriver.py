@@ -239,6 +239,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
         freqs = [-1/3 * a for a in rpa_results['eigenvalues']]
         freqs_for_response_vectors = freqs + [0.0]
 
+        print("rpa_results['eigenvalues']",rpa_results['eigenvalues'])
+        print("freqs",freqs)
+
         # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
 
@@ -393,12 +396,12 @@ class ThreepaTransitionDriver(NonlinearSolver):
                         Nb = ComplexResponse.get_full_solution_vector(Nx[(b_comp, w)])
                         Nc = ComplexResponse.get_full_solution_vector(Nx[(c_comp, w)])
 
-                        Ncf = ComplexResponse.get_full_solution_vector(Nxy[(f"f{c_comp}", w)])
-                        Nbf = ComplexResponse.get_full_solution_vector(Nxy[(f"f{c_comp}", w)])
+                        Ncf = ComplexResponse.get_full_solution_vector(Nxy[(f"f{c_comp}", - 2 * w)])
+                        Nbf = ComplexResponse.get_full_solution_vector(Nxy[(f"f{b_comp}", - 2 * w)])
                         try:
-                            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{b_comp}{c_comp}", w)])
+                            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{b_comp}{c_comp}", 2 * w)])
                         except KeyError:
-                            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{c_comp}{b_comp}", w)])
+                            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{c_comp}{b_comp}", 2 * w)])
 
                         Nf = -LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
@@ -413,16 +416,17 @@ class ThreepaTransitionDriver(NonlinearSolver):
                             kf = LinearSolver.lrvec2mat(Nf, nocc, norb)
                             kbf = LinearSolver.lrvec2mat(Nbf, nocc, norb)
                             kcf = LinearSolver.lrvec2mat(Ncf, nocc, norb)
+                            kbc = LinearSolver.lrvec2mat(Nbc, nocc, norb)
 
                             # A3 contraction
                             A3NbNcNf = np.dot(self._a3_contract(kb, kc, op_A, d_a_mo, nocc, norb), Nf)
-                            A3NcNbNf = np.dot(self._a3_contract(kb, kc, op_A, d_a_mo, nocc, norb), Nf)
+                            A3NbNcNf += np.dot(self._a3_contract(kc, kb, op_A, d_a_mo, nocc, norb), Nf)
 
-                            A3NfNbNc = np.dot(self._a3_contract(kf, kb, op_A, d_a_mo, nocc, norb), Nc)
-                            A3NfNcNb = np.dot(self._a3_contract(kf, kc, op_A, d_a_mo, nocc, norb), Nb)
+                            A3NbNcNf += np.dot(self._a3_contract(kf, kc, op_A, d_a_mo, nocc, norb), Nb)
+                            A3NbNcNf += np.dot(self._a3_contract(kc, kf, op_A, d_a_mo, nocc, norb), Nb)
 
-                            A3NcNbNf = np.dot(self._a3_contract(kc, kb, op_A, d_a_mo, nocc, norb), Nf)
-                            A3NcNfNb = np.dot(self._a3_contract(kc, kf, op_A, d_a_mo, nocc, norb), Nb)
+                            A3NbNcNf += np.dot(self._a3_contract(kb, kf, op_A, d_a_mo, nocc, norb), Nc)
+                            A3NbNcNf += np.dot(self._a3_contract(kf, kb, op_A, d_a_mo, nocc, norb), Nc)
 
                             
                             # X3 contraction
@@ -433,8 +437,13 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
                             # A2 contraction
                             NbA2Ncf = np.dot(self._a2_contract(kb, op_A, d_a_mo, nocc, norb), Ncf)
+                            NbA2Ncf += np.dot(self._a2_contract(kcf, op_A, d_a_mo, nocc, norb), Nb)
+
                             NcA2Nbf = np.dot(self._a2_contract(kc, op_A, d_a_mo, nocc, norb), Nbf)
-                            NfA2Nbc = np.dot(self._a2_contract(kf, op_A, d_a_mo, nocc, norb), Nbc)
+                            NcA2Nbf += np.dot(self._a2_contract(kbf, op_A, d_a_mo, nocc, norb), Nc)
+
+                            NfA2Nbc = np.dot(self._a2_contract(-kf, op_A, d_a_mo, nocc, norb), Nbc)
+                            NfA2Nbc += np.dot(self._a2_contract(kbc, op_A, d_a_mo, nocc, norb), -Nf)
 
                             # X2 contraction
                             NaB2Ncf = np.dot(Na.T,self._x2_contract(kcf, op_B, d_a_mo, nocc, norb))
@@ -448,20 +457,21 @@ class ThreepaTransitionDriver(NonlinearSolver):
                             NaS4NbNcNd = np.dot(Na, s4_dict[(f"{b_comp}{c_comp}", w)])
 
                             # Check signs of the contractions
-                            T_abc = (A3NbNcNf + A3NcNbNf + A3NfNbNc + A3NfNcNb + A3NcNbNf + A3NcNfNb) 
+                            T_abc = A3NbNcNf 
                             T_abc +=  -(NaB3NcNf + NaB3NfNc + NaC3NbNf + NaC3NfNb)
                             T_abc +=  NbA2Ncf + NcA2Nbf + NfA2Nbc
                             T_abc +=  NaB2Ncf + NaC2Nbf 
                             T_abc += - NaE3NbNcf 
-                            T_abc +=  NaE4NbNcNf + NaS4NbNcNd
+                            T_abc +=  -(NaE4NbNcNf - NaS4NbNcNd)
 
                             T_tensors[(f"{a_comp}{b_comp}{c_comp}", w)] = T_abc
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"A3")] = (A3NbNcNf + A3NcNbNf + A3NfNbNc + A3NfNcNb + A3NcNbNf + A3NcNfNb)
+
+                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"A3")] = A3NbNcNf
                             debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"X3")] =  -(NaB3NcNf + NaB3NfNc + NaC3NbNf + NaC3NfNb) 
                             debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"A2")] = NbA2Ncf + NcA2Nbf + NfA2Nbc 
                             debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"X2")] = NaB2Ncf + NaC2Nbf 
                             debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"E3")] = - NaE3NbNcf 
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"T4")] = NaE4NbNcNf + NaS4NbNcNd 
+                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}", w,"T4")] = -(NaE4NbNcNf - NaS4NbNcNd)
 
         diagonalized_tensors = {}
 
@@ -512,47 +522,24 @@ class ThreepaTransitionDriver(NonlinearSolver):
                 tpa_cross_sections['linear'][w] = au2gm * w**3 * D_linear
                 tpa_cross_sections['circular'][w] = au2gm * w**3 * D_circular
 
-            profiler.check_memory_usage('End of QRF')
+            profiler.check_memory_usage('End of 3PA')
 
-            print("dip",scf_prop.get_property('dipole moment'))
+        
+            #a_target, b_target, c_target = 'z', 'z', 'y'
 
-            solution_vector_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
-            solution_vector_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
-            solution_vector_ya = self.flip_yz(ComplexResponse.get_full_solution_vector(Nx[('y', w)]))
-            solution_vector_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
-            solution_vector_f = -LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
-            print("Nx")
-            for element in solution_vector_x:
-                print(element.real)
-            print("Ny")
-            for element in solution_vector_y:
-                print(element.real)
-            print("Nya")
-            for element in solution_vector_ya:
-                print(element.real)
-            print("Nz")
-            for element in solution_vector_z:
-                print(element.real)
-            print("Nf")
-            for element in solution_vector_f:
-                print(element.real)
-
-            a_target, b_target, c_target = 'y', 'y', 'y'
-
-            for key, value in debugg_dict.items():
-                if isinstance(key, tuple) and len(key) == 3:
-                    abc, w, T = key
-                    if abc == f"{a_target}{b_target}{c_target}":
-                        print(f"{key}: {value}")
+            #for key, value in debugg_dict.items():
+            #    if isinstance(key, tuple) and len(key) == 3:
+            #        abc, w, T = key
+            #        if abc == f"{a_target}{b_target}{c_target}":
+            #            print(f"{key}: {value}")
 
             ret_dict = {
                 'photon_energies': [-w for w in freqs],
                 'transition_moments': T_tensors,
                 'cross_sections': tpa_cross_sections,
-                'tpa_strengths': tpa_strengths,
+                '3pa_strengths': tpa_strengths,
                 'ground_state_dipole_moments':scf_prop.get_property('dipole moment')
             }
-
 
 
             self._print_results(ret_dict)
@@ -720,42 +707,39 @@ class ThreepaTransitionDriver(NonlinearSolver):
             # xx
             s4_term_xx = w * self._s4(kx, kx, kf, D0, nocc, norb)
             s4_term_xx += w * self._s4(kx, kx, kf, D0, nocc, norb)
-            s4_term_xx += w * self._s4(kf, kx, kx, D0, nocc, norb)
+            s4_term_xx += - 3 * w * self._s4(kf, kx, kx, D0, nocc, norb)
             s4_vec[('xx',w)] = s4_term_xx
 
             # yy
             s4_term_yy = w * self._s4(ky, ky, kf, D0, nocc, norb)
             s4_term_yy += w * self._s4(ky, ky, kf, D0, nocc, norb)
-            s4_term_yy += w * self._s4(kf, ky, ky, D0, nocc, norb)
+            s4_term_yy += - 3 * w * self._s4(kf, ky, ky, D0, nocc, norb)
             s4_vec[('yy',w)] = s4_term_yy
 
             # zz
             s4_term_zz = w * self._s4(kz, kz, kf, D0, nocc, norb)
             s4_term_zz += w * self._s4(kz, kz, kf, D0, nocc, norb)
-            s4_term_zz += w * self._s4(kf, kz, kz, D0, nocc, norb)
+            s4_term_zz += - 3 * w * self._s4(kf, kz, kz, D0, nocc, norb)
             s4_vec[('zz',w)] = s4_term_zz
 
             # xy
             s4_term_xy = w * self._s4(kx, ky, kf, D0, nocc, norb)
             s4_term_xy += w * self._s4(ky, kx, kf, D0, nocc, norb)
-            s4_term_xy += w * self._s4(kf, kx, ky, D0, nocc, norb)
-            s4_term_xy += w * self._s4(kf, ky, kx, D0, nocc, norb)
+            s4_term_xy += - 3 * w * self._s4(kf, kx, ky, D0, nocc, norb)
             s4_vec[('xy',w)] = s4_term_xy
             s4_vec[('yx',w)] = s4_term_xy
 
             # xz
             s4_term_xz = w * self._s4(kx, kz, kf, D0, nocc, norb)
             s4_term_xz += w * self._s4(kz, kx, kf, D0, nocc, norb)
-            s4_term_xz += w * self._s4(kf, kx, kz, D0, nocc, norb)
-            s4_term_xz += w * self._s4(kf, kz, kx, D0, nocc, norb)
+            s4_term_xz += - 3 * w * self._s4(kf, kx, kz, D0, nocc, norb)
             s4_vec[('xz',w)] = s4_term_xz
             s4_vec[('zx',w)] = s4_term_xz
 
             # yz
             s4_term_yz = w * self._s4(ky, kz, kf, D0, nocc, norb)
             s4_term_yz += w * self._s4(kz, ky, kf, D0, nocc, norb)
-            s4_term_yz += w * self._s4(kf, ky, kz, D0, nocc, norb)
-            s4_term_yz += w * self._s4(kf, kz, ky, D0, nocc, norb)
+            s4_term_yz += - 3 * w * self._s4(kf, ky, kz, D0, nocc, norb)
             s4_vec[('yz',w)] = s4_term_yz
             s4_vec[('zy',w)] = s4_term_yz
 
@@ -823,7 +807,11 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
             # Fix Fock matrices 
 
-            (fx, fy, fz,ff,Fbfx, 
+            (fx, 
+             fy, 
+             fz,
+             ff,
+             Fbfx, 
              Fbfy, 
              Fbfz, 
              Fbc_xx, 
@@ -845,7 +833,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
             kx = (self.complex_lrvec2mat(nx, nocc, norb)).T
             ky = (self.complex_lrvec2mat(ny, nocc, norb)).T
             kz = (self.complex_lrvec2mat(nz, nocc, norb)).T
-
             kf = LinearSolver.lrvec2mat(Nf, nocc, norb).T
 
             # N_xf
@@ -866,9 +853,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
             Y2Nf = 0.5 * self._x2_contract(kf.T, X['y'], d_a_mo, nocc, norb)
             Z2Nf = 0.5 * self._x2_contract(kf.T, X['z'], d_a_mo, nocc, norb)
 
-            BC[('fx', w)] = E3NbNf_x - X2Nf
-            BC[('fy', w)] = E3NbNf_y - Y2Nf
-            BC[('fz', w)] = E3NbNf_z - Z2Nf
+            BC[('fx', - 2 * w)] = E3NbNf_x - X2Nf
+            BC[('fy', - 2 * w)] = E3NbNf_y - Y2Nf
+            BC[('fz', - 2 * w)] = E3NbNf_z - Z2Nf
 
             # E3 contractions 
             xi_xx = self._xi(kx, kx, fx, fx, F0_a)
@@ -893,19 +880,22 @@ class ThreepaTransitionDriver(NonlinearSolver):
             E3NbNf_yz = self.anti_sym(-LinearSolver.lrmat2vec(e3fock_yz, nocc, norb))
 
             # X2 contractions 
-            B2Nc_xx = self._x2_contract(kx.T, X['x'], d_a_mo, nocc, norb)
-            B2Nc_yy = self._x2_contract(ky.T, X['y'], d_a_mo, nocc, norb)
-            B2Nc_zz = self._x2_contract(kz.T, X['z'], d_a_mo, nocc, norb)
+            B2Nc_xx =  0.5 * self._x2_contract(kx.T, X['x'], d_a_mo, nocc, norb) +  0.5 * self._x2_contract(kx.T, X['x'], d_a_mo, nocc, norb)
+            B2Nc_yy =  0.5 * self._x2_contract(ky.T, X['y'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(ky.T, X['y'], d_a_mo, nocc, norb)
+            B2Nc_zz =  0.5 * self._x2_contract(kz.T, X['z'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kz.T, X['z'], d_a_mo, nocc, norb)
             B2Nc_xy = 0.5 * self._x2_contract(kx.T, X['y'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(ky.T, X['x'], d_a_mo, nocc, norb) 
             B2Nc_xz = 0.5 * self._x2_contract(kx.T, X['z'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kz.T, X['x'], d_a_mo, nocc, norb)
             B2Nc_yz = 0.5 * self._x2_contract(ky.T, X['z'], d_a_mo, nocc, norb) + 0.5 * self._x2_contract(kz.T, X['y'], d_a_mo, nocc, norb)
 
-            BC[('xx', w)] = E3NbNf_xx - B2Nc_xx
-            BC[('yy', w)] = E3NbNf_yy - B2Nc_yy
-            BC[('zz', w)] = E3NbNf_zz - B2Nc_zz
-            BC[('xy', w)] = E3NbNf_xy - B2Nc_xy
-            BC[('xz', w)] = E3NbNf_xz - B2Nc_xz
-            BC[('yz', w)] = E3NbNf_yz - B2Nc_yz
+            BC[('xx', 2 * w)] = E3NbNf_xx - B2Nc_xx 
+            BC[('yy', 2 * w)] = E3NbNf_yy - B2Nc_yy 
+            BC[('zz', 2 * w)] = E3NbNf_zz - B2Nc_zz 
+            BC[('xy', 2 * w)] = E3NbNf_xy - B2Nc_xy
+            BC[('xz', 2 * w)] = E3NbNf_xz - B2Nc_xz
+            BC[('yz', 2 * w)] = E3NbNf_yz - B2Nc_yz
+
+            print("w", w)
+            print("- 2w", - 2* w)
 
             XY.update(BC)
 
@@ -968,16 +958,16 @@ class ThreepaTransitionDriver(NonlinearSolver):
             Nz = ComplexResponse.get_full_solution_vector(N[('z', w)])
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
-            Nfx = ComplexResponse.get_full_solution_vector(N2[('fx', w)])
-            Nfy = ComplexResponse.get_full_solution_vector(N2[('fy', w)])
-            Nfz = ComplexResponse.get_full_solution_vector(N2[('fz', w)])
+            Nfx = ComplexResponse.get_full_solution_vector(N2[('fx', - 2 * w)])
+            Nfy = ComplexResponse.get_full_solution_vector(N2[('fy', - 2 * w)])
+            Nfz = ComplexResponse.get_full_solution_vector(N2[('fz', - 2 * w)])
 
-            Nxx = ComplexResponse.get_full_solution_vector(N2[('xx', w)])
-            Nyy = ComplexResponse.get_full_solution_vector(N2[('yy', w)])
-            Nzz = ComplexResponse.get_full_solution_vector(N2[('zz', w)])
-            Nxy = ComplexResponse.get_full_solution_vector(N2[('xy', w)])
-            Nxz = ComplexResponse.get_full_solution_vector(N2[('xz', w)])
-            Nyz = ComplexResponse.get_full_solution_vector(N2[('yz', w)])
+            Nxx = ComplexResponse.get_full_solution_vector(N2[('xx', 2 * w)])
+            Nyy = ComplexResponse.get_full_solution_vector(N2[('yy', 2 * w)])
+            Nzz = ComplexResponse.get_full_solution_vector(N2[('zz', 2 * w)])
+            Nxy = ComplexResponse.get_full_solution_vector(N2[('xy', 2 * w)])
+            Nxz = ComplexResponse.get_full_solution_vector(N2[('xz', 2 * w)])
+            Nyz = ComplexResponse.get_full_solution_vector(N2[('yz', 2 * w)])
             
 
             if self.rank == mpi_master():
@@ -1221,52 +1211,34 @@ class ThreepaTransitionDriver(NonlinearSolver):
                 # create the first order three indexed densities #
                 
                 # xx 
-                Dbcf_xx = self.commut(kx, Dbfx)
-                Dbcf_xx += self.commut(kx, Dbfx)
-                Dbcf_xx += self.commut(kx, Dbfx)
-                Dbcf_xx += self.commut(kx, Dbfx)
-                Dbcf_xx += self.commut(kf, Dbc_xx)
-                Dbcf_xx += self.commut(kf, Dbc_xx)
+                Dbcf_xx = self.commut(kx, Dbfx) # bcd + bdc
+                Dbcf_xx += self.commut(kx, Dbfx) # cbd + cdb
+                Dbcf_xx += self.commut(kf, Dbc_xx) # dbc + dcb
 
                 # yy
-                Dbcf_yy = self.commut(ky, Dbfy)
-                Dbcf_yy += self.commut(ky, Dbfy)
-                Dbcf_yy += self.commut(ky, Dbfy)
-                Dbcf_yy += self.commut(ky, Dbfy)
-                Dbcf_yy += self.commut(kf, Dbc_yy)
-                Dbcf_yy += self.commut(kf, Dbc_yy)
+                Dbcf_yy = self.commut(ky, Dbfy) # bcd + bdc
+                Dbcf_yy += self.commut(ky, Dbfy) # cbd + cdb
+                Dbcf_yy += self.commut(kf, Dbc_yy) # dbc + dcb
 
                 # zz
-                Dbcf_zz = self.commut(kz, Dbfz)
-                Dbcf_zz += self.commut(kz, Dbfz)
-                Dbcf_zz += self.commut(kz, Dbfz)
-                Dbcf_zz += self.commut(kz, Dbfz)
-                Dbcf_zz += self.commut(kf, Dbc_zz)
-                Dbcf_zz += self.commut(kf, Dbc_zz)
+                Dbcf_zz = self.commut(kz, Dbfz) # bcd + bdc
+                Dbcf_zz += self.commut(kz, Dbfz) # cbd + cdb
+                Dbcf_zz += self.commut(kf, Dbc_zz) # dbc + dcb
 
                 #  xy
-                Dbcf_xy = self.commut(kx, Dbfy)
-                Dbcf_xy += self.commut(kx, Dbfy)
-                Dbcf_xy += self.commut(ky, Dbfx)
-                Dbcf_xy += self.commut(ky, Dbfx)
-                Dbcf_xy += self.commut(kf, Dbc_xy)
-                Dbcf_xy += self.commut(kf, Dbc_xy)
+                Dbcf_xy = self.commut(kx, Dbfy) # bcd + bdc
+                Dbcf_xy += self.commut(ky, Dbfx) # cbd + cdb
+                Dbcf_xy += self.commut(kf, Dbc_xy) # dbc + dcb
 
                 #  xz
-                Dbcf_xz = self.commut(kx, Dbfz)
-                Dbcf_xz += self.commut(kx, Dbfz)
-                Dbcf_xz += self.commut(kz, Dbfx)
-                Dbcf_xz += self.commut(kz, Dbfx)
-                Dbcf_xz += self.commut(kf, Dbc_xz)
-                Dbcf_xz += self.commut(kf, Dbc_xz)
+                Dbcf_xz = self.commut(kx, Dbfz) # bcd + bdc
+                Dbcf_xz += self.commut(kz, Dbfx) # cbd + cdb
+                Dbcf_xz += self.commut(kf, Dbc_xz) # dbc + dcb
 
                 #  yz
-                Dbcf_yz = self.commut(ky, Dbfz)
-                Dbcf_yz += self.commut(ky, Dbfz)
-                Dbcf_yz += self.commut(kz, Dbfy)
-                Dbcf_yz += self.commut(kz, Dbfy)
-                Dbcf_yz += self.commut(kf, Dbc_yz)
-                Dbcf_yz += self.commut(kf, Dbc_yz)
+                Dbcf_yz = self.commut(ky, Dbfz) # bcd + bdc
+                Dbcf_yz += self.commut(kz, Dbfy) # cbd + cdb
+                Dbcf_yz += self.commut(kf, Dbc_yz) # dbc + dcb
 
                 # Density transformation from MO to AO basis
 
@@ -1286,6 +1258,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
                 Dbc_xy = np.linalg.multi_dot([mo, Dbc_xy, mo.T])
                 Dbc_xz = np.linalg.multi_dot([mo, Dbc_xz, mo.T])
                 Dbc_yz = np.linalg.multi_dot([mo, Dbc_yz, mo.T])
+
 
                 # first-order three-index
                 Dbcf_yz = np.linalg.multi_dot([mo, Dbcf_yz, mo.T])
@@ -1611,15 +1584,15 @@ class ThreepaTransitionDriver(NonlinearSolver):
                 fo[('x', w)].data,
                 fo[('y', w)].data,
                 fo[('z', w)].data,
-                fo3[('fx', w)].data,
-                fo3[('fy', w)].data,
-                fo3[('fz', w)].data,
-                fo3[('xx', w)].data,
-                fo3[('yy', w)].data,
-                fo3[('zz', w)].data,
-                fo3[('xy', w)].data,
-                fo3[('xz', w)].data,
-                fo3[('yz', w)].data,
+                fo3[('fx', - 2 * w)].data,
+                fo3[('fy', - 2 * w)].data,
+                fo3[('fz', - 2 * w)].data,
+                fo3[('xx',  2 * w)].data,
+                fo3[('yy',  2 * w)].data,
+                fo3[('zz',  2 * w)].data,
+                fo3[('xy',  2 * w)].data,
+                fo3[('xz',  2 * w)].data,
+                fo3[('yz',  2 * w)].data,
                 fo[w_ind].data,
             ]).T.copy()
 
@@ -1632,16 +1605,16 @@ class ThreepaTransitionDriver(NonlinearSolver):
             Nf = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
             # Second-order response vectors
-            Nfx = ComplexResponse.get_full_solution_vector(N_xy[('fx', w)])
-            Nfy = ComplexResponse.get_full_solution_vector(N_xy[('fy', w)])
-            Nfz = ComplexResponse.get_full_solution_vector(N_xy[('fz', w)])
+            Nfx = ComplexResponse.get_full_solution_vector(N_xy[('fx', - 2 * w)])
+            Nfy = ComplexResponse.get_full_solution_vector(N_xy[('fy', - 2 * w)])
+            Nfz = ComplexResponse.get_full_solution_vector(N_xy[('fz', - 2 * w)])
 
-            Nxx = ComplexResponse.get_full_solution_vector(N_xy[('xx', w)])
-            Nyy = ComplexResponse.get_full_solution_vector(N_xy[('xx', w)])
-            Nzz = ComplexResponse.get_full_solution_vector(N_xy[('xx', w)])
-            Nxy = ComplexResponse.get_full_solution_vector(N_xy[('xx', w)])
-            Nxz = ComplexResponse.get_full_solution_vector(N_xy[('xx', w)])
-            Nyz = ComplexResponse.get_full_solution_vector(N_xy[('xx', w)])
+            Nxx = ComplexResponse.get_full_solution_vector(N_xy[('xx', 2 * w)])
+            Nyy = ComplexResponse.get_full_solution_vector(N_xy[('yy', 2 * w)])
+            Nzz = ComplexResponse.get_full_solution_vector(N_xy[('zz', 2 * w)])
+            Nxy = ComplexResponse.get_full_solution_vector(N_xy[('xy', 2 * w)])
+            Nxz = ComplexResponse.get_full_solution_vector(N_xy[('xz', 2 * w)])
+            Nyz = ComplexResponse.get_full_solution_vector(N_xy[('yz', 2 * w)])
 
             if self.rank != mpi_master():
                 continue
@@ -1656,9 +1629,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
             fz = np.conjugate(fz).T
 
             # check these terms for factor of -1 / np.sqrt(2)
-            ffx = np.conjugate(ffx).T
-            ffy = np.conjugate(ffy).T
-            ffz = np.conjugate(ffz).T
+            ffx = np.conjugate(ffx).T 
+            ffy = np.conjugate(ffy).T 
+            ffz = np.conjugate(ffz).T 
 
             fxx = np.conjugate(fxx).T
             fyy = np.conjugate(fyy).T
@@ -1775,15 +1748,15 @@ class ThreepaTransitionDriver(NonlinearSolver):
             The width for the output
         """
 
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
+        w_str = '{:>12s}{:20.9f} {:20.9f} {:20.9f}'.format(
             'x', value[0][0].real, value[0][1].real, value[0][2].real)
         self.ostream.print_header(w_str.ljust(width))
 
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
+        w_str = '{:>12s}{:20.9f} {:20.9f} {:20.9f}'.format(
             'y', value[1][0].real, value[1][1].real, value[1][2].real)
         self.ostream.print_header(w_str.ljust(width))
 
-        w_str = '{:>12s}{:20.5f} {:20.5f} {:20.5f}'.format(
+        w_str = '{:>12s}{:20.9f} {:20.9f} {:20.9f}'.format(
             'z', value[2][0].real, value[2][1].real, value[2][2].real)
         self.ostream.print_header(w_str.ljust(width))
 
@@ -1831,7 +1804,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
                     tensor_key = (label, w)  # Match stored key format
 
                     if tensor_key in T_tensors:
-                        row_values.append(f'{T_tensors[tensor_key].real:12.4f}')  # Fixed width for values
+                        row_values.append(f'{T_tensors[tensor_key].real:12.2f}')  # Fixed width for values
                     else:
                         row_values.append(f'{"N/A":>12s}')  # Align missing values correctly
 
@@ -1839,7 +1812,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
             self.ostream.print_blank()
 
-        tpa_strengths = rsp_results['tpa_strengths']
+        tpa_strengths = rsp_results['3pa_strengths']
         tpa_cross_sections = rsp_results['cross_sections']
 
         title = '3PA Strength and Cross-Section (Linear Polarization)'
