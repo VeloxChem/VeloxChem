@@ -1,11 +1,7 @@
 import os
-from tracemalloc import start
 import numpy as np
 import veloxchem as vlx
-import py3Dmol as p3d
 from collections import defaultdict
-from scipy import optimize
-import time
 
 
 class MolecularPropertyCalculator:
