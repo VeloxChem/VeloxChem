@@ -140,6 +140,7 @@ class EvbDriver():
         optimise: bool = False,
         ordered_input: bool = False,
         breaking_bonds: tuple[int, int] | list[tuple[int, int]] = None,
+        save_output: bool = True,
     ):
         """Build forcefields for the reactant and products, and set self.reactant and self.product to the respective forcefields as well as saving them as json to the input files folder. 
         Will calculate RESP charges and use an xtb Hessian for any necessary reparameterisation. If these files are already present in the input_files folder, they will be loaded instead of recalculated.
@@ -260,7 +261,7 @@ class EvbDriver():
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
 
-            self.reactant, self.product = ffbuilder.build_forcefields(
+            self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
                 reactant_charge,
@@ -270,8 +271,9 @@ class EvbDriver():
                 ordered_input,
                 breaking_bonds,
             )
-        self.save_forcefield(self.reactant, str(reactant_path))
-        self.save_forcefield(self.product, str(combined_product_path))
+        if save_output:
+            self.save_forcefield(self.reactant, str(reactant_path))
+            self.save_forcefield(self.product, str(combined_product_path))
         self.ostream.flush()
 
     def _get_input_files(self, filename: str):
@@ -467,20 +469,17 @@ class EvbDriver():
         #Per configuration
         for conf in configurations:
             #create folders,
+            if save_output:
+                data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
+                conf["data_folder"] = data_folder
+                run_folder = str(Path(data_folder) / "run")
+                conf["run_folder"] = run_folder
+                cwd = Path().cwd()
+                data_folder_path = cwd / data_folder
+                run_folder_path = cwd / run_folder
 
-            data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
-            conf["data_folder"] = data_folder
-            run_folder = str(Path(data_folder) / "run")
-            conf["run_folder"] = run_folder
-            cwd = Path().cwd()
-            data_folder_path = cwd / data_folder
-            run_folder_path = cwd / run_folder
-
-            data_folder_path.mkdir(parents=True, exist_ok=True)
-            run_folder_path.mkdir(parents=True, exist_ok=True)
-
-            self.save_forcefield(self.reactant, str(data_folder_path / "reactant_ff.json"))
-            self.save_forcefield(self.product, str(data_folder_path / "product_ff.json"))
+                data_folder_path.mkdir(parents=True, exist_ok=True)
+                run_folder_path.mkdir(parents=True, exist_ok=True)
 
             # build the system
             system_builder = EvbSystemBuilder()
