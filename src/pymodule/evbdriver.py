@@ -670,14 +670,6 @@ class EvbDriver():
             with open(file_path, mode="w", encoding="utf-8") as output:
                 output.write(mm.XmlSerializer.serialize(systems[lam]))
 
-        file_path = str(path / "reactant.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems["reactant"]))
-
-        file_path = str(path / "product.xml")
-        with open(file_path, mode="w", encoding="utf-8") as output:
-            output.write(mm.XmlSerializer.serialize(systems["product"]))
-
     def load_systems_from_xml(self, folder: str):
         """Load the systems from xml files in the given folder.
 
@@ -694,10 +686,6 @@ class EvbDriver():
         for lam in self.Lambda:
             with open(path / f"{lam:.3f}_sys.xml", mode="r", encoding="utf-8") as input:
                 systems[lam] = mm.XmlSerializer.deserialize(input.read())
-        with open(path / "reactant.xml", mode="r", encoding="utf-8") as input:
-            systems["reactant"] = mm.XmlSerializer.deserialize(input.read())
-        with open(path / "product.xml", mode="r", encoding="utf-8") as input:
-            systems["product"] = mm.XmlSerializer.deserialize(input.read())
         return systems
 
     def run_FEP(
