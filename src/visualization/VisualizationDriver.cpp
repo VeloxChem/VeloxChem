@@ -117,6 +117,7 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
                     break;
                 default:
                     sphmom = std::vector<std::pair<int, double>>();
+                    break;
             }
 
             auto ncomp = static_cast<int>(sphmom.size());
@@ -313,6 +314,7 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolec
             break;
         default:
             sphmom = std::vector<std::pair<int, double>>();
+            break;
     }
 
     auto ncomp = static_cast<int>(sphmom.size());

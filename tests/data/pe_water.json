@@ -1,0 +1,115 @@
+{
+    "quantum_subsystems": [{
+        "nuclei": [{
+            "index": 1,
+            "element": "O",
+            "charge": 8.0,
+            "coordinate": [2.28070688, 2.31873966, -0.21440569]
+        }, {
+            "index": 2,
+            "element": "H",
+            "charge": 1.0,
+            "coordinate": [0.92701328, 2.15169526, 0.96005035]
+        }, {
+            "index": 3,
+            "element": "H",
+            "charge": 1.0,
+            "coordinate": [3.76540894, 2.17966926, 0.76800427]
+        }]
+    }],
+    "classical_subsystems": [{
+        "classical_fragments": [{
+            "index": 1,
+            "name": "H2O",
+            "atoms": [{
+                "index": 1,
+                "element": "O",
+                "coordinate": [-1.88163847, 0.03031404, 2.34752286],
+                "multipoles": {
+                    "elements": [0.0]
+                },
+                "exclusions": [1, 2, 3],
+                "polarizabilities": {
+                    "elements": [
+                        0.0, 0.0, 0.0, 0.0, 5.73935090, 0.0, 0.0, 5.73935090, 0.0, 5.73935090
+                    ],
+                    "order": [1, 1]
+                }
+            }, {
+                "index": 2,
+                "element": "H",
+                "coordinate": [-2.74817258, -1.07142577, 3.49085649],
+                "multipoles": {
+                    "elements": [0.0]
+                },
+                "exclusions": [1, 2, 3],
+                "polarizabilities": {
+                    "elements": [
+                        0.0, 0.0, 0.0, 0.0, 2.30839051, 0.0, 0.0, 2.30839051, 0.0, 2.30839051
+                    ],
+                    "order": [1, 1]
+                }
+            }, {
+                "index": 3,
+                "element": "H",
+                "coordinate": [-1.77217571, -0.91045342, 0.80645234],
+                "multipoles": {
+                    "elements": [0.0]
+                },
+                "exclusions": [1, 2, 3],
+                "polarizabilities": {
+                    "elements": [
+                        0.0, 0.0, 0.0, 0.0, 2.30839051, 0.0, 0.0, 2.30839051, 0.0, 2.30839051
+                    ],
+                    "order": [1, 1]
+                }
+            }]
+        }, {
+            "index": 2,
+            "name": "H2O",
+            "atoms": [{
+                "index": 4,
+                "element": "O",
+                "coordinate": [-0.45964621, -1.92724966, -2.25894233],
+                "multipoles": {
+                    "elements": [0.0]
+                },
+                "exclusions": [4, 5, 6],
+                "polarizabilities": {
+                    "elements": [
+                        0.0, 0.0, 0.0, 0.0, 5.73935090, 0.0, 0.0, 5.73935090, 0.0, 5.73935090
+                    ],
+                    "order": [1, 1]
+                }
+            }, {
+                "index": 5,
+                "element": "H",
+                "coordinate": [0.82534469, -0.71042988, -1.88467999],
+                "multipoles": {
+                    "elements": [0.0]
+                },
+                "exclusions": [4, 5, 6],
+                "polarizabilities": {
+                    "elements": [
+                        0.0, 0.0, 0.0, 0.0, 2.30839051, 0.0, 0.0, 2.30839051, 0.0, 2.30839051
+                    ],
+                    "order": [1, 1]
+                }
+            }, {
+                "index": 6,
+                "element": "H",
+                "coordinate": [-0.95087901, -1.559306, -3.96048026],
+                "multipoles": {
+                    "elements": [0.0]
+                },
+                "exclusions": [4, 5, 6],
+                "polarizabilities": {
+                    "elements": [
+                        0.0, 0.0, 0.0, 0.0, 2.30839051, 0.0, 0.0, 2.30839051, 0.0, 2.30839051
+                    ],
+                    "order": [1, 1]
+                }
+            }]
+        }]
+    }]
+}

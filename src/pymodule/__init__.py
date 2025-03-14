@@ -25,6 +25,10 @@
 # C++ classes
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
+from .veloxchemlib import GtoBlock
+from .veloxchemlib import GtoPairBlock
+from .veloxchemlib import BlockedGtoPairBlock
+from .veloxchemlib import T3FlatBuffer
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
@@ -44,14 +48,21 @@ from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+from .veloxchemlib import ThreeCenterOverlapDriver
+from .veloxchemlib import ThreeCenterElectronRepulsionDriver
+from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
+from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
+from .veloxchemlib import RIFockDriver
+from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
-from .veloxchemlib import DispersionModel
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import SubMatrix
 
@@ -70,7 +81,7 @@ from .veloxchemlib import available_pdft_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import hartree_in_kcalpermol, hartree_in_kjpermol
 from .veloxchemlib import hartree_in_wavenumber, hartree_in_wavenumbers
 from .veloxchemlib import dipole_in_debye
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -106,6 +117,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .dispersionmodel import DispersionModel
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -140,7 +152,7 @@ from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
-from .loprop import LoPropDriver
+from .peforcefieldgenerator import PEForceFieldGenerator
 from .firstorderprop import FirstOrderProperties
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
@@ -152,7 +164,7 @@ from .tdhfhessiandriver import TdhfHessianDriver
 from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
@@ -165,6 +177,20 @@ from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
 from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
+from .evbdriver import EvbDriver
+from .evbffbuilder import EvbForceFieldBuilder
+from .evbsystembuilder import EvbSystemBuilder
+from .evbfepdriver import EvbFepDriver
+from .evbdataprocessing import EvbDataProcessing
+from .evbreporter import EvbReporter
+from .imforcefieldgenerator import IMForceFieldGenerator
+from .imdatabasepointcollecter import IMDatabasePointCollecter
+from .interpolationdriver import InterpolationDriver
+from .interpolationdatapoint import InterpolationDatapoint
+from .mofbuilder import MofBuilder
+
+# for backward compatibility only
+from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
@@ -177,10 +203,11 @@ from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
-from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
-                          configure_mkl_rt)
+from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
+                          get_data_path, set_omp_num_threads, configure_mkl_rt)
 
 set_vlxbasispath()
+set_vlxdatapath()
 set_omp_num_threads()
 configure_mkl_rt()
 

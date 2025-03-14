@@ -30,12 +30,12 @@ from .mpitask import MpiTask
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .respchargesdriver import RespChargesDriver
 from .excitondriver import ExcitonModelDriver
 from .numerovdriver import NumerovDriver
 from .mp2driver import Mp2Driver
-from .loprop import LoPropDriver
+from .peforcefieldgenerator import PEForceFieldGenerator
 from .scfgradientdriver import ScfGradientDriver
 from .tddftgradientdriver import TddftGradientDriver
 from .tddftorbitalresponse import TddftOrbitalResponse
@@ -53,9 +53,9 @@ from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
-#from .cphfsolver import CphfSolver
 #from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
+from .trajectorydriver import TrajectoryDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -95,7 +95,7 @@ def select_scf_driver(task, scf_type):
     elif scf_type == 'restricted_openshell':
         scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
     else:
-        assert_msg_critical(False, f'SCF: invalide scf_type {scf_type}')
+        assert_msg_critical(False, f'SCF: invalid scf_type {scf_type}')
 
     return scf_drv
 
@@ -177,8 +177,8 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     #     rsp_prop = CustomProperty(rsp_dict, method_dict)
 
     else:
-        assert_msg_critical(
-            False, f'Response: invalide response property {prop_type}')
+        assert_msg_critical(False,
+                            f'Response: invalid response property {prop_type}')
 
     return rsp_prop
 
@@ -256,7 +256,7 @@ def main():
 
     # Force field generator
 
-    if task_type == 'force field':
+    if task_type == 'mm force field':
         force_field_dict = (dict(task.input_dict['force_field'])
                             if 'force_field' in task.input_dict else {})
         force_field_dict['filename'] = task.input_dict['filename']
@@ -265,9 +265,27 @@ def main():
                      if 'resp_charges' in task.input_dict else {})
         resp_dict['filename'] = task.input_dict['filename']
 
-        force_field_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
+        force_field_drv = MMForceFieldGenerator(task.mpi_comm, task.ostream)
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
+
+    # Spectrum from trajectory
+
+    if task_type == 'trajectory':
+        traj_dict = (dict(task.input_dict['trajectory'])
+                     if 'trajectory' in task.input_dict else {})
+        spect_dict = (dict(task.input_dict['spectrum_settings'])
+                      if 'spectrum_settings' in task.input_dict else {})
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
+
+        traj_dict['filename'] = task.input_dict['filename']
+        traj_dict['charges'] = task.input_dict['charges']
+        traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
+
+        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
+        traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
+        traj_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Diatomic vibronic spectrum using Numerov
 
@@ -283,12 +301,11 @@ def main():
         numerov_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
     # Self-consistent field
-
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'uscf_gradient',
         'hessian', 'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'vibrational', 'freq', 'cphf', 'polarizability_gradient'
+        'pe force field', 'vibrational', 'polarizability_gradient'
     ]
 
     scf_type = 'restricted'
@@ -364,6 +381,9 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
+            orbrsp_dict = (dict(task.input_dict['orbital_response'])
+                           if 'orbital_response' in task.input_dict else {})
+
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
                 'Invalid response property for gradient calculation')
@@ -371,19 +391,21 @@ def main():
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
-            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
+                                          method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
                                   rsp_prop._rsp_driver, rsp_prop._rsp_property)
 
     # Hessian
     # TODO reconsider keeping this after introducing vibrationalanalysis class
     if task_type == 'hessian':
-        hessian_dict = (task.input_dict['hessian']
+        hessian_dict = (dict(task.input_dict['hessian'])
                         if 'hessian' in task.input_dict else {})
 
-        orbrsp_dict = (task.input_dict['orbital_response']
+        orbrsp_dict = (dict(task.input_dict['orbital_response'])
                        if 'orbital_response' in task.input_dict else {})
         orbrsp_dict['program_end_time'] = program_end_time
         orbrsp_dict['filename'] = task.input_dict['filename']
@@ -442,6 +464,9 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
+            orbrsp_dict = (dict(task.input_dict['orbital_response'])
+                           if 'orbital_response' in task.input_dict else {})
+
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
                 'Invalid response property for geometry optimization')
@@ -449,9 +474,11 @@ def main():
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
-            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, orbrsp_dict,
+                                          method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.keep_files = True
@@ -638,11 +665,11 @@ def main():
         vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
                           density)
 
-    # LoProp
+    # PE force field
 
-    if task_type == 'loprop':
-        loprop_driver = LoPropDriver(task.mpi_comm, task.ostream)
-        loprop_driver.compute(task.molecule, task.ao_basis, scf_results)
+    if task_type in ['loprop', 'pe force field']:
+        pe_ff_gen = PEForceFieldGenerator(task.mpi_comm, task.ostream)
+        pe_ff_gen.compute(task.molecule, task.ao_basis, scf_results)
 
     # RESP and ESP charges
 

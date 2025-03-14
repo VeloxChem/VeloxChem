@@ -29,8 +29,9 @@ import numpy as np
 import time as tm
 import tempfile
 import math
+import h5py
 
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .scfrestdriver import ScfRestrictedDriver
@@ -38,6 +39,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
@@ -90,6 +92,7 @@ class OptimizationDriver:
         self.trust = None
         self.tmax = None
         self.max_iter = 300
+        self.conv_maxiter = False
 
         self.conv_energy = None
         self.conv_grms = None
@@ -122,6 +125,8 @@ class OptimizationDriver:
                 'hessian': ('str_lower', 'hessian flag'),
                 'ref_xyz': ('str', 'reference geometry'),
                 'keep_files': ('bool', 'flag to keep output files'),
+                'conv_maxiter':
+                    ('bool', 'consider converged if max_iter is reached'),
                 'conv_energy': ('float', ''),
                 'conv_grms': ('float', ''),
                 'conv_gmax': ('float', ''),
@@ -199,6 +204,7 @@ class OptimizationDriver:
         elif (isinstance(drv, ScfGradientDriver) or
               isinstance(drv, XtbGradientDriver) or
               isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, TddftGradientDriver) or
               isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
@@ -451,6 +457,10 @@ class OptimizationDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
+                # Write opt results to final hdf5 file
+                final_h5_fname = filename + ".h5"
+                self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
+
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
 
         try:
@@ -484,6 +494,8 @@ class OptimizationDriver:
         if self.conv_dmax is not None:
             opt_flags.append('dmax')
             opt_flags.append(str(self.conv_dmax))
+        if self.conv_maxiter:
+            opt_flags.append('maxiter')
         return opt_flags
 
     @staticmethod
@@ -660,12 +672,12 @@ class OptimizationDriver:
 
         line = '{:>5s}{:>20s}  {:>25s}{:>30s}'.format(
             'Scan', 'Energy (a.u.)', 'Relative Energy (a.u.)',
-            'Relative Energy (kcal/mol)')
+            'Relative Energy (kJ/mol)')
         self.ostream.print_header(line)
         self.ostream.print_header('-' * len(line))
         for i, (e, rel_e) in enumerate(zip(energies, relative_energies)):
             line = '{:>5d}{:22.12f}{:22.12f}   {:25.10f}     '.format(
-                i + 1, e, rel_e, rel_e * hartree_in_kcalpermol())
+                i + 1, e, rel_e, rel_e * hartree_in_kjpermol())
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
@@ -843,13 +855,13 @@ class OptimizationDriver:
 
         min_energy = np.min(energies)
         rel_energies = energies - min_energy
-        rel_energies_kcal = rel_energies * hartree_in_kcalpermol()
+        rel_energies_kJ = rel_energies * hartree_in_kjpermol()
 
         xyz_data_i = geometries[step]
-        steps = range(len(rel_energies_kcal))
-        total_steps = len(rel_energies_kcal) - 1
+        steps = range(len(rel_energies_kJ))
+        total_steps = len(rel_energies_kJ) - 1
         x = np.linspace(0, total_steps, 100)
-        y = np.interp(x, steps, rel_energies_kcal)
+        y = np.interp(x, steps, rel_energies_kJ)
         plt.figure(figsize=(6.5, 4))
         plt.plot(x,
                  y,
@@ -859,7 +871,7 @@ class OptimizationDriver:
                  ls='-',
                  zorder=0)
         plt.scatter(steps,
-                    rel_energies_kcal,
+                    rel_energies_kJ,
                     color='black',
                     alpha=0.7,
                     s=120 / math.log(total_steps, 10),
@@ -867,14 +879,14 @@ class OptimizationDriver:
                     edgecolor="darkcyan",
                     zorder=1)
         plt.scatter(step,
-                    rel_energies_kcal[step],
+                    rel_energies_kJ[step],
                     marker='o',
                     color='darkcyan',
                     alpha=1.0,
                     s=120 / math.log(total_steps, 10),
                     zorder=2)
         plt.xlabel('Iteration')
-        plt.ylabel('Relative energy [kcal/mol]')
+        plt.ylabel('Relative energy [kJ/mol]')
         plt.title("Geometry optimization")
         # Ensure x-axis displays as integers
         plt.xticks(np.arange(0, total_steps + 1, max(1, total_steps // 10)))
@@ -883,3 +895,64 @@ class OptimizationDriver:
 
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
+
+    def _write_final_hdf5(self, fname, molecule, opt_results):
+        """
+        Creats a HDF5 file and saves the optimization results.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param molecule:
+            The molecule.
+        :param opt_results:
+            The dictionary of optimzation results.
+        """
+
+        if (fname and isinstance(fname, str) and Path(fname).is_file()):
+
+            hf = h5py.File(fname, 'a')
+
+            opt_group = 'opt/'
+
+            # Check if it is a scan job or not
+            if 'scan_energies' in opt_results.keys():
+                hf.create_dataset(opt_group + 'scan_energies',
+                                  data=opt_results['scan_energies'])
+
+                nuclear_repulsion_energies = []
+                scan_coordinates_au = []
+                for xyzstr in opt_results['scan_geometries']:
+                    mol = Molecule.read_xyz_string(xyzstr)
+                    nuclear_repulsion_energies.append(
+                        mol.nuclear_repulsion_energy())
+                    scan_coordinates_au.append(mol.get_coordinates_in_bohr())
+
+                hf.create_dataset(opt_group + 'scan_coordinates_au',
+                                  data=np.array(scan_coordinates_au))
+
+            else:
+                hf.create_dataset(opt_group + 'opt_energies',
+                                  data=opt_results['opt_energies'])
+
+                nuclear_repulsion_energies = []
+                opt_coordinates_au = []
+                for xyzstr in opt_results['opt_geometries']:
+                    mol = Molecule.read_xyz_string(xyzstr)
+                    nuclear_repulsion_energies.append(
+                        mol.nuclear_repulsion_energy())
+                    opt_coordinates_au.append(mol.get_coordinates_in_bohr())
+
+                hf.create_dataset(opt_group + 'opt_coordinates_au',
+                                  data=np.array(opt_coordinates_au))
+
+            # TODO: reconsider saving this
+            hf.create_dataset(opt_group + 'nuclear_repulsion_energies',
+                              data=np.array(nuclear_repulsion_energies))
+
+            valstr = 'Optimization results written to file: '
+            valstr += fname
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            hf.close()

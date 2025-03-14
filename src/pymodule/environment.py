@@ -48,6 +48,26 @@ def set_vlxbasispath():
         environ['VLXBASISPATH'] = str(get_basis_path())
 
 
+def get_data_path():
+    """
+    Returns location of data files within module.
+
+    :return:
+        The location of data files within module.
+    """
+
+    return Path(__file__).parent / "database"
+
+
+def set_vlxdatapath():
+    """
+    Sets location of data files.
+    """
+
+    if 'VLXDATAPATH' not in environ:
+        environ['VLXDATAPATH'] = str(get_data_path())
+
+
 def set_omp_num_threads(ncores=None):
     """
     Sets number of OpenMP threads.

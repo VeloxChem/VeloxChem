@@ -27,10 +27,34 @@ import numpy as np
 import math
 
 from .veloxchemlib import Molecule
-from .veloxchemlib import bohr_in_angstrom
+from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
+
+
+@staticmethod
+def _Molecule_smiles_formal_charge(smiles_str):
+    """
+    Gets formal charge from SMILES string.
+
+    :param smiles_str:
+        The SMILES string.
+
+    :return:
+        The formal charge.
+    """
+
+    try:
+        from rdkit import Chem
+
+        mol_bare = Chem.MolFromSmiles(smiles_str)
+        mol_chg = Chem.GetFormalCharge(mol_bare)
+
+        return mol_chg
+
+    except ImportError:
+        raise ImportError('Unable to import rdkit.')
 
 
 @staticmethod
@@ -84,8 +108,12 @@ def _Molecule_read_smiles(smiles_str):
     """
 
     xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
+    mol = Molecule.read_xyz_string(xyz)
 
-    return Molecule.read_xyz_string(xyz)
+    mol_chg = Molecule.smiles_formal_charge(smiles_str)
+    mol.set_charge(mol_chg)
+
+    return mol
 
 
 def _element_guesser(atom_name, residue_name):
@@ -400,9 +428,7 @@ def _Molecule_from_dict(mol_dict):
     assert_msg_critical(
         mol.check_multiplicity(),
         'Molecule: Incompatible multiplicity and number of electrons')
-    assert_msg_critical(
-        mol.check_proximity(0.1),
-        'Molecule: Corrupted geometry with closely located atoms')
+    assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
     return mol
 
@@ -1139,10 +1165,54 @@ def _Molecule_number_of_beta_electrons(self):
     return (self.number_of_electrons() - self.get_multiplicity() + 1) // 2
 
 
+def _Molecule_partition_atoms(self, comm):
+    """
+    Partition atoms for a given MPI communicator.
+
+    :param comm:
+        The MPI communicator.
+
+    :return:
+        The list of atom indices for the current MPI rank.
+    """
+
+    rank = comm.Get_rank()
+    nnodes = comm.Get_size()
+
+    if rank == mpi_master():
+        elem_ids = self.get_identifiers()
+        coords = self.get_coordinates_in_bohr()
+        mol_com = self.center_of_mass_in_bohr()
+
+        r2_array = np.sum((coords - mol_com)**2, axis=1)
+        sorted_r2_list = sorted([
+            (r2, nchg, i)
+            for i, (r2, nchg) in enumerate(zip(r2_array, elem_ids))
+        ])
+
+        dict_atoms = {}
+        for r2, nchg, i in sorted_r2_list:
+            if nchg not in dict_atoms:
+                dict_atoms[nchg] = []
+            dict_atoms[nchg].append(i)
+
+        list_atoms = []
+        for nchg in sorted(dict_atoms.keys(), reverse=True):
+            list_atoms += dict_atoms[nchg]
+
+    else:
+        list_atoms = None
+
+    list_atoms = comm.bcast(list_atoms, root=mpi_master())
+
+    return list(list_atoms[rank::nnodes])
+
+
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
+Molecule.smiles_formal_charge = _Molecule_smiles_formal_charge
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
 Molecule.read_pdb_file = _Molecule_read_pdb_file
@@ -1176,6 +1246,7 @@ Molecule.print_keywords = _Molecule_print_keywords
 Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
+Molecule.partition_atoms = _Molecule_partition_atoms
 
 # aliases for backward compatibility
 Molecule.read_xyz = _Molecule_read_xyz_file

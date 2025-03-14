@@ -1,0 +1,48 @@
+@jobs
+task: trajectory
+@end
+
+@method settings
+basis: sto-3g
+@end
+
+@trajectory
+description: bithiophene in water
+topology file: bithio.tpr
+trajectory file: bithio.xtc
+sampling time: 300 - 400 (100)
+quantum region: resname RES
+classical polarizable region: 3.0
+classical non-polarizable region: 4.5
+units: ps, angstrom
+@end
+
+@spectrum settings
+line profile: gaussian
+broadening parameter: 0.4
+units: eV
+@end
+
+@response
+nstates: 2
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+@end 
+
+@charges
+O  -0.67444408  water
+H   0.33722206  water
+H   0.33722206  water
+O  -0.67444408  water-n
+H   0.33722206  water-n
+H   0.33722206  water-n
+@end
+
+@polarizabilities
+O       5.73935090    0.00000000    0.00000000    5.73935090    0.00000000    5.73935090  water
+H       2.30839051    0.00000000    0.00000000    2.30839051    0.00000000    2.30839051  water
+H       2.30839051    0.00000000    0.00000000    2.30839051    0.00000000    2.30839051  water
+@end

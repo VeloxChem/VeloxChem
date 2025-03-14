@@ -304,6 +304,7 @@ export_math(py::module &m) -> void
                 return vlx_general::pointer_to_numpy(mat.data(), {static_cast<int>(mat.number_of_rows()), static_cast<int>(mat.number_of_columns())});
             },
             "Create full matrix representation of matrix and convert to numpy array.")
+        .def("flat_values", &CMatrix::flat_values, "Gets flatened vector of matrix elements.")
         .def("__add__", [](const CMatrix &self, const CMatrix &other) { return self + other; })
         .def("__eq__", [](const CMatrix &self, const CMatrix &other) { return self == other; })
         .def("__ne__", [](const CMatrix &self, const CMatrix &other) { return self != other; })

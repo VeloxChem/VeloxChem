@@ -87,6 +87,8 @@ class GradientDriver:
         self.grid_level = None
         self.xcfun = None
 
+        self.potfile = None
+
         self.checkpoint_file = None
 
         self._input_keywords = {
@@ -552,14 +554,9 @@ class GradientDriver:
                 cur_str = ('Excited State of Interest       : ' +
                            str(state_deriv_index + 1))
                 self.ostream.print_header(cur_str.ljust(str_width))
-            elif isinstance(state_deriv_index, tuple):
-                states_txt = ""
-                for i in range(len(state_deriv_index)):
-                    s = state_deriv_index[i]
-                    if i == len(state_deriv_index) - 1:
-                        states_txt += "%d." % s
-                    else:
-                        states_txt += "%d, " % s
+            elif isinstance(state_deriv_index, (list, tuple)):
+                state_deriv_index_str = [str(s) for s in state_deriv_index]
+                states_txt = ", ".join(state_deriv_index_str)
                 cur_str = 'Excited States of Interest      : ' + states_txt
                 self.ostream.print_header(cur_str.ljust(str_width))
 

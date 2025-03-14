@@ -20,18 +20,14 @@ class TestCphfSolver:
                        label=None,
                        use_subcomms=False):
         scf_drv = ScfRestrictedDriver()
-        method_settings = {}
-        if xcfun is not None:
-            scf_drv._dft = True
-            scf_drv.xcfun = xcfun
-            method_settings = {'xcfun': xcfun}
+        scf_drv.xcfun = xcfun
 
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
         hess_orbrsp_drv = HessianOrbitalResponse()
         orbrsp_settings = {'conv_thresh': 2e-7}
-        hess_orbrsp_drv.update_settings(orbrsp_settings, method_settings)
+        hess_orbrsp_drv.update_settings(orbrsp_settings)
         hess_orbrsp_drv.ostream.mute()
 
         hess_orbrsp_drv.use_subcomms = use_subcomms

@@ -343,6 +343,36 @@ comp_boys_args(CSimdArray<double>& bf_data,
     }
 }
 
+void
+comp_boys_args_with_rho(CSimdArray<double>& bf_data, const size_t index_args, CSimdArray<double>& buffer, const size_t index_ab, const double a_exp)
+{
+    // Set up exponents
+
+    auto b_exps = buffer.data(0);
+
+    // set up Boys function arguments
+
+    auto bargs = bf_data.data(index_args);
+
+    // set up R(AB) distances
+
+    auto ab_x = buffer.data(index_ab);
+
+    auto ab_y = buffer.data(index_ab + 1);
+
+    auto ab_z = buffer.data(index_ab + 2);
+
+    // compute Boys function arguments
+
+    const auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(bargs, ab_x, ab_y, ab_z, b_exps : 64)
+    for (int i = 0; i < nelems; i++)
+    {
+        bargs[i] = a_exp * b_exps[i] * (ab_x[i] * ab_x[i] + ab_y[i] * ab_y[i] + ab_z[i] * ab_z[i]) / (a_exp + b_exps[i]);
+    }
+}
+
 auto
 reduce(CSimdArray<double>& cbuffer, CSimdArray<double>& pbuffer, const size_t position, const size_t ndims, const size_t nblocks) -> void
 {
