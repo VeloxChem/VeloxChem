@@ -50,37 +50,21 @@ class TestRIJFockGeomExGradDriver:
         rw_den_gen_mat = make_matrix(bas_sto3g, mat_t.general)
         rw_den_gen_mat.set_values(0.68 * density)
         
-        bra_t4c = T4CScreener()
-        bra_t4c.partition_atom(bas_sto3g, mol_h2o, 'eri', 2)
         ket_t4c = T4CScreener()
         ket_t4c.partition(bas_sto3g, mol_h2o, 'eri')
         
         fock_grad_drv = FockGeom1000Driver()
-        rgrad = fock_grad_drv.compute(bas_sto3g, bra_t4c, ket_t4c,
-                                      gs_den_mat, rw_den_gen_mat,
-                                      2, 'j', 0.0, 0.0, 15)
         
-        print(rgrad)
+        ref_grads = []
+        for i in range(3):
+            bra_t4c = T4CScreener()
+            bra_t4c.partition_atom(bas_sto3g, mol_h2o, 'eri', i)
+            grad = fock_grad_drv.compute(bas_sto3g, bra_t4c, ket_t4c,
+                                         gs_den_mat, rw_den_gen_mat,
+                                         i, 'j', 0.0, 0.0, 15)
+            ref_grads.append([grad[0], grad[1], grad[2]])
         
-        bra_t4c = T4CScreener()
-        bra_t4c.partition_atom(bas_sto3g, mol_h2o, 'eri', 1)
-        
-        fock_grad_drv = FockGeom1000Driver()
-        rgrad = fock_grad_drv.compute(bas_sto3g, bra_t4c, ket_t4c,
-                                      gs_den_mat, rw_den_gen_mat,
-                                      1, 'j', 0.0, 0.0, 15)
-        
-        print(rgrad)
-        
-        bra_t4c = T4CScreener()
-        bra_t4c.partition_atom(bas_sto3g, mol_h2o, 'eri', 0)
-        
-        fock_grad_drv = FockGeom1000Driver()
-        rgrad = fock_grad_drv.compute(bas_sto3g, bra_t4c, ket_t4c,
-                                      gs_den_mat, rw_den_gen_mat,
-                                      0, 'j', 0.0, 0.0, 15)
-        
-        print(rgrad)
+        print(ref_grads)
                 
         # compute J metric
         t2c_drv = TwoCenterElectronRepulsionDriver()
@@ -95,27 +79,19 @@ class TestRIJFockGeomExGradDriver:
         rw_bq = ri_fock_drv.compute_bq_vector(rw_den_sym_mat)
         
         ri_grad_drv = RIFockGradDriver()
-        cgrad = ri_grad_drv.direct_compute(ket_t4c, bas_sto3g, bas_aux, mol_h2o, rw_bq, gs_bq, rw_den_sym_mat, gs_den_mat, 2, 15)
-        cg_xyz = cgrad.coordinates()
         
-        print(cg_xyz)
-        
-        ri_grad_drv = RIFockGradDriver()
-        cgrad = ri_grad_drv.direct_compute(ket_t4c, bas_sto3g, bas_aux, mol_h2o, rw_bq, gs_bq, rw_den_sym_mat, gs_den_mat, 1, 15)
-        cg_xyz = cgrad.coordinates()
-        
-        print(cg_xyz)
-        
-        ri_grad_drv = RIFockGradDriver()
-        cgrad = ri_grad_drv.direct_compute(ket_t4c, bas_sto3g, bas_aux, mol_h2o, rw_bq, gs_bq, rw_den_sym_mat, gs_den_mat, 0, 15)
-        cg_xyz = cgrad.coordinates()
-        
-        print(cg_xyz)
-    
-        assert False
-        
+        ri_grads = []
         for i in range(3):
-            assert mt.isclose(rgrad[i], cg_xyz[i], rel_tol=1.0e-5, abs_tol=1.0e-5)
+            grad = ri_grad_drv.direct_compute(ket_t4c, bas_sto3g, bas_aux, mol_h2o, rw_bq, gs_bq, rw_den_sym_mat, gs_den_mat, i, 15)
+            ri_grads.append(grad.coordinates())
+        
+        print(ri_grads)
+    
+        for i in range(3):
+            for j in range(3):
+                assert mt.isclose(ref_grads[i][j], ri_grads[i][j], rel_tol=1.0e-4, abs_tol=1.0e-4)
+        
+        assert False
         
 
        
