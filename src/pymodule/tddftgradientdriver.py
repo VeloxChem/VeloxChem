@@ -185,6 +185,12 @@ class TddftGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             all_states = list(np.arange(1, len(rsp_results['eigenvalues'])+1))
             if self.state_deriv_index is not None:
+
+                # make self.state_deriv_index a tuple in case it is set as an integer
+                # TODO: reconsider how state_deriv_index is used
+                if isinstance(self.state_deriv_index, int):
+                    self.state_deriv_index = (self.state_deriv_index,)
+
                 error_message =  'TdscfGradientDriver: some of the '
                 error_message += 'selected states have not been calculated.'
                 assert_msg_critical(
@@ -197,6 +203,8 @@ class TddftGradientDriver(GradientDriver):
                 self.print_header(self.state_deriv_index[:1])
             else:
                 self.print_header(self.state_deriv_index)
+
+        self.state_deriv_index = self.comm.bcast(self.state_deriv_index, root=mpi_master())
 
         start_time = time.time()
 
@@ -238,6 +246,10 @@ class TddftGradientDriver(GradientDriver):
         scf_tensors = self._scf_drv.scf_tensors
         if self._rsp_results is None:
             self._rsp_results = rsp_results
+
+        self.ostream.print_info('Computing orbital response...')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
@@ -487,9 +499,6 @@ class TddftGradientDriver(GradientDriver):
 
             sym_den_mat_for_fock_rel = make_matrix(basis, mat_t.symmetric)
 
-            # sym_den_mat_for_fock_xpy = make_matrix(basis, mat_t.symmetric)
-            # sym_den_mat_for_fock_xpy_m_xpyT = make_matrix(basis, mat_t.symmetric)
-
             sym_den_mat_for_fock_xmy = make_matrix(basis, mat_t.symmetric)
             sym_den_mat_for_fock_xmy_p_xmyT = make_matrix(basis, mat_t.symmetric)
 
@@ -516,56 +525,33 @@ class TddftGradientDriver(GradientDriver):
 
                 sym_den_mat_for_fock_rel.set_values(self.get_sym_mat(relaxed_density_ao[idx]))
 
-                # sym_den_mat_for_fock_xpy.set_values(self.get_sym_mat(x_plus_y_ao[idx]))
-                # sym_den_mat_for_fock_xpy_m_xpyT.set_values(self.get_sym_mat(x_plus_y_ao[idx] - x_plus_y_ao[idx].T))
-
                 sym_den_mat_for_fock_xmy.set_values(self.get_sym_mat(x_minus_y_ao[idx]))
                 sym_den_mat_for_fock_xmy_p_xmyT.set_values(self.get_sym_mat(x_minus_y_ao[idx] + x_minus_y_ao[idx].T))
 
+                local_ri_gvec_rel = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_rel))
+                ri_gvec_rel = np.zeros(local_ri_gvec_rel.shape)
+                self.comm.Allreduce(local_ri_gvec_rel, ri_gvec_rel, op=MPI.SUM)
+
+                local_ri_gvec_xmy = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy))
+                ri_gvec_xmy = np.zeros(local_ri_gvec_xmy.shape)
+                self.comm.Allreduce(local_ri_gvec_xmy, ri_gvec_xmy, op=MPI.SUM)
+
+                local_ri_gvec_xmy_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy_p_xmyT))
+                ri_gvec_xmy_2 = np.zeros(local_ri_gvec_xmy_2.shape)
+                self.comm.Allreduce(local_ri_gvec_xmy_2, ri_gvec_xmy_2, op=MPI.SUM)
+
                 for iatom in local_atoms:
 
-                    local_ri_gvec_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_rel))
-                    ri_gvec_2 = np.zeros(local_ri_gvec_2.shape)
-                    self.comm.Allreduce(local_ri_gvec_2, ri_gvec_2, op=MPI.SUM)
-
                     atomgrad_rel = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule,
-                                                              ri_gvec_2, ri_gvec_gs, sym_den_mat_for_fock_rel,
+                                                              ri_gvec_rel, ri_gvec_gs, sym_den_mat_for_fock_rel,
                                                               den_mat_for_fock_gs, iatom, thresh_int)
 
-                    # Note: RI gradient from direct_compute does NOT contain factor of 2
-                    self.gradient[idx, iatom, :] += np.array(atomgrad_rel.coordinates()) * 2.0
-
-                    # xpy has no contribution to J gradient
-                    """
-                    local_ri_gvec = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xpy))
-                    ri_gvec = np.zeros(local_ri_gvec.shape)
-                    self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
-
-                    local_ri_gvec_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xpy_m_xpyT))
-                    ri_gvec_2 = np.zeros(local_ri_gvec_2.shape)
-                    self.comm.Allreduce(local_ri_gvec_2, ri_gvec_2, op=MPI.SUM)
-
-                    atomgrad_xpy = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule,
-                                                              ri_gvec_2, ri_gvec, sym_den_mat_for_fock_xpy_m_xpyT,
-                                                              sym_den_mat_for_fock_xpy, iatom, thresh_int)
-
-                    # Note: RI gradient from direct_compute does NOT contain factor of 2
-                    self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xpy.coordinates()) * 2.0
-                    """
-
-                    local_ri_gvec = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy))
-                    ri_gvec = np.zeros(local_ri_gvec.shape)
-                    self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
-
-                    local_ri_gvec_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy_p_xmyT))
-                    ri_gvec_2 = np.zeros(local_ri_gvec_2.shape)
-                    self.comm.Allreduce(local_ri_gvec_2, ri_gvec_2, op=MPI.SUM)
-
                     atomgrad_xmy = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule,
-                                                              ri_gvec_2, ri_gvec, sym_den_mat_for_fock_xmy_p_xmyT, 
+                                                              ri_gvec_xmy_2, ri_gvec_xmy, sym_den_mat_for_fock_xmy_p_xmyT,
                                                               sym_den_mat_for_fock_xmy, iatom, thresh_int)
 
                     # Note: RI gradient from direct_compute does NOT contain factor of 2
+                    self.gradient[idx, iatom, :] += np.array(atomgrad_rel.coordinates()) * 2.0
                     self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xmy.coordinates()) * 2.0
 
         else:
@@ -690,21 +676,31 @@ class TddftGradientDriver(GradientDriver):
             The SCF driver.
         :param rsp_drv:
             The linear response driver.
-        :param state_deriv_index:
-            The index of the excited state of interest.
+        :param rsp_results:
+            The dictionary containing response results.
         """
+
         if self.rank == mpi_master():
             if isinstance(self.state_deriv_index, int):
-                # Python numbering starts at 0
                 state_deriv_index = self.state_deriv_index - 1
             else:
                 state_deriv_index = self.state_deriv_index[0] - 1
-        scf_drv.restart = False
+        else:
+            state_deriv_index = None
+        state_deriv_index = self.comm.bcast(state_deriv_index, root=mpi_master())
+
+        if self.numerical:
+            # disable restarting scf for numerical gradient
+            scf_drv.restart = False
+        else:
+            # always try restarting scf for analytical gradient
+            scf_drv.restart = True
         scf_results = scf_drv.compute(molecule, basis)
         assert_msg_critical(scf_drv.is_converged,
                             'TddftGradientDriver: SCF did not converge')
         self._scf_drv = scf_drv
 
+        # response should not be restarted
         rsp_drv.restart = False
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
         assert_msg_critical(rsp_drv.is_converged,
