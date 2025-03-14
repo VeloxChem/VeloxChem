@@ -1350,9 +1350,8 @@ class PolarizabilityGradient:
                 if self.rank == mpi_master():
                     xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                if (n != m):
-                    xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
-
+                    if (n != m):
+                        xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
 
         return xc_pol_gradient
 
@@ -1431,8 +1430,8 @@ class PolarizabilityGradient:
                 if self.rank == mpi_master():
                     xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                if (n != m):
-                    xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
+                    if (n != m):
+                        xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
 
         return xc_pol_gradient
 
