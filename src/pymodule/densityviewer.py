@@ -129,7 +129,7 @@ class DensityViewer:
         valid_checkpoint = (fname and isinstance(fname, str) and
                             Path(fname).is_file())
 
-        errmsg = f"DensityViewer: {fname} is not a valid checkpoint file."
+        errmsg = f"DensityViewer: Cannot read file {fname}."
         assert_msg_critical(valid_checkpoint, errmsg)
 
         h5f = h5py.File(fname, "r")

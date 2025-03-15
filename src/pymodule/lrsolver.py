@@ -141,7 +141,7 @@ class LinearResponseSolver(LinearSolver):
         scf_results_sanity_check(self, scf_tensors)
 
         # update checkpoint_file after scf_results_sanity_check
-        if self.filename is not None:
+        if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         # check dft setup

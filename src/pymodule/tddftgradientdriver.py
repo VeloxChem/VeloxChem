@@ -259,6 +259,8 @@ class TddftGradientDriver(GradientDriver):
             orbrsp_drv.state_deriv_index = self.state_deriv_index
         if 'timing' not in self.orbrsp_dict:
             orbrsp_drv.timing = self.timing
+        if 'filename' not in self.orbrsp_dict:
+            orbrsp_drv.filename = self.filename
         orbrsp_drv.compute(molecule, basis, scf_tensors,
                            self._rsp_results)
 

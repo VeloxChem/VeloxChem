@@ -209,6 +209,7 @@ class LinearSolver:
                 'use_subcomms': ('bool', 'use subcommunicators for Fock build'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'filename': ('str', 'base name of output files'),
+                'checkpoint_file': ('str', 'name of checkpoint file'),
                 'force_checkpoint':
                     ('bool', 'flag for writing checkpoint every iteration'),
                 'save_solutions': ('bool', 'save solutions to file'),
