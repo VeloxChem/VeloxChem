@@ -23,6 +23,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import time
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import XCIntegrator
@@ -204,7 +205,16 @@ class TddftOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
-        profiler.start_timer('RHS')
+        profiler.set_timing_key('RHS')
+
+        rhs_t0 = time.time()
+
+        self.ostream.print_info(
+            "Computing the right-hand side (RHS) of CPHF/CPKS equations...")
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        profiler.start_timer('Prep')
 
         # Workflow:
         # 1) Construct the necessary density matrices
@@ -341,12 +351,15 @@ class TddftOrbitalResponse(CphfSolver):
             # TODO: consider only bcast size of zero dm
             zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
 
+        profiler.stop_timer('Prep')
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
         fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis,
                           eri_dict, dft_dict, pe_dict, profiler)
+
+        profiler.start_timer('Kxc')
 
         if self._dft:
             # Fock matrix for computing gxc
@@ -369,6 +382,10 @@ class TddftOrbitalResponse(CphfSolver):
 
             for idx in range(len(fock_gxc_ao)):
                 fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx], root=mpi_master())
+
+        profiler.stop_timer('Kxc')
+
+        profiler.start_timer('RHS_MO')
 
         dist_rhs_mo = []
 
@@ -426,8 +443,16 @@ class TddftOrbitalResponse(CphfSolver):
                 rhs_mo_i = None
             dist_rhs_mo.append(DistributedArray(rhs_mo_i, self.comm))
 
+        profiler.stop_timer('RHS_MO')
 
-        profiler.stop_timer('RHS')
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        self.ostream.print_info(
+            "RHS of CPHF/CPKS equations computed in " +
+            f"{time.time() - rhs_t0:.2f} seconds.")
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         if self.rank == mpi_master():
             return {
