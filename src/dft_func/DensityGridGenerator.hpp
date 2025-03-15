@@ -79,6 +79,10 @@ auto generateDensityGridForLDA(const CDenseMatrix&     gtoValues,
                                const xcfun             xcFunType,
                                CMultiTimer&            timer) -> CDensityGrid;
 
+auto serialGenerateDensityGridForLDA(const CDenseMatrix&     gtoValues,
+                                     const CAODensityMatrix& densityMatrix,
+                                     const xcfun             xcFunType) -> CDensityGrid;
+
 /**
  Generates density for GGA.
 

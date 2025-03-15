@@ -242,6 +242,56 @@ generateDensityForLDA(double*             rho,
 }
 
 auto
+serialGenerateDensityGridForLDA(const CDenseMatrix&     gtoValues,
+                                const CAODensityMatrix& densityMatrix,
+                                const xcfun             xcFunType) -> CDensityGrid
+{
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    auto numdens = densityMatrix.getNumberOfDensityMatrices();
+
+    CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
+
+    for (int idens = 0; idens < numdens; idens++)
+    {
+        auto rhoa = dengrid.alphaDensity(idens);
+
+        auto rhob = dengrid.betaDensity(idens);
+
+        auto mat_F = denblas::serialMultAB(densityMatrix.getReferenceToDensity(idens), gtoValues);
+
+        auto naos = gtoValues.getNumberOfRows();
+
+        auto F_val = mat_F.values();
+
+        auto chi_val = gtoValues.values();
+
+        {
+            for (int nu = 0; nu < naos; nu++)
+            {
+                auto nu_offset = nu * npoints;
+
+                #pragma omp simd 
+                for (int g = 0; g < npoints; g++)
+                {
+                    rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+                }
+            }
+
+            #pragma omp simd 
+            for (int g = 0; g < npoints; g++)
+            {
+                rhob[g] = rhoa[g];
+
+                //std::cout << "===rhob===" <<rhob[g]<<std::endl;
+            }
+        }
+    }
+
+    return dengrid;
+}
+
+auto
 generateDensityGridForLDA(const CDenseMatrix&     gtoValues,
                           const CAODensityMatrix& densityMatrix,
                           const xcfun             xcFunType,

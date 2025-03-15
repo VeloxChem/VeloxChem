@@ -136,6 +136,17 @@ auto integrateKxcFockForLDA(const std::vector<double*>& aoFockPointers,
                             const CXCFunctional&    xcFunctional,
                             const std::string&      quadMode) -> void;
 
+auto integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
+                                       const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const std::vector<const double*>& rwDensityPointers,
+                                       const std::vector<const double*>& rw2DensityPointers,
+                                       const std::vector<const double*>& gsDensityPointers,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const double            screeningThresholdForGTOValues,
+                                       const CXCFunctional&    xcFunctional,
+                                       const std::string&      quadMode) -> void;
+
 /**
  Integrates LDA contribution to (third-order) Kxc matrix.
 
