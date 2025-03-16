@@ -101,14 +101,14 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
     std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
 
-    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(max_npoints_per_box));
+    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -471,7 +471,7 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
 }
 
 auto
-integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
+integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
                                     const CMolecularBasis&  basis,
                                     const std::vector<const double*>& rwDensityPointers,
                                     const std::vector<const double*>& gsDensityPointers,
@@ -511,25 +511,24 @@ integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
+    auto omp_max_npoints = max_npoints_per_box / nthreads;
+    if (max_npoints_per_box % nthreads != 0) omp_max_npoints++;
+
     // density and functional derivatives
 
-    std::vector<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-    std::vector<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    std::vector<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    std::vector<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
 
-    std::vector<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    std::vector<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
-    auto local_weights = local_weights_data.data();
+    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
 
-    auto rho     = rho_data.data();
-    auto rhograd = rhograd_data.data();
-    auto sigma   = sigma_data.data();
-
-    auto vrho   = vrho_data.data();
-    auto vsigma = vsigma_data.data();
+    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -588,22 +587,21 @@ integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
 
         if (aocount == 0) continue;
 
+        // generate sub density matrix and density grid
+
+        timer.start("Density matrix slicing");
+
+        auto gs_sub_dens_mat_a = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
+        auto gs_sub_dens_mat_b = dftsubmat::getSubDensityMatrix(gsDensityPointers[1], aoinds, naos);
+
+        auto rw_sub_dens_mat_a = dftsubmat::getSubDensityMatrix(rwDensityPointers[0], aoinds, naos);
+        auto rw_sub_dens_mat_b = dftsubmat::getSubDensityMatrix(rwDensityPointers[1], aoinds, naos);
+
+        timer.stop("Density matrix slicing");
+
         // GTO values on grid points
 
-        timer.start("OMP GTO evaluation");
-
-        CDenseMatrix mat_chi(aocount, npoints);
-
-        CDenseMatrix mat_chi_x(aocount, npoints);
-        CDenseMatrix mat_chi_y(aocount, npoints);
-        CDenseMatrix mat_chi_z(aocount, npoints);
-
-        CDenseMatrix mat_chi_xx(aocount, npoints);
-        CDenseMatrix mat_chi_xy(aocount, npoints);
-        CDenseMatrix mat_chi_xz(aocount, npoints);
-        CDenseMatrix mat_chi_yy(aocount, npoints);
-        CDenseMatrix mat_chi_yz(aocount, npoints);
-        CDenseMatrix mat_chi_zz(aocount, npoints);
+        timer.start("OMP VxcGrad calc.");
 
         #pragma omp parallel
         {
@@ -614,6 +612,20 @@ integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
             auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            CDenseMatrix mat_chi(aocount, grid_batch_size);
+
+            CDenseMatrix mat_chi_x(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_y(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_z(aocount, grid_batch_size);
+
+            CDenseMatrix mat_chi_xx(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_xy(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_xz(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_yy(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_yz(aocount, grid_batch_size);
+            CDenseMatrix mat_chi_zz(aocount, grid_batch_size);
+
 
             const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
             const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
@@ -665,173 +677,163 @@ integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
 
                 for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(mat_chi.row(idx) + grid_batch_offset, submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx), submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
 
-                    std::memcpy(mat_chi_x.row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_y.row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_z.row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_x.row(idx), submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_y.row(idx), submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_z.row(idx), submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
 
-                    std::memcpy(mat_chi_xx.row(idx) + grid_batch_offset, submat_xx_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_xy.row(idx) + grid_batch_offset, submat_xy_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_xz.row(idx) + grid_batch_offset, submat_xz_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_yy.row(idx) + grid_batch_offset, submat_yy_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_yz.row(idx) + grid_batch_offset, submat_yz_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_zz.row(idx) + grid_batch_offset, submat_zz_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_xx.row(idx), submat_xx_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_xy.row(idx), submat_xy_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_xz.row(idx), submat_xz_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_yy.row(idx), submat_yy_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_yz.row(idx), submat_yz_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_zz.row(idx), submat_zz_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
 
             omptimers[thread_id].stop("gtoeval");
-        }
 
-        timer.stop("OMP GTO evaluation");
+            omptimers[thread_id].start("Generate density grid");
 
-        // generate sub density matrix and density grid
+            auto local_weights = omp_local_weights_data[thread_id].data();
 
-        timer.start("Density matrix slicing");
+            auto rho     = omp_rho_data[thread_id].data();
+            auto rhograd = omp_rhograd_data[thread_id].data();
+            auto sigma   = omp_sigma_data[thread_id].data();
 
-        auto gs_sub_dens_mat_a = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
-        auto gs_sub_dens_mat_b = dftsubmat::getSubDensityMatrix(gsDensityPointers[1], aoinds, naos);
+            auto vrho   = omp_vrho_data[thread_id].data();
+            auto vsigma = omp_vsigma_data[thread_id].data();
 
-        auto rw_sub_dens_mat_a = dftsubmat::getSubDensityMatrix(rwDensityPointers[0], aoinds, naos);
-        auto rw_sub_dens_mat_b = dftsubmat::getSubDensityMatrix(rwDensityPointers[1], aoinds, naos);
+            dengridgen::serialGenerateDensityForGGA(
+                rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat_a, gs_sub_dens_mat_b);
 
-        timer.stop("Density matrix slicing");
+            omptimers[thread_id].stop("Generate density grid");
 
-        dengridgen::generateDensityForGGA(
-            rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat_a, gs_sub_dens_mat_b, timer);
+            // generate density gradient grid
 
-        // generate density gradient grid
+            omptimers[thread_id].start("Density grad. grid prep.");
 
-        timer.start("Density grad. grid prep.");
+            CDenseMatrix dengrad_a_x(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_y(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_z(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_a_x(natoms, npoints);
-        CDenseMatrix dengrad_a_y(natoms, npoints);
-        CDenseMatrix dengrad_a_z(natoms, npoints);
+            CDenseMatrix dengrad_b_x(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_y(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_z(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_b_x(natoms, npoints);
-        CDenseMatrix dengrad_b_y(natoms, npoints);
-        CDenseMatrix dengrad_b_z(natoms, npoints);
+            CDenseMatrix dengrad_a_xx(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_xy(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_xz(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_a_xx(natoms, npoints);
-        CDenseMatrix dengrad_a_xy(natoms, npoints);
-        CDenseMatrix dengrad_a_xz(natoms, npoints);
+            CDenseMatrix dengrad_b_xx(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_xy(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_xz(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_b_xx(natoms, npoints);
-        CDenseMatrix dengrad_b_xy(natoms, npoints);
-        CDenseMatrix dengrad_b_xz(natoms, npoints);
+            CDenseMatrix dengrad_a_yx(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_yy(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_yz(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_a_yx(natoms, npoints);
-        CDenseMatrix dengrad_a_yy(natoms, npoints);
-        CDenseMatrix dengrad_a_yz(natoms, npoints);
+            CDenseMatrix dengrad_b_yx(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_yy(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_yz(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_b_yx(natoms, npoints);
-        CDenseMatrix dengrad_b_yy(natoms, npoints);
-        CDenseMatrix dengrad_b_yz(natoms, npoints);
+            CDenseMatrix dengrad_a_zx(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_zy(natoms, grid_batch_size);
+            CDenseMatrix dengrad_a_zz(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_a_zx(natoms, npoints);
-        CDenseMatrix dengrad_a_zy(natoms, npoints);
-        CDenseMatrix dengrad_a_zz(natoms, npoints);
+            CDenseMatrix dengrad_b_zx(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_zy(natoms, grid_batch_size);
+            CDenseMatrix dengrad_b_zz(natoms, grid_batch_size);
 
-        CDenseMatrix dengrad_b_zx(natoms, npoints);
-        CDenseMatrix dengrad_b_zy(natoms, npoints);
-        CDenseMatrix dengrad_b_zz(natoms, npoints);
+            omptimers[thread_id].stop("Density grad. grid prep.");
 
-        timer.stop("Density grad. grid prep.");
+            // eq.(26), JCTC 2021, 17, 1512-1521
 
-        // eq.(26), JCTC 2021, 17, 1512-1521
+            omptimers[thread_id].start("Density grad. grid matmul");
 
-        timer.start("Density grad. grid matmul");
+            auto mat_F_a = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi);
+            auto mat_F_b = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi);
 
-        auto mat_F_a = denblas::multAB(rw_sub_dens_mat_a, mat_chi);
-        auto mat_F_b = denblas::multAB(rw_sub_dens_mat_b, mat_chi);
+            auto mat_F_a_x = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_x);
+            auto mat_F_a_y = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_y);
+            auto mat_F_a_z = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_z);
 
-        auto mat_F_a_x = denblas::multAB(rw_sub_dens_mat_a, mat_chi_x);
-        auto mat_F_a_y = denblas::multAB(rw_sub_dens_mat_a, mat_chi_y);
-        auto mat_F_a_z = denblas::multAB(rw_sub_dens_mat_a, mat_chi_z);
+            auto mat_F_b_x = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_x);
+            auto mat_F_b_y = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_y);
+            auto mat_F_b_z = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_z);
 
-        auto mat_F_b_x = denblas::multAB(rw_sub_dens_mat_b, mat_chi_x);
-        auto mat_F_b_y = denblas::multAB(rw_sub_dens_mat_b, mat_chi_y);
-        auto mat_F_b_z = denblas::multAB(rw_sub_dens_mat_b, mat_chi_z);
+            omptimers[thread_id].stop("Density grad. grid matmul");
 
-        timer.stop("Density grad. grid matmul");
+            // eq.(34), JCTC 2021, 17, 1512-1521
 
-        // eq.(34), JCTC 2021, 17, 1512-1521
+            omptimers[thread_id].start("Density grad. grid rho");
 
-        timer.start("Density grad. grid rho");
+            auto F_a_val = mat_F_a.values();
+            auto F_b_val = mat_F_b.values();
 
-        auto F_a_val = mat_F_a.values();
-        auto F_b_val = mat_F_b.values();
+            auto F_a_x_val = mat_F_a_x.values();
+            auto F_a_y_val = mat_F_a_y.values();
+            auto F_a_z_val = mat_F_a_z.values();
 
-        auto F_a_x_val = mat_F_a_x.values();
-        auto F_a_y_val = mat_F_a_y.values();
-        auto F_a_z_val = mat_F_a_z.values();
+            auto F_b_x_val = mat_F_b_x.values();
+            auto F_b_y_val = mat_F_b_y.values();
+            auto F_b_z_val = mat_F_b_z.values();
 
-        auto F_b_x_val = mat_F_b_x.values();
-        auto F_b_y_val = mat_F_b_y.values();
-        auto F_b_z_val = mat_F_b_z.values();
+            auto chi_x_val = mat_chi_x.values();
+            auto chi_y_val = mat_chi_y.values();
+            auto chi_z_val = mat_chi_z.values();
 
-        auto chi_x_val = mat_chi_x.values();
-        auto chi_y_val = mat_chi_y.values();
-        auto chi_z_val = mat_chi_z.values();
+            auto chi_xx_val = mat_chi_xx.values();
+            auto chi_xy_val = mat_chi_xy.values();
+            auto chi_xz_val = mat_chi_xz.values();
 
-        auto chi_xx_val = mat_chi_xx.values();
-        auto chi_xy_val = mat_chi_xy.values();
-        auto chi_xz_val = mat_chi_xz.values();
+            auto chi_yy_val = mat_chi_yy.values();
+            auto chi_yz_val = mat_chi_yz.values();
+            auto chi_zz_val = mat_chi_zz.values();
 
-        auto chi_yy_val = mat_chi_yy.values();
-        auto chi_yz_val = mat_chi_yz.values();
-        auto chi_zz_val = mat_chi_zz.values();
+            auto gden_a_x = dengrad_a_x.values();
+            auto gden_a_y = dengrad_a_y.values();
+            auto gden_a_z = dengrad_a_z.values();
 
-        auto gden_a_x = dengrad_a_x.values();
-        auto gden_a_y = dengrad_a_y.values();
-        auto gden_a_z = dengrad_a_z.values();
+            auto gden_b_x = dengrad_b_x.values();
+            auto gden_b_y = dengrad_b_y.values();
+            auto gden_b_z = dengrad_b_z.values();
 
-        auto gden_b_x = dengrad_b_x.values();
-        auto gden_b_y = dengrad_b_y.values();
-        auto gden_b_z = dengrad_b_z.values();
+            auto gden_a_xx = dengrad_a_xx.values();
+            auto gden_a_xy = dengrad_a_xy.values();
+            auto gden_a_xz = dengrad_a_xz.values();
 
-        auto gden_a_xx = dengrad_a_xx.values();
-        auto gden_a_xy = dengrad_a_xy.values();
-        auto gden_a_xz = dengrad_a_xz.values();
+            auto gden_b_xx = dengrad_b_xx.values();
+            auto gden_b_xy = dengrad_b_xy.values();
+            auto gden_b_xz = dengrad_b_xz.values();
 
-        auto gden_b_xx = dengrad_b_xx.values();
-        auto gden_b_xy = dengrad_b_xy.values();
-        auto gden_b_xz = dengrad_b_xz.values();
+            auto gden_a_yx = dengrad_a_yx.values();
+            auto gden_a_yy = dengrad_a_yy.values();
+            auto gden_a_yz = dengrad_a_yz.values();
 
-        auto gden_a_yx = dengrad_a_yx.values();
-        auto gden_a_yy = dengrad_a_yy.values();
-        auto gden_a_yz = dengrad_a_yz.values();
+            auto gden_b_yx = dengrad_b_yx.values();
+            auto gden_b_yy = dengrad_b_yy.values();
+            auto gden_b_yz = dengrad_b_yz.values();
 
-        auto gden_b_yx = dengrad_b_yx.values();
-        auto gden_b_yy = dengrad_b_yy.values();
-        auto gden_b_yz = dengrad_b_yz.values();
+            auto gden_a_zx = dengrad_a_zx.values();
+            auto gden_a_zy = dengrad_a_zy.values();
+            auto gden_a_zz = dengrad_a_zz.values();
 
-        auto gden_a_zx = dengrad_a_zx.values();
-        auto gden_a_zy = dengrad_a_zy.values();
-        auto gden_a_zz = dengrad_a_zz.values();
-
-        auto gden_b_zx = dengrad_b_zx.values();
-        auto gden_b_zy = dengrad_b_zy.values();
-        auto gden_b_zz = dengrad_b_zz.values();
-
-        #pragma omp parallel
-        {
-            auto thread_id = omp_get_thread_num();
-
-            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+            auto gden_b_zx = dengrad_b_zx.values();
+            auto gden_b_zy = dengrad_b_zy.values();
+            auto gden_b_zz = dengrad_b_zz.values();
 
             for (int nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
-                auto atom_offset = atomidx * npoints;
+                auto atom_offset = atomidx * grid_batch_size;
 
-                auto nu_offset = nu * npoints;
+                auto nu_offset = nu * grid_batch_size;
 
                 #pragma omp simd 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -870,42 +872,37 @@ integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
                     gden_b_zz[atom_g] -= 2.0 * (F_b_z_val[nu_g] * chi_z_val[nu_g] + F_b_val[nu_g] * chi_zz_val[nu_g]);
                 }
             }
-        }
 
-        timer.stop("Density grad. grid rho");
+            omptimers[thread_id].stop("Density grad. grid rho");
 
-        // compute exchange-correlation functional derivative
+            // compute exchange-correlation functional derivative
 
-        timer.start("XC functional eval.");
+            omptimers[thread_id].start("XC functional eval.");
 
-        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
+            omp_xcfuncs[thread_id].compute_vxc_for_gga(grid_batch_size, rho, sigma, vrho, vsigma);
 
-        std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
+            omptimers[thread_id].stop("XC functional eval.");
 
-        timer.stop("XC functional eval.");
+            omptimers[thread_id].start("Copy grid weights");
 
-        // eq.(32), JCTC 2021, 17, 1512-1521
+            std::memcpy(local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
 
-        timer.start("Accumulate gradient");
+            omptimers[thread_id].stop("Copy grid weights");
 
-        #pragma omp parallel
-        {
-            auto thread_id = omp_get_thread_num();
+            // eq.(32), JCTC 2021, 17, 1512-1521
 
-            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+            omptimers[thread_id].start("Accumulate gradient");
 
             auto gatm = molgrad_threads.row(thread_id);
 
             for (int iatom = 0; iatom < natoms; iatom++)
             {
-                auto atom_offset = iatom * npoints;
+                auto atom_offset = iatom * grid_batch_size;
 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
                 #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
@@ -942,9 +939,11 @@ integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
                 gatm[iatom * 3 + 1] += gatmy;
                 gatm[iatom * 3 + 2] += gatmz;
             }
+
+            omptimers[thread_id].stop("Accumulate gradient");
         }
 
-        timer.stop("Accumulate gradient");
+        timer.stop("OMP VxcGrad calc.");
     }
 
     timer.stop("Total timing");
@@ -1020,22 +1019,22 @@ integrateFxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
     std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
 
-    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(max_npoints_per_box));
+    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_rhow_data(nthreads, std::vector<double>(dim->rho * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhow_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_rhowgrad_data(nthreads, std::vector<double>(dim->rho * 3 * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhowgrad_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -1500,23 +1499,23 @@ integrateKxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
     std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
 
-    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(max_npoints_per_box));
+    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
 
-    std::vector<std::vector<double>> omp_v3rho3_data(nthreads, std::vector<double>(dim->v3rho3 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v3rho2sigma_data(nthreads, std::vector<double>(dim->v3rho2sigma * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v3rhosigma2_data(nthreads, std::vector<double>(dim->v3rhosigma2 * max_npoints_per_box));
-    std::vector<std::vector<double>> omp_v3sigma3_data(nthreads, std::vector<double>(dim->v3sigma3 * max_npoints_per_box));
+    std::vector<std::vector<double>> omp_v3rho3_data(nthreads, std::vector<double>(dim->v3rho3 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v3rho2sigma_data(nthreads, std::vector<double>(dim->v3rho2sigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v3rhosigma2_data(nthreads, std::vector<double>(dim->v3rhosigma2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v3sigma3_data(nthreads, std::vector<double>(dim->v3sigma3 * omp_max_npoints));
 
     // coordinates and weights of grid points
 
