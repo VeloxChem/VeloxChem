@@ -2072,6 +2072,52 @@ class MMForceFieldGenerator:
         self.ostream.print_info(msg)
         self.ostream.flush()
 
+    def get_dihedral_params(self, atom_indices_for_dihedral):
+        """
+        Gets dihedral parameters.
+
+        :param atom_indices_for_dihedral:
+            One-based atom indices for the dihedral.
+
+        :return:
+            The dihedral parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_dihedral) == 4,
+            'MMForceFieldGenerator.get_dihedral_params: ' +
+            'Expecting a tuple of four atom indices')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+
+        return dict(self.dihedrals[key])
+
+    def set_dihedral_params(self, atom_indices_for_dihedral, dihedral_params):
+        """
+        Sets dihedral parameters.
+
+        :param atom_indices_for_dihedral:
+            One-based atom indices for the dihedral.
+        :param dihedral_params:
+            The dihedral parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_dihedral) == 4,
+            'MMForceFieldGenerator.set_dihedral_params: ' +
+            'Expecting a tuple of four atom indices')
+
+        assert_msg_critical(
+            isinstance(dihedral_params, dict),
+            'MMForceFieldGenerator.set_dihedral_params: ' +
+            'Expecting a dictionary of dihedral parameters')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+
+        self.dihedrals[key] = dict(dihedral_params)
+
     def check_rotatable_bonds(self, rotatable_bonds_types):
         """
         Checks the rotatable bonds in the molecule and the atom types involved.
@@ -2891,79 +2937,6 @@ class MMForceFieldGenerator:
                 dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(src.read_text())
 
-    def dihedral_correction(self, i, kT=None):
-        """
-        Corrects dihedral parameters.
-
-        :param i:
-            The index of the target dihedral.
-        :param kT:
-            kT for Boltzmann factor (used in weighted fitting).
-        """
-
-        try:
-            from scipy.optimize import curve_fit
-        except ImportError:
-            raise ImportError('Unable to import scipy. Please install scipy ' +
-                              'via pip or conda.')
-
-        # Ryckaert-Bellemans function
-
-        def rbpot(phi, c0, c1, c2, c3, c4, c5):
-            v = c0 + c1 * np.cos((180 - phi) * 2 * np.pi / 360)
-            v += c2 * np.cos((180 - phi) * 2 * np.pi / 360)**2
-            v += c3 * np.cos((180 - phi) * 2 * np.pi / 360)**3
-            v += c4 * np.cos((180 - phi) * 2 * np.pi / 360)**4
-            v += c5 * np.cos((180 - phi) * 2 * np.pi / 360)**5
-            return v
-
-        dih = self.target_dihedrals[i]
-        geom = self.scan_geometries[i]
-        qm_scan = self.scan_energies[i]
-        angles = self.scan_dih_angles[i]
-
-        dih_str = f'{dih[0] + 1}-{dih[1] + 1}-{dih[2] + 1}-{dih[3] + 1}'
-        self.ostream.print_info(f'Fitting dihedral angle {dih_str}...')
-        self.ostream.flush()
-
-        # MM scan with dihedral parameters set to zero
-
-        self.set_dihedral_parameters(dih, [0.0 for x in range(6)])
-
-        mm_zero_scan = self.perform_mm_scan(dih,
-                                            geom,
-                                            angles,
-                                            print_energies=False)
-
-        # fitting Ryckaert-Bellemans function
-
-        if self.rank == mpi_master():
-            rel_e_qm = np.array(qm_scan) - min(qm_scan)
-            rel_e_qm *= hartree_in_kjpermol()
-            rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
-
-            difference = rel_e_qm - rel_e_mm
-            initial_coef = tuple([0.] * 6)
-
-            if kT is not None:
-                sigma = 1.0 / np.exp(-rel_e_qm / kT)
-                coef, cv = curve_fit(rbpot,
-                                     angles,
-                                     difference,
-                                     initial_coef,
-                                     sigma,
-                                     absolute_sigma=False)
-            else:
-                coef, cv = curve_fit(rbpot, angles, difference, initial_coef)
-
-            coef_list = coef.tolist()
-        else:
-            coef_list = None
-
-        coef_list = self.comm.bcast(coef_list, root=mpi_master())
-
-        self.set_dihedral_parameters(dih, coef_list)
-
     def validate_force_field(self, i, print_summary=False):
         """
         Validates force field by RMSD of dihedral potentials.
@@ -3094,38 +3067,6 @@ class MMForceFieldGenerator:
         mm_drv.compute(final_mol)
 
         return mm_drv.get_energy()
-
-    def set_dihedral_parameters(self, dihedral_key, coefficients):
-        """
-        Sets dihedral parameters of topology.
-
-        :param dihedral_key:
-            The dihedral (list of four atom ids).
-        :param coefficients:
-            The coefficients for Ryckaert-Bellemans funciton.
-        """
-
-        dih = self.dihedrals[tuple(dihedral_key)]
-
-        if dih['type'] == 'Fourier' and dih['multiple']:
-            comment = dih['comment'][0]
-        else:
-            comment = dih['comment']
-
-        self.dihedrals[tuple(dihedral_key)] = {
-            'type': 'RB',
-            'RB_coefficients': list(coefficients),
-            'comment': comment
-        }
-
-        dih_keys_to_remove = []
-        for i, j, k, l in self.dihedrals:
-            if [i, j, k, l] == dihedral_key:
-                continue
-            if [j, k] == dihedral_key[1:3] or [k, j] == dihedral_key[1:3]:
-                dih_keys_to_remove.append((i, j, k, l))
-        for dih_key in dih_keys_to_remove:
-            del self.dihedrals[dih_key]
 
     def print_validation_summary(self, fitted_dihedral_results):
         """
