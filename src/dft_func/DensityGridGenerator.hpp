@@ -170,6 +170,13 @@ auto generateDensityGridForGGA(const CDenseMatrix&     gtoValues,
                                const xcfun             xcFunType,
                                CMultiTimer&            timer) -> CDensityGrid;
 
+auto serialGenerateDensityGridForGGA(const CDenseMatrix&     gtoValues,
+                                     const CDenseMatrix&     gtoValuesX,
+                                     const CDenseMatrix&     gtoValuesY,
+                                     const CDenseMatrix&     gtoValuesZ,
+                                     const CAODensityMatrix& densityMatrix,
+                                     const xcfun             xcFunType) -> CDensityGrid;
+
 /**
  Generates density for meta-GGA.
 
