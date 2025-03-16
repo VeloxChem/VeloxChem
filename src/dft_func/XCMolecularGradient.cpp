@@ -135,7 +135,7 @@ CXCMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return xcgradgga::integrateFxcGradientForGGA(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+            return xcgradgga::integrateFxcGradientForGgaClosedShell(molecule, basis, rwDensityPointersOne, rwDensityPointersTwo, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
         {
