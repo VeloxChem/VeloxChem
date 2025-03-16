@@ -401,13 +401,11 @@ class MMForceFieldGenerator:
         self.ostream.print_header(header)
         self.ostream.print_header('=' * len(header))
         self.ostream.print_blank()
-        self.ostream.flush()
-        # Print some information
+
         self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
 
         # Print the dihedral indices *in 1 index* and types
         self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
-        self.ostream.flush()
 
         # If the scan file is provided, read it
         if scan_file is not None:
@@ -422,19 +420,16 @@ class MMForceFieldGenerator:
         else:
             # Perform a QM scan
             self.ostream.print_info('No scan file provided. Performing QM scan...')
-            self.ostream.flush()
         
             if scf_drv is None:
                 scf_drv = ScfRestrictedDriver()
                 if not scan_verbose:
                     scf_drv.ostream.mute()
                 self.ostream.print_info('SCF driver not provided. Using default: RHF')
-                self.ostream.flush()
-            
+
             if basis is None:
                 basis = MolecularBasis.read(self.molecule,'6-31G*')
                 self.ostream.print_info('Basis set not provided. Using dafault: 6-31G*')
-                self.ostream.flush()
 
             # Perform the reference SCF calculation
             if scf_results is None:
@@ -460,9 +455,10 @@ class MMForceFieldGenerator:
             self.ostream.print_info(f'Number of points: {n_points}')
             self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
             self.ostream.flush()
+
             opt_drv.compute(self.molecule, basis, scf_results)
+
             self.ostream.print_info('Scan completed.')
-            self.ostream.flush()
 
             # Change the default file name to the dihedral indices
             file_path = Path("scan-final.xyz")
@@ -605,7 +601,6 @@ class MMForceFieldGenerator:
 
         # Print initial barriers
         self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
-        self.ostream.flush()
 
         # Store the original barriers and perform the initial validation
         original_barriers = barriers.copy()
@@ -638,7 +633,6 @@ class MMForceFieldGenerator:
         self.ostream.print_info('Fitting the dihedral parameters...')
         if fit_extrema:
             self.ostream.print_info('Only minimum/maximum points are used for fitting.')
-        self.ostream.flush()
 
         # Use the original barriers as the initial guess
         # Note that we add an additional parameter for shifting QM and MM
@@ -658,7 +652,7 @@ class MMForceFieldGenerator:
 
         # Perform the optimization
         self.ostream.print_info('Optimizing dihedral via least squares fitting...')
-        self.ostream.flush()
+
         result = least_squares(
             fun=objective_function,
             x0=initial_guess,
@@ -786,7 +780,6 @@ class MMForceFieldGenerator:
             xyz_fname = str(inp_dir / xyz)
 
             self.ostream.print_info(f'  {xyz_fname}')
-            self.ostream.flush()
 
             geometries = []
             energies = []
@@ -1041,7 +1034,6 @@ class MMForceFieldGenerator:
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
             self.ostream.print_info(msg)
-            self.ostream.flush()
 
         if self.partial_charges is None:
             if scf_results is None:
@@ -1078,9 +1070,9 @@ class MMForceFieldGenerator:
 
                 resp_drv = RespChargesDriver(self.comm, self.ostream)
                 resp_drv.filename = self.molecule_name
-                msg = 'Using provided SCF result for RESP charges'
+                msg = 'Using provided SCF result for RESP charges.'
                 self.ostream.print_info(msg)
-                self.ostream.flush()
+
                 if self.resp_dict is not None:
                     resp_drv.update_settings(self.resp_dict)
                 if resp_drv.equal_charges is None:
@@ -1109,7 +1101,6 @@ class MMForceFieldGenerator:
             msg += ' from the largest charge.'
             self.ostream.print_info(msg)
             self.ostream.print_blank()
-            self.ostream.flush()
 
         # preparing atomtypes and atoms
 
@@ -1340,7 +1331,6 @@ class MMForceFieldGenerator:
                     msg = f'Updated bond length {i + 1}-{j + 1} '
                     msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
                     self.ostream.print_info(msg)
-                    self.ostream.flush()
                 r = r_eq
 
             self.bonds[(i, j)] = {
@@ -1416,7 +1406,6 @@ class MMForceFieldGenerator:
                     msg = f'Updated bond angle {i + 1}-{j + 1}-{k + 1} '
                     msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.3f} deg'
                     self.ostream.print_info(msg)
-                    self.ostream.flush()
                 theta = theta_eq
 
             self.angles[(i, j, k)] = {
@@ -1864,6 +1853,8 @@ class MMForceFieldGenerator:
                     'periodicity': periodicity,
                     'comment': comment
                 }
+
+        self.ostream.flush()
 
     @staticmethod
     def get_dihedral_type_string(target_dihedral):
