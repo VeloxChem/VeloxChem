@@ -54,7 +54,7 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return xchessgga::integrateExcHessianForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+            return xchessgga::integrateExcHessianForGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
         {
