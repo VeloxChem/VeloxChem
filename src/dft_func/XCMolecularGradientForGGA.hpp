@@ -109,7 +109,7 @@ auto integrateFxcGradientForGgaClosedShell(const CMolecule&                  mol
 
 /**
  Integrates third-order GGA exchnage-correlation functional contribution to
- molecular gradient.
+ closed-shell molecular gradient.
 
  @param molecule the molecule.
  @param basis the molecular basis.
@@ -122,14 +122,14 @@ auto integrateFxcGradientForGgaClosedShell(const CMolecule&                  mol
  @param xcFunctional the exchange-correlation functional.
  @return the molecular gradient.
  */
-auto integrateKxcGradientForGGA(const CMolecule&                  molecule,
-                                const CMolecularBasis&            basis,
-                                const std::vector<const double*>& rwDensityPointersOne,
-                                const std::vector<const double*>& rwDensityPointersTwo,
-                                const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&             molecularGrid,
-                                const double                      screeningThresholdForGTOValues,
-                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
+auto integrateKxcGradientForGgaClosedShell(const CMolecule&                  molecule,
+                                           const CMolecularBasis&            basis,
+                                           const std::vector<const double*>& rwDensityPointersOne,
+                                           const std::vector<const double*>& rwDensityPointersTwo,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&             molecularGrid,
+                                           const double                      screeningThresholdForGTOValues,
+                                           const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
 }  // namespace xcgradgga
 
