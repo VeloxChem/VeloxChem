@@ -264,8 +264,9 @@ class TddftGradientDriver(GradientDriver):
         orbrsp_drv.compute(molecule, basis, scf_tensors,
                            self._rsp_results)
 
+        omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
+
         grad_timing = {
-            'Compute_omega': 0.0,
             'Relaxed_density': 0.0,
             'Ground_state_grad': 0.0,
             'Kinetic_energy_grad': 0.0,
@@ -277,18 +278,6 @@ class TddftGradientDriver(GradientDriver):
             'Fxc_grad': 0.0,
             'Kxc_grad': 0.0,
         }
-
-        t0 = time.time()
-
-        self.ostream.print_info('Computing the omega Lagrange multipliers...')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        orbrsp_drv.ostream.mute()
-        omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
-        orbrsp_drv.ostream.unmute()
-
-        grad_timing['Compute_omega'] += time.time() - t0
 
         t0 = time.time()
 

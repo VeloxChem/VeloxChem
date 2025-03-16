@@ -450,7 +450,7 @@ class TddftOrbitalResponse(CphfSolver):
 
         self.ostream.print_info(
             "RHS of CPHF/CPKS equations computed in " +
-            f"{time.time() - rhs_t0:.2f} seconds.")
+            f"{time.time() - rhs_t0:.2f} sec.")
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -485,12 +485,39 @@ class TddftOrbitalResponse(CphfSolver):
             a numpy array containing the Lagrange multipliers in AO basis.
         """
 
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        profiler.set_timing_key('Omega')
+
+        omega_t0 = time.time()
+
+        self.ostream.print_info("Computing the omega Lagrange multipliers...")
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        profiler.start_timer('Prep')
+
+        # we don't want too much output about ERI/DFT/PE so this part is done
+        # with mute/unmute
+        self.ostream.mute()
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        self.ostream.unmute()
+
+        profiler.stop_timer('Prep')
+
+        profiler.start_timer('lambda')
 
         if self.rank == mpi_master():
 
@@ -579,8 +606,12 @@ class TddftOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 lambda_ao_list.append(np.linalg.multi_dot([mo_occ, cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
 
+        profiler.stop_timer('lambda')
+
         fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                                         eri_dict, dft_dict, pe_dict)
+                                         eri_dict, dft_dict, pe_dict, profiler)
+
+        profiler.start_timer('Other')
 
         if self.rank == mpi_master():
             # Compute the contributions from the relaxed 1PDM
@@ -644,7 +675,7 @@ class TddftOrbitalResponse(CphfSolver):
                 ])
                 epsilon_dm_ao[s] += (epsilon_lambda_ao[s] 
                                      + epsilon_lambda_ao[s].T)
-                
+
         if self.rank == mpi_master():
 
             omega = - epsilon_dm_ao - omega_1pdm_2pdm_contribs
@@ -658,10 +689,21 @@ class TddftOrbitalResponse(CphfSolver):
                     omega[ifock] += factor * np.linalg.multi_dot([
                         D_occ, fock_gxc_ao_np, D_occ
                         ])
-
-            return omega
         else:
-            return None
+            omega = None
+
+        profiler.stop_timer('Other')
+
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        self.ostream.print_info(
+            "The omega Lagrange multipliers computed in " +
+            f"{time.time() - omega_t0:.2f} sec.")
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return omega
 
     def print_cphf_header(self, title):
         """
