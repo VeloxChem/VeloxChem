@@ -1523,9 +1523,9 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
             auto vxc_gy_second_contrib = denblas::serialMultABt(mat_chi, vxc_wy);
             auto vxc_gz_second_contrib = denblas::serialMultABt(mat_chi, vxc_wz);
 
-            auto vxc_gx = denblas::addAB(vxc_gx_first_contrib, vxc_gx_second_contrib, 1.0);
-            auto vxc_gy = denblas::addAB(vxc_gy_first_contrib, vxc_gy_second_contrib, 1.0);
-            auto vxc_gz = denblas::addAB(vxc_gz_first_contrib, vxc_gz_second_contrib, 1.0);
+            auto vxc_gx = denblas::serialAddAB(vxc_gx_first_contrib, vxc_gx_second_contrib, 1.0);
+            auto vxc_gy = denblas::serialAddAB(vxc_gy_first_contrib, vxc_gy_second_contrib, 1.0);
+            auto vxc_gz = denblas::serialAddAB(vxc_gz_first_contrib, vxc_gz_second_contrib, 1.0);
 
             vxc_gx.symmetrizeAndScale(0.5);
             vxc_gy.symmetrizeAndScale(0.5);
