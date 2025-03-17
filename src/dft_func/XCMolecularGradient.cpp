@@ -80,7 +80,7 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return xcgradlda::integrateVxcGradientForLDA(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+            return xcgradlda::integrateVxcGradientForLdaClosedShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {

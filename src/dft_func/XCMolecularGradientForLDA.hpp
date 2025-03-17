@@ -43,7 +43,7 @@ namespace xcgradlda {  // xcgradlda namespace
 
 /**
  Integrates first-order LDA exchnage-correlation functional contribution to
- molecular gradient.
+ closed-shell molecular gradient.
 
  @param molecule the molecule.
  @param basis the molecular basis.
@@ -55,13 +55,13 @@ namespace xcgradlda {  // xcgradlda namespace
  @param xcFunctional the exchange-correlation functional.
  @return the molecular gradient.
  */
-auto integrateVxcGradientForLDA(const CMolecule&        molecule,
-                                const CMolecularBasis&  basis,
-                                const std::vector<const double*>& rwDensityPointers,
-                                const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&   molecularGrid,
-                                const double            screeningThresholdForGTOValues,
-                                const CXCFunctional&    xcFunctional) -> CDenseMatrix;
+auto integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const std::vector<const double*>& rwDensityPointers,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const double            screeningThresholdForGTOValues,
+                                           const CXCFunctional&    xcFunctional) -> CDenseMatrix;
 
 /**
  Integrates first-order LDA exchnage-correlation functional contribution to
