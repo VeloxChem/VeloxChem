@@ -1,5 +1,6 @@
 from mpi4py import MPI
 import numpy as np
+import pytest
 
 from veloxchem import Molecule, MolecularBasis
 from veloxchem import FockGeom1000Driver
@@ -10,6 +11,7 @@ from veloxchem import ScfRestrictedDriver
 from veloxchem.rigradientdriver import RIFockGradDriver
 
 
+@pytest.mark.solvers
 class TestRIJFockGeomExGradDriver:
 
     def get_data_h2o(self):
