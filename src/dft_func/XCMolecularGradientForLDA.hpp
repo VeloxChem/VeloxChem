@@ -77,7 +77,7 @@ auto integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
  @param xcFunctional the exchange-correlation functional.
  @return the molecular gradient.
  */
-auto integrateVxcGradientForLDAOpenShell(const CMolecule&                  molecule,
+auto integrateVxcGradientForLdaOpenShell(const CMolecule&                  molecule,
                                          const CMolecularBasis&            basis,
                                          const std::vector<const double*>& rwDensityPointers,
                                          const std::vector<const double*>& gsDensityPointers,
