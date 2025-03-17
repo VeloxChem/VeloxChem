@@ -445,9 +445,9 @@ class EvbDriver():
                     Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
                     Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
                 else:
-                    Lambda = np.linspace(0, 0.1, 11)
+                    Lambda = np.linspace(0, 0.1, 21)
                     Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
-                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
+                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 21))
                 Lambda = np.round(Lambda, 3)
             else:
                 Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
@@ -729,22 +729,31 @@ class EvbDriver():
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver()
-            FEP.run_FEP(equilibration_steps=equil_steps,
-                        total_sample_steps=sample_steps,
-                        write_step=write_step,
-                        lambda_0_equilibration_steps=initial_equil_steps,
-                        step_size=step_size,
-                        equil_step_size=equil_step_size,
-                        initial_equil_step_size=initial_equil_step_size,
-                        Lambda=self.Lambda,
-                        configuration=conf)
+            FEP.run_FEP(
+                equilibration_steps=equil_steps,
+                total_sample_steps=sample_steps,
+                write_step=write_step,
+                lambda_0_equilibration_steps=initial_equil_steps,
+                step_size=step_size,
+                equil_step_size=equil_step_size,
+                initial_equil_step_size=initial_equil_step_size,
+                Lambda=self.Lambda,
+                configuration=conf,
+            )
 
-    def compute_energy_profiles(self,
-                                barrier,
-                                free_energy,
-                                lambda_sub_sample=1,
-                                lambda_sub_sample_ends=False,
-                                time_sub_sample=1):
+    def compute_energy_profiles(
+        self,
+        barrier,
+        free_energy,
+        lambda_sub_sample=1,
+        lambda_sub_sample_ends=False,
+        time_sub_sample=1,
+        alpha=None,
+        H12=None,
+        alpha_guess=None,
+        H12_guess=None,
+        coordinate_bins=None,
+    ):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
@@ -757,9 +766,17 @@ class EvbDriver():
         dp = EvbDataProcessing()
         results = self._load_output_from_folders(lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample)
         self.ostream.flush()
+
+        if alpha is not None: dp.alpha = alpha
+        if H12 is not None: dp.H12 = H12
+        if alpha_guess is not None: dp.alpha_guess = alpha_guess
+        if H12_guess is not None: dp.H12_guess = H12_guess
+        if coordinate_bins is not None: dp.coordinate_bins = coordinate_bins
+
         results = dp.compute(results, barrier, free_energy)
         self._save_dict_as_h5(results, f"results_{self.name}_{self.t_label}")
         self.results = results
+        self.dataprocessing = dp
         self.print_results()
         self.ostream.flush()
 
@@ -816,8 +833,8 @@ class EvbDriver():
         common_results = []
         specific_results = {}
         for name, folder in zip([reference_name] + target_names, folders):
-            E_file = str(cwd / folder / "Energies.dat")
-            data_file = str(cwd / folder / "Data_combined.dat")
+            E_file = str(cwd / folder / "Energies.csv")
+            data_file = str(cwd / folder / "Data_combined.csv")
             options_file = str(cwd / folder / "options.json")
             specific, common = self._load_output_files(E_file, data_file, options_file, lambda_sub_sample,
                                                        lambda_sub_sample_ends, time_sub_sample)
@@ -871,7 +888,12 @@ class EvbDriver():
 
         sub_indices = l_sub_indices[::time_sub_sample]
 
-        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = E_data[:, sub_indices]
+        Lambda_frame = E_data[0, sub_indices]
+        E1_ref = E_data[1, sub_indices]
+        E2_ref = E_data[2, sub_indices]
+        E1_run = E_data[3, sub_indices]
+        E2_run = E_data[4, sub_indices]
+        E_m = E_data[5, sub_indices]
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file, skiprows=1, delimiter=',').T[:, sub_indices]
 
         specific_result = {
