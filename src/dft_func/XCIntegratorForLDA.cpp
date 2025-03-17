@@ -1178,9 +1178,12 @@ integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
                 auto rhow12b = rw2dengrid.betaDensity(idensity);
 
+                std::vector<const double*> rwdengrid_pointers({rhow1a});
+                std::vector<const double*> rw2dengrid_pointers({rhow12a, rhow12b});
+
                 auto partial_mat_Kxc = integratePartialKxcFockForLdaClosedShell(
-                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3, rhow1a, rhow12a, rhow12b,
-                    omptimers[thread_id]);
+                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3,
+                    rwdengrid_pointers, rw2dengrid_pointers, omptimers[thread_id]);
 
                 // accumulate partial Kxc
 
@@ -1460,9 +1463,12 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
                 auto rhow12b = rw2dengrid.betaDensity(idensity);
 
+                std::vector<const double*> rwdengrid_pointers({rhow1a});
+                std::vector<const double*> rw2dengrid_pointers({rhow12a, rhow12b});
+
                 auto partial_mat_Kxc = integratePartialKxcFockForLdaClosedShell(
-                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3, rhow1a, rhow12a, rhow12b,
-                    omptimers[thread_id]);
+                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3,
+                    rwdengrid_pointers, rw2dengrid_pointers, omptimers[thread_id]);
 
                 // accumulate partial Kxc
 
@@ -1532,9 +1538,8 @@ integratePartialKxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
                                          const CDenseMatrix&      gtoValues,
                                          const double*            v2rho2,
                                          const double*            v3rho3,
-                                         const double*            rhow1a,
-                                         const double*            rhow12a,
-                                         const double*            rhow12b,
+                                         const std::vector<const double*>& rwDensityGridPointers,
+                                         const std::vector<const double*>& rw2DensityGridPointers,
                                          CMultiTimer&             timer) -> CDenseMatrix
 {
     const auto npoints = gtoValues.getNumberOfColumns();
@@ -1542,6 +1547,11 @@ integratePartialKxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
     // GTO values on grid points
 
     auto chi_val = gtoValues.values();
+
+    auto rhow1a = rwDensityGridPointers[0];
+
+    auto rhow12a = rw2DensityGridPointers[0];
+    auto rhow12b = rw2DensityGridPointers[1];
 
     timer.start("Kxc matrix G");
 

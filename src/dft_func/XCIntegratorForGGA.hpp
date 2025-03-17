@@ -150,7 +150,7 @@ auto integrateKxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointer
 
 /**
  Integrates fourth-order GGA exchange-correlation functional contribution
- to AO Fock matrix.
+ to closed-shell AO Fock matrix.
 
  @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
@@ -164,17 +164,17 @@ auto integrateKxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointer
  @param xcFunctional the exchange-correlation functional.
  @param cubeMode a string that specifies which densities should be combined.
  */
-auto integrateKxcLxcFockForGGA(const std::vector<double*>& aoFockPointers,
-                               const CMolecule&            molecule,
-                               const CMolecularBasis&      basis,
-                               const std::vector<const double*>& rwDensityPointers,
-                               const std::vector<const double*>& rw2DensityPointers,
-                               const std::vector<const double*>& rw3DensityPointers,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&       molecularGrid,
-                               const double                screeningThresholdForGTOValues,
-                               const CXCFunctional&        xcFunctional,
-                               const std::string&          cubeMode) -> void;
+auto integrateKxcLxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
+                                          const CMolecule&            molecule,
+                                          const CMolecularBasis&      basis,
+                                          const std::vector<const double*>& rwDensityPointers,
+                                          const std::vector<const double*>& rw2DensityPointers,
+                                          const std::vector<const double*>& rw3DensityPointers,
+                                          const std::vector<const double*>& gsDensityPointers,
+                                          const CMolecularGrid&       molecularGrid,
+                                          const double                screeningThresholdForGTOValues,
+                                          const CXCFunctional&        xcFunctional,
+                                          const std::string&          cubeMode) -> void;
 
 /**
  Integrates GGA contribution to (third-order) Kxc matrix.

@@ -183,9 +183,8 @@ auto integratePartialKxcFockForLdaClosedShell(const CXCFunctional&     xcFunctio
                                               const CDenseMatrix&      gtoValues,
                                               const double*            v2rho2,
                                               const double*            v3rho3,
-                                              const double*            rhow1a,
-                                              const double*            rhow12a,
-                                              const double*            rhow12b,
+                                              const std::vector<const double*>& rwDensityGridPointers,
+                                              const std::vector<const double*>& rw2DensityGridPointers,
                                               CMultiTimer&             timer) -> CDenseMatrix;
 
 /**
