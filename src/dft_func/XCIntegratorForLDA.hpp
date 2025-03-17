@@ -172,9 +172,10 @@ auto integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPoin
  @param gtoValues the GTO values on grid points.
  @param v2rho2 the 2nd-order functional derivative wrt density.
  @param v3rho3 the 3rd-order functional derivative wrt density.
- @param rhow1a ...
- @param rhow12a ...
- @param rhow12b ...
+ @param rwDensityGridPointers the pointers to the products of one and two-time
+        transformed densities on grid points.
+ @param rw2DensityGridPointers the pointers to the two-time transformed
+        densities on grid points.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
  */

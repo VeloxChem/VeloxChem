@@ -1693,11 +1693,11 @@ integratePartialLxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
 
     timer.start("Lxc matrix matmul");
 
-    auto mat_Kxc = denblas::serialMultABt(gtoValues, mat_G);
+    auto mat_Lxc = denblas::serialMultABt(gtoValues, mat_G);
 
     timer.stop("Lxc matrix matmul");
 
-    return mat_Kxc;
+    return mat_Lxc;
 }
 
 }  // namespace xcintlda
