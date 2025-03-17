@@ -273,7 +273,7 @@ CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateKxcLxcFockForLDA(
+            xcintlda::integrateKxcLxcFockForLdaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::gga)

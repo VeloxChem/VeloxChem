@@ -138,7 +138,7 @@ auto integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointer
 
 /**
  Integrates fourth-order LDA exchnage-correlation functional contribution
- to AO Fock matrix.
+ to closed-shell AO Fock matrix.
 
  @param aoFockPointers the pointers to AO Fock matrices.
  @param molecule the molecule.
@@ -152,20 +152,20 @@ auto integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointer
  @param xcFunctional the exchange-correlation functional.
  @param cubeMode a string that specifies which densities should be combined.
  */
-auto integrateKxcLxcFockForLDA(const std::vector<double*>& aoFockPointers,
-                               const CMolecule&            molecule,
-                               const CMolecularBasis&      basis,
-                               const std::vector<const double*>& rwDensityPointers,
-                               const std::vector<const double*>& rw2DensityPointers,
-                               const std::vector<const double*>& rw3DensityPointers,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&       molecularGrid,
-                               const double                screeningThresholdForGTOValues,
-                               const CXCFunctional&        xcFunctional,
-                               const std::string&          cubeMode) -> void;
+auto integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
+                                          const CMolecule&            molecule,
+                                          const CMolecularBasis&      basis,
+                                          const std::vector<const double*>& rwDensityPointers,
+                                          const std::vector<const double*>& rw2DensityPointers,
+                                          const std::vector<const double*>& rw3DensityPointers,
+                                          const std::vector<const double*>& gsDensityPointers,
+                                          const CMolecularGrid&       molecularGrid,
+                                          const double                screeningThresholdForGTOValues,
+                                          const CXCFunctional&        xcFunctional,
+                                          const std::string&          cubeMode) -> void;
 
 /**
- Integrates LDA contribution to (third-order) Kxc matrix.
+ Integrates LDA contribution to (third-order) closed-shell Kxc matrix.
 
  @param xcFunctional the exchange-correlation functional.
  @param weights the weights of grid points.
@@ -178,18 +178,18 @@ auto integrateKxcLxcFockForLDA(const std::vector<double*>& aoFockPointers,
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
  */
-auto integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
-                                    const double*            weights,
-                                    const CDenseMatrix&      gtoValues,
-                                    const double*            v2rho2,
-                                    const double*            v3rho3,
-                                    const CDensityGridCubic& rwDensityGridCubic,
-                                    const CDensityGrid&      rw2DensityGrid,
-                                    const int                iFock,
-                                    CMultiTimer&             timer) -> CDenseMatrix;
+auto integratePartialKxcFockForLda2ClosedShell(const CXCFunctional&     xcFunctional,
+                                               const double*            weights,
+                                               const CDenseMatrix&      gtoValues,
+                                               const double*            v2rho2,
+                                               const double*            v3rho3,
+                                               const CDensityGridCubic& rwDensityGridCubic,
+                                               const CDensityGrid&      rw2DensityGrid,
+                                               const int                iFock,
+                                               CMultiTimer&             timer) -> CDenseMatrix;
 
 /**
- Integrates LDA contribution to (fourth-order) Lxc matrix.
+ Integrates LDA contribution to (fourth-order) closed-shell Lxc matrix.
 
  @param xcFunctional the exchange-correlation functional.
  @param weights the weights of grid points.
@@ -203,16 +203,16 @@ auto integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
  */
-auto integratePartialLxcFockForLDA(const CXCFunctional&     xcFunctional,
-                                   const double*            weights,
-                                   const CDenseMatrix&      gtoValues,
-                                   const double*            v2rho2,
-                                   const double*            v3rho3,
-                                   const double*            v4rho4,
-                                   const CDensityGridCubic& rwDensityGridCubic,
-                                   const CDensityGrid&      rw3DensityGrid,
-                                   const int                iFock,
-                                   CMultiTimer&             timer) -> CDenseMatrix;
+auto integratePartialLxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
+                                              const double*            weights,
+                                              const CDenseMatrix&      gtoValues,
+                                              const double*            v2rho2,
+                                              const double*            v3rho3,
+                                              const double*            v4rho4,
+                                              const CDensityGridCubic& rwDensityGridCubic,
+                                              const CDensityGrid&      rw3DensityGrid,
+                                              const int                iFock,
+                                              CMultiTimer&             timer) -> CDenseMatrix;
 
 }  // namespace xcintlda
 
