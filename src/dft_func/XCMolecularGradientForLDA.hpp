@@ -111,7 +111,7 @@ auto integrateFxcGradientForLdaClosedShell(const CMolecule&                  mol
 
 /**
  Integrates third-order LDA exchnage-correlation functional contribution to
- molecular gradient.
+ closed-shell molecular gradient.
 
  @param molecule the molecule.
  @param basis the molecular basis.
@@ -124,14 +124,14 @@ auto integrateFxcGradientForLdaClosedShell(const CMolecule&                  mol
  @param xcFunctional the exchange-correlation functional.
  @return the molecular gradient.
  */
-auto integrateKxcGradientForLDA(const CMolecule&                  molecule,
-                                const CMolecularBasis&            basis,
-                                const std::vector<const double*>& rwDensityPointersOne,
-                                const std::vector<const double*>& rwDensityPointersTwo,
-                                const std::vector<const double*>& gsDensityPointers,
-                                const CMolecularGrid&             molecularGrid,
-                                const double                      screeningThresholdForGTOValues,
-                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
+auto integrateKxcGradientForLdaClosedShell(const CMolecule&                  molecule,
+                                           const CMolecularBasis&            basis,
+                                           const std::vector<const double*>& rwDensityPointersOne,
+                                           const std::vector<const double*>& rwDensityPointersTwo,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&             molecularGrid,
+                                           const double                      screeningThresholdForGTOValues,
+                                           const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
 }  // namespace xcgradlda
 
