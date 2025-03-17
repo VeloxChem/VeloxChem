@@ -224,12 +224,10 @@ def raman_sanity_check(obj):
                 obj.do_raman = True
                 obj.do_resonance_raman = False
             else:
-                # out-commented lines below left from a merge conflict,
-                # I don't remember why I made this list-trick
-                # but I am sure I had a good reason
-                #freq_list = list(obj.frequencies)
-                #freq_list.pop(idx0)
-                obj.frequencies.pop(idx0)
+                # converting to a list because "pop()" does not exist for tuples
+                freq_list = list(obj.frequencies)
+                freq_list.pop(idx0)
+                obj.frequencies = freq_list
                 warn_msg += 'It has been removed from the list.\n'
                 warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
                 warn_msg += str(obj.frequencies)
