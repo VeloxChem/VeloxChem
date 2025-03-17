@@ -90,10 +90,3 @@ class TestRIJFockGeomExGradDriver:
         for i in range(3):
             for j in range(3):
                 assert mt.isclose(ref_grads[i][j], ri_grads[i][j], rel_tol=1.0e-4, abs_tol=1.0e-4)
-        
-        assert False
-        
-
-       
-            
-    

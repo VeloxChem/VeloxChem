@@ -9,6 +9,7 @@
 #include "MatrixFunc.hpp"
 #include "NuclearPotentialFunc.hpp"
 #include "OpenMPFunc.hpp"
+#include "DenseMatrixDistributor.hpp"
 #include "T2CDistributor.hpp"
 
 auto
@@ -73,4 +74,41 @@ CNuclearPotentialDriver::compute(const std::vector<double>&         charges,
     }
 
     return npot_mat;
+}
+
+auto
+CNuclearPotentialDriver::compute(CDenseMatrix&                 gmatrix,
+                                 const std::vector<CGtoBlock>& gto_blocks,
+                                 const CDenseMatrix&           fmatrix,
+                                 const size_t                  gindex,
+                                 const size_t                  naos,
+                                 const double                  gpoint_x,
+                                 const double                  gpoint_y,
+                                 const double                  gpoint_z,
+                                 const double                  gpoint_w) const -> void
+{
+    std::vector<double> charges({1.0, });
+    
+    std::vector<TPoint<double>> coordinates({TPoint<double>({gpoint_x, gpoint_y, gpoint_z}),});
+    
+    if (const auto nblocks = gto_blocks.size(); nblocks > 0)
+    {
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            auto bra_indices = std::pair<size_t, size_t>{size_t{0}, gto_blocks[i].number_of_basis_functions()};
+            
+            CDenseMatrixDistributor distributor_ii(&gmatrix, coordinates, charges, &fmatrix, gpoint_w);
+            
+            npotfunc::compute(distributor_ii, gto_blocks[i], gto_blocks[i], bra_indices, bra_indices, true);
+            
+            for (size_t j = i + 1; j < nblocks; j++)
+            {
+                auto ket_indices = std::pair<size_t, size_t>{size_t{0}, gto_blocks[j].number_of_basis_functions()};
+                
+                CDenseMatrixDistributor distributor_ij(&gmatrix, coordinates, charges, &fmatrix, gpoint_w);
+                
+                npotfunc::compute(distributor_ij, gto_blocks[i], gto_blocks[j], bra_indices, ket_indices, false);
+            }
+        }
+    }
 }

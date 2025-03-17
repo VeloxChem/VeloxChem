@@ -7,6 +7,8 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "Point.hpp"
+#include "DenseMatrix.hpp"
+#include "GtoBlock.hpp"
 
 /// @brief Class CNuclearPotentialDriver provides methods for computing two-center nuclear potential integrals.
 class CNuclearPotentialDriver
@@ -62,6 +64,25 @@ class CNuclearPotentialDriver
                  const std::vector<TPoint<double>> &coordinates,
                  const CMolecularBasis             &basis,
                  const CMolecule                   &molecule) const -> CMatrix;
+    
+    
+    /// @brief Computes row vector  of electron repulsion integrals with respect to grid point.
+    /// @param gmatrix The G matrix (grid points x AOs).
+    /// @param gto_blocks The vector of basis function blocks.
+    /// @param fmatrix The F matrix ( AOs x grid points).
+    /// @param gpoint_x The Cartesian X coordinate of grid point.
+    /// @param gpoint_y The Cartesian Y coordinate of grid point.
+    /// @param gpoint_z The Cartesian Z coordinate of grid point.
+    /// @param gpoint_w The weight of grid point.
+    auto compute(CDenseMatrix&                 gmatrix,
+                 const std::vector<CGtoBlock>& gto_blocks,
+                 const CDenseMatrix&           fmatrix,
+                 const size_t                  gindex,
+                 const size_t                  naos,
+                 const double                  gpoint_x,
+                 const double                  gpoint_y,
+                 const double                  gpoint_z,
+                 const double                  gpoint_w) const -> void;
 };
 
 #endif /* NuclearPotentialDriver_hpp */

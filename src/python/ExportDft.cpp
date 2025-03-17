@@ -637,6 +637,17 @@ export_dft(py::module& m)
             },
             "Integrates 1st-order exchange-correlation contribution.")
         .def(
+            "integrate_kx_fock",
+            [](const CXCIntegrator&                    self,
+               const CMolecule&                        molecule,
+               const CMolecularBasis&                  basis,
+               const std::vector<py::array_t<double>>& gsDensityArrays,
+               const CMolecularGrid&                   molecularGrid,
+               const double                            factor) -> CAOKohnShamMatrix {
+                return CXCIntegrator_integrate_kx_fock(self, molecule, basis, gsDensityArrays, molecularGrid, factor);
+            },
+            "Integrates seminumerical exchange contribution.")
+        .def(
             "integrate_vxc_fock",
             [](const CXCIntegrator&                    self,
                const CMolecule&                        molecule,
