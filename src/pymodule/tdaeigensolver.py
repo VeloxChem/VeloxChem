@@ -187,6 +187,10 @@ class TdaEigenSolver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -352,16 +356,9 @@ class TdaEigenSolver(LinearSolver):
         if self.rank == mpi_master():
             self._print_convergence('{:d} excited states'.format(self.nstates))
 
-            # Final hdf5 file to save response results
-            if self.checkpoint_file is not None:
-                if self.checkpoint_file.endswith('_rsp.h5'):
-                    final_h5_fname = (self.checkpoint_file[:-len('_rsp.h5')] +
-                                      '.h5')
-                else:
-                    # TODO: reconsider the file name in this case
-                    fpath = Path(self.checkpoint_file)
-                    fpath = fpath.with_name(fpath.stem)
-                    final_h5_fname = str(fpath) + '_results.h5'
+            # final hdf5 file to save response results
+            if self.filename is not None:
+                final_h5_fname = f'{self.filename}.h5'
             else:
                 final_h5_fname = None
 
@@ -440,9 +437,8 @@ class TdaEigenSolver(LinearSolver):
                     # Add the NTO to the final hdf5 file.
                     nto_label = f'NTO_S{s + 1}'
                     if final_h5_fname is not None:
-                        nto_mo.write_orbital_to_hdf5(final_h5_fname,
-                                                     nto_label,
-                                                     group="rsp")
+                        nto_mo.write_hdf5(final_h5_fname,
+                                          label=f'rsp/{nto_label}')
                 else:
                     nto_mo = MolecularOrbitals()
                 nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())

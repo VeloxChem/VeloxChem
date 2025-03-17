@@ -172,6 +172,14 @@ class CphfSolver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -183,14 +191,6 @@ class CphfSolver(LinearSolver):
                 self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
             else:
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
-
-        # checkpoint info
-        if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
-        elif (self.checkpoint_file is not None and
-              self.checkpoint_file.endswith('_rsp.h5')):
-            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
-                                    '_orbrsp.h5')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)

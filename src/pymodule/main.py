@@ -381,7 +381,8 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
-            orbrsp_dict = dict(task.input_dict['orbital_response'])
+            orbrsp_dict = (dict(task.input_dict['orbital_response'])
+                           if 'orbital_response' in task.input_dict else {})
 
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
@@ -401,10 +402,10 @@ def main():
     # Hessian
     # TODO reconsider keeping this after introducing vibrationalanalysis class
     if task_type == 'hessian':
-        hessian_dict = (task.input_dict['hessian']
+        hessian_dict = (dict(task.input_dict['hessian'])
                         if 'hessian' in task.input_dict else {})
 
-        orbrsp_dict = (task.input_dict['orbital_response']
+        orbrsp_dict = (dict(task.input_dict['orbital_response'])
                        if 'orbital_response' in task.input_dict else {})
         orbrsp_dict['program_end_time'] = program_end_time
         orbrsp_dict['filename'] = task.input_dict['filename']
@@ -463,7 +464,8 @@ def main():
             rsp_dict['filename'] = task.input_dict['filename']
             rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
-            orbrsp_dict = dict(task.input_dict['orbital_response'])
+            orbrsp_dict = (dict(task.input_dict['orbital_response'])
+                           if 'orbital_response' in task.input_dict else {})
 
             assert_msg_critical(
                 rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
