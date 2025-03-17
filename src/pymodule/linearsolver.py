@@ -421,9 +421,6 @@ class LinearSolver:
             self._ri_drv = RIFockDriver(inv_mat_j)
 
             local_atoms = molecule.partition_atoms(self.comm)
-            # TODO: update prepare_buffers so that local_atoms does not need to
-            #       be in ascending order
-            local_atoms = sorted(local_atoms)
             self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j,
                                          local_atoms)
 

@@ -23,7 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 from copy import deepcopy
 import numpy as np
 import time as tm
@@ -202,6 +201,10 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
+
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -544,15 +547,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 # final h5 file for response solutions
-                if self.checkpoint_file is not None:
-                    if self.checkpoint_file.endswith('_rsp.h5'):
-                        final_h5_fname = (
-                            self.checkpoint_file[:-len('_rsp.h5')] + '.h5')
-                    else:
-                        # TODO: reconsider the file name in this case
-                        fpath = Path(self.checkpoint_file)
-                        fpath = fpath.with_name(fpath.stem)
-                        final_h5_fname = str(fpath) + '_results.h5'
+                if self.filename is not None:
+                    final_h5_fname = f'{self.filename}.h5'
                 else:
                     final_h5_fname = None
 
@@ -607,9 +603,8 @@ class LinearResponseEigenSolver(LinearSolver):
                         # Add the NTO to the final checkpoint file.
                         nto_label = f'NTO_S{s + 1}'
                         if final_h5_fname is not None:
-                            nto_mo.write_orbital_to_hdf5(final_h5_fname,
-                                                         nto_label,
-                                                         group="rsp")
+                            nto_mo.write_hdf5(final_h5_fname,
+                                              label=f'rsp/{nto_label}')
                     else:
                         nto_mo = MolecularOrbitals()
                     nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())

@@ -22,7 +22,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import Path
 from enum import Enum
 import numpy as np
 import h5py
@@ -437,7 +436,7 @@ class MolecularOrbitals:
 
         return MolecularOrbitals(mo_coefs, mo_enes, mo_occs, mo_type)
 
-    def write_hdf5(self, fname, nuclear_charges=None, basis_set=None):
+    def write_hdf5(self, fname, nuclear_charges=None, basis_set=None, label=''):
         """
         Writes molecular orbitals to hdf5 file.
 
@@ -449,74 +448,52 @@ class MolecularOrbitals:
             Name of the basis set.
         """
 
-        hf = h5py.File(fname, 'w')
+        if label and isinstance(label, str):
+            prefix = label + '_'
+        else:
+            prefix = ''
 
-        hf.create_dataset('alpha_orbitals', data=self.alpha_to_numpy())
-        hf.create_dataset('alpha_energies', data=self.ea_to_numpy())
-        hf.create_dataset('alpha_occupations', data=self.occa_to_numpy())
+        hf = h5py.File(fname, 'a')
+
+        for key in [
+                prefix + 'alpha_orbitals',
+                prefix + 'alpha_energies',
+                prefix + 'alpha_occupations',
+                prefix + 'beta_orbitals',
+                prefix + 'beta_energies',
+                prefix + 'beta_occupations',
+                prefix + 'nuclear_charges',
+                prefix + 'basis_set',
+        ]:
+            if key in hf:
+                del hf[key]
+
+        hf.create_dataset(prefix + 'alpha_orbitals', data=self.alpha_to_numpy())
+        hf.create_dataset(prefix + 'alpha_energies', data=self.ea_to_numpy())
+        hf.create_dataset(prefix + 'alpha_occupations',
+                          data=self.occa_to_numpy())
 
         if self._orbitals_type == molorb.unrest:
-            hf.create_dataset('beta_orbitals', data=self.beta_to_numpy())
-            hf.create_dataset('beta_energies', data=self.eb_to_numpy())
-            hf.create_dataset('beta_occupations', data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'beta_orbitals',
+                              data=self.beta_to_numpy())
+            hf.create_dataset(prefix + 'beta_energies', data=self.eb_to_numpy())
+            hf.create_dataset(prefix + 'beta_occupations',
+                              data=self.occb_to_numpy())
 
         elif self._orbitals_type == molorb.restopen:
-            hf.create_dataset('beta_occupations', data=self.occb_to_numpy())
+            hf.create_dataset(prefix + 'beta_occupations',
+                              data=self.occb_to_numpy())
 
         if nuclear_charges is not None:
-            hf.create_dataset('nuclear_charges', data=nuclear_charges)
+            hf.create_dataset(prefix + 'nuclear_charges', data=nuclear_charges)
 
         if basis_set is not None:
-            hf.create_dataset('basis_set', data=np.bytes_([basis_set]))
+            hf.create_dataset(prefix + 'basis_set', data=np.bytes_([basis_set]))
 
         hf.close()
 
-    def write_orbital_to_hdf5(self, fname, label, group=None):
-        """
-        Writes orbitals to a pre-existing hdf5 file.
-
-        :param fname:
-            The name of the hdf5 file.
-        :param label:
-            The orbital label.
-        :param nuclear_charges:
-            The nuclear charges.
-        :param basis_set:
-            Name of the basis set.
-        """
-
-        if (fname and isinstance(fname, str) and Path(fname).is_file()):
-
-            hf = h5py.File(fname, 'a')
-
-            if group is None:
-                group = ''
-            else:
-                group += '/'
-
-            hf.create_dataset(group + label + '_alpha_orbitals',
-                              data=self.alpha_to_numpy())
-            hf.create_dataset(group + label + '_alpha_energies',
-                              data=self.ea_to_numpy())
-            hf.create_dataset(group + label + '_alpha_occupations',
-                              data=self.occa_to_numpy())
-
-            if self._orbitals_type == molorb.unrest:
-                hf.create_dataset(group + label + '_beta_orbitals',
-                                  data=self.beta_to_numpy())
-                hf.create_dataset(group + label + '_beta_energies',
-                                  data=self.eb_to_numpy())
-                hf.create_dataset(group + label + '_beta_occupations',
-                                  data=self.occb_to_numpy())
-
-            elif self._orbitals_type == molorb.restopen:
-                hf.create_dataset(group + label + '_beta_occupations',
-                                  data=self.occb_to_numpy())
-
-            hf.close()
-
     @staticmethod
-    def read_hdf5(fname):
+    def read_hdf5(fname, label=''):
         """
         Reads molecular orbitals from hdf5 file.
 
@@ -527,22 +504,26 @@ class MolecularOrbitals:
             The molecular orbitals.
         """
 
+        if label and isinstance(label, str):
+            prefix = label + '_'
+        else:
+            prefix = ''
+
         hf = h5py.File(fname, 'r')
 
         orbs_type = molorb.rest
 
-        assert_msg_critical(
-            'alpha_orbitals' in hf and 'alpha_energies' in hf and
-            'alpha_occupations' in hf, 'MolecularOrbitals.read_hdf5: ' +
-            'alpha orbitals/energies/occupations not found')
+        for key in ['alpha_orbitals', 'alpha_energies', 'alpha_occupations']:
+            assert_msg_critical((prefix + key) in hf,
+                                f'MolecularOrbitals.read_hdf5: {key} not found')
 
         if 'beta_orbitals' in hf or 'beta_energies' in hf:
             orbs_type = molorb.unrest
 
-            assert_msg_critical(
-                'beta_orbitals' in hf and 'beta_energies' in hf and
-                'beta_occupations' in hf, 'MolecularOrbitals.read_hdf5: ' +
-                'beta orbitals/energies/occupations not found')
+            for key in ['beta_orbitals', 'beta_energies', 'beta_occupations']:
+                assert_msg_critical(
+                    (prefix + key) in hf,
+                    f'MolecularOrbitals.read_hdf5: {key} not found')
 
         elif 'beta_occupations' in hf:
             orbs_type = molorb.restopen
@@ -551,17 +532,17 @@ class MolecularOrbitals:
         enes = []
         occs = []
 
-        orbs.append(np.array(hf.get('alpha_orbitals')))
-        enes.append(np.array(hf.get('alpha_energies')))
-        occs.append(np.array(hf.get('alpha_occupations')))
+        orbs.append(np.array(hf.get(prefix + 'alpha_orbitals')))
+        enes.append(np.array(hf.get(prefix + 'alpha_energies')))
+        occs.append(np.array(hf.get(prefix + 'alpha_occupations')))
 
         if orbs_type == molorb.unrest:
-            orbs.append(np.array(hf.get('beta_orbitals')))
-            enes.append(np.array(hf.get('beta_energies')))
-            occs.append(np.array(hf.get('beta_occupations')))
+            orbs.append(np.array(hf.get(prefix + 'beta_orbitals')))
+            enes.append(np.array(hf.get(prefix + 'beta_energies')))
+            occs.append(np.array(hf.get(prefix + 'beta_occupations')))
 
         elif orbs_type == molorb.restopen:
-            occs.append(np.array(hf.get('beta_occupations')))
+            occs.append(np.array(hf.get(prefix + 'beta_occupations')))
 
         hf.close()
 

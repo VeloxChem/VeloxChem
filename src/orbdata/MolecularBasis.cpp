@@ -471,28 +471,43 @@ CMolecularBasis::index_map(const int angular_momentum, const size_t npgtos) cons
 auto
 CMolecularBasis::index_map(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<size_t>
 {
+    const auto tot_orb_indices = index_map(angular_momentum, npgtos);
+    
+    const auto tot_atm_indices = atomic_indices(angular_momentum, npgtos);
+    
     std::vector<size_t> ao_indices;
 
-    ao_indices.push_back(number_of_basis_functions(angular_momentum));
-
-    auto offset = dimensions_of_basis(angular_momentum);
-
-    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
-        bool not_found = true;
-        std::ranges::for_each(atoms, [&](const int j) {
-            if (j == i)
+    ao_indices.push_back(tot_orb_indices[0]);
+    
+    for (const auto atom : atoms)
+    {
+        for (size_t i = 0; i < tot_atm_indices.size(); i++)
+        {
+            if (tot_atm_indices[i] == atom)
             {
-                std::ranges::for_each(_basis_sets[_indices[i]].basis_functions(angular_momentum), [&](const auto &bf) {
-                    if (bf.number_of_primitive_functions() == npgtos) ao_indices.push_back(offset);
-                    offset++;
-                });
-                not_found = false;
+                ao_indices.push_back(tot_orb_indices[i + 1]);
             }
-        });
-        if (not_found) offset += _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum);
-    });
-
+        }
+    }
+    
     return ao_indices;
+    
+//
+//    
+//    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
+//        bool not_found = true;
+//        std::ranges::for_each(atoms, [&](const int j) {
+//            if (j == i)
+//            {
+//                std::ranges::for_each(_basis_sets[_indices[i]].basis_functions(angular_momentum), [&](const auto &bf) {
+//                    if (bf.number_of_primitive_functions() == npgtos) ao_indices.push_back(offset);
+//                    offset++;
+//                });
+//                not_found = false;
+//            }
+//        });
+//        if (not_found) offset += _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum);
+//    });
 }
 
 auto

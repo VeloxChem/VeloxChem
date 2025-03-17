@@ -53,6 +53,8 @@ class TddftOrbitalResponse(CphfSolver):
 
         super().__init__(comm, ostream)
 
+        self.orbrsp_type = 'tddftgrad'
+
         self.tamm_dancoff = False
         self.state_deriv_index = None
         self.do_first_order_prop = False
