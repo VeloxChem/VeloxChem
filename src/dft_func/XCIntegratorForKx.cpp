@@ -118,6 +118,12 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
 
         timer.stop("Density matrix slicing");
         
+        timer.start("OMP Kx calc.");
+        
+        CDenseMatrix sum_partial_mat_kx(aocount, aocount);
+
+        sum_partial_mat_kx.zero();
+        
 #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
@@ -193,10 +199,29 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
             
             omptimers[thread_id].stop("Generate G_gv matrix");
             
-            //std::cout << " *** NAOS : " << aocount;
+            omptimers[thread_id].start("Kx matmul");
+
+            auto partial_mat_kx = denblas::serialMultAB(mat_chi, mat_ggv);
+
+            omptimers[thread_id].stop("Kx matmul");
+
+            omptimers[thread_id].start("Kx local matrix dist.");
+
+#pragma omp critical
+            denblas::serialInPlaceAddAB(sum_partial_mat_kx, partial_mat_kx);
+
+            omptimers[thread_id].stop("Kx local matrix dist.");
         }
         
-        std::cout << "Grid block : " << box_id  << " Grid dim. : " << npoints << " Local AOs : " << aocount << std::endl; 
+        std::cout << "Grid block : " << box_id  << " Grid dim. : " << npoints << " Local AOs : " << aocount << std::endl;
+        
+        timer.stop("OMP Kx calc.");
+
+        timer.start("Kx matrix dist.");
+
+        dftsubmat::distributeSubMatrixToKohnSham(mat_kx, sum_partial_mat_kx, aoinds);
+
+        timer.stop("Kx matrix dist.");
     
     }
 
