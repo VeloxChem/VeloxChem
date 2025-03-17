@@ -22,11 +22,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from mpi4py import MPI
-import numpy as np
 import time as tm
 import math
 import sys
+from mpi4py import MPI
+import numpy as np
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import MolecularGrid
@@ -91,6 +91,9 @@ class PolarizabilityGradient:
         self.ostream = ostream
 
         self._scf_drv = scf_drv
+
+        self.method_dict = {}
+        self.orbrsp_dict = {}
 
         self.polgradient = None
         self.delta_h = 0.001
@@ -210,7 +213,8 @@ class PolarizabilityGradient:
                 polgrad_sanity_check(self, self.flag, lr_results)
                 self._check_real_or_complex_input(lr_results)
             # compute
-            self.polgradient = self.compute_analytical(molecule, basis, scf_tensors, lr_results)
+            self.polgradient = self.compute_analytical(molecule, basis,
+                                                       scf_tensors, lr_results)
 
         if self.rank == mpi_master():
             # self.print_geometry(molecule)
@@ -218,7 +222,7 @@ class PolarizabilityGradient:
                 self.print_polarizability_gradient(molecule)
 
             valstr = '*** Time spent in polarizability gradient driver: '
-            valstr += '{:.6f} sec ***'.format(tm.time() - start_time)
+            valstr += f'{(tm.time() - start_time):.6f} sec ***'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -241,7 +245,7 @@ class PolarizabilityGradient:
         """
 
         # get orbital response results
-        all_orbrsp_results = self.compute_orbital_response(
+        orbrsp_results = self.compute_orbital_response(
             molecule, basis, scf_tensors, lr_results)
 
         # dictionary for polarizability gradient
@@ -274,22 +278,21 @@ class PolarizabilityGradient:
 
             # number of input frequencies
             n_freqs = len(self.frequencies)
+
+            # if Lagr. multipliers not available as dist. array,
+            # read it from dict into variable on master
+            if 'dist_cphf_ov' not in orbrsp_results.keys():
+                all_cphf_red = orbrsp_results['cphf_ov']
+                if self.is_complex:
+                    all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
+                else:
+                    all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
         else:
             nocc = None
             nvir = None
             n_freqs = None
 
         nocc, nvir, n_freqs = self.comm.bcast((nocc, nvir, n_freqs), root=mpi_master())
-
-        # if Lagr. multipliers not available as dist. array,
-        # read it from dict into variable on master
-        if 'dist_cphf_ov' not in all_orbrsp_results.keys():
-            all_cphf_red = all_orbrsp_results['cphf_ov']
-
-            if self.is_complex:
-                all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
-            else:
-                all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
 
         for f, w in enumerate(self.frequencies):
 
@@ -298,19 +301,19 @@ class PolarizabilityGradient:
                 for x in self.vector_components
             ]
 
-            if 'dist_cphf_ov' in all_orbrsp_results.keys():
+            if 'dist_cphf_ov' in orbrsp_results.keys():
                 # get lambda multipliers from distributed arrays
                 cphf_ov = self.get_lambda_response_vector(
-                    molecule, scf_tensors, all_orbrsp_results['dist_cphf_ov'], f)
+                    molecule, scf_tensors, orbrsp_results['dist_cphf_ov'], f)
 
             else:
                 # TODO get conj. gradient solver to also return dist. array
                 # get lambda multipliers from array in orbrsp dict
                 cphf_ov_red = all_cphf_red[f]
+                cphf_ov = np.zeros((dof, dof, nocc * nvir),
+                                   dtype=self.grad_dt)
 
                 if self.is_complex:
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
-
                     tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
 
                     for idx, xy in enumerate(xy_pairs):
@@ -319,29 +322,31 @@ class PolarizabilityGradient:
 
                         cphf_ov[x, y] = tmp_cphf_ov[idx]
 
-                        if (y != x):
+                        if y != x:
                             cphf_ov[y, x] += cphf_ov[x, y]
                 else:
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
-
                     for idx, xy in enumerate(xy_pairs):
                         x = xy[0]
                         y = xy[1]
 
                         cphf_ov[x, y] = cphf_ov_red[idx]
 
-                        if (y != x):
+                        if y != x:
                             cphf_ov[y, x] += cphf_ov[x, y]
 
-            if self.rank == mpi_master():
+            omega_ao = self.get_omega_response_vector(
+                basis, orbrsp_results['dist_omega_ao'], f
+            )
 
-                info_msg = 'Building gradient for frequency = {:4.3f}'.format(w)
+            if self.rank == mpi_master():
+                info_msg = f'Building gradient for frequency = {w:4.3f}'
                 self.ostream.print_info(info_msg)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
                 # Note: polorbitalresponse uses r instead of mu for dipole operator
-                for idx in range(len(full_vec)):
+                # for idx in range(len(full_vec)):
+                for idx, vec in enumerate(full_vec):
                     full_vec[idx] *= -1.0
 
                 # extract the excitation and de-excitation components
@@ -360,7 +365,6 @@ class PolarizabilityGradient:
                 x_minus_y_mo = exc_vec - deexc_vec
 
                 # transform to AO basis: mi,xia,na->xmn
-                # TODO rename to _ao for clarity
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
                     for x in range(dof)
@@ -371,37 +375,29 @@ class PolarizabilityGradient:
                 ])
                 del x_plus_y_mo, x_minus_y_mo
 
-                orbrsp_results = all_orbrsp_results[w]
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
-            # Lagrange multipliers
-            omega_ao = self.get_omega_response_vector(basis, all_orbrsp_results['dist_omega_ao'], f)
-               
-            if self.rank == mpi_master():
-
-                cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
+                cphf_ov = cphf_ov.reshape((dof**2, nocc, nvir))
 
                 lambda_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
                     for xy in range(dof**2)
                 ])
 
-                lambda_ao = lambda_ao.reshape(dof, dof, nao, nao)
+                lambda_ao = lambda_ao.reshape((dof, dof, nao, nao))
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
 
                 # calculate relaxed density matrix
-                rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
+                rel_dm_ao = orbrsp_results[w]['unrel_dm_ao'] + lambda_ao
 
                 del cphf_ov, lambda_ao
             else:
-                #orbrsp_results = None
                 gs_dm = None
                 x_plus_y_ao = None
                 x_minus_y_ao = None
                 omega_ao = None
                 rel_dm_ao = None
 
-            #orbrsp_results = self.comm.bcast(orbrsp_results, root=mpi_master())
             gs_dm = self.comm.bcast(gs_dm, root=mpi_master())
             x_plus_y_ao = self.comm.bcast(x_plus_y_ao, root=mpi_master())
             x_minus_y_ao = self.comm.bcast(x_minus_y_ao, root=mpi_master())
@@ -409,7 +405,6 @@ class PolarizabilityGradient:
             rel_dm_ao = self.comm.bcast(rel_dm_ao, root=mpi_master())
 
             # initiate polarizability gradient variable with data type set in init()
-            # TODO distributed ?
             pol_gradient = np.zeros((dof, dof, natm, 3), dtype=self.grad_dt)
 
             # kinetic energy gradient driver
@@ -435,12 +430,11 @@ class PolarizabilityGradient:
 
                     # loop over operator components
                     for x, y in xy_pairs:
-                        # TODO distributed ?
                         pol_gradient[x, y, iatom, icoord] += (
-                                np.linalg.multi_dot([ # xymn,amn->xya
-                                    2.0 * rel_dm_ao[x, y].reshape(nao**2),
-                                    gmat_hcore.reshape(nao**2)])
-                                )
+                            np.linalg.multi_dot([  # xymn,amn->xya
+                                2.0 * rel_dm_ao[x, y].reshape(nao**2),
+                                gmat_hcore.reshape(nao**2)])
+                        )
 
                 gmats_kin = Matrices()
                 gmats_npot_100 = Matrices()
@@ -456,33 +450,34 @@ class PolarizabilityGradient:
                     gmat_ovlp += gmat_ovlp.T
                     # loop over operator components
                     for x, y in xy_pairs:
-                        # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
-                                1.0 * np.linalg.multi_dot([ # xymn,amn->xya
-                                    2.0 * omega_ao[x, y],
-                                      gmat_ovlp.reshape(nao**2)]))
+                            1.0 * np.linalg.multi_dot([  # xymn,amn->xya
+                                2.0 * omega_ao[x, y],
+                                gmat_ovlp.reshape(nao**2)])
+                        )
 
                 gmats_ovlp = Matrices()
 
                 # dipole contribution to gradient
                 dip_grad_drv = ElectricDipoleMomentGeom100Driver()
-                gmats_dip = dip_grad_drv.compute(molecule, basis, [0.0, 0.0, 0.0], iatom)
+                gmats_dip = dip_grad_drv.compute(molecule, basis,
+                                                 [0.0, 0.0, 0.0], iatom)
 
                 # the keys of the dipole gmat
-                gmats_dip_components = (['X_X', 'X_Y', 'X_Z', 'Y_X' ]
-                                     + [ 'Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'])
+                gmats_dip_components = (['X_X', 'X_Y', 'X_Z', 'Y_X']
+                                        + ['Y_Y', 'Y_Z', 'Z_X', 'Z_Y', 'Z_Z'])
 
                 # dictionary to convert from string idx to integer idx
                 comp_to_idx = {'X': 0, 'Y': 1, 'Z': 2}
 
                 d_dipole = np.zeros((dof, 3, nao, nao))
 
-                for i, label in enumerate(gmats_dip_components):
+                for label in gmats_dip_components:
                     gmat_dip = gmats_dip.matrix_to_numpy(label)
                     gmat_dip += gmat_dip.T
 
-                    icoord = comp_to_idx[label[0]] # atom coordinate component
-                    icomp = comp_to_idx[label[-1]] # dipole operator component
+                    icoord = comp_to_idx[label[0]]  # atom coordinate component
+                    icomp = comp_to_idx[label[-1]]  # dipole operator component
 
                     # reorder indices to first is operator comp, second is coord
                     d_dipole[icomp, icoord] += gmat_dip
@@ -490,25 +485,22 @@ class PolarizabilityGradient:
                 for icoord in range(3):
                     # loop over operator components
                     for x, y in xy_pairs:
-                        # TODO distributed
                         pol_gradient[x, y, iatom, icoord] += (
-                                - 2.0 * np.linalg.multi_dot([ # xmn,yamn->xya
-                                    x_minus_y_ao[x].reshape(nao**2),
-                                    d_dipole[y, icoord].reshape(nao**2)
-                                ]) - 2.0 * np.linalg.multi_dot([ # xmn,yamn->yxa
-                                    d_dipole[x, icoord].reshape(nao**2),
-                                    x_minus_y_ao[y].reshape(nao**2)
-                                ]))
+                            - 2.0 * np.linalg.multi_dot([  # xmn,yamn->xya
+                                x_minus_y_ao[x].reshape(nao**2),
+                                d_dipole[y, icoord].reshape(nao**2)
+                            ]) - 2.0 * np.linalg.multi_dot([  # xmn,yamn->yxa
+                                d_dipole[x, icoord].reshape(nao**2),
+                                x_minus_y_ao[y].reshape(nao**2)
+                            ]))
 
                 gmats_dip = Matrices()
 
-            # TODO do not compute separate array for eri_contrib -- add
-            # on-the-fly to pol_gradient
             # ERI contribution
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
-                                    rel_dm_ao, x_plus_y_ao, x_minus_y_ao, local_atoms)
+                                                   rel_dm_ao, x_plus_y_ao, x_minus_y_ao,
+                                                   local_atoms)
 
-            # TODO distributed ?
             pol_gradient += eri_contrib
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
@@ -517,7 +509,6 @@ class PolarizabilityGradient:
             if self.rank == mpi_master():
                 for x in range(dof):
                     for y in range(x + 1, dof):
-                        # TODO distributed ?
                         pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
@@ -527,7 +518,6 @@ class PolarizabilityGradient:
 
                 # add contribution to the SCF polarizability gradient
                 if self.rank == mpi_master():
-                    # TODO distributed?
                     pol_gradient += polgrad_xc_contrib
 
                 del polgrad_xc_contrib
@@ -543,14 +533,13 @@ class PolarizabilityGradient:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            return polgrad_results
-        else:
-            return {}
+        # NOTE distributed?
+        return polgrad_results
 
     def compute_eri_contrib(self, molecule, basis, gs_dm, rel_dm_ao,
-                                         x_plus_y_ao, x_minus_y_ao, local_atoms):
+                            x_plus_y_ao, x_minus_y_ao, local_atoms):
         """
-        oDirects the computation of the contribution from ERI derivative integrals
+        Directs the computation of the contribution from ERI derivative integrals
         to the polarizability gradient.
 
         :param molecule:
@@ -574,15 +563,17 @@ class PolarizabilityGradient:
 
         if self.is_complex:
             eri_deriv_contrib = self.compute_eri_contrib_complex(molecule, basis, gs_dm,
-                                            rel_dm_ao, x_plus_y_ao, x_minus_y_ao, local_atoms)
+                                                                 rel_dm_ao, x_plus_y_ao,
+                                                                 x_minus_y_ao, local_atoms)
         else:
             eri_deriv_contrib = self.compute_eri_contrib_real(molecule, basis, gs_dm,
-                                            rel_dm_ao, x_plus_y_ao, x_minus_y_ao, local_atoms)
+                                                              rel_dm_ao, x_plus_y_ao,
+                                                              x_minus_y_ao, local_atoms)
 
         return eri_deriv_contrib
 
     def compute_eri_contrib_real(self, molecule, basis, gs_dm, rel_dm_ao,
-                                         x_plus_y_ao, x_minus_y_ao, local_atoms):
+                                 x_plus_y_ao, x_minus_y_ao, local_atoms):
         """
         Computes the contribution from ERI derivative integrals
         to the real polarizability gradient.
@@ -605,7 +596,7 @@ class PolarizabilityGradient:
         :return eri_deriv_contrib:
             The ERI derivative integral contribution to the polarizability gradient.
         """
-       
+
         fock_type, exchange_scaling_factor = self.get_fock_type_and_x_frac()
 
         # scaling of ERI gradient for non-hybrid functionals
@@ -646,7 +637,7 @@ class PolarizabilityGradient:
             for x, y in xy_pairs:
                 # relaxed DM
                 den_mat_for_fock_rel = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_rel.set_values(2.0*rel_dm_ao[x,y])
+                den_mat_for_fock_rel.set_values(2.0 * rel_dm_ao[x,y])
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xpy_x.set_values(x_plus_y_ao[x])
@@ -655,12 +646,12 @@ class PolarizabilityGradient:
                 den_mat_for_fock_xpy_y.set_values(x_plus_y_ao[y])
                 # (X+Y)_x - (X+Y)_x
                 den_mat_for_fock_xpy_m_xpyT_x = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_x.set_values( x_plus_y_ao[x]
-                                                        - x_plus_y_ao[x].T)
+                den_mat_for_fock_xpy_m_xpyT_x.set_values(x_plus_y_ao[x]
+                                                         - x_plus_y_ao[x].T)
                 # (X+Y)_y - (X+Y)_y
                 den_mat_for_fock_xpy_m_xpyT_y = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y.set_values( x_plus_y_ao[y]
-                                                        - x_plus_y_ao[y].T)
+                den_mat_for_fock_xpy_m_xpyT_y.set_values(x_plus_y_ao[y]
+                                                         - x_plus_y_ao[y].T)
                 # (X-Y)_x
                 den_mat_for_fock_xmy_x = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xmy_x.set_values(x_minus_y_ao[x])
@@ -669,53 +660,54 @@ class PolarizabilityGradient:
                 den_mat_for_fock_xmy_y.set_values(x_minus_y_ao[y])
                 # (X-Y)_x + (X-Y)_x
                 den_mat_for_fock_xmy_p_xmyT_x = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_x.set_values( x_minus_y_ao[x]
-                                                        + x_minus_y_ao[x].T)
+                den_mat_for_fock_xmy_p_xmyT_x.set_values(x_minus_y_ao[x]
+                                                         + x_minus_y_ao[x].T)
                 # (X-Y)_y + (X-Y)_y
                 den_mat_for_fock_xmy_p_xmyT_y = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y.set_values( x_minus_y_ao[y]
-                                                        + x_minus_y_ao[y].T)
+                den_mat_for_fock_xmy_p_xmyT_y.set_values(x_minus_y_ao[y]
+                                                         + x_minus_y_ao[y].T)
                 # contraction of integrals and DMs
-                erigrad_rel = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_gs,
-                                             den_mat_for_fock_rel, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
-                erigrad_xpy_xy = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_x,
-                                             den_mat_for_fock_xpy_m_xpyT_y, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
-                erigrad_xpy_yx = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_m_xpyT_x,
-                                             den_mat_for_fock_xpy_y, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
-                erigrad_xmy_xy = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_x,
-                                             den_mat_for_fock_xmy_p_xmyT_y, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
-                erigrad_xmy_yx = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_p_xmyT_x,
-                                             den_mat_for_fock_xmy_y, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
-                eri_deriv_contrib[x, y, iatom] += np.array(erigrad_rel) * factor
-                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_xy) * factor
-                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_yx) * factor
-                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy) * factor
-                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx) * factor
+                erigrad_rel = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                    den_mat_for_fock_gs,
+                                                    den_mat_for_fock_rel,
+                                                    iatom, fock_type,
+                                                    exchange_scaling_factor,
+                                                    0.0, thresh_int)
+                erigrad_xpy_xy = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                       den_mat_for_fock_xpy_x,
+                                                       den_mat_for_fock_xpy_m_xpyT_y,
+                                                       iatom, fock_type,
+                                                       exchange_scaling_factor,
+                                                       0.0, thresh_int)
+                erigrad_xpy_yx = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                       den_mat_for_fock_xpy_m_xpyT_x,
+                                                       den_mat_for_fock_xpy_y,
+                                                       iatom, fock_type,
+                                                       exchange_scaling_factor,
+                                                       0.0, thresh_int)
+                erigrad_xmy_xy = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                       den_mat_for_fock_xmy_x,
+                                                       den_mat_for_fock_xmy_p_xmyT_y,
+                                                       iatom, fock_type,
+                                                       exchange_scaling_factor,
+                                                       0.0, thresh_int)
+                erigrad_xmy_yx = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                       den_mat_for_fock_xmy_p_xmyT_x,
+                                                       den_mat_for_fock_xmy_y,
+                                                       iatom, fock_type,
+                                                       exchange_scaling_factor,
+                                                       0.0, thresh_int)
+                eri_deriv_contrib[x, y, iatom] += np.array(erigrad_rel)
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_xy)
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xpy_yx)
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_xy)
+                eri_deriv_contrib[x, y, iatom] += 0.5 * np.array(erigrad_xmy_yx)
+                eri_deriv_contrib[x, y, iatom] *= factor
 
         return eri_deriv_contrib
 
     def compute_eri_contrib_complex(self, molecule, basis, gs_dm, rel_dm_ao,
-                                         x_plus_y_ao, x_minus_y_ao, local_atoms):
+                                    x_plus_y_ao, x_minus_y_ao, local_atoms):
         """
         Computes the contribution from ERI derivative integrals
         to the complex polarizability gradient.
@@ -779,9 +771,9 @@ class PolarizabilityGradient:
             for x, y in xy_pairs:
                 # relaxed DM
                 den_mat_for_fock_rel_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_rel_real.set_values(2.0*rel_dm_ao[x,y].real)
+                den_mat_for_fock_rel_real.set_values(2.0 * rel_dm_ao[x,y].real)
                 den_mat_for_fock_rel_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_rel_imag.set_values(2.0*rel_dm_ao[x,y].imag)
+                den_mat_for_fock_rel_imag.set_values(2.0 * rel_dm_ao[x,y].imag)
                 # (X+Y)_x
                 den_mat_for_fock_xpy_x_real = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xpy_x_real.set_values(x_plus_y_ao[x].real)
@@ -794,18 +786,18 @@ class PolarizabilityGradient:
                 den_mat_for_fock_xpy_y_imag.set_values(x_plus_y_ao[y].imag)
                 # (X+Y)_x - (X+Y)_x
                 den_mat_for_fock_xpy_m_xpyT_x_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_x_real.set_values( (x_plus_y_ao[x]
-                                                        - x_plus_y_ao[x].T).real )
+                den_mat_for_fock_xpy_m_xpyT_x_real.set_values((x_plus_y_ao[x]
+                                                               - x_plus_y_ao[x].T).real)
                 den_mat_for_fock_xpy_m_xpyT_x_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_x_imag.set_values( (x_plus_y_ao[x]
-                                                        - x_plus_y_ao[x].T).imag )
+                den_mat_for_fock_xpy_m_xpyT_x_imag.set_values((x_plus_y_ao[x]
+                                                               - x_plus_y_ao[x].T).imag)
                 # (X+Y)_y - (X+Y)_y
                 den_mat_for_fock_xpy_m_xpyT_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y_real.set_values( (x_plus_y_ao[y]
-                                                        - x_plus_y_ao[y].T).real )
+                den_mat_for_fock_xpy_m_xpyT_y_real.set_values((x_plus_y_ao[y]
+                                                               - x_plus_y_ao[y].T).real)
                 den_mat_for_fock_xpy_m_xpyT_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xpy_m_xpyT_y_imag.set_values( (x_plus_y_ao[y]
-                                                        - x_plus_y_ao[y].T).imag )
+                den_mat_for_fock_xpy_m_xpyT_y_imag.set_values((x_plus_y_ao[y]
+                                                               - x_plus_y_ao[y].T).imag)
                 # (X-Y)_x
                 den_mat_for_fock_xmy_x_real = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xmy_x_real.set_values(x_minus_y_ao[x].real)
@@ -818,168 +810,184 @@ class PolarizabilityGradient:
                 den_mat_for_fock_xmy_y_imag.set_values(x_minus_y_ao[y].imag)
                 # (X-Y)_x + (X-Y)_x
                 den_mat_for_fock_xmy_p_xmyT_x_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_x_real.set_values( (x_minus_y_ao[x]
-                                                        + x_minus_y_ao[x].T).real)
+                den_mat_for_fock_xmy_p_xmyT_x_real.set_values((x_minus_y_ao[x]
+                                                               + x_minus_y_ao[x].T).real)
                 den_mat_for_fock_xmy_p_xmyT_x_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_x_imag.set_values( (x_minus_y_ao[x]
-                                                        + x_minus_y_ao[x].T).imag)
+                den_mat_for_fock_xmy_p_xmyT_x_imag.set_values((x_minus_y_ao[x]
+                                                               + x_minus_y_ao[x].T).imag)
                 # (X-Y)_y + (X-Y)_y
                 den_mat_for_fock_xmy_p_xmyT_y_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y_real.set_values( (x_minus_y_ao[y]
-                                                        + x_minus_y_ao[y].T).real)
+                den_mat_for_fock_xmy_p_xmyT_y_real.set_values((x_minus_y_ao[y]
+                                                               + x_minus_y_ao[y].T).real)
                 den_mat_for_fock_xmy_p_xmyT_y_imag = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_y_imag.set_values( (x_minus_y_ao[y]
-                                                        + x_minus_y_ao[y].T).imag)
+                den_mat_for_fock_xmy_p_xmyT_y_imag.set_values((x_minus_y_ao[y]
+                                                               + x_minus_y_ao[y].T).imag)
                 # contraction of integrals and DMs
                 # Re
-                erigrad_rel_re = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_gs,
-                                             den_mat_for_fock_rel_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                erigrad_rel_re = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                       den_mat_for_fock_gs,
+                                                       den_mat_for_fock_rel_real,
+                                                       iatom, fock_type,
+                                                       exchange_scaling_factor,
+                                                       0.0, thresh_int)
                 # Im
-                erigrad_rel_im = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_gs,
-                                             den_mat_for_fock_rel_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                erigrad_rel_im = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                       den_mat_for_fock_gs,
+                                                       den_mat_for_fock_rel_imag,
+                                                       iatom, fock_type,
+                                                       exchange_scaling_factor,
+                                                       0.0, thresh_int)
                 # ReRe
                 erigrad_xpy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_x_real,
-                                             den_mat_for_fock_xpy_m_xpyT_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_x_real,
+                                                            den_mat_for_fock_xpy_m_xpyT_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImIm
                 erigrad_xpy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_x_imag,
-                                             den_mat_for_fock_xpy_m_xpyT_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_x_imag,
+                                                            den_mat_for_fock_xpy_m_xpyT_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ReIm
                 erigrad_xpy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_x_real,
-                                             den_mat_for_fock_xpy_m_xpyT_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_x_real,
+                                                            den_mat_for_fock_xpy_m_xpyT_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImRe
                 erigrad_xpy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_x_imag,
-                                             den_mat_for_fock_xpy_m_xpyT_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_x_imag,
+                                                            den_mat_for_fock_xpy_m_xpyT_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ReRe
                 erigrad_xpy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_m_xpyT_x_real,
-                                             den_mat_for_fock_xpy_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_m_xpyT_x_real,
+                                                            den_mat_for_fock_xpy_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImIm
                 erigrad_xpy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_m_xpyT_x_imag,
-                                             den_mat_for_fock_xpy_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_m_xpyT_x_imag,
+                                                            den_mat_for_fock_xpy_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ReIm
                 erigrad_xpy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_m_xpyT_x_real,
-                                             den_mat_for_fock_xpy_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_m_xpyT_x_real,
+                                                            den_mat_for_fock_xpy_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImRe
                 erigrad_xpy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xpy_m_xpyT_x_imag,
-                                             den_mat_for_fock_xpy_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xpy_m_xpyT_x_imag,
+                                                            den_mat_for_fock_xpy_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ReRe
                 erigrad_xmy_xy_rere = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_x_real,
-                                             den_mat_for_fock_xmy_p_xmyT_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_x_real,
+                                                            den_mat_for_fock_xmy_p_xmyT_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImIm
                 erigrad_xmy_xy_imim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_x_imag,
-                                             den_mat_for_fock_xmy_p_xmyT_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_x_imag,
+                                                            den_mat_for_fock_xmy_p_xmyT_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ReIm
                 erigrad_xmy_xy_reim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_x_real,
-                                             den_mat_for_fock_xmy_p_xmyT_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_x_real,
+                                                            den_mat_for_fock_xmy_p_xmyT_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImRe
                 erigrad_xmy_xy_imre = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_x_imag,
-                                             den_mat_for_fock_xmy_p_xmyT_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_x_imag,
+                                                            den_mat_for_fock_xmy_p_xmyT_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ReRe
                 erigrad_xmy_yx_rere = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_p_xmyT_x_real,
-                                             den_mat_for_fock_xmy_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_p_xmyT_x_real,
+                                                            den_mat_for_fock_xmy_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImIm
                 erigrad_xmy_yx_imim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_p_xmyT_x_imag,
-                                             den_mat_for_fock_xmy_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_p_xmyT_x_imag,
+                                                            den_mat_for_fock_xmy_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ReIm
                 erigrad_xmy_yx_reim = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_p_xmyT_x_real,
-                                             den_mat_for_fock_xmy_y_imag, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_p_xmyT_x_real,
+                                                            den_mat_for_fock_xmy_y_imag,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
                 # ImRe
                 erigrad_xmy_yx_imre = fock_grad_drv.compute(basis, screener_atom,
-                                             screener,
-                                             den_mat_for_fock_xmy_p_xmyT_x_imag,
-                                             den_mat_for_fock_xmy_y_real, iatom,
-                                             fock_type, exchange_scaling_factor,
-                                             0.0, thresh_int)
+                                                            screener,
+                                                            den_mat_for_fock_xmy_p_xmyT_x_imag,
+                                                            den_mat_for_fock_xmy_y_real,
+                                                            iatom, fock_type,
+                                                            exchange_scaling_factor,
+                                                            0.0, thresh_int)
 
                 # Real fmat contribution to gradient
-                erigrad_real = np.array(erigrad_rel_re) # real DM
-                erigrad_real += 0.5 * np.array(erigrad_xpy_xy_rere) # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xpy_xy_imim) # ImIm
-                erigrad_real += 0.5 * np.array(erigrad_xpy_yx_rere) # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xpy_yx_imim) # ImIm
-                erigrad_real += 0.5 * np.array(erigrad_xmy_xy_rere) # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xmy_xy_imim) # ImIm
-                erigrad_real += 0.5 * np.array(erigrad_xmy_yx_rere) # ReRe
-                erigrad_real -= 0.5 * np.array(erigrad_xmy_yx_imim) # ImIm
+                erigrad_real = np.array(erigrad_rel_re)  # real DM
+                erigrad_real += 0.5 * np.array(erigrad_xpy_xy_rere)  # ReRe
+                erigrad_real -= 0.5 * np.array(erigrad_xpy_xy_imim)  # ImIm
+                erigrad_real += 0.5 * np.array(erigrad_xpy_yx_rere)  # ReRe
+                erigrad_real -= 0.5 * np.array(erigrad_xpy_yx_imim)  # ImIm
+                erigrad_real += 0.5 * np.array(erigrad_xmy_xy_rere)  # ReRe
+                erigrad_real -= 0.5 * np.array(erigrad_xmy_xy_imim)  # ImIm
+                erigrad_real += 0.5 * np.array(erigrad_xmy_yx_rere)  # ReRe
+                erigrad_real -= 0.5 * np.array(erigrad_xmy_yx_imim)  # ImIm
                 erigrad_real *= factor
 
                 # Imaginary fmat contribution to gradient
                 erigrad_imag = np.array(erigrad_rel_im) # imag DM
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_reim) # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_imre) # ImRe
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_reim) # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_imre) # ImRe
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_reim) # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_imre) # ImRe
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_reim) # ReIm
-                erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_imre) # ImRe
+                erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_reim)  # ReIm
+                erigrad_imag += 0.5 * np.array(erigrad_xpy_xy_imre)  # ImRe
+                erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_reim)  # ReIm
+                erigrad_imag += 0.5 * np.array(erigrad_xpy_yx_imre)  # ImRe
+                erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_reim)  # ReIm
+                erigrad_imag += 0.5 * np.array(erigrad_xmy_xy_imre)  # ImRe
+                erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_reim)  # ReIm
+                erigrad_imag += 0.5 * np.array(erigrad_xmy_yx_imre)  # ImRe
                 erigrad_imag *= factor
 
                 # add to complex variable
@@ -1062,21 +1070,27 @@ class PolarizabilityGradient:
             The orbital response lambda vector.
         """
 
-        dof = len(self.vector_components)
-        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
-        dof_red = len(xy_pairs)
-
         if self.rank == mpi_master():
             mo = scf_tensors['C_alpha']  # only alpha part
             nocc = molecule.number_of_alpha_electrons()
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
+            del mo, mo_vir
+
+            dof = len(self.vector_components)
+            xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
+
+            lambda_ov = np.zeros((dof, dof, nocc * nvir),
+                                 dtype=self.grad_dt)
+        else:
+            dof_red = None
+            xy_pairs = None
+            lambda_ov = None
+
+        dof_red, xy_pairs = self.comm.bcast((dof_red, xy_pairs), root=mpi_master())
 
         if self.is_complex:
-            if self.rank == mpi_master():
-                lambda_ov = np.zeros((dof, dof, nocc * nvir), dtype = np.dtype('complex128'))
-            else:
-                lambda_ov = None
 
             for idx, xy in enumerate(xy_pairs):
                 tmp_lambda_re = lambda_list[
@@ -1090,23 +1104,19 @@ class PolarizabilityGradient:
 
                     lambda_ov[x, y] += tmp_lambda_re + 1j * tmp_lambda_im
 
-                    if (y != x):
+                    if y != x:
                         lambda_ov[y, x] += lambda_ov[x, y]
         else:
-            if self.rank == mpi_master():
-                lambda_ov = np.zeros((dof, dof, nocc * nvir))
-            else:
-                lambda_ov = None
-
             for idx, xy in enumerate(xy_pairs):
                 tmp_lambda_ov = lambda_list[dof_red * fdx + idx].get_full_vector()
 
                 if self.rank == mpi_master():
                     x = xy[0]
                     y = xy[1]
+
                     lambda_ov[x, y] += tmp_lambda_ov
 
-                    if (y != x):
+                    if y != x:
                         lambda_ov[y, x] += lambda_ov[x, y]
 
         return lambda_ov
@@ -1124,19 +1134,21 @@ class PolarizabilityGradient:
             The orbital response omega vector.
         """
 
-        dof = len(self.vector_components)
-        xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
-        dof_red = len(xy_pairs)
-
         if self.rank == mpi_master():
+            dof = len(self.vector_components)
+            xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
+            dof_red = len(xy_pairs)
             nao = basis.get_dimensions_of_basis()
 
-        if self.is_complex:
-            if self.rank == mpi_master():
-                omega_ao = np.zeros((dof, dof, nao * nao), dtype = np.dtype('complex128'))
-            else:
-                omega_ao = None
+            omega_ao = np.zeros((dof, dof, nao * nao), dtype=self.grad_dt)
+        else:
+            dof_red = None
+            xy_pairs = None
+            omega_ao = None
 
+        dof_red, xy_pairs = self.comm.bcast((dof_red, xy_pairs), root=mpi_master())
+
+        if self.is_complex:
             for idx, xy in enumerate(xy_pairs):
                 tmp_omega_re = omega_list[
                     2 * dof_red * fdx + idx].get_full_vector()
@@ -1149,14 +1161,9 @@ class PolarizabilityGradient:
 
                     omega_ao[x, y] += tmp_omega_re + 1j * tmp_omega_im
 
-                    if (y != x):
+                    if y != x:
                         omega_ao[y, x] += omega_ao[x, y]
         else:
-            if self.rank == mpi_master():
-                omega_ao = np.zeros((dof, dof, nao * nao))
-            else:
-                omega_ao = None
-
             for idx, xy in enumerate(xy_pairs):
                 tmp_omega_ao = omega_list[dof_red * fdx + idx].get_full_vector()
 
@@ -1165,7 +1172,7 @@ class PolarizabilityGradient:
                     y = xy[1]
                     omega_ao[x, y] += tmp_omega_ao
 
-                    if (y != x):
+                    if y != x:
                         omega_ao[y, x] += omega_ao[x, y]
 
         return omega_ao
@@ -1199,10 +1206,7 @@ class PolarizabilityGradient:
         scf_drv.ostream.unmute()
         lr_drv.ostream.unmute()
 
-        if self.rank == mpi_master():
-            return num_polgradient
-        else:
-            return {}
+        return num_polgradient
 
     def set_lr_driver(self):
         """
@@ -1252,9 +1256,8 @@ class PolarizabilityGradient:
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on orbital response for {} frequencies: '.format(
-                len(self.frequencies))
-            valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
+            valstr = f'** Time spent on orbital response for {len(self.frequencies)} frequencies: '
+            valstr += f'{(tm.time() - orbrsp_start_time):.6f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1262,7 +1265,7 @@ class PolarizabilityGradient:
         return orbrsp_drv.cphf_results
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y_ao):
+                                   x_minus_y_ao):
         """
         Directs the calculation of the exchange-correlation contribution to the DFT
         polarizability gradient.
@@ -1294,7 +1297,7 @@ class PolarizabilityGradient:
         return xc_contrib
 
     def compute_polgrad_xc_contrib_real(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y_ao, xcfun_label):
+                                        x_minus_y_ao, xcfun_label):
         """
         Calculates the exchange-correlation contribution to the real
         polarizability gradient.
@@ -1355,7 +1358,7 @@ class PolarizabilityGradient:
         return xc_pol_gradient
 
     def compute_polgrad_xc_contrib_complex(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                    x_minus_y_ao, xcfun_label):
+                                           x_minus_y_ao, xcfun_label):
         """
         Calculates the exchange-correlation contribution to the complex
         polarizability gradient.
@@ -1381,7 +1384,7 @@ class PolarizabilityGradient:
         dof = len(self.vector_components)
         xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
 
-        # TODO change "m,n" to "x,y" for consistency
+        # FIXME change "m,n" to "x,y" for consistency
         for m in range(dof):
             for n in range(m, dof):
                 if self.rank == mpi_master():
@@ -1394,8 +1397,8 @@ class PolarizabilityGradient:
                     # symmetrize
                     x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y_ao[m] +
                                                           x_minus_y_ao[m].T)
-                    x_minus_y_sym_m_list_real = [ np.array(x_minus_y_sym_m.real) ]
-                    x_minus_y_sym_m_list_imag = [ np.array(x_minus_y_sym_m.imag) ]
+                    x_minus_y_sym_m_list_real = [np.array(x_minus_y_sym_m.real)]
+                    x_minus_y_sym_m_list_imag = [np.array(x_minus_y_sym_m.imag)]
 
                     x_minus_y_sym_n = np.sqrt(2) * 0.5 * (x_minus_y_ao[n] +
                                                           x_minus_y_ao[n].T)
@@ -1410,12 +1413,18 @@ class PolarizabilityGradient:
                     x_minus_y_sym_n_list_real = None
                     x_minus_y_sym_n_list_imag = None
 
-                rhow_dm_sym_list_real = self.comm.bcast(rhow_dm_sym_list_real, root=mpi_master())
-                rhow_dm_sym_list_imag = self.comm.bcast(rhow_dm_sym_list_imag, root=mpi_master())
-                x_minus_y_sym_m_list_real = self.comm.bcast(x_minus_y_sym_m_list_real, root=mpi_master())
-                x_minus_y_sym_m_list_imag = self.comm.bcast(x_minus_y_sym_m_list_imag, root=mpi_master())
-                x_minus_y_sym_n_list_real = self.comm.bcast(x_minus_y_sym_n_list_real, root=mpi_master())
-                x_minus_y_sym_n_list_imag = self.comm.bcast(x_minus_y_sym_n_list_imag, root=mpi_master())
+                rhow_dm_sym_list_real = self.comm.bcast(rhow_dm_sym_list_real,
+                                                        root=mpi_master())
+                rhow_dm_sym_list_imag = self.comm.bcast(rhow_dm_sym_list_imag,
+                                                        root=mpi_master())
+                x_minus_y_sym_m_list_real = self.comm.bcast(x_minus_y_sym_m_list_real,
+                                                            root=mpi_master())
+                x_minus_y_sym_m_list_imag = self.comm.bcast(x_minus_y_sym_m_list_imag,
+                                                            root=mpi_master())
+                x_minus_y_sym_n_list_real = self.comm.bcast(x_minus_y_sym_n_list_real,
+                                                            root=mpi_master())
+                x_minus_y_sym_n_list_imag = self.comm.bcast(x_minus_y_sym_n_list_imag,
+                                                            root=mpi_master())
 
                 polgrad_xcgrad = self.calculate_xc_mn_contrib_complex(
                     molecule, ao_basis, rhow_dm_sym_list_real,
@@ -1429,7 +1438,7 @@ class PolarizabilityGradient:
                 if self.rank == mpi_master():
                     xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                    if (n != m):
+                    if n != m:
                         xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
 
         return xc_pol_gradient
@@ -1527,29 +1536,29 @@ class PolarizabilityGradient:
             molecule, ao_basis, rhow_den_real, gs_density, gs_density, mol_grid,
             xcfun_label)
 
-        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReRe
+        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
             molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_fxc_gradient(  # ReRe
+        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ReRe
             molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReRe
+        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
             molecule, ao_basis, x_minus_y_den_real_m, x_minus_y_den_real_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real += 0.5*xcgrad_drv.integrate_kxc_gradient(  # ReRe
+        polgrad_xcgrad_real += 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ReRe
             molecule, ao_basis, x_minus_y_den_real_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
 
-        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImIm
+        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
             molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_fxc_gradient(  # ImIm
+        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_fxc_gradient(  # ImIm
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImIm
+        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
             molecule, ao_basis, x_minus_y_den_imag_m, x_minus_y_den_imag_n,
             gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad_real -= 0.5*xcgrad_drv.integrate_kxc_gradient(  # ImIm
+        polgrad_xcgrad_real -= 0.5 * xcgrad_drv.integrate_kxc_gradient(  # ImIm
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
 
@@ -1667,7 +1676,7 @@ class PolarizabilityGradient:
                 scf_drv.compute(new_mol, ao_basis)
                 lr_drv._is_converged = False
                 lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
-                                              scf_drv.scf_tensors)
+                                               scf_drv.scf_tensors)
 
                 coords[i, d] -= 2.0 * self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
@@ -1714,16 +1723,15 @@ class PolarizabilityGradient:
                                     ) / (12.0 * self.delta_h))
                 else:
                     for f, w in enumerate(self.frequencies):
-                        tmp_polgradient = np.zeros((3, 3, 3 * natm), dtype=self.grad_dt)
                         for aop, acomp in enumerate('xyz'):
                             for bop, bcomp in enumerate('xyz'):
                                 key = (acomp, bcomp, w)
                                 if self.rank == mpi_master():
                                     num_polgradient[f, aop, bop, 3 * i + d] = ((
-                                         lr_results_p1['response_functions'][key]
-                                         -
-                                         lr_results_m1['response_functions'][key]
-                                         ) / (2.0 * self.delta_h))
+                                        lr_results_p1['response_functions'][key]
+                                        -
+                                        lr_results_m1['response_functions'][key])
+                                        / (2.0 * self.delta_h))
 
         if self.rank == mpi_master():
 
@@ -1731,9 +1739,8 @@ class PolarizabilityGradient:
             for f, w in enumerate(self.frequencies):
                 polgrad_results[w] = num_polgradient[f]
 
-            valstr = '** Time spent on constructing the analytical gradient for '
-            valstr += '{:d} frequencies: {:.6f} sec **'.format(
-                n_freqs, tm.time() - loop_start_time)
+            valstr = '** Time spent on constructing the numerical gradient for '
+            valstr += f'{n_freqs:d} frequencies: {(tm.time() - loop_start_time):.6f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -1805,7 +1812,7 @@ class PolarizabilityGradient:
         if self.is_complex:
             cur_str += 'Complex '
             cur_str2 = 'Damping value                   : '
-            cur_str2 += '{:.4f} a.u.'.format(self.damping)
+            cur_str2 += f'{self.damping:.4f} a.u.'
         else:
             cur_str += 'Real '
         if self.numerical:
@@ -1816,7 +1823,7 @@ class PolarizabilityGradient:
             else:
                 cur_str3 += 'Symmetric Difference Quotient'
             cur_str4 = 'Finite Difference Step Size     : '
-            cur_str4 += '{:.4f} a.u.'.format(self.delta_h)
+            cur_str4 += f'{self.delta_h:.4f} a.u.'
         else:
             cur_str += 'Analytical'
 
@@ -1835,7 +1842,7 @@ class PolarizabilityGradient:
             self.ostream.print_header(cur_str.ljust(str_width))
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
-            cur_str = 'Molecular Grid Level            : {}'.format(grid_level)
+            cur_str = f'Molecular Grid Level            : {grid_level}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
@@ -1915,7 +1922,6 @@ class PolarizabilityGradient:
                                 row += grad_str + result + '\n'
                                 gradient_block += row
 
-
             self.ostream.print_block(gradient_block)
             self.ostream.print_blank()
             self.ostream.print_blank()
@@ -1942,9 +1948,9 @@ class PolarizabilityGradient:
 
         response_functions = lr_results.get('response_functions', None)
         keys = list(response_functions.keys())
-        is_complex_response = (type(response_functions[keys[0]]) == np.dtype('complex128'))
+        is_complex_response = response_functions[keys[0]].dtype is np.dtype('complex128')
 
-        if (is_complex_response != self.is_complex):
+        if is_complex_response != self.is_complex:
             error_text = 'Mismatch between LR results and polgrad settings!'
             error_text += 'One is complex, the other is not.'
             raise ValueError(error_text)
