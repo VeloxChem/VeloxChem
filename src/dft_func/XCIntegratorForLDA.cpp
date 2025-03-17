@@ -1172,62 +1172,17 @@ integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
             {
                 // compute partial contribution to Kxc matrix
 
-                omptimers[thread_id].start("Kxc matrix prep.");
-
                 auto rhow1a = rwdengridquad.gam(idensity);
 
                 auto rhow12a = rw2dengrid.alphaDensity(idensity);
 
                 auto rhow12b = rw2dengrid.betaDensity(idensity);
 
-                omptimers[thread_id].stop("Kxc matrix prep.");
+                auto partial_mat_Kxc = integratePartialKxcFockForLdaClosedShell(
+                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3, rhow1a, rhow12a, rhow12b,
+                    omptimers[thread_id]);
 
-                omptimers[thread_id].start("Kxc matrix G");
-
-                CDenseMatrix mat_G(aocount, grid_batch_size);
-
-                auto G_val = mat_G.values();
-
-                auto chi_val = mat_chi.values();
-
-                auto       ldafunc = omp_xcfuncs[thread_id].getFunctionalPointerToLdaComponent();
-                const auto dim     = &(ldafunc->dim);
-
-                for (int nu = 0; nu < aocount; nu++)
-                {
-                    auto nu_offset = nu * grid_batch_size;
-
-                    #pragma omp simd 
-                    for (int g = 0; g < grid_batch_size; g++)
-                    {
-                        // functional derivatives
-
-                        // first-order
-
-                        // second-order
-
-                        auto v2rho2_aa = v2rho2[dim->v2rho2 * g + 0];
-                        auto v2rho2_ab = v2rho2[dim->v2rho2 * g + 1];
-
-                        // third-order
-
-                        auto v3rho3_aaa = v3rho3[dim->v3rho3 * g + 0];
-                        auto v3rho3_aab = v3rho3[dim->v3rho3 * g + 1];
-                        auto v3rho3_abb = v3rho3[dim->v3rho3 * g + 2];
-
-                        G_val[nu_offset + g] = local_weights[g] *
-                                               ((v3rho3_aaa + 2.0 * v3rho3_aab + v3rho3_abb) * rhow1a[g] + v2rho2_aa * rhow12a[g] + v2rho2_ab * rhow12b[g]) *
-                                               chi_val[nu_offset + g];
-                    }
-                }
-
-                omptimers[thread_id].stop("Kxc matrix G");
-
-                omptimers[thread_id].start("Kxc matrix matmul");
-
-                auto partial_mat_Kxc = denblas::serialMultABt(mat_chi, mat_G);
-
-                omptimers[thread_id].stop("Kxc matrix matmul");
+                // accumulate partial Kxc
 
                 omptimers[thread_id].start("Kxc local matrix dist.");
 
@@ -1499,8 +1454,15 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
             {
                 // compute partial contribution to Kxc matrix
 
-                auto partial_mat_Kxc = integratePartialKxcFockForLda2ClosedShell(
-                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3, rwdengridcube, rw2dengrid, idensity, omptimers[thread_id]);
+                auto rhow1a = rwdengridcube.gam2(idensity);
+
+                auto rhow12a = rw2dengrid.alphaDensity(idensity);
+
+                auto rhow12b = rw2dengrid.betaDensity(idensity);
+
+                auto partial_mat_Kxc = integratePartialKxcFockForLdaClosedShell(
+                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3, rhow1a, rhow12a, rhow12b,
+                    omptimers[thread_id]);
 
                 // accumulate partial Kxc
 
@@ -1565,35 +1527,21 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 }
 
 auto
-integratePartialKxcFockForLda2ClosedShell(const CXCFunctional&     xcFunctional,
-                                          const double*            weights,
-                                          const CDenseMatrix&      gtoValues,
-                                          const double*            v2rho2,
-                                          const double*            v3rho3,
-                                          const CDensityGridCubic& rwDensityGridCubic,
-                                          const CDensityGrid&      rw2DensityGrid,
-                                          const int                iFock,
-                                          CMultiTimer&             timer) -> CDenseMatrix
+integratePartialKxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
+                                         const double*            weights,
+                                         const CDenseMatrix&      gtoValues,
+                                         const double*            v2rho2,
+                                         const double*            v3rho3,
+                                         const double*            rhow1a,
+                                         const double*            rhow12a,
+                                         const double*            rhow12b,
+                                         CMultiTimer&             timer) -> CDenseMatrix
 {
     const auto npoints = gtoValues.getNumberOfColumns();
-
-    timer.start("Kxc matrix prep.");
 
     // GTO values on grid points
 
     auto chi_val = gtoValues.values();
-
-    // pointers to perturbed density
-
-    auto rhow1a = rwDensityGridCubic.gam2(iFock);
-
-    auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
-
-    auto rhow12b = rw2DensityGrid.betaDensity(iFock);
-
-    timer.stop("Kxc matrix prep.");
-
-    // eq.(30), JCTC 2021, 17, 1512-1521
 
     timer.start("Kxc matrix G");
 

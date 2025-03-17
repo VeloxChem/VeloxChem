@@ -172,21 +172,21 @@ auto integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPoin
  @param gtoValues the GTO values on grid points.
  @param v2rho2 the 2nd-order functional derivative wrt density.
  @param v3rho3 the 3rd-order functional derivative wrt density.
- @param rwDensityGridCubic the products of one and two-time transformed densities on grid points.
- @param rw2DensityGrid the two-time transformed densities on grid points.
- @param iFock the index of the AO Fock matrix.
+ @param rhow1a ...
+ @param rhow12a ...
+ @param rhow12b ...
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
  */
-auto integratePartialKxcFockForLda2ClosedShell(const CXCFunctional&     xcFunctional,
-                                               const double*            weights,
-                                               const CDenseMatrix&      gtoValues,
-                                               const double*            v2rho2,
-                                               const double*            v3rho3,
-                                               const CDensityGridCubic& rwDensityGridCubic,
-                                               const CDensityGrid&      rw2DensityGrid,
-                                               const int                iFock,
-                                               CMultiTimer&             timer) -> CDenseMatrix;
+auto integratePartialKxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
+                                              const double*            weights,
+                                              const CDenseMatrix&      gtoValues,
+                                              const double*            v2rho2,
+                                              const double*            v3rho3,
+                                              const double*            rhow1a,
+                                              const double*            rhow12a,
+                                              const double*            rhow12b,
+                                              CMultiTimer&             timer) -> CDenseMatrix;
 
 /**
  Integrates LDA contribution to (fourth-order) closed-shell Lxc matrix.
