@@ -1079,6 +1079,11 @@ class SolvationBuilder:
             density = 786
             smiles_code = 'CC#N'
 
+        elif solvent == 'dmf':
+            mols_per_nm3 = 12.96
+            density = 944
+            smiles_code = 'CN(C)C=O'
+
         else:
             return None
 
