@@ -36,9 +36,8 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
-from .veloxchemlib import DispersionModel
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .veloxchemlib import xcfun
 from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
@@ -52,6 +51,7 @@ from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver
 from .firstorderprop import FirstOrderProperties
 from .cpcmdriver import CpcmDriver
+from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_libxc_reference
@@ -560,20 +560,6 @@ class ScfDriver:
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
 
-        # D4 dispersion correction
-        if self.dispersion:
-            if self.rank == mpi_master():
-                disp = DispersionModel()
-                xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
-                disp.compute(molecule, xc_label)
-                self._d4_energy = disp.get_energy()
-            else:
-                self._d4_energy = 0.0
-            self._d4_energy = self.comm.bcast(self._d4_energy,
-                                              root=mpi_master())
-        else:
-            self._d4_energy = 0.0
-
         # generate integration grid
         if self._dft:
             print_libxc_reference(self.xcfun, self.ostream)
@@ -591,6 +577,30 @@ class ScfDriver:
                 format(n_grid_points,
                        tm.time() - grid_t0))
             self.ostream.print_blank()
+
+        # D4 dispersion correction
+        if self.dispersion:
+            if self.rank == mpi_master():
+                disp = DispersionModel()
+                xc_label = self.xcfun.get_func_label() if self._dft else 'HF'
+                disp.compute(molecule, xc_label)
+                self._d4_energy = disp.get_energy()
+
+                dftd4_info = 'Using the D4 dispersion correction.'
+                self.ostream.print_info(dftd4_info)
+                self.ostream.print_blank()
+                for dftd4_ref in disp.get_references():
+                    self.ostream.print_reference(dftd4_ref)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+            else:
+                self._d4_energy = 0.0
+
+            self._d4_energy = self.comm.bcast(self._d4_energy,
+                                              root=mpi_master())
+        else:
+            self._d4_energy = 0.0
 
         # set up polarizable continuum model
         if self._cpcm:
@@ -771,7 +781,7 @@ class ScfDriver:
                         vdw_ene += 4.0 * epsilon_ij * (sigma_r_12 - sigma_r_6)
 
                 # kJ/mol to Hartree
-                vdw_ene /= (4.184 * hartree_in_kcalpermol())
+                vdw_ene /= hartree_in_kjpermol()
 
                 self._nuc_mm_energy += vdw_ene
 
@@ -2867,15 +2877,6 @@ class ScfDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
-
-        if self.dispersion:
-            valstr = '*** Reference for D4 dispersion correction: '
-            self.ostream.print_header(valstr.ljust(92))
-            valstr = 'E. Caldeweyher, S. Ehlert, A. Hansen, H. Neugebauer, '
-            valstr += 'S. Spicher, C. Bannwarth'
-            self.ostream.print_header(valstr.ljust(92))
-            valstr = 'and S. Grimme, J. Chem Phys, 2019, 150, 154122.'
-            self.ostream.print_header(valstr.ljust(92))
 
     def _write_final_hdf5(self, molecule, ao_basis):
         """

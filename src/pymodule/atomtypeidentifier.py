@@ -2117,7 +2117,6 @@ class AtomTypeIdentifier:
             for idx, at in enumerate(self.gaff_atom_types):
                 if at in [atom_type, swapped_atom_type]:
                     paths = gather_neighbors(idx)
-
                     path_types = [
                         tuple(self.gaff_atom_types[step]
                               for step in path)

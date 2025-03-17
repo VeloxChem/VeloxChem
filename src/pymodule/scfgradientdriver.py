@@ -32,15 +32,15 @@ from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
                            NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
-from .veloxchemlib import DispersionModel
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master, mat_t
 from .veloxchemlib import make_matrix
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .matrices import Matrices
 from .profiler import Profiler
 from .outputstream import OutputStream
+from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
 from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
@@ -452,7 +452,7 @@ class ScfGradientDriver(GradientDriver):
             if self.dispersion:
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
-                self.gradient += disp.get_gradient().to_numpy()
+                self.gradient += disp.get_gradient()
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
@@ -513,8 +513,7 @@ class ScfGradientDriver(GradientDriver):
                         vdw_grad[a] += -g * n_ij
 
                 # convert gradient to atomic unit
-                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                             bohr_in_angstrom())
+                vdw_grad /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
                 self.gradient += vdw_grad
 
@@ -761,7 +760,7 @@ class ScfGradientDriver(GradientDriver):
             if self.dispersion:
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
-                self.gradient += disp.get_gradient().to_numpy()
+                self.gradient += disp.get_gradient()
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
@@ -822,8 +821,7 @@ class ScfGradientDriver(GradientDriver):
                         vdw_grad[a] += -g * n_ij
 
                 # convert gradient to atomic unit
-                vdw_grad /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                             bohr_in_angstrom())
+                vdw_grad /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
                 self.gradient += vdw_grad
 

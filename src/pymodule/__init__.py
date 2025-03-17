@@ -51,7 +51,6 @@ from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
-from .veloxchemlib import DispersionModel
 from .veloxchemlib import XCMolecularGradient
 from .veloxchemlib import SubMatrix
 
@@ -70,7 +69,7 @@ from .veloxchemlib import available_pdft_functionals
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import hartree_in_kcalpermol
+from .veloxchemlib import hartree_in_kcalpermol, hartree_in_kjpermol
 from .veloxchemlib import hartree_in_wavenumber, hartree_in_wavenumbers
 from .veloxchemlib import dipole_in_debye
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -106,6 +105,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .dispersionmodel import DispersionModel
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -140,7 +140,7 @@ from .rsptpa import TPA
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
-from .loprop import LoPropDriver
+from .peforcefieldgenerator import PEForceFieldGenerator
 from .firstorderprop import FirstOrderProperties
 from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
@@ -152,7 +152,7 @@ from .tdhfhessiandriver import TdhfHessianDriver
 from .polorbitalresponse import PolOrbitalResponse
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
@@ -164,12 +164,20 @@ from .symmetryanalyzer import SymmetryAnalyzer
 from .solvationbuilder import SolvationBuilder
 from .solvationfepdriver import SolvationFepDriver
 from .openmmdynamics import OpenMMDynamics
-
-# impes functionalities
+from .evbdriver import EvbDriver
+from .evbffbuilder import EvbForceFieldBuilder
+from .evbsystembuilder import EvbSystemBuilder
+from .evbfepdriver import EvbFepDriver
+from .evbdataprocessing import EvbDataProcessing
+from .evbreporter import EvbReporter
 from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .atommapper import AtomMapper
+
+# for backward compatibility only
+from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

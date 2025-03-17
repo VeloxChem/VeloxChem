@@ -28,13 +28,17 @@ from io import StringIO
 import numpy as np
 import h5py
 import sys
+import scipy
 from .profiler import Profiler
 import multiprocessing as mp
 from mpi4py import MPI
 
+
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
+
+from .mmforcefieldgenerator import MMForceFieldGenerator
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -79,14 +83,14 @@ class InterpolationDatapoint:
         :param z_matrix: a list of tuples with atom indices (starting at 0)
         that define bonds, bond angles, and dihedral angles.
         """
-        if comm is None:
-            comm = MPI.COMM_WORLD
+        # if comm is None:
+        #     comm = MPI.COMM_WORLD
 
-        if ostream is None:
-            ostream = OutputStream(sys.stdout)
+        # if ostream is None:
+        #     ostream = OutputStream(sys.stdout)
 
-        self.comm = None
-        self.ostream = ostream
+        # self.comm = None
+        # self.ostream = ostream
 
         self.point_label = None
 
@@ -106,6 +110,7 @@ class InterpolationDatapoint:
         self.original_b_matrix = None
         self.b2_matrix = None
 
+        self.confidence_radius = None
         self.use_inverse_bond_length = True
         self.use_cosine_dihedral = False
         self.NAC = False
@@ -473,7 +478,6 @@ class InterpolationDatapoint:
         # vice-versa.
         self.calculate_b_matrix()
         self.calculate_b2_matrix()
-        self.ostream.flush()
         self.compute_internal_coordinates_values()
 
         # The gradient and Hessian are reset to None.
@@ -633,6 +637,13 @@ class InterpolationDatapoint:
                                    compression='gzip')
 
             assert_msg_critical(
+                self.confidence_radius is not None,
+                'InterpolationDatapoint: No confidence radius is defined.')
+            # write internal coordinates
+            full_label = label + "_confidence_radius"
+            h5f.create_dataset(full_label, data=np.float64(self.confidence_radius))
+
+            assert_msg_critical(
                 self.cartesian_coordinates is not None,
                 'InterpolationDatapoint: No Cartesian coordinates are defined.')
             # write Cartesian coordinates
@@ -689,6 +700,7 @@ class InterpolationDatapoint:
             hessian_label = label + "_hessian"
             coords_label = label + "_internal_coordinates"
             cart_coords_label = label + "_cartesian_coordinates"
+            confidence_radius_label = label + "_confidence_radius"
 
             z_matrix_bonds = label + '_bonds'
             z_matrix_angles = label + '_angles'
@@ -702,6 +714,7 @@ class InterpolationDatapoint:
             self.internal_hessian = np.array(h5f.get(hessian_label))
             self.internal_coordinates_values = np.array(h5f.get(coords_label))
             self.cartesian_coordinates = np.array(h5f.get(cart_coords_label))
+            self.confidence_radius = np.array(h5f.get(confidence_radius_label))
 
 
             z_matrix = []
@@ -736,5 +749,73 @@ class InterpolationDatapoint:
         distance_vector = (reference_coordinates - rotated_coordinates)
 
         return distance_vector
+    
+    def determine_trust_radius(self, molecule, interpolation_settings, dynamics_settings, label, key, allowed_deviation, symmetry_groups=[]):
+        from .imdatabasepointcollecter import IMDatabasePointCollecter
+        from scipy.stats import pearsonr
+        forcefield_generator = MMForceFieldGenerator()
+        dynamics_settings['trajectory_file'] = f'trajectory_single_point.pdb'
+        
+        forcefield_generator.create_topology(molecule)
+            
+        im_database_driver = IMDatabasePointCollecter()
+        im_database_driver.distance_thrsh = 0.1
+        im_database_driver.platform = 'CUDA'
+        im_database_driver.optimize = False
+        im_database_driver.system_from_molecule(molecule, self.z_matrix, forcefield_generator, solvent=dynamics_settings['solvent'], qm_atoms='all', trust_radius=True)  
+        desiered_point_density = 100
+
+        im_database_driver.density_around_data_point = [desiered_point_density, key]
+
+        im_database_driver.allowed_molecule_deviation = allowed_deviation
+       
+        im_database_driver.update_settings(dynamics_settings, interpolation_settings)
+        im_database_driver.expansion = False
+        im_database_driver.qm_data_points = [self]
+        im_database_driver.im_labels = [label]
+        im_database_driver.non_core_symmetry_groups = symmetry_groups
+        im_database_driver.run_qmmm()
+
+        # individual impes run objects
+        
+        self.molecules = im_database_driver.molecules
+
+        expansion_molecules = im_database_driver.expansion_molecules
+        
+        sorted_expansion_list = sorted(expansion_molecules, key=lambda x: x[1], reverse=True)
+        # Printing neatly
+        # Renaming molecules to "Molecule 1", "Molecule 2", etc.
+        sorted_data_with_labels = [(f"Molecule {i+1}", v1, v2, v3) for i, (mol, v1, v2, v3) in enumerate(sorted_expansion_list)]
+
+        # Printing neatly
+        print(f"{'Molecule':<15} {'delta E':<10} {'RMSD (distance)':<10} {'|r|':<10}")
+        print("="*50)
+        for molecule, value1, value2, value3 in sorted_data_with_labels:
+            print(f"{molecule:<15} {value1:<10.6f} {value2:<10.6f} {value3:<10.6f}")
+
+        # Extract the delta E (energy difference) and norm (|r|) values from the data
+        deltaE = [value1 for _, value1, _, _ in sorted_data_with_labels]
+        norm_distance = [value3 for _, _, _, value3 in sorted_data_with_labels]
+        if len(deltaE) > 1:
+            # Calculate Pearson correlation using scipy
+            corr_coef_scipy, p_value = pearsonr(deltaE, norm_distance)
+            print("Pearson correlation coefficient (scipy):", corr_coef_scipy)
+            print("p-value:", p_value)
+            
+            trust_radius = 0.5
+            if corr_coef_scipy <= 0:
+                trust_radius = 0.01
+            # Define boundaries:
+            else:
+                min_trust = 0.01  # trust radius when r=0
+                max_trust = 0.5   # trust radius when r=1
+                # Linear interpolation:
+                trust_radius = min_trust + corr_coef_scipy * (max_trust - min_trust)
+        else:
+            trust_radius = 0.5
+
+        print('Trust Radius', trust_radius)
+                
+        return trust_radius
 
 

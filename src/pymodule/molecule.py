@@ -400,9 +400,7 @@ def _Molecule_from_dict(mol_dict):
     assert_msg_critical(
         mol.check_multiplicity(),
         'Molecule: Incompatible multiplicity and number of electrons')
-    assert_msg_critical(
-        mol.check_proximity(0.1),
-        'Molecule: Corrupted geometry with closely located atoms')
+    assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
     return mol
 
@@ -435,6 +433,27 @@ def _Molecule_get_connectivity_matrix(self, factor=1.3):
                 connectivity_matrix[j, i] = 1
 
     return connectivity_matrix
+
+def _Molecule_identify_monovalent_elements(self):
+        """ Identifies monovalent elements, i.e. elements for which every atom is bonded
+        to at most one other atom for this system.
+
+        Returns:
+            mono_el:    A list of monovalent elements.
+        """
+        mono_el = []
+        con_matrix = self.get_connectivity_matrix()
+        for el, n_el in zip(*np.unique(self.get_labels(), return_counts=True)):
+            if n_el == 1:
+                continue
+            mono = True
+            for i in range(len(self.get_labels())):
+                if self.get_labels()[i] == el and np.sum(con_matrix[i]) > 1:
+                    mono = False
+                    break
+            if mono:
+                mono_el.append(el)
+        return mono_el
 
 
 def _Molecule_find_connected_atoms(self, atom_idx, connectivity_matrix=None):
@@ -1154,6 +1173,7 @@ Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.get_connectivity_matrix = _Molecule_get_connectivity_matrix
+Molecule.identify_monovalent_elements = _Molecule_identify_monovalent_elements
 Molecule.get_dihedral = _Molecule_get_dihedral
 Molecule.set_dihedral = _Molecule_set_dihedral
 Molecule.get_dihedral_in_degrees = _Molecule_get_dihedral_in_degrees

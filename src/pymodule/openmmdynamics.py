@@ -32,14 +32,13 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
+from .veloxchemlib import hartree_in_kjpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .solvationbuilder import SolvationBuilder
 from .xtbdriver import XtbDriver
-from .scfdriver import ScfDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
@@ -468,7 +467,7 @@ class OpenMMDynamics:
         if qm_atoms:
             self.set_qm_mm_system(phase, 
                                   ff_gen)
-            self.qm_stabilizer(ff_gen)
+            # self.qm_stabilizer(ff_gen)
         
         # Write the system to a xml file (for debugging purposes)
         with open(f'{filename}_system.xml', 'w') as f:
@@ -613,7 +612,7 @@ class OpenMMDynamics:
 
         # Generate or use an existing forcefield generator for the QM region
         if ff_gen_qm is None:
-            ff_gen_qm = ForceFieldGenerator()
+            ff_gen_qm = MMForceFieldGenerator()
             ff_gen_qm.create_topology(qm_molecule)
 
         # Determine qm_atoms based on the QM residue
@@ -695,7 +694,7 @@ class OpenMMDynamics:
         self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
 
         # Adding the stabilizer force to the QM region
-        self.qm_stabilizer(ff_gen_qm)
+        # self.qm_stabilizer(ff_gen_qm)
 
         # Save system to XML and PDB for inspection and reuse
         with open(f'{filename}_system.xml', 'w') as f:
@@ -1875,7 +1874,7 @@ class OpenMMDynamics:
         :param phase:
             Phase of the system ('gas', 'periodic').
         :param ff_gen:
-            ForceFieldGenerator object from VeloxChem.
+            MMForceFieldGenerator object from VeloxChem.
         """
 
         from openmm import NonbondedForce
@@ -2017,7 +2016,7 @@ class OpenMMDynamics:
         :param qm_atoms: 
             List of atom indices to be included in the QM region.
         :param ff_gen_qm: 
-            ForceFieldGenerator object from VeloxChem.
+            MMForceFieldGenerator object from VeloxChem.
         """
 
 
@@ -2121,15 +2120,15 @@ class OpenMMDynamics:
 
         if self.basis is not None:
             basis = MolecularBasis.read(new_molecule, self.basis)
-            scf_result = self.qm_driver.compute(new_molecule, basis)
-            gradient = self.grad_driver.compute(new_molecule, basis, scf_result)
-            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+            scf_results = self.qm_driver.compute(new_molecule, basis)
+            gradient = self.grad_driver.compute(new_molecule, basis, scf_results)
+            potential_kjmol = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
         else:
             self.qm_driver.compute(new_molecule)
             if self.driver_flag != 'IM Driver':
                 self.grad_driver.compute(new_molecule)
-            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+            potential_kjmol = self.qm_driver.get_energy() * hartree_in_kjpermol()
             gradient = self.grad_driver.get_gradient()
 
         return gradient, potential_kjmol
@@ -2168,7 +2167,7 @@ class OpenMMDynamics:
             context: The OpenMM context object.
         """
 
-        conversion_factor = (4.184 * hartree_in_kcalpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
+        conversion_factor = (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
         new_positions = context.getState(getPositions=True).getPositions()
 
         # Update the forces of the QM region
@@ -2195,9 +2194,9 @@ class OpenMMDynamics:
             The potential energy of the QM region.
         """
         if self.basis is not None:
-            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kcalpermol() * 4.184
+            potential_energy = self.qm_driver.get_scf_energy() * hartree_in_kjpermol()
         else:
-            potential_energy = self.qm_driver.get_energy() * hartree_in_kcalpermol() * 4.184
+            potential_energy = self.qm_driver.get_energy() * hartree_in_kjpermol()
 
         return potential_energy
     
