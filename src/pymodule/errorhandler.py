@@ -98,6 +98,8 @@ def safe_solve(mat, b):
     """
 
     try:
-        return np.linalg.solve(mat, b)
+        sol = np.linalg.solve(mat, b)
     except np.linalg.LinAlgError:
-        return np.dot(np.linalg.pinv(mat), b)
+        sol = np.dot(np.linalg.pinv(mat), b)
+
+    return sol
