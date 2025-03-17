@@ -529,6 +529,9 @@ class ScfDriver:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_scf.h5'
+
         # check RI-J
         # for now, force DIIS for RI-J
         # TODO: double check
@@ -1691,6 +1694,7 @@ class ScfDriver:
                     'scf_type': self.scf_type,
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
+                    'filename': self.filename,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -3025,17 +3029,11 @@ class ScfDriver:
             The AO basis set.
         """
 
-        if self.checkpoint_file is None:
+        if self.filename is None:
             return
 
         # Final hdf5 file to save scf results
-        if self.checkpoint_file.endswith('_scf.h5'):
-            final_h5_fname = self.checkpoint_file[:-len('_scf.h5')] + '.h5'
-        else:
-            # TODO: reconsider the file name in this case
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            final_h5_fname = str(fpath) + '_results.h5'
+        final_h5_fname = f'{self.filename}.h5'
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
