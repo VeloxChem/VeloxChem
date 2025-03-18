@@ -45,6 +45,7 @@
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "Prescreener.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 #include "XCFunctional.hpp"
 
 namespace xchessgga {  // xchessgga namespace
@@ -382,11 +383,11 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F = denblas::serialMultAB(gs_sub_dens_mat, mat_chi);
+            auto mat_F = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi);
 
-            auto mat_F_x = denblas::serialMultAB(gs_sub_dens_mat, mat_chi_x);
-            auto mat_F_y = denblas::serialMultAB(gs_sub_dens_mat, mat_chi_y);
-            auto mat_F_z = denblas::serialMultAB(gs_sub_dens_mat, mat_chi_z);
+            auto mat_F_x = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi_x);
+            auto mat_F_y = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi_y);
+            auto mat_F_z = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi_z);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
@@ -1515,17 +1516,17 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                 }
             }
 
-            auto vxc_gx = denblas::serialMultABt(mat_atomvec_chi_x[vecind], vxc_w);
-            auto vxc_gy = denblas::serialMultABt(mat_atomvec_chi_y[vecind], vxc_w);
-            auto vxc_gz = denblas::serialMultABt(mat_atomvec_chi_z[vecind], vxc_w);
+            auto vxc_gx = sdenblas::serialMultABt(mat_atomvec_chi_x[vecind], vxc_w);
+            auto vxc_gy = sdenblas::serialMultABt(mat_atomvec_chi_y[vecind], vxc_w);
+            auto vxc_gz = sdenblas::serialMultABt(mat_atomvec_chi_z[vecind], vxc_w);
 
-            auto vxc_gx_2 = denblas::serialMultABt(mat_chi, vxc_wx);
-            auto vxc_gy_2 = denblas::serialMultABt(mat_chi, vxc_wy);
-            auto vxc_gz_2 = denblas::serialMultABt(mat_chi, vxc_wz);
+            auto vxc_gx_2 = sdenblas::serialMultABt(mat_chi, vxc_wx);
+            auto vxc_gy_2 = sdenblas::serialMultABt(mat_chi, vxc_wy);
+            auto vxc_gz_2 = sdenblas::serialMultABt(mat_chi, vxc_wz);
 
-            denblas::serialInPlaceAddAB(vxc_gx, vxc_gx_2);
-            denblas::serialInPlaceAddAB(vxc_gy, vxc_gy_2);
-            denblas::serialInPlaceAddAB(vxc_gz, vxc_gz_2);
+            sdenblas::serialInPlaceAddAB(vxc_gx, vxc_gx_2);
+            sdenblas::serialInPlaceAddAB(vxc_gy, vxc_gy_2);
+            sdenblas::serialInPlaceAddAB(vxc_gz, vxc_gz_2);
 
             vxc_gx.symmetrizeAndScale(0.5);
             vxc_gy.symmetrizeAndScale(0.5);

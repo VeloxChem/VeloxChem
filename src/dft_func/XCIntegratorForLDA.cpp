@@ -32,7 +32,6 @@
 #include <iomanip>
 #include <sstream>
 
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
@@ -42,6 +41,7 @@
 #include "MathFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 #include "StringFormat.hpp"
 
 namespace xcintlda {  // xcintlda namespace
@@ -266,14 +266,14 @@ integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Vxc matmul");
 
-            auto partial_mat_Vxc = denblas::serialMultABt(mat_chi, mat_G);
+            auto partial_mat_Vxc = sdenblas::serialMultABt(mat_chi, mat_G);
 
             omptimers[thread_id].stop("Vxc matmul");
 
             omptimers[thread_id].start("Vxc local matrix dist.");
 
 #pragma omp critical
-            denblas::serialInPlaceAddAB(sum_partial_mat_Vxc, partial_mat_Vxc);
+            sdenblas::serialInPlaceAddAB(sum_partial_mat_Vxc, partial_mat_Vxc);
 
             omptimers[thread_id].stop("Vxc local matrix dist.");
 
@@ -554,8 +554,8 @@ integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Vxc matmul");
 
-            auto partial_mat_Vxc_a = denblas::serialMultABt(mat_chi, mat_G_a);
-            auto partial_mat_Vxc_b = denblas::serialMultABt(mat_chi, mat_G_b);
+            auto partial_mat_Vxc_a = sdenblas::serialMultABt(mat_chi, mat_G_a);
+            auto partial_mat_Vxc_b = sdenblas::serialMultABt(mat_chi, mat_G_b);
 
             omptimers[thread_id].stop("Vxc matmul");
 
@@ -563,8 +563,8 @@ integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
 
 #pragma omp critical
             {
-                denblas::serialInPlaceAddAB(sum_partial_mat_Vxc_a, partial_mat_Vxc_a);
-                denblas::serialInPlaceAddAB(sum_partial_mat_Vxc_b, partial_mat_Vxc_b);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Vxc_a, partial_mat_Vxc_a);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Vxc_b, partial_mat_Vxc_b);
             }
 
             omptimers[thread_id].stop("Vxc local matrix dist.");
@@ -861,14 +861,14 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
 
                 omptimers[thread_id].start("Fxc matrix matmul");
 
-                auto partial_mat_Fxc = denblas::serialMultABt(mat_chi, mat_G);
+                auto partial_mat_Fxc = sdenblas::serialMultABt(mat_chi, mat_G);
 
                 omptimers[thread_id].stop("Fxc matrix matmul");
 
                 omptimers[thread_id].start("Fxc local matrix dist.");
 
 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Fxc[idensity], partial_mat_Fxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Fxc[idensity], partial_mat_Fxc);
 
                 omptimers[thread_id].stop("Fxc local matrix dist.");
             }
@@ -1140,7 +1140,7 @@ integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
                 omptimers[thread_id].start("Kxc local matrix dist.");
 
                 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
 
                 omptimers[thread_id].stop("Kxc local matrix dist.");
             }
@@ -1425,7 +1425,7 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
                 omptimers[thread_id].start("Kxc local matrix dist.");
 
                 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
 
                 omptimers[thread_id].stop("Kxc local matrix dist.");
             }
@@ -1442,7 +1442,7 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
                 omptimers[thread_id].start("Lxc local matrix dist.");
 
                 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Lxc[idensity], partial_mat_Lxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Lxc[idensity], partial_mat_Lxc);
 
                 omptimers[thread_id].stop("Lxc local matrix dist.");
             }
@@ -1550,7 +1550,7 @@ integratePartialKxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
 
     timer.start("Kxc matrix matmul");
 
-    auto mat_Kxc = denblas::serialMultABt(gtoValues, mat_G);
+    auto mat_Kxc = sdenblas::serialMultABt(gtoValues, mat_G);
 
     timer.stop("Kxc matrix matmul");
 
@@ -1643,7 +1643,7 @@ integratePartialLxcFockForLdaClosedShell(const CXCFunctional&     xcFunctional,
 
     timer.start("Lxc matrix matmul");
 
-    auto mat_Lxc = denblas::serialMultABt(gtoValues, mat_G);
+    auto mat_Lxc = sdenblas::serialMultABt(gtoValues, mat_G);
 
     timer.stop("Lxc matrix matmul");
 

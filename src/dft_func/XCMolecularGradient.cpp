@@ -34,7 +34,6 @@
 #include <sstream>
 
 #include "AODensityMatrix.hpp"
-#include "DenseLinearAlgebra.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"

@@ -32,7 +32,6 @@
 #include <iomanip>
 #include <sstream>
 
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"

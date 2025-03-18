@@ -26,7 +26,6 @@
 #define DensityGridGenerator_hpp
 
 #include "AODensityMatrix.hpp"
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
 #include "MultiTimer.hpp"

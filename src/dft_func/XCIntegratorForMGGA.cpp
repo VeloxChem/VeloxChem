@@ -32,7 +32,6 @@
 #include <iomanip>
 #include <sstream>
 
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
@@ -42,6 +41,7 @@
 #include "MathFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 #include "StringFormat.hpp"
 
 namespace xcintmgga {  // xcintmgga namespace
@@ -331,16 +331,16 @@ integrateVxcFockForMetaGgaClosedShell(const CMolecule&                  molecule
             omptimers[thread_id].start("Vxc matmul and symm.");
 
             // LDA and GGA contribution
-            auto partial_mat_Vxc = denblas::serialMultABt(mat_chi, denblas::serialAddAB(mat_G, mat_G_gga, 2.0));
+            auto partial_mat_Vxc = sdenblas::serialMultABt(mat_chi, sdenblas::serialAddAB(mat_G, mat_G_gga, 2.0));
 
             // tau contribution
-            auto partial_mat_Vxc_x = denblas::serialMultABt(mat_chi_x, mat_G_gga_x);
-            auto partial_mat_Vxc_y = denblas::serialMultABt(mat_chi_y, mat_G_gga_y);
-            auto partial_mat_Vxc_z = denblas::serialMultABt(mat_chi_z, mat_G_gga_z);
+            auto partial_mat_Vxc_x = sdenblas::serialMultABt(mat_chi_x, mat_G_gga_x);
+            auto partial_mat_Vxc_y = sdenblas::serialMultABt(mat_chi_y, mat_G_gga_y);
+            auto partial_mat_Vxc_z = sdenblas::serialMultABt(mat_chi_z, mat_G_gga_z);
 
-            denblas::serialInPlaceAddAB(partial_mat_Vxc, partial_mat_Vxc_x, 0.5);
-            denblas::serialInPlaceAddAB(partial_mat_Vxc, partial_mat_Vxc_y, 0.5);
-            denblas::serialInPlaceAddAB(partial_mat_Vxc, partial_mat_Vxc_z, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc, partial_mat_Vxc_x, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc, partial_mat_Vxc_y, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc, partial_mat_Vxc_z, 0.5);
 
             partial_mat_Vxc.symmetrizeAndScale(0.5);
 
@@ -349,7 +349,7 @@ integrateVxcFockForMetaGgaClosedShell(const CMolecule&                  molecule
             omptimers[thread_id].start("Vxc local matrix dist.");
 
 #pragma omp critical
-            denblas::serialInPlaceAddAB(sum_partial_mat_Vxc, partial_mat_Vxc);
+            sdenblas::serialInPlaceAddAB(sum_partial_mat_Vxc, partial_mat_Vxc);
 
             omptimers[thread_id].stop("Vxc local matrix dist.");
 
@@ -715,25 +715,25 @@ integrateVxcFockForMetaGgaOpenShell(const CMolecule&                  molecule,
             omptimers[thread_id].start("Vxc matmul and symm.");
 
             // LDA and GGA contribution
-            auto partial_mat_Vxc_a = denblas::serialMultABt(mat_chi, denblas::serialAddAB(mat_G_a, mat_G_a_gga, 2.0));
-            auto partial_mat_Vxc_b = denblas::serialMultABt(mat_chi, denblas::serialAddAB(mat_G_b, mat_G_b_gga, 2.0));
+            auto partial_mat_Vxc_a = sdenblas::serialMultABt(mat_chi, sdenblas::serialAddAB(mat_G_a, mat_G_a_gga, 2.0));
+            auto partial_mat_Vxc_b = sdenblas::serialMultABt(mat_chi, sdenblas::serialAddAB(mat_G_b, mat_G_b_gga, 2.0));
 
             // tau contribution
-            auto partial_mat_Vxc_a_x = denblas::serialMultABt(mat_chi_x, mat_G_a_gga_x);
-            auto partial_mat_Vxc_a_y = denblas::serialMultABt(mat_chi_y, mat_G_a_gga_y);
-            auto partial_mat_Vxc_a_z = denblas::serialMultABt(mat_chi_z, mat_G_a_gga_z);
+            auto partial_mat_Vxc_a_x = sdenblas::serialMultABt(mat_chi_x, mat_G_a_gga_x);
+            auto partial_mat_Vxc_a_y = sdenblas::serialMultABt(mat_chi_y, mat_G_a_gga_y);
+            auto partial_mat_Vxc_a_z = sdenblas::serialMultABt(mat_chi_z, mat_G_a_gga_z);
 
-            auto partial_mat_Vxc_b_x = denblas::serialMultABt(mat_chi_x, mat_G_b_gga_x);
-            auto partial_mat_Vxc_b_y = denblas::serialMultABt(mat_chi_y, mat_G_b_gga_y);
-            auto partial_mat_Vxc_b_z = denblas::serialMultABt(mat_chi_z, mat_G_b_gga_z);
+            auto partial_mat_Vxc_b_x = sdenblas::serialMultABt(mat_chi_x, mat_G_b_gga_x);
+            auto partial_mat_Vxc_b_y = sdenblas::serialMultABt(mat_chi_y, mat_G_b_gga_y);
+            auto partial_mat_Vxc_b_z = sdenblas::serialMultABt(mat_chi_z, mat_G_b_gga_z);
 
-            denblas::serialInPlaceAddAB(partial_mat_Vxc_a, partial_mat_Vxc_a_x, 0.5);
-            denblas::serialInPlaceAddAB(partial_mat_Vxc_a, partial_mat_Vxc_a_y, 0.5);
-            denblas::serialInPlaceAddAB(partial_mat_Vxc_a, partial_mat_Vxc_a_z, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc_a, partial_mat_Vxc_a_x, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc_a, partial_mat_Vxc_a_y, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc_a, partial_mat_Vxc_a_z, 0.5);
 
-            denblas::serialInPlaceAddAB(partial_mat_Vxc_b, partial_mat_Vxc_b_x, 0.5);
-            denblas::serialInPlaceAddAB(partial_mat_Vxc_b, partial_mat_Vxc_b_y, 0.5);
-            denblas::serialInPlaceAddAB(partial_mat_Vxc_b, partial_mat_Vxc_b_z, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc_b, partial_mat_Vxc_b_x, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc_b, partial_mat_Vxc_b_y, 0.5);
+            sdenblas::serialInPlaceAddAB(partial_mat_Vxc_b, partial_mat_Vxc_b_z, 0.5);
 
             partial_mat_Vxc_a.symmetrizeAndScale(0.5);
             partial_mat_Vxc_b.symmetrizeAndScale(0.5);
@@ -744,8 +744,8 @@ integrateVxcFockForMetaGgaOpenShell(const CMolecule&                  molecule,
 
 #pragma omp critical
             {
-                denblas::serialInPlaceAddAB(sum_partial_mat_Vxc_a, partial_mat_Vxc_a);
-                denblas::serialInPlaceAddAB(sum_partial_mat_Vxc_b, partial_mat_Vxc_b);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Vxc_a, partial_mat_Vxc_a);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Vxc_b, partial_mat_Vxc_b);
             }
 
             omptimers[thread_id].stop("Vxc local matrix dist.");
@@ -1254,29 +1254,29 @@ integrateFxcFockForMetaGgaClosedShell(const std::vector<double*>&       aoFockPo
                 omptimers[thread_id].start("Fxc matmul and symm.");
 
                 // LDA and GGA contribution
-                auto partial_mat_Fxc = denblas::serialMultABt(mat_chi, mat_G);
+                auto partial_mat_Fxc = sdenblas::serialMultABt(mat_chi, mat_G);
 
-                auto partial_mat_Fxc_gga = denblas::serialMultABt(mat_chi, mat_G_gga);
+                auto partial_mat_Fxc_gga = sdenblas::serialMultABt(mat_chi, mat_G_gga);
 
                 partial_mat_Fxc_gga.symmetrize();  // (matrix + matrix.T)
 
-                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_gga, 1.0);
+                sdenblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_gga, 1.0);
 
                 // tau contribution
-                auto partial_mat_Fxc_x = denblas::serialMultABt(mat_chi_x, mat_G_gga_x);
-                auto partial_mat_Fxc_y = denblas::serialMultABt(mat_chi_y, mat_G_gga_y);
-                auto partial_mat_Fxc_z = denblas::serialMultABt(mat_chi_z, mat_G_gga_z);
+                auto partial_mat_Fxc_x = sdenblas::serialMultABt(mat_chi_x, mat_G_gga_x);
+                auto partial_mat_Fxc_y = sdenblas::serialMultABt(mat_chi_y, mat_G_gga_y);
+                auto partial_mat_Fxc_z = sdenblas::serialMultABt(mat_chi_z, mat_G_gga_z);
 
-                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_x, 0.5);
-                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_y, 0.5);
-                denblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_z, 0.5);
+                sdenblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_x, 0.5);
+                sdenblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_y, 0.5);
+                sdenblas::serialInPlaceAddAB(partial_mat_Fxc, partial_mat_Fxc_z, 0.5);
 
                 omptimers[thread_id].stop("Fxc matmul and symm.");
 
                 omptimers[thread_id].start("Fxc local matrix dist.");
 
 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Fxc[idensity], partial_mat_Fxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Fxc[idensity], partial_mat_Fxc);
 
                 omptimers[thread_id].stop("Fxc local matrix dist.");
             }
@@ -1753,7 +1753,7 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
                 omptimers[thread_id].start("Kxc local matrix dist.");
 
                 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
 
                 omptimers[thread_id].stop("Kxc local matrix dist.");
             }
@@ -2353,7 +2353,7 @@ integrateKxcLxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPoint
                 omptimers[thread_id].start("Kxc local matrix dist.");
 
                 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
 
                 omptimers[thread_id].stop("Kxc local matrix dist.");
             }
@@ -2445,7 +2445,7 @@ integrateKxcLxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPoint
                 omptimers[thread_id].start("Lxc local matrix dist.");
 
                 #pragma omp critical
-                denblas::serialInPlaceAddAB(sum_partial_mat_Lxc[idensity], partial_mat_Lxc);
+                sdenblas::serialInPlaceAddAB(sum_partial_mat_Lxc[idensity], partial_mat_Lxc);
 
                 omptimers[thread_id].stop("Lxc local matrix dist.");
             }
@@ -3116,22 +3116,22 @@ integratePartialKxcFockForMetaGgaClosedShell(const CXCFunctional&     xcFunction
     timer.start("Kxc matrix matmul");
 
     // LDA and GGA contribution
-    auto mat_Kxc = denblas::serialMultABt(gtoValues, mat_G);
+    auto mat_Kxc = sdenblas::serialMultABt(gtoValues, mat_G);
 
-    auto mat_Kxc_gga = denblas::serialMultABt(gtoValues, mat_G_gga);
+    auto mat_Kxc_gga = sdenblas::serialMultABt(gtoValues, mat_G_gga);
 
     mat_Kxc_gga.symmetrize();  // (matrix + matrix.T)
 
-    denblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_gga);
+    sdenblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_gga);
 
     // tau contribution
-    auto mat_Kxc_x = denblas::serialMultABt(gtoValuesX, mat_G_gga_x);
-    auto mat_Kxc_y = denblas::serialMultABt(gtoValuesY, mat_G_gga_y);
-    auto mat_Kxc_z = denblas::serialMultABt(gtoValuesZ, mat_G_gga_z);
+    auto mat_Kxc_x = sdenblas::serialMultABt(gtoValuesX, mat_G_gga_x);
+    auto mat_Kxc_y = sdenblas::serialMultABt(gtoValuesY, mat_G_gga_y);
+    auto mat_Kxc_z = sdenblas::serialMultABt(gtoValuesZ, mat_G_gga_z);
 
-    denblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_x, 0.5);
-    denblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_y, 0.5);
-    denblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_z, 0.5);
+    sdenblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_x, 0.5);
+    sdenblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_y, 0.5);
+    sdenblas::serialInPlaceAddAB(mat_Kxc, mat_Kxc_z, 0.5);
 
     timer.stop("Kxc matrix matmul");
 
@@ -4971,22 +4971,22 @@ integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
     timer.start("Lxc matrix matmul");
 
     // LDA and GGA contribution
-    auto mat_Lxc = denblas::serialMultABt(gtoValues, mat_G);
+    auto mat_Lxc = sdenblas::serialMultABt(gtoValues, mat_G);
 
-    auto mat_Lxc_gga = denblas::serialMultABt(gtoValues, mat_G_gga);
+    auto mat_Lxc_gga = sdenblas::serialMultABt(gtoValues, mat_G_gga);
 
     mat_Lxc_gga.symmetrize();  // (matrix + matrix.T)
 
-    denblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_gga);
+    sdenblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_gga);
 
     // tau contribution
-    auto mat_Lxc_x = denblas::serialMultABt(gtoValuesX, mat_G_gga_x);
-    auto mat_Lxc_y = denblas::serialMultABt(gtoValuesY, mat_G_gga_y);
-    auto mat_Lxc_z = denblas::serialMultABt(gtoValuesZ, mat_G_gga_z);
+    auto mat_Lxc_x = sdenblas::serialMultABt(gtoValuesX, mat_G_gga_x);
+    auto mat_Lxc_y = sdenblas::serialMultABt(gtoValuesY, mat_G_gga_y);
+    auto mat_Lxc_z = sdenblas::serialMultABt(gtoValuesZ, mat_G_gga_z);
 
-    denblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_x, 0.5);
-    denblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_y, 0.5);
-    denblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_z, 0.5);
+    sdenblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_x, 0.5);
+    sdenblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_y, 0.5);
+    sdenblas::serialInPlaceAddAB(mat_Lxc, mat_Lxc_z, 0.5);
 
     timer.stop("Lxc matrix matmul");
 

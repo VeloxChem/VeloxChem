@@ -7,6 +7,7 @@ target_sources(vlxobjs
     Matrices.cpp
     Matrix.cpp
     MatrixFunc.cpp
+    SerialDenseLinearAlgebra.cpp
     SubMatrix.cpp
   )
 
