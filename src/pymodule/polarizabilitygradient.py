@@ -224,7 +224,7 @@ class PolarizabilityGradient:
                                                        scf_tensors, lr_results)
 
         if self.rank == mpi_master():
-            # self.print_geometry(molecule)
+
             if self.do_print_polgrad:
                 self.print_polarizability_gradient(molecule)
 
@@ -306,9 +306,8 @@ class PolarizabilityGradient:
         else:
             nocc = None
             nvir = None
-            n_freqs = None
 
-        nocc, nvir, n_freqs = self.comm.bcast((nocc, nvir, n_freqs), root=mpi_master())
+        nocc, nvir = self.comm.bcast((nocc, nvir), root=mpi_master())
 
         for f, w in enumerate(self.frequencies):
 
@@ -381,6 +380,8 @@ class PolarizabilityGradient:
                 # de-excitation part
                 x_plus_y_mo = exc_vec + deexc_vec
                 x_minus_y_mo = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
 
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
@@ -1357,9 +1358,16 @@ class PolarizabilityGradient:
             The XC-contribution to the polarizability gradient
         """
 
-        natm = molecule.number_of_atoms()
-        dof = len(self.vector_components)
-        xc_pol_gradient = np.zeros((dof, dof, natm, 3))
+        if self.rank == mpi_master():
+            natm = molecule.number_of_atoms()
+            dof = len(self.vector_components)
+            xc_pol_gradient = np.zeros((dof, dof, natm, 3))
+        else:
+            dof = None
+            xc_pol_gradient = None
+
+        dof = self.comm.bcast(dof, root=mpi_master())
+        xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         for m in range(dof):
             for n in range(m, dof):
@@ -1421,9 +1429,17 @@ class PolarizabilityGradient:
             The XC-contribution to the polarizability gradient
         """
 
-        natm = molecule.number_of_atoms()
-        dof = len(self.vector_components)
-        xc_pol_gradient = np.zeros((dof, dof, natm, 3), dtype=np.dtype('complex128'))
+        if self.rank == mpi_master():
+            natm = molecule.number_of_atoms()
+            dof = len(self.vector_components)
+            xc_pol_gradient = np.zeros((dof, dof, natm, 3),
+                                       dtype=np.dtype('complex128'))
+        else:
+            dof = None
+            xc_pol_gradient = None
+
+        dof = self.comm.bcast(dof, root=mpi_master())
+        xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         # FIXME change "m,n" to "x,y" for consistency
         for m in range(dof):
@@ -1487,8 +1503,9 @@ class PolarizabilityGradient:
 
         return xc_pol_gradient
 
-    def calculate_xc_mn_contrib_real(self, molecule, ao_basis, rhow_den, x_minus_y_den_m,
-                                     x_minus_y_den_n, gs_density, xcfun_label, profiler):
+    def calculate_xc_mn_contrib_real(self, molecule, ao_basis, rhow_den,
+                                     x_minus_y_den_m, x_minus_y_den_n,
+                                     gs_density, xcfun_label, profiler):
         """
         Calculates exchange-correlation contribution to the (m,n) component of
         the real polarizability gradient.
@@ -1863,7 +1880,6 @@ class PolarizabilityGradient:
                                         / (2.0 * self.delta_h))
 
         if self.rank == mpi_master():
-
             # convert array to dict
             for f, w in enumerate(self.frequencies):
                 polgrad_results[w] = num_polgradient[f]

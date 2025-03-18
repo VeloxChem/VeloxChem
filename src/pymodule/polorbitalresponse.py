@@ -277,6 +277,8 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
+                del exc_vec, deexc_vec
+
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
@@ -669,6 +671,8 @@ class PolOrbitalResponse(CphfSolver):
                 # de-excitation part
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
 
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
@@ -1127,7 +1131,7 @@ class PolOrbitalResponse(CphfSolver):
         :param scf_tensors:
             The tensors from the converged SCF calculation.
         :param x_minus_y:
-            The X-Y response vectors.
+            The X-Y response vectors in MO basis.
         """
 
         # degrees of freedom
@@ -1190,7 +1194,7 @@ class PolOrbitalResponse(CphfSolver):
                         [x_minus_y[x], dipole_ints_vv[y]])
                              + np.linalg.multi_dot(  # yib,xab->xyia
                                  [x_minus_y[y], dipole_ints_vv[x].T])))
-                
+
                 if y != x:
                     rhs_dipole_contrib[y, x] = rhs_dipole_contrib[x, y]
 
@@ -1467,8 +1471,8 @@ class PolOrbitalResponse(CphfSolver):
             # MO coefficients
             nocc = molecule.number_of_alpha_electrons()
             mo = scf_tensors['C_alpha']
-            mo_occ = mo[:, :nocc]
-            mo_vir = mo[:, nocc:]
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
 
             # number of atomic orbitals
@@ -1572,26 +1576,28 @@ class PolOrbitalResponse(CphfSolver):
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
-                x_plus_y = exc_vec + deexc_vec
-                x_minus_y = exc_vec - deexc_vec
+                x_plus_y_mo = exc_vec + deexc_vec
+                x_minus_y_mo = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
 
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
-                    for x in range(x_plus_y.shape[0])
+                    np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
+                    for x in range(x_plus_y_mo.shape[0])
                 ])
                 x_minus_y_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
-                    for x in range(x_minus_y.shape[0])
+                    np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
+                    for x in range(x_minus_y_mo.shape[0])
                 ])
 
                 # calculate the one-particle density matrices in MO
                 dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors,
-                                                   x_plus_y, x_minus_y)
+                                                   x_plus_y_mo, x_minus_y_mo)
 
                 # calculate dipole contribution to omega
                 omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
-                    molecule, basis, scf_tensors, x_minus_y)
+                    molecule, basis, scf_tensors, x_minus_y_mo)
 
                 # FIXME rename to lower-case
                 # calculate the density matrices, alpha block only
@@ -1603,7 +1609,10 @@ class PolOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
                     for xy in range(dof**2)
                 ])
+
                 cphf_ao_list = [cphf_ao[x] for x in range(dof**2)]
+
+                del x_plus_y_mo, x_minus_y_mo, cphf_ao
             else:
                 cphf_ao_list = None
 
@@ -1665,8 +1674,7 @@ class PolOrbitalResponse(CphfSolver):
                                        + omega_dipole_contrib_ao[m, n])
                         if self._dft:
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
-                                scf_tensors, fock_gxc_ao[2 * (m * dof + n)],
-                                D_occ)
+                                fock_gxc_ao[2 * (m * dof + n)], D_occ)
 
                             omega[m, n] += omega_gxc_contrib
 
@@ -1724,8 +1732,8 @@ class PolOrbitalResponse(CphfSolver):
             # MO coefficients
             nocc = molecule.number_of_alpha_electrons()
             mo = scf_tensors['C_alpha']
-            mo_occ = mo[:, :nocc]
-            mo_vir = mo[:, nocc:]
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
 
             # number of atomic orbitals
@@ -1775,6 +1783,7 @@ class PolOrbitalResponse(CphfSolver):
                 for idx, xy in enumerate(xy_pairs):
                     tmp_cphf_re = self.cphf_results['dist_cphf_ov'][
                         2 * dof_red * f + idx].get_full_vector()
+
                     tmp_cphf_im = self.cphf_results['dist_cphf_ov'][
                         2 * dof_red * f + dof_red + idx].get_full_vector()
 
@@ -1786,6 +1795,7 @@ class PolOrbitalResponse(CphfSolver):
 
                         if y != x:
                             cphf_ov[y, x] += cphf_ov[x, y]
+
                 del tmp_cphf_re, tmp_cphf_im
 
             if self.rank == mpi_master():
@@ -1808,7 +1818,8 @@ class PolOrbitalResponse(CphfSolver):
                 # get Lagrangian lambda multipliers
                 if not self.use_subspace_solver:
                     cphf_ov_red = all_cphf_red[f]
-                    cphf_ov = np.zeros((dof, dof, nocc * nvir), dtype=np.dtype('complex128'))
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir),
+                                       dtype=np.dtype('complex128'))
 
                     tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
 
@@ -1818,7 +1829,7 @@ class PolOrbitalResponse(CphfSolver):
 
                         cphf_ov[x, y] = tmp_cphf_ov[idx]
 
-                        if (y != x):
+                        if y != x:
                             cphf_ov[y, x] += cphf_ov[x, y]
                     del cphf_ov_red
 
@@ -1827,33 +1838,34 @@ class PolOrbitalResponse(CphfSolver):
                 # extract the excitation and de-excitation components
                 # from the full solution vector.
                 sqrt2 = np.sqrt(2.0)
-                exc_vec = (1.0 / sqrt2 *
-                           np.array(full_vec)[:, :nocc * nvir].reshape(
-                               dof, nocc, nvir))
-                deexc_vec = (1.0 / sqrt2 *
-                             np.array(full_vec)[:, nocc * nvir:].reshape(
-                                 dof, nocc, nvir))
+                exc_vec = (1.0 / sqrt2 * np.array(full_vec)[:, :nocc * nvir].reshape(
+                    dof, nocc, nvir))
+                deexc_vec = (1.0 / sqrt2 * np.array(full_vec)[:, nocc * nvir:].reshape(
+                    dof, nocc, nvir))
 
-                x_plus_y = exc_vec + deexc_vec
-                x_minus_y = exc_vec - deexc_vec
+                x_plus_y_mo = exc_vec + deexc_vec
+                x_minus_y_mo = exc_vec - deexc_vec
+
+                del exc_vec, deexc_vec
 
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
-                    for x in range(x_plus_y.shape[0])
+                    np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
+                    for x in range(x_plus_y_mo.shape[0])
                 ])
                 x_minus_y_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
-                    for x in range(x_minus_y.shape[0])
+                    np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
+                    for x in range(x_minus_y_mo.shape[0])
                 ])
 
                 # calculate the one-particle density matrices
                 dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors,
-                                                   x_plus_y, x_minus_y)
+                                                   x_plus_y_mo, x_minus_y_mo)
+
 
                 # calculate dipole contribution to omega
                 omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
-                    molecule, basis, scf_tensors, x_minus_y)
+                    molecule, basis, scf_tensors, x_minus_y_mo)
 
                 # calculate the density matrices, alpha block only
                 D_occ = np.matmul(mo_occ, mo_occ.T)
@@ -1869,6 +1881,8 @@ class PolOrbitalResponse(CphfSolver):
                     np.array([cphf_ao[x].real for x in range(dof**2)]))
                 cphf_ao_list_imag = list(
                     np.array([cphf_ao[x].imag for x in range(dof**2)]))
+
+                del x_plus_y_mo, x_minus_y_mo, cphf_ao
             else:
                 cphf_ao_list_real = None
                 cphf_ao_list_imag = None
@@ -1878,10 +1892,10 @@ class PolOrbitalResponse(CphfSolver):
 
             # TODO: what has to be on MPI master and what not?
             # TODO: use profiler
-            fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule,
-                               basis, eri_dict, dft_dict, pe_dict)
-            fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule,
-                               basis, eri_dict, dft_dict, pe_dict)
+            fock_cphf_real = self._comp_lr_fock(cphf_ao_list_real, molecule, basis,
+                                                eri_dict, dft_dict, pe_dict)
+            fock_cphf_imag = self._comp_lr_fock(cphf_ao_list_imag, molecule, basis,
+                                                eri_dict, dft_dict, pe_dict)
 
             # For now we:
             # - loop over indices m and n
@@ -2034,7 +2048,8 @@ class PolOrbitalResponse(CphfSolver):
             omega_dt = np.dtype('float64')
 
         # get dipole moment integrals
-        dipole_mats = compute_electric_dipole_integrals(molecule, basis, [0.0, 0.0, 0.0])
+        dipole_mats = compute_electric_dipole_integrals(molecule, basis,
+                                                        [0.0, 0.0, 0.0])
 
         dipole_ints_ao = np.zeros((dof, nao, nao))
         k = 0
@@ -2140,7 +2155,7 @@ class PolOrbitalResponse(CphfSolver):
 
         # construct epsilon density matrix
         epsilon_dm = np.zeros((dof, dof, nao, nao), dtype=epsilon_dt)
-        epsilon_lambda= np.zeros((dof, dof, nao, nao), dtype=epsilon_dt)
+        epsilon_lambda = np.zeros((dof, dof, nao, nao), dtype=epsilon_dt)
         for x in range(dof):
             for y in range(x, dof):
                 # mi,ii,xyij,nj->xymn
@@ -2257,13 +2272,11 @@ class PolOrbitalResponse(CphfSolver):
 
         return omega_1pdm_2pdm_contrib
 
-    def calculate_omega_gxc_contrib_real(self, scf_tensors, fock_gxc_ao_mn, D_occ):
+    def calculate_omega_gxc_contrib_real(self, fock_gxc_ao_mn, D_occ):
         """
         Calculates the contribution to the real omega multipliers from the
         DFT E[3] g^xc term.
 
-        :param scf_tensors:
-            The tensors from the SCF calculation.
         :param fock_gxc_ao_mn:
             The mn component of the integrated g^xc Fock matrix
         :param D_occ:
@@ -2273,11 +2286,7 @@ class PolOrbitalResponse(CphfSolver):
             The E[3] g^xc contribution to the omega multipliers.
         """
 
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        factor = -0.5
-        omega_gxc_contrib = factor * np.linalg.multi_dot([
+        omega_gxc_contrib = -0.5 * np.linalg.multi_dot([
             D_occ, fock_gxc_ao_mn, D_occ])
 
         return omega_gxc_contrib
