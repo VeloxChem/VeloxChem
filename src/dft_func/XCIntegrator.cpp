@@ -26,23 +26,17 @@
 
 #include <omp.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <iomanip>
-#include <sstream>
+#include <vector>
 
 #include "DenseMatrix.hpp"
-#include "DensityGridGenerator.hpp"
-#include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
-#include "MultiTimer.hpp"
 #include "Prescreener.hpp"
-#include "StringFormat.hpp"
 #include "XCIntegratorForGGA.hpp"
 #include "XCIntegratorForLDA.hpp"
 #include "XCIntegratorForMGGA.hpp"

@@ -46,6 +46,7 @@
 #include "GtoValues.hpp"
 #include "Prescreener.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
+#include "SerialDensityGridGenerator.hpp"
 #include "XCFunctional.hpp"
 
 namespace xchessgga {  // xchessgga namespace
@@ -341,7 +342,7 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
             auto wy = omp_weighted_vnabla_y[thread_id].data();
             auto wz = omp_weighted_vnabla_z[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             // generate density gradient grid
 

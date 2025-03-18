@@ -23,6 +23,7 @@ target_sources(vlxobjs
     MolecularGrid.cpp
     PartitionFunc.cpp
     Prescreener.cpp
+    SerialDensityGridGenerator.cpp
     XCComponent.cpp
     XCFunctional.cpp
     XCIntegrator.cpp

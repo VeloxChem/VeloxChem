@@ -33,7 +33,6 @@
 #include <sstream>
 
 #include "DenseMatrix.hpp"
-#include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
@@ -42,6 +41,7 @@
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
+#include "SerialDensityGridGenerator.hpp"
 #include "StringFormat.hpp"
 
 namespace xcintlda {  // xcintlda namespace
@@ -227,7 +227,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
             auto exc    = omp_exc_data[thread_id].data();
             auto vrho   = omp_vrho_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, sub_dens_mat);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -509,7 +509,7 @@ integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
             auto exc    = omp_exc_data[thread_id].data();
             auto vrho   = omp_vrho_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, sub_dens_mat_a, sub_dens_mat_b);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, sub_dens_mat_a, sub_dens_mat_b);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -797,7 +797,7 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
 
             auto v2rho2     = omp_v2rho2_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, sub_dens_mat);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -819,7 +819,7 @@ integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointe
             {
                 omptimers[thread_id].start("Generate density grid");
 
-                dengridgen::serialGenerateDensityForLDA(rhow, mat_chi, rw_sub_dens_mat_vec[idensity]);
+                sdengridgen::serialGenerateDensityForLDA(rhow, mat_chi, rw_sub_dens_mat_vec[idensity]);
 
                 omptimers[thread_id].stop("Generate density grid");
 
@@ -1078,13 +1078,13 @@ integrateKxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
             auto v2rho2     = omp_v2rho2_data[thread_id].data();
             auto v3rho3     = omp_v3rho3_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
 
             auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
 
-            auto rwdengrid = dengridgen::serialGenerateDensityGridForLDA(mat_chi, rw_sub_dens_mat, xcfuntype);
+            auto rwdengrid = sdengridgen::serialGenerateDensityGridForLDA(mat_chi, rw_sub_dens_mat, xcfuntype);
 
-            auto rw2dengrid = dengridgen::serialGenerateDensityGridForLDA(mat_chi, rw2_sub_dens_mat, xcfuntype);
+            auto rw2dengrid = sdengridgen::serialGenerateDensityGridForLDA(mat_chi, rw2_sub_dens_mat, xcfuntype);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -1359,15 +1359,15 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
             auto v3rho3 = omp_v3rho3_data[thread_id].data();
             auto v4rho4 = omp_v4rho4_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
 
             auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
 
-            auto rwdengrid = dengridgen::serialGenerateDensityGridForLDA(mat_chi, rw_sub_dens_mat, xcfuntype);
+            auto rwdengrid = sdengridgen::serialGenerateDensityGridForLDA(mat_chi, rw_sub_dens_mat, xcfuntype);
 
-            auto rw2dengrid = dengridgen::serialGenerateDensityGridForLDA(mat_chi, rw2_sub_dens_mat, xcfuntype);
+            auto rw2dengrid = sdengridgen::serialGenerateDensityGridForLDA(mat_chi, rw2_sub_dens_mat, xcfuntype);
 
-            auto rw3dengrid = dengridgen::serialGenerateDensityGridForLDA(mat_chi, rw3_sub_dens_mat, xcfuntype);
+            auto rw3dengrid = sdengridgen::serialGenerateDensityGridForLDA(mat_chi, rw3_sub_dens_mat, xcfuntype);
 
             // compute perturbed density
 

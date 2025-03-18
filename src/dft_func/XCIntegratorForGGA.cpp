@@ -34,7 +34,6 @@
 #include <iostream>
 
 #include "DenseMatrix.hpp"
-#include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
@@ -43,6 +42,7 @@
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
+#include "SerialDensityGridGenerator.hpp"
 #include "StringFormat.hpp"
 
 namespace xcintgga {  // xcintgga namespace
@@ -246,7 +246,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
             auto vrho   = omp_vrho_data[thread_id].data();
             auto vsigma = omp_vsigma_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -560,7 +560,7 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
             auto vrho   = omp_vrho_data[thread_id].data();
             auto vsigma = omp_vsigma_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_dens_mat_b);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_dens_mat_b);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -900,7 +900,7 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
             auto v2rhosigma = omp_v2rhosigma_data[thread_id].data();
             auto v2sigma2   = omp_v2sigma2_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -924,7 +924,7 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
             {
                 omptimers[thread_id].start("Generate density grid");
 
-                dengridgen::serialGenerateDensityForGGA(rhow, rhowgrad, nullptr, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat_vec[idensity]);
+                sdengridgen::serialGenerateDensityForGGA(rhow, rhowgrad, nullptr, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat_vec[idensity]);
 
                 omptimers[thread_id].stop("Generate density grid");
 
@@ -1295,14 +1295,14 @@ integrateKxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
 
             // generate density grid
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
 
-            auto rwdengrid = dengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat, xcfuntype);
+            auto rwdengrid = sdengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat, xcfuntype);
 
             auto rw2dengrid =
-                dengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw2_sub_dens_mat, xcfuntype);
+                sdengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw2_sub_dens_mat, xcfuntype);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -1660,18 +1660,18 @@ integrateKxcLxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
             auto v4rhosigma3  = omp_v4rhosigma3_data[thread_id].data();
             auto v4sigma4     = omp_v4sigma4_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
 
             auto rwdengrid =
-                dengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat, xcfuntype);
+                sdengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat, xcfuntype);
 
             auto rw2dengrid =
-                dengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw2_sub_dens_mat, xcfuntype);
+                sdengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw2_sub_dens_mat, xcfuntype);
 
             auto rw3dengrid =
-                dengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw3_sub_dens_mat, xcfuntype);
+                sdengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw3_sub_dens_mat, xcfuntype);
 
             omptimers[thread_id].stop("Generate density grid");
 
