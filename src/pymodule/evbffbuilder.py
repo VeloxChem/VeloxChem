@@ -99,29 +99,25 @@ class EvbForceFieldBuilder():
                     product_charge[i],
                     product_multiplicity[i],  # type:ignore
                     self.reparameterize,
-                    self.optimise
-                ))
+                    self.optimise))
 
         rea_elems = self.reactant.molecule.get_element_ids()
-        pro_elems = [
-            element_id
-            for pro_ff in products
-            for element_id in pro_ff.molecule.get_element_ids()
-        ]
+        pro_elems = [element_id for pro_ff in products for element_id in pro_ff.molecule.get_element_ids()]
 
         # Never merge the reactant forcefield generators, for these we actually need positions
         self.ostream.print_info("Creating combined product force field")
         self.ostream.flush()
         self.product = self._create_combined_forcefield(products)
-        
+
         if not ordered_input:
             self.ostream.print_info("Matching reactant and product force fields")
             self.ostream.flush()
-            self.product = self._match_reactant_and_product(self.reactant, rea_elems,self.product, pro_elems, breaking_bonds)
+            self.product = self._match_reactant_and_product(self.reactant, rea_elems, self.product, pro_elems,
+                                                            breaking_bonds)
         self.product.ostream.flush()
-        self._summarise_reaction(self.reactant, self.product)
-        
-        return self.reactant, self.product
+        formed_bonds, broken_bonds = self._summarise_reaction(self.reactant, self.product)
+
+        return self.reactant, self.product, formed_bonds, broken_bonds
 
     def get_forcefield(
         self,
@@ -155,12 +151,15 @@ class EvbForceFieldBuilder():
             forcefield = MMForceFieldGenerator()
 
             #Load or calculate the charges
-            
+
             if input["charges"] is not None:
-                assert len(input["charges"]) == molecule.number_of_atoms(), "The number of provided charges does not match the number of atoms in the molecule"
+                assert len(input["charges"]) == molecule.number_of_atoms(
+                ), "The number of provided charges does not match the number of atoms in the molecule"
                 charge_sum = sum(input["charges"])
                 if charge_sum - round(charge_sum) > 0.001:
-                    self.ostream.print_warning(f"Sum of charges is {charge_sum} is not close to an integer. Confirm that the input is correct.")  
+                    self.ostream.print_warning(
+                        f"Sum of charges is {charge_sum} is not close to an integer. Confirm that the input is correct."
+                    )
                 forcefield.partial_charges = input["charges"]
                 self.ostream.print_info("Creating topology")
                 self.ostream.flush()
@@ -184,11 +183,11 @@ class EvbForceFieldBuilder():
                     scf_drv.max_iter = 200
                     scf_results = scf_drv.compute(molecule, basis)
                 assert scf_drv.is_converged, f"SCF calculation for RESP charges did not converge, aborting"
-                
+
                 resp_drv = RespChargesDriver()
                 self.ostream.print_info("Calculating RESP charges")
                 self.ostream.flush()
-                forcefield.partial_charges = resp_drv.compute(molecule, basis,scf_results,'resp')
+                forcefield.partial_charges = resp_drv.compute(molecule, basis, scf_results, 'resp')
                 self.ostream.flush()
                 self.ostream.print_info("Creating topology")
                 forcefield.create_topology(molecule, basis, scf_results=scf_results)
@@ -203,18 +202,18 @@ class EvbForceFieldBuilder():
                     atom['epsilon'] = epsilon
                     atom['comment'] = "Reaction-water oxygen"
                 elif atom['type'] == 'hw':
-                    
+
                     sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
                     epsilon = 0.0047 * 4.184
                     atom['type'] = 'ho'
                     atom['sigma'] = sigma
                     atom['epsilon'] = epsilon
-                    atom['comment'] = "Reaction-water hydrogen"         
+                    atom['comment'] = "Reaction-water hydrogen"
 
             #Reparameterize the forcefield if necessary and requested
             if reparameterize:
                 self.ostream.print_info("Reparameterising force field.")
-                
+
                 if input["hessian"] is not None:
                     hessian = input["hessian"]
                 else:
@@ -236,7 +235,8 @@ class EvbForceFieldBuilder():
         pro_elems: list,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ) -> MMForceFieldGenerator:
-        assert len(reactant_ff.atoms) == len(product_ff.atoms), "The number of atoms in the reactant and product do not match"
+        assert len(reactant_ff.atoms) == len(
+            product_ff.atoms), "The number of atoms in the reactant and product do not match"
         # Turn the reactand and product into graphs
         rea_graph = nx.Graph()
         reactant_bonds = list(reactant_ff.bonds.keys())
@@ -255,7 +255,7 @@ class EvbForceFieldBuilder():
         pro_graph.add_edges_from(list(product_ff.bonds.keys()))
         for i, elem in enumerate(pro_elems):
             pro_graph.nodes[i]['elem'] = elem
-            
+
         rm = ReactionMatcher()
         total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
@@ -273,7 +273,7 @@ class EvbForceFieldBuilder():
         forcefield.dihedrals = {}
         forcefield.impropers = {}
         atom_count = 0
-        
+
         for product_ffgen in forcefields:
             # Shift all atom keys by the current atom count so that every atom has a unique ID
             shift = atom_count
@@ -285,12 +285,13 @@ class EvbForceFieldBuilder():
             forcefield.angles.update(product_ffgen.angles)
             forcefield.dihedrals.update(product_ffgen.dihedrals)
             forcefield.impropers.update(product_ffgen.impropers)
-            
+
         return forcefield
 
     # Remap indices in the forcefield to the new indices
     @staticmethod
-    def _apply_mapping_to_forcefield(forcefield: MMForceFieldGenerator, mapping: dict[int, int]) -> MMForceFieldGenerator:
+    def _apply_mapping_to_forcefield(forcefield: MMForceFieldGenerator, mapping: dict[int,
+                                                                                      int]) -> MMForceFieldGenerator:
         new_product_atoms = {}
         for atom_key in forcefield.atoms:
             key = mapping[atom_key]
@@ -341,7 +342,8 @@ class EvbForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1]
-            self.ostream.print_info(f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
+            self.ostream.print_info(
+                f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
 
         self.ostream.print_info(f"{len(formed_bonds)} forming bonds:")
         if len(formed_bonds) > 0:
@@ -353,7 +355,7 @@ class EvbForceFieldBuilder():
             reactant_type1 = reactant.atoms[bond_key[1]]["type"]
             product_type1 = product.atoms[bond_key[1]]["type"]
             id1 = bond_key[1]
-            self.ostream.print_info(f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
+            self.ostream.print_info(
+                f"{reactant_type0:<9}{product_type0:<9}{id0:<2} - {reactant_type1:<9}{product_type1:<9}{id1:<2}")
 
         return formed_bonds, broken_bonds
-        

@@ -416,6 +416,7 @@ class EvbDataProcessing:
                     dens_max = np.append(dens_max, np.max(dE_hist))
                 else:
                     dens_max = np.append(dens_max, 0)
+            #todo smooth the dens_max a little bit
             middle = len(dens_max) // 2
             dens_max = scipy.signal.savgol_filter(dens_max, 5, 3)
             min_inds = np.where(dens_max[:middle] < dens_threshold)[0]

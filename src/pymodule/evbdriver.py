@@ -889,18 +889,18 @@ class EvbDriver():
         sub_indices = l_sub_indices[::time_sub_sample]
 
         Lambda_frame = E_data[0, sub_indices]
-        E1_ref = E_data[1, sub_indices]
-        E2_ref = E_data[2, sub_indices]
-        E1_run = E_data[3, sub_indices]
-        E2_run = E_data[4, sub_indices]
+        E1_pes = E_data[1, sub_indices]
+        E2_pes = E_data[2, sub_indices]
+        E1_int = E_data[3, sub_indices]
+        E2_int = E_data[4, sub_indices]
         E_m = E_data[5, sub_indices]
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file, skiprows=1, delimiter=',').T[:, sub_indices]
 
         specific_result = {
-            "E1_ref": E1_ref,
-            "E2_ref": E2_ref,
-            "E1_run": E1_run,
-            "E2_run": E2_run,
+            "E1_ref": E1_pes,
+            "E2_ref": E2_pes,
+            "E1_run": E1_int,
+            "E2_run": E2_int,
             "E_m": E_m,
             "Ep": Ep,
             "Ek": Ek,
