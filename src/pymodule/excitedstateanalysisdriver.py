@@ -34,6 +34,7 @@ from .veloxchemlib import MolecularBasis
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .visualizationdriver import VisualizationDriver
+from .lreigensolver import LinearResponseEigenSolver
 
 
 class ExcitedStateAnalysisDriver:
@@ -110,14 +111,12 @@ class ExcitedStateAnalysisDriver:
 
         assert_msg_critical(self.fragment_dict is not None,
                             'fragment_dict not defined ')
-        if self._tda:
-            num_exc_states = len([rsp_tensors['eigenvalues']]) + 1
-        else:
-            num_exc_states = sum(
-                [1 for key in rsp_tensors if key.startswith('S')])
+
+        num_exc_states = len(rsp_tensors['eigenvalues'])
 
         assert_msg_critical(state_index <= num_exc_states,
                             'excited state not included in rsp calculation')
+
         ret_dict = {}
 
         self.print_header('Excited State Analysis.', state_index)
@@ -197,6 +196,40 @@ class ExcitedStateAnalysisDriver:
         self.ostream.flush()
 
         return ret_dict
+    
+    def read_from_h5(self, filename):
+        """
+        """
+        h5f = h5py.File(filename, "r")
+
+        scf_tensors = {}
+        rsp_tensors = {}
+        for key in h5f:
+            if key == "atom_coordinates":
+                scf_tensors[key] = np.array(h5f[key])
+            if key == "nuclear_charges":
+                scf_tensors[key] = np.array(h5f[key])
+            if key == "basis_set":
+                scf_tensors[key] = np.array(h5f[key])
+            if key == "scf":
+                scf_tensors_dict = dict(h5f.get(key))
+                for scf_key in scf_tensors_dict:
+                    scf_tensors[scf_key] = np.array(scf_tensors_dict[scf_key])
+            elif key == "rsp":
+                rsp_tensors_dict = dict(h5f.get(key))
+                for rsp_key in rsp_tensors_dict:
+                    rsp_tensors[rsp_key] = np.array(rsp_tensors_dict[rsp_key]) 
+        h5f.close()
+
+        return scf_tensors, rsp_tensors
+    
+    def format_rsp_tensors(self, rsp_tensors):
+        rsp_drv = LinearResponseEigenSolver()
+        num_states = len(rsp_tensors['eigenvectors_distributed'])
+        for i in range(num_states):
+            name = 'S'+str(i+1)
+            rsp_tensors[name] = rsp_drv.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][i])
+        return rsp_tensors
 
     def read_scf_checkpoint_file(self, fname):
         """
@@ -306,6 +339,9 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the TDM in MO and AO basis.
         """
 
+        if not any(key.startswith('S') for key in rsp_tensors.keys()):
+            rsp_tensors = self.format_rsp_tensors(rsp_tensors)
+
         nocc = molecule.number_of_alpha_electrons()
         norb = scf_tensors["C_alpha"].shape[1]
         nvirt = norb - nocc
@@ -349,6 +385,9 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the hole density matrix in MO and AO basis.
         """
 
+        if not any(key.startswith('S') for key in rsp_tensors.keys()):
+            rsp_tensors = self.format_rsp_tensors(rsp_tensors)
+
         nocc = molecule.number_of_alpha_electrons()
 
         tdens_mo, tdens_ao = self.compute_transition_density_matrix(
@@ -381,6 +420,9 @@ class ExcitedStateAnalysisDriver:
         :return:
             A tuple containing the particle density matrix in MO and AO basis.
         """
+
+        if not any(key.startswith('S') for key in rsp_tensors.keys()):
+            rsp_tensors = self.format_rsp_tensors(rsp_tensors)
 
         nocc = molecule.number_of_alpha_electrons()
 
