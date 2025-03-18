@@ -388,7 +388,6 @@ class PolarizabilityGradient:
                     np.linalg.multi_dot([mo_occ, x_minus_y_mo[x], mo_vir.T])
                     for x in range(dof)
                 ])
-                del x_plus_y_mo, x_minus_y_mo
 
                 gs_dm = scf_tensors['D_alpha']  # only alpha part
 
@@ -404,9 +403,14 @@ class PolarizabilityGradient:
 
                 # TODO compute unrel dm from dm_oo and dm_vv to save memory
                 # calculate relaxed density matrix
-                rel_dm_ao = orbrsp_results[w]['unrel_dm_ao'] + lambda_ao
+                unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
+                                                      x_plus_y_mo, x_minus_y_mo)
+                del x_plus_y_mo, x_minus_y_mo
 
-                del cphf_ov, lambda_ao
+                #rel_dm_ao = orbrsp_results[w]['unrel_dm_ao'] + lambda_ao
+                rel_dm_ao = unrel_dm_ao + lambda_ao
+
+                del cphf_ov, unrel_dm_ao, lambda_ao
             else:
                 gs_dm = None
                 x_plus_y_ao = None
@@ -1647,6 +1651,83 @@ class PolarizabilityGradient:
             fock_type = "2jk"
 
         return fock_type, exchange_scaling_factor
+
+    def calculate_unrel_dm(self, molecule, scf_tensors, x_plus_y_mo, x_minus_y_mo):
+        """
+        Calculates the symmetrized unrelaxed one-particle density matrix
+        in AO basis.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param x_plus_y_mo:
+            The X+Y response vectors in MO basis.
+        :param x_minus_y_mo:
+            The X-Y response vectors in MO basis.
+
+        :return unrel_dm_ao:
+            Unrelaxed one-particle density matrix in AO basis.
+        """
+
+        # degrees of freedom
+        dof = len(self.vector_components)
+
+        # MO coefficients
+        mo = scf_tensors['C_alpha']  # only alpha part
+        nocc = molecule.number_of_alpha_electrons()
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nvir = mo_vir.shape[1]
+
+        # number of AOs
+        nao = mo.shape[0]
+
+        # calculate the symmetrized unrelaxed one-particle density matrix
+        # in MO basis
+        dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=self.grad_dt)
+        dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=self.grad_dt)
+
+        for x in range(dof):
+            for y in range(x, dof):
+                dm_vv[x, y] = 0.25 * (
+                    # xib,yia->xyab
+                    np.linalg.multi_dot([x_plus_y_mo[y].T, x_plus_y_mo[x]])
+                    # xib,yia->xyab
+                    + np.linalg.multi_dot([x_minus_y_mo[y].T, x_minus_y_mo[x]])
+                    # yib,xia->xyab
+                    + np.linalg.multi_dot([x_plus_y_mo[x].T, x_plus_y_mo[y]])
+                    # yib,xia->xyab
+                    + np.linalg.multi_dot([x_minus_y_mo[x].T, x_minus_y_mo[y]]))
+
+                dm_oo[x, y] = -0.25 * (
+                    # xja,yia->xyij
+                    np.linalg.multi_dot([x_plus_y_mo[x], x_plus_y_mo[y].T])
+                    # xja,yia->xyij
+                    + np.linalg.multi_dot([x_minus_y_mo[x], x_minus_y_mo[y].T])
+                    # yja,xia->xyij
+                    + np.linalg.multi_dot([x_plus_y_mo[y], x_plus_y_mo[x].T])
+                    # yja,xia->xyij
+                    + np.linalg.multi_dot([x_minus_y_mo[y], x_minus_y_mo[x].T]))
+
+                if y != x:
+                    dm_vv[y,x] = dm_vv[x,y]
+                    dm_oo[y,x] = dm_oo[x,y]
+
+        # transform to AO basis: mi,xia,na->xmn
+        unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=self.grad_dt)
+        for x in range(dof):
+            for y in range(x, dof):
+                unrel_dm_ao[x, y] = (
+                    # mi,xyij,nj->xymn
+                    np.linalg.multi_dot([mo_occ, dm_oo[x, y], mo_occ.T])
+                    # ma,xyab,nb->xymn
+                    + np.linalg.multi_dot([mo_vir, dm_vv[x, y], mo_vir.T]))
+
+                if y != x:
+                    unrel_dm_ao[y, x] = unrel_dm_ao[x, y]
+
+        return unrel_dm_ao
 
     def construct_numerical_gradient(self, molecule, ao_basis, scf_drv, lr_drv):
         """
