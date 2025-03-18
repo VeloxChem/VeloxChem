@@ -46,6 +46,7 @@ from .outputstream import OutputStream
 from .matrices import Matrices
 from .griddriver import GridDriver
 from .inputparser import parse_input
+from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, polgrad_sanity_check)
@@ -89,6 +90,12 @@ class PolarizabilityGradient:
         self.nodes = self.comm.Get_size()
 
         self.ostream = ostream
+
+        # timing and profiling
+        self.timing = False
+        self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
 
         self._scf_drv = scf_drv
 
@@ -248,6 +255,14 @@ class PolarizabilityGradient:
         orbrsp_results = self.compute_orbital_response(
             molecule, basis, scf_tensors, lr_results)
 
+        # profiling
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         # dictionary for polarizability gradient
         polgrad_results = {}
 
@@ -387,6 +402,7 @@ class PolarizabilityGradient:
                 lambda_ao = lambda_ao.reshape((dof, dof, nao, nao))
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
 
+                # TODO compute unrel dm from dm_oo and dm_vv to save memory
                 # calculate relaxed density matrix
                 rel_dm_ao = orbrsp_results[w]['unrel_dm_ao'] + lambda_ao
 
@@ -1328,6 +1344,7 @@ class PolarizabilityGradient:
                 if self.rank == mpi_master():
                     rhow_dm = 1.0 * rel_dm_ao[m, n]
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
+                    del rhow_dm
 
                     # symmetrize
                     x_minus_y_sym_m = np.sqrt(2) * 0.5 * (x_minus_y_ao[m] +
@@ -1352,7 +1369,7 @@ class PolarizabilityGradient:
                 if self.rank == mpi_master():
                     xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                    if (n != m):
+                    if n != m:
                         xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
 
         return xc_pol_gradient
