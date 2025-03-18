@@ -276,6 +276,13 @@ auto generateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
                                 const xcfun             xcFunType,
                                 CMultiTimer&            timer) -> CDensityGrid;
 
+auto serialGenerateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
+                                      const CDenseMatrix&     gtoValuesX,
+                                      const CDenseMatrix&     gtoValuesY,
+                                      const CDenseMatrix&     gtoValuesZ,
+                                      const CAODensityMatrix& densityMatrix,
+                                      const xcfun             xcFunType) -> CDensityGrid;
+
 }  // namespace dengridgen
 
 #endif /* DensityGridGenerator_hpp */
