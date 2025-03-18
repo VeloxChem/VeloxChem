@@ -125,96 +125,6 @@ auto integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPoi
                                            const std::string&          quadMode) -> void;
 
 /**
- Integrates meta-GGA contribution to (third-order) Kxc matrix.
-
- @param xcFunctional the exchange-correlation functional.
- @param weights the weights of grid points.
- @param gtoValues the GTO values on grid points.
- @param gtoValuesX the GTO gradient X values on grid points.
- @param gtoValuesY the GTO gradient Y values on grid points.
- @param gtoValuesZ the GTO gradient Z values on grid points.
- @param rhograd the density gradient.
- @param vsigma the 1st-order functional derivative wrt sigma.
- @param v2rho2 the 2nd-order functional derivative wrt rho.
- @param v2rhosigma ,
- @param v2rholapl ,
- @param v2rhotau ,
- @param v2sigma2 ,
- @param v2sigmalapl ,
- @param v2sigmatau ,
- @param v2lapl2 ,
- @param v2lapltau ,
- @param v2tau2 ,
- @param v3rho3 ,
- @param v3rho2sigma ,
- @param v3rho2lapl ,
- @param v3rho2tau ,
- @param v3rhosigma2 ,
- @param v3rhosigmalapl ,
- @param v3rhosigmatau ,
- @param v3rholapl2 ,
- @param v3rholapltau ,
- @param v3rhotau2 ,
- @param v3sigma3 ,
- @param v3sigma2lapl ,
- @param v3sigma2tau ,
- @param v3sigmalapl2 ,
- @param v3sigmalapltau ,
- @param v3sigmatau2 ,
- @param v3lapl3 ,
- @param v3lapl2tau ,
- @param v3lapltau2 ,
- @param v3tau3 ,
- @param rwDensityGridQuad the products of one-time transformed densities on grid points.
- @param rw2DensityGrid the two-time transformed densities on grid points.
- @param iFock the index of the AO Fock matrix.
- @param timer the timer.
- @return the contribution as a CDenseMatrix object.
- */
-auto integratePartialKxcFockForMGGA(const CXCFunctional&    xcFunctional,
-                                    const double*           weights,
-                                    const CDenseMatrix&     gtoValues,
-                                    const CDenseMatrix&     gtoValuesX,
-                                    const CDenseMatrix&     gtoValuesY,
-                                    const CDenseMatrix&     gtoValuesZ,
-                                    const double*           rhograd,
-                                    const double*           vsigma,
-                                    const double*           v2rho2,
-                                    const double*           v2rhosigma,
-                                    const double*           v2rholapl,
-                                    const double*           v2rhotau,
-                                    const double*           v2sigma2,
-                                    const double*           v2sigmalapl,
-                                    const double*           v2sigmatau,
-                                    const double*           v2lapl2,
-                                    const double*           v2lapltau,
-                                    const double*           v2tau2,
-                                    const double*           v3rho3,
-                                    const double*           v3rho2sigma,
-                                    const double*           v3rho2lapl,
-                                    const double*           v3rho2tau,
-                                    const double*           v3rhosigma2,
-                                    const double*           v3rhosigmalapl,
-                                    const double*           v3rhosigmatau,
-                                    const double*           v3rholapl2,
-                                    const double*           v3rholapltau,
-                                    const double*           v3rhotau2,
-                                    const double*           v3sigma3,
-                                    const double*           v3sigma2lapl,
-                                    const double*           v3sigma2tau,
-                                    const double*           v3sigmalapl2,
-                                    const double*           v3sigmalapltau,
-                                    const double*           v3sigmatau2,
-                                    const double*           v3lapl3,
-                                    const double*           v3lapl2tau,
-                                    const double*           v3lapltau2,
-                                    const double*           v3tau3,
-                                    const CDensityGridQuad& rwDensityGridQuad,
-                                    const CDensityGrid&     rw2DensityGrid,
-                                    const int               iFock,
-                                    CMultiTimer&            timer) -> CDenseMatrix;
-
-/**
  Integrates fourth-order meta-GGA exchange-correlation functional
  contribution to AO Fock matrix.
 
@@ -283,54 +193,54 @@ auto integrateKxcLxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFock
  @param v3lapl2tau ,
  @param v3lapltau2 ,
  @param v3tau3 ,
- @param rwDensityGridQuad the products of one-time transformed densities on grid points.
- @param rw2DensityGrid the two-time transformed densities on grid points.
- @param iFock the index of the AO Fock matrix.
+ @param rwDensityGridPointers the pointers to the products of one-time
+        transformed densities on grid points.
+ @param rw2DensityGridPointers the pointers to the two-time transformed
+        densities on grid points.
  @param timer the timer.
  @return the contribution as a CDenseMatrix object.
  */
-auto integratePartialKxcFockForMGGA2(const CXCFunctional&     xcFunctional,
-                                     const double*            weights,
-                                     const CDenseMatrix&      gtoValues,
-                                     const CDenseMatrix&      gtoValuesX,
-                                     const CDenseMatrix&      gtoValuesY,
-                                     const CDenseMatrix&      gtoValuesZ,
-                                     const double*            rhograd,
-                                     const double*            vsigma,
-                                     const double*            v2rho2,
-                                     const double*            v2rhosigma,
-                                     const double*            v2rholapl,
-                                     const double*            v2rhotau,
-                                     const double*            v2sigma2,
-                                     const double*            v2sigmalapl,
-                                     const double*            v2sigmatau,
-                                     const double*            v2lapl2,
-                                     const double*            v2lapltau,
-                                     const double*            v2tau2,
-                                     const double*            v3rho3,
-                                     const double*            v3rho2sigma,
-                                     const double*            v3rho2lapl,
-                                     const double*            v3rho2tau,
-                                     const double*            v3rhosigma2,
-                                     const double*            v3rhosigmalapl,
-                                     const double*            v3rhosigmatau,
-                                     const double*            v3rholapl2,
-                                     const double*            v3rholapltau,
-                                     const double*            v3rhotau2,
-                                     const double*            v3sigma3,
-                                     const double*            v3sigma2lapl,
-                                     const double*            v3sigma2tau,
-                                     const double*            v3sigmalapl2,
-                                     const double*            v3sigmalapltau,
-                                     const double*            v3sigmatau2,
-                                     const double*            v3lapl3,
-                                     const double*            v3lapl2tau,
-                                     const double*            v3lapltau2,
-                                     const double*            v3tau3,
-                                     const CDensityGridCubic& rwDensityGridCubic,
-                                     const CDensityGrid&      rw2DensityGrid,
-                                     const int                iFock,
-                                     CMultiTimer&             timer) -> CDenseMatrix;
+auto integratePartialKxcFockForMetaGgaClosedShell(const CXCFunctional&     xcFunctional,
+                                                  const double*            weights,
+                                                  const CDenseMatrix&      gtoValues,
+                                                  const CDenseMatrix&      gtoValuesX,
+                                                  const CDenseMatrix&      gtoValuesY,
+                                                  const CDenseMatrix&      gtoValuesZ,
+                                                  const double*            rhograd,
+                                                  const double*            vsigma,
+                                                  const double*            v2rho2,
+                                                  const double*            v2rhosigma,
+                                                  const double*            v2rholapl,
+                                                  const double*            v2rhotau,
+                                                  const double*            v2sigma2,
+                                                  const double*            v2sigmalapl,
+                                                  const double*            v2sigmatau,
+                                                  const double*            v2lapl2,
+                                                  const double*            v2lapltau,
+                                                  const double*            v2tau2,
+                                                  const double*            v3rho3,
+                                                  const double*            v3rho2sigma,
+                                                  const double*            v3rho2lapl,
+                                                  const double*            v3rho2tau,
+                                                  const double*            v3rhosigma2,
+                                                  const double*            v3rhosigmalapl,
+                                                  const double*            v3rhosigmatau,
+                                                  const double*            v3rholapl2,
+                                                  const double*            v3rholapltau,
+                                                  const double*            v3rhotau2,
+                                                  const double*            v3sigma3,
+                                                  const double*            v3sigma2lapl,
+                                                  const double*            v3sigma2tau,
+                                                  const double*            v3sigmalapl2,
+                                                  const double*            v3sigmalapltau,
+                                                  const double*            v3sigmatau2,
+                                                  const double*            v3lapl3,
+                                                  const double*            v3lapl2tau,
+                                                  const double*            v3lapltau2,
+                                                  const double*            v3tau3,
+                                                  const std::vector<const double*>& rwDensityGridPointers,
+                                                  const std::vector<const double*>& rw2DensityGridPointers,
+                                                  CMultiTimer&             timer) -> CDenseMatrix;
 
 /**
  Integrates meta-GGA contribution to (fourth-order) Lxc matrix.
