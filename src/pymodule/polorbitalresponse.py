@@ -523,7 +523,7 @@ class PolOrbitalResponse(CphfSolver):
                 orbrsp_rhs[(w)] = {
                     #'dm_oo': dm_oo,
                     #'dm_vv': dm_vv,
-                    'unrel_dm_ao': unrel_dm_ao,
+                    #'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs_real': fock_ao_rhs_real,
                     'fock_ao_rhs_imag': fock_ao_rhs_imag,
                     'fock_gxc_ao_rere': fock_gxc_ao_rere,  # None if not DFT
@@ -814,7 +814,7 @@ class PolOrbitalResponse(CphfSolver):
                 orbrsp_rhs[(w)] = {
                     #'dm_oo': dm_oo,
                     #'dm_vv': dm_vv,
-                    'unrel_dm_ao': unrel_dm_ao,
+                    #'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
                 }
@@ -827,7 +827,7 @@ class PolOrbitalResponse(CphfSolver):
                     {
                     #'dm_oo': dm_oo,
                     #'dm_vv': dm_vv,
-                    'unrel_dm_ao': unrel_dm_ao,
+                    #'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao,
                     }, self.ostream)
@@ -877,10 +877,10 @@ class PolOrbitalResponse(CphfSolver):
             The molecule.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param x_plus_y_ao:
-            The X+Y response vectors in AO basis.
-        :param x_minus_y_ao:
-            The X-Y response vectors in AO basis.
+        :param x_plus_y:
+            The X+Y response vectors in MO basis.
+        :param x_minus_y:
+            The X-Y response vectors in MO basis.
 
         :return dm_oo:
             Occ/Occ block of unrelaxed one-particle density matrix in MO basis.
@@ -945,10 +945,10 @@ class PolOrbitalResponse(CphfSolver):
             The molecule.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param x_plus_y_ao:
-            The X+Y response vectors in AO basis.
-        :param x_minus_y_ao:
-            The X-Y response vectors in AO basis.
+        :param x_plus_y:
+            The X+Y response vectors in MO basis.
+        :param x_minus_y:
+            The X-Y response vectors in MO basis.
 
         :return unrel_dm_ao:
             Unrelaxed one-particle density matrix in AO basis.
@@ -1002,10 +1002,10 @@ class PolOrbitalResponse(CphfSolver):
 #            The molecule.
 #        :param scf_tensors:
 #            The tensors from the converged SCF calculation.
-#        :param x_plus_y_ao:
-#            The X+Y response vectors in AO basis.
-#        :param x_minus_y_ao:
-#            The X-Y response vectors in AO basis.
+#        :param x_plus_y:
+#            The X+Y response vectors in MO basis.
+#        :param x_minus_y:
+#            The X-Y response vectors in MO basis.
 #
 #        :return dm_oo:
 #            Occ/Occ block of unrelaxed one-particle density matrix in MO basis.
@@ -1708,6 +1708,7 @@ class PolOrbitalResponse(CphfSolver):
                 omega_dipole_contrib_ao = self.calculate_omega_dipole_contrib(
                     molecule, basis, scf_tensors, x_minus_y)
 
+                # FIXME rename to lower-case
                 # calculate the density matrices, alpha block only
                 D_occ = np.matmul(mo_occ, mo_occ.T)
 
