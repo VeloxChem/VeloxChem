@@ -22,8 +22,8 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import numpy as np
 import time as tm
+import numpy as np
 
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import XCIntegrator
@@ -68,8 +68,7 @@ class PolOrbitalResponse(CphfSolver):
         self.vector_components = 'xyz'
 
         self._input_keywords['orbitalresponse'].update({
-            'vector_components':
-                ('str_lower', 'Cartesian components of operator'),
+            'vector_components': ('str_lower', 'Cartesian components of operator'),
             'frequencies': ('seq_range', 'frequencies'),
             'is_complex': ('bool', 'whether the polarizability is complex'),
         })
@@ -295,8 +294,6 @@ class PolOrbitalResponse(CphfSolver):
                     np.array(x_minus_y_ao.imag))
 
                 # calculate symmetrized unrelaxed one-particle density matrix
-                #unrel_dm_ao, dm_oo, dm_vv = self.calculate_unrel_dm(molecule, scf_tensors,
-                #                                      x_plus_y, x_minus_y)
                 unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
                                                       x_plus_y, x_minus_y)
                 # create lists
@@ -386,11 +383,6 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_imim = []
                 fock_gxc_ao_reim = []
                 fock_gxc_ao_imre = []
-                #for i_mat in range(len(zero_dm_ao_list)):
-                #    fock_gxc_ao_rere.append(zero_dm_ao_list[i_mat].copy())
-                #    fock_gxc_ao_imim.append(zero_dm_ao_list[i_mat].copy())
-                #    fock_gxc_ao_reim.append(zero_dm_ao_list[i_mat].copy())
-                #    fock_gxc_ao_imre.append(zero_dm_ao_list[i_mat].copy())
                 for dm_i_mat in zero_dm_ao_list:
                     fock_gxc_ao_rere.append(dm_i_mat.copy())
                     fock_gxc_ao_imim.append(dm_i_mat.copy())
@@ -521,9 +513,6 @@ class PolOrbitalResponse(CphfSolver):
                 rhs_red = np.array(rhs_red)
 
                 orbrsp_rhs[(w)] = {
-                    #'dm_oo': dm_oo,
-                    #'dm_vv': dm_vv,
-                    #'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs_real': fock_ao_rhs_real,
                     'fock_ao_rhs_imag': fock_ao_rhs_imag,
                     'fock_gxc_ao_rere': fock_gxc_ao_rere,  # None if not DFT
@@ -563,8 +552,8 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += '{} frequencies: '.format(len(self.frequencies))
-            valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
+            valstr += f'{len(self.frequencies)} frequencies: '
+            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -695,10 +684,6 @@ class PolOrbitalResponse(CphfSolver):
                 xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
 
                 # calculate symmetrized unrelaxed one-particle density matrix
-                #unrel_dm_ao, dm_oo, dm_vv = self.calculate_unrel_dm(molecule,
-                #                                                    scf_tensors,
-                #                                                    x_plus_y,
-                #                                                    x_minus_y)
                 unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
                                                       x_plus_y, x_minus_y)
                 # create lists
@@ -725,8 +710,6 @@ class PolOrbitalResponse(CphfSolver):
 
             if self._dft:
                 fock_gxc_ao = []
-                #for i_mat in range(len(zero_dm_ao_list)):
-                #    fock_gxc_ao.append(zero_dm_ao_list[i_mat].copy())
                 for dm_i_mat in zero_dm_ao_list:
                     fock_gxc_ao.append(dm_i_mat.copy())
 
@@ -736,8 +719,6 @@ class PolOrbitalResponse(CphfSolver):
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label(), "qrf")
 
-                #for idx in range(len(fock_gxc_ao)):
-                #    fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx], root=mpi_master())
                 for idx, tmp in enumerate(fock_gxc_ao):
                     fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx],
                                                         root=mpi_master())
@@ -812,9 +793,6 @@ class PolOrbitalResponse(CphfSolver):
                 rhs_red = np.array(rhs_red)
 
                 orbrsp_rhs[(w)] = {
-                    #'dm_oo': dm_oo,
-                    #'dm_vv': dm_vv,
-                    #'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
                 }
@@ -825,9 +803,6 @@ class PolOrbitalResponse(CphfSolver):
 
                 profiler.print_memory_subspace(
                     {
-                    #'dm_oo': dm_oo,
-                    #'dm_vv': dm_vv,
-                    #'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao,
                     }, self.ostream)
@@ -852,8 +827,8 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the orbrsp RHS for '
-            valstr += '{} frequencies: '.format(len(self.frequencies))
-            valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
+            valstr += f'{len(self.frequencies)} frequencies: '
+            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -897,7 +872,6 @@ class PolOrbitalResponse(CphfSolver):
         mo_vir = mo[:, nocc:].copy()
         nvir = mo_vir.shape[1]
 
-        # TODO make class attrobute for rhs_dt
         # determine data type of RHS
         if self.is_complex:
             rhs_dt = np.dtype('complex128')
@@ -966,7 +940,6 @@ class PolOrbitalResponse(CphfSolver):
 #        # number of AOs
         nao = mo.shape[0]
 
-        # TODO make class attrobute for rhs_dt
         # determine data type of RHS
         if self.is_complex:
             rhs_dt = np.dtype('complex128')
@@ -974,8 +947,6 @@ class PolOrbitalResponse(CphfSolver):
             rhs_dt = np.dtype('float64')
 
         # calculate the symmetrized unrelaxed one-particle density matrix
-        #dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=rhs_dt)
-        #dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=rhs_dt)
         dm_oo, dm_vv = self.calculate_1pdm(molecule, scf_tensors, x_plus_y, x_minus_y)
 
         # transform to AO basis: mi,xia,na->xmn
@@ -993,97 +964,9 @@ class PolOrbitalResponse(CphfSolver):
 
         return unrel_dm_ao
 
-#    def calculate_unrel_dm(self, molecule, scf_tensors, x_plus_y, x_minus_y):
-#        """
-#        Calculates the symmetrized unrelaxed one-particle density matrix
-#        in AO basis.
-#
-#        :param molecule:
-#            The molecule.
-#        :param scf_tensors:
-#            The tensors from the converged SCF calculation.
-#        :param x_plus_y:
-#            The X+Y response vectors in MO basis.
-#        :param x_minus_y:
-#            The X-Y response vectors in MO basis.
-#
-#        :return dm_oo:
-#            Occ/Occ block of unrelaxed one-particle density matrix in MO basis.
-#        :return dm_vv:
-#            Vir/vir block of unrelaxed one-particle density matrix in MO basis.
-#        :return unrel_dm_ao:
-#            Unrelaxed one-particle density matrix in AO basis.
-#        """
-#
-#        # degrees of freedom
-#        dof = len(self.vector_components)
-#
-#        # MO coefficients
-#        mo = scf_tensors['C_alpha']  # only alpha part
-#        nocc = molecule.number_of_alpha_electrons()
-#        mo_occ = mo[:, :nocc].copy()
-#        mo_vir = mo[:, nocc:].copy()
-#        nvir = mo_vir.shape[1]
-#
-#        # number of AOs
-#        nao = mo.shape[0]
-#
-#        # TODO make class attrobute for rhs_dt
-#        # determine data type of RHS
-#        if self.is_complex:
-#            rhs_dt = np.dtype('complex128')
-#        else:
-#            rhs_dt = np.dtype('float64')
-#
-#        # calculate the symmetrized unrelaxed one-particle density matrix
-#        # in MO basis
-#        dm_oo = np.zeros((dof, dof, nocc, nocc), dtype=rhs_dt)
-#        dm_vv = np.zeros((dof, dof, nvir, nvir), dtype=rhs_dt)
-#
-#        for x in range(dof):
-#            for y in range(x, dof):
-#                dm_vv[x, y] = 0.25 * (
-#                    # xib,yia->xyab
-#                    np.linalg.multi_dot([x_plus_y[y].T, x_plus_y[x]])
-#                    # xib,yia->xyab
-#                    + np.linalg.multi_dot([x_minus_y[y].T, x_minus_y[x]])
-#                    # yib,xia->xyab
-#                    + np.linalg.multi_dot([x_plus_y[x].T, x_plus_y[y]])
-#                    # yib,xia->xyab
-#                    + np.linalg.multi_dot([x_minus_y[x].T, x_minus_y[y]]))
-#
-#                dm_oo[x, y] = -0.25 * (
-#                    # xja,yia->xyij
-#                    np.linalg.multi_dot([x_plus_y[x], x_plus_y[y].T])
-#                    # xja,yia->xyij
-#                    + np.linalg.multi_dot([x_minus_y[x], x_minus_y[y].T])
-#                    # yja,xia->xyij
-#                    + np.linalg.multi_dot([x_plus_y[y], x_plus_y[x].T])
-#                    # yja,xia->xyij
-#                    + np.linalg.multi_dot([x_minus_y[y], x_minus_y[x].T]))
-#
-#                if (y != x):
-#                    dm_vv[y,x] = dm_vv[x,y]
-#                    dm_oo[y,x] = dm_oo[x,y]
-#
-#        # TODO move outside this function
-#        # transform to AO basis: mi,xia,na->xmn
-#        unrel_dm_ao = np.zeros((dof, dof, nao, nao), dtype=rhs_dt)
-#        for x in range(dof):
-#            for y in range(x, dof):
-#                unrel_dm_ao[x, y] = (
-#                        # mi,xyij,nj->xymn
-#                        np.linalg.multi_dot([mo_occ, dm_oo[x, y], mo_occ.T])
-#                        # ma,xyab,nb->xymn
-#                        + np.linalg.multi_dot([mo_vir, dm_vv[x, y], mo_vir.T]))
-#
-#                if (y != x):
-#                    unrel_dm_ao[y, x] = unrel_dm_ao[x, y]
-#
-#        return unrel_dm_ao, dm_oo, dm_vv
-
-    def calculate_rhs_2pdm_contrib(self, molecule, scf_tensors, x_plus_y_ao, x_minus_y_ao,
-                                  fock_ao_rhs_x_plus_y, fock_ao_rhs_x_minus_y):
+    def calculate_rhs_2pdm_contrib(self, molecule, scf_tensors, x_plus_y_ao,
+                                   x_minus_y_ao, fock_ao_rhs_x_plus_y,
+                                   fock_ao_rhs_x_minus_y):
         """
         Calculates the 2-particle density matrix contribution to the RHS.
 
@@ -1225,7 +1108,7 @@ class PolOrbitalResponse(CphfSolver):
                     [mo_vir.T, tmp, ovlp, mo_occ]).T
 
                 # save value in lower off-diagonal block
-                if (y != x):
+                if y != x:
                     fock_mo_rhs_2pdm[y, x] = fock_mo_rhs_2pdm[x, y]
 
         fock_mo_rhs_2pdm = 0.25 * fock_mo_rhs_2pdm.reshape(
@@ -1300,20 +1183,19 @@ class PolOrbitalResponse(CphfSolver):
         for x in range(dof):
             for y in range(x, dof):
                 rhs_dipole_contrib[x, y] = (
-                    0.5 * (np.linalg.multi_dot( # xja,yji->xyia
-                    [dipole_ints_oo[y].T, x_minus_y[x]])
-                    + np.linalg.multi_dot( # yja,xji->xyia
-                    [dipole_ints_oo[x], x_minus_y[y]]))
-                    - 0.5 * (np.linalg.multi_dot( # xib,yab->xyia
-                    [x_minus_y[x], dipole_ints_vv[y]])
-                    + np.linalg.multi_dot( # yib,xab->xyia
-                    [x_minus_y[y], dipole_ints_vv[x].T])))
+                    0.5 * (np.linalg.multi_dot(  # xja,yji->xyia
+                        [dipole_ints_oo[y].T, x_minus_y[x]])
+                           + np.linalg.multi_dot(  # yja,xji->xyia
+                               [dipole_ints_oo[x], x_minus_y[y]]))
+                    - 0.5 * (np.linalg.multi_dot(  # xib,yab->xyia
+                        [x_minus_y[x], dipole_ints_vv[y]])
+                             + np.linalg.multi_dot(  # yib,xab->xyia
+                                 [x_minus_y[y], dipole_ints_vv[x].T])))
                 
-                if (y != x):
+                if y != x:
                     rhs_dipole_contrib[y, x] = rhs_dipole_contrib[x, y]
 
-        rhs_dipole_contrib = rhs_dipole_contrib.reshape(
-                    dof**2, nocc, nvir)
+        rhs_dipole_contrib = rhs_dipole_contrib.reshape(dof**2, nocc, nvir)
 
         return rhs_dipole_contrib
 
@@ -1364,13 +1246,17 @@ class PolOrbitalResponse(CphfSolver):
             the X-Y response vectors in AO basis.
 
         :return perturbed_dm_ao_rere:
-            The perturbed density matrix from Re/Re parts of the X-Y response vectors as an AODensityMatrix.
+            The perturbed density matrix from Re/Re parts of the
+            X-Y response vectors as an AODensityMatrix.
         :return perturbed_dm_ao_imim:
-            The perturbed density matrix from Im/Im parts of the X-Y response vectors as an AODensityMatrix.
+            The perturbed density matrix from Im/Im parts of the
+            X-Y response vectors as an AODensityMatrix.
         :return perturbed_dm_ao_reim:
-            The perturbed density matrix from Re/Im parts of the X-Y response vectors as an AODensityMatrix.
+            The perturbed density matrix from Re/Im parts of the
+            X-Y response vectors as an AODensityMatrix.
         :return perturbed_dm_ao_imre:
-            The perturbed density matrix from Im/Re parts of the X-Y response vectors as an AODensityMatrix.
+            The perturbed density matrix from Im/Re parts of the
+            X-Y response vectors as an AODensityMatrix.
         :return zero_dm_ao:
             Empty matrix same size as perturbed density matrices as an AODensityMatrix.
         """
@@ -1417,20 +1303,20 @@ class PolOrbitalResponse(CphfSolver):
                     np.array(0 * x_minus_y_ao[y].real)])
 
         perturbed_dm_ao_rere = AODensityMatrix(perturbed_dm_ao_list_rere,
-                                          denmat.rest)
+                                               denmat.rest)
         perturbed_dm_ao_imim = AODensityMatrix(perturbed_dm_ao_list_imim,
-                                          denmat.rest)
+                                               denmat.rest)
         perturbed_dm_ao_reim = AODensityMatrix(perturbed_dm_ao_list_reim,
-                                          denmat.rest)
+                                               denmat.rest)
         perturbed_dm_ao_imre = AODensityMatrix(perturbed_dm_ao_list_imre,
-                                          denmat.rest)
+                                               denmat.rest)
 
         # corresponds to rho^{omega_b,omega_c} in quadratic response,
         # which is zero for orbital response
         zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
 
         return (perturbed_dm_ao_rere, perturbed_dm_ao_imim,
-               perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
+                perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
 
     def integrate_gxc_real(self, molecule, basis, molgrid, gs_density,
                            zero_dm_ao, perturbed_dm_ao, fock_gxc_ao):
@@ -1657,8 +1543,6 @@ class PolOrbitalResponse(CphfSolver):
                 # get fock matrices from cphf_results
                 fock_ao_rhs = self.cphf_results[w]['fock_ao_rhs']
                 fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
-                #dm_oo = self.cphf_results[w]['dm_oo']
-                #dm_vv = self.cphf_results[w]['dm_vv']
 
                 # note: conjugate gradient solver returns array in dictionary
                 # and the coefficients are therefore imported differently
@@ -1675,7 +1559,9 @@ class PolOrbitalResponse(CphfSolver):
 
                         if y != x:
                             cphf_ov[y, x] += cphf_ov[x, y]
-                           
+
+                    del cphf_ov_red
+
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
                 # create response vectors in MO basis
@@ -1901,8 +1787,7 @@ class PolOrbitalResponse(CphfSolver):
 
                         if y != x:
                             cphf_ov[y, x] += cphf_ov[x, y]
-                del tmp_cphf_re
-                del tmp_cphf_im
+                del tmp_cphf_re, tmp_cphf_im
 
             if self.rank == mpi_master():
 
@@ -1920,8 +1805,6 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_imim = self.cphf_results[w]['fock_gxc_ao_imim']
                 fock_gxc_ao_reim = self.cphf_results[w]['fock_gxc_ao_reim']
                 fock_gxc_ao_imre = self.cphf_results[w]['fock_gxc_ao_imre']
-                #dm_oo = self.cphf_results[w]['dm_oo']  # complex
-                #dm_vv = self.cphf_results[w]['dm_vv']  # complex
 
                 # get Lagrangian lambda multipliers
                 if not self.use_subspace_solver:
@@ -1938,6 +1821,7 @@ class PolOrbitalResponse(CphfSolver):
 
                         if (y != x):
                             cphf_ov[y, x] += cphf_ov[x, y]
+                    del cphf_ov_red
 
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
@@ -2118,8 +2002,7 @@ class PolOrbitalResponse(CphfSolver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def calculate_omega_dipole_contrib(self, molecule, basis, scf_tensors,
-                                     x_minus_y):
+    def calculate_omega_dipole_contrib(self, molecule, basis, scf_tensors, x_minus_y_mo):
         """
         Calculates the dipole contribution to the omega multipliers.
 
@@ -2129,8 +2012,8 @@ class PolOrbitalResponse(CphfSolver):
             The AO basis set.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param x_minus_y:
-            The X-Y response vectors.
+        :param x_minus_y_mo:
+            The X-Y response vectors in MO basis.
         """
 
         # degrees of freedom
@@ -2158,15 +2041,15 @@ class PolOrbitalResponse(CphfSolver):
         k = 0
         if 'x' in self.vector_components:
             # Note: polorbitalresponse uses r instead of mu for dipole operator
-            dipole_ints_ao[k] = -1.0*dipole_mats[0]
+            dipole_ints_ao[k] = -1.0 * dipole_mats[0]
             k += 1
         if 'y' in self.vector_components:
             # Note: polorbitalresponse uses r instead of mu for dipole operator
-            dipole_ints_ao[k] = -1.0*dipole_mats[1]
+            dipole_ints_ao[k] = -1.0 * dipole_mats[1]
             k += 1
         if 'z' in self.vector_components:
             # Note: polorbitalresponse uses r instead of mu for dipole operator
-            dipole_ints_ao[k] = -1.0*dipole_mats[2]
+            dipole_ints_ao[k] = -1.0 * dipole_mats[2]
 
         # transform to MO basis (oo and ov blocks only)
         dipole_ints_oo = np.array([
@@ -2178,21 +2061,24 @@ class PolOrbitalResponse(CphfSolver):
             for x in range(dof)
         ])
 
-        omega_dipole_contrib = np.zeros((dof, dof, nao, nao), dtype = omega_dt)
+        omega_dipole_contrib = np.zeros((dof, dof, nao, nao), dtype=omega_dt)
         for x in range(dof):
             for y in range(x, dof):
-                tmp_oo = 0.5 * (np.linalg.multi_dot([ # xjc,yic->xyij
-                    dipole_ints_ov[y], x_minus_y[x].T])
-                    + np.linalg.multi_dot( # yjc,xic->xyij
-                    [dipole_ints_ov[x], x_minus_y[y].T]))
-                tmp_ov = 0.5 * (np.linalg.multi_dot([ # xka,yki->xyia
-                    dipole_ints_oo[y].T, x_minus_y[x]])
-                    + np.linalg.multi_dot( # yka,xki->xyia
-                    [dipole_ints_oo[x].T, x_minus_y[y]]))
-                tmp_vv = 0.5 * (np.linalg.multi_dot([ # xkb,yka->xyab
-                    dipole_ints_ov[y].T, x_minus_y[x]])
-                    + np.linalg.multi_dot( # ykb,xka->xyab
-                    [dipole_ints_ov[x].T, x_minus_y[y]]))
+                tmp_oo = 0.5 * (np.linalg.multi_dot([  # xjc,yic->xyij
+                    dipole_ints_ov[y], x_minus_y_mo[x].T])
+                    + np.linalg.multi_dot(  # yjc,xic->xyij
+                    [dipole_ints_ov[x], x_minus_y_mo[y].T]))
+
+                tmp_ov = 0.5 * (np.linalg.multi_dot([  # xka,yki->xyia
+                    dipole_ints_oo[y].T, x_minus_y_mo[x]])
+                    + np.linalg.multi_dot(  # yka,xki->xyia
+                    [dipole_ints_oo[x].T, x_minus_y_mo[y]]))
+
+                tmp_vv = 0.5 * (np.linalg.multi_dot([  # xkb,yka->xyab
+                    dipole_ints_ov[y].T, x_minus_y_mo[x]])
+                    + np.linalg.multi_dot(  # ykb,xka->xyab
+                    [dipole_ints_ov[x].T, x_minus_y_mo[y]]))
+
                 omega_dipole_contrib[x, y] = (
                     # mi,xyij,nj->xymn
                     np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T]) +
@@ -2202,9 +2088,10 @@ class PolOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T +
                     # ma,xyab,nb->xymn
                     np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
-                if (y != x):
+
+                if y != x:
                     omega_dipole_contrib[y, x] = omega_dipole_contrib[x, y]
-               
+
         return omega_dipole_contrib
 
     def calculate_epsilon_dm(self, molecule, scf_tensors, dm_oo, dm_vv, lambda_ov):
@@ -2253,34 +2140,37 @@ class PolOrbitalResponse(CphfSolver):
             epsilon_dt = np.dtype('float64')
 
         # construct epsilon density matrix
-        epsilon_dm = np.zeros((dof, dof, nao, nao), dtype = epsilon_dt)
-        epsilon_lambda= np.zeros((dof, dof, nao, nao), dtype = epsilon_dt)
+        epsilon_dm = np.zeros((dof, dof, nao, nao), dtype=epsilon_dt)
+        epsilon_lambda= np.zeros((dof, dof, nao, nao), dtype=epsilon_dt)
         for x in range(dof):
             for y in range(x, dof):
                 # mi,ii,xyij,nj->xymn
                 epsilon_dm[x, y] = -1.0 * np.linalg.multi_dot(
                     [mo_occ, eo_diag, dm_oo[x, y], mo_occ.T])
+
                 # ma,aa,xyab,nb->xymn
                 epsilon_dm[x, y] -= np.linalg.multi_dot(
                     [mo_vir, ev_diag, dm_vv[x, y], mo_vir.T])
+
                 # mi,ii,xyia,na->xymn
                 epsilon_lambda[x, y] = np.linalg.multi_dot([
                     mo_occ, eo_diag,
                     lambda_ov.reshape(dof, dof, nocc, nvir)[x, y],
-                    mo_vir.T
-                ])
+                    mo_vir.T])
+
                 if y != x:
                     epsilon_dm[y, x] = epsilon_dm[x, y]
 
         # symmetrize (OV + VO)
-        epsilon_dm -= (epsilon_lambda +
-                          epsilon_lambda.transpose(0, 1, 3, 2))
+        epsilon_dm -= (epsilon_lambda + epsilon_lambda.transpose(0, 1, 3, 2))
 
         return epsilon_dm
 
-    def calculate_omega_1pdm_2pdm_contrib(self, molecule, scf_tensors, x_plus_y_ao_m, x_plus_y_ao_n,
-                                          x_minus_y_ao_m, x_minus_y_ao_n, fock_ao_rhs_1_m,
-                                          fock_ao_rhs_2_m, fock_ao_rhs_1_n, fock_ao_rhs_2_n,
+    def calculate_omega_1pdm_2pdm_contrib(self, molecule, scf_tensors,
+                                          x_plus_y_ao_m, x_plus_y_ao_n,
+                                          x_minus_y_ao_m, x_minus_y_ao_n,
+                                          fock_ao_rhs_1_m, fock_ao_rhs_2_m,
+                                          fock_ao_rhs_1_n, fock_ao_rhs_2_n,
                                           fmat):
         """
         Calculates the one-particle and two-particle density matrix contributions to the
@@ -2323,43 +2213,35 @@ class PolOrbitalResponse(CphfSolver):
         # contract Fock RHS matrices with response vectors
         Fp1_vv = 0.25 * (np.linalg.multi_dot([
             fock_ao_rhs_1_m.T, x_plus_y_ao_n, ovlp.T
-        ]) + np.linalg.multi_dot(
-            [fock_ao_rhs_1_n.T, x_plus_y_ao_m, ovlp.T]))
+        ]) + np.linalg.multi_dot([fock_ao_rhs_1_n.T, x_plus_y_ao_m, ovlp.T]))
 
         Fm1_vv = 0.25 * (np.linalg.multi_dot([
             fock_ao_rhs_2_m.T, x_minus_y_ao_n, ovlp.T
-        ]) + np.linalg.multi_dot(
-            [fock_ao_rhs_2_n.T, x_minus_y_ao_m, ovlp.T]))
+        ]) + np.linalg.multi_dot([fock_ao_rhs_2_n.T, x_minus_y_ao_m, ovlp.T]))
 
         Fp2_vv = 0.25 * (np.linalg.multi_dot([
             fock_ao_rhs_1_m, x_plus_y_ao_n, ovlp.T
-        ]) + np.linalg.multi_dot(
-            [fock_ao_rhs_1_n, x_plus_y_ao_m, ovlp.T]))
+        ]) + np.linalg.multi_dot([fock_ao_rhs_1_n, x_plus_y_ao_m, ovlp.T]))
 
         Fm2_vv = 0.25 * (np.linalg.multi_dot([
             fock_ao_rhs_2_m, x_minus_y_ao_n, ovlp.T
-        ]) + np.linalg.multi_dot(
-            [fock_ao_rhs_2_n, x_minus_y_ao_m, ovlp.T]))
+        ]) + np.linalg.multi_dot([fock_ao_rhs_2_n, x_minus_y_ao_m, ovlp.T]))
 
         Fp1_oo = 0.25 * (np.linalg.multi_dot([
             fock_ao_rhs_1_m, x_plus_y_ao_n.T, ovlp.T
-        ]) + np.linalg.multi_dot(
-            [fock_ao_rhs_1_n, x_plus_y_ao_m.T, ovlp.T]))
+        ]) + np.linalg.multi_dot([fock_ao_rhs_1_n, x_plus_y_ao_m.T, ovlp.T]))
 
         Fm1_oo = 0.25 * (np.linalg.multi_dot([
             fock_ao_rhs_2_m, x_minus_y_ao_n.T, ovlp.T
-        ]) + np.linalg.multi_dot(
-            [fock_ao_rhs_2_n, x_minus_y_ao_m.T, ovlp.T]))
+        ]) + np.linalg.multi_dot([fock_ao_rhs_2_n, x_minus_y_ao_m.T, ovlp.T]))
 
         Fp2_oo = 0.25 * (np.linalg.multi_dot([
             ovlp, x_plus_y_ao_n, fock_ao_rhs_1_m]).T
-            + np.linalg.multi_dot([
-            ovlp, x_plus_y_ao_m, fock_ao_rhs_1_n]).T)
+            + np.linalg.multi_dot([ovlp, x_plus_y_ao_m, fock_ao_rhs_1_n]).T)
 
         Fm2_oo = 0.25 * (np.linalg.multi_dot([
             ovlp, x_minus_y_ao_n, fock_ao_rhs_2_m]).T
-            + np.linalg.multi_dot([
-            ovlp, x_minus_y_ao_m, fock_ao_rhs_2_n]).T)
+            + np.linalg.multi_dot([ovlp, x_minus_y_ao_m, fock_ao_rhs_2_n]).T)
         # We see that:
         # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
         # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
@@ -2422,19 +2304,18 @@ class PolOrbitalResponse(CphfSolver):
         fock_gxc_ao_reim_mn = fock_gxc_ao_mn_list[2]
         fock_gxc_ao_imre_mn = fock_gxc_ao_mn_list[3]
 
-        factor = -0.5
-        omega_gxc_contrib = factor * (
-                np.linalg.multi_dot([D_occ, fock_gxc_ao_rere_mn, D_occ])
-                - np.linalg.multi_dot([D_occ, fock_gxc_ao_imim_mn, D_occ])
-                + 1j * (np.linalg.multi_dot([D_occ, fock_gxc_ao_reim_mn, D_occ])
-                + np.linalg.multi_dot([D_occ, fock_gxc_ao_imre_mn, D_occ]))
+        omega_gxc_contrib = -0.5 * (
+            np.linalg.multi_dot([D_occ, fock_gxc_ao_rere_mn, D_occ])
+            - np.linalg.multi_dot([D_occ, fock_gxc_ao_imim_mn, D_occ])
+            + 1j * (np.linalg.multi_dot([D_occ, fock_gxc_ao_reim_mn, D_occ])
+                    + np.linalg.multi_dot([D_occ, fock_gxc_ao_imre_mn, D_occ]))
         )
 
         return omega_gxc_contrib
 
     def print_cphf_header(self, title):
         self.ostream.print_blank()
-        self.ostream.print_header('{:s} Setup'.format(title))
+        self.ostream.print_header(f'{title:s} Setup')
         self.ostream.print_header('=' * (len(title) + 8))
         self.ostream.print_blank()
 
@@ -2448,17 +2329,15 @@ class PolOrbitalResponse(CphfSolver):
             cur_str += 'Conjugate Gradient'
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
+        cur_str = f'Max. Number of Iterations       : {self.max_iter}'
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Convergence Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(str_width))
-
-        cur_str = ('Number of frequencies           : ' +
-                   str(len(self.frequencies)))
+        cur_str = f'Convergence Threshold           : {self.conv_thresh:.1e}'
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = 'Vector components               : ' + self.vector_components
+        cur_str = f'Number of frequencies           : {len(self.frequencies)}'
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = f'Vector components               : {self.vector_components}'
         self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()

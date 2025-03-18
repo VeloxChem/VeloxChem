@@ -299,7 +299,8 @@ class PolarizabilityGradient:
             if 'dist_cphf_ov' not in orbrsp_results.keys():
                 all_cphf_red = orbrsp_results['cphf_ov']
                 if self.is_complex:
-                    all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
+                    all_cphf_red = all_cphf_red.reshape(
+                        n_freqs, 2 * dof_red, nocc * nvir)
                 else:
                     all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
         else:
@@ -401,16 +402,14 @@ class PolarizabilityGradient:
                 lambda_ao = lambda_ao.reshape((dof, dof, nao, nao))
                 lambda_ao += lambda_ao.transpose(0, 1, 3, 2)
 
-                # TODO compute unrel dm from dm_oo and dm_vv to save memory
-                # calculate relaxed density matrix
+                # calculate symmetrized unrelaxed density matrix
                 unrel_dm_ao = self.calculate_unrel_dm(molecule, scf_tensors,
                                                       x_plus_y_mo, x_minus_y_mo)
-                del x_plus_y_mo, x_minus_y_mo
 
-                #rel_dm_ao = orbrsp_results[w]['unrel_dm_ao'] + lambda_ao
+                # calculate relaxed density matrix
                 rel_dm_ao = unrel_dm_ao + lambda_ao
 
-                del cphf_ov, unrel_dm_ao, lambda_ao
+                del x_plus_y_mo, x_minus_y_mo, cphf_ov, unrel_dm_ao, lambda_ao
             else:
                 gs_dm = None
                 x_plus_y_ao = None
@@ -547,8 +546,8 @@ class PolarizabilityGradient:
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the analytical gradient for '
-            valstr += '{:d} frequencies: {:.6f} sec **'.format(
-                n_freqs, tm.time() - loop_start_time)
+            valstr += f'{n_freqs:d} frequencies: '
+            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -584,7 +583,8 @@ class PolarizabilityGradient:
         if self.is_complex:
             eri_deriv_contrib = self.compute_eri_contrib_complex(molecule, basis, gs_dm,
                                                                  rel_dm_ao, x_plus_y_ao,
-                                                                 x_minus_y_ao, local_atoms)
+                                                                 x_minus_y_ao,
+                                                                 local_atoms)
         else:
             eri_deriv_contrib = self.compute_eri_contrib_real(molecule, basis, gs_dm,
                                                               rel_dm_ao, x_plus_y_ao,
@@ -1870,9 +1870,8 @@ class PolarizabilityGradient:
 
             n_grid_points = molgrid.number_of_points()
             self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
+                f'Molecular grid with {n_grid_points:d} points '
+                + f'generated in {(tm.time() - grid_t0):.2f} sec.')
             self.ostream.print_blank()
 
             if self.rank == mpi_master():
@@ -1977,7 +1976,7 @@ class PolarizabilityGradient:
         self.ostream.flush()
 
         for i in range(natm):
-            atom_info = '** Atom #{0}: {1} **'.format(i + 1, labels[i])
+            atom_info = f'** Atom #{i + 1}: {labels[i]} **'
             self.ostream.print_header(atom_info)
             self.ostream.print_blank()
 
