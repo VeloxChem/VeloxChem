@@ -251,10 +251,6 @@ class PolarizabilityGradient:
             The results of the linear response calculation.
         """
 
-        # get orbital response results
-        orbrsp_results = self.compute_orbital_response(
-            molecule, basis, scf_tensors, lr_results)
-
         # profiling
         profiler = Profiler({
             'timing': self.timing,
@@ -262,6 +258,10 @@ class PolarizabilityGradient:
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
+
+        # get orbital response results
+        orbrsp_results = self.compute_orbital_response(
+            molecule, basis, scf_tensors, lr_results)
 
         # dictionary for polarizability gradient
         polgrad_results = {}
@@ -277,7 +277,7 @@ class PolarizabilityGradient:
         # operator components and permutation pairs
         dof = len(self.vector_components)
         xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
-        dof_red  = len(xy_pairs)
+        dof_red = len(xy_pairs)
 
         # number of atomic orbitals
         nao = basis.get_dimensions_of_basis()
@@ -311,6 +311,8 @@ class PolarizabilityGradient:
         nocc, nvir, n_freqs = self.comm.bcast((nocc, nvir, n_freqs), root=mpi_master())
 
         for f, w in enumerate(self.frequencies):
+
+            profiler.set_timing_key(f"Polgrad w = {w}")
 
             full_vec = [
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
@@ -433,6 +435,8 @@ class PolarizabilityGradient:
             npot_grad_100_drv = NuclearPotentialGeom100Driver()
             npot_grad_010_drv = NuclearPotentialGeom010Driver()
 
+            profiler.start_timer("1-elec contribs")
+
             # loop over atoms and contract integral derivatives with density matrices
             for iatom in local_atoms:
                 # core Hamiltonian contribution to gradients
@@ -515,10 +519,16 @@ class PolarizabilityGradient:
 
                 gmats_dip = Matrices()
 
+            profiler.stop_timer("1-elec contribs")
+            profiler.check_memory_usage(f"1-elec grad w = {w}")
+
             # ERI contribution
+            profiler.start_timer("ERI contrib")
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                                    rel_dm_ao, x_plus_y_ao, x_minus_y_ao,
                                                    local_atoms)
+            profiler.stop_timer("ERI contrib")
+            profiler.check_memory_usage(f"ERI grad w = {w}")
 
             pol_gradient += eri_contrib
             pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
@@ -531,18 +541,26 @@ class PolarizabilityGradient:
                         pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
+                profiler.start_timer("XC contrib")
+
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
-                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao)
+                    molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao, profiler)
 
                 # add contribution to the SCF polarizability gradient
                 if self.rank == mpi_master():
                     pol_gradient += polgrad_xc_contrib
 
+                profiler.stop_timer("XC contrib")
+                profiler.check_memory_usage(f'XC contrib w = {w}')
+
                 del polgrad_xc_contrib
 
             if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
+
+        profiler.print_timing(self.ostream)
+        profiler.print_memory_usage(self.ostream)
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the analytical gradient for '
@@ -1285,7 +1303,7 @@ class PolarizabilityGradient:
         return orbrsp_drv.cphf_results
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                   x_minus_y_ao):
+                                   x_minus_y_ao, profiler):
         """
         Directs the calculation of the exchange-correlation contribution to the DFT
         polarizability gradient.
@@ -1309,15 +1327,15 @@ class PolarizabilityGradient:
 
         if self.is_complex:
             xc_contrib = self.compute_polgrad_xc_contrib_complex(
-                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y_ao, xcfun_label)
+                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y_ao, xcfun_label, profiler)
         else:
             xc_contrib = self.compute_polgrad_xc_contrib_real(
-                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y_ao, xcfun_label)
+                molecule, ao_basis, gs_dm, rel_dm_ao, x_minus_y_ao, xcfun_label, profiler)
 
         return xc_contrib
 
     def compute_polgrad_xc_contrib_real(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                        x_minus_y_ao, xcfun_label):
+                                        x_minus_y_ao, xcfun_label, profiler):
         """
         Calculates the exchange-correlation contribution to the real
         polarizability gradient.
@@ -1368,18 +1386,20 @@ class PolarizabilityGradient:
                 polgrad_xcgrad = self.calculate_xc_mn_contrib_real(
                     molecule, ao_basis, [rhow_dm_sym],
                     [x_minus_y_sym_m], [x_minus_y_sym_n],
-                    [gs_dm], xcfun_label)
+                    [gs_dm], xcfun_label, profiler)
 
-                if self.rank == mpi_master():
-                    xc_pol_gradient[m, n] += polgrad_xcgrad
+                #if self.rank == mpi_master():
+                xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                    if n != m:
-                        xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
+                if n != m:
+                    xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
+
+        xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
     def compute_polgrad_xc_contrib_complex(self, molecule, ao_basis, gs_dm, rel_dm_ao,
-                                           x_minus_y_ao, xcfun_label):
+                                           x_minus_y_ao, xcfun_label, profiler):
         """
         Calculates the exchange-correlation contribution to the complex
         polarizability gradient.
@@ -1454,18 +1474,21 @@ class PolarizabilityGradient:
                     x_minus_y_sym_n_list_real,
                     x_minus_y_sym_m_list_imag,
                     x_minus_y_sym_n_list_imag,
-                    [gs_dm], xcfun_label)
+                    [gs_dm], xcfun_label,
+                    profiler)
 
-                if self.rank == mpi_master():
-                    xc_pol_gradient[m, n] += polgrad_xcgrad
+                #if self.rank == mpi_master():
+                xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                    if n != m:
-                        xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
+                if n != m:
+                    xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
+
+        xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
     def calculate_xc_mn_contrib_real(self, molecule, ao_basis, rhow_den, x_minus_y_den_m,
-                                     x_minus_y_den_n, gs_density, xcfun_label):
+                                     x_minus_y_den_n, gs_density, xcfun_label, profiler):
         """
         Calculates exchange-correlation contribution to the (m,n) component of
         the real polarizability gradient.
@@ -1494,32 +1517,39 @@ class PolarizabilityGradient:
         mol_grid = grid_drv.generate(molecule)
 
         xcgrad_drv = XCMolecularGradient()
+
         polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
+
         polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
             xcfun_label)
+
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
             mol_grid, xcfun_label)
+
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, x_minus_y_den_m, x_minus_y_den_n, gs_density,
             mol_grid, xcfun_label)
+
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
             mol_grid, xcfun_label)
+
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
             mol_grid, xcfun_label)
 
-        polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
+        #polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
 
         return polgrad_xcgrad
 
     def calculate_xc_mn_contrib_complex(self, molecule, ao_basis, rhow_den_real,
                                         rhow_den_imag, x_minus_y_den_real_m,
                                         x_minus_y_den_real_n, x_minus_y_den_imag_m,
-                                        x_minus_y_den_imag_n, gs_density, xcfun_label):
+                                        x_minus_y_den_imag_n, gs_density, xcfun_label,
+                                        profiler):
         """
         Calculates exchange-correlation contribution to the (m,n) component of
         the complex polarizability gradient.
@@ -1583,8 +1613,8 @@ class PolarizabilityGradient:
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
 
-        polgrad_xcgrad_real = self.comm.reduce(polgrad_xcgrad_real,
-                                               root=mpi_master())
+        #polgrad_xcgrad_real = self.comm.reduce(polgrad_xcgrad_real,
+        #                                       root=mpi_master())
 
         # imaginary contribution
         polgrad_xcgrad_imag = xcgrad_drv.integrate_vxc_gradient(  # Im DM
@@ -1620,13 +1650,14 @@ class PolarizabilityGradient:
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
 
-        polgrad_xcgrad_imag = self.comm.reduce(polgrad_xcgrad_imag,
-                                               root=mpi_master())
+        #polgrad_xcgrad_imag = self.comm.reduce(polgrad_xcgrad_imag,
+        #                                       root=mpi_master())
 
-        if self.rank == mpi_master():
-            return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
-        else:
-            return None
+        #if self.rank == mpi_master():
+        #    return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
+        #else:
+        #    return None
+        return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
 
     def get_fock_type_and_x_frac(self):
         """

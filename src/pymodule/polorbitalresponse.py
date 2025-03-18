@@ -807,7 +807,6 @@ class PolOrbitalResponse(CphfSolver):
                     'fock_gxc_ao': fock_gxc_ao,
                     }, self.ostream)
             profiler.check_memory_usage(f'RHS w={w}')
-            #profiler.print_memory_tracing(self.ostream)
 
             # save RHS in distributed array
             for k in range(dof_red):
@@ -820,9 +819,9 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_memory_subspace({
             'dist_cphf_rhs': dist_cphf_rhs
         }, self.ostream)
-        profiler.print_timing(self.ostream)
-        profiler.print_profiling_summary(self.ostream)
 
+        profiler.print_timing(self.ostream)
+        #profiler.print_profiling_summary(self.ostream)
         profiler.print_memory_usage(self.ostream)
 
         if self.rank == mpi_master():
