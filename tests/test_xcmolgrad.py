@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import XCMolecularGradient
@@ -9,6 +10,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.dftutils import get_default_grid_level
 
 
+@pytest.mark.solvers
 class TestXCMolGrad:
 
     def run_xc_mol_grad(self, molecule, basis, xcfun, ref_grad):

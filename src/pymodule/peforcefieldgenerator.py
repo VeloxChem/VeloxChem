@@ -30,7 +30,7 @@ from collections import Counter
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .lrsolver import LinearResponseSolver
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .aoindices import get_basis_function_indices_of_atoms
 from .oneeints import compute_electric_dipole_integrals
 
@@ -312,7 +312,7 @@ class PEForceFieldGenerator:
             Lab = Fab + 2.0 * np.max(np.abs(Fab))
 
             dQa = dQa.swapaxes(0, 1)
-            lagragian = [np.linalg.solve(Lab, rhs) for rhs in dQa]
+            lagragian = [safe_solve(Lab, rhs) for rhs in dQa]
 
             # dQab
             dQab = np.zeros((natoms, natoms, 3))

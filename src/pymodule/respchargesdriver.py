@@ -36,7 +36,7 @@ from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 
 
 class RespChargesDriver:
@@ -590,7 +590,7 @@ class RespChargesDriver:
         # generate and solve equation system (ESP fit)
         a, b = self.generate_equation_system(molecules, grids, esp, weights,
                                              None, constr)
-        q = np.linalg.solve(a, b)
+        q = safe_solve(a, b)
 
         n_atoms = molecules[0].number_of_atoms()
 
@@ -680,7 +680,7 @@ class RespChargesDriver:
                 a[i, n_points + 1 + j] = -1
                 j += 1
 
-        q = np.linalg.solve(a, b)
+        q = safe_solve(a, b)
 
         # print results
         for i in range(n_points):
@@ -767,7 +767,7 @@ class RespChargesDriver:
                                                             0.1**2)
             a_tot = a + np.diag(rstr)
 
-            q_new = np.linalg.solve(a_tot, b)
+            q_new = safe_solve(a_tot, b)
             dq_norm = np.linalg.norm(q_new - q_old)
 
             current_iteration = iteration

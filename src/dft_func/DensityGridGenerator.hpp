@@ -79,6 +79,10 @@ auto generateDensityGridForLDA(const CDenseMatrix&     gtoValues,
                                const xcfun             xcFunType,
                                CMultiTimer&            timer) -> CDensityGrid;
 
+auto serialGenerateDensityGridForLDA(const CDenseMatrix&     gtoValues,
+                                     const CAODensityMatrix& densityMatrix,
+                                     const xcfun             xcFunType) -> CDensityGrid;
+
 /**
  Generates density for GGA.
 
@@ -165,6 +169,13 @@ auto generateDensityGridForGGA(const CDenseMatrix&     gtoValues,
                                const CAODensityMatrix& densityMatrix,
                                const xcfun             xcFunType,
                                CMultiTimer&            timer) -> CDensityGrid;
+
+auto serialGenerateDensityGridForGGA(const CDenseMatrix&     gtoValues,
+                                     const CDenseMatrix&     gtoValuesX,
+                                     const CDenseMatrix&     gtoValuesY,
+                                     const CDenseMatrix&     gtoValuesZ,
+                                     const CAODensityMatrix& densityMatrix,
+                                     const xcfun             xcFunType) -> CDensityGrid;
 
 /**
  Generates density for meta-GGA.
@@ -264,6 +275,13 @@ auto generateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
                                 const CAODensityMatrix& densityMatrix,
                                 const xcfun             xcFunType,
                                 CMultiTimer&            timer) -> CDensityGrid;
+
+auto serialGenerateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
+                                      const CDenseMatrix&     gtoValuesX,
+                                      const CDenseMatrix&     gtoValuesY,
+                                      const CDenseMatrix&     gtoValuesZ,
+                                      const CAODensityMatrix& densityMatrix,
+                                      const xcfun             xcFunType) -> CDensityGrid;
 
 }  // namespace dengridgen
 

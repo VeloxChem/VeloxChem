@@ -34,7 +34,7 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import (assert_msg_critical, safe_solve)
+from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .batchsize import get_batch_size

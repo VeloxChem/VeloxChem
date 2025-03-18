@@ -242,6 +242,56 @@ generateDensityForLDA(double*             rho,
 }
 
 auto
+serialGenerateDensityGridForLDA(const CDenseMatrix&     gtoValues,
+                                const CAODensityMatrix& densityMatrix,
+                                const xcfun             xcFunType) -> CDensityGrid
+{
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    auto numdens = densityMatrix.getNumberOfDensityMatrices();
+
+    CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
+
+    for (int idens = 0; idens < numdens; idens++)
+    {
+        auto rhoa = dengrid.alphaDensity(idens);
+
+        auto rhob = dengrid.betaDensity(idens);
+
+        auto mat_F = denblas::serialMultAB(densityMatrix.getReferenceToDensity(idens), gtoValues);
+
+        auto naos = gtoValues.getNumberOfRows();
+
+        auto F_val = mat_F.values();
+
+        auto chi_val = gtoValues.values();
+
+        {
+            for (int nu = 0; nu < naos; nu++)
+            {
+                auto nu_offset = nu * npoints;
+
+                #pragma omp simd 
+                for (int g = 0; g < npoints; g++)
+                {
+                    rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+                }
+            }
+
+            #pragma omp simd 
+            for (int g = 0; g < npoints; g++)
+            {
+                rhob[g] = rhoa[g];
+
+                //std::cout << "===rhob===" <<rhob[g]<<std::endl;
+            }
+        }
+    }
+
+    return dengrid;
+}
+
+auto
 generateDensityGridForLDA(const CDenseMatrix&     gtoValues,
                           const CAODensityMatrix& densityMatrix,
                           const xcfun             xcFunType,
@@ -723,6 +773,103 @@ generateDensityForGGA(double*             rho,
     }
 
     timer.stop("Density grid rho");
+}
+
+auto
+serialGenerateDensityGridForGGA(const CDenseMatrix&     gtoValues,
+                                const CDenseMatrix&     gtoValuesX,
+                                const CDenseMatrix&     gtoValuesY,
+                                const CDenseMatrix&     gtoValuesZ,
+                                const CAODensityMatrix& densityMatrix,
+                                const xcfun             xcFunType) -> CDensityGrid
+{
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    auto numdens = densityMatrix.getNumberOfDensityMatrices();
+
+    CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
+
+    for (int idens = 0; idens < numdens; idens++)
+    {
+        auto rhoa = dengrid.alphaDensity(idens);
+
+        auto rhob = dengrid.betaDensity(idens);
+
+        auto grada = dengrid.alphaDensityGradient(idens);
+
+        auto gradb = dengrid.betaDensityGradient(idens);
+
+        auto gradab = dengrid.mixedDensityGradient(idens);
+
+        auto gradax = dengrid.alphaDensityGradientX(idens);
+
+        auto graday = dengrid.alphaDensityGradientY(idens);
+
+        auto gradaz = dengrid.alphaDensityGradientZ(idens);
+
+        auto gradbx = dengrid.betaDensityGradientX(idens);
+
+        auto gradby = dengrid.betaDensityGradientY(idens);
+
+        auto gradbz = dengrid.betaDensityGradientZ(idens);
+
+        CDenseMatrix symmetricDensityMatrix(densityMatrix.getReferenceToDensity(idens)); 
+
+        symmetricDensityMatrix.symmetrizeAndScale(0.5);
+
+        auto mat_F = denblas::serialMultAB(symmetricDensityMatrix, gtoValues);
+
+        auto naos = gtoValues.getNumberOfRows();
+
+        auto F_val = mat_F.values();
+
+        auto chi_val = gtoValues.values();
+
+        auto chi_x_val = gtoValuesX.values();
+
+        auto chi_y_val = gtoValuesY.values();
+
+        auto chi_z_val = gtoValuesZ.values();
+
+        {
+            for (int nu = 0; nu < naos; nu++)
+            {
+                auto nu_offset = nu * npoints;
+
+                #pragma omp simd 
+                for (int g = 0; g < npoints; g++)
+                {
+                    rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+
+                    gradax[g] += 2.0 * F_val[nu_offset + g] * chi_x_val[nu_offset + g];
+
+                    graday[g] += 2.0 * F_val[nu_offset + g] * chi_y_val[nu_offset + g];
+
+                    gradaz[g] += 2.0 * F_val[nu_offset + g] * chi_z_val[nu_offset + g];
+                }
+            }
+
+            #pragma omp simd 
+            for (int g = 0; g < npoints; g++)
+            {
+                rhob[g] = rhoa[g];
+
+                gradbx[g] = gradax[g];
+
+                gradby[g] = graday[g];
+
+                gradbz[g] = gradaz[g];
+
+                grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
+
+                gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
+
+                gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
+            }
+        }
+    }
+
+    return dengrid;
 }
 
 auto
@@ -1384,6 +1531,117 @@ generateDensityForMGGA(double*             rho,
     }
 
     timer.stop("Density grid rho");
+}
+
+auto
+serialGenerateDensityGridForMGGA(const CDenseMatrix&     gtoValues,
+                                 const CDenseMatrix&     gtoValuesX,
+                                 const CDenseMatrix&     gtoValuesY,
+                                 const CDenseMatrix&     gtoValuesZ,
+                                 const CAODensityMatrix& densityMatrix,
+                                 const xcfun             xcFunType) -> CDensityGrid
+{
+    auto npoints = gtoValues.getNumberOfColumns();
+
+    auto numdens = densityMatrix.getNumberOfDensityMatrices();
+
+    CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
+
+    for (int idens = 0; idens < numdens; idens++)
+    {
+        auto rhoa = dengrid.alphaDensity(idens);
+        auto rhob = dengrid.betaDensity(idens);
+
+        auto taua = dengrid.alphaDensitytau(idens);
+        auto taub = dengrid.betaDensitytau(idens);
+
+        auto lapla = dengrid.alphaDensitylapl(idens);
+        auto laplb = dengrid.betaDensitylapl(idens);
+
+        auto grada = dengrid.alphaDensityGradient(idens);
+        auto gradb = dengrid.betaDensityGradient(idens);
+        auto gradab = dengrid.mixedDensityGradient(idens);
+
+        auto gradax = dengrid.alphaDensityGradientX(idens);
+        auto graday = dengrid.alphaDensityGradientY(idens);
+        auto gradaz = dengrid.alphaDensityGradientZ(idens);
+
+        auto gradbx = dengrid.betaDensityGradientX(idens);
+        auto gradby = dengrid.betaDensityGradientY(idens);
+        auto gradbz = dengrid.betaDensityGradientZ(idens);
+
+        // eq.(26), JCTC 2021, 17, 1512-1521
+
+        CDenseMatrix symmetricDensityMatrix(densityMatrix.getReferenceToDensity(idens)); 
+
+        symmetricDensityMatrix.symmetrizeAndScale(0.5);
+
+        auto mat_F = denblas::serialMultAB(symmetricDensityMatrix, gtoValues);
+
+        auto mat_F_x = denblas::serialMultAB(symmetricDensityMatrix, gtoValuesX);
+        auto mat_F_y = denblas::serialMultAB(symmetricDensityMatrix, gtoValuesY);
+        auto mat_F_z = denblas::serialMultAB(symmetricDensityMatrix, gtoValuesZ);
+
+        // eq.(27), JCTC 2021, 17, 1512-1521
+
+        auto naos = gtoValues.getNumberOfRows();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto F_val = mat_F.values();
+
+        auto F_x_val = mat_F_x.values();
+        auto F_y_val = mat_F_y.values();
+        auto F_z_val = mat_F_z.values();
+
+        auto chi_val = gtoValues.values();
+
+        auto chi_x_val = gtoValuesX.values();
+        auto chi_y_val = gtoValuesY.values();
+        auto chi_z_val = gtoValuesZ.values();
+
+        {
+            for (int nu = 0; nu < naos; nu++)
+            {
+                auto nu_offset = nu * npoints;
+
+                #pragma omp simd 
+                for (int g = 0; g < npoints; g++)
+                {
+                    rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+
+                    gradax[g] += 2.0 * F_val[nu_offset + g] * chi_x_val[nu_offset + g];
+                    graday[g] += 2.0 * F_val[nu_offset + g] * chi_y_val[nu_offset + g];
+                    gradaz[g] += 2.0 * F_val[nu_offset + g] * chi_z_val[nu_offset + g];
+
+                    // TODO implement Laplacian dependence
+
+                    // tau_a
+                    taua[g] += 0.5 * (F_x_val[nu_offset + g] * chi_x_val[nu_offset + g] +
+                                      F_y_val[nu_offset + g] * chi_y_val[nu_offset + g] +
+                                      F_z_val[nu_offset + g] * chi_z_val[nu_offset + g]);
+                }
+            }
+
+            #pragma omp simd 
+            for (int g = 0; g < npoints; g++)
+            {
+                rhob[g] = rhoa[g];
+                laplb[g] = lapla[g];
+                taub[g] = taua[g]; 
+
+                gradbx[g] = gradax[g];
+                gradby[g] = graday[g];
+                gradbz[g] = gradaz[g];
+
+                grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
+                gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
+                gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
+            }
+        }
+    }
+
+    return dengrid;
 }
 
 auto

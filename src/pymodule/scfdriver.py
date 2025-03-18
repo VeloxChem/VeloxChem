@@ -60,7 +60,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 try:
@@ -1488,7 +1488,7 @@ class ScfDriver:
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                    self._cpcm_q = np.linalg.solve(self._cpcm_Amat, rhs)
+                    self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
 
                     e_sol = self.cpcm_drv.compute_solv_energy(
                         self._cpcm_Bzvec, Cvec, self._cpcm_q)
