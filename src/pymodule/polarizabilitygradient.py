@@ -1527,11 +1527,7 @@ class PolarizabilityGradient:
             The exchange-correlation contribution to polarizability gradient.
         """
 
-        grid_drv = GridDriver(self.comm)
-        grid_level = (get_default_grid_level(self.xcfun)
-                      if self.grid_level is None else self.grid_level)
-        grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid = self._scf_drv._mol_grid
 
         xcgrad_drv = XCMolecularGradient()
 
@@ -1588,11 +1584,7 @@ class PolarizabilityGradient:
             The exchange-correlation contribution to complex polarizability gradient.
         """
 
-        grid_drv = GridDriver(self.comm)
-        grid_level = (get_default_grid_level(self.xcfun)
-                      if self.grid_level is None else self.grid_level)
-        grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid = self._scf_drv._mol_grid
 
         xcgrad_drv = XCMolecularGradient()
 
@@ -1891,54 +1883,6 @@ class PolarizabilityGradient:
             self.ostream.flush()
 
         return polgrad_results
-
-    def _init_dft(self, molecule, scf_tensors):
-        """
-        Initializes DFT.
-
-        :param molecule:
-            The molecule.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-
-        :return:
-            The dictionary of DFT information.
-        """
-
-        # generate integration grid
-        if self._dft:
-            grid_drv = GridDriver(self.comm)
-            grid_level = (get_default_grid_level(self.xcfun)
-                          if self.grid_level is None else self.grid_level)
-            grid_drv.set_level(grid_level)
-
-            grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
-
-            n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                f'Molecular grid with {n_grid_points:d} points '
-                + f'generated in {(tm.time() - grid_t0):.2f} sec.')
-            self.ostream.print_blank()
-
-            if self.rank == mpi_master():
-                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
-                                             denmat.rest)
-            else:
-                gs_density = AODensityMatrix()
-            gs_density.broadcast(self.rank, self.comm)
-
-            dft_func_label = self.xcfun.get_func_label().upper()
-        else:
-            molgrid = MolecularGrid()
-            gs_density = AODensityMatrix()
-            dft_func_label = 'HF'
-
-        return {
-            'molgrid': molgrid,
-            'gs_density': gs_density,
-            'dft_func_label': dft_func_label,
-        }
 
     def print_header(self):
         """
