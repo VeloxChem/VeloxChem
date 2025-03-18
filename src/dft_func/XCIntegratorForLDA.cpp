@@ -618,56 +618,6 @@ integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
 }
 
 auto
-integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer& timer) -> CDenseMatrix
-{
-    const auto npoints = gtoValues.getNumberOfColumns();
-
-    // GTO values on grid points
-
-    timer.start("Vxc matrix G");
-
-    auto chi_val = gtoValues.values();
-
-    auto naos = gtoValues.getNumberOfRows();
-
-    CDenseMatrix mat_G(naos, npoints);
-
-    auto G_val = mat_G.values();
-
-#pragma omp parallel
-    {
-        auto thread_id = omp_get_thread_num();
-
-        auto nthreads = omp_get_max_threads();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
-        for (int nu = 0; nu < naos; nu++)
-        {
-            auto nu_offset = nu * npoints;
-
-#pragma omp simd
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-            {
-                G_val[nu_offset + g] = weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
-            }
-        }
-    }
-
-    timer.stop("Vxc matrix G");
-
-    timer.start("Vxc matrix matmul");
-
-    auto mat_Vxc = denblas::multABt(gtoValues, mat_G);
-
-    timer.stop("Vxc matrix matmul");
-
-    return mat_Vxc;
-}
-
-auto
 integrateFxcFockForLdaClosedShell(const std::vector<double*>&       aoFockPointers,
                                   const CMolecule&                  molecule,
                                   const CMolecularBasis&            basis,

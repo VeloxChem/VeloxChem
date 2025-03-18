@@ -78,17 +78,6 @@ auto integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
                                      const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
 
 /**
- Integrates LDA contribution to (first-order) Vxc matrix.
-
- @param weights the weights of grid points.
- @param gtoValues the GTO values on grid points.
- @param vrho the 1st-order functional derivative wrt density.
- @param timer the timer.
- @return the contribution as a CDenseMatrix object.
- */
-auto integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer& timer) -> CDenseMatrix;
-
-/**
  Integrates second-order LDA exchange-correlation functional contribution
  to closed-shell AO Fock matrix.
 
