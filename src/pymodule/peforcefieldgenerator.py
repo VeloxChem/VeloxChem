@@ -402,12 +402,13 @@ class PEForceFieldGenerator:
 
         RBS = np.array([
             0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.6, 0.5, 0.43, 1.8,
-            1.5, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0
+            1.5, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.8, 1.8
         ]) / bohr_in_angstrom()
 
-        assert_msg_critical(
-            za <= 18 and zb <= 18,
-            'PEForceFieldGenerator: we currently support up to Ar')
+#        assert_msg_critical(
+#            za <= 18 and zb <= 18,
+#            'PEForceFieldGenerator: we currently support up to Ar')
 
         ra = RBS[za]
         rb = RBS[zb]
@@ -489,7 +490,7 @@ class PEForceFieldGenerator:
             # Note: This function supports up to Ar but is limited by the RBS
             # radius list in penalty_fc
             assert_msg_critical(
-                element_id <= 18,
+                element_id <= 18 or element_id==35,
                 'PEForceFieldGenerator: we currently support up to Ar')
 
             # H and He: 1s
@@ -517,6 +518,23 @@ class PEForceFieldGenerator:
                 ao_occ.append(offset_3p + 0)
                 ao_occ.append(offset_3p + 1)
                 ao_occ.append(offset_3p + 2)
+            # Br
+            elif element_id == 35:
+                
+                # 4s 
+                ao_occ.append(offset_3p + 3)
+                # 4p
+                offset_4p = offset_3p + 1 + angular_momentum_counter['P']
+                ao_occ.append(offset_4p + 0)
+                ao_occ.append(offset_4p + 1)
+                ao_occ.append(offset_4p + 2)
+                # 3d
+                ao_occ.append(offset_4p + 3)
+                ao_occ.append(offset_4p + 4)
+                ao_occ.append(offset_4p + 5)
+                ao_occ.append(offset_4p + 6)
+                ao_occ.append(offset_4p + 7)
+                
 
             # sum number of orbitals. used to calculate virtual orbitals later
             orb = sum(
