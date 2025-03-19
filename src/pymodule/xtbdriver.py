@@ -70,12 +70,10 @@ class XtbDriver:
 
         self.ostream = ostream
 
+        self.xtb_method = 'gfn2'
+
         self._xtb_calc = None
         self._xtb_res = None
-
-        self.max_iter = None
-        self.electron_temperature = None
-        self.xtb_method = 'gfn2'
 
     @staticmethod
     def is_available():
@@ -169,12 +167,6 @@ class XtbDriver:
             # run XTB calculation
 
             self.print_title()
-
-            if self.max_iter is not None:
-                self._xtb_calc.set_max_iterations(self.max_iter)
-
-            if self.elec_temp is not None:
-                self._xtb_calc.set_electronic_temperature(self.elec_temp)
 
             self._xtb_res = self._xtb_calc.singlepoint()
 
