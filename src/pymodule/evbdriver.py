@@ -101,7 +101,7 @@ class EvbDriver():
         self.ostream.print_blank()
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
-        self.build_forcefields(reactant, product, ordered_input=ordered_input,optimise=True)
+        self.build_forcefields(reactant, product, ordered_input=ordered_input,optimize=True)
         self.ostream.print_blank()
         self.ostream.print_header("Building systems")
         self.ostream.flush()
@@ -131,7 +131,7 @@ class EvbDriver():
         reactant_multiplicity: int = 1,
         product_multiplicity: int | list[int] = 1,
         reparameterize: bool = True,
-        optimise: bool = False,
+        optimize: bool = False,
         ordered_input: bool = False,
         breaking_bonds: tuple[int,int] | list[tuple[int, int]] = None,
     ):
@@ -148,7 +148,7 @@ class EvbDriver():
             reactant_multiplicity (int, optional): The multiplicity of the reactant. Defaults to 1.
             product_multiplicity (int | list[int], optional): The multiplicity of each provided product. List should have the same length as the amount of products provided. Defaults to 1.
             reparameterize (bool, optional): If unknown parameters in the forcefield should be reparameterized. Defaults to True.
-            optimise (bool, optional): If the provided structure should be optimised before the forcefield is generated. Defaults to False.
+            optimize (bool, optional): If the provided structure should be optimized before the forcefield is generated. Defaults to False.
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
             breaking_bonds (list[tuple[int, int]], optional): A list of tuples of atom-indices of breaking bonds. 
                 The atom indices are 0-indexed with respect to the reactant structure, and not all breaking bonds have to be provided. Defaults to None.
@@ -177,8 +177,8 @@ class EvbDriver():
                 assert reactant_charge == product_charge, "Total charge of reactant and products must match"
                 product_multiplicity = [product.get_multiplicity()]
 
-            rea_input = {"molecule": reactant, "optimise": None, "forcefield": None, "hessian": None, "charges": None}
-            pro_input = [{"molecule": pro, "optimise": None, "forcefield": None, "hessian": None, "charges": None} for pro in product]
+            rea_input = {"molecule": reactant, "optimize": None, "forcefield": None, "hessian": None, "charges": None}
+            pro_input = [{"molecule": pro, "optimize": None, "forcefield": None, "hessian": None, "charges": None} for pro in product]
 
         elif isinstance(reactant, str):
             assert isinstance(product, str) or all(isinstance(pro, str) for pro in product), "All products must be strings if the reactant is a string"
@@ -237,7 +237,7 @@ class EvbDriver():
         else:
             ffbuilder = EvbForceFieldBuilder()
             ffbuilder.reparameterize = reparameterize
-            ffbuilder.optimise = optimise
+            ffbuilder.optimize = optimize
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
@@ -257,18 +257,18 @@ class EvbDriver():
         self.ostream.flush()
 
     def _get_input_files(self, filename: str):
-        # Build a molecule from a (possibly optimised) geometry
-        optimise = True
+        # Build a molecule from a (possibly optimized) geometry
+        optimize = True
         cwd = Path().cwd()
 
         opt_path = cwd / self.input_folder / f"{filename}_xtb_opt.xyz"
         if opt_path.exists():
-            self.ostream.print_info(f"Loading optimised geometry from {opt_path}")
+            self.ostream.print_info(f"Loading optimized geometry from {opt_path}")
             molecule = Molecule.read_xyz_file(str(opt_path))
-            optimise = False
+            optimize = False
         else:
             struct_path = cwd / self.input_folder / f"{filename}.xyz"
-            self.ostream.print_info(f"Loading (possibly unoptimised) geometry from {struct_path}")
+            self.ostream.print_info(f"Loading (possibly unoptimized) geometry from {struct_path}")
             molecule = Molecule.read_xyz_file(str(struct_path))
 
         charges = None
@@ -308,7 +308,7 @@ class EvbDriver():
                 f"Could not find hessian file at {hessian_path}, calculating hessian with xtb and saving it"
             )
 
-        return {"molecule": molecule, "optimise": optimise, "forcefield": forcefield, "hessian": hessian, "charges": charges}
+        return {"molecule": molecule, "optimize": optimize, "forcefield": forcefield, "hessian": hessian, "charges": charges}
 
     #todo, should be moved to forcefieldgenerator class
     @staticmethod

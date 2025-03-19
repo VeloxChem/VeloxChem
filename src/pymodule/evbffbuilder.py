@@ -61,7 +61,7 @@ class EvbForceFieldBuilder():
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.optimise: bool = False
+        self.optimize: bool = False
         self.reparameterize: bool = True
 
         self.input_folder: str = "input_files"
@@ -86,7 +86,7 @@ class EvbForceFieldBuilder():
             reactant_charge,
             reactant_multiplicity,
             self.reparameterize,
-            self.optimise,
+            self.optimize,
         )
         self.reactant.ostream.flush()
 
@@ -101,7 +101,7 @@ class EvbForceFieldBuilder():
                     product_charge[i],
                     product_multiplicity[i],  # type:ignore
                     self.reparameterize,
-                    self.optimise
+                    self.optimize
                 ))
 
         rea_elems = self.reactant.molecule.get_element_ids()
@@ -127,7 +127,7 @@ class EvbForceFieldBuilder():
         charge: int,
         multiplicity: int,
         reparameterize: bool,
-        optimise: bool,
+        optimize: bool,
     ) -> MMForceFieldGenerator:
 
         molecule = input["molecule"]
@@ -142,7 +142,7 @@ class EvbForceFieldBuilder():
             forcefield = input["forcefield"]
             forcefield.molecule = molecule
         else:
-            if input["optimise"] and optimise:
+            if input["optimize"] and optimize:
                 self.ostream.print_info("Optimising the geometry with xtb.")
                 scf_drv = XtbDriver()
                 opt_drv = OptimizationDriver(scf_drv)
