@@ -106,6 +106,13 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
             }
         }
 
+        std::cout << "INDICES : "; 
+        for (const auto ao_idx : aoinds)
+        {
+            std::cout << ao_idx << " ";
+        }
+        std::cout << std::endl;
+        
         const auto aocount = static_cast<int>(aoinds.size());
 
         timer.stop("GTO pre-screening");
