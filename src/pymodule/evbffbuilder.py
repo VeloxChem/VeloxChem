@@ -112,9 +112,13 @@ class EvbForceFieldBuilder():
         ]
 
         # Never merge the reactant forcefield generators, for these we actually need positions
+        self.ostream.print_info("Creating combined product force field")
+        self.ostream.flush()
         self.product = self._create_combined_forcefield(products)
         
         if not ordered_input:
+            self.ostream.print_info("Matching reactant and product force fields")
+            self.ostream.flush()
             self.product = self._match_reactant_and_product(self.reactant, rea_elems,self.product, pro_elems, breaking_bonds)
         self.product.ostream.flush()
         self._summarise_reaction(self.reactant, self.product)
