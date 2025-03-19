@@ -29,7 +29,7 @@ class MolecularPropertyCalculator:
         else:
             raise FileNotFoundError(f"Error: The file {file_path} does not exist.")
     
-    def run_scf(self, functional='BLYP', solvation_model='CPCM'):
+    def run_scf(self, functional='BLYP', solvation_model=None):
 
         self.scf_drv = vlx.ScfRestrictedDriver()
         self.scf_drv.xcfun = functional
@@ -38,7 +38,7 @@ class MolecularPropertyCalculator:
         self.scf_drv.grid_level = 2
         self.scf_drv.conv_thresh = 1e-4
         self.scf_drv.cpcm_epsilon = 78.4
-        # self.scf_drv.ostream.mute()
+        self.scf_drv.ostream.mute()
         self.scf_drv.cpcm_grid_per_sphere = 194 # valid grid numbers are [50, 110, 194, 302, 434, 590, 770, 974, 2030]
         self.scf_drv.dispersion = True
 
@@ -247,7 +247,7 @@ class MolecularPropertyCalculator:
         )
     
     def generate_data_matrix(self):
-        num_atoms = len(self.resp_charges)
+        num_atoms = self.molecule.number_of_atoms()
         data_matrix = np.zeros((num_atoms, 15))
 
         for i, atom_idx in enumerate(range(num_atoms)):
