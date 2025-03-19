@@ -89,7 +89,8 @@ class EvbDataProcessing:
         self.smooth_polynomial_order = 3
         self.coordinate_bins = np.array([])
         self.bin_size = 10
-        self.dens_threshold = 0
+        self.dens_threshold = 0.05
+        self.dens_max_window = 30
 
     def _beta(self, T) -> float:
         return 1 / (self.kb * T)
@@ -126,8 +127,8 @@ class EvbDataProcessing:
 
         reference_key = list(self.results.keys())[0]
 
-        E1_ref = self.results[reference_key]["E1_ref"]
-        E2_ref = self.results[reference_key]["E2_ref"]
+        E1_ref = self.results[reference_key]["E1_pes"]
+        E2_ref = self.results[reference_key]["E2_pes"]
         Temp_set = self.results[reference_key]["Temp_set"]
 
         def get_barrier_and_free_energy_difference(x):
@@ -310,8 +311,8 @@ class EvbDataProcessing:
 
         for result in self.results.values():
             # Temp = result["Temp_step"]
-            E1_ref = result["E1_ref"]
-            E2_ref = result["E2_ref"]
+            E1_ref = result["E1_pes"]
+            E2_ref = result["E2_pes"]
             E2_shifted, V, dE, Eg = self._calculate_Eg_V_dE(E1_ref, E2_ref, self.alpha, self.H12)
 
             E1_avg = np.average(self._bin(E1_ref), axis=1)
@@ -331,8 +332,8 @@ class EvbDataProcessing:
             })
 
         if self.coordinate_bins.size == 0:
-            self.coordinate_bins = self._calculate_coordinate_bins(self.Lambda_indices, self.results, self.bin_size,
-                                                                   self.dens_threshold)
+            self.coordinate_bins, self.dens_max = self._calculate_coordinate_bins(self.Lambda_indices, self.results,
+                                                                                  self.bin_size, self.dens_threshold)
         else:
             self.ostream.print_info(
                 f"Using provided coordinate bins, min: {self.coordinate_bins[0]}, max: {self.coordinate_bins[-1]}, length: {len(self.coordinate_bins)}"
@@ -390,13 +391,13 @@ class EvbDataProcessing:
                     }
                 })
 
-    @staticmethod
-    def _calculate_coordinate_bins(Lambda_indices, results, bin_size, dens_threshold):
+    def _calculate_coordinate_bins(self, Lambda_indices, results, bin_size, dens_threshold):
 
         assert_msg_critical('scipy' in sys.modules, 'scipy is required for EvbDataProcessing.')
 
         dE_min = 0
         dE_max = 0
+        dens_max = np.array([])
         for result in results.values():
             dE = result['dE']
             xy = np.vstack([dE, Lambda_indices])
@@ -404,9 +405,11 @@ class EvbDataProcessing:
             dens = dens / np.max(dens)
             result.update({"dE_dens": dens})
 
-            dE_bins = np.linspace(-2000, 2000, 2000)
+            minde = np.min(dE)
+            maxde = np.max(dE)
+            steps = int((maxde - minde) // 2)
+            dE_bins = np.linspace(np.min(dE), np.max(dE), steps)
             bin_inds = np.digitize(dE, dE_bins)
-            dens_max = np.array([])
             for i, bin in enumerate(dE_bins):
                 inds = np.where(bin_inds == i)[0]
                 dE_hist = []
@@ -416,9 +419,16 @@ class EvbDataProcessing:
                     dens_max = np.append(dens_max, np.max(dE_hist))
                 else:
                     dens_max = np.append(dens_max, 0)
-            #todo smooth the dens_max a little bit
+
             middle = len(dens_max) // 2
-            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3)
+            window_size = self.dens_max_window
+            dens_max_smooth = np.zeros(len(dens_max) - window_size)
+            for i in range(1, len(dens_max) - window_size):
+                dens_max_smooth[i] = np.max(dens_max[i:i + window_size])
+            dens_max = dens_max_smooth
+            result.update({"dE_dens_max": dens_max})
+            result.update({"dE_dens_threshold": dens_threshold})
+            # dens_max = scipy.signal.savgol_filter(dens_max, 20, 3)
             min_inds = np.where(dens_max[:middle] < dens_threshold)[0]
             max_inds = np.where(dens_max[middle:] < dens_threshold)[0]
 
@@ -434,7 +444,7 @@ class EvbDataProcessing:
             if dE_max_new > dE_max:
                 dE_max = dE_max_new
 
-        return np.arange(dE_min, dE_max, bin_size)
+        return np.arange(dE_min, dE_max, bin_size), dens_max
 
     @staticmethod
     def print_results(results, ostream):
@@ -468,25 +478,16 @@ class EvbDataProcessing:
 
         dE_min = coordinate_bins[0]
         dE_max = coordinate_bins[-1]
-        dE_bins = np.linspace(-2000, 2000, 2000)
+        dE_bins = np.linspace(dE_min, dE_max, int(dE_max - dE_min // 2))
 
         for j, (name, result) in enumerate(results["configuration_results"].items()):
             dE = result["dE"]
             L_values = [Lambda[i] for i in indices]
             dens = result["dE_dens"]
+            dens_max = result["dE_dens_max"]
+            dens_thres = result["dE_dens_threshold"]
 
-            dens_max = np.array([])
-            bin_inds = np.digitize(dE, dE_bins)
-            for i, bin in enumerate(dE_bins):
-                inds = np.where(bin_inds == i)[0]
-                dE_hist = []
-                for ind in inds:
-                    dE_hist.append(dens[ind])
-                if len(dE_hist) > 0:
-                    dens_max = np.append(dens_max, np.max(dE_hist))
-                else:
-                    dens_max = np.append(dens_max, 0)
-            dens_max = scipy.signal.savgol_filter(dens_max, 5, 3)
+            # dens_max = scipy.signal.savgol_filter(dens_max, 20, 3)
 
             ax[j, 0].scatter(dE, L_values, c=dens, s=5)
             ax[j, 0].plot([dE_min, dE_min], [0, 0.3])
@@ -526,7 +527,7 @@ class EvbDataProcessing:
             end = len(dens_max) - 1
 
             ax[j, 1].scatter(dE, dens, s=1)
-            ax[j, 1].plot([-start, end], [0.05, 0.05])
+            ax[j, 1].plot([dE_min, dE_max], [dens_thres, dens_thres])
             ax[j, 1].plot(dE_bins[start:end], dens_max[start:end])
             ax[j, 1].plot([dE_min, dE_min], [0, 1])
             ax[j, 1].plot([dE_max, dE_max], [0, 1])
