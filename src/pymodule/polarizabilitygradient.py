@@ -132,6 +132,10 @@ class PolarizabilityGradient:
                 'is_complex': ('bool', 'whether the polarizability is complex'),
                 'damping': ('float', 'damping parameter for complex numerical (a.u.)'),
                 'do_print_polgrad': ('bool', 'whether to print the pol. gradient'),
+                'timing': ('bool', 'print timing information'),
+                'profiling': ('bool', 'print profiling information'),
+                'memory_profiling': ('bool', 'print memory usage'),
+                'memory_tracing': ('bool', 'trace memory allocation'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
