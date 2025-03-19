@@ -849,8 +849,8 @@ class PolarizabilityGradient:
                 den_mat_for_fock_xmy_y_imag.set_values(x_minus_y_ao[y].imag)
                 # (X-Y)_x + (X-Y)_x
                 den_mat_for_fock_xmy_p_xmyT_x_real = make_matrix(basis, mat_t.general)
-                den_mat_for_fock_xmy_p_xmyT_x_real.set_values((x_minus_y_ao[x]
-                                                               + x_minus_y_ao[x].T).real)
+                den_mat_for_fock_xmy_p_xmyT_x_real.set_values(
+                    (x_minus_y_ao[x] + x_minus_y_ao[x].T).real)
                 den_mat_for_fock_xmy_p_xmyT_x_imag = make_matrix(basis, mat_t.general)
                 den_mat_for_fock_xmy_p_xmyT_x_imag.set_values((x_minus_y_ao[x]
                                                                + x_minus_y_ao[x].T).imag)
