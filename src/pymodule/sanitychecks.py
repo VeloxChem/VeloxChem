@@ -23,9 +23,12 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import Path
+import json
 
+from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import mpi_master
+from .inputparser import InputParser
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
@@ -57,8 +60,19 @@ def scf_results_sanity_check(obj, scf_results):
     updated_scf_info = {}
 
     if obj.rank == mpi_master():
+        if 'filename' in scf_results:
+            # force filename to be the same since we want a single final h5
+            # file to store all results
+            updated_scf_info['filename'] = scf_results['filename']
+
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
+
+        if scf_results.get('ri_coulomb', None) is not None:
+            # TODO: consider storing ri_aux_basis_obj in scf_results
+            updated_scf_info['ri_coulomb'] = scf_results['ri_coulomb']
+            updated_scf_info['ri_auxiliary_basis'] = scf_results[
+                'ri_auxiliary_basis']
 
         if scf_results.get('restart', None) is not None:
             # do not restart if scf is not restarted from checkpoint
@@ -210,6 +224,11 @@ def raman_sanity_check(obj):
                 obj.do_raman = True
                 obj.do_resonance_raman = False
             else:
+                # out-commented lines below left from a merge conflict,
+                # I don't remember why I made this list-trick
+                # but I am sure I had a good reason
+                #freq_list = list(obj.frequencies)
+                #freq_list.pop(idx0)
                 obj.frequencies.pop(idx0)
                 warn_msg += 'It has been removed from the list.\n'
                 warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
@@ -219,7 +238,7 @@ def raman_sanity_check(obj):
             pass
 
 
-def pe_sanity_check(obj, method_dict=None):
+def pe_sanity_check(obj, method_dict=None, molecule=None):
     """
     Checks PE settings and updates relevant attributes.
 
@@ -236,36 +255,57 @@ def pe_sanity_check(obj, method_dict=None):
     if obj.potfile:
         obj.pe_options['potfile'] = obj.potfile
 
-    obj._pe = (('potfile' in obj.pe_options) or
-               (obj.embedding_options is not None))
+    obj._pe = (('potfile' in obj.pe_options) or (obj.embedding is not None))
 
     if obj._pe:
-        if obj.embedding_options is None:
+        if obj.embedding is None:
             potfile = None
             if obj.rank == mpi_master():
                 potfile = obj.pe_options['potfile']
                 if not Path(potfile).is_file():
                     potfile = str(
                         Path(obj.filename).parent / Path(potfile).name)
+                assert_msg_critical(
+                    Path(potfile).is_file(),
+                    'PE sanity check: potfile does not exist')
+
             potfile = obj.comm.bcast(potfile, root=mpi_master())
             obj.pe_options['potfile'] = potfile
+
             # TODO: include more options from pe_options
-            obj.embedding_options = {
+            obj.embedding = {
                 'settings': {
                     'embedding_method': 'PE',
+                    'induced_dipoles': {
+                        'solver': 'jacobi',
+                        'mic': False,
+                        'threshold': 1e-8,
+                        'max_iterations': 100,
+                    },
                 },
                 'inputs': {
                     'json_file': potfile,
                 },
             }
         else:
-            potfile = obj.embedding_options['inputs']['json_file']
+            potfile = obj.embedding['inputs']['json_file']
             obj.pe_options['potfile'] = potfile
 
-        embedding_options_sanity_check(obj.embedding_options)
+        # update potfile in case it is not in json format
+
+        if Path(potfile).suffix != '.json' and molecule is not None:
+            if obj.rank == mpi_master():
+                new_potfile = write_pe_jsonfile(molecule, potfile)
+                potfile = new_potfile
+
+            potfile = obj.comm.bcast(potfile, root=mpi_master())
+            obj.pe_options['potfile'] = potfile
+            obj.embedding['inputs']['json_file'] = potfile
+
+        embedding_sanity_check(obj.embedding)
 
 
-def embedding_options_sanity_check(options):
+def embedding_sanity_check(options):
     """
     Checks the validity of the given options dictionary.
 
@@ -398,3 +438,177 @@ def solvation_model_sanity_check(obj):
 
     else:
         obj._cpcm = False
+
+
+def write_pe_jsonfile(molecule, potfile):
+    """
+    Writes potential json file for PyFraME.
+
+    :param molecule:
+        The molecule.
+    :param potfile:
+        The name of the potential file.
+
+    :return:
+        The name of the temporary potential json file.
+    """
+
+    # read potential file (new format)
+
+    pe_inp = InputParser(potfile).input_dict
+
+    # process units
+
+    if 'units' in pe_inp['environment']:
+        units = pe_inp['environment']['units'].lower()
+        if len(units) >= 3 and units == 'angstrom'[:len(units)]:
+            prefac = 1.0
+        elif units in ['au', 'bohr']:
+            prefac = bohr_in_angstroms()
+        else:
+            assert_msg_critical(False, 'potential file: invalid units')
+    else:
+        prefac = 1.0
+
+    # process residues (a dictionary with residue ID as key)
+
+    residues = {}
+    for line in pe_inp['environment']['xyz']:
+        val = line.split()
+        resname = val[4]
+        resid = int(val[5])
+        if resid not in residues:
+            residues[resid] = {'resname': resname, 'atoms': []}
+        residues[resid]['atoms'].append([
+            val[0],
+            float(val[1]) * prefac,
+            float(val[2]) * prefac,
+            float(val[3]) * prefac,
+        ])
+
+    # process charges (a dictionary with residue name as key)
+
+    charges = {}
+    if 'charges' in pe_inp:
+        for line in pe_inp['charges']:
+            val = line.split()
+            resname = val[2]
+            if resname not in charges:
+                charges[resname] = []
+            charges[resname].append(val[1])
+
+    # process polarizabilities (a dictionary with residue name as key)
+
+    polarizabilities = {}
+    if 'polarizabilities' in pe_inp:
+        for line in pe_inp['polarizabilities']:
+            val = line.split()
+            resname = val[7]
+            if resname not in polarizabilities:
+                polarizabilities[resname] = []
+            polarizabilities[resname].append(val[1:7])
+
+    # create dictionary for json
+
+    # QM atoms
+
+    qm_nuclei = []
+
+    qm_coords = molecule.get_coordinates_in_bohr()
+    qm_labels = molecule.get_labels()
+    qm_elem_ids = molecule.get_element_ids()
+
+    for atom_idx in range(molecule.number_of_atoms()):
+        # Note: make sure all elements in qm_nuclei are
+        # serializable by json
+        qm_nuclei.append({
+            'index': atom_idx + 1,
+            'element': qm_labels[atom_idx].capitalize(),
+            'charge': float(qm_elem_ids[atom_idx]),
+            'coordinate': list(qm_coords[atom_idx]),
+        })
+
+    embedding_json = {
+        "quantum_subsystems": [{
+            "nuclei": qm_nuclei,
+        }],
+    }
+
+    # MM atoms
+
+    classical_fragments = []
+
+    mm_atom_count = 0
+
+    for res_count, resid in enumerate(sorted(list(residues.keys()))):
+
+        classical_fragments.append({
+            "index": res_count + 1,
+            "name": residues[resid]['resname'],
+            "atoms": [],
+        })
+
+        # charges
+
+        if resname in charges:
+            assert len(charges[resname]) == len(residues[resid]['atoms'])
+            atom_chgs = [float(x) for x in charges[resname]]
+        else:
+            atom_chgs = [0.0 for x in range(len(residues[resid]['atoms']))]
+
+        # polarizabilities
+
+        if resname in polarizabilities:
+            assert len(polarizabilities[resname]) == len(
+                residues[resid]['atoms'])
+            atom_pols = [
+                [float(p) for p in pol] for pol in polarizabilities[resname]
+            ]
+        else:
+            atom_pols = [[0.0
+                          for p in range(6)]
+                         for x in range(len(residues[resid]['atoms']))]
+
+        # coordinates
+
+        res_atom_start = mm_atom_count
+
+        for atom_idx, atom in enumerate(residues[resid]['atoms']):
+            # Note: make sure all elements in classical_fragments
+            # are serializable by json
+            classical_fragments[-1]["atoms"].append({
+                "index": mm_atom_count + 1,
+                "element": atom[0].capitalize(),
+                "coordinate": [
+                    float(atom[1]) / bohr_in_angstroms(),
+                    float(atom[2]) / bohr_in_angstroms(),
+                    float(atom[3]) / bohr_in_angstroms(),
+                ],
+                "multipoles": {
+                    "elements": [atom_chgs[atom_idx]],
+                },
+                "exclusions": list(
+                    range(res_atom_start + 1,
+                          res_atom_start + 1 + len(residues[resid]['atoms']))),
+                "polarizabilities": {
+                    "elements": ([0.0, 0.0, 0.0, 0.0] + atom_pols[atom_idx]),
+                    "order": [1, 1],
+                },
+            })
+
+            mm_atom_count += 1
+
+    embedding_json.update({
+        "classical_subsystems": [{
+            "classical_fragments": classical_fragments,
+        }],
+    })
+
+    # write json file
+
+    pe_jsonfile = Path(potfile).with_suffix('.json')
+
+    with open(pe_jsonfile, 'w') as fh:
+        json.dump(embedding_json, fh, indent=4)
+
+    return str(pe_jsonfile)

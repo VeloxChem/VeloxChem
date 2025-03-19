@@ -25,6 +25,10 @@
 # C++ classes
 from .veloxchemlib import AtomBasis
 from .veloxchemlib import BasisFunction
+from .veloxchemlib import GtoBlock
+from .veloxchemlib import GtoPairBlock
+from .veloxchemlib import BlockedGtoPairBlock
+from .veloxchemlib import T3FlatBuffer
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
 from .veloxchemlib import NuclearPotentialDriver
@@ -44,11 +48,19 @@ from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
+from .veloxchemlib import ThreeCenterOverlapDriver
+from .veloxchemlib import ThreeCenterElectronRepulsionDriver
+from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
+from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
+from .veloxchemlib import RIFockDriver
+from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCMolecularGradient
@@ -174,7 +186,7 @@ from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
-from .atommapper import AtomMapper
+from .mofbuilder import MofBuilder
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
@@ -190,10 +202,11 @@ from .oneeints import compute_linear_momentum_integrals
 from .oneeints import compute_angular_momentum_integrals
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
-from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
-                          configure_mkl_rt)
+from .environment import (set_vlxbasispath, get_basis_path, set_vlxdatapath,
+                          get_data_path, set_omp_num_threads, configure_mkl_rt)
 
 set_vlxbasispath()
+set_vlxdatapath()
 set_omp_num_threads()
 configure_mkl_rt()
 

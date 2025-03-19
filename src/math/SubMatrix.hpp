@@ -162,18 +162,6 @@ class CSubMatrix
     /// @return The vector with submatrix elements.
     auto get_values() const -> std::vector<double>;
 
-    inline auto
-    data() -> double*
-    {
-        return _values.data();
-    }
-
-    inline auto
-    data() const -> const double*
-    {
-        return _values.data();
-    }
-
     /// @brief Gets offset of matrix rows in global indexing scheme.
     /// @return The offset of matrix rows.
     inline auto
@@ -220,6 +208,22 @@ class CSubMatrix
     is_square() const -> bool
     {
         return _dimensions[2] == _dimensions[3];
+    }
+    
+    /// @brief Gets constant pointer to raw submatrix data.
+    /// @return The constant pointer to raw submatrix data.
+    inline auto
+    data() const -> const double*
+    {
+        return _values.data();
+    }
+    
+    /// @brief Gets pointer to raw submatrix data.
+    /// @return The pointer to raw submatrix data.
+    inline auto
+    data()  -> double*
+    {
+        return _values.data();
     }
 
    private:

@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -26,15 +25,10 @@
 import numpy as np
 import math
 import os
-from pathlib import Path
-from sys import stdout
-from time import time
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
 import random
-
 from contextlib import redirect_stderr
 from io import StringIO
+
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -43,7 +37,6 @@ from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .molecularbasis import MolecularBasis
 from .openmmdynamics import OpenMMDynamics
-
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .imdatabasepointcollecter import IMDatabasePointCollecter
@@ -62,6 +55,7 @@ from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
+
 
 class IMForceFieldGenerator:
     """
@@ -261,6 +255,7 @@ class IMForceFieldGenerator:
                                     'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
                                     'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
                                     'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect}
+                                    'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect}
 
 
     def set_up_the_system(self, molecule, target_dihedrals=None, sampling_structures=1):
@@ -341,6 +336,7 @@ class IMForceFieldGenerator:
                                     'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
                                     'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
                                     'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
+                                    'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect}
                                     'NAC':False, 'load_system': None, 'collect_qm_points_from':self.start_collect}
         
 
@@ -697,7 +693,7 @@ class IMForceFieldGenerator:
             A VeloxChem Molecule object representing the target system.
 
         :param forcefield_generator:
-            A defined ForceFieldGenerator object.
+            A defined MMForceFieldGenerator object.
 
         :returns:
             A list of molecular structures obtained from the dynamics simulation.
@@ -804,7 +800,7 @@ class IMForceFieldGenerator:
 
         if self.dynamics_method == 'MM':
             rot_bonds = forcefield_generator.rotatable_bonds
-            forcefield_generator.reparametrize_dihedrals(rot_bonds[0], scan_range=[180, 360], n_points=7, visualize=True)
+            forcefield_generator.reparameterize_dihedrals(rot_bonds[0], scan_range=[180, 360], n_points=7, visualize=True)
 
         database_quality = False
 

@@ -5,11 +5,11 @@ import pytest
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.loprop import LoPropDriver
+from veloxchem.peforcefieldgenerator import PEForceFieldGenerator
 
 
 @pytest.mark.solvers
-class TestLoProp:
+class TestPEForceFieldGenerator:
 
     def run_loprop(self, inpfile, ref_charges, ref_polarizabilities):
 
@@ -22,20 +22,20 @@ class TestLoProp:
         scf_results = scf_drv.compute(task.molecule, task.ao_basis,
                                       task.min_basis)
 
-        loprop_drv = LoPropDriver(task.mpi_comm, task.ostream)
-        loprop_result = loprop_drv.compute(task.molecule, task.ao_basis,
-                                           scf_results)
+        pe_ff_gen = PEForceFieldGenerator(task.mpi_comm, task.ostream)
+        pe_ff_results = pe_ff_gen.compute(task.molecule, task.ao_basis,
+                                          scf_results)
 
         if task.mpi_rank == mpi_master():
-            charges = loprop_result['localized_charges']
-            polarizabilities = loprop_result['localized_polarizabilities']
+            charges = pe_ff_results['localized_charges']
+            polarizabilities = pe_ff_results['localized_polarizabilities']
             assert np.max(np.abs(charges - ref_charges)) < 1.0e-4
             assert np.max(np.abs(polarizabilities -
                                  ref_polarizabilities)) < 1.0e-4
 
     def test_loprop_water(self):
 
-        # vlxtag: RHF, LoProp
+        # vlxtag: RHF, PEForceFieldGenerator
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'loprop_water.inp')

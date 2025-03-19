@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -31,17 +30,9 @@ import sys
 from time import time
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import random
-import re
-
 from contextlib import redirect_stderr
 from io import StringIO
-with redirect_stderr(StringIO()) as fg_err:
-    import geometric
 
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
 from .molecule import Molecule
 from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
@@ -61,6 +52,15 @@ from .xtbhessiandriver import XtbHessianDriver
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 
+with redirect_stderr(StringIO()) as fg_err:
+    import geometric
+
+try:
+    import openmm as mm
+    import openmm.app as app
+    import openmm.unit as unit
+except ImportError:
+    pass
 
 
 class IMDatabasePointCollecter:
@@ -269,6 +269,8 @@ class IMDatabasePointCollecter:
             Name of the residue. Default is 'MOL'.
         """
 
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
+
         # Store the molecule object and generate OpenMM compatible files
         self.molecule = molecule
         self.positions = molecule.get_coordinates_in_angstrom()
@@ -403,6 +405,8 @@ class IMDatabasePointCollecter:
             Target equilibrium parameter (distance (nm), angle and torsion (deg))
         """
 
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
+
         if len(atoms) == 2:
             msg = f'Adding stretch force between atoms {atoms[0]} and {atoms[1]} with force constant {force_constant}.'
             self.ostream.print_info(msg)
@@ -462,6 +466,9 @@ class IMDatabasePointCollecter:
             Tuple containing the minimized potential energies and the XYZ format strings of the relaxed coordinates.
 
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
+
         if self.system is None:
             raise RuntimeError('System has not been created!')
         if self.molecule is None:
@@ -710,13 +717,15 @@ class IMDatabasePointCollecter:
 
         """
 
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
+
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
-        temperature = self.temperature
+        # temperature = self.temperature
         self.temperature = self.temperature * unit.kelvin
         
-        friction = self.friction
+        # friction = self.friction
         self.friction = self.friction / unit.picosecond
         
         timestep = self.timestep
@@ -1124,6 +1133,9 @@ class IMDatabasePointCollecter:
         Returns:
             OpenMM Integrator: Configured integrator for the simulation.
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
+
         # Common parameters for Langevin integrators
 
         if self.ensemble in ['NVT', 'NPT']:
@@ -1201,7 +1213,7 @@ class IMDatabasePointCollecter:
             ET.SubElement(NonbondedForce, "Atom", **attributes)
 
         # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")  
@@ -1407,7 +1419,7 @@ class IMDatabasePointCollecter:
                 ET.SubElement(ImproperForce, "Torsion", **attributes)
 
         # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")  
@@ -1429,10 +1441,10 @@ class IMDatabasePointCollecter:
         :param phase:
             Phase of the system ('gas', 'water', 'periodic').
         :param ff_gen:
-            ForceFieldGenerator object from VeloxChem.
+            MMForceFieldGenerator object from VeloxChem.
         """
 
-        from openmm import NonbondedForce
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
 
         # Set the QM/MM Interaction Groups
         total_atoms = self.system.getNumParticles()
@@ -1463,7 +1475,7 @@ class IMDatabasePointCollecter:
             
             nonbonded_force = None
             for force in self.system.getForces():
-                if isinstance(force, NonbondedForce):
+                if isinstance(force, mm.NonbondedForce):
                     nonbonded_force = force
                     break
     
@@ -1599,8 +1611,10 @@ class IMDatabasePointCollecter:
         :param qm_atoms: 
             List of atom indices to be included in the QM region.
         :param ff_gen_qm: 
-            ForceFieldGenerator object from VeloxChem.
+            MMForceFieldGenerator object from VeloxChem.
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
 
         # Harmonic bond contribution. Parameters are read from ff_gen_qm
         bonds = ff_gen_qm.bonds
@@ -1736,6 +1750,8 @@ class IMDatabasePointCollecter:
             context: The OpenMM context object.
         """
 
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
+
         conversion_factor = (4.184 * hartree_in_kcalpermol() * 10.0 / bohr_in_angstrom()) * unit.kilojoule_per_mole / unit.nanometer
         new_positions = context.getState(getPositions=True).getPositions()
 
@@ -1859,25 +1875,7 @@ class IMDatabasePointCollecter:
             self.system.getForce(self.qm_force_index).updateParametersInContext(context)
     
     
-    def get_qm_potential_energy(self):
-        """
-        Returns the potential energy of the QM region.
-
-        Args:
-            context: The OpenMM context object.
-        Returns:
-            The potential energy of the QM region.
-        """
-
-        #positions = context.getState(getPositions=True).getPositions()
-        #qm_positions = np.array([positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
-        potential_energy = self.current_energy
-
-        return potential_energy
-    
-    
-    
-        ####################################################################
+    ####################################################################
     ################ Functions to expand the database ##################
     ####################################################################
 
@@ -2017,9 +2015,11 @@ class IMDatabasePointCollecter:
                 the energy of the previous QM calcualtion.
             :param basis:
                 the basis set (if required).
-            :scf_result:
-                the scf_result of previous QM calculation (if required).
+            :scf_results:
+                the scf_results of previous QM calculation (if required).
         """
+
+        assert_msg_critical('openmm' in sys.modules, 'OpenMM is required for IMDatabasePointCollecter.')
 
         if self.qm_driver is None:
             raise ValueError("No energy driver defined.")

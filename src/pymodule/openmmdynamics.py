@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -448,7 +447,7 @@ class OpenMMDynamics:
                 forcefield_files = [f'{filename}.xml', self.parent_ff, solvent_ff]
 
             # Load the PDB from the SolvationBuilder
-            self.pdb = app.PDBFile('equilibrated_system.pdb')
+            self.pdb = app.PDBFile('system.pdb')
 
         # Create the ForceField object        
         forcefield = app.ForceField(*forcefield_files)

@@ -1,4 +1,4 @@
-name: vlxenv_impes_release
+name: vlxenv
 channels:
   - conda-forge
 dependencies:
@@ -24,6 +24,7 @@ dependencies:
   - openmm
   - scipy
   - rdkit
+  - dftd4-python
   - xtb
   - geometric
   - libxc

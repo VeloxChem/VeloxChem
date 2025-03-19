@@ -25,8 +25,6 @@
 #ifndef XCPairDensityFunctional_hpp
 #define XCPairDensityFunctional_hpp
 
-#include <xc.h>
-
 #include <cstdint>
 #include <string>
 #include <tuple>

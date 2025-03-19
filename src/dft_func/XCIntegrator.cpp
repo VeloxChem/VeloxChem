@@ -26,24 +26,17 @@
 
 #include <omp.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <iomanip>
-#include <sstream>
+#include <vector>
 
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
-#include "DensityGridGenerator.hpp"
-#include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
-#include "MultiTimer.hpp"
 #include "Prescreener.hpp"
-#include "StringFormat.hpp"
 #include "XCIntegratorForGGA.hpp"
 #include "XCIntegratorForLDA.hpp"
 #include "XCIntegratorForMGGA.hpp"
@@ -82,7 +75,14 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
 
     if (xcfuntype == xcfun::lda)
     {
-        return xcintlda::integrateVxcFockForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintlda::integrateVxcFockForLdaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintlda::integrateVxcFockForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
     }
 
     if (xcfuntype == xcfun::gga)
@@ -99,7 +99,14 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
 
     if (xcfuntype == xcfun::mgga)
     {
-        return xcintmgga::integrateVxcFockForMGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintmgga::integrateVxcFockForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintmgga::integrateVxcFockForMetaGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
     }
 
     std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
@@ -138,7 +145,7 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateFxcFockForLDA(
+            xcintlda::integrateFxcFockForLdaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
@@ -148,7 +155,7 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateFxcFockForMGGA(
+            xcintmgga::integrateFxcFockForMetaGgaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
@@ -199,15 +206,15 @@ CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateKxcFockForLDA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintlda::integrateKxcFockForLdaClosedShell(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            xcintgga::integrateKxcFockForGGA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintgga::integrateKxcFockForGgaClosedShell(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateKxcFockForMGGA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintmgga::integrateKxcFockForMetaGgaClosedShell(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else
         {
@@ -259,17 +266,17 @@ CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateKxcLxcFockForLDA(
+            xcintlda::integrateKxcLxcFockForLdaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            xcintgga::integrateKxcLxcFockForGGA(
+            xcintgga::integrateKxcLxcFockForGgaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateKxcLxcFockForMGGA(
+            xcintmgga::integrateKxcLxcFockForMetaGgaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else
@@ -426,4 +433,272 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
     }
 
     return allgtovalues;
+}
+
+auto
+CXCIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                          const CMolecularBasis& basis,
+                                                          const CMolecularGrid&  molecularGrid) const -> std::vector<CDenseMatrix>
+{
+    // number of OpenMP threads
+
+    auto nthreads = omp_get_max_threads();
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // GTO values on grid points
+
+    CDenseMatrix allgtovalues(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_x(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_y(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_z(naos, molecularGrid.getNumberOfGridPoints());
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // compute GTO values on grid points
+
+#pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
+            const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
+            const auto grid_z_ptr = zcoords + gridblockpos + grid_batch_offset;
+
+            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + grid_batch_size);
+            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + grid_batch_size);
+            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + grid_batch_size);
+
+            // go through GTO blocks
+
+            for (const auto& gto_block : gto_blocks)
+            {
+                // prescreen GTO block
+
+                // 1st order GTO derivative
+                auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 1, _screeningThresholdForGTOValues, boxdim);
+
+                // GTO values on grid points
+
+                auto cmat = gtoval::get_gto_values_for_gga(gto_block, grid_x, grid_y, grid_z, cgto_mask);
+
+                if (cmat.is_empty()) continue;
+
+                auto submat_0_ptr = cmat.sub_matrix({0, 0});
+                auto submat_x_ptr = cmat.sub_matrix({1, 0});
+                auto submat_y_ptr = cmat.sub_matrix({1, 1});
+                auto submat_z_ptr = cmat.sub_matrix({1, 2});
+
+                auto subgaos_0_ptr = submat_0_ptr->data();
+                auto subgaos_x_ptr = submat_x_ptr->data();
+                auto subgaos_y_ptr = submat_y_ptr->data();
+                auto subgaos_z_ptr = submat_z_ptr->data();
+
+                for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++)
+                {
+                    std::memcpy(allgtovalues.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_0_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_x.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_x_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_y.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_y_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_z.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_z_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                }
+            }
+        }
+    }
+
+    return std::vector<CDenseMatrix>({allgtovalues, allgtovalues_x, allgtovalues_y, allgtovalues_z});
+}
+
+auto
+CXCIntegrator::computeGtoValuesAndSecondOrderDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                                     const CMolecularBasis& basis,
+                                                                     const CMolecularGrid&  molecularGrid) const -> std::vector<CDenseMatrix>
+{
+    // number of OpenMP threads
+
+    auto nthreads = omp_get_max_threads();
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // GTO values on grid points
+
+    CDenseMatrix allgtovalues(naos, molecularGrid.getNumberOfGridPoints());
+
+    CDenseMatrix allgtovalues_x(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_y(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_z(naos, molecularGrid.getNumberOfGridPoints());
+
+    CDenseMatrix allgtovalues_xx(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_xy(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_xz(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_yy(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_yz(naos, molecularGrid.getNumberOfGridPoints());
+    CDenseMatrix allgtovalues_zz(naos, molecularGrid.getNumberOfGridPoints());
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // compute GTO values on grid points
+
+#pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
+            const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
+            const auto grid_z_ptr = zcoords + gridblockpos + grid_batch_offset;
+
+            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + grid_batch_size);
+            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + grid_batch_size);
+            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + grid_batch_size);
+
+            // go through GTO blocks
+
+            for (const auto& gto_block : gto_blocks)
+            {
+                // prescreen GTO block
+
+                // 1st order GTO derivative
+                auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 1, _screeningThresholdForGTOValues, boxdim);
+
+                // GTO values on grid points
+
+                auto cmat = gtoval::get_gto_values_for_mgga(gto_block, grid_x, grid_y, grid_z, cgto_mask);
+
+                if (cmat.is_empty()) continue;
+
+                auto submat_0_ptr = cmat.sub_matrix({0, 0});
+
+                auto submat_x_ptr = cmat.sub_matrix({1, 0});
+                auto submat_y_ptr = cmat.sub_matrix({1, 1});
+                auto submat_z_ptr = cmat.sub_matrix({1, 2});
+
+                auto submat_xx_ptr = cmat.sub_matrix({2, 0});
+                auto submat_xy_ptr = cmat.sub_matrix({2, 1});
+                auto submat_xz_ptr = cmat.sub_matrix({2, 2});
+                auto submat_yy_ptr = cmat.sub_matrix({2, 3});
+                auto submat_yz_ptr = cmat.sub_matrix({2, 4});
+                auto submat_zz_ptr = cmat.sub_matrix({2, 5});
+
+                auto subgaos_0_ptr = submat_0_ptr->data();
+
+                auto subgaos_x_ptr = submat_x_ptr->data();
+                auto subgaos_y_ptr = submat_y_ptr->data();
+                auto subgaos_z_ptr = submat_z_ptr->data();
+
+                auto subgaos_xx_ptr = submat_xx_ptr->data();
+                auto subgaos_xy_ptr = submat_xy_ptr->data();
+                auto subgaos_xz_ptr = submat_xz_ptr->data();
+                auto subgaos_yy_ptr = submat_yy_ptr->data();
+                auto subgaos_yz_ptr = submat_yz_ptr->data();
+                auto subgaos_zz_ptr = submat_zz_ptr->data();
+
+                for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++)
+                {
+                    std::memcpy(allgtovalues.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_0_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+
+                    std::memcpy(allgtovalues_x.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_x_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_y.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_y_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_z.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_z_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+
+                    std::memcpy(allgtovalues_xx.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_xx_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_xy.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_xy_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_xz.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_xz_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_yy.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_yy_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_yz.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_yz_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                    std::memcpy(allgtovalues_zz.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_zz_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                }
+            }
+        }
+    }
+
+    return std::vector<CDenseMatrix>({allgtovalues, allgtovalues_x, allgtovalues_y, allgtovalues_z,
+                                      allgtovalues_xx, allgtovalues_xy, allgtovalues_xz,
+                                      allgtovalues_yy, allgtovalues_yz, allgtovalues_zz});
 }

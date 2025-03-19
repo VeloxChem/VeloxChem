@@ -277,9 +277,8 @@ class ScfRestrictedDriver(ScfDriver):
             The string for spin restricted closed shell SCF calculation.
         """
 
-        if self.embedding_options is not None:
-            emb_type = ' with ' + self.embedding_options['settings'][
-                'embedding_method']
+        if self.embedding is not None:
+            emb_type = ' with ' + self.embedding['settings']['embedding_method']
         else:
             emb_type = ''
 

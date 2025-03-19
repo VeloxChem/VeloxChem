@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -24,35 +23,18 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-import itertools
-from pathlib import Path
-from sys import stdout
-from time import time
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
-
 from contextlib import redirect_stderr
 from io import StringIO
-from .xtbdriver import XtbDriver
-from .xtbgradientdriver import XtbGradientDriver
-from .xtbhessiandriver import XtbHessianDriver
-from .molecularbasis import MolecularBasis
+
 from .impesdriver import ImpesDriver
 from .impescoordinates import ImpesCoordinates
 from .imdatabasepointcollecter import IMDatabasePointCollecter
-# from .impesdatabasebuilder import ImpesDatabaseBuilder
-# from .imdatabasedriver import IMDatabaseDriver
-#from .impesforcefieldgenerator_parallel import ImpesForceFieldGeneratorParallel
-from .forcefieldgenerator import ForceFieldGenerator
-from .atomtypeidentifier import AtomTypeIdentifier
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .molecule import Molecule
-from .veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
+
 
 class ImDatabaseDriver:
     """
@@ -79,8 +61,6 @@ class ImDatabaseDriver:
         Initializes the DATABASE driver.
         """
         
-        #self.impes_forcefield_generator = TestNewImpesFFGen()
-
         self.density_of_datapoints = None
         self.qm_data_points = None
         self.qmlabels = None
@@ -191,8 +171,7 @@ class ImDatabaseDriver:
                     print('key', key, self.density_of_datapoints)
                 #structure = structure * bohr_in_angstrom()
                 #current_molecule = Molecule(self.molecule.get_labels(), structure, units="angstrom")
-                forcefield_generator = ForceFieldGenerator()
-                forcefield_generator.force_field_data = self.dynamics_settings['FF_datafile']
+                forcefield_generator = MMForceFieldGenerator()
                 self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}.pdb'
                 forcefield_generator.partial_charges = mol.get_partial_charges(mol.get_charge())
                 

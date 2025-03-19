@@ -38,6 +38,9 @@
 #include "StringFormat.hpp"
 #include "TensorComponents.hpp"
 #include "TensorLabels.hpp"
+#include "T3FlatBuffer.hpp"
+#include "T3RectFlatBuffer.hpp"
+#include "MathFunc.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -111,6 +114,7 @@ export_general(py::module &m) -> void
     m.def("bohr_in_angstroms", &units::bohr_in_angstrom, "Gets Bohr value in Angstroms.");
     m.def("hartree_in_ev", &units::hartree_in_ev, "Gets Hartree value in electronvolts.");
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole, "Gets Hartree value in kcal/mol.");
+    m.def("hartree_in_kjpermol", &units::getHartreeValueInKiloJoulePerMole, "Gets Hartree value in kJ/mol.");
     m.def("hartree_in_inverse_nm", &units::getHartreeValueInInverseNanometer, "Gets Hartree value in inverse nanometer.");
     m.def("hartree_in_wavenumber", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");
     m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");
@@ -193,7 +197,12 @@ export_general(py::module &m) -> void
           py::overload_cast<const std::vector<CGtoBlock> &, const std::vector<CGtoBlock> &>(&omp::make_work_tasks),
           "Gets work tasks for given two vectors of basis function blocks.");
     m.def("make_diag_work_tasks", &omp::make_diag_work_group, "Gets work tasks for diagonal integrals.");
-    m.def("make_work_group", &omp::make_work_group, "Gets work group for ERIs.");
+    m.def("make_work_group",
+          py::overload_cast<const std::vector<CBlockedGtoPairBlock>&, const int, const int>(&omp::make_work_group),
+          "Gets work group for ERIs.");
+    m.def("make_work_group",
+          py::overload_cast<const std::vector<CBlockedGtoPairBlock>&, const int, const int, const int>(&omp::make_work_group),
+          "Gets work group for ERIs.");
     m.def("make_bra_ket_work_group", &omp::make_bra_ket_work_group, "Gets work group for ERIs.");
     m.def("partition_atoms", &omp::partition_atoms, "Get atomic indices of partitioned atoms list.");
 
@@ -221,6 +230,66 @@ export_general(py::module &m) -> void
         .def("__ne__", [](const TPoint<double> &self, const TPoint<double> &other) { return self != other; })
         .def("__copy__", [](const TPoint<double> &self) { return TPoint<double>(self); })
         .def("__deepcopy__", [](const TPoint<double> &self, py::dict) { return TPoint<double>(self); });
+    
+    // CT3FlatBuffer class
+    PyClass<CT3FlatBuffer<double>>(m, "T3FlatBuffer")
+        .def(py::init<>())
+        .def(py::init<const std::vector<size_t>&, const size_t>())
+        .def(py::init<const CT3FlatBuffer<double> &>())
+        .def("indices", &CT3FlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
+        .def("mask_indices", &CT3FlatBuffer<double>::mask_indices, "Gets mask of indices along x axis of tensor.")
+        .def(
+            "values",
+             [](const CT3FlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
+                 const auto ndim = self.width();
+                 const auto nelems = static_cast<py::ssize_t>(ndim * (ndim + 1) / 2);
+                 const auto tdim  = static_cast<py::ssize_t>(sizeof(double));
+                 return py::array_t<double>(
+                                            std::vector<py::ssize_t>({nelems,}), std::vector<py::ssize_t>({tdim, }), self.data(index));
+            },
+            "Gets slice of tensor values along y,z axes.")
+        .def("value",
+             [](const CT3FlatBuffer<double> &self, const size_t index, const size_t i, const size_t j) -> double {
+                if (i <= j)
+                {
+                    return self.data(index)[mathfunc::uplo_rm_index(i, j, self.width())];
+                }
+                else
+                {
+                    return self.data(index)[mathfunc::uplo_rm_index(j, i, self.width())];
+                }
+             },
+             "Gets tensor element value.")
+        .def("__copy__", [](CT3FlatBuffer<double> &self) { return CT3FlatBuffer<double>(self); })
+        .def("__deepcopy__", [](const CT3FlatBuffer<double> &self, py::dict) { return CT3FlatBuffer<double>(self); });
+    
+    // CT3RectFlatBuffer class
+    PyClass<CT3RectFlatBuffer<double>>(m, "T3RectFlatBuffer")
+        .def(py::init<>())
+        .def(py::init<const std::vector<size_t>&, const std::map<size_t, size_t>&, const size_t>())
+        .def(py::init<const CT3RectFlatBuffer<double> &>())
+        .def("indices", &CT3RectFlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
+        .def("mask_indices", &CT3RectFlatBuffer<double>::mask_indices, "Gets masked indices along y axis of tensor.")
+        .def("width", &CT3RectFlatBuffer<double>::width, "Gets width along z axis of tensor.")
+        .def(
+            "values",
+             [](const CT3RectFlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
+                 const auto nrows = self.mask_indices().size();
+                 const auto ncols = self.width();
+                 const auto nelems = static_cast<py::ssize_t>(nrows * ncols);
+                 const auto tdim  = static_cast<py::ssize_t>(sizeof(double));
+                 return py::array_t<double>(
+                                            std::vector<py::ssize_t>({nelems,}), std::vector<py::ssize_t>({tdim, }), self.data(index));
+            },
+            "Gets slice of tensor values along y,z axes.")
+        .def("value",
+             [](const CT3RectFlatBuffer<double> &self, const size_t index, const size_t i, const size_t j) -> double {
+                const auto mask = self.mask_indices();
+                return self.data(index)[mask.at(i) * self.width() + j];
+             },
+             "Gets tensor element value.")
+        .def("__copy__", [](CT3RectFlatBuffer<double> &self) { return CT3RectFlatBuffer<double>(self); })
+        .def("__deepcopy__", [](const CT3RectFlatBuffer<double> &self, py::dict) { return CT3RectFlatBuffer<double>(self); });
 }
 
 }  // namespace vlx_general

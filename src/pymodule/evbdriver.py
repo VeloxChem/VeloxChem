@@ -1,3 +1,27 @@
+#
+#                              VELOXCHEM
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
@@ -737,7 +761,6 @@ class EvbDriver():
         dp = EvbDataProcessing()
         dp.print_results(results, self.ostream)
         self.ostream.flush()
-        pass
 
     def plot_results(self, results: dict = None, file_name: str = None):
         """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
@@ -757,7 +780,6 @@ class EvbDriver():
         dp = EvbDataProcessing()
         dp.plot_results(results)
         self.ostream.flush()
-        pass
 
     def _load_output_from_folders(self, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample) -> dict:
         reference_folder = self.system_confs[0]["data_folder"]

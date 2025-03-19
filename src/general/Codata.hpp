@@ -49,6 +49,13 @@ double hartree_in_ev();
 double getHartreeValueInKiloCaloriePerMole();
 
 /**
+ Gets Hartree value in kJ/mol.
+
+ @return the conversion factor.
+ */
+double getHartreeValueInKiloJoulePerMole();
+
+/**
  Gets a Hartree value in inverse nanometer.
 
  @return the conversion factor.
