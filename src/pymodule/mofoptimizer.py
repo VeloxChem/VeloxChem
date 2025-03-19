@@ -23,7 +23,11 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-from scipy.optimize import minimize
+
+try:
+    from scipy.optimize import minimize
+except ImportError:
+    pass
 
 
 ###
@@ -250,6 +254,11 @@ def optimize_rotations_pre(
     Returns:
         list: Optimized rotation matrices for all nodes.
     """
+
+    assert_msg_critical(
+        "scipy" in sys.modules, "scipy is required for optimize_rotations_pre."
+    )
+
     print("optimize_rotations_step1")
     # initial_rotations = np.tile(np.eye(3), (num_nodes, 1)).flatten()
     # get a better initial guess, use random rotation matrix combination
@@ -314,6 +323,11 @@ def optimize_rotations_after(
     Returns:
         list: Optimized rotation matrices for all nodes.
     """
+
+    assert_msg_critical(
+        "scipy" in sys.modules, "scipy is required for optimize_rotations_after."
+    )
+
     print("optimize_rotations information:")
     print("opt_method:", opt_method)
     print("\n")
@@ -445,6 +459,11 @@ def scale_objective_function(
 
 # Example usage
 def optimize_cell_parameters(cell_info, original_ccoords, updated_ccoords):
+
+    assert_msg_critical(
+        "scipy" in sys.modules, "scipy is required for optimize_cell_parameters."
+    )
+
     # Old cell parameters (example values)
     old_cell_params = cell_info  # [a, b, c, alpha, beta, gamma]
 

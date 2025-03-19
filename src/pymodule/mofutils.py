@@ -30,7 +30,7 @@ import sys
 import re
 
 from .molecule import Molecule
-
+from .errorhandler import assert_msg_critical
 from .mofoptimizer import (
     optimize_rotations_pre,
     optimize_rotations_after,
@@ -40,8 +40,6 @@ from .mofoptimizer import (
     optimize_cell_parameters,
     expand_setrots,
 )
-
-from errorhandler import assert_msg_critical
 
 
 try:
