@@ -192,7 +192,6 @@ class EvbSystemBuilder():
         Lambda: list,
         configuration: dict,
         constraints: list = [],
-        neutralize: bool = True,
     ):
 
         assert_msg_critical('openmm' in sys.modules, 'openmm is required for EvbSystemBuilder.')
@@ -210,6 +209,7 @@ class EvbSystemBuilder():
         ion_count = configuration.get("ion_count", 0)
         no_reactant = configuration.get("no_reactant", False)
         E_field = configuration.get("E_field", [0, 0, 0])
+        neutralize = configuration.get("neutralize", False)
 
         self.constraints = constraints
 
@@ -595,33 +595,18 @@ class EvbSystemBuilder():
             target_density=density * 0.95,
         )
 
-        num_solvent_molecules = vlxsysbuilder.added_solvent_counts
-        vlx_solvent_molecule = vlxsysbuilder.solvents[0]
-        solvent_ff = MMForceFieldGenerator()
-        solvent_ff.create_topology(vlx_solvent_molecule)
         self.positions = vlxsysbuilder.system_molecule.get_coordinates_in_angstrom() * 0.1
         box = [side * 0.1 for side in vlxsysbuilder.box]
-        for atom in solvent_ff.atoms.values():
-            if atom['type'] == 'ow':
-                sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
-                epsilon = 0.0930 * 4.184
-                atom['type'] = 'oh'
-                atom['sigma'] = sigma
-                atom['epsilon'] = epsilon
-                atom['comment'] = "Reaction-water oxygen"
-            elif atom['type'] == 'hw':
+        solvents = vlxsysbuilder.solvents
+        solvent_counts = vlxsysbuilder.added_solvent_counts
+        resnames = ["SOL"] * len(vlxsysbuilder.added_solvent_counts)
+        if hasattr(vlxsysbuilder, "added_counterions"):
+            if vlxsysbuilder.added_counterions > 0:
+                solvents = solvents + [vlxsysbuilder._counterion_molecules()] * vlxsysbuilder.added_counterions
+                solvent_counts = solvent_counts + [vlxsysbuilder.added_counterions]
+                resnames = resnames + ["ION"]
 
-                sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
-                epsilon = 0.0047 * 4.184
-                atom['type'] = 'ho'
-                atom['sigma'] = sigma
-                atom['epsilon'] = epsilon
-                atom['comment'] = "Reaction-water hydrogen"
-
-        resname = "SOL"
-
-        for i, (num_solvent_molecules,
-                vlx_solvent_molecule) in enumerate(zip(vlxsysbuilder.added_solvent_counts, vlxsysbuilder.solvents)):
+        for i, (solvent_count, vlx_solvent_molecule, resname) in enumerate(zip(solvent_counts, solvents, resnames)):
 
             num_solvent_atoms_per_molecule = vlx_solvent_molecule.number_of_atoms()
             elements = vlx_solvent_molecule.get_labels()
@@ -632,7 +617,6 @@ class EvbSystemBuilder():
             harmonic_angle_force.setName(f"Solvent {i} harmonic angle")
             fourier_force = mm.PeriodicTorsionForce()
             fourier_force.setName(f"Solvent {i} proper fourier torsion")
-
             fourier_imp_force = mm.PeriodicTorsionForce()
             fourier_imp_force.setName(f"Solvent {i} improper fourier torsion")
 
@@ -640,7 +624,26 @@ class EvbSystemBuilder():
             solvent_nb_atom_count = 0
             solvent_system_atom_count = 0
             solvent_chain = topology.addChain()
-            for i in range(num_solvent_molecules):
+            solvent_ff = MMForceFieldGenerator()
+            solvent_ff.create_topology(vlx_solvent_molecule)
+
+            for atom in solvent_ff.atoms.values():
+                if atom['type'] == 'ow':
+                    sigma = 1.8200 * 2**(-1 / 6) * 2 / 10
+                    epsilon = 0.0930 * 4.184
+                    atom['type'] = 'oh'
+                    atom['sigma'] = sigma
+                    atom['epsilon'] = epsilon
+                    atom['comment'] = "Reaction-water oxygen"
+                elif atom['type'] == 'hw':
+                    sigma = 0.3019 * 2**(-1 / 6) * 2 / 10
+                    epsilon = 0.0047 * 4.184
+                    atom['type'] = 'ho'
+                    atom['sigma'] = sigma
+                    atom['epsilon'] = epsilon
+                    atom['comment'] = "Reaction-water hydrogen"
+
+            for i in range(solvent_count):
 
                 solvent_residue = topology.addResidue(name=resname, chain=solvent_chain)
                 solvent_atoms = []
@@ -672,6 +675,7 @@ class EvbSystemBuilder():
                     self._add_torsion(fourier_imp_force, dihedral, atom_ids)
 
                 exceptions = self._create_exceptions_from_bonds(solvent_ff)
+
                 for key, atom in solvent_ff.atoms.items():
 
                     sigma = atom["sigma"]

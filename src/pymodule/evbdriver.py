@@ -212,10 +212,17 @@ class EvbDriver():
                 if len(product) != 1:
                     assert product_charge == 0, "A charge should be provided for every provided product"
 
-                product_charge: list[int] = [product_charge] * len(product)
+                product_charge: list[int] = [product_charge]
+                pro_input[0]["molecule"].set_charge(product_charge[0])
+
                 reactant_charge: int = product_charge[0]  # type: ignore
+                rea_input["molecule"].set_charge(reactant_charge)
+
             else:
                 reactant_charge = sum(product_charge)
+                for pro, charge in zip(pro_input, product_charge):
+                    pro["molecule"].set_charge(charge)
+                rea_input["molecule"].set_charge(reactant_charge)
 
             if isinstance(product_multiplicity, int):
                 product_multiplicity = [product_multiplicity] * len(product)
@@ -544,6 +551,7 @@ class EvbDriver():
                 "pressure": 1,
                 "padding": 1,
                 "ion_count": 0,
+                "neutralize": False
             }
         # elif name == "CNT":
         #     conf = {
@@ -556,17 +564,17 @@ class EvbDriver():
         #         "CNT": True,
         #         "CNT_radius": 0.5,
         #     }
-        elif name == "graphene":
-            conf = {
-                "name": "water_graphene",
-                "solvent": "spce",
-                "temperature": self.temperature,
-                "NPT": True,
-                "pressure": 1,
-                "ion_count": 0,
-                "graphene": True,
-                "graphene_size": 2,
-            }
+        # elif name == "graphene":
+        #     conf = {
+        #         "name": "water_graphene",
+        #         "solvent": "spce",
+        #         "temperature": self.temperature,
+        #         "NPT": True,
+        #         "pressure": 1,
+        #         "ion_count": 0,
+        #         "graphene": True,
+        #         "graphene_size": 2,
+        #     }
         elif name == "E_field":
             conf = {
                 "name": "water_E_field",
@@ -692,9 +700,9 @@ class EvbDriver():
         self,
         equil_steps=5000,
         sample_steps=100000,
-        write_step=1000,
+        write_step=2000,
         initial_equil_steps=5000,
-        step_size=0.001,
+        step_size=0.0005,
         equil_step_size=0.002,
         initial_equil_step_size=0.002,
     ):
@@ -893,15 +901,20 @@ class EvbDriver():
         E2_pes = E_data[2, sub_indices]
         E1_int = E_data[3, sub_indices]
         E2_int = E_data[4, sub_indices]
-        E_m = E_data[5, sub_indices]
+        E_constraints = E_data[5, sub_indices]
+        # E_m_pes = E_data[6, sub_indices]
+        # E_m_int = E_data[7, sub_indices]
+
         step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file, skiprows=1, delimiter=',').T[:, sub_indices]
 
         specific_result = {
-            "E1_ref": E1_pes,
-            "E2_ref": E2_pes,
-            "E1_run": E1_int,
-            "E2_run": E2_int,
-            "E_m": E_m,
+            "E1_pes": E1_pes,
+            "E2_pes": E2_pes,
+            "E1_int": E1_int,
+            "E2_int": E2_int,
+            # "E_m_pes": E_m_pes,
+            # "E_m_int": E_m_int,
+            "E_constraints": E_constraints,
             "Ep": Ep,
             "Ek": Ek,
             "Temp_step": Temp,
@@ -910,6 +923,12 @@ class EvbDriver():
             "options": options,
             "Temp_set": Temp_set,
         }
+
+        if len(E_data) > 7:
+            E_m_pes = E_data[6, sub_indices]
+            E_m_int = E_data[7, sub_indices]
+            specific_result.update({"E_m_pes": E_m_pes, "E_m_int": E_m_int})
+
         common_result = {
             "step": step,
             "Lambda": Lambda,

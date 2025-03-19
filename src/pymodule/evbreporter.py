@@ -102,7 +102,7 @@ class EvbReporter():
         })
 
         if not append:
-            header = "Lambda, reactant PES, product PES, reactant integration, product integration, E_m, Constraints\n"
+            header = "Lambda, reactant PES, product PES, reactant integration, product integration, Constraints, E_m_pes, E_m_int\n"
             self.E_out.write(header)
 
         if force_file is None:
@@ -135,7 +135,7 @@ class EvbReporter():
     @staticmethod
     def _get_simulation_dict(topology, ff, forcegroups):
         integrator = mm.VerletIntegrator(1)
-        integrator.setIntegrationForceGroups(forcegroups)
+        integrator.setIntegrationForceGroups(forcegroups)  # todo, this is probably not necessary
         simulation = mmapp.Simulation(topology, ff, integrator)
         return {"simulation": simulation, "forcegroups": forcegroups}
 
@@ -162,8 +162,16 @@ class EvbReporter():
             E = self._get_energy(simulation_dict, positions)
             line += f", {E}"
 
-        Em = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
-        line += f", {Em}\n"
+        Em_int = simulation.context.getState(
+            getEnergy=True,
+            groups=EvbForceGroup.integration_force_groups(),
+        ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+        Em_pes = simulation.context.getState(
+            getEnergy=True,
+            groups=EvbForceGroup.pes_force_groups(),
+        ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+
+        line += f", {Em_pes}, {Em_int}\n"
         self.E_out.write(line)
 
         if self.forces:
