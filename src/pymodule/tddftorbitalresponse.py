@@ -23,18 +23,16 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
 from .profiler import Profiler
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
 from .distributedarray import DistributedArray
-from .inputparser import (parse_input, parse_seq_fixed)
-from .visualizationdriver import VisualizationDriver
+from .dftutils import get_default_grid_level
+from .inputparser import parse_input
+
 
 class TddftOrbitalResponse(CphfSolver):
     """
@@ -463,7 +461,7 @@ class TddftOrbitalResponse(CphfSolver):
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
@@ -637,3 +635,41 @@ class TddftOrbitalResponse(CphfSolver):
             return omega
         else:
             return None
+
+    def print_cphf_header(self, title):
+        """
+        Prints information on the solver setup
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('{:s} Setup'.format(title))
+        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_blank()
+
+        str_width = 70
+
+        # print general info
+        cur_str = 'Solver Type                     : '
+        if self.use_subspace_solver:
+            cur_str += 'Iterative Subspace Algorithm'
+        else:
+            cur_str += 'Conjugate Gradient'
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = 'Convergence Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()

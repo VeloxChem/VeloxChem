@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -30,7 +29,7 @@ import sys
 import time
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
-from .forcefieldgenerator import ForceFieldGenerator
+from .mmforcefieldgenerator import MMForceFieldGenerator
 from .molecule import Molecule
 from .outputstream import OutputStream
 
@@ -398,7 +397,7 @@ class SolvationBuilder:
             self.ostream.print_blank()
             start = time.time()
             self.perform_equilibration()
-            self.ostream.print_info("Equilibration completed, system saved as 'equilibrated_system.pdb'")
+            self.ostream.print_info("Equilibration completed, system saved")
             self.ostream.flush()
             end = time.time()
             self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
@@ -696,7 +695,7 @@ class SolvationBuilder:
         
         # Generate the forcefields using semiempirical charges.
 
-        solute_ff = ForceFieldGenerator()
+        solute_ff = MMForceFieldGenerator()
         solute_ff.ostream.mute()
         solute_ff.partial_charges = self.solute.get_partial_charges(self.solute.get_charge())
         solute_ff.create_topology(self.solute)
@@ -707,7 +706,7 @@ class SolvationBuilder:
         else:
             solvent_ffs = []
             for i in range(len(self.solvents)):
-                solvent_ff = ForceFieldGenerator()
+                solvent_ff = MMForceFieldGenerator()
                 solvent_ff.ostream.mute()
                 solvent_ff.partial_charges = self.solvents[i].get_partial_charges(self.solvents[i].get_charge())
                 solvent_ff.create_topology(self.solvents[i])
@@ -1135,7 +1134,7 @@ class SolvationBuilder:
         
         # Solute
         if not solute_ff:
-            self.solute_ff = ForceFieldGenerator()
+            self.solute_ff = MMForceFieldGenerator()
             self.solute_ff.ostream.mute()
             if not equilibration:
                 self.ostream.print_info('Generating the ForceField for the solute')
@@ -1157,7 +1156,7 @@ class SolvationBuilder:
             elif self.solvent_name not in ['spce', 'tip3p']:
                 self.solvent_ffs = []
                 for solvent in self.solvents:
-                    solvent_ff = ForceFieldGenerator()
+                    solvent_ff = MMForceFieldGenerator()
                     solvent_ff.ostream.mute()
                     if not equilibration:
                         self.ostream.print_info(f'Generating the ForceField for the solvent')

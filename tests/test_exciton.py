@@ -132,18 +132,24 @@ class TestExciton:
             exciton_h5 = Path(exciton_drv.checkpoint_file)
 
             for ind in range(len(exciton_drv.monomers)):
-                scf_h5 = exciton_h5.with_suffix(f'.monomer_{ind + 1}.scf.h5')
+
+                final_h5 = Path(
+                    str(exciton_h5).replace('_exciton.h5',
+                                            f'_exciton_monomer_{ind + 1}.h5'))
+                if final_h5.is_file():
+                    final_h5.unlink()
+
+                scf_h5 = Path(
+                    str(exciton_h5).replace(
+                        '_exciton.h5', f'_exciton_monomer_{ind + 1}_scf.h5'))
                 if scf_h5.is_file():
                     scf_h5.unlink()
-                scf_final_h5 = scf_h5.with_suffix('.results.h5')
-                if scf_final_h5.is_file():
-                    scf_final_h5.unlink()
-                rsp_h5 = exciton_h5.with_suffix(f'.monomer_{ind + 1}.rsp.h5')
+
+                rsp_h5 = Path(
+                    str(exciton_h5).replace(
+                        '_exciton.h5', f'_exciton_monomer_{ind + 1}_rsp.h5'))
                 if rsp_h5.is_file():
                     rsp_h5.unlink()
-                rsp_final_h5 = rsp_h5.with_suffix('.solutions.h5')
-                if rsp_final_h5.is_file():
-                    rsp_final_h5.unlink()
 
             if exciton_h5.is_file():
                 exciton_h5.unlink()

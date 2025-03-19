@@ -48,13 +48,12 @@ CVisualizationDriver_compute_local_grid(CVisualizationDriver&      self,
                              const CMolecule&           molecule,
                              const CMolecularBasis&     basis,
                              const py::array_t<double>& mocoefs,
-                             const int                  moidx,
-                             const std::string&         mospin) -> void
+                             const int                  moidx) -> void
 {
     auto nao = mocoefs.shape(0);
     auto nmo = mocoefs.shape(1);
 
-    self.compute_local_grid(grid, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
+    self.compute_local_grid(grid, molecule, basis, nao, nmo, mocoefs.data(), moidx);
 }
 
 static auto
@@ -63,13 +62,12 @@ CVisualizationDriver_get_mo(CVisualizationDriver&                   self,
                             const CMolecule&                        molecule,
                             const CMolecularBasis&                  basis,
                             const py::array_t<double>&              mocoefs,
-                            const int                               moidx,
-                            const std::string&                      mospin) -> std::vector<double>
+                            const int                               moidx) -> std::vector<double>
 {
     auto nao = mocoefs.shape(0);
     auto nmo = mocoefs.shape(1);
 
-    return self.getMO(coords, molecule, basis, nao, nmo, mocoefs.data(), moidx, mospin);
+    return self.getMO(coords, molecule, basis, nao, nmo, mocoefs.data(), moidx);
 }
 
 // Exports classes/functions in src/visualization to python
@@ -119,8 +117,7 @@ export_visualization(py::module& m)
              "molecule"_a,
              "basis"_a,
              "mocoefs"_a,
-             "moidx"_a,
-             "mospin"_a)
+             "moidx"_a)
         .def("_compute_local_grid",
              py::overload_cast<CCubicGrid&, const CMolecule&, const CMolecularBasis&, const CAODensityMatrix&, const int, const std::string&>(
                  &CVisualizationDriver::compute_local_grid, py::const_),
@@ -138,8 +135,7 @@ export_visualization(py::module& m)
              "molecule"_a,
              "basis"_a,
              "mocoefs"_a,
-             "moidx"_a,
-             "mospin"_a)
+             "moidx"_a)
         .def("get_density",
              &CVisualizationDriver::getDensity,
              "Computes densities at given coordinates.",

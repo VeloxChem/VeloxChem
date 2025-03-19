@@ -102,7 +102,7 @@ def get_default_grid_level(xc_func):
             False, 'get_default_grid_level: Invalid XC functional type')
 
 
-def print_libxc_reference(xcfun, ostream):
+def print_xc_reference(xcfun, ostream):
     """
     Prints libxc reference.
 
@@ -113,8 +113,7 @@ def print_libxc_reference(xcfun, ostream):
     """
 
     if isinstance(xcfun, XCFunctional):
-        valstr = f'Using the {xcfun.get_func_label()} functional and the '
-        valstr += f'Libxc library (v{xcfun.get_libxc_version()}).'
+        valstr = f'Using the {xcfun.get_func_label()} functional.'
         ostream.print_info(valstr)
         ostream.print_blank()
         printed_refs = []
@@ -123,5 +122,18 @@ def print_libxc_reference(xcfun, ostream):
                 ostream.print_reference(ref)
                 printed_refs.append(ref)
         ostream.print_blank()
+
+        valstr = 'Using the Libxc library '
+        valstr += f'(v{xcfun.get_libxc_version()}).'
+        ostream.print_info(valstr)
+        ostream.print_blank()
         ostream.print_reference(xcfun.get_libxc_reference())
+        ostream.print_blank()
+
+        valstr = 'Using the following algorithm for XC numerical integration.'
+        ostream.print_info(valstr)
+        ostream.print_blank()
+        valstr = 'J. Kussmann, H. Laqua and C. Ochsenfeld, '
+        valstr += 'J. Chem. Theory Comput. 2021, 17, 1512-1521'
+        ostream.print_reference(valstr)
         ostream.print_blank()

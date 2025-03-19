@@ -1,16 +1,16 @@
 #include "OverlapPrimRecFI.hpp"
 
-namespace ovlrec {  // ovlrec namespace
+namespace ovlrec { // ovlrec namespace
 
 auto
-comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
-                     const size_t              idx_ovl_fi,
-                     const size_t              idx_ovl_pi,
-                     const size_t              idx_ovl_dh,
-                     const size_t              idx_ovl_di,
+comp_prim_overlap_fi(CSimdArray<double>& pbuffer, 
+                     const size_t idx_ovl_fi,
+                     const size_t idx_ovl_pi,
+                     const size_t idx_ovl_dh,
+                     const size_t idx_ovl_di,
                      const CSimdArray<double>& factors,
-                     const size_t              idx_rpa,
-                     const double              a_exp) -> void
+                     const size_t idx_rpa,
+                     const double a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -662,113 +662,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_xxx_zzzzzz = pbuffer.data(idx_ovl_fi + 27);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_x_xxxxxx,   \
-                             ts_x_xxxxxy,   \
-                             ts_x_xxxxxz,   \
-                             ts_x_xxxxyy,   \
-                             ts_x_xxxxyz,   \
-                             ts_x_xxxxzz,   \
-                             ts_x_xxxyyy,   \
-                             ts_x_xxxyyz,   \
-                             ts_x_xxxyzz,   \
-                             ts_x_xxxzzz,   \
-                             ts_x_xxyyyy,   \
-                             ts_x_xxyyyz,   \
-                             ts_x_xxyyzz,   \
-                             ts_x_xxyzzz,   \
-                             ts_x_xxzzzz,   \
-                             ts_x_xyyyyy,   \
-                             ts_x_xyyyyz,   \
-                             ts_x_xyyyzz,   \
-                             ts_x_xyyzzz,   \
-                             ts_x_xyzzzz,   \
-                             ts_x_xzzzzz,   \
-                             ts_x_yyyyyy,   \
-                             ts_x_yyyyyz,   \
-                             ts_x_yyyyzz,   \
-                             ts_x_yyyzzz,   \
-                             ts_x_yyzzzz,   \
-                             ts_x_yzzzzz,   \
-                             ts_x_zzzzzz,   \
-                             ts_xx_xxxxx,   \
-                             ts_xx_xxxxxx,  \
-                             ts_xx_xxxxxy,  \
-                             ts_xx_xxxxxz,  \
-                             ts_xx_xxxxy,   \
-                             ts_xx_xxxxyy,  \
-                             ts_xx_xxxxyz,  \
-                             ts_xx_xxxxz,   \
-                             ts_xx_xxxxzz,  \
-                             ts_xx_xxxyy,   \
-                             ts_xx_xxxyyy,  \
-                             ts_xx_xxxyyz,  \
-                             ts_xx_xxxyz,   \
-                             ts_xx_xxxyzz,  \
-                             ts_xx_xxxzz,   \
-                             ts_xx_xxxzzz,  \
-                             ts_xx_xxyyy,   \
-                             ts_xx_xxyyyy,  \
-                             ts_xx_xxyyyz,  \
-                             ts_xx_xxyyz,   \
-                             ts_xx_xxyyzz,  \
-                             ts_xx_xxyzz,   \
-                             ts_xx_xxyzzz,  \
-                             ts_xx_xxzzz,   \
-                             ts_xx_xxzzzz,  \
-                             ts_xx_xyyyy,   \
-                             ts_xx_xyyyyy,  \
-                             ts_xx_xyyyyz,  \
-                             ts_xx_xyyyz,   \
-                             ts_xx_xyyyzz,  \
-                             ts_xx_xyyzz,   \
-                             ts_xx_xyyzzz,  \
-                             ts_xx_xyzzz,   \
-                             ts_xx_xyzzzz,  \
-                             ts_xx_xzzzz,   \
-                             ts_xx_xzzzzz,  \
-                             ts_xx_yyyyy,   \
-                             ts_xx_yyyyyy,  \
-                             ts_xx_yyyyyz,  \
-                             ts_xx_yyyyz,   \
-                             ts_xx_yyyyzz,  \
-                             ts_xx_yyyzz,   \
-                             ts_xx_yyyzzz,  \
-                             ts_xx_yyzzz,   \
-                             ts_xx_yyzzzz,  \
-                             ts_xx_yzzzz,   \
-                             ts_xx_yzzzzz,  \
-                             ts_xx_zzzzz,   \
-                             ts_xx_zzzzzz,  \
-                             ts_xxx_xxxxxx, \
-                             ts_xxx_xxxxxy, \
-                             ts_xxx_xxxxxz, \
-                             ts_xxx_xxxxyy, \
-                             ts_xxx_xxxxyz, \
-                             ts_xxx_xxxxzz, \
-                             ts_xxx_xxxyyy, \
-                             ts_xxx_xxxyyz, \
-                             ts_xxx_xxxyzz, \
-                             ts_xxx_xxxzzz, \
-                             ts_xxx_xxyyyy, \
-                             ts_xxx_xxyyyz, \
-                             ts_xxx_xxyyzz, \
-                             ts_xxx_xxyzzz, \
-                             ts_xxx_xxzzzz, \
-                             ts_xxx_xyyyyy, \
-                             ts_xxx_xyyyyz, \
-                             ts_xxx_xyyyzz, \
-                             ts_xxx_xyyzzz, \
-                             ts_xxx_xyzzzz, \
-                             ts_xxx_xzzzzz, \
-                             ts_xxx_yyyyyy, \
-                             ts_xxx_yyyyyz, \
-                             ts_xxx_yyyyzz, \
-                             ts_xxx_yyyzzz, \
-                             ts_xxx_yyzzzz, \
-                             ts_xxx_yzzzzz, \
-                             ts_xxx_zzzzzz, \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_x_xxxxxx, ts_x_xxxxxy, ts_x_xxxxxz, ts_x_xxxxyy, ts_x_xxxxyz, ts_x_xxxxzz, ts_x_xxxyyy, ts_x_xxxyyz, ts_x_xxxyzz, ts_x_xxxzzz, ts_x_xxyyyy, ts_x_xxyyyz, ts_x_xxyyzz, ts_x_xxyzzz, ts_x_xxzzzz, ts_x_xyyyyy, ts_x_xyyyyz, ts_x_xyyyzz, ts_x_xyyzzz, ts_x_xyzzzz, ts_x_xzzzzz, ts_x_yyyyyy, ts_x_yyyyyz, ts_x_yyyyzz, ts_x_yyyzzz, ts_x_yyzzzz, ts_x_yzzzzz, ts_x_zzzzzz, ts_xx_xxxxx, ts_xx_xxxxxx, ts_xx_xxxxxy, ts_xx_xxxxxz, ts_xx_xxxxy, ts_xx_xxxxyy, ts_xx_xxxxyz, ts_xx_xxxxz, ts_xx_xxxxzz, ts_xx_xxxyy, ts_xx_xxxyyy, ts_xx_xxxyyz, ts_xx_xxxyz, ts_xx_xxxyzz, ts_xx_xxxzz, ts_xx_xxxzzz, ts_xx_xxyyy, ts_xx_xxyyyy, ts_xx_xxyyyz, ts_xx_xxyyz, ts_xx_xxyyzz, ts_xx_xxyzz, ts_xx_xxyzzz, ts_xx_xxzzz, ts_xx_xxzzzz, ts_xx_xyyyy, ts_xx_xyyyyy, ts_xx_xyyyyz, ts_xx_xyyyz, ts_xx_xyyyzz, ts_xx_xyyzz, ts_xx_xyyzzz, ts_xx_xyzzz, ts_xx_xyzzzz, ts_xx_xzzzz, ts_xx_xzzzzz, ts_xx_yyyyy, ts_xx_yyyyyy, ts_xx_yyyyyz, ts_xx_yyyyz, ts_xx_yyyyzz, ts_xx_yyyzz, ts_xx_yyyzzz, ts_xx_yyzzz, ts_xx_yyzzzz, ts_xx_yzzzz, ts_xx_yzzzzz, ts_xx_zzzzz, ts_xx_zzzzzz, ts_xxx_xxxxxx, ts_xxx_xxxxxy, ts_xxx_xxxxxz, ts_xxx_xxxxyy, ts_xxx_xxxxyz, ts_xxx_xxxxzz, ts_xxx_xxxyyy, ts_xxx_xxxyyz, ts_xxx_xxxyzz, ts_xxx_xxxzzz, ts_xxx_xxyyyy, ts_xxx_xxyyyz, ts_xxx_xxyyzz, ts_xxx_xxyzzz, ts_xxx_xxzzzz, ts_xxx_xyyyyy, ts_xxx_xyyyyz, ts_xxx_xyyyzz, ts_xxx_xyyzzz, ts_xxx_xyzzzz, ts_xxx_xzzzzz, ts_xxx_yyyyyy, ts_xxx_yyyyyz, ts_xxx_yyyyzz, ts_xxx_yyyzzz, ts_xxx_yyzzzz, ts_xxx_yzzzzz, ts_xxx_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -888,86 +782,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_xxy_zzzzzz = pbuffer.data(idx_ovl_fi + 55);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xx_xxxxx,   \
-                             ts_xx_xxxxxx,  \
-                             ts_xx_xxxxxy,  \
-                             ts_xx_xxxxxz,  \
-                             ts_xx_xxxxy,   \
-                             ts_xx_xxxxyy,  \
-                             ts_xx_xxxxyz,  \
-                             ts_xx_xxxxz,   \
-                             ts_xx_xxxxzz,  \
-                             ts_xx_xxxyy,   \
-                             ts_xx_xxxyyy,  \
-                             ts_xx_xxxyyz,  \
-                             ts_xx_xxxyz,   \
-                             ts_xx_xxxyzz,  \
-                             ts_xx_xxxzz,   \
-                             ts_xx_xxxzzz,  \
-                             ts_xx_xxyyy,   \
-                             ts_xx_xxyyyy,  \
-                             ts_xx_xxyyyz,  \
-                             ts_xx_xxyyz,   \
-                             ts_xx_xxyyzz,  \
-                             ts_xx_xxyzz,   \
-                             ts_xx_xxyzzz,  \
-                             ts_xx_xxzzz,   \
-                             ts_xx_xxzzzz,  \
-                             ts_xx_xyyyy,   \
-                             ts_xx_xyyyyy,  \
-                             ts_xx_xyyyyz,  \
-                             ts_xx_xyyyz,   \
-                             ts_xx_xyyyzz,  \
-                             ts_xx_xyyzz,   \
-                             ts_xx_xyyzzz,  \
-                             ts_xx_xyzzz,   \
-                             ts_xx_xyzzzz,  \
-                             ts_xx_xzzzz,   \
-                             ts_xx_xzzzzz,  \
-                             ts_xx_zzzzzz,  \
-                             ts_xxy_xxxxxx, \
-                             ts_xxy_xxxxxy, \
-                             ts_xxy_xxxxxz, \
-                             ts_xxy_xxxxyy, \
-                             ts_xxy_xxxxyz, \
-                             ts_xxy_xxxxzz, \
-                             ts_xxy_xxxyyy, \
-                             ts_xxy_xxxyyz, \
-                             ts_xxy_xxxyzz, \
-                             ts_xxy_xxxzzz, \
-                             ts_xxy_xxyyyy, \
-                             ts_xxy_xxyyyz, \
-                             ts_xxy_xxyyzz, \
-                             ts_xxy_xxyzzz, \
-                             ts_xxy_xxzzzz, \
-                             ts_xxy_xyyyyy, \
-                             ts_xxy_xyyyyz, \
-                             ts_xxy_xyyyzz, \
-                             ts_xxy_xyyzzz, \
-                             ts_xxy_xyzzzz, \
-                             ts_xxy_xzzzzz, \
-                             ts_xxy_yyyyyy, \
-                             ts_xxy_yyyyyz, \
-                             ts_xxy_yyyyzz, \
-                             ts_xxy_yyyzzz, \
-                             ts_xxy_yyzzzz, \
-                             ts_xxy_yzzzzz, \
-                             ts_xxy_zzzzzz, \
-                             ts_xy_yyyyyy,  \
-                             ts_xy_yyyyyz,  \
-                             ts_xy_yyyyzz,  \
-                             ts_xy_yyyzzz,  \
-                             ts_xy_yyzzzz,  \
-                             ts_xy_yzzzzz,  \
-                             ts_y_yyyyyy,   \
-                             ts_y_yyyyyz,   \
-                             ts_y_yyyyzz,   \
-                             ts_y_yyyzzz,   \
-                             ts_y_yyzzzz,   \
-                             ts_y_yzzzzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xx_xxxxx, ts_xx_xxxxxx, ts_xx_xxxxxy, ts_xx_xxxxxz, ts_xx_xxxxy, ts_xx_xxxxyy, ts_xx_xxxxyz, ts_xx_xxxxz, ts_xx_xxxxzz, ts_xx_xxxyy, ts_xx_xxxyyy, ts_xx_xxxyyz, ts_xx_xxxyz, ts_xx_xxxyzz, ts_xx_xxxzz, ts_xx_xxxzzz, ts_xx_xxyyy, ts_xx_xxyyyy, ts_xx_xxyyyz, ts_xx_xxyyz, ts_xx_xxyyzz, ts_xx_xxyzz, ts_xx_xxyzzz, ts_xx_xxzzz, ts_xx_xxzzzz, ts_xx_xyyyy, ts_xx_xyyyyy, ts_xx_xyyyyz, ts_xx_xyyyz, ts_xx_xyyyzz, ts_xx_xyyzz, ts_xx_xyyzzz, ts_xx_xyzzz, ts_xx_xyzzzz, ts_xx_xzzzz, ts_xx_xzzzzz, ts_xx_zzzzzz, ts_xxy_xxxxxx, ts_xxy_xxxxxy, ts_xxy_xxxxxz, ts_xxy_xxxxyy, ts_xxy_xxxxyz, ts_xxy_xxxxzz, ts_xxy_xxxyyy, ts_xxy_xxxyyz, ts_xxy_xxxyzz, ts_xxy_xxxzzz, ts_xxy_xxyyyy, ts_xxy_xxyyyz, ts_xxy_xxyyzz, ts_xxy_xxyzzz, ts_xxy_xxzzzz, ts_xxy_xyyyyy, ts_xxy_xyyyyz, ts_xxy_xyyyzz, ts_xxy_xyyzzz, ts_xxy_xyzzzz, ts_xxy_xzzzzz, ts_xxy_yyyyyy, ts_xxy_yyyyyz, ts_xxy_yyyyzz, ts_xxy_yyyzzz, ts_xxy_yyzzzz, ts_xxy_yzzzzz, ts_xxy_zzzzzz, ts_xy_yyyyyy, ts_xy_yyyyyz, ts_xy_yyyyzz, ts_xy_yyyzzz, ts_xy_yyzzzz, ts_xy_yzzzzz, ts_y_yyyyyy, ts_y_yyyyyz, ts_y_yyyyzz, ts_y_yyyzzz, ts_y_yyzzzz, ts_y_yzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1087,86 +902,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_xxz_zzzzzz = pbuffer.data(idx_ovl_fi + 83);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_z,          \
-                             ts_xx_xxxxx,   \
-                             ts_xx_xxxxxx,  \
-                             ts_xx_xxxxxy,  \
-                             ts_xx_xxxxxz,  \
-                             ts_xx_xxxxy,   \
-                             ts_xx_xxxxyy,  \
-                             ts_xx_xxxxyz,  \
-                             ts_xx_xxxxz,   \
-                             ts_xx_xxxxzz,  \
-                             ts_xx_xxxyy,   \
-                             ts_xx_xxxyyy,  \
-                             ts_xx_xxxyyz,  \
-                             ts_xx_xxxyz,   \
-                             ts_xx_xxxyzz,  \
-                             ts_xx_xxxzz,   \
-                             ts_xx_xxxzzz,  \
-                             ts_xx_xxyyy,   \
-                             ts_xx_xxyyyy,  \
-                             ts_xx_xxyyyz,  \
-                             ts_xx_xxyyz,   \
-                             ts_xx_xxyyzz,  \
-                             ts_xx_xxyzz,   \
-                             ts_xx_xxyzzz,  \
-                             ts_xx_xxzzz,   \
-                             ts_xx_xxzzzz,  \
-                             ts_xx_xyyyy,   \
-                             ts_xx_xyyyyy,  \
-                             ts_xx_xyyyyz,  \
-                             ts_xx_xyyyz,   \
-                             ts_xx_xyyyzz,  \
-                             ts_xx_xyyzz,   \
-                             ts_xx_xyyzzz,  \
-                             ts_xx_xyzzz,   \
-                             ts_xx_xyzzzz,  \
-                             ts_xx_xzzzz,   \
-                             ts_xx_xzzzzz,  \
-                             ts_xx_yyyyyy,  \
-                             ts_xxz_xxxxxx, \
-                             ts_xxz_xxxxxy, \
-                             ts_xxz_xxxxxz, \
-                             ts_xxz_xxxxyy, \
-                             ts_xxz_xxxxyz, \
-                             ts_xxz_xxxxzz, \
-                             ts_xxz_xxxyyy, \
-                             ts_xxz_xxxyyz, \
-                             ts_xxz_xxxyzz, \
-                             ts_xxz_xxxzzz, \
-                             ts_xxz_xxyyyy, \
-                             ts_xxz_xxyyyz, \
-                             ts_xxz_xxyyzz, \
-                             ts_xxz_xxyzzz, \
-                             ts_xxz_xxzzzz, \
-                             ts_xxz_xyyyyy, \
-                             ts_xxz_xyyyyz, \
-                             ts_xxz_xyyyzz, \
-                             ts_xxz_xyyzzz, \
-                             ts_xxz_xyzzzz, \
-                             ts_xxz_xzzzzz, \
-                             ts_xxz_yyyyyy, \
-                             ts_xxz_yyyyyz, \
-                             ts_xxz_yyyyzz, \
-                             ts_xxz_yyyzzz, \
-                             ts_xxz_yyzzzz, \
-                             ts_xxz_yzzzzz, \
-                             ts_xxz_zzzzzz, \
-                             ts_xz_yyyyyz,  \
-                             ts_xz_yyyyzz,  \
-                             ts_xz_yyyzzz,  \
-                             ts_xz_yyzzzz,  \
-                             ts_xz_yzzzzz,  \
-                             ts_xz_zzzzzz,  \
-                             ts_z_yyyyyz,   \
-                             ts_z_yyyyzz,   \
-                             ts_z_yyyzzz,   \
-                             ts_z_yyzzzz,   \
-                             ts_z_yzzzzz,   \
-                             ts_z_zzzzzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_z, ts_xx_xxxxx, ts_xx_xxxxxx, ts_xx_xxxxxy, ts_xx_xxxxxz, ts_xx_xxxxy, ts_xx_xxxxyy, ts_xx_xxxxyz, ts_xx_xxxxz, ts_xx_xxxxzz, ts_xx_xxxyy, ts_xx_xxxyyy, ts_xx_xxxyyz, ts_xx_xxxyz, ts_xx_xxxyzz, ts_xx_xxxzz, ts_xx_xxxzzz, ts_xx_xxyyy, ts_xx_xxyyyy, ts_xx_xxyyyz, ts_xx_xxyyz, ts_xx_xxyyzz, ts_xx_xxyzz, ts_xx_xxyzzz, ts_xx_xxzzz, ts_xx_xxzzzz, ts_xx_xyyyy, ts_xx_xyyyyy, ts_xx_xyyyyz, ts_xx_xyyyz, ts_xx_xyyyzz, ts_xx_xyyzz, ts_xx_xyyzzz, ts_xx_xyzzz, ts_xx_xyzzzz, ts_xx_xzzzz, ts_xx_xzzzzz, ts_xx_yyyyyy, ts_xxz_xxxxxx, ts_xxz_xxxxxy, ts_xxz_xxxxxz, ts_xxz_xxxxyy, ts_xxz_xxxxyz, ts_xxz_xxxxzz, ts_xxz_xxxyyy, ts_xxz_xxxyyz, ts_xxz_xxxyzz, ts_xxz_xxxzzz, ts_xxz_xxyyyy, ts_xxz_xxyyyz, ts_xxz_xxyyzz, ts_xxz_xxyzzz, ts_xxz_xxzzzz, ts_xxz_xyyyyy, ts_xxz_xyyyyz, ts_xxz_xyyyzz, ts_xxz_xyyzzz, ts_xxz_xyzzzz, ts_xxz_xzzzzz, ts_xxz_yyyyyy, ts_xxz_yyyyyz, ts_xxz_yyyyzz, ts_xxz_yyyzzz, ts_xxz_yyzzzz, ts_xxz_yzzzzz, ts_xxz_zzzzzz, ts_xz_yyyyyz, ts_xz_yyyyzz, ts_xz_yyyzzz, ts_xz_yyzzzz, ts_xz_yzzzzz, ts_xz_zzzzzz, ts_z_yyyyyz, ts_z_yyyyzz, ts_z_yyyzzz, ts_z_yyzzzz, ts_z_yzzzzz, ts_z_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1286,85 +1022,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_xyy_zzzzzz = pbuffer.data(idx_ovl_fi + 111);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_xyy_xxxxxx, \
-                             ts_xyy_xxxxxy, \
-                             ts_xyy_xxxxxz, \
-                             ts_xyy_xxxxyy, \
-                             ts_xyy_xxxxyz, \
-                             ts_xyy_xxxxzz, \
-                             ts_xyy_xxxyyy, \
-                             ts_xyy_xxxyyz, \
-                             ts_xyy_xxxyzz, \
-                             ts_xyy_xxxzzz, \
-                             ts_xyy_xxyyyy, \
-                             ts_xyy_xxyyyz, \
-                             ts_xyy_xxyyzz, \
-                             ts_xyy_xxyzzz, \
-                             ts_xyy_xxzzzz, \
-                             ts_xyy_xyyyyy, \
-                             ts_xyy_xyyyyz, \
-                             ts_xyy_xyyyzz, \
-                             ts_xyy_xyyzzz, \
-                             ts_xyy_xyzzzz, \
-                             ts_xyy_xzzzzz, \
-                             ts_xyy_yyyyyy, \
-                             ts_xyy_yyyyyz, \
-                             ts_xyy_yyyyzz, \
-                             ts_xyy_yyyzzz, \
-                             ts_xyy_yyzzzz, \
-                             ts_xyy_yzzzzz, \
-                             ts_xyy_zzzzzz, \
-                             ts_yy_xxxxx,   \
-                             ts_yy_xxxxxx,  \
-                             ts_yy_xxxxxy,  \
-                             ts_yy_xxxxxz,  \
-                             ts_yy_xxxxy,   \
-                             ts_yy_xxxxyy,  \
-                             ts_yy_xxxxyz,  \
-                             ts_yy_xxxxz,   \
-                             ts_yy_xxxxzz,  \
-                             ts_yy_xxxyy,   \
-                             ts_yy_xxxyyy,  \
-                             ts_yy_xxxyyz,  \
-                             ts_yy_xxxyz,   \
-                             ts_yy_xxxyzz,  \
-                             ts_yy_xxxzz,   \
-                             ts_yy_xxxzzz,  \
-                             ts_yy_xxyyy,   \
-                             ts_yy_xxyyyy,  \
-                             ts_yy_xxyyyz,  \
-                             ts_yy_xxyyz,   \
-                             ts_yy_xxyyzz,  \
-                             ts_yy_xxyzz,   \
-                             ts_yy_xxyzzz,  \
-                             ts_yy_xxzzz,   \
-                             ts_yy_xxzzzz,  \
-                             ts_yy_xyyyy,   \
-                             ts_yy_xyyyyy,  \
-                             ts_yy_xyyyyz,  \
-                             ts_yy_xyyyz,   \
-                             ts_yy_xyyyzz,  \
-                             ts_yy_xyyzz,   \
-                             ts_yy_xyyzzz,  \
-                             ts_yy_xyzzz,   \
-                             ts_yy_xyzzzz,  \
-                             ts_yy_xzzzz,   \
-                             ts_yy_xzzzzz,  \
-                             ts_yy_yyyyy,   \
-                             ts_yy_yyyyyy,  \
-                             ts_yy_yyyyyz,  \
-                             ts_yy_yyyyz,   \
-                             ts_yy_yyyyzz,  \
-                             ts_yy_yyyzz,   \
-                             ts_yy_yyyzzz,  \
-                             ts_yy_yyzzz,   \
-                             ts_yy_yyzzzz,  \
-                             ts_yy_yzzzz,   \
-                             ts_yy_yzzzzz,  \
-                             ts_yy_zzzzz,   \
-                             ts_yy_zzzzzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_xyy_xxxxxx, ts_xyy_xxxxxy, ts_xyy_xxxxxz, ts_xyy_xxxxyy, ts_xyy_xxxxyz, ts_xyy_xxxxzz, ts_xyy_xxxyyy, ts_xyy_xxxyyz, ts_xyy_xxxyzz, ts_xyy_xxxzzz, ts_xyy_xxyyyy, ts_xyy_xxyyyz, ts_xyy_xxyyzz, ts_xyy_xxyzzz, ts_xyy_xxzzzz, ts_xyy_xyyyyy, ts_xyy_xyyyyz, ts_xyy_xyyyzz, ts_xyy_xyyzzz, ts_xyy_xyzzzz, ts_xyy_xzzzzz, ts_xyy_yyyyyy, ts_xyy_yyyyyz, ts_xyy_yyyyzz, ts_xyy_yyyzzz, ts_xyy_yyzzzz, ts_xyy_yzzzzz, ts_xyy_zzzzzz, ts_yy_xxxxx, ts_yy_xxxxxx, ts_yy_xxxxxy, ts_yy_xxxxxz, ts_yy_xxxxy, ts_yy_xxxxyy, ts_yy_xxxxyz, ts_yy_xxxxz, ts_yy_xxxxzz, ts_yy_xxxyy, ts_yy_xxxyyy, ts_yy_xxxyyz, ts_yy_xxxyz, ts_yy_xxxyzz, ts_yy_xxxzz, ts_yy_xxxzzz, ts_yy_xxyyy, ts_yy_xxyyyy, ts_yy_xxyyyz, ts_yy_xxyyz, ts_yy_xxyyzz, ts_yy_xxyzz, ts_yy_xxyzzz, ts_yy_xxzzz, ts_yy_xxzzzz, ts_yy_xyyyy, ts_yy_xyyyyy, ts_yy_xyyyyz, ts_yy_xyyyz, ts_yy_xyyyzz, ts_yy_xyyzz, ts_yy_xyyzzz, ts_yy_xyzzz, ts_yy_xyzzzz, ts_yy_xzzzz, ts_yy_xzzzzz, ts_yy_yyyyy, ts_yy_yyyyyy, ts_yy_yyyyyz, ts_yy_yyyyz, ts_yy_yyyyzz, ts_yy_yyyzz, ts_yy_yyyzzz, ts_yy_yyzzz, ts_yy_yyzzzz, ts_yy_yzzzz, ts_yy_yzzzzz, ts_yy_zzzzz, ts_yy_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1484,76 +1142,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_xyz_zzzzzz = pbuffer.data(idx_ovl_fi + 139);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             pa_z,          \
-                             ts_xy_xxxxxy,  \
-                             ts_xy_xxxxyy,  \
-                             ts_xy_xxxyyy,  \
-                             ts_xy_xxyyyy,  \
-                             ts_xy_xyyyyy,  \
-                             ts_xyz_xxxxxx, \
-                             ts_xyz_xxxxxy, \
-                             ts_xyz_xxxxxz, \
-                             ts_xyz_xxxxyy, \
-                             ts_xyz_xxxxyz, \
-                             ts_xyz_xxxxzz, \
-                             ts_xyz_xxxyyy, \
-                             ts_xyz_xxxyyz, \
-                             ts_xyz_xxxyzz, \
-                             ts_xyz_xxxzzz, \
-                             ts_xyz_xxyyyy, \
-                             ts_xyz_xxyyyz, \
-                             ts_xyz_xxyyzz, \
-                             ts_xyz_xxyzzz, \
-                             ts_xyz_xxzzzz, \
-                             ts_xyz_xyyyyy, \
-                             ts_xyz_xyyyyz, \
-                             ts_xyz_xyyyzz, \
-                             ts_xyz_xyyzzz, \
-                             ts_xyz_xyzzzz, \
-                             ts_xyz_xzzzzz, \
-                             ts_xyz_yyyyyy, \
-                             ts_xyz_yyyyyz, \
-                             ts_xyz_yyyyzz, \
-                             ts_xyz_yyyzzz, \
-                             ts_xyz_yyzzzz, \
-                             ts_xyz_yzzzzz, \
-                             ts_xyz_zzzzzz, \
-                             ts_xz_xxxxxx,  \
-                             ts_xz_xxxxxz,  \
-                             ts_xz_xxxxzz,  \
-                             ts_xz_xxxzzz,  \
-                             ts_xz_xxzzzz,  \
-                             ts_xz_xzzzzz,  \
-                             ts_yz_xxxxyz,  \
-                             ts_yz_xxxyyz,  \
-                             ts_yz_xxxyz,   \
-                             ts_yz_xxxyzz,  \
-                             ts_yz_xxyyyz,  \
-                             ts_yz_xxyyz,   \
-                             ts_yz_xxyyzz,  \
-                             ts_yz_xxyzz,   \
-                             ts_yz_xxyzzz,  \
-                             ts_yz_xyyyyz,  \
-                             ts_yz_xyyyz,   \
-                             ts_yz_xyyyzz,  \
-                             ts_yz_xyyzz,   \
-                             ts_yz_xyyzzz,  \
-                             ts_yz_xyzzz,   \
-                             ts_yz_xyzzzz,  \
-                             ts_yz_yyyyyy,  \
-                             ts_yz_yyyyyz,  \
-                             ts_yz_yyyyz,   \
-                             ts_yz_yyyyzz,  \
-                             ts_yz_yyyzz,   \
-                             ts_yz_yyyzzz,  \
-                             ts_yz_yyzzz,   \
-                             ts_yz_yyzzzz,  \
-                             ts_yz_yzzzz,   \
-                             ts_yz_yzzzzz,  \
-                             ts_yz_zzzzzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, pa_z, ts_xy_xxxxxy, ts_xy_xxxxyy, ts_xy_xxxyyy, ts_xy_xxyyyy, ts_xy_xyyyyy, ts_xyz_xxxxxx, ts_xyz_xxxxxy, ts_xyz_xxxxxz, ts_xyz_xxxxyy, ts_xyz_xxxxyz, ts_xyz_xxxxzz, ts_xyz_xxxyyy, ts_xyz_xxxyyz, ts_xyz_xxxyzz, ts_xyz_xxxzzz, ts_xyz_xxyyyy, ts_xyz_xxyyyz, ts_xyz_xxyyzz, ts_xyz_xxyzzz, ts_xyz_xxzzzz, ts_xyz_xyyyyy, ts_xyz_xyyyyz, ts_xyz_xyyyzz, ts_xyz_xyyzzz, ts_xyz_xyzzzz, ts_xyz_xzzzzz, ts_xyz_yyyyyy, ts_xyz_yyyyyz, ts_xyz_yyyyzz, ts_xyz_yyyzzz, ts_xyz_yyzzzz, ts_xyz_yzzzzz, ts_xyz_zzzzzz, ts_xz_xxxxxx, ts_xz_xxxxxz, ts_xz_xxxxzz, ts_xz_xxxzzz, ts_xz_xxzzzz, ts_xz_xzzzzz, ts_yz_xxxxyz, ts_yz_xxxyyz, ts_yz_xxxyz, ts_yz_xxxyzz, ts_yz_xxyyyz, ts_yz_xxyyz, ts_yz_xxyyzz, ts_yz_xxyzz, ts_yz_xxyzzz, ts_yz_xyyyyz, ts_yz_xyyyz, ts_yz_xyyyzz, ts_yz_xyyzz, ts_yz_xyyzzz, ts_yz_xyzzz, ts_yz_xyzzzz, ts_yz_yyyyyy, ts_yz_yyyyyz, ts_yz_yyyyz, ts_yz_yyyyzz, ts_yz_yyyzz, ts_yz_yyyzzz, ts_yz_yyzzz, ts_yz_yyzzzz, ts_yz_yzzzz, ts_yz_yzzzzz, ts_yz_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1673,85 +1262,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_xzz_zzzzzz = pbuffer.data(idx_ovl_fi + 167);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_xzz_xxxxxx, \
-                             ts_xzz_xxxxxy, \
-                             ts_xzz_xxxxxz, \
-                             ts_xzz_xxxxyy, \
-                             ts_xzz_xxxxyz, \
-                             ts_xzz_xxxxzz, \
-                             ts_xzz_xxxyyy, \
-                             ts_xzz_xxxyyz, \
-                             ts_xzz_xxxyzz, \
-                             ts_xzz_xxxzzz, \
-                             ts_xzz_xxyyyy, \
-                             ts_xzz_xxyyyz, \
-                             ts_xzz_xxyyzz, \
-                             ts_xzz_xxyzzz, \
-                             ts_xzz_xxzzzz, \
-                             ts_xzz_xyyyyy, \
-                             ts_xzz_xyyyyz, \
-                             ts_xzz_xyyyzz, \
-                             ts_xzz_xyyzzz, \
-                             ts_xzz_xyzzzz, \
-                             ts_xzz_xzzzzz, \
-                             ts_xzz_yyyyyy, \
-                             ts_xzz_yyyyyz, \
-                             ts_xzz_yyyyzz, \
-                             ts_xzz_yyyzzz, \
-                             ts_xzz_yyzzzz, \
-                             ts_xzz_yzzzzz, \
-                             ts_xzz_zzzzzz, \
-                             ts_zz_xxxxx,   \
-                             ts_zz_xxxxxx,  \
-                             ts_zz_xxxxxy,  \
-                             ts_zz_xxxxxz,  \
-                             ts_zz_xxxxy,   \
-                             ts_zz_xxxxyy,  \
-                             ts_zz_xxxxyz,  \
-                             ts_zz_xxxxz,   \
-                             ts_zz_xxxxzz,  \
-                             ts_zz_xxxyy,   \
-                             ts_zz_xxxyyy,  \
-                             ts_zz_xxxyyz,  \
-                             ts_zz_xxxyz,   \
-                             ts_zz_xxxyzz,  \
-                             ts_zz_xxxzz,   \
-                             ts_zz_xxxzzz,  \
-                             ts_zz_xxyyy,   \
-                             ts_zz_xxyyyy,  \
-                             ts_zz_xxyyyz,  \
-                             ts_zz_xxyyz,   \
-                             ts_zz_xxyyzz,  \
-                             ts_zz_xxyzz,   \
-                             ts_zz_xxyzzz,  \
-                             ts_zz_xxzzz,   \
-                             ts_zz_xxzzzz,  \
-                             ts_zz_xyyyy,   \
-                             ts_zz_xyyyyy,  \
-                             ts_zz_xyyyyz,  \
-                             ts_zz_xyyyz,   \
-                             ts_zz_xyyyzz,  \
-                             ts_zz_xyyzz,   \
-                             ts_zz_xyyzzz,  \
-                             ts_zz_xyzzz,   \
-                             ts_zz_xyzzzz,  \
-                             ts_zz_xzzzz,   \
-                             ts_zz_xzzzzz,  \
-                             ts_zz_yyyyy,   \
-                             ts_zz_yyyyyy,  \
-                             ts_zz_yyyyyz,  \
-                             ts_zz_yyyyz,   \
-                             ts_zz_yyyyzz,  \
-                             ts_zz_yyyzz,   \
-                             ts_zz_yyyzzz,  \
-                             ts_zz_yyzzz,   \
-                             ts_zz_yyzzzz,  \
-                             ts_zz_yzzzz,   \
-                             ts_zz_yzzzzz,  \
-                             ts_zz_zzzzz,   \
-                             ts_zz_zzzzzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_xzz_xxxxxx, ts_xzz_xxxxxy, ts_xzz_xxxxxz, ts_xzz_xxxxyy, ts_xzz_xxxxyz, ts_xzz_xxxxzz, ts_xzz_xxxyyy, ts_xzz_xxxyyz, ts_xzz_xxxyzz, ts_xzz_xxxzzz, ts_xzz_xxyyyy, ts_xzz_xxyyyz, ts_xzz_xxyyzz, ts_xzz_xxyzzz, ts_xzz_xxzzzz, ts_xzz_xyyyyy, ts_xzz_xyyyyz, ts_xzz_xyyyzz, ts_xzz_xyyzzz, ts_xzz_xyzzzz, ts_xzz_xzzzzz, ts_xzz_yyyyyy, ts_xzz_yyyyyz, ts_xzz_yyyyzz, ts_xzz_yyyzzz, ts_xzz_yyzzzz, ts_xzz_yzzzzz, ts_xzz_zzzzzz, ts_zz_xxxxx, ts_zz_xxxxxx, ts_zz_xxxxxy, ts_zz_xxxxxz, ts_zz_xxxxy, ts_zz_xxxxyy, ts_zz_xxxxyz, ts_zz_xxxxz, ts_zz_xxxxzz, ts_zz_xxxyy, ts_zz_xxxyyy, ts_zz_xxxyyz, ts_zz_xxxyz, ts_zz_xxxyzz, ts_zz_xxxzz, ts_zz_xxxzzz, ts_zz_xxyyy, ts_zz_xxyyyy, ts_zz_xxyyyz, ts_zz_xxyyz, ts_zz_xxyyzz, ts_zz_xxyzz, ts_zz_xxyzzz, ts_zz_xxzzz, ts_zz_xxzzzz, ts_zz_xyyyy, ts_zz_xyyyyy, ts_zz_xyyyyz, ts_zz_xyyyz, ts_zz_xyyyzz, ts_zz_xyyzz, ts_zz_xyyzzz, ts_zz_xyzzz, ts_zz_xyzzzz, ts_zz_xzzzz, ts_zz_xzzzzz, ts_zz_yyyyy, ts_zz_yyyyyy, ts_zz_yyyyyz, ts_zz_yyyyz, ts_zz_yyyyzz, ts_zz_yyyzz, ts_zz_yyyzzz, ts_zz_yyzzz, ts_zz_yyzzzz, ts_zz_yzzzz, ts_zz_yzzzzz, ts_zz_zzzzz, ts_zz_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1871,113 +1382,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_yyy_zzzzzz = pbuffer.data(idx_ovl_fi + 195);
 
-#pragma omp simd aligned(pa_y,              \
-                             ts_y_xxxxxx,   \
-                             ts_y_xxxxxy,   \
-                             ts_y_xxxxxz,   \
-                             ts_y_xxxxyy,   \
-                             ts_y_xxxxyz,   \
-                             ts_y_xxxxzz,   \
-                             ts_y_xxxyyy,   \
-                             ts_y_xxxyyz,   \
-                             ts_y_xxxyzz,   \
-                             ts_y_xxxzzz,   \
-                             ts_y_xxyyyy,   \
-                             ts_y_xxyyyz,   \
-                             ts_y_xxyyzz,   \
-                             ts_y_xxyzzz,   \
-                             ts_y_xxzzzz,   \
-                             ts_y_xyyyyy,   \
-                             ts_y_xyyyyz,   \
-                             ts_y_xyyyzz,   \
-                             ts_y_xyyzzz,   \
-                             ts_y_xyzzzz,   \
-                             ts_y_xzzzzz,   \
-                             ts_y_yyyyyy,   \
-                             ts_y_yyyyyz,   \
-                             ts_y_yyyyzz,   \
-                             ts_y_yyyzzz,   \
-                             ts_y_yyzzzz,   \
-                             ts_y_yzzzzz,   \
-                             ts_y_zzzzzz,   \
-                             ts_yy_xxxxx,   \
-                             ts_yy_xxxxxx,  \
-                             ts_yy_xxxxxy,  \
-                             ts_yy_xxxxxz,  \
-                             ts_yy_xxxxy,   \
-                             ts_yy_xxxxyy,  \
-                             ts_yy_xxxxyz,  \
-                             ts_yy_xxxxz,   \
-                             ts_yy_xxxxzz,  \
-                             ts_yy_xxxyy,   \
-                             ts_yy_xxxyyy,  \
-                             ts_yy_xxxyyz,  \
-                             ts_yy_xxxyz,   \
-                             ts_yy_xxxyzz,  \
-                             ts_yy_xxxzz,   \
-                             ts_yy_xxxzzz,  \
-                             ts_yy_xxyyy,   \
-                             ts_yy_xxyyyy,  \
-                             ts_yy_xxyyyz,  \
-                             ts_yy_xxyyz,   \
-                             ts_yy_xxyyzz,  \
-                             ts_yy_xxyzz,   \
-                             ts_yy_xxyzzz,  \
-                             ts_yy_xxzzz,   \
-                             ts_yy_xxzzzz,  \
-                             ts_yy_xyyyy,   \
-                             ts_yy_xyyyyy,  \
-                             ts_yy_xyyyyz,  \
-                             ts_yy_xyyyz,   \
-                             ts_yy_xyyyzz,  \
-                             ts_yy_xyyzz,   \
-                             ts_yy_xyyzzz,  \
-                             ts_yy_xyzzz,   \
-                             ts_yy_xyzzzz,  \
-                             ts_yy_xzzzz,   \
-                             ts_yy_xzzzzz,  \
-                             ts_yy_yyyyy,   \
-                             ts_yy_yyyyyy,  \
-                             ts_yy_yyyyyz,  \
-                             ts_yy_yyyyz,   \
-                             ts_yy_yyyyzz,  \
-                             ts_yy_yyyzz,   \
-                             ts_yy_yyyzzz,  \
-                             ts_yy_yyzzz,   \
-                             ts_yy_yyzzzz,  \
-                             ts_yy_yzzzz,   \
-                             ts_yy_yzzzzz,  \
-                             ts_yy_zzzzz,   \
-                             ts_yy_zzzzzz,  \
-                             ts_yyy_xxxxxx, \
-                             ts_yyy_xxxxxy, \
-                             ts_yyy_xxxxxz, \
-                             ts_yyy_xxxxyy, \
-                             ts_yyy_xxxxyz, \
-                             ts_yyy_xxxxzz, \
-                             ts_yyy_xxxyyy, \
-                             ts_yyy_xxxyyz, \
-                             ts_yyy_xxxyzz, \
-                             ts_yyy_xxxzzz, \
-                             ts_yyy_xxyyyy, \
-                             ts_yyy_xxyyyz, \
-                             ts_yyy_xxyyzz, \
-                             ts_yyy_xxyzzz, \
-                             ts_yyy_xxzzzz, \
-                             ts_yyy_xyyyyy, \
-                             ts_yyy_xyyyyz, \
-                             ts_yyy_xyyyzz, \
-                             ts_yyy_xyyzzz, \
-                             ts_yyy_xyzzzz, \
-                             ts_yyy_xzzzzz, \
-                             ts_yyy_yyyyyy, \
-                             ts_yyy_yyyyyz, \
-                             ts_yyy_yyyyzz, \
-                             ts_yyy_yyyzzz, \
-                             ts_yyy_yyzzzz, \
-                             ts_yyy_yzzzzz, \
-                             ts_yyy_zzzzzz, \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, ts_y_xxxxxx, ts_y_xxxxxy, ts_y_xxxxxz, ts_y_xxxxyy, ts_y_xxxxyz, ts_y_xxxxzz, ts_y_xxxyyy, ts_y_xxxyyz, ts_y_xxxyzz, ts_y_xxxzzz, ts_y_xxyyyy, ts_y_xxyyyz, ts_y_xxyyzz, ts_y_xxyzzz, ts_y_xxzzzz, ts_y_xyyyyy, ts_y_xyyyyz, ts_y_xyyyzz, ts_y_xyyzzz, ts_y_xyzzzz, ts_y_xzzzzz, ts_y_yyyyyy, ts_y_yyyyyz, ts_y_yyyyzz, ts_y_yyyzzz, ts_y_yyzzzz, ts_y_yzzzzz, ts_y_zzzzzz, ts_yy_xxxxx, ts_yy_xxxxxx, ts_yy_xxxxxy, ts_yy_xxxxxz, ts_yy_xxxxy, ts_yy_xxxxyy, ts_yy_xxxxyz, ts_yy_xxxxz, ts_yy_xxxxzz, ts_yy_xxxyy, ts_yy_xxxyyy, ts_yy_xxxyyz, ts_yy_xxxyz, ts_yy_xxxyzz, ts_yy_xxxzz, ts_yy_xxxzzz, ts_yy_xxyyy, ts_yy_xxyyyy, ts_yy_xxyyyz, ts_yy_xxyyz, ts_yy_xxyyzz, ts_yy_xxyzz, ts_yy_xxyzzz, ts_yy_xxzzz, ts_yy_xxzzzz, ts_yy_xyyyy, ts_yy_xyyyyy, ts_yy_xyyyyz, ts_yy_xyyyz, ts_yy_xyyyzz, ts_yy_xyyzz, ts_yy_xyyzzz, ts_yy_xyzzz, ts_yy_xyzzzz, ts_yy_xzzzz, ts_yy_xzzzzz, ts_yy_yyyyy, ts_yy_yyyyyy, ts_yy_yyyyyz, ts_yy_yyyyz, ts_yy_yyyyzz, ts_yy_yyyzz, ts_yy_yyyzzz, ts_yy_yyzzz, ts_yy_yyzzzz, ts_yy_yzzzz, ts_yy_yzzzzz, ts_yy_zzzzz, ts_yy_zzzzzz, ts_yyy_xxxxxx, ts_yyy_xxxxxy, ts_yyy_xxxxxz, ts_yyy_xxxxyy, ts_yyy_xxxxyz, ts_yyy_xxxxzz, ts_yyy_xxxyyy, ts_yyy_xxxyyz, ts_yyy_xxxyzz, ts_yyy_xxxzzz, ts_yyy_xxyyyy, ts_yyy_xxyyyz, ts_yyy_xxyyzz, ts_yyy_xxyzzz, ts_yyy_xxzzzz, ts_yyy_xyyyyy, ts_yyy_xyyyyz, ts_yyy_xyyyzz, ts_yyy_xyyzzz, ts_yyy_xyzzzz, ts_yyy_xzzzzz, ts_yyy_yyyyyy, ts_yyy_yyyyyz, ts_yyy_yyyyzz, ts_yyy_yyyzzz, ts_yyy_yyzzzz, ts_yyy_yzzzzz, ts_yyy_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2097,86 +1502,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_yyz_zzzzzz = pbuffer.data(idx_ovl_fi + 223);
 
-#pragma omp simd aligned(pa_y,              \
-                             pa_z,          \
-                             ts_yy_xxxxxx,  \
-                             ts_yy_xxxxxy,  \
-                             ts_yy_xxxxy,   \
-                             ts_yy_xxxxyy,  \
-                             ts_yy_xxxxyz,  \
-                             ts_yy_xxxyy,   \
-                             ts_yy_xxxyyy,  \
-                             ts_yy_xxxyyz,  \
-                             ts_yy_xxxyz,   \
-                             ts_yy_xxxyzz,  \
-                             ts_yy_xxyyy,   \
-                             ts_yy_xxyyyy,  \
-                             ts_yy_xxyyyz,  \
-                             ts_yy_xxyyz,   \
-                             ts_yy_xxyyzz,  \
-                             ts_yy_xxyzz,   \
-                             ts_yy_xxyzzz,  \
-                             ts_yy_xyyyy,   \
-                             ts_yy_xyyyyy,  \
-                             ts_yy_xyyyyz,  \
-                             ts_yy_xyyyz,   \
-                             ts_yy_xyyyzz,  \
-                             ts_yy_xyyzz,   \
-                             ts_yy_xyyzzz,  \
-                             ts_yy_xyzzz,   \
-                             ts_yy_xyzzzz,  \
-                             ts_yy_yyyyy,   \
-                             ts_yy_yyyyyy,  \
-                             ts_yy_yyyyyz,  \
-                             ts_yy_yyyyz,   \
-                             ts_yy_yyyyzz,  \
-                             ts_yy_yyyzz,   \
-                             ts_yy_yyyzzz,  \
-                             ts_yy_yyzzz,   \
-                             ts_yy_yyzzzz,  \
-                             ts_yy_yzzzz,   \
-                             ts_yy_yzzzzz,  \
-                             ts_yyz_xxxxxx, \
-                             ts_yyz_xxxxxy, \
-                             ts_yyz_xxxxxz, \
-                             ts_yyz_xxxxyy, \
-                             ts_yyz_xxxxyz, \
-                             ts_yyz_xxxxzz, \
-                             ts_yyz_xxxyyy, \
-                             ts_yyz_xxxyyz, \
-                             ts_yyz_xxxyzz, \
-                             ts_yyz_xxxzzz, \
-                             ts_yyz_xxyyyy, \
-                             ts_yyz_xxyyyz, \
-                             ts_yyz_xxyyzz, \
-                             ts_yyz_xxyzzz, \
-                             ts_yyz_xxzzzz, \
-                             ts_yyz_xyyyyy, \
-                             ts_yyz_xyyyyz, \
-                             ts_yyz_xyyyzz, \
-                             ts_yyz_xyyzzz, \
-                             ts_yyz_xyzzzz, \
-                             ts_yyz_xzzzzz, \
-                             ts_yyz_yyyyyy, \
-                             ts_yyz_yyyyyz, \
-                             ts_yyz_yyyyzz, \
-                             ts_yyz_yyyzzz, \
-                             ts_yyz_yyzzzz, \
-                             ts_yyz_yzzzzz, \
-                             ts_yyz_zzzzzz, \
-                             ts_yz_xxxxxz,  \
-                             ts_yz_xxxxzz,  \
-                             ts_yz_xxxzzz,  \
-                             ts_yz_xxzzzz,  \
-                             ts_yz_xzzzzz,  \
-                             ts_yz_zzzzzz,  \
-                             ts_z_xxxxxz,   \
-                             ts_z_xxxxzz,   \
-                             ts_z_xxxzzz,   \
-                             ts_z_xxzzzz,   \
-                             ts_z_xzzzzz,   \
-                             ts_z_zzzzzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, pa_z, ts_yy_xxxxxx, ts_yy_xxxxxy, ts_yy_xxxxy, ts_yy_xxxxyy, ts_yy_xxxxyz, ts_yy_xxxyy, ts_yy_xxxyyy, ts_yy_xxxyyz, ts_yy_xxxyz, ts_yy_xxxyzz, ts_yy_xxyyy, ts_yy_xxyyyy, ts_yy_xxyyyz, ts_yy_xxyyz, ts_yy_xxyyzz, ts_yy_xxyzz, ts_yy_xxyzzz, ts_yy_xyyyy, ts_yy_xyyyyy, ts_yy_xyyyyz, ts_yy_xyyyz, ts_yy_xyyyzz, ts_yy_xyyzz, ts_yy_xyyzzz, ts_yy_xyzzz, ts_yy_xyzzzz, ts_yy_yyyyy, ts_yy_yyyyyy, ts_yy_yyyyyz, ts_yy_yyyyz, ts_yy_yyyyzz, ts_yy_yyyzz, ts_yy_yyyzzz, ts_yy_yyzzz, ts_yy_yyzzzz, ts_yy_yzzzz, ts_yy_yzzzzz, ts_yyz_xxxxxx, ts_yyz_xxxxxy, ts_yyz_xxxxxz, ts_yyz_xxxxyy, ts_yyz_xxxxyz, ts_yyz_xxxxzz, ts_yyz_xxxyyy, ts_yyz_xxxyyz, ts_yyz_xxxyzz, ts_yyz_xxxzzz, ts_yyz_xxyyyy, ts_yyz_xxyyyz, ts_yyz_xxyyzz, ts_yyz_xxyzzz, ts_yyz_xxzzzz, ts_yyz_xyyyyy, ts_yyz_xyyyyz, ts_yyz_xyyyzz, ts_yyz_xyyzzz, ts_yyz_xyzzzz, ts_yyz_xzzzzz, ts_yyz_yyyyyy, ts_yyz_yyyyyz, ts_yyz_yyyyzz, ts_yyz_yyyzzz, ts_yyz_yyzzzz, ts_yyz_yzzzzz, ts_yyz_zzzzzz, ts_yz_xxxxxz, ts_yz_xxxxzz, ts_yz_xxxzzz, ts_yz_xxzzzz, ts_yz_xzzzzz, ts_yz_zzzzzz, ts_z_xxxxxz, ts_z_xxxxzz, ts_z_xxxzzz, ts_z_xxzzzz, ts_z_xzzzzz, ts_z_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2296,85 +1622,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_yzz_zzzzzz = pbuffer.data(idx_ovl_fi + 251);
 
-#pragma omp simd aligned(pa_y,              \
-                             ts_yzz_xxxxxx, \
-                             ts_yzz_xxxxxy, \
-                             ts_yzz_xxxxxz, \
-                             ts_yzz_xxxxyy, \
-                             ts_yzz_xxxxyz, \
-                             ts_yzz_xxxxzz, \
-                             ts_yzz_xxxyyy, \
-                             ts_yzz_xxxyyz, \
-                             ts_yzz_xxxyzz, \
-                             ts_yzz_xxxzzz, \
-                             ts_yzz_xxyyyy, \
-                             ts_yzz_xxyyyz, \
-                             ts_yzz_xxyyzz, \
-                             ts_yzz_xxyzzz, \
-                             ts_yzz_xxzzzz, \
-                             ts_yzz_xyyyyy, \
-                             ts_yzz_xyyyyz, \
-                             ts_yzz_xyyyzz, \
-                             ts_yzz_xyyzzz, \
-                             ts_yzz_xyzzzz, \
-                             ts_yzz_xzzzzz, \
-                             ts_yzz_yyyyyy, \
-                             ts_yzz_yyyyyz, \
-                             ts_yzz_yyyyzz, \
-                             ts_yzz_yyyzzz, \
-                             ts_yzz_yyzzzz, \
-                             ts_yzz_yzzzzz, \
-                             ts_yzz_zzzzzz, \
-                             ts_zz_xxxxx,   \
-                             ts_zz_xxxxxx,  \
-                             ts_zz_xxxxxy,  \
-                             ts_zz_xxxxxz,  \
-                             ts_zz_xxxxy,   \
-                             ts_zz_xxxxyy,  \
-                             ts_zz_xxxxyz,  \
-                             ts_zz_xxxxz,   \
-                             ts_zz_xxxxzz,  \
-                             ts_zz_xxxyy,   \
-                             ts_zz_xxxyyy,  \
-                             ts_zz_xxxyyz,  \
-                             ts_zz_xxxyz,   \
-                             ts_zz_xxxyzz,  \
-                             ts_zz_xxxzz,   \
-                             ts_zz_xxxzzz,  \
-                             ts_zz_xxyyy,   \
-                             ts_zz_xxyyyy,  \
-                             ts_zz_xxyyyz,  \
-                             ts_zz_xxyyz,   \
-                             ts_zz_xxyyzz,  \
-                             ts_zz_xxyzz,   \
-                             ts_zz_xxyzzz,  \
-                             ts_zz_xxzzz,   \
-                             ts_zz_xxzzzz,  \
-                             ts_zz_xyyyy,   \
-                             ts_zz_xyyyyy,  \
-                             ts_zz_xyyyyz,  \
-                             ts_zz_xyyyz,   \
-                             ts_zz_xyyyzz,  \
-                             ts_zz_xyyzz,   \
-                             ts_zz_xyyzzz,  \
-                             ts_zz_xyzzz,   \
-                             ts_zz_xyzzzz,  \
-                             ts_zz_xzzzz,   \
-                             ts_zz_xzzzzz,  \
-                             ts_zz_yyyyy,   \
-                             ts_zz_yyyyyy,  \
-                             ts_zz_yyyyyz,  \
-                             ts_zz_yyyyz,   \
-                             ts_zz_yyyyzz,  \
-                             ts_zz_yyyzz,   \
-                             ts_zz_yyyzzz,  \
-                             ts_zz_yyzzz,   \
-                             ts_zz_yyzzzz,  \
-                             ts_zz_yzzzz,   \
-                             ts_zz_yzzzzz,  \
-                             ts_zz_zzzzz,   \
-                             ts_zz_zzzzzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, ts_yzz_xxxxxx, ts_yzz_xxxxxy, ts_yzz_xxxxxz, ts_yzz_xxxxyy, ts_yzz_xxxxyz, ts_yzz_xxxxzz, ts_yzz_xxxyyy, ts_yzz_xxxyyz, ts_yzz_xxxyzz, ts_yzz_xxxzzz, ts_yzz_xxyyyy, ts_yzz_xxyyyz, ts_yzz_xxyyzz, ts_yzz_xxyzzz, ts_yzz_xxzzzz, ts_yzz_xyyyyy, ts_yzz_xyyyyz, ts_yzz_xyyyzz, ts_yzz_xyyzzz, ts_yzz_xyzzzz, ts_yzz_xzzzzz, ts_yzz_yyyyyy, ts_yzz_yyyyyz, ts_yzz_yyyyzz, ts_yzz_yyyzzz, ts_yzz_yyzzzz, ts_yzz_yzzzzz, ts_yzz_zzzzzz, ts_zz_xxxxx, ts_zz_xxxxxx, ts_zz_xxxxxy, ts_zz_xxxxxz, ts_zz_xxxxy, ts_zz_xxxxyy, ts_zz_xxxxyz, ts_zz_xxxxz, ts_zz_xxxxzz, ts_zz_xxxyy, ts_zz_xxxyyy, ts_zz_xxxyyz, ts_zz_xxxyz, ts_zz_xxxyzz, ts_zz_xxxzz, ts_zz_xxxzzz, ts_zz_xxyyy, ts_zz_xxyyyy, ts_zz_xxyyyz, ts_zz_xxyyz, ts_zz_xxyyzz, ts_zz_xxyzz, ts_zz_xxyzzz, ts_zz_xxzzz, ts_zz_xxzzzz, ts_zz_xyyyy, ts_zz_xyyyyy, ts_zz_xyyyyz, ts_zz_xyyyz, ts_zz_xyyyzz, ts_zz_xyyzz, ts_zz_xyyzzz, ts_zz_xyzzz, ts_zz_xyzzzz, ts_zz_xzzzz, ts_zz_xzzzzz, ts_zz_yyyyy, ts_zz_yyyyyy, ts_zz_yyyyyz, ts_zz_yyyyz, ts_zz_yyyyzz, ts_zz_yyyzz, ts_zz_yyyzzz, ts_zz_yyzzz, ts_zz_yyzzzz, ts_zz_yzzzz, ts_zz_yzzzzz, ts_zz_zzzzz, ts_zz_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2494,113 +1742,7 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
     auto ts_zzz_zzzzzz = pbuffer.data(idx_ovl_fi + 279);
 
-#pragma omp simd aligned(pa_z,              \
-                             ts_z_xxxxxx,   \
-                             ts_z_xxxxxy,   \
-                             ts_z_xxxxxz,   \
-                             ts_z_xxxxyy,   \
-                             ts_z_xxxxyz,   \
-                             ts_z_xxxxzz,   \
-                             ts_z_xxxyyy,   \
-                             ts_z_xxxyyz,   \
-                             ts_z_xxxyzz,   \
-                             ts_z_xxxzzz,   \
-                             ts_z_xxyyyy,   \
-                             ts_z_xxyyyz,   \
-                             ts_z_xxyyzz,   \
-                             ts_z_xxyzzz,   \
-                             ts_z_xxzzzz,   \
-                             ts_z_xyyyyy,   \
-                             ts_z_xyyyyz,   \
-                             ts_z_xyyyzz,   \
-                             ts_z_xyyzzz,   \
-                             ts_z_xyzzzz,   \
-                             ts_z_xzzzzz,   \
-                             ts_z_yyyyyy,   \
-                             ts_z_yyyyyz,   \
-                             ts_z_yyyyzz,   \
-                             ts_z_yyyzzz,   \
-                             ts_z_yyzzzz,   \
-                             ts_z_yzzzzz,   \
-                             ts_z_zzzzzz,   \
-                             ts_zz_xxxxx,   \
-                             ts_zz_xxxxxx,  \
-                             ts_zz_xxxxxy,  \
-                             ts_zz_xxxxxz,  \
-                             ts_zz_xxxxy,   \
-                             ts_zz_xxxxyy,  \
-                             ts_zz_xxxxyz,  \
-                             ts_zz_xxxxz,   \
-                             ts_zz_xxxxzz,  \
-                             ts_zz_xxxyy,   \
-                             ts_zz_xxxyyy,  \
-                             ts_zz_xxxyyz,  \
-                             ts_zz_xxxyz,   \
-                             ts_zz_xxxyzz,  \
-                             ts_zz_xxxzz,   \
-                             ts_zz_xxxzzz,  \
-                             ts_zz_xxyyy,   \
-                             ts_zz_xxyyyy,  \
-                             ts_zz_xxyyyz,  \
-                             ts_zz_xxyyz,   \
-                             ts_zz_xxyyzz,  \
-                             ts_zz_xxyzz,   \
-                             ts_zz_xxyzzz,  \
-                             ts_zz_xxzzz,   \
-                             ts_zz_xxzzzz,  \
-                             ts_zz_xyyyy,   \
-                             ts_zz_xyyyyy,  \
-                             ts_zz_xyyyyz,  \
-                             ts_zz_xyyyz,   \
-                             ts_zz_xyyyzz,  \
-                             ts_zz_xyyzz,   \
-                             ts_zz_xyyzzz,  \
-                             ts_zz_xyzzz,   \
-                             ts_zz_xyzzzz,  \
-                             ts_zz_xzzzz,   \
-                             ts_zz_xzzzzz,  \
-                             ts_zz_yyyyy,   \
-                             ts_zz_yyyyyy,  \
-                             ts_zz_yyyyyz,  \
-                             ts_zz_yyyyz,   \
-                             ts_zz_yyyyzz,  \
-                             ts_zz_yyyzz,   \
-                             ts_zz_yyyzzz,  \
-                             ts_zz_yyzzz,   \
-                             ts_zz_yyzzzz,  \
-                             ts_zz_yzzzz,   \
-                             ts_zz_yzzzzz,  \
-                             ts_zz_zzzzz,   \
-                             ts_zz_zzzzzz,  \
-                             ts_zzz_xxxxxx, \
-                             ts_zzz_xxxxxy, \
-                             ts_zzz_xxxxxz, \
-                             ts_zzz_xxxxyy, \
-                             ts_zzz_xxxxyz, \
-                             ts_zzz_xxxxzz, \
-                             ts_zzz_xxxyyy, \
-                             ts_zzz_xxxyyz, \
-                             ts_zzz_xxxyzz, \
-                             ts_zzz_xxxzzz, \
-                             ts_zzz_xxyyyy, \
-                             ts_zzz_xxyyyz, \
-                             ts_zzz_xxyyzz, \
-                             ts_zzz_xxyzzz, \
-                             ts_zzz_xxzzzz, \
-                             ts_zzz_xyyyyy, \
-                             ts_zzz_xyyyyz, \
-                             ts_zzz_xyyyzz, \
-                             ts_zzz_xyyzzz, \
-                             ts_zzz_xyzzzz, \
-                             ts_zzz_xzzzzz, \
-                             ts_zzz_yyyyyy, \
-                             ts_zzz_yyyyyz, \
-                             ts_zzz_yyyyzz, \
-                             ts_zzz_yyyzzz, \
-                             ts_zzz_yyzzzz, \
-                             ts_zzz_yzzzzz, \
-                             ts_zzz_zzzzzz, \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_z, ts_z_xxxxxx, ts_z_xxxxxy, ts_z_xxxxxz, ts_z_xxxxyy, ts_z_xxxxyz, ts_z_xxxxzz, ts_z_xxxyyy, ts_z_xxxyyz, ts_z_xxxyzz, ts_z_xxxzzz, ts_z_xxyyyy, ts_z_xxyyyz, ts_z_xxyyzz, ts_z_xxyzzz, ts_z_xxzzzz, ts_z_xyyyyy, ts_z_xyyyyz, ts_z_xyyyzz, ts_z_xyyzzz, ts_z_xyzzzz, ts_z_xzzzzz, ts_z_yyyyyy, ts_z_yyyyyz, ts_z_yyyyzz, ts_z_yyyzzz, ts_z_yyzzzz, ts_z_yzzzzz, ts_z_zzzzzz, ts_zz_xxxxx, ts_zz_xxxxxx, ts_zz_xxxxxy, ts_zz_xxxxxz, ts_zz_xxxxy, ts_zz_xxxxyy, ts_zz_xxxxyz, ts_zz_xxxxz, ts_zz_xxxxzz, ts_zz_xxxyy, ts_zz_xxxyyy, ts_zz_xxxyyz, ts_zz_xxxyz, ts_zz_xxxyzz, ts_zz_xxxzz, ts_zz_xxxzzz, ts_zz_xxyyy, ts_zz_xxyyyy, ts_zz_xxyyyz, ts_zz_xxyyz, ts_zz_xxyyzz, ts_zz_xxyzz, ts_zz_xxyzzz, ts_zz_xxzzz, ts_zz_xxzzzz, ts_zz_xyyyy, ts_zz_xyyyyy, ts_zz_xyyyyz, ts_zz_xyyyz, ts_zz_xyyyzz, ts_zz_xyyzz, ts_zz_xyyzzz, ts_zz_xyzzz, ts_zz_xyzzzz, ts_zz_xzzzz, ts_zz_xzzzzz, ts_zz_yyyyy, ts_zz_yyyyyy, ts_zz_yyyyyz, ts_zz_yyyyz, ts_zz_yyyyzz, ts_zz_yyyzz, ts_zz_yyyzzz, ts_zz_yyzzz, ts_zz_yyzzzz, ts_zz_yzzzz, ts_zz_yzzzzz, ts_zz_zzzzz, ts_zz_zzzzzz, ts_zzz_xxxxxx, ts_zzz_xxxxxy, ts_zzz_xxxxxz, ts_zzz_xxxxyy, ts_zzz_xxxxyz, ts_zzz_xxxxzz, ts_zzz_xxxyyy, ts_zzz_xxxyyz, ts_zzz_xxxyzz, ts_zzz_xxxzzz, ts_zzz_xxyyyy, ts_zzz_xxyyyz, ts_zzz_xxyyzz, ts_zzz_xxyzzz, ts_zzz_xxzzzz, ts_zzz_xyyyyy, ts_zzz_xyyyyz, ts_zzz_xyyyzz, ts_zzz_xyyzzz, ts_zzz_xyzzzz, ts_zzz_xzzzzz, ts_zzz_yyyyyy, ts_zzz_yyyyyz, ts_zzz_yyyyzz, ts_zzz_yyyzzz, ts_zzz_yyzzzz, ts_zzz_yzzzzz, ts_zzz_zzzzzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2661,6 +1803,8 @@ comp_prim_overlap_fi(CSimdArray<double>&       pbuffer,
 
         ts_zzz_zzzzzz[i] = 2.0 * ts_z_zzzzzz[i] * fe_0 + 6.0 * ts_zz_zzzzz[i] * fe_0 + ts_zz_zzzzzz[i] * pa_z[i];
     }
+
 }
 
-}  // namespace ovlrec
+} // ovlrec namespace
+

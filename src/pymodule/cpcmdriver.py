@@ -1,10 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC3
+#                              VELOXCHEM
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -45,9 +44,8 @@ except ImportError:
 
 
 class CpcmDriver:
-    # add for being able to run with alternative grid
     """
-    Implements CPCM driver.
+    Implements the CPCM driver.
 
     :param comm:
         The MPI communicator.
@@ -168,7 +166,9 @@ class CpcmDriver:
         unit_grid = gen_lebedev_grid(self.grid_per_sphere)
         unit_grid_coords = unit_grid[:, :3]
         unit_grid_weights = unit_grid[:, 3:]
+
         # standard normalization of lebedev weights -- unit sphere surface; 1 -> 4pi
+        # Ref.: B. A. Gregersen and D. M. York, J. Chem. Phys. 122, 194110 (2005)
         unit_grid_weights *= 4 * np.pi
 
         zeta = self.get_zeta_dict()[self.grid_per_sphere]
@@ -339,7 +339,7 @@ class CpcmDriver:
             The grid object containing the grid positions, weights, 
             the Gaussian exponents, and indices for which atom they belong to.
         :param D:
-            The density matrix.
+            The AO density matrix.
 
         :return:
             The total (electronic) electrostatic potential at each grid point.
@@ -452,59 +452,54 @@ class CpcmDriver:
             the scaling function f.
 
         :return:
-        The gradient array of each cartesian component -- of shape (nAtoms, 3).
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         # Defnine constants
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
         natoms         = molecule.number_of_atoms()
         scale_f        = -(eps - 1) / (eps + x)
-        avoid_div_0    = 1e-12
         grid_coords    = grid[:, :3]
         zeta           = grid[:, 4]
+        zeta_2         = zeta**2
         atom_indices   = grid[:, 5]
+        n_dim          = 3 # x,y,z
         
         # M = Nr. of grid pts.
         M = grid_coords.shape[0]
         grad = np.zeros((M, M, natoms, 3))
 
-        delta_r = grid_coords[:, None, :] - grid_coords[None, :, :]
+        delta_r = grid_coords[:, np.newaxis, :] - grid_coords[np.newaxis, :, :]
         r_ij_2  = np.sum(delta_r**2, axis=-1)
-        r_ij_2_avoid = np.where(r_ij_2 == 0.0, avoid_div_0, r_ij_2)
-        r_ij        = np.sqrt(r_ij_2_avoid)
-        dr_rij      = delta_r / r_ij[..., None]
+        # Diagonal terms are not used anyway so fill these elements
+        # to avoid divison by zero errors
+        np.fill_diagonal(r_ij_2, 1.0)
+        r_ij   = np.sqrt(r_ij_2)
+        dr_rij = delta_r / r_ij[:, :, np.newaxis]
 
         # Construct the explicit terms appearing in the gradient
-        zeta_2   = zeta**2
-        zeta_ij  = (zeta[:, None] * zeta[None, :]) / np.sqrt(zeta_2[:, None] + zeta_2[None, :])
+        zeta_ij  = (zeta[:, np.newaxis] * zeta[np.newaxis, :]) / np.sqrt(zeta_2[:, np.newaxis] + zeta_2[np.newaxis, :])
         erf_term = self.erf_array(zeta_ij * r_ij)
-        exp_term = np.exp(-zeta_ij**2 * r_ij_2_avoid)
+        exp_term = np.exp(-zeta_ij**2 * r_ij_2)
 
-        dA_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_ij * r_ij * exp_term) / r_ij_2_avoid
+        dA_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_ij * r_ij * exp_term) / r_ij_2
         
         # Definitions to keep track of which atom each piint belongs to
-        I_vals      = np.arange(natoms - 1)[:, None, None]
-        atom_idx_m  = atom_indices[None, :, None]
-        atom_idx_n  = atom_indices[None, None, :]
+        I_vals      = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
+        atom_idx_m  = atom_indices[np.newaxis, :, np.newaxis]
+        atom_idx_n  = atom_indices[np.newaxis, np.newaxis, :]
         delta_ij    = ((I_vals == atom_idx_m).astype(int)
-                    - (I_vals == atom_idx_n).astype(int))
+                     - (I_vals == atom_idx_n).astype(int))
 
-        # Prepare for broadcasting
-        _dA_dr = dA_dr[..., None, None]
-        _delta_ij = delta_ij.transpose(1, 2, 0)[..., None]
-        _dr_rij = dr_rij[..., None, :]
-
-        # Construct the (n-1) gradient terms
-        grad[:, :, :-1, :] = _dA_dr * _delta_ij * _dr_rij
+        # Construct the (n-1) gradient terms by broadcasting
+        grad[:, :, :-1, :] = dA_dr[:, :, np.newaxis, np.newaxis] * delta_ij.transpose(1, 2, 0)[:, :, :, np.newaxis] * dr_rij[:, :, np.newaxis, :]
         # Translational invariance
         grad[:, :, -1, :] = -np.sum(grad[:, :, :-1, :], axis=2)
 
         # Perform contractions
-        #gradAij = (-0.5 / scale_f) * np.einsum('i,ijax,j->ax', q, grad, q, optimize=True)
-        partial = np.tensordot(q, grad, axes=(0, 0))  
-        gradAij = np.tensordot(partial, q, axes=(0, 0)) 
-        gradAij *= (-0.5 / scale_f)
-
-        return gradAij
+        partial_contract = np.matmul(q, grad.reshape(M, M * natoms * n_dim)).reshape(M, natoms * n_dim)
+        grad_Aij = np.matmul(partial_contract.T, q).reshape(natoms, n_dim)
+        grad_Aij *= (-0.5 / scale_f)
+        return grad_Aij
 
     def grad_Aii(self, molecule, grid, sw_f, q, eps, x):
         """
@@ -526,76 +521,60 @@ class CpcmDriver:
             the scaling function f.
 
         :return:
-        The gradient array of each cartesian component -- of shape (nAtoms, 3).
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         # Basic constants
         sqrt_2_inv_pi = np.sqrt(2.0 / np.pi)
         scale_f       = -(eps - 1) / (eps + x)
-        avoid_div_0   = 1e-12
         natoms        = molecule.number_of_atoms()
         atom_coords   = molecule.get_coordinates_in_bohr()
         atom_radii    = molecule.vdw_radii_to_numpy() * 1.2
-
+        
         # Grid info
-        M = grid.shape[0]
+        M           = grid.shape[0]
         grid_coords = grid[:, :3]
         zeta_i      = grid[:, 4]
         atom_idx    = grid[:, 5]
+        n_dim       = 3 # x,y,z
         F_i         = sw_f
 
+        # Initialise grad. object
         grad = np.zeros((M, M, natoms, 3))
 
         # Basic geometrical vectors
-        r_iJ = grid_coords[:, None, :] - atom_coords[None, :, :]
+        r_iJ      = grid_coords[:, np.newaxis, :] - atom_coords[np.newaxis, :, :]
         r_iJ_norm = np.linalg.norm(r_iJ, axis=2)
+        dr_iJ     = r_iJ / r_iJ_norm[:, :, np.newaxis]
+        RJ        = atom_radii[np.newaxis, :]
 
-        # Avoiding division by zero
-        r_iJ_safe = np.where(r_iJ_norm == 0.0, avoid_div_0, r_iJ_norm)
-        dr_iJ     = r_iJ / r_iJ_safe[..., None]
-
-        # Definitions to keep track of which atom each point belongs to
-        a_vals = np.arange(natoms - 1)[:, None, None]
-        _i_idx = atom_idx[None, :, None]
-        J_vals = np.arange(natoms)[None, None, :]
+        # Definitions to keep track of which atom each grid point belongs to
+        a_vals = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
+        _i_idx = atom_idx[np.newaxis, :, np.newaxis]
+        J_vals = np.arange(natoms)[np.newaxis, np.newaxis, :]
         delta  = ((a_vals == _i_idx).astype(int)
                 - (a_vals == J_vals).astype(int))
-        
-        # Prep for broadcasting
-        RJ = atom_radii[None, :]
-        _r_iJ = r_iJ_norm
-        _zeta = zeta_i[:, None]
 
         # Compute fiJ
-        term_m = _zeta * (RJ - _r_iJ)
-        term_p = _zeta * (RJ + _r_iJ)
+        term_m = zeta_i[:, np.newaxis] * (RJ - r_iJ_norm)
+        term_p = zeta_i[:, np.newaxis] * (RJ + r_iJ_norm)
         fiJ = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
 
         # Derivative of fiJ: dfiJ_driJ
-        z2 = _zeta**2
-        dfiJ_driJ = (_zeta / np.sqrt(np.pi)) * (
-            -np.exp(-z2 * (RJ - _r_iJ)**2) + np.exp(-z2 * (RJ + _r_iJ)**2))
+        z2 = zeta_i[:, np.newaxis]**2
+        dfiJ_driJ = (zeta_i[:, np.newaxis] / np.sqrt(np.pi)) * (
+            -np.exp(-z2 * (RJ - r_iJ_norm)**2) + np.exp(-z2 * (RJ + r_iJ_norm)**2))
+        ratio_fiJ = dfiJ_driJ / fiJ
 
-        # Avoid division by zero
-        fiJ_avoid = np.where(fiJ == 0.0, avoid_div_0, fiJ)
-        ratio_fiJ = dfiJ_driJ / fiJ_avoid
+        # Primitive switching func. derivative contribution
+        f_i = delta[:, :, :, np.newaxis] * ratio_fiJ[np.newaxis, :, :, np.newaxis] * dr_iJ[np.newaxis, :, :, :]
+        summed_fi = np.sum(f_i, axis=2)
 
-        # Prep for broadcasting
-        _delta = delta[..., None]
-        _ratio = ratio_fiJ[None, :, :, None]
-        _dr_iJ  = dr_iJ[None, ...]
+        # Switching func. contribution
+        grad_Fi = -F_i[np.newaxis, :, np.newaxis] * summed_fi
 
-        partial = _delta * _ratio * _dr_iJ
-        summed_fi = np.sum(partial, axis=2)
+        factor_i = -zeta_i[np.newaxis, :] * sqrt_2_inv_pi / (F_i[np.newaxis, :]**2)
 
-        _F_i = F_i[None, :, None]
-        __zeta = zeta_i[None, :]
-
-        grad_Fi = -_F_i * summed_fi
-
-        factor_i = -__zeta * sqrt_2_inv_pi / (_F_i[..., 0]**2)
-        _factor_i = factor_i[..., None]
-
-        final_contribution = grad_Fi * _factor_i
+        final_contribution = grad_Fi * factor_i[:, :, np.newaxis]
 
         idx = np.arange(M)
         for a in range(natoms - 1):
@@ -606,11 +585,10 @@ class CpcmDriver:
         # Translational invariance
         grad[:, :, -1, :] = -np.sum(grad[:, :, :-1, :], axis=2)
 
-        # Contract
-        #grad_Aii = (-0.5 / scale_f) * np.einsum('i, ijax, j -> ax', q, grad, q)
-        partial = np.tensordot(q, grad, axes=(0, 0))
-        grad_Aii = np.tensordot(partial, q, axes=(0, 0))
-        grad_Aii *= (-0.5 / scale_f)
+        # Perform contractions
+        partial_contract = np.matmul(q, grad.reshape(M, M * natoms * n_dim)).reshape(M, natoms * n_dim)
+        grad_Aii         = np.matmul(partial_contract.T, q).reshape(natoms, n_dim)
+        grad_Aii        *= (-0.5 / scale_f)
         return grad_Aii
 
     def grad_B(self, molecule, grid, q):
@@ -633,54 +611,46 @@ class CpcmDriver:
         grid_coords = grid[:, :3]
         zeta_i      = grid[:, 4]
         atom_idx    = grid[:, 5]
+        n_dim       = 3 # x,y,z
 
         # Define constants
         # M = Nr. of grid points
         M              = grid_coords.shape[0]
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
-        avoid_div_0    = 1e-12
-        dB_mat         = np.zeros((M, natoms, natoms, 3))
+        dB_mat         = np.zeros((M, natoms, natoms, n_dim))
 
         # distances and direction vects.
-        r_iA   = grid_coords[:, None, :] - atom_coords[None, :, :]
+        r_iA   = grid_coords[:, np.newaxis, :] - atom_coords[np.newaxis, :, :]
         r_iA_2 = np.sum(r_iA**2, axis=2)
         d_iA   = np.sqrt(r_iA_2)
+        dr_iA  = r_iA / d_iA[:, :, np.newaxis]
 
-        d_iA_avoid = np.where(d_iA== 0.0, avoid_div_0, d_iA)
-        dr_iA      = r_iA / d_iA_avoid[..., None]
-
-        zeta_r      = zeta_i[:, None] *d_iA
+        zeta_r   = zeta_i[:, np.newaxis] * d_iA
         erf_term    = self.erf_array(zeta_r)
-        exp_term    = np.exp(-1.0 * (zeta_i[:, None]**2) * r_iA_2)
-        denominator = np.where(r_iA_2 == 0.0, avoid_div_0, r_iA_2)
-
-        dB_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / denominator
+        exp_term = np.exp(-1.0 * (zeta_i[:, np.newaxis]**2) * r_iA_2)
+        dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
 
         # Set up for broadcasting
-        I_vals    = np.arange(natoms - 1)[:, None, None]
-        A_vals    = np.arange(natoms)[None, None, :]
-        _atom_idx = atom_idx[None, :, None]
-        factor    = ((I_vals == _atom_idx).astype(int)
+        I_vals       = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
+        A_vals       = np.arange(natoms)[np.newaxis, np.newaxis, :]
+        atom_idx_exp = atom_idx[np.newaxis, :, np.newaxis]
+        factor    = ((I_vals == atom_idx_exp).astype(int)
                     - (I_vals == A_vals).astype(int))
         
-        _dB_dr  = dB_dr[None, ..., None]
-        _dr_iA  = dr_iA[None, ...]
-        _factor = factor[..., None]
-        _dB_mat = _dB_dr * _factor * _dr_iA
-
+        # Calculate for the n-1 first atoms
+        dB_mat_n_minus_1 = dB_dr[np.newaxis, :, :, np.newaxis] * factor[:, :, :, np.newaxis] * dr_iA[np.newaxis, :, :, :]
         # Reordeer to (M, nAtoms, nAtoms-1, 3)
-        _dB_mat = np.transpose(_dB_mat, (1, 2, 0, 3))
+        dB_mat_n_minus_1 = np.transpose(dB_mat_n_minus_1, (1, 2, 0, 3))
         
         # Translational invariance
-        dB_mat[:, :, :-1, :] = _dB_mat
-        dB_mat[:, :, -1, :] = -np.sum(dB_mat[:, :, :-1, :], axis=2)
+        dB_mat[:, :, :-1, :] = dB_mat_n_minus_1
+        dB_mat[:, :, -1, :]  = -np.sum(dB_mat[:, :, :-1, :], axis=2)
         
         # Contract
-        #gradBvec = np.einsum('m,mzax,z -> ax', q, dB_mat, molecule.get_element_ids())
-        partial_res = np.tensordot(q, dB_mat, axes=(0, 0))  # -> (z, ax)
-        gradBvec = np.tensordot(partial_res, molecule.get_element_ids(), axes=(0, 0))  # -> (a, x)
+        partial_contract = np.matmul(q, dB_mat.reshape(M, natoms * natoms * n_dim)).reshape(natoms, natoms * n_dim)
+        gradB_vec = np.matmul(partial_contract.T, molecule.get_element_ids()).reshape(natoms, n_dim)
 
-        return gradBvec
+        return gradB_vec
     
     def grad_C(self, molecule, basis, grid, q, DM):
         """
@@ -739,9 +709,8 @@ class CpcmDriver:
             
             partial_nuc = np.tensordot(geom010_mats, DM, axes=([2, 3], [0, 1]))
             grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
-            #grad_C_nuc[a] = np.einsum('kxij,ij -> x', geom010_mats, DM)
+
             grad_C_cav[a] = np.tensordot(DM, geom100_mats, axes=([0, 1], [1, 2]))
-            #grad_C_cav[a] = np.einsum('xij,ij-> x', geom100_mats, DM)
 
         # Translational invariance
         grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
@@ -756,177 +725,3 @@ class CpcmDriver:
         gradB = self.grad_B(molecule, grid, q)
         gradC = self.grad_C(molecule, basis, grid, q, D)
         return gradA + gradB + gradC
-
-    def non_vec_cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D, eps, x):
-        # get the C-PCM gradient contribution (non-vectorized)
-
-        # Helper functions
-        def dr_rij(ri, rj):
-            r_ij = np.array([(ri[0] - rj[0]), (ri[1] - rj[1]), (ri[2] - rj[2])])
-            return r_ij / np.linalg.norm(r_ij)
-
-        def delta_ij(M, index_i, index_j):
-            delta_iM, delta_jM = 0, 0
-            if M == index_i:
-                delta_iM = 1
-            if M == index_j:
-                delta_jM = 1
-
-            return delta_iM - delta_jM
-        
-        def grad_B(molecule, grid, q):
-            # Nuclear-cavity contribution
-            atom_coords = molecule.get_coordinates_in_bohr()
-            natoms = molecule.number_of_atoms()
-            natoms_ = natoms
-            two_sqrt_invpi = 2 / np.sqrt(np.pi)
-            dB_mat = np.zeros((grid.shape[0], natoms, natoms, 3))
-
-            for I in range(natoms - 1):
-                for m in range(grid.shape[0]):
-                    xi, yi, zi, wi, zeta_i, atom_idx = grid[m]
-                    for a in range(natoms_):
-                        xa, ya, za = atom_coords[a]
-                        ra = np.array([xa, ya, za])
-                        #factor = delta_ij(I, atom_idx, -1)
-                        factor = delta_ij(I, atom_idx, a)
-
-                        ri = np.array([xi, yi, zi])
-                        r_ia_2 = (xi - xa)**2 + (yi - ya)**2 + (zi - za)**2
-                        r_ia = np.sqrt(r_ia_2)
-
-                        dr_ia = factor * dr_rij(ri, ra)
-
-                        dB_dr = -1.0 * (math.erf(zeta_i * r_ia) - two_sqrt_invpi * zeta_i * r_ia * 
-                                            math.exp(-1.0 * zeta_i**2 * r_ia_2)) / r_ia_2
-                            
-                        dB_mat[m, a, I] = dB_dr * dr_ia
-            # transl inv
-            dB_mat[:,:,-1] = -np.sum(dB_mat[:,:,:-1], axis=2)
-
-            partial_res = np.tensordot(q, dB_mat, axes=(0, 0))  # -> (z, ax)
-            gradBvec = np.tensordot(partial_res, molecule.get_element_ids(), axes=(0, 0))
-            return gradBvec
-
-        def grad_C(molecule, basis, grid, q, DM):
-            natoms = molecule.number_of_atoms()
-            grad_C_nuc = np.zeros((natoms, 3))
-            grad_C_cav = np.zeros((natoms, 3))
-            grid_coords    = grid[:, :3]
-            weights        = grid[:, 3]
-            zeta           = grid[:, 4]
-            atom_indices   = grid[:, 5]
-            labels = ['X', 'Y', 'Z']
-            geom100_drv = NuclearPotentialErfGeom100Driver()
-            geom010_drv = NuclearPotentialErfGeom010Driver()
-
-            # -1: translational invariance
-            for a in range(natoms - 1):
-                indices = (atom_indices == a)
-                geom100_mats, geom010_mats, geom001_mats = [], [], []
-                grid_a = grid_coords[indices, :3]
-                zeta_a = zeta[indices]
-                
-                for i, charge in enumerate(q[indices]):
-                    grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i].tolist()], [zeta_a[i]])
-                    geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
-
-                grad_100 = geom100_drv.compute(molecule, basis, a, grid_coords, q, zeta)
-
-                for label in labels:
-                    geom100_mats.append(-1.0 *grad_100.matrix(label).full_matrix().to_numpy())
-                    geom001_mats.append(-1.0 *grad_100.matrix(label).full_matrix().to_numpy().T)
-                
-                geom010_mats = np.array(geom010_mats)
-                geom100_mats = np.array(geom100_mats)
-                geom001_mats = np.array(geom001_mats)
-                geom100_mats += geom001_mats
-
-                partial_nuc = np.tensordot(geom010_mats, DM, axes=([2, 3], [0, 1]))
-                grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
-                #grad_C_nuc[a] = np.einsum('kxij,ij -> x', geom010_mats, DM)
-                grad_C_cav[a] = np.tensordot(DM, geom100_mats, axes=([0, 1], [1, 2]))
-                #grad_C_cav[a] = np.einsum('xij,ij-> x', geom100_mats, DM)
-
-            grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
-            grad_C_nuc[-1] = -np.sum(grad_C_nuc[:-1], axis=0)
-            return grad_C_nuc + grad_C_cav
-
-        def grad_Aij(molecule, grid, q, eps, x):
-            two_sqrt_invpi = 2 / np.sqrt(np.pi)
-            natoms         = molecule.number_of_atoms()
-            scale_f        = -(eps - 1) / (eps + x)
-            grad           = np.zeros((grid.shape[0], grid.shape[0], natoms, 3)) # (grid_pts, grid_pts, natoms, 3)
-            grid_coords    = grid[:, :3]
-            weights        = grid[:, 3]
-            zeta           = grid[:, 4]
-            atom_indices   = grid[:, 5]
-            zeta_2         = zeta**2
-
-            delta_r = grid_coords[:, None] - grid_coords[None, :]
-            r_ij_2  = np.sum(delta_r**2, axis=-1) 
-            r_ij    = np.sqrt(r_ij_2)
-            np.fill_diagonal(r_ij, 1e-12), np.fill_diagonal(r_ij_2, 1e-12)
-            dr_rij  = delta_r / r_ij[..., None]
-
-            zeta_ij  = (zeta[:, None] * zeta[None, :]) / np.sqrt((zeta_2[:, None] + zeta_2[None, :]))
-            delta_ij = np.array([(a == atom_indices[:, None]).astype(int) - (a == atom_indices[None, :]).astype(int) for a in range(natoms - 1)])
-            dA_dr    = -1.0 * (self.erf_array(zeta_ij * r_ij) - two_sqrt_invpi * zeta_ij * r_ij * np.exp(-1.0 * zeta_ij**2 * r_ij_2)) / r_ij_2
-            
-            for a in range(natoms - 1):
-                _delta      = delta_ij[a]
-                dr_ij       = _delta[..., None] * dr_rij
-                grad[:,:,a] = dA_dr[..., None] * dr_ij
-            
-            grad[:,:,-1] = -np.sum(grad[:,:,:-1], axis=2)
-            #gradAij = (-0.5 / scale_f) * np.einsum('i,ijax,j -> ax', q, grad, q, optimize=True)
-            partial = np.tensordot(q, grad, axes=(0, 0))  
-            gradAij = np.tensordot(partial, q, axes=(0, 0)) 
-            gradAij *= (-0.5 / scale_f)
-            return gradAij
-
-        def grad_Aii(molecule, grid, sw_f, q, eps, x):
-            natoms = molecule.number_of_atoms()
-            natoms_ = natoms
-            grad = np.zeros((grid.shape[0], grid.shape[0], natoms, 3))
-            sqrt_2_inv_pi = np.sqrt(2 / np.pi)
-            atom_radii = molecule.vdw_radii_to_numpy() * 1.2
-            atom_coords = molecule.get_coordinates_in_bohr()
-            scale_f = -(eps - 1) / (eps + x)
-            
-            for a in range(natoms - 1):
-                for i in range(grid.shape[0]):
-                    xi, yi, zi, wi, zeta_i, atom_idx = grid[i]
-                    r_i = np.array([xi, yi, zi])
-                    F_i = sw_f[i]
-                    
-                    summed_fi = np.zeros((1,3))
-                    for J in range(natoms_):
-                        r_J = atom_coords[J]
-                        RJ = atom_radii[J]
-                        vec_r_iJ = r_i - r_J
-                        r_iJ = np.linalg.norm(vec_r_iJ)
-                        factor = delta_ij(a, atom_idx, J)
-                        
-                        dr_iJ = factor * dr_rij(r_i, r_J) 
-                        fiJ = 1 - 0.5 * (math.erf(zeta_i * (RJ - r_iJ)) + math.erf(zeta_i * (RJ + r_iJ)))
-                        dfiJ_driJ = zeta_i/np.sqrt(np.pi) * (-1.0 * math.exp(-1.0 * zeta_i**2 * (RJ - r_iJ)**2) + math.exp(-1.0 * zeta_i**2 * (RJ + r_iJ)**2))
-                        summed_fi += dfiJ_driJ / fiJ * dr_iJ
-                    
-                    grad_F_i = -1.0 * F_i * summed_fi
-                    
-                    grad[i,i,a] = -1.0 * zeta_i * sqrt_2_inv_pi / F_i**2 * grad_F_i
-            # transl inv
-            grad[:,:,-1] = - np.sum(grad[:,:,:-1], axis=2)
-
-            #grad_Aii = (-0.5 / scale_f) * np.einsum('i, ijax, j -> ax', q, grad, q)
-            partial = np.tensordot(q, grad, axes=(0, 0))
-            grad_Aii = np.tensordot(partial, q, axes=(0, 0))
-            grad_Aii *= (-0.5 / scale_f)
-            return grad_Aii
-
-        gradA = grad_Aij(molecule, grid, q, eps, x) + grad_Aii(molecule, grid, sw_f, q, eps, x)
-        gradB = grad_B(molecule, grid, q)
-        gradC = grad_C(molecule, basis, grid, q, D)
-        return gradA + gradB + gradC
-    

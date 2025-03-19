@@ -114,6 +114,10 @@ class CMatrix
 
     /// @brief Set matrix values to zero.
     auto zero() -> void;
+    
+    /// @brief Assigns flat vector of values to matrix.
+    /// @param values The flat vector of values.
+    auto assign_flat_values(const std::vector<double>& values) -> void;
 
     /// @brief Scales matrix values by factor.
     /// @param factor The factor to scale matrix values.
@@ -172,6 +176,10 @@ class CMatrix
     /// @brief Gets constant pointer to matrix.
     /// @return The constant pointer to matrix.
     auto pointer() const -> const CMatrix *;
+    
+    /// @brief Gets flatened values of matrix elements into vector.
+    /// @return The constant pointer to matrix.
+    auto flat_values() const -> std::vector<double>;
 
    private:
     /// @brief The map of submatrices.

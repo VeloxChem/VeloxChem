@@ -27,7 +27,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical, safe_arccos
 
@@ -75,12 +75,12 @@ class MMDriver:
         # TODO: separate the basic part of MMDriver into another class to avoid
         # cyclic import
 
-        # NOTE: Never use this method inside ForceFieldGenerator.
+        # NOTE: Never use this method inside MMForceFieldGenerator.
         # Otherwise it will be a cyclic import.
 
-        from .forcefieldgenerator import ForceFieldGenerator
+        from .mmforcefieldgenerator import MMForceFieldGenerator
 
-        ff_generator = ForceFieldGenerator()
+        ff_generator = MMForceFieldGenerator()
         ff_generator.ostream.mute()
         ff_generator.create_topology(molecule)
 
@@ -288,8 +288,7 @@ class MMDriver:
                     # Coulomb
 
                     # Coulomb's constant in MD units: 138.9354576...
-                    ke = (4.184 * hartree_in_kcalpermol() * 0.1 *
-                          bohr_in_angstrom())
+                    ke = (hartree_in_kjpermol() * 0.1 * bohr_in_angstrom())
 
                     self.coulomb_potential += prefac_QQ * ke * (
                         charge_i * charge_j) / distance_ij
@@ -404,11 +403,10 @@ class MMDriver:
         self.energy = (self.stretch_potential + self.bend_potential +
                        self.torsion_potential + self.improper_potential +
                        self.coulomb_potential + self.vdw_potential)
-        self.energy /= (4.184 * hartree_in_kcalpermol())
+        self.energy /= hartree_in_kjpermol()
 
         # gradient
-        self.gradient /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                          bohr_in_angstrom())
+        self.gradient /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
     def get_energy(self):
         """

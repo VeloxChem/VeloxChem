@@ -22,20 +22,20 @@ if(DEFINED EXTRA_CXXFLAGS)
 endif()
 
 # option for using higher order geometric derivatives
-option(USE_4TH_GEOM_DERIV "Use 4th-order geometric derivatives" ON)
-option(USE_3RD_GEOM_DERIV "Use 3rd-order geometric derivatives" ON)
+option(USE_4TH_GEOM_DERIV "Use 4th-order geometric derivatives" OFF)
+option(USE_3RD_GEOM_DERIV "Use 3rd-order geometric derivatives" OFF)
 option(USE_2ND_GEOM_DERIV "Use 2nd-order geometric derivatives" ON)
 if(USE_4TH_GEOM_DERIV)
-  print_option(USE_4TH_GEOM_DERIV "${USE_4TH_GEOM_DERIV}")
+  # print_option(USE_4TH_GEOM_DERIV "${USE_4TH_GEOM_DERIV}")
   add_compile_definitions(USE_4TH_GEOM_DERIV)
   add_compile_definitions(USE_3RD_GEOM_DERIV)
   add_compile_definitions(USE_2ND_GEOM_DERIV)
 elseif(USE_3RD_GEOM_DERIV)
-  print_option(USE_3RD_GEOM_DERIV "${USE_3RD_GEOM_DERIV}")
+  # print_option(USE_3RD_GEOM_DERIV "${USE_3RD_GEOM_DERIV}")
   add_compile_definitions(USE_3RD_GEOM_DERIV)
   add_compile_definitions(USE_2ND_GEOM_DERIV)
 elseif(USE_2ND_GEOM_DERIV)
-  print_option(USE_2ND_GEOM_DERIV "${USE_2ND_GEOM_DERIV}")
+  # print_option(USE_2ND_GEOM_DERIV "${USE_2ND_GEOM_DERIV}")
   add_compile_definitions(USE_2ND_GEOM_DERIV)
 endif()
 
@@ -62,41 +62,12 @@ file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR})
 
 add_subdirectory(src)
 
-# handle folder with basis sets
-file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis)
-# we glob the basis set files in basis and let CMake add a rule such that
-# the glob is repeated every time we rebuild.
-# This is NOT RECOMMENDED by CMake
-# (https://cmake.org/cmake/help/v3.16/command/file.html#filesystem) but you only
-# live once!
-file(
-  GLOB
-    _vlx_basis_sets
-  LIST_DIRECTORIES
-    FALSE
-  CONFIGURE_DEPENDS
-  ${PROJECT_SOURCE_DIR}/basis/*
-  )
-# 1. symlink under the build tree
-foreach(_basis IN LISTS _vlx_basis_sets)
- get_filename_component(__basis ${_basis} NAME)
- file(
-   CREATE_LINK
-     ${_basis}
-     ${PROJECT_BINARY_DIR}/${PYMOD_INSTALL_FULLDIR}/basis/${__basis}
-   COPY_ON_ERROR
-   SYMBOLIC
-   )
-endforeach()
-# 2. install rules for basis sets folder
-install(
-  DIRECTORY
-    ${PROJECT_SOURCE_DIR}/basis
-  DESTINATION
-    ${PYMOD_INSTALL_FULLDIR}
-  )
+# handle folder with data files
+install(DIRECTORY   ${PROJECT_SOURCE_DIR}/database
+        DESTINATION ${PYMOD_INSTALL_FULLDIR}
+        FILES_MATCHING PATTERN "*")
 
-enable_testing()
-include(CTest)
-# this add_subdirectory command must come last!!
-add_subdirectory(tests)
+# handle folder with basis files
+install(DIRECTORY   ${PROJECT_SOURCE_DIR}/basis
+        DESTINATION ${PYMOD_INSTALL_FULLDIR}
+        FILES_MATCHING PATTERN "*")

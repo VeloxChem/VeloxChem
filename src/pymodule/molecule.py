@@ -34,6 +34,30 @@ from .errorhandler import assert_msg_critical, safe_arccos
 
 
 @staticmethod
+def _Molecule_smiles_formal_charge(smiles_str):
+    """
+    Gets formal charge from SMILES string.
+
+    :param smiles_str:
+        The SMILES string.
+
+    :return:
+        The formal charge.
+    """
+
+    try:
+        from rdkit import Chem
+
+        mol_bare = Chem.MolFromSmiles(smiles_str)
+        mol_chg = Chem.GetFormalCharge(mol_bare)
+
+        return mol_chg
+
+    except ImportError:
+        raise ImportError('Unable to import rdkit.')
+
+
+@staticmethod
 def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
     Converts SMILES string to xyz string.
@@ -84,8 +108,12 @@ def _Molecule_read_smiles(smiles_str):
     """
 
     xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
+    mol = Molecule.read_xyz_string(xyz)
 
-    return Molecule.read_xyz_string(xyz)
+    mol_chg = Molecule.smiles_formal_charge(smiles_str)
+    mol.set_charge(mol_chg)
+
+    return mol
 
 
 def _element_guesser(atom_name, residue_name):
@@ -400,9 +428,7 @@ def _Molecule_from_dict(mol_dict):
     assert_msg_critical(
         mol.check_multiplicity(),
         'Molecule: Incompatible multiplicity and number of electrons')
-    assert_msg_critical(
-        mol.check_proximity(0.1),
-        'Molecule: Corrupted geometry with closely located atoms')
+    assert_msg_critical(mol.check_proximity(0.1), 'Molecule: Atoms too close')
 
     return mol
 
@@ -1143,6 +1169,7 @@ Molecule._get_input_keywords = _Molecule_get_input_keywords
 Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
+Molecule.smiles_formal_charge = _Molecule_smiles_formal_charge
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
 Molecule.read_pdb_file = _Molecule_read_pdb_file

@@ -200,8 +200,8 @@ export_t4cintegrals(py::module& m)
                const int                     iatom,
                const std::string&            label,
                const double                  exchange_factor,
-               const double                  omega) -> std::shared_ptr<CMatrices> {
-                return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega));
+               const double                  omega) -> CMatrices {
+                return fock_drv.compute(basis, molecule, density, iatom, label, exchange_factor, omega);
             },
             "Computes Hessian of Fock matrix of requested type for given molecule and basis.")
         .def(
@@ -234,8 +234,8 @@ export_t4cintegrals(py::module& m)
                const int                     jatom,
                const std::string&            label,
                const double                  exchange_factor,
-               const double                  omega) -> std::shared_ptr<CMatrices> {
-                   return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega));
+               const double                  omega) -> CMatrices {
+                   return fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega);
             },
             "Computes Hessian of Fock matrix of requested type for given molecule and basis.")
         .def(
@@ -269,8 +269,8 @@ export_t4cintegrals(py::module& m)
                const int                     jatom,
                const std::string&            label,
                const double                  exchange_factor,
-               const double                  omega) -> std::shared_ptr<CMatrices> {
-                   return std::make_shared<CMatrices>(fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega));
+               const double                  omega) -> CMatrices {
+                   return fock_drv.compute(basis, molecule, density, iatom, jatom, label, exchange_factor, omega);
             },
             "Computes Hessian of Fock matrix of requested type for given molecule and basis.")
         .def(
