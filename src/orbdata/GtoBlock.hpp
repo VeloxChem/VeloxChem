@@ -78,6 +78,11 @@ class CGtoBlock
     /// @param other The basis functions block to be compared.
     /// @return True if basis functions blocks are not equal, False otherwise.
     auto operator!=(const CGtoBlock &other) const -> bool;
+    
+    /// @brief Reduces basis functions block with mask.
+    /// @param mask The basis functions mask.
+    /// @return The reduced basis functions block.
+    auto reduce(const std::vector<int>& mask) const -> CGtoBlock;
 
     /// @brief Gets vector of basis function Cartesian coordinates.
     /// @return The vector of Cartesian coordinates.

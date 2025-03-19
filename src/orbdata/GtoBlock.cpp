@@ -33,8 +33,8 @@ CGtoBlock::CGtoBlock(const std::vector<TPoint<double>> &coordinates,
                      const std::vector<double>         &norms,
                      const std::vector<size_t>         &orb_indices,
                      const std::vector<int>            &atm_indices,
-                     const int                          angular_momentum,
-                     const int                          npgtos)
+                     const int                         angular_momentum,
+                     const int                         npgtos)
 
     : _coordinates(coordinates)
 
@@ -266,6 +266,63 @@ auto
 CGtoBlock::operator!=(const CGtoBlock &other) const -> bool
 {
     return !(*this == other);
+}
+
+auto
+CGtoBlock::reduce(const std::vector<int>& mask) const -> CGtoBlock
+{
+    if (const auto ncgtos = number_of_basis_functions(); ncgtos > 0)
+    {
+        std::vector<TPoint<double>> red_coordinates;
+                            
+        std::vector<size_t> red_orb_indices;
+        
+        std::vector<int> red_atm_indices;
+        
+        red_orb_indices.push_back(_orb_indices[0]);
+        
+        for (int i = 0; i < ncgtos; i++)
+        {
+            if (std::ranges::find(mask, _orb_indices[i + 1]) != mask.end())
+            {
+                red_coordinates.push_back(_coordinates[i]);
+                
+                red_orb_indices.push_back(_orb_indices[i + 1]);
+                
+                red_atm_indices.push_back(_atm_indices[i]);
+            }
+        }
+        
+        if (const auto red_ncgtos = red_atm_indices.size(); red_ncgtos > 0)
+        {
+            std::vector<double> red_exponents;
+            
+            std::vector<double> red_norms;
+            
+            size_t red_idx = 0;
+            
+            for (int i = 0; i < ncgtos; i++)
+            {
+                if (std::ranges::find(mask, _orb_indices[i + 1]) != mask.end())
+                {
+                    
+                    
+                    red_idx++;
+                }
+            }
+            
+            //_exponents[j * ncgtos + i] = fexps[j];
+            //_norms[j * ncgtos + i]     = fnorms[j];
+            
+            return CGtoBlock();
+        }
+        else
+        {
+            return CGtoBlock();
+        }
+    }
+    
+    return CGtoBlock();
 }
 
 auto

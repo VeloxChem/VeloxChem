@@ -2,6 +2,7 @@
 #define NuclearPotentialDriver_hpp
 
 #include <vector>
+#include <map>
 
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
@@ -70,19 +71,21 @@ class CNuclearPotentialDriver
     /// @param gmatrix The G matrix (grid points x AOs).
     /// @param gto_blocks The vector of basis function blocks.
     /// @param fmatrix The F matrix ( AOs x grid points).
+    /// @param ao_mask The mask of local indices.
+    /// @param gindex The index of grid point.
     /// @param gpoint_x The Cartesian X coordinate of grid point.
     /// @param gpoint_y The Cartesian Y coordinate of grid point.
     /// @param gpoint_z The Cartesian Z coordinate of grid point.
     /// @param gpoint_w The weight of grid point.
-    auto compute(CDenseMatrix&                 gmatrix,
-                 const std::vector<CGtoBlock>& gto_blocks,
-                 const CDenseMatrix&           fmatrix,
-                 const size_t                  gindex,
-                 const size_t                  naos,
-                 const double                  gpoint_x,
-                 const double                  gpoint_y,
-                 const double                  gpoint_z,
-                 const double                  gpoint_w) const -> void;
+    auto compute(CDenseMatrix&                   gmatrix,
+                 const std::vector<CGtoBlock>&   gto_blocks,
+                 const CDenseMatrix&             fmatrix,
+                 const std::map<size_t, size_t>& ao_mask,
+                 const size_t                    gindex,
+                 const double                    gpoint_x,
+                 const double                    gpoint_y,
+                 const double                    gpoint_z,
+                 const double                    gpoint_w) const -> void;
 };
 
 #endif /* NuclearPotentialDriver_hpp */

@@ -8,7 +8,6 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.dftutils import get_default_grid_level
 
-
 class TestSNLinkK:
 
     def run_sn_link_k(self, molecule, basis):

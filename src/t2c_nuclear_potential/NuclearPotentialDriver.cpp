@@ -77,15 +77,15 @@ CNuclearPotentialDriver::compute(const std::vector<double>&         charges,
 }
 
 auto
-CNuclearPotentialDriver::compute(CDenseMatrix&                 gmatrix,
-                                 const std::vector<CGtoBlock>& gto_blocks,
-                                 const CDenseMatrix&           fmatrix,
-                                 const size_t                  gindex,
-                                 const size_t                  naos,
-                                 const double                  gpoint_x,
-                                 const double                  gpoint_y,
-                                 const double                  gpoint_z,
-                                 const double                  gpoint_w) const -> void
+CNuclearPotentialDriver::compute(CDenseMatrix&                   gmatrix,
+                                 const std::vector<CGtoBlock>&   gto_blocks,
+                                 const CDenseMatrix&             fmatrix,
+                                 const std::map<size_t, size_t>& ao_mask,
+                                 const size_t                    gindex,
+                                 const double                    gpoint_x,
+                                 const double                    gpoint_y,
+                                 const double                    gpoint_z,
+                                 const double                    gpoint_w) const -> void
 {
     std::vector<double> charges({1.0, });
     
@@ -97,7 +97,7 @@ CNuclearPotentialDriver::compute(CDenseMatrix&                 gmatrix,
         {
             auto bra_indices = std::pair<size_t, size_t>{size_t{0}, gto_blocks[i].number_of_basis_functions()};
             
-            CDenseMatrixDistributor distributor_ii(&gmatrix, coordinates, charges, &fmatrix, gpoint_w);
+            CDenseMatrixDistributor distributor_ii(&gmatrix, coordinates, charges, &fmatrix, ao_mask, gpoint_w, gindex);
             
             npotfunc::compute(distributor_ii, gto_blocks[i], gto_blocks[i], bra_indices, bra_indices, true);
             
@@ -105,7 +105,7 @@ CNuclearPotentialDriver::compute(CDenseMatrix&                 gmatrix,
             {
                 auto ket_indices = std::pair<size_t, size_t>{size_t{0}, gto_blocks[j].number_of_basis_functions()};
                 
-                CDenseMatrixDistributor distributor_ij(&gmatrix, coordinates, charges, &fmatrix, gpoint_w);
+                CDenseMatrixDistributor distributor_ij(&gmatrix, coordinates, charges, &fmatrix, ao_mask, gpoint_w, gindex);
                 
                 npotfunc::compute(distributor_ij, gto_blocks[i], gto_blocks[j], bra_indices, ket_indices, false);
             }

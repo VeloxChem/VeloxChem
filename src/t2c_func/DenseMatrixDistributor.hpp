@@ -2,6 +2,7 @@
 #define DenseMatrixDistributor_hpp
 
 #include <vector>
+#include <map>
 
 #include "Point.hpp"
 #include "SimdArray.hpp"
@@ -21,7 +22,9 @@ class CDenseMatrixDistributor
                             const std::vector<TPoint<double>>& coordinates,
                             const std::vector<double>&         data,
                             const CDenseMatrix*                f_matrix,
-                            const double                       weight);
+                            const std::map<size_t, size_t>&    ao_mask,
+                            const double                       weight,
+                            const size_t                       gp_index);
     
     /// @brief The default copy constructor.
     /// @param other The distributor to be copied.
@@ -101,8 +104,14 @@ class CDenseMatrixDistributor
     ///@brief The pointer to F matrix.
     const CDenseMatrix* _f_matrix;
     
+    ///@brief The mask of local indices.
+    std::map<size_t, size_t> _ao_mask;
+    
     ///@brief The weight of grid point.
     const double _weight;
+    
+    ///@brief The index of grid point.
+    const size_t _gp_index;
 };
 
 #endif /* DenseMatrixDistributor_hpp */

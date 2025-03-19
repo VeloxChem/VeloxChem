@@ -106,18 +106,34 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
             }
         }
 
-        std::cout << "INDICES : "; 
+        const auto aocount = static_cast<int>(aoinds.size());
+
+        timer.stop("GTO pre-screening");
+
+        if (aocount == 0) continue;
+        
+        std::map<size_t, size_t> mask;
+        
+        for (size_t i = 0; i < aocount; i++)
+        {
+            mask.insert({(size_t)aoinds[i], i});
+        }
+        
+        auto ptr_mask = &mask;
+        
+        std::cout << "INDICES : ";
         for (const auto ao_idx : aoinds)
         {
             std::cout << ao_idx << " ";
         }
         std::cout << std::endl;
         
-        const auto aocount = static_cast<int>(aoinds.size());
-
-        timer.stop("GTO pre-screening");
-
-        if (aocount == 0) continue;
+        std::cout << "MASK : ";
+        for (const auto m : mask)
+        {
+            std::cout << "(" << m.first << "," << m.second << ")" ;
+        }
+        std::cout << std::endl;
 
         timer.start("Density matrix slicing");
 
@@ -201,7 +217,7 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
             
             for (int g = 0; g < grid_batch_size; g++)
             {
-                npot_drv.compute(mat_ggv, gto_blocks, mat_fvg, g, aocount, grid_x[g], grid_y[g], grid_z[g], local_weights[g]);
+                npot_drv.compute(mat_ggv, gto_blocks, mat_fvg, *ptr_mask, g, grid_x[g], grid_y[g], grid_z[g], local_weights[g]);
             }
             
             omptimers[thread_id].stop("Generate G_gv matrix");
