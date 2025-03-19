@@ -107,7 +107,7 @@ class DispersionModel:
             'Please install dftd4-python.\n' +
             'Alternatively, you can install dftd4, ' +
             'set the DFTD4_HOME environment variable, ' +
-            'and reinstall VeloxChem.')
+            'and reinstall VeloxChem.\n')
 
         if 'dftd4' in sys.modules:
 
