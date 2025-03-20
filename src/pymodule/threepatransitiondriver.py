@@ -245,7 +245,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         freqs = [-1/3 * a for a in rpa_results['eigenvalues']]
         freqs_for_response_vectors = freqs + [0.0]
 
-        print("freqs_for_response_vectors",freqs_for_response_vectors)
+        # print("freqs_for_response_vectors",freqs_for_response_vectors)
 
         # Storing the dipole integral matrices used for the X[2] and
         # A[2] contractions in MO basis
@@ -397,7 +397,8 @@ class ThreePATransitionDriver(NonlinearSolver):
                 for b_comp in 'xyz':
                     for c_comp in 'xyz':
 
-                        Na = self.flip_yz(ComplexResponse.get_full_solution_vector(Nx[(a_comp, w)]))
+                        Na_raw = ComplexResponse.get_full_solution_vector(Nx[(a_comp, w)])
+
                         Nb = ComplexResponse.get_full_solution_vector(Nx[(b_comp, w)])
                         Nc = ComplexResponse.get_full_solution_vector(Nx[(c_comp, w)])
 
@@ -408,9 +409,12 @@ class ThreePATransitionDriver(NonlinearSolver):
                         except KeyError:
                             Nbc = ComplexResponse.get_full_solution_vector(Nxy[(f"{c_comp}{b_comp}", 2 * w)])
 
-                        Nf = -LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
+                        Nf_raw = LinearResponseEigenSolver.get_full_solution_vector(Xf[w_ind])
 
                         if self.rank == mpi_master():
+
+                            Na = self.flip_yz(Na_raw)
+                            Nf = -Nf_raw
 
                             op_A = X[a_comp]
                             op_B = X[b_comp]
