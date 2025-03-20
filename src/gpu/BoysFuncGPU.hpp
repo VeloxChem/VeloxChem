@@ -39,11 +39,51 @@
 
 namespace gpu {  // gpu namespace
 
+template<typename TPtr>
+using CharPtr = std::conditional_t<std::is_const_v<std::remove_pointer_t<TPtr>>, const char*, char*>;
+
+template<typename ValueType, typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value, bool> = true>
+static inline __device__ __attribute__((always_inline)) IndexType calculateOffset(IndexType index)
+{
+    __builtin_assume(index >= 0);
+    return index * static_cast<IndexType>(sizeof(ValueType));
+}
+
+template<typename PointerType, typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value, bool> = true>
+static inline __device__ __attribute__((always_inline)) PointerType indexedAddress(PointerType address,
+                                                                                          IndexType idx)
+{
+    return reinterpret_cast<PointerType>(reinterpret_cast<CharPtr<decltype(address)>>(address)
+                                         + calculateOffset<std::remove_pointer_t<PointerType>>(idx));
+}
+
+template<typename ValueType>
+class AmdFastBuffer
+{
+private:
+    ValueType* buffer;
+
+public:
+    __device__ AmdFastBuffer(ValueType* buffer) : buffer(buffer) {}
+    template<typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value && std::is_const_v<std::remove_pointer_t<ValueType>>, bool> = true>
+    inline __device__ __attribute__((always_inline)) const ValueType& operator[](IndexType idx) const
+    {
+        return *indexedAddress(buffer, idx);
+    }
+    template<typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value && !std::is_const_v<std::remove_pointer_t<ValueType>>, bool> = true>
+    inline __device__ __attribute__((always_inline)) ValueType& operator[](IndexType idx)
+    {
+        return *indexedAddress(buffer, idx);
+    }
+};
+
 __device__ static void
-computeBoysFunction(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft)
+computeBoysFunction(double* values_in, const double fa, const uint32_t N, const double* bf_table, const double* ft_in)
 {
     // Note: 847 = 121 * 7
-    const double* bf_data = bf_table + N * 847;
+    AmdFastBuffer<const double> bf_data{bf_table + N * 847};
+    AmdFastBuffer<const double> ft{ft_in};
+    AmdFastBuffer<double> values{values_in};
 
     uint32_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<uint32_t>(10.0 * fa + 0.5);
 
@@ -65,7 +105,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         for (uint32_t j = 0; j < N; j++)
         {
-            values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j] + fx);
+            values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j]+ fx);
         }
     }
     else
