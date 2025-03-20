@@ -124,7 +124,7 @@ class SolvationFepDriver:
         # Ensemble and MD options
         self.temperature = 298.15 * unit.kelvin
         self.pressure = 1 * unit.atmospheres
-        self.timestep = 1.0 * unit.femtoseconds 
+        self.timestep = 2.0 * unit.femtoseconds 
         self.num_equil_steps = 10000 #10 ps
         self.num_steps = 1000000 # 1 ns
         self.number_of_snapshots = 1000
@@ -182,6 +182,7 @@ class SolvationFepDriver:
         """
         
         sol_builder = SolvationBuilder()
+        sol_builder.steps = 10000
 
         sol_builder.solvate(solute=molecule, 
                             solvent=solvent,
@@ -189,7 +190,7 @@ class SolvationFepDriver:
                             padding=self.padding,
                             target_density=target_density, 
                             neutralize=False, 
-                            equilibrate=False)
+                            equilibrate=True)
         
         self.solvent_name = solvent
         self.output_folder.mkdir(parents=True, exist_ok=True)
