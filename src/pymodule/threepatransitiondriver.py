@@ -289,7 +289,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
         profiler.check_memory_usage('CPP')
 
-        ret_dict,debugg_fock, debugg_dict,debugg_fock_II = self.compute_cubic_components(Focks, freqs, X, d_a_mo, Nx,
+        ret_dict = self.compute_cubic_components(Focks, freqs, X, d_a_mo, Nx,
                                                 scf_results, molecule, ao_basis,
                                                 profiler, Xf)
 
@@ -306,9 +306,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
                 'oscillator_strengths': oscillator_strengths,
                 'elec_trans_dipoles': elec_trans_dipoles,
                 'excitation_details': excitation_details,
-                'debugg': debugg_fock,
-                'debugg2': debugg_dict,
-                'debugg3': debugg_fock_II,
             })
 
         return ret_dict
@@ -369,7 +366,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
         profiler.check_memory_usage('Focks')
 
-        e4_dict, s4_dict,debugg_fock = self.get_es4(freqs, Nx, fock_dict, Focks, nocc, norb, d_a_mo,Xf)
+        e4_dict, s4_dict = self.get_es4(freqs, Nx, fock_dict, Focks, nocc, norb, d_a_mo,Xf)
 
         Nxy, f_xy = self.get_nxy(freqs, Nx, fock_dict, Focks, nocc, norb, d_a_mo, X, molecule, ao_basis, scf_results,Xf)
 
@@ -379,13 +376,12 @@ class ThreepaTransitionDriver(NonlinearSolver):
         # Needs tgo be fixed
         fock_dict_two = self.get_fock_dict_II(freqs, density_list1_two,density_list2_two, F0, mo,molecule, ao_basis, eri_dict,dft_dict)
 
-        e3_dict,debugg_fock_II = self.get_e3(freqs, Nx, Nxy, Focks, fock_dict_two, f_xy, nocc, norb, Xf)
+        e3_dict = self.get_e3(freqs, Nx, Nxy, Focks, fock_dict_two, f_xy, nocc, norb, Xf)
 
         profiler.check_memory_usage('E[3]')
 
         ret_dict = {}
         T_tensors = {}
-        debugg_dict = {}
 
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
@@ -468,15 +464,8 @@ class ThreepaTransitionDriver(NonlinearSolver):
                             T_abc += - NaE3NbNcf 
                             T_abc +=  -(NaE4NbNcNf - NaS4NbNcNd)
 
-                            T_tensors[(f"{a_comp}{b_comp}{c_comp}", w)] = T_abc
+                            T_tensors[(f"{a_comp}{b_comp}{c_comp}", round(float(w), 4))] = T_abc
 
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}","A3")] = A3NbNcNf
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}","X3")] =  -(NaB3NcNf + NaB3NfNc + NaC3NbNf + NaC3NfNb) 
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}","A2")] = NbA2Ncf + NcA2Nbf + NfA2Nbc 
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}","X2")] = NaB2Ncf + NaC2Nbf 
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}","E3")] = - NaE3NbNcf 
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}","T4")] = -(NaE4NbNcNf - NaS4NbNcNd)
-                            debugg_dict[(f"{a_comp}{b_comp}{c_comp}","T_abc")] = T_abc
 
         diagonalized_tensors = {}
 
@@ -509,9 +498,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
                 for i in 'xyz':
                     for j in 'xyz':
                         for k in 'xyz':
-                            Tiij = T_tensors[(f"{i}{i}{j}", w)]
-                            Tkkj = T_tensors[(f"{k}{k}{j}", w)]
-                            Tijk = T_tensors[(f"{i}{j}{k}", w)]
+                            Tiij = T_tensors[(f"{i}{i}{j}", round(float(w), 4))]
+                            Tkkj = T_tensors[(f"{k}{k}{j}", round(float(w), 4))]
+                            Tijk = T_tensors[(f"{i}{j}{k}", round(float(w), 4))]
 
                             Df += (Tiij * Tkkj).real
                             Dg += (Tijk * Tijk).real
@@ -549,7 +538,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
             self._print_results(ret_dict)
 
-            return ret_dict, debugg_fock, debugg_dict, debugg_fock_II
+            return ret_dict
         else:
             return None, None, None, None
 
@@ -579,8 +568,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
         e4_vec = {}
         s4_vec = {}
-
-        debugg = {}
 
         for w_ind, w in enumerate(wi):
 
@@ -643,29 +630,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
             fy = np.conjugate(fy).T
             fz = np.conjugate(fz).T
             ff = np.conjugate(ff).T * -1 / np.sqrt(2)
-
-            debugg.update({
-                'Fbfx': Fbfx,
-                'Fbfy': Fbfy,
-                'Fbfz': Fbfz,
-                'Fbc_xx': Fbc_xx,
-                'Fbc_yy': Fbc_yy,
-                'Fbc_zz': Fbc_zz,
-                'Fbc_xy': Fbc_xy,
-                'Fbc_xz': Fbc_xz,
-                'Fbc_yz': Fbc_yz,
-                'Fbcf_yz': Fbcf_yz,
-                'Fbcf_xz': Fbcf_xz,
-                'Fbcf_xy': Fbcf_xy,
-                'Fbcf_xx': Fbcf_xx,
-                'Fbcf_yy': Fbcf_yy,
-                'Fbcf_zz': Fbcf_zz,
-                'fx': fx,
-                'fy': fy,
-                'fz': fz,
-                'ff': ff
-            })
-
 
             F0_a = fo['F0']
 
@@ -774,7 +738,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
             s4_vec[('zy',w)] = s4_term_yz
 
 
-        return e4_vec, s4_vec, debugg
+        return e4_vec, s4_vec
 
 
     def get_nxy(self, freqs, Nx, fo, fo2, nocc, norb, d_a_mo, X, molecule,ao_basis, scf_tensors,Xf):
@@ -1595,7 +1559,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
         """
 
         e3vec = {}
-        debugg = {}
 
         for w_ind, w in enumerate(wi):
             vec_pack = np.array([
@@ -1666,30 +1629,6 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
             ff = np.conjugate(ff).T * -1 / np.sqrt(2)
 
-            
-            debugg['ffxx'] = ffxx
-            debugg['ffyy'] = ffyy
-            debugg['ffzz'] = ffzz
-            debugg['ffxy'] = ffxy
-            debugg['ffxz'] = ffxz
-            debugg['ffyz'] = ffyz
-
-            debugg['Nx'] = np.dot(Nbx, Nbx)
-            debugg['Ny'] = np.dot(Nby, Nby)
-            debugg['Nz'] = np.dot(Nbz, Nbz)
-            debugg['Nf'] = np.dot(Nf, Nf)
-
-            debugg['Nxx'] = np.dot(Nxx, Nxx)
-            debugg['Nyy'] = np.dot(Nyy, Nyy)
-            debugg['Nzz'] = np.dot(Nzz, Nzz)
-            debugg['Nxy'] = np.dot(Nxy, Nxy)
-            debugg['Nxz'] = np.dot(Nxz, Nxz)
-            debugg['Nyz'] = np.dot(Nyz, Nyz)
-            debugg['Nfx'] = np.dot(Nfx, Nfx)
-            debugg['Nfy'] = np.dot(Nfy, Nfy)
-            debugg['Nfz'] = np.dot(Nfz, Nfz)
-
-
             F0_a = fo2['F0']
 
             # Response matrices
@@ -1757,7 +1696,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
             e3vec[('yz', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
             e3vec[('zy', w)] = self.anti_sym(-2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
-        return e3vec, debugg
+        return e3vec
 
     def print_header(self):
         """
