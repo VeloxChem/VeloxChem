@@ -9,7 +9,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.threepatransitiondriver import ThreePATransitionDriver
 
 
-@pytest.mark.solvers
 class Test3PA:
 
     def run_scf(self, xcfun_label, basis_set_label):
