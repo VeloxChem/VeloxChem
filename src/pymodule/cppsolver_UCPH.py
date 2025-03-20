@@ -36,10 +36,11 @@ from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
+from .lreigensolver import LinearResponseEigenSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, create_hdf5,
+from .checkpoint import (check_rsp_hdf5, create_hdf5, write_rsp_hdf5,
                          write_rsp_solution_with_multiple_keys)
 from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
@@ -90,7 +91,6 @@ class ComplexResponseUCPH(LinearSolver):
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
 
-
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
             'a_components': ('str_lower', 'Cartesian components of A operator'),
@@ -139,7 +139,7 @@ class ComplexResponseUCPH(LinearSolver):
             self.a_components = 'xyz'
             self.b_operator = 'linear momentum'
             self.b_components = 'xyz'
-
+    
     def _get_precond(self, orb_ene, nocc, norb, w, d):
         """
         Constructs the preconditioners.
@@ -162,21 +162,14 @@ class ComplexResponseUCPH(LinearSolver):
         # spawning needed components
 
         ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
-        ediag_sq = ediag**2
-        sdiag_sq = sdiag**2
-        w_sq = w**2
-        d_sq = d**2
 
         # constructing matrix block diagonals
 
-        a_diag = ediag - w * sdiag
-        b_diag = d * sdiag
+        A0mg = ediag-w
+        invdiag = 1/(A0mg*A0mg+d*d)
 
-        p_diag = 1.0 / (ediag_sq - (w_sq*sdiag_sq - d_sq*sdiag_sq))
-
-        pa_diag = p_diag * a_diag
-        pb_diag = p_diag * b_diag
-
+        pa_diag = invdiag * A0mg
+        pb_diag = invdiag * d
 
         p_mat = np.hstack((
             pa_diag.reshape(-1, 1),
@@ -198,15 +191,17 @@ class ComplexResponseUCPH(LinearSolver):
             A tuple of distributed trial vectors after preconditioning.
         """
 
-        pa = precond.data[:, 0]
-        pb = precond.data[:, 1]
+        pa = precond.data[:, 0].reshape(self.nocc,self.nvir)
+        pb = precond.data[:, 1].reshape(self.nocc,self.nvir)
 
-        v_in_rg = v_in.data[:, 0]
-        v_in_ig = v_in.data[:, 1]
-  
-        v_out_rg = pa * v_in_rg + pb * v_in_ig
-        v_out_ig = pb * v_in_rg - pa * v_in_ig # RAS sign
-        
+        v_in_rg = v_in.data[:, 0].reshape(self.nocc,self.nvir) 
+        v_in_ig = v_in.data[:, 1].reshape(self.nocc,self.nvir)
+
+        #v_in_ig = 0.0
+
+        v_out_rg = (pa * v_in_rg + pb * v_in_ig).reshape(self.nocc*self.nvir)
+        v_out_ig = (pb * v_in_rg - pa * v_in_ig).reshape(self.nocc*self.nvir)
+
         v_mat = np.hstack((
             v_out_rg.reshape(-1, 1),
             v_out_ig.reshape(-1, 1),
@@ -328,6 +323,9 @@ class ComplexResponseUCPH(LinearSolver):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
 
+        self.nocc = nocc
+        self.nvir = norb - nocc
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -345,7 +343,7 @@ class ComplexResponseUCPH(LinearSolver):
         if not self.nonlinear:
             b_grad = self.get_complex_prop_grad(self.b_operator,
                                                 self.b_components, molecule,
-                                                basis, scf_tensors)
+                                                basis, scf_tensors)      
             
             if self.rank == mpi_master():
                 v_grad = {
@@ -382,7 +380,6 @@ class ComplexResponseUCPH(LinearSolver):
             if self.rank == mpi_master():
                 # No decomposing into ger ung
                 gradger = v_grad[key]
-                
                 grad_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
                     gradger.imag.reshape(-1, 1),
@@ -394,20 +391,18 @@ class ComplexResponseUCPH(LinearSolver):
             else:
                 grad_mat = None
                 rhs_mat = None
-      
+            
             dist_grad[key] = DistributedArray(grad_mat, self.comm)
             dist_rhs[key] = DistributedArray(rhs_mat, self.comm)
 
         if self.nonlinear:
             rsp_vector_labels = [
-                'CLR_bger_half_size', 'CLR_bung_half_size',
-                'CLR_e2bger_half_size', 'CLR_e2bung_half_size', 'CLR_Fock_ger',
-                'CLR_Fock_ung'
+                'CLR_bger',
+                'CLR_e2bger', 'CLR_Fock_ger'
             ]
         else:
             rsp_vector_labels = [
-                'CLR_bger_half_size', 'CLR_bung_half_size',
-                'CLR_e2bger_half_size', 'CLR_e2bung_half_size'
+                'CLR_bger', 'CLR_e2bger'
             ]
 
         # check validity of checkpoint file
@@ -424,14 +419,14 @@ class ComplexResponseUCPH(LinearSolver):
 
         # generate initial guess from scratch
         else:
-
-            bger = self.setup_trials(dist_rhs, precond)
             
+            bger = self.setup_trials(dist_rhs, precond)
+
             profiler.set_timing_key('Preparation')
 
             # We set up sigma in another way since we do not have ger ung 
-            
-            tdens = self._get_trans_densities(bger.data, scf_tensors,
+
+            tdens = self._get_trans_densities(bger.data, scf_tensors,       
                                                   molecule)     
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict)
@@ -439,7 +434,7 @@ class ComplexResponseUCPH(LinearSolver):
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
                                                bger.data)
-
+            
             self._append_trial_sigma_vectors(bger, sig_mat)
 
         profiler.check_memory_usage('Initial guess')
@@ -454,6 +449,8 @@ class ComplexResponseUCPH(LinearSolver):
         # start iterations
         for iteration in range(self.max_iter):
 
+            self.iteration = iteration
+
             iter_start_time = tm.time()
 
             profiler.set_timing_key(f'Iteration {iteration + 1}')
@@ -462,22 +459,22 @@ class ComplexResponseUCPH(LinearSolver):
 
             xvs = []
             self._cur_iter = iteration
-            
+
             n_ger = self._dist_bger.shape(1)
 
-            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger) # factor 2 is removed since we do not have halfsize
+
+            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger)
             s2gg = self._dist_bger.matmul_AtB(self._dist_bger)
 
             for op, w in op_freq_keys:
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
+                    
 
                     grad_rg = dist_grad[(op, w)].get_column(0)
                     grad_ig = dist_grad[(op, w)].get_column(1)
 
-                    # projections onto gerade and ungerade subspaces:
-
-                    g_realger = self._dist_bger.matmul_AtB(grad_rg) # factor 2 is removed since we do not have halfsize
+                    g_realger = self._dist_bger.matmul_AtB(grad_rg)
                     g_imagger = self._dist_bger.matmul_AtB(grad_ig)
 
                     # creating gradient and matrix for linear equation
@@ -486,23 +483,16 @@ class ComplexResponseUCPH(LinearSolver):
 
                     if self.rank == mpi_master():
 
-                        # gradient
-
                         g = np.zeros(size)
 
                         g[:n_ger] = g_realger[:]
                         g[size - n_ger:] = - g_imagger[:]
 
-                        # matrix
-
                         mat = np.zeros((size, size))
-
-                        # filling E2gg
 
                         mat[:n_ger, :n_ger] += e2gg[:, :]
                         mat[size - n_ger:, size - n_ger:] += -e2gg[:, :] 
 
-                        # filling S2gg
 
                         mat[:n_ger, :n_ger] += -w * s2gg[:, :]
 
@@ -513,6 +503,7 @@ class ComplexResponseUCPH(LinearSolver):
                         mat[size - n_ger:, size - n_ger:] += w * s2gg[:, :]
 
                         # solving matrix equation
+
                         c = np.linalg.solve(mat, g)
 
                     else:
@@ -533,13 +524,12 @@ class ComplexResponseUCPH(LinearSolver):
 
                     e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
                     e2imagger = self._dist_e2bger.matmul_AB_no_gather(c_imagger)
-
+                    
                     if self.nonlinear:
                         fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_realger)
                         fock_imagger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_imagger)
-
 
                         fock_full_data = (
                             fock_realger.data - 1j *
@@ -581,8 +571,9 @@ class ComplexResponseUCPH(LinearSolver):
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
-
-                    r_norms_2 = 2.0 * r.squared_norm(axis=0)            # RAS factors?
+                    
+                    # Velox wat rel. residual norm
+                    r_norms_2 = 2.0 * r.squared_norm(axis=0)           
                     x_norms_2 = 2.0 * x.squared_norm(axis=0)
 
                     rn = np.sqrt(np.sum(r_norms_2))
@@ -654,9 +645,9 @@ class ComplexResponseUCPH(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
-            # if self.force_checkpoint:
-            #     self._write_checkpoint(molecule, basis, dft_dict, pe_dict,         
-            #                            rsp_vector_labels)
+            if self.force_checkpoint:
+                self._write_checkpoint(molecule, basis, dft_dict, pe_dict,         
+                                       rsp_vector_labels)
 
             # creating new sigma and rho linear transformations
 
@@ -669,9 +660,8 @@ class ComplexResponseUCPH(LinearSolver):
             
             if self.rank == mpi_master():
 
-                # if i >= n_restart_iterations:
                 sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
-                                               bger.data)
+                                               new_trials_ger.data)
             
             self._append_trial_sigma_vectors(new_trials_ger, sig_mat)
 
@@ -681,8 +671,8 @@ class ComplexResponseUCPH(LinearSolver):
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        # self._write_checkpoint(molecule, basis, dft_dict, pe_dict,        
-        #                        rsp_vector_labels)
+        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,        
+                               rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
@@ -726,6 +716,7 @@ class ComplexResponseUCPH(LinearSolver):
                     if self.rank == mpi_master():
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
+
 
                         # write to h5 file for response solutions
                         if (self.save_solutions and
@@ -784,10 +775,6 @@ class ComplexResponseUCPH(LinearSolver):
         x_imagger = solution.get_full_vector(1)
 
         if solution.rank == mpi_master():
-            # x_real = np.hstack((x_realger, x_realger)) + np.hstack(
-            #     (x_realung, -x_realung))
-            # x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
-            #     (x_imagger, x_imagger))
             return x_realger + 1j * x_imagger
         else:
             return None
@@ -853,6 +840,7 @@ class ComplexResponseUCPH(LinearSolver):
         orb_ene = tensors['E_alpha']
 
         sigma_vecs = []
+
         for fockind in range(len(fock)):
             # 2e contribution
             mat = fock[fockind].copy()
@@ -866,7 +854,7 @@ class ComplexResponseUCPH(LinearSolver):
         sigma_mat = sigma_vecs[0]
         for vec in sigma_vecs[1:]:
             sigma_mat = np.hstack((sigma_mat, vec))
-
+        
         return sigma_mat    
     
     def _append_trial_sigma_vectors(self, b, e2b):
@@ -1088,44 +1076,42 @@ class ComplexResponseUCPH(LinearSolver):
             The orthonormalized gerade and ungerade trial vectors.
         """
 
+
         dist_new_b = self._precond_trials(vectors, precond)
 
         if dist_new_b.data.size == 0:
             dist_new_b.data = np.zeros((dist_new_b.shape(0), 0))
 
         if dist_b is not None:
-            # t = t - (b (b.T t))
-            bT_new = dist_b.matmul_AtB_allreduce(dist_new_b) # factor 2
+            # t = t - (b (b.T t))           
+            bT_new = dist_b.matmul_AtB_allreduce(dist_new_b) 
             dist_new_proj = dist_b.matmul_AB_no_gather(bT_new)
             dist_new_b.data -= dist_new_proj.data
         
         if renormalize:
             if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
-                dist_new_b = self.remove_linear_dependence(
-                    dist_new_b.data, self.lindep_thresh)
-                
+                dist_new_b = self.remove_linear_dependence(  
+                        dist_new_b.data, self.lindep_thresh)
+
                 dist_new_b = self.orthogonalize_gram_schmidt(
-                    dist_new_b)
-               
-                dist_new_b = self.normalize(dist_new_b)
-    
+                        dist_new_b)            
+
+                dist_new_b = self.normalize(dist_new_b) 
+
                 dist_new_b = DistributedArray(dist_new_b, self.comm)
 
         if self.rank == mpi_master():
             assert_msg_critical(
                 dist_new_b.data.size > 0,
                 'LinearSolver: trial vectors are empty')
-
-        # if dist_b is not None:
-        #     print("old new",np.matmul(dist_b.data.T, dist_new_b.data))
-        #     print("new new",np.matmul(dist_new_b.data.T,dist_new_b.data))
             
         return dist_new_b
     
     def get_complex_prop_grad(self, operator, components, molecule, basis,
                               scf_tensors):
         """
-        Computes complex property gradients for linear response equations.
+        Computes complex property gradients for linear response equations for TDA.
+        Copied from linearsolver.py, but changed factor 
 
         :param operator:
             The string for the operator.
@@ -1210,7 +1196,8 @@ class ComplexResponseUCPH(LinearSolver):
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
 
-            factor = np.sqrt(2.0)
+            # This factor is changed to 1 bc TDA
+            factor = 1              
             matrices = [
                 factor * (-1.0) * self.commut_mo_density(
                     np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
@@ -1435,3 +1422,79 @@ class ComplexResponseUCPH(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+
+    def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
+        """
+        Writes checkpoint file. Copied from linearsolver. Changed to work without ungerade.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param labels:
+            The list of labels.
+        """
+
+        if self.checkpoint_file is None and self.filename is None:
+            return
+
+        if self.checkpoint_file is None and self.filename is not None:
+            self.checkpoint_file = f'{self.filename}.rsp.h5'
+
+        t0 = tm.time()
+
+        if self.rank == mpi_master():
+            success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
+                                     basis, dft_dict, pe_dict, self.ostream)
+        else:
+            success = False
+        success = self.comm.bcast(success, root=mpi_master())
+
+        if success:
+            if self.nonlinear:
+                dist_arrays = [
+                    self._dist_bger, self._dist_e2bger, self._dist_fock_ger,
+                ]
+            else:
+                dist_arrays = [
+                    self._dist_bger, self._dist_e2bger
+                ]
+
+            for dist_array, label in zip(dist_arrays, labels):
+                dist_array.append_to_hdf5_file(self.checkpoint_file, label)
+
+            checkpoint_text = 'Time spent in writing checkpoint file: '
+            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
+
+
+    def _read_checkpoint(self, rsp_vector_labels):
+        """
+        Reads distributed arrays from checkpoint file. Copied from linearsolver.py and adjusted for TDA
+
+        :param rsp_vector_labels:
+            The list of labels of vectors.
+        """
+
+        dist_arrays = [
+            DistributedArray.read_from_hdf5_file(self.checkpoint_file, label,
+                                                 self.comm)
+            for label in rsp_vector_labels
+        ]
+
+        if self.nonlinear:
+            (self._dist_bger, self._dist_e2bger, self._dist_fock_ger,
+             ) = dist_arrays
+        else:
+            (self._dist_bger, self._dist_e2bger,
+             ) = dist_arrays
+
+        checkpoint_text = 'Restarting from checkpoint file: '
+        checkpoint_text += self.checkpoint_file
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()
