@@ -60,10 +60,16 @@ def scf_results_sanity_check(obj, scf_results):
     updated_scf_info = {}
 
     if obj.rank == mpi_master():
+        if 'filename' in scf_results:
+            # force filename to be the same since we want a single final h5
+            # file to store all results
+            updated_scf_info['filename'] = scf_results['filename']
+
         if scf_results.get('eri_thresh', None) is not None:
             updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
 
         if scf_results.get('ri_coulomb', None) is not None:
+            # TODO: consider storing ri_aux_basis_obj in scf_results
             updated_scf_info['ri_coulomb'] = scf_results['ri_coulomb']
             updated_scf_info['ri_auxiliary_basis'] = scf_results[
                 'ri_auxiliary_basis']

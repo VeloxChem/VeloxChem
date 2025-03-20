@@ -1205,7 +1205,7 @@ def _Molecule_partition_atoms(self, comm):
 
     list_atoms = comm.bcast(list_atoms, root=mpi_master())
 
-    return list_atoms[rank::nnodes]
+    return list(list_atoms[rank::nnodes])
 
 
 Molecule._get_input_keywords = _Molecule_get_input_keywords

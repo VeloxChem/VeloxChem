@@ -22,12 +22,12 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef DenseLinearAlgebra_hpp
-#define DenseLinearAlgebra_hpp
+#ifndef SerialDenseLinearAlgebra_hpp
+#define SerialDenseLinearAlgebra_hpp
 
 #include "DenseMatrix.hpp"
 
-namespace denblas {  // denblas namespace
+namespace sdenblas {  // sdenblas namespace
 
 /**
  Computes matrix multiplication: A * B.
@@ -36,7 +36,7 @@ namespace denblas {  // denblas namespace
  @param matrixB the matrix B
  @return the matrix A * B.
  */
-auto multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
+auto serialMultAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
  Computes matrix multiplication: A * B^T.
@@ -45,53 +45,34 @@ auto multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseM
  @param matrixB the matrix B
  @return the matrix A * B^T.
  */
-auto multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
+auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
- Computes matrix multiplication: A^T * B.
+ Computes matrix addition: A + B.
 
  @param matrixA the matrix A.
  @param matrixB the matrix B
- @return the matrix A^T * B.
+ @return the matrix A + B.
  */
-auto multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
+auto serialAddAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix;
 
 /**
- Computes matrix substraction: A - B.
+ Adds matrix B to matrix A.
 
  @param matrixA the matrix A.
  @param matrixB the matrix B
- @return the matrix A - B.
  */
-auto subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
+auto serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor=1.0) -> void;
 
 /**
- Computes matrix addition: A + factor * B.
+ Solves Ax=b.
 
- @param matrixA the matrix A.
- @param matrixB the matrix B
- @param factor the scaling factor of matrix B.
- @return the matrix A +  factor * B.
+ @param mat the matrix A.
+ @param vec the vector b.
+ @return the solution vector x.
  */
-auto addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix;
+auto serialSolve(const CDenseMatrix& mat, const std::vector<double>& vec) -> std::vector<double>;
 
-/**
- Computes dot product of two vectors.
+}  // namespace sdenblas
 
- @param vectorA the vector A.
- @param vectorB the vector B.
- @return the dot product of A and B.
- */
-auto dot(const std::vector<double>& vectorA, const std::vector<double>& vectorB) -> double;
-
-/**
- Computes trace of matrix.
-
- @param matrix the matrix.
- @return the trace of matrix.
- */
-auto trace(const CDenseMatrix& matrix) -> double;
-
-}  // namespace denblas
-
-#endif /* DenseLinearAlgebra_hpp */
+#endif /* SerialDenseLinearAlgebra_hpp */

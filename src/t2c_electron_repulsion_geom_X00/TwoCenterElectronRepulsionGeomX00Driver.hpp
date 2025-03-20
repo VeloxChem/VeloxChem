@@ -13,6 +13,7 @@
 #include "Point.hpp"
 #include "T2CDistributor.hpp"
 #include "T2CGeom10SumDistributor.hpp"
+#include "T2CGeom10SumTwoDistributor.hpp"
 #include "TwoCenterElectronRepulsionGeom100Func.hpp"
 
 #include <iostream>
@@ -75,6 +76,19 @@ class CTwoCenterElectronRepulsionGeomX00Driver
     auto compute(const CMolecularBasis             &basis,
                  const CMolecule                   &molecule,
                  const std::vector<double>&        gamma,
+                 const int                         iatom) const -> std::array<double, 3>;
+    
+    /// @brief Computes electron repulsion matrix derivative fro molecule and molecular basis.
+    /// @param basis The molecular basis.
+    /// @param molecule The molecule.
+    /// @param bra_gamma The transformed Gamma vector on bra side.
+    /// @param ket_gamma The transformed Gamma vector on ket side.
+    /// @param iatom The index of atom.
+    /// @return The electron repulsion gradient.
+    auto compute(const CMolecularBasis             &basis,
+                 const CMolecule                   &molecule,
+                 const std::vector<double>&        bra_gamma,
+                 const std::vector<double>&        ket_gamma,
                  const int                         iatom) const -> std::array<double, 3>;
 };
 
@@ -209,5 +223,88 @@ CTwoCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis      
     
     return g_xyz;
 }
+
+template <int N>
+auto
+CTwoCenterElectronRepulsionGeomX00Driver<N>::compute(const CMolecularBasis             &basis,
+                                                     const CMolecule                   &molecule,
+                                                     const std::vector<double>&        bra_gamma,
+                                                     const std::vector<double>&        ket_gamma,
+                                                     const int                         iatom) const -> std::array<double, 3>
+{
+    // set up bra and ket GTOs blocks
+    
+    const auto bra_gto_blocks = gtofunc::make_gto_blocks(basis, molecule, {iatom, });
+    
+    const auto ket_gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+    
+    // set up tasks
+
+    const auto tasks = omp::make_work_tasks(bra_gto_blocks, ket_gto_blocks);
+    
+    // set up accumulation vector
+    
+    auto gvec_xyz = std::vector<std::array<double, 3>>(tasks.size(), {0.0, 0.0, 0.0});
+    
+    // prepare pointers for OMP parallel region
+    
+    auto ptr_bra_gto_blocks = bra_gto_blocks.data();
+    
+    auto ptr_ket_gto_blocks = ket_gto_blocks.data();
+    
+    auto ptr_bra_gamma = bra_gamma.data();
+    
+    auto ptr_ket_gamma = ket_gamma.data();
+    
+    auto ptr_tasks = &tasks;
+    
+    auto ptr_gvec_xyz = gvec_xyz.data();
+
+    // execute OMP tasks with static scheduling
+
+    omp::set_static_scheduler();
+
+#pragma omp parallel shared(ptr_bra_gto_blocks, ptr_ket_gto_blocks, ptr_tasks, ptr_gvec_xyz)
+    {
+#pragma omp single nowait
+        {
+            size_t index = 0;
+            std::ranges::for_each(std::ranges::reverse_view(*ptr_tasks), [&](const auto& task) {
+                auto bra_idx     = task[0];
+                auto ket_idx     = task[1];
+                auto bra_indices = std::pair<size_t, size_t>{task[2], task[3]};
+                auto ket_indices = std::pair<size_t, size_t>{task[4], task[5]};
+#pragma omp task firstprivate(bra_idx, ket_idx, bra_indices, ket_indices)
+                {
+                    auto bra_gtos = ptr_bra_gto_blocks[bra_idx];
+                    auto ket_gtos = ptr_ket_gto_blocks[ket_idx];
+                    CT2CGeom10SumTwoDistributor distributor(ptr_gvec_xyz[index].data(), ptr_bra_gamma, ptr_ket_gamma);
+                    if constexpr (N == 1)
+                    {
+                        t2cerifunc::compute_geom_100(distributor, bra_gtos, ket_gtos, bra_indices, ket_indices, false);
+                    }
+                }
+                index++;
+            });
+        }
+    }
+
+    // sum up contributions from accumulation vector
+    
+    auto g_xyz = std::array<double, 3>({0.0, 0.0, 0.0});
+    
+    for (const auto& t_xyz : gvec_xyz)
+    {
+        g_xyz[0] += t_xyz[0];
+        
+        g_xyz[1] += t_xyz[1];
+        
+        g_xyz[2] += t_xyz[2];
+    }
+    
+    return g_xyz;
+}
+
+
 
 #endif /* TwoCenterElectronRepulsionX00Driver_hpp */

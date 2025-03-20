@@ -23,7 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import sys
@@ -35,7 +34,7 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
 
@@ -139,6 +138,10 @@ class LinearResponseSolver(LinearSolver):
 
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
+
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         # check dft setup
         dft_sanity_check(self, 'compute')
@@ -320,7 +323,7 @@ class LinearResponseSolver(LinearSolver):
                     g[:n_ger] = g_ger[:]
                     g[n_ger:] = g_ung[:]
 
-                    c = np.linalg.solve(mat, g)
+                    c = safe_solve(mat, g)
                 else:
                     c = None
                 c = self.comm.bcast(c, root=mpi_master())
@@ -477,15 +480,8 @@ class LinearResponseSolver(LinearSolver):
                     rsp_funcs = {}
 
                     # final h5 file for response solutions
-                    if self.checkpoint_file is not None:
-                        if self.checkpoint_file.endswith('_rsp.h5'):
-                            final_h5_fname = (
-                                self.checkpoint_file[:-len('_rsp.h5')] + '.h5')
-                        else:
-                            # TODO: reconsider the file name in this case
-                            fpath = Path(self.checkpoint_file)
-                            fpath = fpath.with_name(fpath.stem)
-                            final_h5_fname = str(fpath) + '_results.h5'
+                    if self.filename is not None:
+                        final_h5_fname = f'{self.filename}.h5'
                     else:
                         final_h5_fname = None
 

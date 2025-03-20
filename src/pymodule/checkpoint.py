@@ -146,13 +146,12 @@ def write_rsp_solution(fname, key, vec):
         The solution vector.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
+    if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
-        rsp_group = 'rsp/'
-        hf.create_dataset(rsp_group + key, data=vec)
+        label = 'rsp/' + key
+        if label in hf:
+            del hf[label]
+        hf.create_dataset(label, data=vec)
         hf.close()
 
 
@@ -168,15 +167,20 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         The solution vector.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
+    if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
-        rsp_group = 'rsp/'
-        dset = hf.create_dataset(rsp_group + keys[0], data=vec)
+
+        label = 'rsp/' + keys[0]
+        if label in hf:
+            del hf[label]
+        dset = hf.create_dataset(label, data=vec)
+
         for key in keys[1:]:
-            hf[rsp_group + key] = dset
+            label = 'rsp/' + key
+            if label in hf:
+                del hf[label]
+            hf[label] = dset
+
         hf.close()
 
 
@@ -190,20 +194,19 @@ def write_lr_rsp_results_to_hdf5(fname, rsp_results):
         The dictionary containing the linear response results.
     """
 
-    if (fname and isinstance(fname, str) and Path(fname).is_file()):
+    if fname and isinstance(fname, str):
 
         hf = h5py.File(fname, 'a')
 
-        keys = rsp_results.keys()
-
-        rsp_group = 'rsp/'
-
-        for key in keys:
+        for key in rsp_results:
             # Do not write the eigenvectors, file names and excitation details
             if "vector" in key or "cube" in key or "file" in key or "details" in key:
                 continue
-            else:
-                hf.create_dataset(rsp_group + key, data=rsp_results[key])
+
+            label = 'rsp/' + key
+            if label in hf:
+                del hf[label]
+            hf.create_dataset(label, data=rsp_results[key])
 
         hf.close()
 
@@ -272,19 +275,21 @@ def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
         The attachment density matrix.
     """
 
-    if (fname and isinstance(fname, str) and Path(fname).is_file()):
+    if fname and isinstance(fname, str):
 
         hf = h5py.File(fname, 'a')
 
-        # Add the attachment and detachment densities to the
-        # rsp group.
-        rsp_group = 'rsp/'
+        # add detachment/attachment densities to the rsp group
 
-        detach_label = "detach_" + state_label
-        hf.create_dataset(rsp_group + detach_label, data=dens_detach)
+        detach_label = "rsp/detach_" + state_label
+        if detach_label in hf:
+            del hf[detach_label]
+        hf.create_dataset(detach_label, data=dens_detach)
 
-        attach_label = "attach_" + state_label
-        hf.create_dataset(rsp_group + attach_label, data=dens_attach)
+        attach_label = "rsp/attach_" + state_label
+        if attach_label in hf:
+            del hf[attach_label]
+        hf.create_dataset(attach_label, data=dens_attach)
 
         hf.close()
 

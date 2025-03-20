@@ -340,7 +340,7 @@ class OrbitalViewer:
 
         return np_orb
 
-    def plot(self, molecule, basis, mo_inp):
+    def plot(self, molecule, basis, mo_inp, label=''):
         """
         Plots the orbitals, with a widget to choose which.
 
@@ -365,7 +365,10 @@ class OrbitalViewer:
             raise ImportError(self.help_string_widgets_and_display())
 
         if isinstance(mo_inp, str):
-            mo_object = MolecularOrbitals.read_hdf5(mo_inp)
+            if (label and isinstance(label, str)):
+                mo_object = MolecularOrbitals.read_hdf5(mo_inp, label=label)
+            else:
+                mo_object = MolecularOrbitals.read_hdf5(mo_inp)
         elif isinstance(mo_inp, MolecularOrbitals):
             mo_object = mo_inp
         else:

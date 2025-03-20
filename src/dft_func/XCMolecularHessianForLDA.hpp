@@ -36,8 +36,8 @@
 namespace xchesslda {  // xchesslda namespace
 
 /**
- Integrates LDA exchnage-correlation functional contribution to molecular
- Hessian.
+ Integrates LDA exchnage-correlation functional contribution to closed-shell
+ molecular Hessian.
 
  @param molecule the molecule.
  @param basis the molecular basis.
@@ -47,12 +47,12 @@ namespace xchesslda {  // xchesslda namespace
  @param xcFunctional the exchange-correlation functional.
  @return the molecular Hessian.
  */
-auto integrateExcHessianForLDA(const CMolecule&                  molecule,
-                               const CMolecularBasis&            basis,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&             molecularGrid,
-                               const double                      screeningThresholdForGTOValues,
-                               const CXCFunctional&              xcFunctional) -> CDenseMatrix;
+auto integrateExcHessianForLdaClosedShell(const CMolecule&                  molecule,
+                                          const CMolecularBasis&            basis,
+                                          const std::vector<const double*>& gsDensityPointers,
+                                          const CMolecularGrid&             molecularGrid,
+                                          const double                      screeningThresholdForGTOValues,
+                                          const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
 /**
  Integrates LDA exchnage-correlation functional contribution to molecular

@@ -1,8 +1,8 @@
+from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import math as mt
-
-from mpi4py import MPI
+import pytest
 
 from veloxchem.veloxchemlib import T4CScreener, SubMatrix, Matrices
 from veloxchem.veloxchemlib import make_matrix, mat_t
@@ -13,6 +13,7 @@ from veloxchem import TwoCenterElectronRepulsionDriver
 from veloxchem.rifockdriver import RIFockDriver
 
 
+@pytest.mark.solvers
 class TestRIFockDriver:
 
     def get_data_h2o(self):

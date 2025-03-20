@@ -362,11 +362,11 @@ class ScfHessianDriver(HessianDriver):
                 density=density * 2)
 
         # TODO: double check propagation of cphf settings
-        profiler_keywords = {
+        cphf_keywords = {
             'timing', 'profiling', 'memory_profiling', 'memory_tracing',
-            'use_subcomms'
+            'use_subcomms', 'filename'
         }
-        for key in profiler_keywords:
+        for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
 
         cphf_solver.compute(molecule, ao_basis, scf_tensors)

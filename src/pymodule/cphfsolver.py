@@ -34,7 +34,7 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import (assert_msg_critical, safe_solve)
+from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .batchsize import get_batch_size
@@ -172,6 +172,14 @@ class CphfSolver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -183,14 +191,6 @@ class CphfSolver(LinearSolver):
                 self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
             else:
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
-
-        # checkpoint info
-        if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
-        elif (self.checkpoint_file is not None and
-              self.checkpoint_file.endswith('_rsp.h5')):
-            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
-                                    '_orbrsp.h5')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)

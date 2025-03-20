@@ -60,7 +60,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 try:
@@ -528,6 +528,9 @@ class ScfDriver:
             else:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
+
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_scf.h5'
 
         # check RI-J
         # for now, force DIIS for RI-J
@@ -1434,9 +1437,6 @@ class ScfDriver:
             self._ri_drv = RIFockDriver(inv_mat_j)
 
             local_atoms = molecule.partition_atoms(self.comm)
-            # TODO: update prepare_buffers so that local_atoms does not need to
-            #       be in ascending order
-            local_atoms = sorted(local_atoms)
             self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j,
                                          local_atoms)
 
@@ -1488,7 +1488,7 @@ class ScfDriver:
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                    self._cpcm_q = np.linalg.solve(self._cpcm_Amat, rhs)
+                    self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
 
                     e_sol = self.cpcm_drv.compute_solv_energy(
                         self._cpcm_Bzvec, Cvec, self._cpcm_q)
@@ -1694,6 +1694,7 @@ class ScfDriver:
                     'scf_type': self.scf_type,
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
+                    'filename': self.filename,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -3028,17 +3029,11 @@ class ScfDriver:
             The AO basis set.
         """
 
-        if self.checkpoint_file is None:
+        if self.filename is None:
             return
 
         # Final hdf5 file to save scf results
-        if self.checkpoint_file.endswith('_scf.h5'):
-            final_h5_fname = self.checkpoint_file[:-len('_scf.h5')] + '.h5'
-        else:
-            # TODO: reconsider the file name in this case
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            final_h5_fname = str(fpath) + '_results.h5'
+        final_h5_fname = f'{self.filename}.h5'
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
