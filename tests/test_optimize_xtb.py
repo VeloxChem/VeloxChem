@@ -45,7 +45,7 @@ class TestOptimizeXTB:
                 logfile.unlink()
 
     @pytest.mark.skipif(not XtbDriver.is_available(),
-                        reason='xtb not available')
+                        reason='xtb-python not available')
     def test_nh3(self):
 
         here = Path(__file__).parent

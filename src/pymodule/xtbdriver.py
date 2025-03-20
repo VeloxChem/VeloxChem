@@ -143,9 +143,8 @@ class XtbDriver:
         """
 
         # sanity check
-
-        errmsg = 'XtbDriver: xtb-python not available. Please install xtb-python.'
-
+        errmsg = 'XtbDriver: xtb-python is not available. '
+        errmsg += 'Please install xtb-python.'
         assert_msg_critical(self.is_available(), errmsg)
 
         identifiers = np.array(molecule.get_identifiers())
