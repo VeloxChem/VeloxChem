@@ -465,12 +465,12 @@ class NonlinearSolver:
 
         mode_is_valid = mode.lower() in [
             'crf', 'tpa', 'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf',
-            'shg', 'shg_red', 'tpa_quad', '3pa_cubic', '3pa_ii'
+            'shg', 'shg_red', 'tpa_quad', '3pa', '3pa_ii'
         ]
         assert_msg_critical(mode_is_valid,
                             'NonlinearSolver: Invalid mode ' + mode.lower())
 
-        mode_is_cubic = mode.lower() in ['crf', 'tpa','3pa_cubic']
+        mode_is_cubic = mode.lower() in ['crf', 'tpa','3pa']
 
         mode_is_quadratic = mode.lower() in [
             'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg',
@@ -513,7 +513,7 @@ class NonlinearSolver:
                     # 6 third-order densities per frequency
                     size_1, size_2, size_3 = 12, 24, 6
 
-                elif mode.lower() == '3pa_cubic':
+                elif mode.lower() == '3pa':
                     # 4 first-order densities per frequency
                     # 9 second-order densities per frequency
                     # 6 third-order densities per frequency
@@ -524,12 +524,10 @@ class NonlinearSolver:
                     # 6 second-order densities per frequency
                     size_1, size_2 = 12, 2
 
-
                 elif mode.lower() == '3pa_ii':
                     # 12 first-order densities per frequency
                     # 6 second-order densities per frequency
-                    size_1, size_2 = 10, 15
-
+                    size_1, size_2 = 13, 6
 
                 elif mode.lower() == 'tpa_ii':
                     # 36 first-order densities per frequency
