@@ -2304,15 +2304,63 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
 {
     if (xcFuncType == xcfun::lda)
     {
-        DensityProdForLDA(rwDensityGrid, rw2DensityGrid, numdens, cubeMode);
+        if (format::upper_case(cubeMode) == "TPA")
+        {
+            DensityProdForLDA_TPA(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else if (format::upper_case(cubeMode) == "CRF")
+        {
+            DensityProdForLDA_CRF(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else if (format::upper_case(cubeMode) == "3PA")
+        {
+            DensityProdForLDA_3PA(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
+                                      std::string(" not implemented for LDA"));
+        }
     }
     else if (xcFuncType == xcfun::gga)
     {   
-        DensityProdForGGA(rwDensityGrid, rw2DensityGrid, numdens, cubeMode);
+        if (format::upper_case(cubeMode) == "TPA")
+        {
+            DensityProdForGGA_TPA(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else if (format::upper_case(cubeMode) == "CRF")
+        {
+            DensityProdForGGA_CRF(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else if (format::upper_case(cubeMode) == "3PA")
+        {
+            DensityProdForGGA_3PA(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
+                                      std::string(" not implemented for GGA"));
+        }
     }
     else if (xcFuncType == xcfun::mgga)
     {
-        DensityProdForMGGA(rwDensityGrid, rw2DensityGrid, numdens, cubeMode);
+        if (format::upper_case(cubeMode) == "TPA")
+        {
+            DensityProdForMGGA_TPA(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else if (format::upper_case(cubeMode) == "CRF")
+        {
+            DensityProdForMGGA_CRF(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else if (format::upper_case(cubeMode) == "3PA")
+        {
+            DensityProdForMGGA_3PA(rwDensityGrid, rw2DensityGrid, numdens);
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
+                                      std::string(" not implemented for meta-GGA"));
+        }
     }
     else
     {
@@ -2321,16 +2369,14 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
 }
 
 void
-CDensityGridCubic::DensityProdForLDA(const CDensityGrid& rwDensityGrid,
-                                     const CDensityGrid& rw2DensityGrid,
-                                     const int           numdens,
-                                     const std::string&  cubeMode) 
+CDensityGridCubic::DensityProdForLDA_TPA(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
 {
         if (_gridType != dengrid::ab) return;
 
         auto npoints = getNumberOfGridPoints();
 
-        if (format::upper_case(cubeMode) == "TPA")
         {
             for (int j = 0; j < numdens / 30; j++)
             {
@@ -2545,7 +2591,17 @@ CDensityGridCubic::DensityProdForLDA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(cubeMode) == "CRF")
+}
+
+void
+CDensityGridCubic::DensityProdForLDA_CRF(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         {
             for (int j = 0; j < numdens / 8; j++)
             {
@@ -2631,7 +2687,17 @@ CDensityGridCubic::DensityProdForLDA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(cubeMode) == "3PA")
+}
+
+void
+CDensityGridCubic::DensityProdForLDA_3PA(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         {
             for (int j = 0; j < numdens / 9; j++)
             {
@@ -2777,25 +2843,17 @@ CDensityGridCubic::DensityProdForLDA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else
-        {
-            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
-                                      std::string(" not implemented for LDA"));
-        }
-    
 }
 
 void
-CDensityGridCubic::DensityProdForGGA(const CDensityGrid& rwDensityGrid,
-                                     const CDensityGrid& rw2DensityGrid,
-                                     const int           numdens,
-                                     const std::string&  cubeMode) 
+CDensityGridCubic::DensityProdForGGA_TPA(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
 {
         if (_gridType != dengrid::ab) return;
 
         auto npoints = getNumberOfGridPoints();
 
-        if (format::upper_case(cubeMode) == "TPA")
         {
             for (int j = 0; j < numdens / 30; j++)
             {
@@ -7288,7 +7346,17 @@ CDensityGridCubic::DensityProdForGGA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(cubeMode) == "CRF")
+}
+
+void
+CDensityGridCubic::DensityProdForGGA_CRF(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         {
             for (int j = 0; j < numdens / 8; j++)
             {
@@ -8276,11 +8344,20 @@ CDensityGridCubic::DensityProdForGGA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(cubeMode) == "3PA")
+}
+
+void
+CDensityGridCubic::DensityProdForGGA_3PA(const CDensityGrid& rwDensityGrid,
+                                         const CDensityGrid& rw2DensityGrid,
+                                         const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         {
             for (int j = 0; j < numdens / 9; j++)
             {
-
                 // Second-order Fock matrix terms 
 
                 auto gam_fx_r = gam2(9 * j);
@@ -10584,24 +10661,17 @@ CDensityGridCubic::DensityProdForGGA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else
-        {
-            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
-                                      std::string(" not implemented for GGA"));
-        }
 }
 
 void
-CDensityGridCubic::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
-                                      const CDensityGrid& rw2DensityGrid,
-                                      const int           numdens,
-                                      const std::string&  cubeMode) 
+CDensityGridCubic::DensityProdForMGGA_CRF(const CDensityGrid& rwDensityGrid,
+                                          const CDensityGrid& rw2DensityGrid,
+                                          const int           numdens)
 {
         if (_gridType != dengrid::ab) return;
 
         auto npoints = getNumberOfGridPoints();
 
-        if (format::upper_case(cubeMode) == "CRF")
         {
             for (int j = 0; j < numdens / 8; j++)
             {
@@ -12375,7 +12445,17 @@ CDensityGridCubic::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        else if (format::upper_case(cubeMode) == "3PA")
+}
+
+void
+CDensityGridCubic::DensityProdForMGGA_3PA(const CDensityGrid& rwDensityGrid,
+                                          const CDensityGrid& rw2DensityGrid,
+                                          const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         {
             for (int j = 0; j < numdens / 9; j++)
             {
@@ -16697,7 +16777,17 @@ CDensityGridCubic::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
                 }
             }
         }        
-        else if (format::upper_case(cubeMode) == "TPA")
+}
+
+void
+CDensityGridCubic::DensityProdForMGGA_TPA(const CDensityGrid& rwDensityGrid,
+                                          const CDensityGrid& rw2DensityGrid,
+                                          const int           numdens)
+{
+        if (_gridType != dengrid::ab) return;
+
+        auto npoints = getNumberOfGridPoints();
+
         {
             for (int j = 0; j < numdens / 30; j++)
             {
@@ -25686,10 +25776,5 @@ CDensityGridCubic::DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
                                   + 1.0/3.0 * prod2_i(gam_lamtau_zz_zz_r[i],gam_lamtau_zz_zz_i[i],gradBz_z_r[i],gradBz_z_i[i]);
                 }
             }
-        }
-        else
-        {
-            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + format::upper_case(cubeMode) +
-                                      std::string(" not implemented for meta-GGA"));
         }
 }
