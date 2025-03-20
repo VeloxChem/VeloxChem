@@ -179,14 +179,14 @@ class AtomTypeIdentifier:
                 if self.connectivity_matrix[i][j] == 1:
                     self.graph.add_edge(i, j)
 
-        all_cycles = list(nx.simple_cycles(self.graph, length_bound=6))
+        all_cycles = list(nx.simple_cycles(self.graph, length_bound=10))
 
         # Sort by cycle length
         all_cycles = sorted(all_cycles, key=len)
 
-        # Filter only the cycles of size 3 to 6
+        # Filter only the cycles of size 3 to 10
         filtered_cycles = [
-            cycle for cycle in all_cycles if 3 <= len(cycle) <= 6
+            cycle for cycle in all_cycles if 3 <= len(cycle) <= 10
         ]
 
         # Remove super-cycles (cycles that contain smaller cycles)
@@ -262,6 +262,8 @@ class AtomTypeIdentifier:
                     else:
                         all_nitrogens_likely_sp2 = False
                         break
+
+            # TODO: add aromaticity detection for rings with 7-10 atoms
 
             if len(cycle) == 6 and only_carbon_nitrogen_in_cycle:
 
@@ -2041,11 +2043,11 @@ class AtomTypeIdentifier:
 
         return np.linalg.norm(np.array(v1) - np.array(v2))
 
-    def identify_equivalences(self, depth=20):
+    def identify_equivalences(self, depth=10):
         """
         Identifies equivalent atoms in the molecule.
         The depth parameter specifies how many bonds are considered for the equivalence.
-        The default value is 4.
+        The default value is 10.
 
         :param depth:
             Depth of the equivalence search
