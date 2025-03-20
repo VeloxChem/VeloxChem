@@ -27,7 +27,6 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-from tabulate import tabulate
 
 
 from .oneeints import compute_electric_dipole_integrals
@@ -49,7 +48,7 @@ from .lreigensolver import LinearResponseEigenSolver
 from .firstorderprop import FirstOrderProperties
 
 
-class ThreepaTransitionDriver(NonlinearSolver):
+class ThreePATransitionDriver(NonlinearSolver):
     """
     Implements a general quadratic response driver.
 
@@ -71,7 +70,7 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
     def __init__(self, comm=None, ostream=None):
         """
-        Initializes the quadratic response driver.
+        Initializes the three-photon absorption driver.
         """
 
         if comm is None:
@@ -136,6 +135,10 @@ class ThreepaTransitionDriver(NonlinearSolver):
 
         # check SCF results
         scf_results_sanity_check(self, scf_results)
+
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
@@ -221,8 +224,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
             setattr(rpa_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            rpa_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpatrans_rpa.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            rpa_drv.checkpoint_file = str(fpath) + '_3patrans_1_rpa.h5'
 
         rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
 
@@ -276,8 +280,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
             setattr(N_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            N_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpatrans_cpp.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            N_drv.checkpoint_file = str(fpath) + '_3patrans_1_cpp.h5'
 
         N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
@@ -904,8 +909,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
             setattr(Nxy_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            Nxy_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.3pa_2.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            Nxy_drv.checkpoint_file = str(fpath) + '_3patrans_2.h5'
 
         Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
 
@@ -1365,8 +1371,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.3pa_fock_2.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            fock_file = str(fpath) + '_3patrans_fock_2.h5'
         else:
             fock_file = None
 
@@ -1483,8 +1490,9 @@ class ThreepaTransitionDriver(NonlinearSolver):
         # examine checkpoint for distributed Focks
 
         if self.checkpoint_file is not None:
-            fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.3patrans_fock.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            fock_file = str(fpath) + '_3patrans_fock_1.h5'
         else:
             fock_file = None
 

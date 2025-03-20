@@ -6,7 +6,7 @@ from veloxchem.veloxchemlib import mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.threepatransitiondriver import ThreepaTransitionDriver
+from veloxchem.threepatransitiondriver import ThreePATransitionDriver
 
 
 @pytest.mark.solvers
@@ -52,7 +52,7 @@ class Test3PA:
 
         rsp_conv_thresh = 1.0e-6
         rsp_settings_tpa = {'nstates': 2,'conv_thresh':rsp_conv_thresh}
-        tpa = ThreepaTransitionDriver() 
+        tpa = ThreePATransitionDriver() 
         grid_level  = 3
         tpa.update_settings(rsp_settings_tpa,  {'xcfun': xcfun_label,'grid_level': grid_level})
         dict_for_TPA = tpa.compute(molecule, ao_basis, scf_results)
