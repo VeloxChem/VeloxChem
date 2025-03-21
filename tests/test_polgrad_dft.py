@@ -13,6 +13,7 @@ from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polarizabilitygradient import PolarizabilityGradient
 
 
+@pytest.mark.solvers
 class TestPolgrad:
 
     def run_polgrad_real(self, molecule, basis, xcfun=None, label=None):
@@ -146,7 +147,6 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-    @pytest.mark.timeconsuming
     def test_ks_polarizabilitygradient_real(self):
         h2o_xyz = """3
 
@@ -161,7 +161,6 @@ class TestPolgrad:
 
         self.run_polgrad_real(molecule, basis, "b3lyp", "polarizabilitygradient_b3lyp_real")
 
-    @pytest.mark.timeconsuming
     def test_ks_polarizabilitygradient_complex(self):
         h2o_xyz = """3
 

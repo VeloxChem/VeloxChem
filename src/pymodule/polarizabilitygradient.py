@@ -328,32 +328,33 @@ class PolarizabilityGradient:
                     molecule, scf_tensors, orbrsp_results['dist_cphf_ov'], f)
 
             else:
-                # TODO get conj. gradient solver to also return dist. array
-                # get lambda multipliers from array in orbrsp dict
-                cphf_ov_red = all_cphf_red[f]
-                cphf_ov = np.zeros((dof, dof, nocc * nvir),
-                                   dtype=self.grad_dt)
+                if self.rank == mpi_master():
+                    # TODO get conj. gradient solver to also return dist. array
+                    # get lambda multipliers from array in orbrsp dict
+                    cphf_ov_red = all_cphf_red[f]
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir),
+                                       dtype=self.grad_dt)
 
-                if self.is_complex:
-                    tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
+                    if self.is_complex:
+                        tmp_cphf_ov = cphf_ov_red[:dof_red] + 1j * cphf_ov_red[dof_red:]
 
-                    for idx, xy in enumerate(xy_pairs):
-                        x = xy[0]
-                        y = xy[1]
+                        for idx, xy in enumerate(xy_pairs):
+                            x = xy[0]
+                            y = xy[1]
 
-                        cphf_ov[x, y] = tmp_cphf_ov[idx]
+                            cphf_ov[x, y] = tmp_cphf_ov[idx]
 
-                        if y != x:
-                            cphf_ov[y, x] += cphf_ov[x, y]
-                else:
-                    for idx, xy in enumerate(xy_pairs):
-                        x = xy[0]
-                        y = xy[1]
+                            if y != x:
+                                cphf_ov[y, x] += cphf_ov[x, y]
+                    else:
+                        for idx, xy in enumerate(xy_pairs):
+                            x = xy[0]
+                            y = xy[1]
 
-                        cphf_ov[x, y] = cphf_ov_red[idx]
+                            cphf_ov[x, y] = cphf_ov_red[idx]
 
-                        if y != x:
-                            cphf_ov[y, x] += cphf_ov[x, y]
+                            if y != x:
+                                cphf_ov[y, x] += cphf_ov[x, y]
 
             omega_ao = self.get_omega_response_vector(
                 basis, orbrsp_results['dist_omega_ao'], f
