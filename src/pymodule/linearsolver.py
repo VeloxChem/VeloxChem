@@ -672,6 +672,15 @@ class LinearSolver:
                        pe_dict,
                        profiler=None):
 
+        if self.use_subcomms and self.ri_coulomb:
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-J.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # TODO: enable RI-J with subcomms
+
         if self.use_subcomms:
             self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
                                          scf_tensors, eri_dict, dft_dict,
