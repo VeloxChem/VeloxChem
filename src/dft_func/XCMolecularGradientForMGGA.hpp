@@ -62,6 +62,27 @@ auto integrateVxcGradientForMetaGgaClosedShell(const CMolecule&                 
                                                const double                      screeningThresholdForGTOValues,
                                                const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
+/**
+ Integrates first-order meta-GGA exchnage-correlation functional contribution
+ to open-shell molecular gradient.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param rwDensityPointers the pointers to perturbed AO density matrix.
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param screeningThresholdForGTOValues the screening threshold for GTO values.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular gradient.
+ */
+auto integrateVxcGradientForMetaGgaOpenShell(const CMolecule&                  molecule,
+                                             const CMolecularBasis&            basis,
+                                             const std::vector<const double*>& rwDensityPointers,
+                                             const std::vector<const double*>& gsDensityPointers,
+                                             const CMolecularGrid&             molecularGrid,
+                                             const double                      screeningThresholdForGTOValues,
+                                             const CXCFunctional&              xcFunctional) -> CDenseMatrix;
+
 }  // namespace xcgradmgga
 
 #endif /* XCMolecularGradientForMGGA_hpp */
