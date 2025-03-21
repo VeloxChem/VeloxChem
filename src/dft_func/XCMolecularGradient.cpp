@@ -35,6 +35,7 @@
 #include "XCFunctional.hpp"
 #include "XCMolecularGradientForLDA.hpp"
 #include "XCMolecularGradientForGGA.hpp"
+#include "XCMolecularGradientForMGGA.hpp"
 #include "XCMolecularGradientForPDFT.hpp"
 
 CXCMolecularGradient::CXCMolecularGradient()
@@ -75,9 +76,13 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
         {
             return xcgradgga::integrateVxcGradientForGgaClosedShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
+        else if (xcfuntype == xcfun::mgga)
+        {
+            return xcgradmgga::integrateVxcGradientForMetaGgaClosedShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
         else
         {
-            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
