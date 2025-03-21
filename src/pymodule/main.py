@@ -549,9 +549,8 @@ def main():
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
-        polgrad_drv = PolarizabilityGradient(task.mpi_comm, task.ostream)
-        polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict,
-                                    scf_drv)
+        polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm, task.ostream)
+        polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
         polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
                             rsp_prop._rsp_property)
 
