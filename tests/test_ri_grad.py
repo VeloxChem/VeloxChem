@@ -108,8 +108,8 @@ class TestScfGradientDriverWithRI:
         ref_scf_energy = -3280.675905579988
         tol_energy = 5.0e-4
 
-        ref_scf_grad = np.array([[[0.03204882, 0.02245542, 0.18911158],
-                                  [-0.03204882, -0.02245542, -0.18911158]]])
+        ref_scf_grad = np.array([[0.03204882, 0.02245542, 0.18911158],
+                                 [-0.03204882, -0.02245542, -0.18911158]])
         tol_grad = 5.0e-5
 
         self.run_scf_grad(mol_xyz, 'blyp', ref_scf_energy, ref_scf_grad,
@@ -118,8 +118,8 @@ class TestScfGradientDriverWithRI:
         ref_scf_energy = -3280.5482717437712
         tol_energy = 5.0e-4
 
-        ref_scf_grad = np.array([[[0.03093886, 0.0216664, 0.1825468],
-                                  [-0.03093886, -0.0216664, -0.1825468]]])
+        ref_scf_grad = np.array([[0.03093886, 0.0216664, 0.1825468],
+                                 [-0.03093886, -0.0216664, -0.1825468]])
         tol_grad = 5.0e-5
 
         self.run_scf_grad(mol_xyz, 'tpss', ref_scf_energy, ref_scf_grad,
