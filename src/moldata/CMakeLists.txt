@@ -1,13 +1,9 @@
 target_sources(vlxobjs
   PRIVATE
+    AtomicPartialChargesModel.cpp
     AtomicRadii.cpp
     ChemicalElement.cpp
-    CoordinationNumber.cpp
-    DispersionData.cpp
-    DispersionModel.cpp
-    DispersionParameters.cpp
     Molecule.cpp
-    PartialCharges.cpp
   )
 
 target_include_directories(vlxobjs

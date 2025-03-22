@@ -27,7 +27,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical, safe_arccos
 
@@ -72,12 +72,15 @@ class MMDriver:
             The molecule.
         """
 
-        # NOTE: Never use this method inside ForceFieldGenerator.
+        # TODO: separate the basic part of MMDriver into another class to avoid
+        # cyclic import
+
+        # NOTE: Never use this method inside MMForceFieldGenerator.
         # Otherwise it will be a cyclic import.
 
-        from .forcefieldgenerator import ForceFieldGenerator
+        from .mmforcefieldgenerator import MMForceFieldGenerator
 
-        ff_generator = ForceFieldGenerator()
+        ff_generator = MMForceFieldGenerator()
         ff_generator.ostream.mute()
         ff_generator.create_topology(molecule)
 
@@ -192,32 +195,54 @@ class MMDriver:
         for dihedral_key in ['dihedrals', 'impropers']:
 
             for (i, j, k, l), dih in self.force_field[dihedral_key].items():
-
+                
+                # Assert msg critical if the dihedral potential is not Fourier
                 assert_msg_critical(
-                    dih['type'] in ['Fourier', 'RB'],
-                    'MMDriver: Invalid type for dihedral potential')
-
-                if dih['type'] == 'RB':
-                    RB_coefs = dih['RB_coefficients']
-                elif dih['type'] == 'Fourier':
+                    dih['type'] == 'Fourier',
+                    'MMDriver: Only Fourier dihedral potential is supported')
+                
+                # Multiple dihedral potentials can be true or false
+                if dih.get('multiple', False):  # Use get method with default value False
+                    # Barrier, phase, and periodicity are in lists
+                    for barrier, phase, periodicity in zip(dih['barrier'],
+                                                           dih['phase'],
+                                                           dih['periodicity']):
+                        
+                        RB_coefs = self.get_RB_coefficients(barrier, phase,
+                                                            periodicity)
+                        (potential_energy, grad_i, grad_j, grad_k,
+                         grad_l) = MMDriver.compute_Ryckaert_Bellemans(
+                             coordinates[i], coordinates[j], coordinates[k],
+                             coordinates[l], RB_coefs)
+                
+                        if dihedral_key == 'dihedrals':
+                            self.torsion_potential += potential_energy
+                        elif dihedral_key == 'impropers':
+                            self.improper_potential += potential_energy
+                
+                        self.gradient[i] += grad_i
+                        self.gradient[j] += grad_j
+                        self.gradient[k] += grad_k
+                        self.gradient[l] += grad_l
+                
+                else:
                     RB_coefs = self.get_RB_coefficients(dih['barrier'],
                                                         dih['phase'],
                                                         dih['periodicity'])
-
-                (potential_energy, grad_i, grad_j, grad_k,
-                 grad_l) = MMDriver.compute_Ryckaert_Bellemans(
-                     coordinates[i], coordinates[j], coordinates[k],
-                     coordinates[l], RB_coefs)
-
-                if dihedral_key == 'dihedrals':
-                    self.torsion_potential += potential_energy
-                elif dihedral_key == 'impropers':
-                    self.improper_potential += potential_energy
-
-                self.gradient[i] += grad_i
-                self.gradient[j] += grad_j
-                self.gradient[k] += grad_k
-                self.gradient[l] += grad_l
+                    (potential_energy, grad_i, grad_j, grad_k,
+                    grad_l) = MMDriver.compute_Ryckaert_Bellemans(
+                        coordinates[i], coordinates[j], coordinates[k],
+                        coordinates[l], RB_coefs)
+                
+                    if dihedral_key == 'dihedrals':
+                        self.torsion_potential += potential_energy
+                    elif dihedral_key == 'impropers':
+                        self.improper_potential += potential_energy
+                
+                    self.gradient[i] += grad_i
+                    self.gradient[j] += grad_j
+                    self.gradient[k] += grad_k
+                    self.gradient[l] += grad_l
 
                 self.exclusions.append((i, l))
 
@@ -263,8 +288,7 @@ class MMDriver:
                     # Coulomb
 
                     # Coulomb's constant in MD units: 138.9354576...
-                    ke = (4.184 * hartree_in_kcalpermol() * 0.1 *
-                          bohr_in_angstrom())
+                    ke = (hartree_in_kjpermol() * 0.1 * bohr_in_angstrom())
 
                     self.coulomb_potential += prefac_QQ * ke * (
                         charge_i * charge_j) / distance_ij
@@ -346,6 +370,9 @@ class MMDriver:
             The molecule.
         """
 
+        # TODO: automatically generate and load force field if self.force_field
+        # is empty
+
         # Convert coordinates to nm
         bohr_in_nm = bohr_in_angstrom() * 0.1
 
@@ -376,11 +403,10 @@ class MMDriver:
         self.energy = (self.stretch_potential + self.bend_potential +
                        self.torsion_potential + self.improper_potential +
                        self.coulomb_potential + self.vdw_potential)
-        self.energy /= (4.184 * hartree_in_kcalpermol())
+        self.energy /= hartree_in_kjpermol()
 
         # gradient
-        self.gradient /= (4.184 * hartree_in_kcalpermol() * 10.0 /
-                          bohr_in_angstrom())
+        self.gradient /= (hartree_in_kjpermol() * 10.0 / bohr_in_angstrom())
 
     def get_energy(self):
         """

@@ -24,6 +24,7 @@
 
 from mpi4py import MPI
 from sys import stderr
+import numpy as np
 import math
 
 
@@ -89,3 +90,16 @@ def safe_arcsin(val):
         sin_phi = val
 
     return math.asin(sin_phi)
+
+
+def safe_solve(mat, b):
+    """
+    Safely solve Ax=b.
+    """
+
+    try:
+        sol = np.linalg.solve(mat, b)
+    except np.linalg.LinAlgError:
+        sol = np.dot(np.linalg.pinv(mat), b)
+
+    return sol

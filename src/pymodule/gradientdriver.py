@@ -87,6 +87,8 @@ class GradientDriver:
         self.grid_level = None
         self.xcfun = None
 
+        self.potfile = None
+
         self.checkpoint_file = None
 
         self._input_keywords = {
@@ -168,7 +170,15 @@ class GradientDriver:
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
 
-        for i in range(molecule.number_of_atoms()):
+        natoms = molecule.number_of_atoms()
+
+        for i in range(natoms):
+
+            self.ostream.unmute()
+            self.ostream.print_info(f'Processing atom {i + 1}/{natoms}...')
+            self.ostream.flush()
+            self.ostream.mute()
+
             for d in range(3):
                 coords[i, d] += self.delta_h
                 new_mol = Molecule(labels, coords, 'au', atom_basis_labels)
@@ -544,14 +554,9 @@ class GradientDriver:
                 cur_str = ('Excited State of Interest       : ' +
                            str(state_deriv_index + 1))
                 self.ostream.print_header(cur_str.ljust(str_width))
-            elif isinstance(state_deriv_index, tuple):
-                states_txt = ""
-                for i in range(len(state_deriv_index)):
-                    s = state_deriv_index[i]
-                    if i == len(state_deriv_index) - 1:
-                        states_txt += "%d." % s
-                    else:
-                        states_txt += "%d, " % s
+            elif isinstance(state_deriv_index, (list, tuple)):
+                state_deriv_index_str = [str(s) for s in state_deriv_index]
+                states_txt = ", ".join(state_deriv_index_str)
                 cur_str = 'Excited States of Interest      : ' + states_txt
                 self.ostream.print_header(cur_str.ljust(str_width))
 

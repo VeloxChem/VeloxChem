@@ -115,33 +115,25 @@ CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
 
         if (hyb_exx_coeff != 0.0) _fractionOfExactExchange += coeff * hyb_exx_coeff;
 
-        // TODO process range-separation parameters when range-separted functional is supported
-
-        double omega = 0.0, alpha = 0.0, beta = 0.0;
-
         xc_hyb_cam_coef(funcptr, &_rangeSeparationParameterOmega, &_rangeSeparationParameterAlpha, &_rangeSeparationParameterBeta);
-
-        errors::assertMsgCritical(std::fabs(beta) < 1.0e-13, std::string("XCFunctional: Range-separated functional is not yet supported"));
 
         if (isRangeSeparated())
         {
             errors::assertMsgCritical(_components.size() == 1, "XCFunctional: Range-separated functional can only include one component");
         }
 
-        /*
-        auto n_ext_param = xc_func_info_get_n_ext_params(funcptr->info);
-        std::cout << "n_ext_param: " << n_ext_param << std::endl;
-        for (int i_param = 0; i_param < static_cast<int>(n_ext_param); i_param++)
-        {
-            auto param_name = xc_func_info_get_ext_params_name(funcptr->info, i_param);
-            auto param_descr = xc_func_info_get_ext_params_description(funcptr->info, i_param);
-            auto param_value = xc_func_info_get_ext_params_default_value(funcptr->info, i_param);
-            std::cout << "  param id: " << i_param << std::endl;
-            std::cout << "        name: " << param_name << std::endl;
-            std::cout << "        descr: " << param_descr << std::endl;
-            std::cout << "        value: " << param_value << std::endl;
-        }
-        */
+        // auto n_ext_param = xc_func_info_get_n_ext_params(funcptr->info);
+        // std::cout << "n_ext_param: " << n_ext_param << std::endl;
+        // for (int i_param = 0; i_param < static_cast<int>(n_ext_param); i_param++)
+        // {
+        //     auto param_name = xc_func_info_get_ext_params_name(funcptr->info, i_param);
+        //     auto param_descr = xc_func_info_get_ext_params_description(funcptr->info, i_param);
+        //     auto param_value = xc_func_info_get_ext_params_default_value(funcptr->info, i_param);
+        //     std::cout << "  param id: " << i_param << std::endl;
+        //     std::cout << "        name: " << param_name << std::endl;
+        //     std::cout << "        descr: " << param_descr << std::endl;
+        //     std::cout << "        value: " << param_value << std::endl;
+        // }
     }
 
     if (hasExc) _maxDerivOrder = 0;

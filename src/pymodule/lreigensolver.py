@@ -23,7 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 from copy import deepcopy
 import numpy as np
 import time as tm
@@ -33,7 +32,8 @@ from .oneeints import compute_electric_dipole_integrals
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
-                           extinction_coefficient_from_beta)
+                           extinction_coefficient_from_beta, avogadro_constant,
+                           bohr_in_angstrom, hartree_in_wavenumber)
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -46,8 +46,15 @@ from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
-from .inputparser import get_random_string_parallel
-from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
+from .checkpoint import (check_rsp_hdf5, write_rsp_solution,
+                         write_lr_rsp_results_to_hdf5,
+                         write_detach_attach_to_hdf5)
+
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib.lines as mlines
+except ImportError:
+    pass
 
 
 class LinearResponseEigenSolver(LinearSolver):
@@ -98,6 +105,7 @@ class LinearResponseEigenSolver(LinearSolver):
         self.nto_pairs = None
         self.nto_cubes = False
         self.detach_attach = False
+        self.detach_attach_cubes = False
         self.cube_origin = None
         self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
@@ -113,6 +121,8 @@ class LinearResponseEigenSolver(LinearSolver):
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'nto_cubes': ('bool', 'write NTO cube files'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
+            'detach_attach_cubes':
+                ('bool', 'write detachment/attachment density cube files'),
             'esa': ('bool', 'compute excited state absorption'),
             'esa_from_state':
                 ('int', 'the state to excite from (e.g. 1 for S1)'),
@@ -151,6 +161,12 @@ class LinearResponseEigenSolver(LinearSolver):
                 len(self.cube_points) == 3,
                 'LinearResponseEigenSolver: cube points needs 3 integers')
 
+        # If the detachemnt and attachment cube files are requested
+        # set the detach_attach flag to True to get the detachment and
+        # attachment densities.
+        if self.detach_attach_cubes:
+            self.detach_attach = True
+
     def compute(self, molecule, basis, scf_tensors):
         """
         Performs linear response calculation for a molecule and a basis set.
@@ -186,11 +202,21 @@ class LinearResponseEigenSolver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                'solvation_model' not in scf_tensors,
+                type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -520,16 +546,13 @@ class LinearResponseEigenSolver(LinearSolver):
             magn_trans_dipoles = np.zeros((self.nstates, 3))
 
             if self.rank == mpi_master():
-                # create h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    final_h5_fname = str(
-                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
+                # final h5 file for response solutions
+                if self.filename is not None:
+                    final_h5_fname = f'{self.filename}.h5'
+                else:
+                    final_h5_fname = None
 
             nto_lambdas = []
-            nto_h5_files = []
             nto_cube_files = []
             dens_cube_files = []
 
@@ -568,12 +591,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         'Running NTO analysis for S{:d}...'.format(s + 1))
                     self.ostream.flush()
 
-                    if self.filename is not None:
-                        base_fname = self.filename
-                    else:
-                        name_string = get_random_string_parallel(self.comm)
-                        base_fname = 'vlx_' + name_string
-
                     if self.rank == mpi_master():
                         nto_mo = self.get_nto(z_mat - y_mat, mo_occ, mo_vir)
 
@@ -583,9 +600,11 @@ class LinearResponseEigenSolver(LinearSolver):
                                                   mo_vir.shape[1])
                         nto_lambdas.append(nto_lam[lam_start:lam_end])
 
-                        nto_h5_fname = f'{base_fname}_S{s + 1}_NTO.h5'
-                        nto_mo.write_hdf5(nto_h5_fname)
-                        nto_h5_files.append(nto_h5_fname)
+                        # Add the NTO to the final checkpoint file.
+                        nto_label = f'NTO_S{s + 1}'
+                        if final_h5_fname is not None:
+                            nto_mo.write_hdf5(final_h5_fname,
+                                              label=f'rsp/{nto_label}')
                     else:
                         nto_mo = MolecularOrbitals()
                     nto_mo = nto_mo.broadcast(self.comm, root=mpi_master())
@@ -607,16 +626,29 @@ class LinearResponseEigenSolver(LinearSolver):
                     if self.rank == mpi_master():
                         dens_D, dens_A = self.get_detach_attach_densities(
                             z_mat, y_mat, mo_occ, mo_vir)
-                        dens_DA = AODensityMatrix([dens_D, dens_A], denmat.rest)
-                    else:
-                        dens_DA = AODensityMatrix()
-                    dens_DA = dens_DA.broadcast(self.comm, root=mpi_master())
 
-                    dens_cube_fnames = self.write_detach_attach_cubes(
-                        cubic_grid, molecule, basis, s, dens_DA)
+                        # Add the detachment and attachment density matrices
+                        # to the checkpoint file
+                        state_label = f'S{s + 1}'
+                        if final_h5_fname is not None:
+                            write_detach_attach_to_hdf5(final_h5_fname,
+                                                        state_label, dens_D,
+                                                        dens_A)
 
-                    if self.rank == mpi_master():
-                        dens_cube_files.append(dens_cube_fnames)
+                    if self.detach_attach_cubes:
+                        if self.rank == mpi_master():
+                            dens_DA = AODensityMatrix([dens_D, dens_A],
+                                                      denmat.rest)
+                        else:
+                            dens_DA = AODensityMatrix()
+                        dens_DA = dens_DA.broadcast(self.comm,
+                                                    root=mpi_master())
+
+                        dens_cube_fnames = self.write_detach_attach_cubes(
+                            cubic_grid, molecule, basis, s, dens_DA)
+
+                        if self.rank == mpi_master():
+                            dens_cube_files.append(dens_cube_fnames)
 
                 if self.esa:
                     if self.esa_from_state is None:
@@ -687,8 +719,7 @@ class LinearResponseEigenSolver(LinearSolver):
                             mdip_grad[ind], eigvec)
 
                     # write to h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
+                    if (self.save_solutions and final_h5_fname is not None):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}'.format(s + 1), eigvec)
 
@@ -718,26 +749,28 @@ class LinearResponseEigenSolver(LinearSolver):
                         'oscillator_strengths': osc,
                         'rotatory_strengths': rot_vel,
                         'excitation_details': excitation_details,
+                        'number_of_states': self.nstates,
                     }
 
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
-                        ret_dict['nto_h5_files'] = nto_h5_files
                         if self.nto_cubes:
                             ret_dict['nto_cubes'] = nto_cube_files
 
-                    if self.detach_attach:
+                    if self.detach_attach_cubes:
                         ret_dict['density_cubes'] = dens_cube_files
 
                     if self.esa:
                         ret_dict['esa_results'] = esa_results
 
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                        checkpoint_text = 'Response solution vectors written to file: '
-                        checkpoint_text += final_h5_fname
-                        self.ostream.print_info(checkpoint_text)
+                    if (self.save_solutions and final_h5_fname is not None):
+                        self.ostream.print_info(
+                            'Response solution vectors written to file: ' +
+                            final_h5_fname)
                         self.ostream.print_blank()
+
+                        # Write the response results to the final checkpoint file
+                        write_lr_rsp_results_to_hdf5(final_h5_fname, ret_dict)
 
                     self._print_results(ret_dict)
 
@@ -1144,6 +1177,300 @@ class LinearResponseEigenSolver(LinearSolver):
                 new_rsp_drv.key = deepcopy(val)
 
         return new_rsp_drv
+
+    def plot_uv_vis(self,
+                    rpa_results,
+                    broadening_type="lorentzian",
+                    broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                      hartree_in_ev()),
+                    ax=None):
+        """
+        Plot the UV spectrum from the response calculation.
+
+        :param rpa_results:
+            The dictionary containing RPA results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
+        au2ev = hartree_in_ev()
+        ev2au = 1.0 / au2ev
+
+        # initialize the plot
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+        ax.set_xlabel('Wavelength [nm]')
+        ax.set_ylabel(r'$\epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
+
+        ax.set_title("Absorption Spectrum")
+
+        x = (rpa_results['eigenvalues'])
+        y = rpa_results['oscillator_strengths']
+        xmin = min(x) - 0.03
+        xmax = max(x) + 0.03
+        xstep = 0.0001
+
+        ax2 = ax.twinx()
+
+        for i in np.arange(len(rpa_results['eigenvalues'])):
+            ax2.plot(
+                [
+                    ev_x_nm / (rpa_results['eigenvalues'][i] * au2ev),
+                    ev_x_nm / (rpa_results['eigenvalues'][i] * au2ev),
+                ],
+                [0.0, rpa_results['oscillator_strengths'][i]],
+                alpha=0.7,
+                linewidth=2,
+                color="darkcyan",
+            )
+
+        c = 1.0 / fine_structure_constant()
+        NA = avogadro_constant()
+        a_0 = bohr_in_angstrom() * 1.0e-10
+
+        if broadening_type.lower() == "lorentzian":
+            xi, yi = self.lorentzian_uv_vis(x, y, xmin, xmax, xstep,
+                                            broadening_value * ev2au)
+
+        elif broadening_type.lower() == "gaussian":
+            xi, yi = self.gaussian_uv_vis(x, y, xmin, xmax, xstep,
+                                          broadening_value * ev2au)
+
+        sigma = (2 * np.pi * np.pi * xi * yi) / c
+        sigma_m2 = sigma * a_0**2
+        sigma_cm2 = sigma_m2 * 10**4
+        epsilon = sigma_cm2 * NA / (np.log(10) * 10**3)
+        ax.plot(ev_x_nm / (xi * au2ev),
+                epsilon,
+                color="black",
+                alpha=0.9,
+                linewidth=2.5)
+
+        legend_bars = mlines.Line2D([], [],
+                                    color='darkcyan',
+                                    alpha=0.7,
+                                    linewidth=2,
+                                    label='Oscillator strength')
+        label_spectrum = f'{broadening_type.capitalize()} '
+        label_spectrum += f'broadening ({broadening_value:.3f} eV)'
+        legend_spectrum = mlines.Line2D([], [],
+                                        color='black',
+                                        linestyle='-',
+                                        linewidth=2.5,
+                                        label=label_spectrum)
+        ax2.legend(handles=[legend_bars, legend_spectrum],
+                   frameon=False,
+                   borderaxespad=0.,
+                   loc='center left',
+                   bbox_to_anchor=(1.15, 0.5))
+        ax2.set_ylim(0, max(abs(rpa_results['oscillator_strengths'])) * 1.1)
+        ax.set_ylim(0, max(epsilon) * 1.1)
+        ax.set_ylim(bottom=0)
+        ax2.set_ylim(bottom=0)
+        ax2.set_ylabel("Oscillator strength")
+        ax.set_xlim(ev_x_nm / (xmax * au2ev), ev_x_nm / (xmin * au2ev))
+
+    def plot_ecd(self,
+                 rpa_results,
+                 broadening_type="lorentzian",
+                 broadening_value=(1000.0 / hartree_in_wavenumber() *
+                                   hartree_in_ev()),
+                 ax=None):
+        """
+        Plot the ECD spectrum from the response calculation.
+
+        :param rpa_results:
+            The dictionary containing RPA results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param ax:
+            The matplotlib axis to plot on.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        ev_x_nm = hartree_in_ev() / hartree_in_inverse_nm()
+        au2ev = hartree_in_ev()
+
+        # initialize the plot
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+        ax.set_xlabel("Wavelength [nm]")
+        ax.set_title("ECD Spectrum")
+        ax.set_ylabel(r'$\Delta \epsilon$ [L mol$^{-1}$ cm$^{-1}$]')
+
+        ax2 = ax.twinx()
+        ax2.set_ylabel('Rotatory strength [10$^{-40}$ cgs]')
+
+        for i in np.arange(len(rpa_results["eigenvalues"])):
+            ax2.plot(
+                [
+                    ev_x_nm / (rpa_results["eigenvalues"][i] * au2ev),
+                    ev_x_nm / (rpa_results["eigenvalues"][i] * au2ev),
+                ],
+                [0.0, rpa_results["rotatory_strengths"][i]],
+                alpha=0.7,
+                linewidth=2,
+                color="darkcyan",
+            )
+        ax2.set_ylim(-max(abs(rpa_results["rotatory_strengths"])) * 1.1,
+                     max(abs(rpa_results["rotatory_strengths"])) * 1.1)
+
+        ax.axhline(y=0,
+                   marker=',',
+                   color='k',
+                   linestyle='-.',
+                   markersize=0,
+                   linewidth=0.2)
+
+        x = (rpa_results["eigenvalues"]) * au2ev
+        y = rpa_results["rotatory_strengths"]
+        xmin = min(x) - 0.8
+        xmax = max(x) + 0.8
+        xstep = 0.003
+
+        if broadening_type.lower() == "lorentzian":
+            xi, yi = self.lorentzian_ecd(x, y, xmin, xmax, xstep,
+                                         broadening_value)
+
+        elif broadening_type.lower() == "gaussian":
+            xi, yi = self.gaussian_ecd(x, y, xmin, xmax, xstep,
+                                       broadening_value)
+
+        # denorm_factor is roughly 22.96 * PI
+        denorm_factor = (rotatory_strength_in_cgs() /
+                         (extinction_coefficient_from_beta() / 3.0))
+        yi = (yi * xi) / denorm_factor
+
+        ax.set_ylim(-max(abs(yi)) * 1.1, max(abs(yi)) * 1.1)
+
+        ax.plot(ev_x_nm / xi, yi, color="black", alpha=0.9, linewidth=2.5)
+        ax.set_xlim(ev_x_nm / xmax, ev_x_nm / xmin)
+
+        # include a legend for the bar and for the broadened spectrum
+        legend_bars = mlines.Line2D([], [],
+                                    color='darkcyan',
+                                    alpha=0.7,
+                                    linewidth=2,
+                                    label='Rotatory strength')
+        label_spectrum = f'{broadening_type.capitalize()} '
+        label_spectrum += f'broadening ({broadening_value:.3f} eV)'
+        legend_spectrum = mlines.Line2D([], [],
+                                        color='black',
+                                        linestyle='-',
+                                        linewidth=2.5,
+                                        label=label_spectrum)
+        ax.legend(handles=[legend_bars, legend_spectrum],
+                  frameon=False,
+                  borderaxespad=0.,
+                  loc='center left',
+                  bbox_to_anchor=(1.15, 0.5))
+
+    @staticmethod
+    def lorentzian_uv_vis(x, y, xmin, xmax, xstep, gamma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k] / x[k] * gamma / (
+                    (xi[i] - x[k])**2 + gamma**2)
+        yi = yi / np.pi
+        return xi, yi
+
+    @staticmethod
+    def gaussian_uv_vis(x, y, xmin, xmax, xstep, sigma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k] / x[k] * np.exp(-((xi[i] - x[k])**2) /
+                                                     (2 * sigma**2))
+        yi = yi / (sigma * np.sqrt(2 * np.pi))
+        return xi, yi
+
+    @staticmethod
+    def lorentzian_ecd(x, y, xmin, xmax, xstep, gamma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k] * (gamma) / ((xi[i] - x[k])**2 +
+                                                  (gamma)**2)
+        return xi, yi
+
+    @staticmethod
+    def gaussian_ecd(x, y, xmin, xmax, xstep, sigma):
+        xi = np.arange(xmin, xmax, xstep)
+        yi = np.zeros(len(xi))
+        for i in range(len(xi)):
+            for k in range(len(x)):
+                yi[i] = yi[i] + y[k] * np.exp(-((xi[i] - x[k])**2) /
+                                              (2 * sigma**2))
+        yi = np.pi * yi / (sigma * np.sqrt(2 * np.pi))
+        return xi, yi
+
+    def plot(self,
+             rpa_results,
+             broadening_type="lorentzian",
+             broadening_value=(1000.0 / hartree_in_wavenumber() *
+                               hartree_in_ev()),
+             plot_type="electronic"):
+        """
+        Plot the UV or ECD spectrum from the response calculation.
+
+        :param rpa_results:
+            The dictionary containing RPA results.
+        :param broadening_type:
+            The type of broadening to use. Either 'lorentzian' or 'gaussian'.
+        :param broadening_value:
+            The broadening value in eV.
+        :param plot_type:
+            The type of plot to generate. Either 'uv', 'ecd' or 'electronic'.
+        """
+
+        assert_msg_critical('matplotlib' in sys.modules,
+                            'matplotlib is required.')
+
+        if plot_type.lower() in ["uv", "uv-vis", "uv_vis"]:
+            self.plot_uv_vis(rpa_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value)
+
+        elif plot_type.lower() == "ecd":
+            self.plot_ecd(rpa_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value)
+
+        elif plot_type.lower() == "electronic":
+            fig, axs = plt.subplots(2, 1, figsize=(8, 10))
+            # Increase the height space between subplots
+            fig.subplots_adjust(hspace=0.3)
+            self.plot_uv_vis(rpa_results,
+                             broadening_type=broadening_type,
+                             broadening_value=broadening_value,
+                             ax=axs[0])
+            self.plot_ecd(rpa_results,
+                          broadening_type=broadening_type,
+                          broadening_value=broadening_value,
+                          ax=axs[1])
+
+        else:
+            assert_msg_critical(False, 'Invalid plot type')
+
+        plt.show()
 
     @staticmethod
     def get_absorption_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):

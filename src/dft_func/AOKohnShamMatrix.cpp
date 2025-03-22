@@ -54,6 +54,21 @@ CAOKohnShamMatrix::CAOKohnShamMatrix(const int nRows, const int nColumns, const 
     if (!_xcRestricted) _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
 }
 
+CAOKohnShamMatrix::CAOKohnShamMatrix(const int nRows, const int nColumns, const std::string& flag)
+
+    : _xcElectrons(0.0)
+
+    , _xcEnergy(0.0)
+{
+    _xcRestricted = ((format::lower_case(flag) == std::string("closedshell")) ||
+                     (format::lower_case(flag) == std::string("closed-shell")) ||
+                     (format::lower_case(flag) == std::string("closed_shell")));
+
+    _xcMatrices = std::vector<CDenseMatrix>({CDenseMatrix(nRows, nColumns)});
+
+    if (!_xcRestricted) _xcMatrices.push_back(CDenseMatrix(nRows, nColumns));
+}
+
 CAOKohnShamMatrix::CAOKohnShamMatrix(const CAOKohnShamMatrix& source)
 
     : _xcMatrices(source._xcMatrices)

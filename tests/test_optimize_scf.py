@@ -12,8 +12,6 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.optimizationdriver import OptimizationDriver
 
 
-@pytest.mark.filterwarnings(
-    'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 @pytest.mark.solvers
 class TestOptimizeSCF:
 
@@ -51,12 +49,22 @@ class TestOptimizeSCF:
             assert np.max(np.abs(opt_coords - ref_coords)) < 1.0e-5
 
             inpfile = Path(inpfile)
+
             optfile = Path(str(inpfile.with_name(inpfile.stem)) + '_optim.xyz')
-            logfile = inpfile.with_suffix('.log')
             if optfile.is_file():
                 optfile.unlink()
+
+            logfile = inpfile.with_suffix('.log')
             if logfile.is_file():
                 logfile.unlink()
+
+            h5file = inpfile.with_suffix('.h5')
+            if h5file.is_file():
+                h5file.unlink()
+
+            scffile = Path(str(inpfile.with_name(inpfile.stem)) + '_scf.h5')
+            if scffile.is_file():
+                scffile.unlink()
 
     def test_nh3(self):
 

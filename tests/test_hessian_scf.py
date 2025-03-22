@@ -42,7 +42,7 @@ class TestScfHessianDriver:
             ref_hessian = np.array(hf.get('hessian'))
             ref_frequencies = np.array(hf.get('frequencies'))
             ref_ir_intensities = np.array(hf.get('ir'))
-            ref_raman_intensities = np.array(hf.get('raman'))
+            ref_raman_activities = np.array(hf.get('raman'))
             hf.close()
 
             diff_hessian = np.max(np.abs(vibanalysis_drv.hessian - ref_hessian))
@@ -52,8 +52,8 @@ class TestScfHessianDriver:
                 np.abs(vibanalysis_drv.ir_intensities / ref_ir_intensities -
                        1.0))
             rel_diff_raman = np.max(
-                np.abs(vibanalysis_drv.raman_intensities[0.0] /
-                       ref_raman_intensities - 1.0))
+                np.abs(vibanalysis_drv.raman_activities[0.0] /
+                       ref_raman_activities - 1.0))
 
             assert diff_hessian < 1.0e-5
             assert rel_diff_freq < 1.0e-3

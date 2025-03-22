@@ -57,24 +57,6 @@ auto multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDense
 auto multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
- Computes diagonal matrix and matrix multiplication: diag(M) * A.
-
- @param diagonal the diagonal matrix.
- @param matrix the square matrix.
- @return the matrix diag(M) * A.
- */
-auto multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix;
-
-/**
- Computes diagonal matrix and matrix multiplication: diag(M) * A^T.
-
- @param diagonal the diagonal matrix.
- @param matrix the square matrix.
- @return the matrix diag(M) * A^T.
- */
-auto multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix;
-
-/**
  Computes matrix substraction: A - B.
 
  @param matrixA the matrix A.

@@ -23,7 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -36,9 +35,8 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, create_hdf5,
-                         write_rsp_solution_with_multiple_keys)
+from .errorhandler import assert_msg_critical, safe_solve
+from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
 
 class C6Driver(LinearSolver):
@@ -248,11 +246,21 @@ class C6Driver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                'solvation_model' not in scf_tensors,
+                type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -437,7 +445,7 @@ class C6Driver(LinearSolver):
 
                         # solving matrix equation
 
-                        c = np.linalg.solve(mat, g)
+                        c = safe_solve(mat, g)
                     else:
                         c = None
                     c = self.comm.bcast(c, root=mpi_master())
@@ -608,13 +616,11 @@ class C6Driver(LinearSolver):
                 va = {op: v for op, v in zip(self.a_components, a_grad)}
                 rsp_funcs = {}
 
-                # create h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    final_h5_fname = str(
-                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
+                # final h5 file for response solutions
+                if self.filename is not None:
+                    final_h5_fname = f'{self.filename}.h5'
+                else:
+                    final_h5_fname = None
 
             for bop, iw in solutions:
                 x = self.get_full_solution_vector(solutions[(bop, iw)])
@@ -624,8 +630,7 @@ class C6Driver(LinearSolver):
                         rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
 
                     # write to h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
+                    if (self.save_solutions and final_h5_fname is not None):
                         solution_keys = [
                             '{:s}_{:s}_{:.8f}'.format(aop, bop, iw)
                             for aop in self.a_components
@@ -635,10 +640,10 @@ class C6Driver(LinearSolver):
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    checkpoint_text = 'Response solution vectors written to file: '
-                    checkpoint_text += final_h5_fname
-                    self.ostream.print_info(checkpoint_text)
+                if (self.save_solutions and final_h5_fname is not None):
+                    self.ostream.print_info(
+                        'Response solution vectors written to file: ' +
+                        final_h5_fname)
                     self.ostream.print_blank()
 
                 c6 = self._integrate_c6(self.w0, points, weights, imagfreqs,

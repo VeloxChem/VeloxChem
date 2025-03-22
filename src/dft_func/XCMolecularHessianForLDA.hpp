@@ -36,8 +36,8 @@
 namespace xchesslda {  // xchesslda namespace
 
 /**
- Integrates LDA exchnage-correlation functional contribution to molecular
- Hessian.
+ Integrates LDA exchnage-correlation functional contribution to closed-shell
+ molecular Hessian.
 
  @param molecule the molecule.
  @param basis the molecular basis.
@@ -47,12 +47,12 @@ namespace xchesslda {  // xchesslda namespace
  @param xcFunctional the exchange-correlation functional.
  @return the molecular Hessian.
  */
-auto integrateExcHessianForLDA(const CMolecule&                  molecule,
-                               const CMolecularBasis&            basis,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&             molecularGrid,
-                               const double                      screeningThresholdForGTOValues,
-                               const CXCFunctional&              xcFunctional) -> CDenseMatrix;
+auto integrateExcHessianForLdaClosedShell(const CMolecule&                  molecule,
+                                          const CMolecularBasis&            basis,
+                                          const std::vector<const double*>& gsDensityPointers,
+                                          const CMolecularGrid&             molecularGrid,
+                                          const double                      screeningThresholdForGTOValues,
+                                          const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
 /**
  Integrates LDA exchnage-correlation functional contribution to molecular
@@ -64,7 +64,7 @@ auto integrateExcHessianForLDA(const CMolecule&                  molecule,
  @param molecularGrid the molecular grid.
  @param screeningThresholdForGTOValues the screening threshold for GTO values.
  @param xcFunctional the exchange-correlation functional.
- @param atomIdx the index of the atom with respect to which gradient is
+ @param atomIdxVec the indices of the atoms with respect to which gradient is
  computed.
  @return the Vxc gradient.
  */
@@ -74,7 +74,7 @@ auto integrateVxcFockGradientForLDA(const CMolecule&                  molecule,
                                     const CMolecularGrid&             molecularGrid,
                                     const double                      screeningThresholdForGTOValues,
                                     const CXCFunctional&              xcFunctional,
-                                    const int32_t                     atomIdx) -> std::vector<CDenseMatrix>;
+                                    const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
 
 }  // namespace xchesslda
 

@@ -50,11 +50,11 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return xchesslda::integrateExcHessianForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+            return xchesslda::integrateExcHessianForLdaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return xchessgga::integrateExcHessianForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+            return xchessgga::integrateExcHessianForGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
         {
@@ -79,7 +79,7 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
                                               const std::vector<const double*>& gsDensityPointers,
                                               const CMolecularGrid&   molecularGrid,
                                               const std::string&      xcFuncLabel,
-                                              const int               atomIdx) const -> std::vector<CDenseMatrix>
+                                              const std::vector<int>& atomIdxVec) const -> std::vector<CDenseMatrix>
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -89,11 +89,11 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return xchesslda::integrateVxcFockGradientForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdx);
+            return xchesslda::integrateVxcFockGradientForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return xchessgga::integrateVxcFockGradientForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdx);
+            return xchessgga::integrateVxcFockGradientForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
         else
         {

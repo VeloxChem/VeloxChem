@@ -179,14 +179,14 @@ class AtomTypeIdentifier:
                 if self.connectivity_matrix[i][j] == 1:
                     self.graph.add_edge(i, j)
 
-        all_cycles = list(nx.simple_cycles(self.graph, length_bound=6))
+        all_cycles = list(nx.simple_cycles(self.graph, length_bound=10))
 
         # Sort by cycle length
         all_cycles = sorted(all_cycles, key=len)
 
-        # Filter only the cycles of size 3 to 6
+        # Filter only the cycles of size 3 to 10
         filtered_cycles = [
-            cycle for cycle in all_cycles if 3 <= len(cycle) <= 6
+            cycle for cycle in all_cycles if 3 <= len(cycle) <= 10
         ]
 
         # Remove super-cycles (cycles that contain smaller cycles)
@@ -262,6 +262,8 @@ class AtomTypeIdentifier:
                     else:
                         all_nitrogens_likely_sp2 = False
                         break
+
+            # TODO: add aromaticity detection for rings with 7-10 atoms
 
             if len(cycle) == 6 and only_carbon_nitrogen_in_cycle:
 
@@ -991,7 +993,7 @@ class AtomTypeIdentifier:
 
                             hydrogen_type = {
                                 'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'hox{info["AtomNumber"]}'
+                                'gaff': f'hx{info["AtomNumber"]}'
                             }
 
                         self.atom_types_dict[
@@ -1530,93 +1532,112 @@ class AtomTypeIdentifier:
             # Phosphorus type decision
 
             elif info['AtomicSymbol'] == 'P':
-
+                
+                # Disclaimer: Only non-cyclic structures and non-conjugated cases are considered for now.
                 if info.get('CyclicStructure') == 'none':
 
-                    # Phosphate groups or phosphoric acid
+                    # hypervalent phosphorus, 4 subst.
                     if (info['NumConnectedAtoms'] == 4 and
                             'O' in connected_symbols):
-                        oxygen_count = info['ConnectedAtoms'].count('O')
 
-                        if oxygen_count == 4:
-                            # Simplified, it could be tetrahedral phosphate
-                            phosphorus_type = {
-                                'opls': 'opls_900P',
-                                'gaff': 'p5'
-                            }
-
+                        phosphorus_type = {
+                            'opls': 'opls_900P',
+                            'gaff': 'p5'
+                        }
+                                                
+                    # sp3 phosphorus, 3 subst. 
+                    elif info['NumConnectedAtoms'] == 3:
+                        
+                        # Oxygen determines if the phosphorus is hypervalent or not
+                        if 'O' in connected_symbols:
+                            oxygen_count = info['ConnectedAtoms'].count('O')
                         else:
-                            phosphorus_type = {
-                                'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'px{info["AtomNumber"]}'
-                            }
+                            oxygen_count = 0
 
-                    # Phosphine
-                    elif (info['NumConnectedAtoms'] == 3 and
-                          'H' in connected_symbols):
-                        hydrogen_count = info['ConnectedAtoms'].count('H')
-
-                        if hydrogen_count == 3:
+                        # Regular sp3 P with three connected atoms, such as PH3
+                        if oxygen_count == 0:
                             phosphorus_type = {
                                 'opls': 'opls_901P',
-                                'gaff': 'ph3'
-                            }
-
-                        else:
-                            phosphorus_type = {
-                                'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'px{info["AtomNumber"]}'
-                            }
-
-                    # Phosphine oxides
-                    elif (info['NumConnectedAtoms'] == 4 and
-                          'O' in connected_symbols):
-                        hydrogen_count = info['ConnectedAtoms'].count('H')
-
-                        if hydrogen_count == 3:
-                            phosphorus_type = {
-                                'opls': 'opls_902P',
-                                'gaff': 'po'
-                            }
-
-                        else:
-                            phosphorus_type = {
-                                'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'px{info["AtomNumber"]}'
-                            }
-
-                    # Phosphonates and Phosphites
-                    elif (info['NumConnectedAtoms'] == 3 and
-                          'O' in connected_symbols):
-                        oxygen_count = info['ConnectedAtoms'].count('O')
-
-                        if oxygen_count == 2:
-                            # Again simplified, could distinguish between
-                            # phosphonates and phosphites
-                            phosphorus_type = {
-                                'opls': 'opls_903P',
                                 'gaff': 'p3'
                             }
-
+                        
+                        #  hypervalent phosphorus, 3 subst.
                         else:
                             phosphorus_type = {
-                                'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'px{info["AtomNumber"]}'
+                                'opls': 'opls_900P',
+                                'gaff': 'p4'
                             }
+                                                
+                    # sp2 phosphorus (C=P, etc.)
+                    elif info['NumConnectedAtoms'] == 2:
+                        phosphorus_type = {
+                            'opls': 'opls_900P',
+                            'gaff': 'p2'
+                        }
 
+                    # Undefined phosphorus
                     else:
-
                         phosphorus_type = {
                             'opls': f'opls_x{info["AtomNumber"]}',
                             'gaff': f'px{info["AtomNumber"]}'
                         }
 
+                    self.atom_types_dict[f"P{info['AtomNumber']}"] = phosphorus_type
+
+                    # Hydrogens based on the phosphorus type
+                    # If px then hx, else hp
+                    for connected_atom_number in info['ConnectedAtomsNumbers']:
+                        connected_atom_info = self.atom_info_dict[
+                            connected_atom_number]
+
+                        if (connected_atom_info['AtomicSymbol'] == 'H' and
+                                connected_atom_info['NumConnectedAtoms'] == 1):
+
+                            if phosphorus_type == {
+                                'opls': f'opls_x{info["AtomNumber"]}',
+                                'gaff': f'px{info["AtomNumber"]}'
+                                }:
+
+                                # Undefined hydrogen
+                                hydrogen_type = {
+                                    'opls': f'opls_{info["AtomNumber"]}',
+                                    'gaff': f'hx{info["AtomNumber"]}'
+                                }
+                            else:
+                                hydrogen_type = {
+                                    'opls': 'opls_XXX',
+                                    'gaff': 'hp'
+                                }
+
+                            self.atom_types_dict[
+                                f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
+
+                # Other cases 
+                else:
+                    phosphorus_type = {
+                        'opls': f'opls_x{info["AtomNumber"]}',
+                        'gaff': f'px{info["AtomNumber"]}'
+                    }
+
                     self.atom_types_dict[
                         f"P{info['AtomNumber']}"] = phosphorus_type
+                    
+                    # Assign hydrogen types if necessary
+                    for connected_atom_number in info['ConnectedAtomsNumbers']:
+                        connected_atom_info = self.atom_info_dict[
+                            connected_atom_number]
 
-                    # Note: Hydrogens in phosphine groups are less commonly
-                    # parameterized in force fields and hence not added here.
+                        if (connected_atom_info['AtomicSymbol'] == 'H' and
+                                connected_atom_info['NumConnectedAtoms'] == 1):
 
+                            hydrogen_type = {
+                                'opls': 'opls_XXX',
+                                'gaff': 'hx'
+                            }
+
+                            self.atom_types_dict[
+                                f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
+                            
             # Sulfur type decision
 
             elif info['AtomicSymbol'] == 'S':
@@ -1918,7 +1939,7 @@ class AtomTypeIdentifier:
         else:
             return list(common_cycle_numbers)
 
-    def generate_gaff_atomtypes(self, molecule):
+    def generate_gaff_atomtypes(self, molecule, connectivity_matrix=None):
         """
         Generates GAFF (General Amber Force Field) atom types for a given molecule.
 
@@ -1933,7 +1954,12 @@ class AtomTypeIdentifier:
         self.coordinates = molecule.get_coordinates_in_angstrom()
         self.atomic_symbols = molecule.get_labels()
 
-        self.connectivity_matrix = molecule.get_connectivity_matrix()
+        if connectivity_matrix is None:
+            self.connectivity_matrix = molecule.get_connectivity_matrix()
+        else:
+            # For the add bond feature
+            self.connectivity_matrix = connectivity_matrix.copy()  
+
         self.distance_matrix = molecule.get_distance_matrix_in_angstrom()
 
         self.detect_closed_cyclic_structures()
@@ -1987,7 +2013,7 @@ class AtomTypeIdentifier:
         self.ostream.flush()
 
         return list(self.gaff_atom_types)
-
+    
     @staticmethod
     def get_atom_number(atom_type_str):
         """
@@ -2017,11 +2043,11 @@ class AtomTypeIdentifier:
 
         return np.linalg.norm(np.array(v1) - np.array(v2))
 
-    def identify_equivalences(self, depth=20):
+    def identify_equivalences(self, depth=10):
         """
         Identifies equivalent atoms in the molecule.
         The depth parameter specifies how many bonds are considered for the equivalence.
-        The default value is 4.
+        The default value is 10.
 
         :param depth:
             Depth of the equivalence search
