@@ -191,16 +191,16 @@ class ComplexResponseUCPH(LinearSolver):
             A tuple of distributed trial vectors after preconditioning.
         """
 
-        pa = precond.data[:, 0].reshape(self.nocc,self.nvir)
-        pb = precond.data[:, 1].reshape(self.nocc,self.nvir)
+        pa = precond.data[:, 0]
+        pb = precond.data[:, 1]
 
-        v_in_rg = v_in.data[:, 0].reshape(self.nocc,self.nvir) 
-        v_in_ig = v_in.data[:, 1].reshape(self.nocc,self.nvir)
+        v_in_rg = v_in.data[:, 0] 
+        v_in_ig = v_in.data[:, 1]
 
         #v_in_ig = 0.0
 
-        v_out_rg = (pa * v_in_rg + pb * v_in_ig).reshape(self.nocc*self.nvir)
-        v_out_ig = (pb * v_in_rg - pa * v_in_ig).reshape(self.nocc*self.nvir)
+        v_out_rg = (pa * v_in_rg + pb * v_in_ig)
+        v_out_ig = (pb * v_in_rg - pa * v_in_ig)
 
         v_mat = np.hstack((
             v_out_rg.reshape(-1, 1),
@@ -339,6 +339,8 @@ class ComplexResponseUCPH(LinearSolver):
         if self.rank == mpi_master():
             self.nonlinear = (v_grad is not None)
         self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
+
+        print("We are in the correct solver")
 
         if not self.nonlinear:
             b_grad = self.get_complex_prop_grad(self.b_operator,
