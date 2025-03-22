@@ -197,8 +197,6 @@ class ComplexResponseUCPH(LinearSolver):
         v_in_rg = v_in.data[:, 0] 
         v_in_ig = v_in.data[:, 1]
 
-        #v_in_ig = 0.0
-
         v_out_rg = (pa * v_in_rg + pb * v_in_ig)
         v_out_ig = (pb * v_in_rg - pa * v_in_ig)
 
