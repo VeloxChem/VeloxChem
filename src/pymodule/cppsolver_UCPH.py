@@ -426,14 +426,20 @@ class ComplexResponseUCPH(LinearSolver):
 
             # We set up sigma in another way since we do not have ger ung 
 
-            tdens = self._get_trans_densities(bger.data, scf_tensors,       
+            bger_loc = bger.get_full_matrix(root=mpi_master())
+
+            tdens = self._get_trans_densities(bger_loc, scf_tensors,       
                                                   molecule)     
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict)
             
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
-                                               bger.data)
+                                               bger_loc)
+            else:
+                sig_mat = None
+
+            sig_mat = DistributedArray(sig_mat,self.comm)
             
             self._append_trial_sigma_vectors(bger, sig_mat)
 
@@ -652,8 +658,10 @@ class ComplexResponseUCPH(LinearSolver):
             # creating new sigma and rho linear transformations
 
             # Once again using the other way of computing sigma
+                
+            new_trials_ger_loc = new_trials_ger.get_full_matrix(root=mpi_master())
         
-            tdens = self._get_trans_densities(new_trials_ger.data, scf_tensors,
+            tdens = self._get_trans_densities(new_trials_ger_loc, scf_tensors,
                                                   molecule)     
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
                                           dft_dict, pe_dict)
@@ -661,7 +669,11 @@ class ComplexResponseUCPH(LinearSolver):
             if self.rank == mpi_master():
 
                 sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
-                                               new_trials_ger.data)
+                                               new_trials_ger_loc)
+            else:
+                sig_mat = None
+
+            sig_mat = DistributedArray(sig_mat,self.comm)
             
             self._append_trial_sigma_vectors(new_trials_ger, sig_mat)
 
@@ -875,7 +887,7 @@ class ComplexResponseUCPH(LinearSolver):
             self._dist_bger.append(b, axis=1)
         
         if self._dist_e2bger is None:
-            self._dist_e2bger = DistributedArray(e2b,
+            self._dist_e2bger = DistributedArray(e2b.data,
                                                  self.comm,
                                                  distribute=False)
         else:
@@ -1075,8 +1087,6 @@ class ComplexResponseUCPH(LinearSolver):
         :return:
             The orthonormalized gerade and ungerade trial vectors.
         """
-
-
         dist_new_b = self._precond_trials(vectors, precond)
 
         if dist_new_b.data.size == 0:
@@ -1091,14 +1101,12 @@ class ComplexResponseUCPH(LinearSolver):
         if renormalize:
             if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
                 dist_new_b = self.remove_linear_dependence(  
-                        dist_new_b.data, self.lindep_thresh)
+                        dist_new_b, self.lindep_thresh)
 
                 dist_new_b = self.orthogonalize_gram_schmidt(
                         dist_new_b)            
 
                 dist_new_b = self.normalize(dist_new_b) 
-
-                dist_new_b = DistributedArray(dist_new_b, self.comm)
 
         if self.rank == mpi_master():
             assert_msg_critical(
@@ -1498,3 +1506,86 @@ class ComplexResponseUCPH(LinearSolver):
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
+
+    def remove_linear_dependence(self,basis, threshold):
+        """
+        Removes linear dependence in a set of vectors.
+
+        Based on the function in linearsolver.py, modified to work with full size
+        distributed arrays.
+
+        :param basis:
+            The set of vectors.
+        :param threshold:
+            The threshold for removing linear dependence.
+
+        :return:
+            The new set of vectors.
+        """
+
+        Sb = basis.matmul_AtB(basis)
+        if self.rank == mpi_master():
+            l, T = np.linalg.eigh(Sb)
+            b_norm = np.sqrt(Sb.diagonal())
+            mask = l > b_norm * threshold
+            Tmask = T[:, mask].copy()
+        else:
+            Tmask = None
+        Tmask = self.comm.bcast(Tmask, root=mpi_master())
+
+        return basis.matmul_AB_no_gather(Tmask)
+    
+    @staticmethod
+    def orthogonalize_gram_schmidt(tvecs):
+        """
+        Applies modified Gram Schmidt orthogonalization to trial vectors.
+
+        Based on the function in linearsolver.py, modified to work with full size
+        distributed arrays.
+
+        :param tvecs:
+            The trial vectors.
+
+        :return:
+            The orthogonalized trial vectors.
+        """
+
+        if tvecs.shape(1) > 0:
+            
+            n2 = tvecs.dot(0,tvecs,0)
+            f = 1.0 / n2
+            tvecs.data[:, 0] *= f
+
+            for i in range(1, tvecs.shape(1)):
+                for j in range(i):
+                    dot_ij = tvecs.dot(i,tvecs,j)
+                    dot_jj = tvecs.dot(j,tvecs,j)
+                    f = dot_ij/dot_jj
+                    tvecs.data[:, i] -= f * tvecs.data[:, j]
+                
+                n2 = tvecs.dot(i,tvecs,i)
+                f = 1.0 / n2
+                tvecs.data[:, i] *= f
+
+        return tvecs
+    
+    @staticmethod
+    def normalize(vecs):
+        """
+        Normalizes vectors by dividing by vector norm.
+
+        Based on the function in linearsolver.py, modified to work with full size
+        distributed arrays.
+
+        :param vecs:
+            The vectors.
+
+        :param Retruns:
+            The normalized vectors.
+        """
+
+        invnorm = 1 / vecs.norm(axis=0)
+
+        vecs.data *= invnorm
+
+        return vecs
