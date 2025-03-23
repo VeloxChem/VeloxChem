@@ -28,7 +28,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
-from .cppsolver_UCPH import ComplexResponseUCPH
+from .tda_cppsolver import ComplexResponseTDA
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6driver import C6Driver
@@ -135,8 +135,10 @@ class ResponseProperty:
               self._rsp_dict['onlystatic'] == 'no' and
               self._rsp_dict['is_complex'] == 'yes'):
             
-            #self._rsp_driver = ComplexResponse(self.comm, self.ostream)  # which version of the solver are we using
-            self._rsp_driver = ComplexResponseUCPH(self.comm, self.ostream)
+            if self.tamm_dancoff:
+                self._rsp_driver = ComplexResponseTDA(self.comm, self.ostream)
+            else:
+                self._rsp_driver = ComplexResponse(self.comm, self.ostream)
 
             if self.prop_type in [
                     'linear absorption cross-section',

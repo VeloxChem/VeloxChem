@@ -36,7 +36,6 @@ from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
-from .lreigensolver import LinearResponseEigenSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -47,9 +46,9 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_angular_momentum_integrals)
 
 
-class ComplexResponseUCPH(LinearSolver):
+class ComplexResponseTDA(LinearSolver):
     """
-    Implements the complex linear response solver.
+    Implements the complex linear response solver using the Tamm-Dancoff approximation.
 
     :param comm:
         The MPI communicator.
@@ -161,7 +160,7 @@ class ComplexResponseUCPH(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
+        ediag, _ = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 
         # constructing matrix block diagonals
 
@@ -301,7 +300,7 @@ class ComplexResponseUCPH(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self._print_header('Complex Response Solver',
+            self._print_header('TDA Complex Response Solver',
                                n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
@@ -337,8 +336,6 @@ class ComplexResponseUCPH(LinearSolver):
         if self.rank == mpi_master():
             self.nonlinear = (v_grad is not None)
         self.nonlinear = self.comm.bcast(self.nonlinear, root=mpi_master())
-
-        print("We are in the correct solver")
 
         if not self.nonlinear:
             b_grad = self.get_complex_prop_grad(self.b_operator,
