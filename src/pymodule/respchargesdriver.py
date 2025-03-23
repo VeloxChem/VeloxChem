@@ -437,7 +437,6 @@ class RespChargesDriver:
                     scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
                 if self.filename is not None:
                     scf_drv.filename = self.filename
-                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
@@ -465,7 +464,6 @@ class RespChargesDriver:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
                 if self.filename is not None:
                     scf_drv.filename = self.filename
-                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):

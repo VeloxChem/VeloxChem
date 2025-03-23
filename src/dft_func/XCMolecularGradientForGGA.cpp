@@ -35,8 +35,6 @@
 
 #include "AODensityMatrix.hpp"
 #include "AOIndices.hpp"
-#include "DenseLinearAlgebra.hpp"
-#include "DensityGridGenerator.hpp"
 #include "DensityGridQuad.hpp"
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
@@ -45,6 +43,8 @@
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "Prescreener.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
+#include "SerialDensityGridGenerator.hpp"
 #include "XCFunctional.hpp"
 #include "XCMolecularGradientForGGA.hpp"
 
@@ -281,7 +281,7 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
             auto vrho   = omp_vrho_data[thread_id].data();
             auto vsigma = omp_vsigma_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -311,11 +311,11 @@ integrateVxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F = denblas::serialMultAB(rw_sub_dens_mat, mat_chi);
+            auto mat_F = sdenblas::serialMultAB(rw_sub_dens_mat, mat_chi);
 
-            auto mat_F_x = denblas::serialMultAB(rw_sub_dens_mat, mat_chi_x);
-            auto mat_F_y = denblas::serialMultAB(rw_sub_dens_mat, mat_chi_y);
-            auto mat_F_z = denblas::serialMultAB(rw_sub_dens_mat, mat_chi_z);
+            auto mat_F_x = sdenblas::serialMultAB(rw_sub_dens_mat, mat_chi_x);
+            auto mat_F_y = sdenblas::serialMultAB(rw_sub_dens_mat, mat_chi_y);
+            auto mat_F_z = sdenblas::serialMultAB(rw_sub_dens_mat, mat_chi_z);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
@@ -705,7 +705,7 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
             auto vrho   = omp_vrho_data[thread_id].data();
             auto vsigma = omp_vsigma_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(
+            sdengridgen::serialGenerateDensityForGGA(
                 rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat_a, gs_sub_dens_mat_b);
 
             omptimers[thread_id].stop("Generate density grid");
@@ -752,16 +752,16 @@ integrateVxcGradientForGgaOpenShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F_a = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi);
-            auto mat_F_b = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi);
+            auto mat_F_a = sdenblas::serialMultAB(rw_sub_dens_mat_a, mat_chi);
+            auto mat_F_b = sdenblas::serialMultAB(rw_sub_dens_mat_b, mat_chi);
 
-            auto mat_F_a_x = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_x);
-            auto mat_F_a_y = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_y);
-            auto mat_F_a_z = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_z);
+            auto mat_F_a_x = sdenblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_x);
+            auto mat_F_a_y = sdenblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_y);
+            auto mat_F_a_z = sdenblas::serialMultAB(rw_sub_dens_mat_a, mat_chi_z);
 
-            auto mat_F_b_x = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_x);
-            auto mat_F_b_y = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_y);
-            auto mat_F_b_z = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_z);
+            auto mat_F_b_x = sdenblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_x);
+            auto mat_F_b_y = sdenblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_y);
+            auto mat_F_b_z = sdenblas::serialMultAB(rw_sub_dens_mat_b, mat_chi_z);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
@@ -1218,9 +1218,9 @@ integrateFxcGradientForGgaClosedShell(const CMolecule&        molecule,
             auto v2rhosigma = omp_v2rhosigma_data[thread_id].data();
             auto v2sigma2   = omp_v2sigma2_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
-            dengridgen::serialGenerateDensityForGGA(rhow, rhowgrad, nullptr, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat_one);
+            sdengridgen::serialGenerateDensityForGGA(rhow, rhowgrad, nullptr, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat_one);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -1250,11 +1250,11 @@ integrateFxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F = denblas::serialMultAB(rw_sub_dens_mat_two, mat_chi);
+            auto mat_F = sdenblas::serialMultAB(rw_sub_dens_mat_two, mat_chi);
 
-            auto mat_F_x = denblas::serialMultAB(rw_sub_dens_mat_two, mat_chi_x);
-            auto mat_F_y = denblas::serialMultAB(rw_sub_dens_mat_two, mat_chi_y);
-            auto mat_F_z = denblas::serialMultAB(rw_sub_dens_mat_two, mat_chi_z);
+            auto mat_F_x = sdenblas::serialMultAB(rw_sub_dens_mat_two, mat_chi_x);
+            auto mat_F_y = sdenblas::serialMultAB(rw_sub_dens_mat_two, mat_chi_y);
+            auto mat_F_z = sdenblas::serialMultAB(rw_sub_dens_mat_two, mat_chi_z);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
@@ -1701,7 +1701,7 @@ integrateKxcGradientForGgaClosedShell(const CMolecule&        molecule,
             auto v3rhosigma2 = omp_v3rhosigma2_data[thread_id].data();
             auto v3sigma3    = omp_v3sigma3_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -1734,7 +1734,7 @@ integrateKxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
             auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
 
-            auto rwdengrid = dengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rwdenmat, xcfuntype);
+            auto rwdengrid = sdengridgen::serialGenerateDensityGridForGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rwdenmat, xcfuntype);
 
             CDensityGridQuad rwdengridquad(grid_batch_size, numdens_rw2, xcfuntype, dengrid::ab);
 
@@ -1768,11 +1768,11 @@ integrateKxcGradientForGgaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F = denblas::serialMultAB(gs_sub_dens_mat, mat_chi);
+            auto mat_F = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi);
 
-            auto mat_F_x = denblas::serialMultAB(gs_sub_dens_mat, mat_chi_x);
-            auto mat_F_y = denblas::serialMultAB(gs_sub_dens_mat, mat_chi_y);
-            auto mat_F_z = denblas::serialMultAB(gs_sub_dens_mat, mat_chi_z);
+            auto mat_F_x = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi_x);
+            auto mat_F_y = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi_y);
+            auto mat_F_z = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi_z);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 

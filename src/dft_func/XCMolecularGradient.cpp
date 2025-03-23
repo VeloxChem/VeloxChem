@@ -26,26 +26,16 @@
 
 #include <omp.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
 
-#include "AODensityMatrix.hpp"
-#include "DenseLinearAlgebra.hpp"
-#include "DensityGridGenerator.hpp"
-#include "DftSubMatrix.hpp"
+#include "DenseMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
-#include "GridScreener.hpp"
-#include "GtoFunc.hpp"
-#include "GtoValues.hpp"
-#include "Prescreener.hpp"
 #include "XCFunctional.hpp"
 #include "XCMolecularGradientForLDA.hpp"
 #include "XCMolecularGradientForGGA.hpp"
+#include "XCMolecularGradientForMGGA.hpp"
 #include "XCMolecularGradientForPDFT.hpp"
 
 CXCMolecularGradient::CXCMolecularGradient()
@@ -86,9 +76,13 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
         {
             return xcgradgga::integrateVxcGradientForGgaClosedShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
+        else if (xcfuntype == xcfun::mgga)
+        {
+            return xcgradmgga::integrateVxcGradientForMetaGgaClosedShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
         else
         {
-            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
@@ -103,9 +97,13 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
         {
             return xcgradgga::integrateVxcGradientForGgaOpenShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
+        else if (xcfuntype == xcfun::mgga)
+        {
+            return xcgradmgga::integrateVxcGradientForMetaGgaOpenShell(molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
         else
         {
-            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }

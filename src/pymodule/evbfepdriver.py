@@ -180,7 +180,7 @@ class EvbFepDriver():
                 simulation.step(lambda_0_equilibration_steps)
                 timer.start()
 
-            # Equiliberate
+            # equilibrate
             simulation.integrator.setStepSize(equil_step_size * mmunit.picoseconds)
             self.ostream.print_info(f"Running equilibration with step size {simulation.integrator.getStepSize()}")
             self.ostream.flush()

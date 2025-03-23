@@ -138,6 +138,7 @@ from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
+from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver

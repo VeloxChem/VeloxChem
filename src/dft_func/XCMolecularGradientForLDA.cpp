@@ -35,8 +35,6 @@
 
 #include "AODensityMatrix.hpp"
 #include "AOIndices.hpp"
-#include "DenseLinearAlgebra.hpp"
-#include "DensityGridGenerator.hpp"
 #include "DensityGridQuad.hpp"
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
@@ -45,6 +43,8 @@
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "Prescreener.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
+#include "SerialDensityGridGenerator.hpp"
 #include "XCFunctional.hpp"
 
 namespace xcgradlda {  // xcgradlda namespace
@@ -242,7 +242,7 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
             auto vrho = omp_vrho_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -260,7 +260,7 @@ integrateVxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F = denblas::serialMultAB(rw_sub_dens_mat, mat_chi);
+            auto mat_F = sdenblas::serialMultAB(rw_sub_dens_mat, mat_chi);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
@@ -569,7 +569,7 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
             auto rho  = omp_rho_data[thread_id].data();
             auto vrho = omp_vrho_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat_a, gs_sub_dens_mat_b);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat_a, gs_sub_dens_mat_b);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -591,8 +591,8 @@ integrateVxcGradientForLdaOpenShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F_a = denblas::serialMultAB(rw_sub_dens_mat_a, mat_chi);
-            auto mat_F_b = denblas::serialMultAB(rw_sub_dens_mat_b, mat_chi);
+            auto mat_F_a = sdenblas::serialMultAB(rw_sub_dens_mat_a, mat_chi);
+            auto mat_F_b = sdenblas::serialMultAB(rw_sub_dens_mat_b, mat_chi);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
@@ -915,9 +915,9 @@ integrateFxcGradientForLdaClosedShell(const CMolecule&        molecule,
             auto rhow   = omp_rhow_data[thread_id].data();
             auto v2rho2 = omp_v2rho2_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
 
-            dengridgen::serialGenerateDensityForLDA(rhow, mat_chi, rw_sub_dens_mat_one);
+            sdengridgen::serialGenerateDensityForLDA(rhow, mat_chi, rw_sub_dens_mat_one);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -935,7 +935,7 @@ integrateFxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F = denblas::serialMultAB(rw_sub_dens_mat_two, mat_chi);
+            auto mat_F = sdenblas::serialMultAB(rw_sub_dens_mat_two, mat_chi);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
@@ -1248,7 +1248,7 @@ integrateKxcGradientForLdaClosedShell(const CMolecule&        molecule,
             auto v2rho2 = omp_v2rho2_data[thread_id].data();
             auto v3rho3 = omp_v3rho3_data[thread_id].data();
 
-            dengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
 
             // compute perturbed density
 
@@ -1279,7 +1279,7 @@ integrateKxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
             auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
 
-            auto rwdengrid = dengridgen::serialGenerateDensityGridForLDA(mat_chi, rwdenmat, xcfuntype);
+            auto rwdengrid = sdengridgen::serialGenerateDensityGridForLDA(mat_chi, rwdenmat, xcfuntype);
 
             CDensityGridQuad rwdengridquad(grid_batch_size, numdens_rw2, xcfuntype, dengrid::ab);
 
@@ -1301,7 +1301,7 @@ integrateKxcGradientForLdaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("Density grad. grid matmul");
 
-            auto mat_F = denblas::serialMultAB(gs_sub_dens_mat, mat_chi);
+            auto mat_F = sdenblas::serialMultAB(gs_sub_dens_mat, mat_chi);
 
             omptimers[thread_id].stop("Density grad. grid matmul");
 
