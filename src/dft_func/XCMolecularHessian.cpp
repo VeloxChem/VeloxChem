@@ -28,6 +28,7 @@
 #include "FunctionalParser.hpp"
 #include "XCMolecularHessianForLDA.hpp"
 #include "XCMolecularHessianForGGA.hpp"
+#include "XCMolecularHessianForMGGA.hpp"
 
 CXCMolecularHessian::CXCMolecularHessian()
 
@@ -97,9 +98,7 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
         }
         else
         {
-            std::string errxcfuntype("XCMolecularHessian.integrateVxcFockGradient: Only implemented for LDA/GGA");
-
-            errors::assertMsgCritical(false, errxcfuntype);
+            return xchessmgga::integrateVxcFockGradientForMetaGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
     }
     else
