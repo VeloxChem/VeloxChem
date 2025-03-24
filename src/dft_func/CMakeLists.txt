@@ -4,7 +4,6 @@ target_sources(vlxobjs
     DensityGrid.cpp
     DensityGridCubic.cpp
     DensityGridData2D.cpp
-    DensityGridGenerator.cpp
     DensityGridQuad.cpp
     DftFunc.cpp
     DftSubMatrix.cpp
@@ -23,6 +22,7 @@ target_sources(vlxobjs
     MolecularGrid.cpp
     PartitionFunc.cpp
     Prescreener.cpp
+    SerialDensityGridGenerator.cpp
     XCComponent.cpp
     XCFunctional.cpp
     XCIntegrator.cpp
@@ -32,6 +32,7 @@ target_sources(vlxobjs
     XCMolecularGradient.cpp
     XCMolecularGradientForLDA.cpp
     XCMolecularGradientForGGA.cpp
+    XCMolecularGradientForMGGA.cpp
     XCMolecularHessian.cpp
     XCMolecularHessianForLDA.cpp
     XCMolecularHessianForGGA.cpp

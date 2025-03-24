@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import h5py
+import pytest
 
 from veloxchem.veloxchemlib import XCMolecularHessian
 from veloxchem.veloxchemlib import mpi_master
@@ -10,6 +11,7 @@ from veloxchem.griddriver import GridDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
+@pytest.mark.solvers
 class TestXCMolHess:
 
     def run_xc_mol_hess(self,

@@ -38,16 +38,6 @@ namespace denblas {  // denblas namespace
  */
 auto multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
-auto serialMultAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
-
-auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
-
-auto serialAddAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix;
-
-auto serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor=1.0) -> void;
-
-auto serialSolve(const CDenseMatrix& mat, const std::vector<double>& vec) -> std::vector<double>;
-
 /**
  Computes matrix multiplication: A * B^T.
 
@@ -65,24 +55,6 @@ auto multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDense
  @return the matrix A^T * B.
  */
 auto multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
-
-/**
- Computes diagonal matrix and matrix multiplication: diag(M) * A.
-
- @param diagonal the diagonal matrix.
- @param matrix the square matrix.
- @return the matrix diag(M) * A.
- */
-auto multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix;
-
-/**
- Computes diagonal matrix and matrix multiplication: diag(M) * A^T.
-
- @param diagonal the diagonal matrix.
- @param matrix the square matrix.
- @return the matrix diag(M) * A^T.
- */
-auto multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix;
 
 /**
  Computes matrix substraction: A - B.

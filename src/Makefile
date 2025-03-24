@@ -55,7 +55,6 @@ VLX_LIBS_DIR += t3c_electron_repulsion_geom_0X0
 VLX_LIBS_DIR += visualization
 VLX_LIBS_DIR +=	onee_ints
 VLX_LIBS_DIR +=	pdft_func
-VLX_LIBS_DIR +=	xtb
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))

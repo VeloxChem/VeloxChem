@@ -23,7 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -38,7 +37,7 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
 
@@ -564,7 +563,7 @@ class ComplexResponse(LinearSolver):
 
                         # solving matrix equation
 
-                        c = np.linalg.solve(mat, g)
+                        c = safe_solve(mat, g)
                     else:
                         c = None
                     c = self.comm.bcast(c, root=mpi_master())

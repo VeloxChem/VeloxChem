@@ -2,6 +2,7 @@ from mpi4py import MPI
 from pathlib import Path
 import math as mt
 import numpy as np
+import pytest
 
 from veloxchem import MolecularBasis
 from veloxchem import Molecule
@@ -16,6 +17,8 @@ from veloxchem import make_matrix
 from veloxchem import mat_t
 from veloxchem.rigradientdriver import RIFockGradDriver
 
+
+@pytest.mark.solvers
 class TestRIJFockGeomGradDriver:
 
     def get_data_h2o(self):

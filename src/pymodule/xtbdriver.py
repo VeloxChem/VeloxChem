@@ -26,10 +26,15 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-from .veloxchemlib import _XtbDriver
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
+
+try:
+    from xtb.interface import Calculator as XtbCalculator
+    from xtb.utils import get_method as xtb_get_method
+except ImportError:
+    pass
 
 
 class XtbDriver:
@@ -65,9 +70,10 @@ class XtbDriver:
 
         self.ostream = ostream
 
-        self._xtb_driver = _XtbDriver()
-        self._xtb_driver.mute()
-        self.xtb_verbose = False
+        self.xtb_method = 'gfn2'
+
+        self._xtb_calc = None
+        self._xtb_res = None
 
     @staticmethod
     def is_available():
@@ -75,23 +81,7 @@ class XtbDriver:
         Returns if XTB driver is available.
         """
 
-        return _XtbDriver.is_available()
-
-    def set_max_iter(self, max_iter):
-        """
-        Sets maximum number of SCF iterations.
-        """
-
-        if self.rank == mpi_master():
-            self._xtb_driver.set_max_iter(max_iter)
-
-    def set_elec_temp(self, elec_temp):
-        """
-        Sets electronic temperature for electron smearing.
-        """
-
-        if self.rank == mpi_master():
-            self._xtb_driver.set_elec_temp(elec_temp)
+        return ('xtb' in sys.modules)
 
     def set_method(self, xtb_method):
         """
@@ -99,22 +89,25 @@ class XtbDriver:
         """
 
         if self.rank == mpi_master():
-            self._xtb_driver.set_method(xtb_method.lower())
+            self.xtb_method = xtb_method
 
     def get_method(self):
         """
         Gets XTB method.
         """
 
-        return self._xtb_driver.get_method()
+        if self.rank == mpi_master():
+            return self.xtb_method
+        else:
+            return None
 
     def get_energy(self):
         """
         Gets XTB energy.
         """
 
-        if self.rank == mpi_master():
-            return self._xtb_driver.get_energy()
+        if self.rank == mpi_master() and self._xtb_res is not None:
+            return self._xtb_res.get_energy()
         else:
             return None
 
@@ -123,8 +116,8 @@ class XtbDriver:
         Gets XTB gradient.
         """
 
-        if self.rank == mpi_master():
-            return self._xtb_driver.get_gradient()
+        if self.rank == mpi_master() and self._xtb_res is not None:
+            return self._xtb_res.get_gradient()
         else:
             return None
 
@@ -133,8 +126,8 @@ class XtbDriver:
         Gets XTB dipole.
         """
 
-        if self.rank == mpi_master():
-            return self._xtb_driver.get_dipole()
+        if self.rank == mpi_master() and self._xtb_res is not None:
+            return self._xtb_res.get_dipole()
         else:
             return None
 
@@ -150,37 +143,41 @@ class XtbDriver:
         """
 
         # sanity check
-
-        errmsg = 'XtbDriver: XTB not available. Please download and install XTB '
-        errmsg += 'from https://github.com/grimme-lab/xtb, set XTBHOME environment '
-        errmsg += 'variable, and reinstall VeloxChem.'
-
+        errmsg = 'XtbDriver: xtb-python is not available. '
+        errmsg += 'Please install xtb-python.'
         assert_msg_critical(self.is_available(), errmsg)
+
+        identifiers = np.array(molecule.get_identifiers())
+        coords_in_au = molecule.get_coordinates_in_bohr()
+
+        self._xtb_calc = XtbCalculator(
+            xtb_get_method(self.xtb_method.upper() + '-xTB'), identifiers,
+            coords_in_au)
 
         if self.rank == mpi_master():
 
             # set verbosity
 
-            if self.ostream.is_muted or (not self.xtb_verbose):
-                self._xtb_driver.mute()
+            if self.ostream.is_muted:
+                self._xtb_calc.set_verbosity('muted')
             else:
-                self._xtb_driver.unmute()
+                self._xtb_calc.set_verbosity('full')
 
             # run XTB calculation
 
             self.print_title()
 
-            self._xtb_driver.compute(molecule)
+            self._xtb_res = self._xtb_calc.singlepoint()
 
             # process results
 
-            energy = self._xtb_driver.get_energy()
-            gradient = self._xtb_driver.get_gradient()
-            dipole = self._xtb_driver.get_dipole()
-            partial_charges = self._xtb_driver.get_partial_charges()
-            bond_orders = self._xtb_driver.get_bond_orders()
-            orbital_energies = self._xtb_driver.get_orbital_energies()
-            orbital_occupations = self._xtb_driver.get_orbital_occupations()
+            energy = self._xtb_res.get_energy()
+            gradient = self._xtb_res.get_gradient()
+            dipole = self._xtb_res.get_dipole()
+            partial_charges = self._xtb_res.get_charges()
+            bond_orders = self._xtb_res.get_bond_orders()
+            orbital_energies = self._xtb_res.get_orbital_eigenvalues()
+            orbital_occupations = self._xtb_res.get_orbital_occupations()
 
             grad2 = np.sum(gradient**2, axis=1)
             rms_grad = np.sqrt(np.mean(grad2))

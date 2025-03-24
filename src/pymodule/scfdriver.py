@@ -60,7 +60,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 try:
@@ -1488,7 +1488,7 @@ class ScfDriver:
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                    self._cpcm_q = np.linalg.solve(self._cpcm_Amat, rhs)
+                    self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
 
                     e_sol = self.cpcm_drv.compute_solv_energy(
                         self._cpcm_Bzvec, Cvec, self._cpcm_q)
@@ -2710,6 +2710,10 @@ class ScfDriver:
             self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
@@ -2717,6 +2721,10 @@ class ScfDriver:
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.dispersion:
+            cur_str = 'Dispersion Correction           : D4'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._cpcm:
