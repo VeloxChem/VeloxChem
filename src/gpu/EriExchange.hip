@@ -31,20 +31,20 @@ namespace gpu {  // gpu namespace
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockSSSS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
+                        const uint32_t* pair_inds_i_for_K_ss_in,
+                        const uint32_t* pair_inds_k_for_K_ss_in,
                         const uint32_t  pair_inds_count_for_K_ss,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
                         const double    ss_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_ss,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_counts_K_ss,
-                        const double*   pair_data_K_ss,
+                        const double*   Q_K_ss_in,
+                        const uint32_t* D_inds_K_ss_in,
+                        const uint32_t* pair_displs_K_ss_in,
+                        const uint32_t* pair_counts_K_ss_in,
+                        const double*   pair_data_K_ss_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -60,6 +60,17 @@ computeExchangeFockSSSS(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<const uint32_t>  pair_inds_i_for_K_ss{pair_inds_i_for_K_ss_in};
+    AmdFastBuffer<const uint32_t>  pair_inds_k_for_K_ss{pair_inds_k_for_K_ss_in};
+    AmdFastBuffer<const double  >  s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t>  s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  >  mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  >  Q_K_ss{Q_K_ss_in};
+    AmdFastBuffer<const uint32_t>  D_inds_K_ss{D_inds_K_ss_in};
+    AmdFastBuffer<const uint32_t>  pair_displs_K_ss{pair_displs_K_ss_in};
+    AmdFastBuffer<const uint32_t>  pair_counts_K_ss{pair_counts_K_ss_in};
+    AmdFastBuffer<const double  >  pair_data_K_ss{pair_data_K_ss_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -236,29 +247,29 @@ computeExchangeFockSSSS(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockSSSP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
+computeExchangeFockSSSP(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_ss_in,
+                        const uint32_t* pair_inds_k_for_K_ss_in,
                         const uint32_t  pair_inds_count_for_K_ss,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    sp_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_ss,
-                        const double*   Q_K_sp,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_sp,
-                        const double*   pair_data_K_ss,
-                        const double*   pair_data_K_sp,
+                        const double*   Q_K_ss_in,
+                        const double*   Q_K_sp_in,
+                        const uint32_t* D_inds_K_ss_in,
+                        const uint32_t* D_inds_K_sp_in,
+                        const uint32_t* pair_displs_K_ss_in,
+                        const uint32_t* pair_displs_K_sp_in,
+                        const uint32_t* pair_counts_K_ss_in,
+                        const uint32_t* pair_counts_K_sp_in,
+                        const double*   pair_data_K_ss_in,
+                        const double*   pair_data_K_sp_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -274,6 +285,25 @@ computeExchangeFockSSSP(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        >  mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t>  pair_inds_i_for_K_ss{pair_inds_i_for_K_ss_in};
+    AmdFastBuffer<const uint32_t>  pair_inds_k_for_K_ss{pair_inds_k_for_K_ss_in};
+    AmdFastBuffer<const double  >  s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t>  s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  >  p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t>  p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  >  mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  >  Q_K_ss{Q_K_ss_in};
+    AmdFastBuffer<const double  >  Q_K_sp{Q_K_sp_in};
+    AmdFastBuffer<const uint32_t>  D_inds_K_ss{D_inds_K_ss_in};
+    AmdFastBuffer<const uint32_t>  D_inds_K_sp{D_inds_K_sp_in};
+    AmdFastBuffer<const uint32_t>  pair_displs_K_ss{pair_displs_K_ss_in};
+    AmdFastBuffer<const uint32_t>  pair_displs_K_sp{pair_displs_K_sp_in};
+    AmdFastBuffer<const uint32_t>  pair_counts_K_ss{pair_counts_K_ss_in};
+    AmdFastBuffer<const uint32_t>  pair_counts_K_sp{pair_counts_K_sp_in};
+    AmdFastBuffer<const double  >  pair_data_K_ss{pair_data_K_ss_in};
+    AmdFastBuffer<const double  >  pair_data_K_sp{pair_data_K_sp_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -467,29 +497,29 @@ computeExchangeFockSSSP(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockSPSS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
+computeExchangeFockSPSS(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_ss_in,
+                        const uint32_t* pair_inds_k_for_K_ss_in,
                         const uint32_t  pair_inds_count_for_K_ss,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    ps_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_sp,
-                        const double*   Q_K_ss,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_ss,
-                        const double*   pair_data_K_sp,
-                        const double*   pair_data_K_ss,
+                        const double*   Q_K_sp_in,
+                        const double*   Q_K_ss_in,
+                        const uint32_t* D_inds_K_sp_in,
+                        const uint32_t* D_inds_K_ss_in,
+                        const uint32_t* pair_displs_K_sp_in,
+                        const uint32_t* pair_displs_K_ss_in,
+                        const uint32_t* pair_counts_K_sp_in,
+                        const uint32_t* pair_counts_K_ss_in,
+                        const double*   pair_data_K_sp_in,
+                        const double*   pair_data_K_ss_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -505,6 +535,25 @@ computeExchangeFockSPSS(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_ss{pair_inds_i_for_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_ss{pair_inds_k_for_K_ss_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_sp{Q_K_sp_in};
+    AmdFastBuffer<const double  > Q_K_ss{Q_K_ss_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_sp{D_inds_K_sp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ss{D_inds_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_sp{pair_displs_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ss{pair_displs_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_sp{pair_counts_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ss{pair_counts_K_ss_in};
+    AmdFastBuffer<const double  > pair_data_K_sp{pair_data_K_sp_in};
+    AmdFastBuffer<const double  > pair_data_K_ss{pair_data_K_ss_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -698,24 +747,24 @@ computeExchangeFockSPSS(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockSPSP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_ss,
-                        const uint32_t* pair_inds_k_for_K_ss,
+computeExchangeFockSPSP(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_ss_in,
+                        const uint32_t* pair_inds_k_for_K_ss_in,
                         const uint32_t  pair_inds_count_for_K_ss,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    pp_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_sp,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_counts_K_sp,
-                        const double*   pair_data_K_sp,
+                        const double*   Q_K_sp_in,
+                        const uint32_t* D_inds_K_sp_in,
+                        const uint32_t* pair_displs_K_sp_in,
+                        const uint32_t* pair_counts_K_sp_in,
+                        const double*   pair_data_K_sp_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -732,6 +781,20 @@ computeExchangeFockSPSP(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_ss{pair_inds_i_for_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_ss{pair_inds_k_for_K_ss_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_sp{Q_K_sp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_sp{D_inds_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_sp{pair_displs_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_sp{pair_counts_K_sp_in};
+    AmdFastBuffer<const double  > pair_data_K_sp{pair_data_K_sp_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -950,29 +1013,29 @@ computeExchangeFockSPSP(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockSSPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
+computeExchangeFockSSPS(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_sp_in,
+                        const uint32_t* pair_inds_k_for_K_sp_in,
                         const uint32_t  pair_inds_count_for_K_sp,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    ss_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_ss,
-                        const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_ps,
-                        const double*   pair_data_K_ss,
-                        const double*   pair_data_K_ps,
+                        const double*   Q_K_ss_in,
+                        const double*   Q_K_ps_in,
+                        const uint32_t* D_inds_K_ss_in,
+                        const uint32_t* D_inds_K_ps_in,
+                        const uint32_t* pair_displs_K_ss_in,
+                        const uint32_t* pair_displs_K_ps_in,
+                        const uint32_t* pair_counts_K_ss_in,
+                        const uint32_t* pair_counts_K_ps_in,
+                        const double*   pair_data_K_ss_in,
+                        const double*   pair_data_K_ps_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -989,6 +1052,25 @@ computeExchangeFockSSPS(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_sp{pair_inds_i_for_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_sp{pair_inds_k_for_K_sp_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_ss{Q_K_ss_in};
+    AmdFastBuffer<const double  > Q_K_ps{Q_K_ps_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ss{D_inds_K_ss_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ps{D_inds_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ss{pair_displs_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ps{pair_displs_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ss{pair_counts_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ps{pair_counts_K_ps_in};
+    AmdFastBuffer<const double  > pair_data_K_ss{pair_data_K_ss_in};
+    AmdFastBuffer<const double  > pair_data_K_ps{pair_data_K_ps_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1183,29 +1265,29 @@ computeExchangeFockSSPS(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockSSPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
+computeExchangeFockSSPP(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_sp_in,
+                        const uint32_t* pair_inds_k_for_K_sp_in,
                         const uint32_t  pair_inds_count_for_K_sp,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    sp_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_ss,
-                        const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_ss,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_ss,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_ss,
-                        const uint32_t* pair_counts_K_pp,
-                        const double*   pair_data_K_ss,
-                        const double*   pair_data_K_pp,
+                        const double*   Q_K_ss_in,
+                        const double*   Q_K_pp_in,
+                        const uint32_t* D_inds_K_ss_in,
+                        const uint32_t* D_inds_K_pp_in,
+                        const uint32_t* pair_displs_K_ss_in,
+                        const uint32_t* pair_displs_K_pp_in,
+                        const uint32_t* pair_counts_K_ss_in,
+                        const uint32_t* pair_counts_K_pp_in,
+                        const double*   pair_data_K_ss_in,
+                        const double*   pair_data_K_pp_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -1223,6 +1305,25 @@ computeExchangeFockSSPP(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_sp{pair_inds_i_for_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_sp{pair_inds_k_for_K_sp_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_ss{Q_K_ss_in};
+    AmdFastBuffer<const double  > Q_K_pp{Q_K_pp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ss{D_inds_K_ss_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_pp{D_inds_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ss{pair_displs_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_pp{pair_displs_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ss{pair_counts_K_ss_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_pp{pair_counts_K_pp_in};
+    AmdFastBuffer<const double  > pair_data_K_ss{pair_data_K_ss_in};
+    AmdFastBuffer<const double  > pair_data_K_pp{pair_data_K_pp_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1442,29 +1543,29 @@ computeExchangeFockSSPP(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockSPPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
+computeExchangeFockSPPS(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_sp_in,
+                        const uint32_t* pair_inds_k_for_K_sp_in,
                         const uint32_t  pair_inds_count_for_K_sp,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    ps_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_sp,
-                        const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_ps,
-                        const double*   pair_data_K_sp,
-                        const double*   pair_data_K_ps,
+                        const double*   Q_K_sp_in,
+                        const double*   Q_K_ps_in,
+                        const uint32_t* D_inds_K_sp_in,
+                        const uint32_t* D_inds_K_ps_in,
+                        const uint32_t* pair_displs_K_sp_in,
+                        const uint32_t* pair_displs_K_ps_in,
+                        const uint32_t* pair_counts_K_sp_in,
+                        const uint32_t* pair_counts_K_ps_in,
+                        const double*   pair_data_K_sp_in,
+                        const double*   pair_data_K_ps_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -1482,6 +1583,25 @@ computeExchangeFockSPPS(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_sp{pair_inds_i_for_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_sp{pair_inds_k_for_K_sp_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_sp{Q_K_sp_in};
+    AmdFastBuffer<const double  > Q_K_ps{Q_K_ps_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_sp{D_inds_K_sp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ps{D_inds_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_sp{pair_displs_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ps{pair_displs_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_sp{pair_counts_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ps{pair_counts_K_ps_in};
+    AmdFastBuffer<const double  > pair_data_K_sp{pair_data_K_sp_in};
+    AmdFastBuffer<const double  > pair_data_K_ps{pair_data_K_ps_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1702,29 +1822,29 @@ computeExchangeFockSPPS(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockSPPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_sp,
-                        const uint32_t* pair_inds_k_for_K_sp,
+computeExchangeFockSPPP(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_sp_in,
+                        const uint32_t* pair_inds_k_for_K_sp_in,
                         const uint32_t  pair_inds_count_for_K_sp,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    pp_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_sp,
-                        const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_sp,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_sp,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_sp,
-                        const uint32_t* pair_counts_K_pp,
-                        const double*   pair_data_K_sp,
-                        const double*   pair_data_K_pp,
+                        const double*   Q_K_sp_in,
+                        const double*   Q_K_pp_in,
+                        const uint32_t* D_inds_K_sp_in,
+                        const uint32_t* D_inds_K_pp_in,
+                        const uint32_t* pair_displs_K_sp_in,
+                        const uint32_t* pair_displs_K_pp_in,
+                        const uint32_t* pair_counts_K_sp_in,
+                        const uint32_t* pair_counts_K_pp_in,
+                        const double*   pair_data_K_sp_in,
+                        const double*   pair_data_K_pp_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -1742,6 +1862,25 @@ computeExchangeFockSPPP(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_sp{pair_inds_i_for_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_sp{pair_inds_k_for_K_sp_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_sp{Q_K_sp_in};
+    AmdFastBuffer<const double  > Q_K_pp{Q_K_pp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_sp{D_inds_K_sp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_pp{D_inds_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_sp{pair_displs_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_pp{pair_displs_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_sp{pair_counts_K_sp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_pp{pair_counts_K_pp_in};
+    AmdFastBuffer<const double  > pair_data_K_sp{pair_data_K_sp_in};
+    AmdFastBuffer<const double  > pair_data_K_pp{pair_data_K_pp_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -1996,24 +2135,24 @@ computeExchangeFockSPPP(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPSPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
+computeExchangeFockPSPS(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_pp_in,
+                        const uint32_t* pair_inds_k_for_K_pp_in,
                         const uint32_t  pair_inds_count_for_K_pp,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    ss_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_ps,
-                        const double*   pair_data_K_ps,
+                        const double*   Q_K_ps_in,
+                        const uint32_t* D_inds_K_ps_in,
+                        const uint32_t* pair_displs_K_ps_in,
+                        const uint32_t* pair_counts_K_ps_in,
+                        const double*   pair_data_K_ps_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -2031,6 +2170,20 @@ computeExchangeFockPSPS(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_pp{pair_inds_i_for_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_pp{pair_inds_k_for_K_pp_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_ps{Q_K_ps_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ps{D_inds_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ps{pair_displs_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ps{pair_counts_K_ps_in};
+    AmdFastBuffer<const double  > pair_data_K_ps{pair_data_K_ps_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2251,29 +2404,29 @@ computeExchangeFockPSPS(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPSPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
+computeExchangeFockPSPP(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_pp_in,
+                        const uint32_t* pair_inds_k_for_K_pp_in,
                         const uint32_t  pair_inds_count_for_K_pp,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    sp_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_ps,
-                        const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_ps,
-                        const uint32_t* pair_counts_K_pp,
-                        const double*   pair_data_K_ps,
-                        const double*   pair_data_K_pp,
+                        const double*   Q_K_ps_in,
+                        const double*   Q_K_pp_in,
+                        const uint32_t* D_inds_K_ps_in,
+                        const uint32_t* D_inds_K_pp_in,
+                        const uint32_t* pair_displs_K_ps_in,
+                        const uint32_t* pair_displs_K_pp_in,
+                        const uint32_t* pair_counts_K_ps_in,
+                        const uint32_t* pair_counts_K_pp_in,
+                        const double*   pair_data_K_ps_in,
+                        const double*   pair_data_K_pp_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -2291,6 +2444,25 @@ computeExchangeFockPSPP(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_pp{pair_inds_i_for_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_pp{pair_inds_k_for_K_pp_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_ps{Q_K_ps_in};
+    AmdFastBuffer<const double  > Q_K_pp{Q_K_pp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ps{D_inds_K_ps_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_pp{D_inds_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ps{pair_displs_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_pp{pair_displs_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ps{pair_counts_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_pp{pair_counts_K_pp_in};
+    AmdFastBuffer<const double  > pair_data_K_ps{pair_data_K_ps_in};
+    AmdFastBuffer<const double  > pair_data_K_pp{pair_data_K_pp_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2546,29 +2718,29 @@ computeExchangeFockPSPP(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPPPS(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
+computeExchangeFockPPPS(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_pp_in,
+                        const uint32_t* pair_inds_k_for_K_pp_in,
                         const uint32_t  pair_inds_count_for_K_pp,
-                        const double*   s_prim_info,
-                        const uint32_t* s_prim_aoinds,
+                        const double*   s_prim_info_in,
+                        const uint32_t* s_prim_aoinds_in,
                         const uint32_t  s_prim_count,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    ps_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_pp,
-                        const double*   Q_K_ps,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* D_inds_K_ps,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_displs_K_ps,
-                        const uint32_t* pair_counts_K_pp,
-                        const uint32_t* pair_counts_K_ps,
-                        const double*   pair_data_K_pp,
-                        const double*   pair_data_K_ps,
+                        const double*   Q_K_pp_in,
+                        const double*   Q_K_ps_in,
+                        const uint32_t* D_inds_K_pp_in,
+                        const uint32_t* D_inds_K_ps_in,
+                        const uint32_t* pair_displs_K_pp_in,
+                        const uint32_t* pair_displs_K_ps_in,
+                        const uint32_t* pair_counts_K_pp_in,
+                        const uint32_t* pair_counts_K_ps_in,
+                        const double*   pair_data_K_pp_in,
+                        const double*   pair_data_K_ps_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -2586,6 +2758,25 @@ computeExchangeFockPPPS(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_pp{pair_inds_i_for_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_pp{pair_inds_k_for_K_pp_in};
+    AmdFastBuffer<const double  > s_prim_info{s_prim_info_in};
+    AmdFastBuffer<const uint32_t> s_prim_aoinds{s_prim_aoinds_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_pp{Q_K_pp_in};
+    AmdFastBuffer<const double  > Q_K_ps{Q_K_ps_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_pp{D_inds_K_pp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_ps{D_inds_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_pp{pair_displs_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_ps{pair_displs_K_ps_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_pp{pair_counts_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_ps{pair_counts_K_ps_in};
+    AmdFastBuffer<const double  > pair_data_K_pp{pair_data_K_pp_in};
+    AmdFastBuffer<const double  > pair_data_K_ps{pair_data_K_ps_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
@@ -2842,21 +3033,21 @@ computeExchangeFockPPPS(double*         mat_K,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockPPPP(double*         mat_K,
-                        const uint32_t* pair_inds_i_for_K_pp,
-                        const uint32_t* pair_inds_k_for_K_pp,
+computeExchangeFockPPPP(double*         mat_K_in,
+                        const uint32_t* pair_inds_i_for_K_pp_in,
+                        const uint32_t* pair_inds_k_for_K_pp_in,
                         const uint32_t  pair_inds_count_for_K_pp,
-                        const double*   p_prim_info,
-                        const uint32_t* p_prim_aoinds,
+                        const double*   p_prim_info_in,
+                        const uint32_t* p_prim_aoinds_in,
                         const uint32_t  p_prim_count,
                         const double    pp_max_D,
-                        const double*   mat_D_full_AO,
+                        const double*   mat_D_full_AO_in,
                         const uint32_t  naos,
-                        const double*   Q_K_pp,
-                        const uint32_t* D_inds_K_pp,
-                        const uint32_t* pair_displs_K_pp,
-                        const uint32_t* pair_counts_K_pp,
-                        const double*   pair_data_K_pp,
+                        const double*   Q_K_pp_in,
+                        const uint32_t* D_inds_K_pp_in,
+                        const uint32_t* pair_displs_K_pp_in,
+                        const uint32_t* pair_counts_K_pp_in,
+                        const double*   pair_data_K_pp_in,
                         const double*   boys_func_table,
                         const double*   boys_func_ft,
                         const double    omega,
@@ -2874,6 +3065,18 @@ computeExchangeFockPPPP(double*         mat_K,
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
+
+    AmdFastBuffer<double        > mat_K{mat_K_in};
+    AmdFastBuffer<const uint32_t> pair_inds_i_for_K_pp{pair_inds_i_for_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_inds_k_for_K_pp{pair_inds_k_for_K_pp_in};
+    AmdFastBuffer<const double  > p_prim_info{p_prim_info_in};
+    AmdFastBuffer<const uint32_t> p_prim_aoinds{p_prim_aoinds_in};
+    AmdFastBuffer<const double  > mat_D_full_AO{mat_D_full_AO_in};
+    AmdFastBuffer<const double  > Q_K_pp{Q_K_pp_in};
+    AmdFastBuffer<const uint32_t> D_inds_K_pp{D_inds_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_displs_K_pp{pair_displs_K_pp_in};
+    AmdFastBuffer<const uint32_t> pair_counts_K_pp{pair_counts_K_pp_in};
+    AmdFastBuffer<const double  > pair_data_K_pp{pair_data_K_pp_in};
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0))
     {
