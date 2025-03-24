@@ -2,6 +2,31 @@ target_sources(vlxobjs
   PRIVATE
     ThreeCenterOverlapDriver.cpp
     ThreeCenterOverlapPrimRecSS.cpp
+    ThreeCenterOverlapPrimRecFF.cpp
+    ThreeCenterOverlapPrimRecGP.cpp
+    ThreeCenterOverlapPrimRecSD.cpp
+    ThreeCenterOverlapPrimRecDD.cpp
+    ThreeCenterOverlapPrimRecFG.cpp
+    ThreeCenterOverlapPrimRecGS.cpp
+    ThreeCenterOverlapPrimRecSF.cpp
+    ThreeCenterOverlapPrimRecDF.cpp
+    ThreeCenterOverlapPrimRecFP.cpp
+    ThreeCenterOverlapPrimRecPD.cpp	
+    ThreeCenterOverlapPrimRecSG.cpp
+    ThreeCenterOverlapPrimRecDG.cpp	
+    ThreeCenterOverlapPrimRecFS.cpp	
+    ThreeCenterOverlapPrimRecPF.cpp	
+    ThreeCenterOverlapPrimRecSP.cpp
+    ThreeCenterOverlapPrimRecDP.cpp
+    ThreeCenterOverlapPrimRecGD.cpp
+    ThreeCenterOverlapPrimRecPG.cpp
+    ThreeCenterOverlapPrimRecSS.cpp
+    ThreeCenterOverlapPrimRecDS.cpp
+    ThreeCenterOverlapPrimRecGF.cpp
+    ThreeCenterOverlapPrimRecPP.cpp
+    ThreeCenterOverlapPrimRecFD.cpp	
+    ThreeCenterOverlapPrimRecGG.cpp
+    ThreeCenterOverlapPrimRecPS.cpp
   )
 
 target_include_directories(vlxobjs

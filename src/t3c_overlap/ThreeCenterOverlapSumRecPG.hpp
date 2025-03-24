@@ -1,22 +1,26 @@
-#ifndef ThreeCenterOverlapRecSS_hpp
-#define ThreeCenterOverlapRecSS_hpp
+#ifndef ThreeCenterOverlapSumRecPG_hpp
+#define ThreeCenterOverlapSumRecPG_hpp
 
-#include <array>
 #include <cstddef>
+#include <array>
 #include <utility>
 
-#include "BatchFunc.hpp"
-#include "BoysFunc.hpp"
 #include "GtoBlock.hpp"
-#include "ThreeCenterOverlapPrimRecSS.hpp"
-#include "OverlapPrimRecSS.hpp"
 #include "SimdArray.hpp"
-#include "T2CTransform.hpp"
+#include "OverlapPrimRecSS.hpp"
+#include "ThreeCenterOverlapPrimRecSS.hpp"
+#include "ThreeCenterOverlapPrimRecSP.hpp"
+#include "ThreeCenterOverlapPrimRecSD.hpp"
+#include "ThreeCenterOverlapPrimRecSF.hpp"
+#include "ThreeCenterOverlapPrimRecSG.hpp"
+#include "ThreeCenterOverlapPrimRecPG.hpp"
 #include "T2CUtils.hpp"
+#include "T2CTransform.hpp"
+#include "BatchFunc.hpp"
 
-namespace t3ovlrec {  // npotrec namespace
+namespace t3ovlrec { // t3ovlrec namespace
 
-/// @brief Computes (S|A|S)  integrals for pair of basis functions blocks.
+/// @brief Computes (P|G(r)|G)  integrals for pair of basis functions blocks.
 /// @param distributor The integrals distributor.
 /// @param bra_gto_block The basis functions block on bra side.
 /// @param ket_gto_block The basis functions block on ket side.
@@ -25,18 +29,18 @@ namespace t3ovlrec {  // npotrec namespace
 /// @param bra_eq_ket True if basis functions blocks on bra and ket are the same, False otherwise.
 template <class T>
 auto
-comp_overlap_ss(T&                               distributor,
-                              const CGtoBlock&                 bra_gto_block,
-                              const CGtoBlock&                 ket_gto_block,
-                              const std::pair<size_t, size_t>& bra_indices,
-                              const std::pair<size_t, size_t>& ket_indices,
-                              const bool                       bra_eq_ket) -> void
+comp_sum_overlap_pg(T& distributor,
+                    const CGtoBlock& bra_gto_block,
+                    const CGtoBlock& ket_gto_block,
+                    const std::pair<size_t, size_t>& bra_indices,
+                    const std::pair<size_t, size_t>& ket_indices,
+                    const bool bra_eq_ket) -> void
 {
     // intialize external coordinate(s)
 
     const auto coords = distributor.coordinates();
 
-    // intialize external charge(s)
+    // intialize external Gaussian(s)
 
     const auto exgtos = distributor.data();
 
@@ -68,15 +72,17 @@ comp_overlap_ss(T&                               distributor,
 
     // allocate aligned 2D arrays for ket side
 
-    CSimdArray<double> factors(14, ket_npgtos);
+    CSimdArray<double> factors(20, ket_npgtos);
 
     // allocate aligned primitive integrals
 
-    CSimdArray<double> pbuffer(2, ket_npgtos);
+    CSimdArray<double> pbuffer(81, ket_npgtos);
 
     // allocate aligned contracted integrals
 
-    CSimdArray<double> cbuffer(1, 1);
+    CSimdArray<double> cbuffer(45, 1);
+
+    CSimdArray<double> sbuffer(27, 1);
 
     // set up ket partitioning
 
@@ -98,6 +104,8 @@ comp_overlap_ss(T&                               distributor,
 
         const auto ket_width = ket_range.second - ket_range.first;
 
+        sbuffer.set_active_width(ket_width);
+
         cbuffer.set_active_width(ket_width);
 
         pbuffer.set_active_width(ket_width);
@@ -107,6 +115,8 @@ comp_overlap_ss(T&                               distributor,
         for (auto j = bra_indices.first; j < bra_indices.second; j++)
         {
             cbuffer.zero();
+
+            sbuffer.zero();
 
             const auto r_a = bra_gto_coords[j];
 
@@ -123,22 +133,38 @@ comp_overlap_ss(T&                               distributor,
                 ovlrec::comp_prim_overlap_ss(pbuffer, 0, factors, a_exp, a_norm);
 
                 const size_t npoints = coords.size();
-                
+
                 for (size_t l = 0; l < npoints; l++)
                 {
                     t2cfunc::comp_distances_pc(factors, 11, 8, coords[l]);
-                    
+
+                    t2cfunc::comp_distances_ga(factors, 14, 8, r_a, coords[l], a_exp, exgtos[l]);
+
+                    t2cfunc::comp_distances_gb(factors, 17, 8, 2, coords[l], a_exp, exgtos[l]);
+
                     t3ovlrec::comp_prim_overlap_ss(pbuffer, 1, 0, factors, 11, a_exp, exgtos[l], exgtos[npoints + l]);
 
-                    t2cfunc::reduce(cbuffer, pbuffer, 1, ket_width, ket_npgtos);
+                    t3ovlrec::comp_prim_overlap_sp(pbuffer, 2, 1, factors, 17);
+
+                    t3ovlrec::comp_prim_overlap_sd(pbuffer, 5, 1, 2, factors, 17, a_exp, exgtos[l]);
+
+                    t3ovlrec::comp_prim_overlap_sf(pbuffer, 11, 2, 5, factors, 17, a_exp, exgtos[l]);
+
+                    t3ovlrec::comp_prim_overlap_sg(pbuffer, 21, 5, 11, factors, 17, a_exp, exgtos[l]);
+
+                    t3ovlrec::comp_prim_overlap_pg(pbuffer, 36, 11, 21, factors, 14, a_exp, exgtos[l]);
+
+                    t2cfunc::reduce(cbuffer, pbuffer, 36, ket_width, ket_npgtos);
                 }
             }
 
-            distributor.distribute(cbuffer, bra_gto_indices, ket_gto_indices, 0, 0, j, ket_range, bra_eq_ket);
+            t2cfunc::transform<1, 4>(sbuffer, cbuffer);
+
+            distributor.distribute(sbuffer, bra_gto_indices, ket_gto_indices, 1, 4, j, ket_range, bra_eq_ket);
         }
     }
 }
 
-}  // namespace t3ovl
+} // t3ovlrec namespace
 
-#endif /* ThreeCenterOverlapRecSS_hpp */
+#endif /* ThreeCenterOverlapSumRecPG_hpp */

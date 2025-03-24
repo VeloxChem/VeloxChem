@@ -55,6 +55,26 @@ auto comp_distances_pb_from_p(CSimdArray<double>& buffer, const size_t index_pb,
 /// @param r_a The Cartesian A point coordinates.
 auto comp_distances_pa_from_p(CSimdArray<double>& buffer, const size_t index_pa, const size_t index_p, const TPoint<double>& r_a) -> void;
 
+/// @brief Computes R(GB) = G - B distances.
+/// @param buffer The SIMD array containing R(GB) distances.
+/// @param index_gb The primary row index of R(GB) distances in SIMD array.
+/// @param index_p The primary row index of  Cartesian P points coordinates in SIMD array.
+/// @param index_b  The primary row index of  Cartesian B points coordinates in SIMD array.
+/// @param r_c The Cartesian C point coordinates.
+/// @param a_exp The exponent on A center.
+/// @param c_exp The exponent on C center.
+auto comp_distances_gb(CSimdArray<double>& buffer, const size_t index_gb, const size_t index_p, const size_t index_b, const TPoint<double>& r_c, const double a_exp, const double c_exp) -> void;
+
+/// @brief Computes R(GA) = G - A distances.
+/// @param buffer The SIMD array containing R(GA) distances.
+/// @param index_ga The primary row index of R(GA) distances in SIMD array.
+/// @param index_p The primary row index of  Cartesian P points coordinates in SIMD array.
+/// @param r_a The Cartesian A point coordinates.
+/// @param r_c The Cartesian C point coordinates.
+/// @param a_exp The exponent on A center.
+/// @param c_exp The exponent on C center.
+auto comp_distances_ga(CSimdArray<double>& buffer, const size_t index_ga, const size_t index_p, const TPoint<double>& r_a, const TPoint<double>& r_c, const double a_exp, const double c_exp) -> void;
+
 /// @brief Computes R(PC) = P - C distances.
 /// @param buffer The SIMD array containing R(PC) distances.
 /// @param index_pc The primary row index of R(PC) distances in SIMD array.
