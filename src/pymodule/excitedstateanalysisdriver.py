@@ -65,25 +65,14 @@ class ExcitedStateAnalysisDriver:
 
         self.fragment_dict = None
 
-        self.include_particle_hole_density_matrices = False
-        self.include_participation_ratios = False
-        self.include_avg_particle_hole_position = False
-        self.include_relative_ct_length = False
+        self.include_particle_hole_density_matrices = True
+        self.include_participation_ratios = True
+        self.include_avg_particle_hole_position = True
+        self.include_relative_ct_length = True
         self._tda = False
 
         # output stream
         self.ostream = ostream
-
-    def update_settings(self, fragment_dict=None):
-        """
-        Update fragment dictionary and descriptor settings.
-
-        :param fragment_dict:
-            The dictionary containing the indices of atoms in each fragment.
-        """
-
-        if fragment_dict is not None:
-            self.fragment_dict = fragment_dict
 
     def compute(self, state_index, molecule, basis, scf_tensors, rsp_tensors):
         """
@@ -199,6 +188,14 @@ class ExcitedStateAnalysisDriver:
     
     def read_from_h5(self, filename):
         """
+        Reads data from hdf5 checkpoint file and 
+        returns it as tuple containing the scf and rsp dictionaries.
+
+        :param filename:
+            The name of the checkpoint file.
+
+        :return:
+            A tuple containing the scf and rsp dictionaries.
         """
         h5f = h5py.File(filename, "r")
 
@@ -224,81 +221,33 @@ class ExcitedStateAnalysisDriver:
         return scf_tensors, rsp_tensors
     
     def format_rsp_tensors(self, rsp_tensors):
-        rsp_drv = LinearResponseEigenSolver()
-        num_states = len(rsp_tensors['eigenvectors_distributed'])
-        for i in range(num_states):
-            name = 'S'+str(i+1)
-            rsp_tensors[name] = rsp_drv.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][i])
+        """
+        Reads the eigenvectors in rsp_tensors and adds them
+        as numpy arrays with individual keys to the dictionary.
+
+        :param rsp_tensors:
+            The dictionary containing the results from a 
+            rsp calculation.
+
+        :return:
+            The rsp results dictionary in the format needed for
+            the excited state analysis driver class.
+        """
+
+        if 'eigenvectors_distributed' in rsp_tensors.keys():
+            rsp_drv = LinearResponseEigenSolver()
+            num_states = len(rsp_tensors['eigenvectors_distributed'])
+            for i in range(num_states):
+                name = 'S'+str(i+1)
+                rsp_tensors[name] = rsp_drv.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][i])
+        else:
+            num_states = len(rsp_tensors['eigenvectors'][0, :])
+            for i in range(num_states):
+                name = 'S'+str(i+1)
+                rsp_tensors[name] = rsp_tensors['eigenvectors'][:, i]
+        rsp_tensors['formatted'] = True
+
         return rsp_tensors
-
-    def read_scf_checkpoint_file(self, fname):
-        """
-        Reads data from hdf5 scf checkpoint file
-        and returns it as a dictionary.
-
-        :param filename:
-            The name of the scf checkpoint file.
-
-        :return:
-            The scf checkpoint file dictionary.
-        """
-
-        dict = {}
-        h5f = h5py.File(fname, "r")
-
-        for key in h5f.keys():
-            data = np.array(h5f.get(key))
-            dict[key] = data
-        h5f.close()
-
-        assert_msg_critical(
-            'atom_coordinates' in dict,
-            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
-            'atom_coordinates not found')
-
-        assert_msg_critical(
-            'nuclear_charges' in dict,
-            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
-            'nuclear_charges not found')
-
-        assert_msg_critical(
-            'basis_set' in dict,
-            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
-            'basis_set not found')
-
-        assert_msg_critical(
-            'C_alpha' in dict,
-            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
-            'C_alpha not found')
-
-        assert_msg_critical(
-            'S' in dict,
-            'ExcitedStateAnalysisDriver.read_scf_checkpoint_file: ' +
-            'S not found')
-
-        return dict
-
-    def read_rsp_checkpoint_file(self, fname):
-        """
-        Read data from hdf5 rsp checkpoint file
-        and return it as a dictionary.
-
-        :param filename:
-            The name of the rsp checkpoint file.
-
-        :return:
-            The rsp checkpoint file dictionary.
-        """
-
-        dict = {}
-        h5f = h5py.File(fname, "r")
-
-        for key in h5f.keys():
-            data = np.array(h5f.get(key))
-            dict[key] = data
-        h5f.close()
-
-        return dict
 
     def create_molecule_basis(self, scf_tensors):
         """
@@ -339,18 +288,16 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the TDM in MO and AO basis.
         """
 
-        if not any(key.startswith('S') for key in rsp_tensors.keys()):
+        if any(key.startswith('eigenvector') for key in rsp_tensors.keys()) and 'formatted' not in rsp_tensors.keys():
             rsp_tensors = self.format_rsp_tensors(rsp_tensors)
 
         nocc = molecule.number_of_alpha_electrons()
         norb = scf_tensors["C_alpha"].shape[1]
         nvirt = norb - nocc
 
-        if self._tda:
-            eigvec = rsp_tensors['eigenvectors'][:, state_index - 1]
-        else:
-            excstate = "S" + str(state_index)
-            eigvec = rsp_tensors[excstate]
+        
+        excstate = "S" + str(state_index)
+        eigvec = rsp_tensors[excstate]
 
         nexc = nocc * nvirt
         z_mat = eigvec[:nexc]
@@ -385,7 +332,7 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the hole density matrix in MO and AO basis.
         """
 
-        if not any(key.startswith('S') for key in rsp_tensors.keys()):
+        if any(key.startswith('eigenvector') for key in rsp_tensors.keys()) and 'formatted' not in rsp_tensors.keys():
             rsp_tensors = self.format_rsp_tensors(rsp_tensors)
 
         nocc = molecule.number_of_alpha_electrons()
@@ -421,7 +368,7 @@ class ExcitedStateAnalysisDriver:
             A tuple containing the particle density matrix in MO and AO basis.
         """
 
-        if not any(key.startswith('S') for key in rsp_tensors.keys()):
+        if any(key.startswith('eigenvector') for key in rsp_tensors.keys()) and 'formatted' not in rsp_tensors.keys():
             rsp_tensors = self.format_rsp_tensors(rsp_tensors)
 
         nocc = molecule.number_of_alpha_electrons()
@@ -706,7 +653,7 @@ class ExcitedStateAnalysisDriver:
                     self.fragment_dict[key][i:i + 7]
                     for i in range(0, len(self.fragment_dict[key]), 7)
                 ]
-                cur_str = 'Fragment ' + key + '                      : ' + str(
+                cur_str = f'Fragment {key:15s}        : ' + str(
                     fragment_slice[0])[1:-1]
                 self.ostream.print_header(cur_str.ljust(str_width))
                 for i in range(1, len(fragment_slice)):
@@ -714,16 +661,17 @@ class ExcitedStateAnalysisDriver:
                         fragment_slice[i])[1:-1]
                     self.ostream.print_header(cur_str.ljust(str_width))
             else:
-                cur_str = 'Fragment ' + key + '                      : ' + str(
+                cur_str = f'Fragment {key:15s}        : ' + str(
                     self.fragment_dict[key])[1:-1]
                 self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self._tda:
-            cur_str = 'Tamm-Dancoff Approximation      : yes'
-            self.ostream.print_header(cur_str.ljust(str_width))
-        else:
-            cur_str = 'Tamm-Dancoff Approximation      : no'
-            self.ostream.print_header(cur_str.ljust(str_width))
+        # is this part necessary and if so, what is the best way to add it?
+        #if self._tda:
+        #    cur_str = 'Tamm-Dancoff Approximation      : yes'
+        #    self.ostream.print_header(cur_str.ljust(str_width))
+        #else:
+        #    cur_str = 'Tamm-Dancoff Approximation      : no'
+        #    self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()
