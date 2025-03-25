@@ -997,13 +997,13 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 }
 
 auto
-integrateVxcFockGradientForGGA(const CMolecule&        molecule,
-                               const CMolecularBasis&  basis,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&   molecularGrid,
-                               const double            screeningThresholdForGTOValues,
-                               const CXCFunctional&    xcFunctional,
-                               const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
+integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const std::vector<const double*>& gsDensityPointers,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const double            screeningThresholdForGTOValues,
+                                          const CXCFunctional&    xcFunctional,
+                                          const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
 {
     CMultiTimer timer;
 
@@ -1578,26 +1578,6 @@ integrateVxcFockGradientForGGA(const CMolecule&        molecule,
     // }
 
     return vxcgrads;
-}
-
-auto
-integrateVxcFockGradientForGGA(const CMolecule&        molecule,
-                               const CMolecularBasis&  basis,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&   molecularGrid,
-                               const double            screeningThresholdForGTOValues,
-                               const CXCFunctional&    xcFunctional,
-                               const int               atomIdx) -> std::vector<CDenseMatrix>
-{
-    std::vector<int> atomIdxVec({atomIdx});
-
-    return integrateVxcFockGradientForGGA(molecule,
-                                          basis,
-                                          gsDensityPointers,
-                                          molecularGrid,
-                                          screeningThresholdForGTOValues,
-                                          xcFunctional,
-                                          atomIdxVec);
 }
 
 }  // namespace xchessgga

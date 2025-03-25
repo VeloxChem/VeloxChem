@@ -66,13 +66,13 @@ auto integrateExcHessianForGgaClosedShell(const CMolecule&                  mole
  computed.
  @return the Vxc gradient.
  */
-auto integrateVxcFockGradientForGGA(const CMolecule&                  molecule,
-                                    const CMolecularBasis&            basis,
-                                    const std::vector<const double*>& gsDensityPointers,
-                                    const CMolecularGrid&             molecularGrid,
-                                    const double                      screeningThresholdForGTOValues,
-                                    const CXCFunctional&              xcFunctional,
-                                    const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
+auto integrateVxcFockGradientForGgaClosedShell(const CMolecule&                  molecule,
+                                               const CMolecularBasis&            basis,
+                                               const std::vector<const double*>& gsDensityPointers,
+                                               const CMolecularGrid&             molecularGrid,
+                                               const double                      screeningThresholdForGTOValues,
+                                               const CXCFunctional&              xcFunctional,
+                                               const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
 
 }  // namespace xchessgga
 

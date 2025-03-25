@@ -1305,13 +1305,13 @@ integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
 }
 
 auto
-integrateVxcFockGradientForMetaGGA(const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const std::vector<const double*>& gsDensityPointers,
-                                   const CMolecularGrid&   molecularGrid,
-                                   const double            screeningThresholdForGTOValues,
-                                   const CXCFunctional&    xcFunctional,
-                                   const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
+integrateVxcFockGradientForMetaGgaClosedShell(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const std::vector<const double*>& gsDensityPointers,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const double            screeningThresholdForGTOValues,
+                                              const CXCFunctional&    xcFunctional,
+                                              const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
 {
     CMultiTimer timer;
 

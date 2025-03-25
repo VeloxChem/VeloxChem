@@ -626,13 +626,13 @@ integrateExcHessianForLdaClosedShell(const CMolecule&        molecule,
 }
 
 auto
-integrateVxcFockGradientForLDA(const CMolecule&        molecule,
-                               const CMolecularBasis&  basis,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&   molecularGrid,
-                               const double            screeningThresholdForGTOValues,
-                               const CXCFunctional&    xcFunctional,
-                               const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
+integrateVxcFockGradientForLdaClosedShell(const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const std::vector<const double*>& gsDensityPointers,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const double            screeningThresholdForGTOValues,
+                                          const CXCFunctional&    xcFunctional,
+                                          const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
 {
     CMultiTimer timer;
 

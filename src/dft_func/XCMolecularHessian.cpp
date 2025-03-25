@@ -88,15 +88,15 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return xchesslda::integrateVxcFockGradientForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
+            return xchesslda::integrateVxcFockGradientForLdaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return xchessgga::integrateVxcFockGradientForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
+            return xchessgga::integrateVxcFockGradientForGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
         else
         {
-            return xchessmgga::integrateVxcFockGradientForMetaGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
+            return xchessmgga::integrateVxcFockGradientForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
     }
     else
