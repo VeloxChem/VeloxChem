@@ -134,8 +134,6 @@ integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
 
     std::vector<std::vector<double>> omp_weighted_vtau(nthreads, std::vector<double>(omp_max_npoints));
 
-    // TODO: tau terms?
-
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
@@ -375,8 +373,6 @@ integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
 
             auto wtau = omp_weighted_vtau[thread_id].data();
 
-            // TODO: tau terms?
-
             sdengridgen::serialGenerateDensityForMGGA(rho, rhograd, sigma, lapl, tau, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             // generate density gradient grid
@@ -501,7 +497,8 @@ integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
                 wy[g] = local_weights[g] * vy;
                 wz[g] = local_weights[g] * vz;
 
-                wtau[g] = local_weights[g] * vtau[2 * g + 0];
+                // Note that we include a factor of 0.5 in wtau
+                wtau[g] = local_weights[g] * 0.5 * vtau[2 * g + 0];
             }
 
             // prepare gradient grid
@@ -659,75 +656,64 @@ integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
                     // = \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \nabla\phi_{\mu}^{(\xi,\zeta)} \nabla\phi_{\nu}
                     // = \sum_{\mu} \nabla F_{\mu} \nabla\phi_{\mu}^{(\xi,\zeta)}
 
-                    // need a factor of 0.5 to counter the factor of 2 added outside of the for loop
+                    // factor of 2 is added outside of the for loop
+                    // factor of 0.5 is included in wtau
 
                     // === x ===
 
-                    double F_tau_chi_xx = 0.5 * F_x_val[mu_g] * chi_xxx_val[mu_g];
-                    double F_tau_chi_xy = 0.5 * F_x_val[mu_g] * chi_xxy_val[mu_g];
-                    double F_tau_chi_xz = 0.5 * F_x_val[mu_g] * chi_xxz_val[mu_g];
+                    double F_tau_chi_xx = F_x_val[mu_g] * chi_xxx_val[mu_g];
+                    double F_tau_chi_xy = F_x_val[mu_g] * chi_xxy_val[mu_g];
+                    double F_tau_chi_xz = F_x_val[mu_g] * chi_xxz_val[mu_g];
 
-                    double F_tau_chi_yx = 0.5 * F_x_val[mu_g] * chi_xxy_val[mu_g];
-                    double F_tau_chi_yy = 0.5 * F_x_val[mu_g] * chi_xyy_val[mu_g];
-                    double F_tau_chi_yz = 0.5 * F_x_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_tau_chi_yx = F_x_val[mu_g] * chi_xxy_val[mu_g];
+                    double F_tau_chi_yy = F_x_val[mu_g] * chi_xyy_val[mu_g];
+                    double F_tau_chi_yz = F_x_val[mu_g] * chi_xyz_val[mu_g];
 
-                    double F_tau_chi_zx = 0.5 * F_x_val[mu_g] * chi_xxz_val[mu_g];
-                    double F_tau_chi_zy = 0.5 * F_x_val[mu_g] * chi_xyz_val[mu_g];
-                    double F_tau_chi_zz = 0.5 * F_x_val[mu_g] * chi_xzz_val[mu_g];
+                    double F_tau_chi_zx = F_x_val[mu_g] * chi_xxz_val[mu_g];
+                    double F_tau_chi_zy = F_x_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_tau_chi_zz = F_x_val[mu_g] * chi_xzz_val[mu_g];
 
                     // === y ===
 
-                    F_tau_chi_xx += 0.5 * F_y_val[mu_g] * chi_xxy_val[mu_g];
-                    F_tau_chi_xy += 0.5 * F_y_val[mu_g] * chi_xyy_val[mu_g];
-                    F_tau_chi_xz += 0.5 * F_y_val[mu_g] * chi_xyz_val[mu_g];
+                    F_tau_chi_xx += F_y_val[mu_g] * chi_xxy_val[mu_g];
+                    F_tau_chi_xy += F_y_val[mu_g] * chi_xyy_val[mu_g];
+                    F_tau_chi_xz += F_y_val[mu_g] * chi_xyz_val[mu_g];
 
-                    F_tau_chi_yx += 0.5 * F_y_val[mu_g] * chi_xyy_val[mu_g];
-                    F_tau_chi_yy += 0.5 * F_y_val[mu_g] * chi_yyy_val[mu_g];
-                    F_tau_chi_yz += 0.5 * F_y_val[mu_g] * chi_yyz_val[mu_g];
+                    F_tau_chi_yx += F_y_val[mu_g] * chi_xyy_val[mu_g];
+                    F_tau_chi_yy += F_y_val[mu_g] * chi_yyy_val[mu_g];
+                    F_tau_chi_yz += F_y_val[mu_g] * chi_yyz_val[mu_g];
 
-                    F_tau_chi_zx += 0.5 * F_y_val[mu_g] * chi_xyz_val[mu_g];
-                    F_tau_chi_zy += 0.5 * F_y_val[mu_g] * chi_yyz_val[mu_g];
-                    F_tau_chi_zz += 0.5 * F_y_val[mu_g] * chi_yzz_val[mu_g];
+                    F_tau_chi_zx += F_y_val[mu_g] * chi_xyz_val[mu_g];
+                    F_tau_chi_zy += F_y_val[mu_g] * chi_yyz_val[mu_g];
+                    F_tau_chi_zz += F_y_val[mu_g] * chi_yzz_val[mu_g];
 
                     // === z ===
 
-                    F_tau_chi_xx += 0.5 * F_z_val[mu_g] * chi_xxz_val[mu_g];
-                    F_tau_chi_xy += 0.5 * F_z_val[mu_g] * chi_xyz_val[mu_g];
-                    F_tau_chi_xz += 0.5 * F_z_val[mu_g] * chi_xzz_val[mu_g];
+                    F_tau_chi_xx += F_z_val[mu_g] * chi_xxz_val[mu_g];
+                    F_tau_chi_xy += F_z_val[mu_g] * chi_xyz_val[mu_g];
+                    F_tau_chi_xz += F_z_val[mu_g] * chi_xzz_val[mu_g];
 
-                    F_tau_chi_yx += 0.5 * F_z_val[mu_g] * chi_xyz_val[mu_g];
-                    F_tau_chi_yy += 0.5 * F_z_val[mu_g] * chi_yyz_val[mu_g];
-                    F_tau_chi_yz += 0.5 * F_z_val[mu_g] * chi_yzz_val[mu_g];
+                    F_tau_chi_yx += F_z_val[mu_g] * chi_xyz_val[mu_g];
+                    F_tau_chi_yy += F_z_val[mu_g] * chi_yyz_val[mu_g];
+                    F_tau_chi_yz += F_z_val[mu_g] * chi_yzz_val[mu_g];
 
-                    F_tau_chi_zx += 0.5 * F_z_val[mu_g] * chi_xzz_val[mu_g];
-                    F_tau_chi_zy += 0.5 * F_z_val[mu_g] * chi_yzz_val[mu_g];
-                    F_tau_chi_zz += 0.5 * F_z_val[mu_g] * chi_zzz_val[mu_g];
+                    F_tau_chi_zx += F_z_val[mu_g] * chi_xzz_val[mu_g];
+                    F_tau_chi_zy += F_z_val[mu_g] * chi_yzz_val[mu_g];
+                    F_tau_chi_zz += F_z_val[mu_g] * chi_zzz_val[mu_g];
 
                     // accumulate contribution
 
-                    gatmxx += w0[g] * F_chi_xx + (wx[g] * F_chi_xxx + wy[g] * F_chi_yxx + wz[g] * F_chi_zxx);
-                    gatmxy += w0[g] * F_chi_xy + (wx[g] * F_chi_xxy + wy[g] * F_chi_yxy + wz[g] * F_chi_zxy);
-                    gatmxz += w0[g] * F_chi_xz + (wx[g] * F_chi_xxz + wy[g] * F_chi_yxz + wz[g] * F_chi_zxz);
+                    gatmxx += w0[g] * F_chi_xx + (wx[g] * F_chi_xxx + wy[g] * F_chi_yxx + wz[g] * F_chi_zxx) + wtau[g] * F_tau_chi_xx;
+                    gatmxy += w0[g] * F_chi_xy + (wx[g] * F_chi_xxy + wy[g] * F_chi_yxy + wz[g] * F_chi_zxy) + wtau[g] * F_tau_chi_xy;
+                    gatmxz += w0[g] * F_chi_xz + (wx[g] * F_chi_xxz + wy[g] * F_chi_yxz + wz[g] * F_chi_zxz) + wtau[g] * F_tau_chi_xz;
 
-                    gatmyx += w0[g] * F_chi_yx + (wx[g] * F_chi_xyx + wy[g] * F_chi_yyx + wz[g] * F_chi_zyx);
-                    gatmyy += w0[g] * F_chi_yy + (wx[g] * F_chi_xyy + wy[g] * F_chi_yyy + wz[g] * F_chi_zyy);
-                    gatmyz += w0[g] * F_chi_yz + (wx[g] * F_chi_xyz + wy[g] * F_chi_yyz + wz[g] * F_chi_zyz);
+                    gatmyx += w0[g] * F_chi_yx + (wx[g] * F_chi_xyx + wy[g] * F_chi_yyx + wz[g] * F_chi_zyx) + wtau[g] * F_tau_chi_yx;
+                    gatmyy += w0[g] * F_chi_yy + (wx[g] * F_chi_xyy + wy[g] * F_chi_yyy + wz[g] * F_chi_zyy) + wtau[g] * F_tau_chi_yy;
+                    gatmyz += w0[g] * F_chi_yz + (wx[g] * F_chi_xyz + wy[g] * F_chi_yyz + wz[g] * F_chi_zyz) + wtau[g] * F_tau_chi_yz;
 
-                    gatmzx += w0[g] * F_chi_zx + (wx[g] * F_chi_xzx + wy[g] * F_chi_yzx + wz[g] * F_chi_zzx);
-                    gatmzy += w0[g] * F_chi_zy + (wx[g] * F_chi_xzy + wy[g] * F_chi_yzy + wz[g] * F_chi_zzy);
-                    gatmzz += w0[g] * F_chi_zz + (wx[g] * F_chi_xzz + wy[g] * F_chi_yzz + wz[g] * F_chi_zzz);
-
-                    gatmxx += wtau[g] * F_tau_chi_xx;
-                    gatmxy += wtau[g] * F_tau_chi_xy;
-                    gatmxz += wtau[g] * F_tau_chi_xz;
-
-                    gatmyx += wtau[g] * F_tau_chi_yx;
-                    gatmyy += wtau[g] * F_tau_chi_yy;
-                    gatmyz += wtau[g] * F_tau_chi_yz;
-
-                    gatmzx += wtau[g] * F_tau_chi_zx;
-                    gatmzy += wtau[g] * F_tau_chi_zy;
-                    gatmzz += wtau[g] * F_tau_chi_zz;
+                    gatmzx += w0[g] * F_chi_zx + (wx[g] * F_chi_xzx + wy[g] * F_chi_yzx + wz[g] * F_chi_zzx) + wtau[g] * F_tau_chi_zx;
+                    gatmzy += w0[g] * F_chi_zy + (wx[g] * F_chi_xzy + wy[g] * F_chi_yzy + wz[g] * F_chi_zzy) + wtau[g] * F_tau_chi_zy;
+                    gatmzz += w0[g] * F_chi_zz + (wx[g] * F_chi_xzz + wy[g] * F_chi_yzz + wz[g] * F_chi_zzz) + wtau[g] * F_tau_chi_zz;
                 }
 
                 // factor of 2 from differentiation
@@ -869,75 +855,63 @@ integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
                         // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \nabla\phi_{\mu}^{(\xi)} \nabla\phi_{\nu}^{(\zeta)}
 
                         // factor of 2 and D_{\mu\nu,sym}^{\alpha} are added outside of the for loop
-                        // need a factor of 0.5 to counter the factor of 2 added outside of the for loop
+                        // factor of 0.5 is included in wtau
 
                         // === x ===
 
-                        double gtxx = 0.5 * chi_xx_val[mu_g] * chi_xx_val[nu_g];
-                        double gtxy = 0.5 * chi_xx_val[mu_g] * chi_xy_val[nu_g];
-                        double gtxz = 0.5 * chi_xx_val[mu_g] * chi_xz_val[nu_g];
+                        double gtxx = chi_xx_val[mu_g] * chi_xx_val[nu_g];
+                        double gtxy = chi_xx_val[mu_g] * chi_xy_val[nu_g];
+                        double gtxz = chi_xx_val[mu_g] * chi_xz_val[nu_g];
 
-                        double gtyx = 0.5 * chi_xy_val[mu_g] * chi_xx_val[nu_g];
-                        double gtyy = 0.5 * chi_xy_val[mu_g] * chi_xy_val[nu_g];
-                        double gtyz = 0.5 * chi_xy_val[mu_g] * chi_xz_val[nu_g];
+                        double gtyx = chi_xy_val[mu_g] * chi_xx_val[nu_g];
+                        double gtyy = chi_xy_val[mu_g] * chi_xy_val[nu_g];
+                        double gtyz = chi_xy_val[mu_g] * chi_xz_val[nu_g];
 
-                        double gtzx = 0.5 * chi_xz_val[mu_g] * chi_xx_val[nu_g];
-                        double gtzy = 0.5 * chi_xz_val[mu_g] * chi_xy_val[nu_g];
-                        double gtzz = 0.5 * chi_xz_val[mu_g] * chi_xz_val[nu_g];
+                        double gtzx = chi_xz_val[mu_g] * chi_xx_val[nu_g];
+                        double gtzy = chi_xz_val[mu_g] * chi_xy_val[nu_g];
+                        double gtzz = chi_xz_val[mu_g] * chi_xz_val[nu_g];
 
                         // === y ===
 
-                        gtxx += 0.5 * chi_xy_val[mu_g] * chi_xy_val[nu_g];
-                        gtxy += 0.5 * chi_xy_val[mu_g] * chi_yy_val[nu_g];
-                        gtxz += 0.5 * chi_xy_val[mu_g] * chi_yz_val[nu_g];
+                        gtxx += chi_xy_val[mu_g] * chi_xy_val[nu_g];
+                        gtxy += chi_xy_val[mu_g] * chi_yy_val[nu_g];
+                        gtxz += chi_xy_val[mu_g] * chi_yz_val[nu_g];
 
-                        gtyx += 0.5 * chi_yy_val[mu_g] * chi_xy_val[nu_g];
-                        gtyy += 0.5 * chi_yy_val[mu_g] * chi_yy_val[nu_g];
-                        gtyz += 0.5 * chi_yy_val[mu_g] * chi_yz_val[nu_g];
+                        gtyx += chi_yy_val[mu_g] * chi_xy_val[nu_g];
+                        gtyy += chi_yy_val[mu_g] * chi_yy_val[nu_g];
+                        gtyz += chi_yy_val[mu_g] * chi_yz_val[nu_g];
 
-                        gtzx += 0.5 * chi_yz_val[mu_g] * chi_xy_val[nu_g];
-                        gtzy += 0.5 * chi_yz_val[mu_g] * chi_yy_val[nu_g];
-                        gtzz += 0.5 * chi_yz_val[mu_g] * chi_yz_val[nu_g];
+                        gtzx += chi_yz_val[mu_g] * chi_xy_val[nu_g];
+                        gtzy += chi_yz_val[mu_g] * chi_yy_val[nu_g];
+                        gtzz += chi_yz_val[mu_g] * chi_yz_val[nu_g];
 
                         // === z ===
 
-                        gtxx += 0.5 * chi_xz_val[mu_g] * chi_xz_val[nu_g];
-                        gtxy += 0.5 * chi_xz_val[mu_g] * chi_yz_val[nu_g];
-                        gtxz += 0.5 * chi_xz_val[mu_g] * chi_zz_val[nu_g];
+                        gtxx += chi_xz_val[mu_g] * chi_xz_val[nu_g];
+                        gtxy += chi_xz_val[mu_g] * chi_yz_val[nu_g];
+                        gtxz += chi_xz_val[mu_g] * chi_zz_val[nu_g];
 
-                        gtyx += 0.5 * chi_yz_val[mu_g] * chi_xz_val[nu_g];
-                        gtyy += 0.5 * chi_yz_val[mu_g] * chi_yz_val[nu_g];
-                        gtyz += 0.5 * chi_yz_val[mu_g] * chi_zz_val[nu_g];
+                        gtyx += chi_yz_val[mu_g] * chi_xz_val[nu_g];
+                        gtyy += chi_yz_val[mu_g] * chi_yz_val[nu_g];
+                        gtyz += chi_yz_val[mu_g] * chi_zz_val[nu_g];
 
-                        gtzx += 0.5 * chi_zz_val[mu_g] * chi_xz_val[nu_g];
-                        gtzy += 0.5 * chi_zz_val[mu_g] * chi_yz_val[nu_g];
-                        gtzz += 0.5 * chi_zz_val[mu_g] * chi_zz_val[nu_g];
+                        gtzx += chi_zz_val[mu_g] * chi_xz_val[nu_g];
+                        gtzy += chi_zz_val[mu_g] * chi_yz_val[nu_g];
+                        gtzz += chi_zz_val[mu_g] * chi_zz_val[nu_g];
 
                         // accumulate contributions
 
-                        gatmxx += w0[g] * gxx + (wx[g] * gxxx + wy[g] * gyxx + wz[g] * gzxx);
-                        gatmxy += w0[g] * gxy + (wx[g] * gxxy + wy[g] * gyxy + wz[g] * gzxy);
-                        gatmxz += w0[g] * gxz + (wx[g] * gxxz + wy[g] * gyxz + wz[g] * gzxz);
+                        gatmxx += w0[g] * gxx + (wx[g] * gxxx + wy[g] * gyxx + wz[g] * gzxx) + wtau[g] * gtxx;
+                        gatmxy += w0[g] * gxy + (wx[g] * gxxy + wy[g] * gyxy + wz[g] * gzxy) + wtau[g] * gtxy;
+                        gatmxz += w0[g] * gxz + (wx[g] * gxxz + wy[g] * gyxz + wz[g] * gzxz) + wtau[g] * gtxz;
 
-                        gatmyx += w0[g] * gyx + (wx[g] * gxyx + wy[g] * gyyx + wz[g] * gzyx);
-                        gatmyy += w0[g] * gyy + (wx[g] * gxyy + wy[g] * gyyy + wz[g] * gzyy);
-                        gatmyz += w0[g] * gyz + (wx[g] * gxyz + wy[g] * gyyz + wz[g] * gzyz);
+                        gatmyx += w0[g] * gyx + (wx[g] * gxyx + wy[g] * gyyx + wz[g] * gzyx) + wtau[g] * gtyx;
+                        gatmyy += w0[g] * gyy + (wx[g] * gxyy + wy[g] * gyyy + wz[g] * gzyy) + wtau[g] * gtyy;
+                        gatmyz += w0[g] * gyz + (wx[g] * gxyz + wy[g] * gyyz + wz[g] * gzyz) + wtau[g] * gtyz;
 
-                        gatmzx += w0[g] * gzx + (wx[g] * gxzx + wy[g] * gyzx + wz[g] * gzzx);
-                        gatmzy += w0[g] * gzy + (wx[g] * gxzy + wy[g] * gyzy + wz[g] * gzzy);
-                        gatmzz += w0[g] * gzz + (wx[g] * gxzz + wy[g] * gyzz + wz[g] * gzzz);
-
-                        gatmxx += wtau[g] * gtxx;
-                        gatmxy += wtau[g] * gtxy;
-                        gatmxz += wtau[g] * gtxz;
-
-                        gatmyx += wtau[g] * gtyx;
-                        gatmyy += wtau[g] * gtyy;
-                        gatmyz += wtau[g] * gtyz;
-
-                        gatmzx += wtau[g] * gtzx;
-                        gatmzy += wtau[g] * gtzy;
-                        gatmzz += wtau[g] * gtzz;
+                        gatmzx += w0[g] * gzx + (wx[g] * gxzx + wy[g] * gyzx + wz[g] * gzzx) + wtau[g] * gtzx;
+                        gatmzy += w0[g] * gzy + (wx[g] * gxzy + wy[g] * gyzy + wz[g] * gzzy) + wtau[g] * gtzy;
+                        gatmzz += w0[g] * gzz + (wx[g] * gxzz + wy[g] * gyzz + wz[g] * gzzz) + wtau[g] * gtzz;
                     }
 
                     auto D_mn = D_val[mu * aocount + nu];

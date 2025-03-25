@@ -307,6 +307,12 @@ class ScfHessianDriver(HessianDriver):
         scf_results_sanity_check(self, self.scf_driver.scf_tensors)
         dft_sanity_check(self, 'compute')
 
+        # use determine_xc_hessian_grid_level here to ensure early exit for
+        # unsupported cases
+        if self._dft:
+            self.determine_xc_hessian_grid_level(
+                molecule, get_default_grid_level(self.scf_driver.xcfun))
+
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
         hess_ref = 'P. Deglmann, F. Furche, R. Ahlrichs,'
@@ -679,11 +685,11 @@ class ScfHessianDriver(HessianDriver):
             grid_level = (get_default_grid_level(self.scf_driver.xcfun)
                           if self.scf_driver.grid_level is None else
                           self.scf_driver.grid_level)
-            # make sure to use high grid level for DFT Hessian
-            if molecule.get_charge() == 0:
-                grid_level = max(6, grid_level)
-            else:
-                grid_level = max(7, grid_level)
+
+            # determine grid level for XC Hessian
+            grid_level = self.determine_xc_hessian_grid_level(
+                molecule, grid_level)
+
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
 
@@ -803,6 +809,55 @@ class ScfHessianDriver(HessianDriver):
         # Calculate the gradient of the dipole moment for IR intensities
         if self.do_dipole_gradient:
             self.compute_dipole_gradient(molecule, ao_basis, dist_cphf_ov)
+
+    def determine_xc_hessian_grid_level(self, molecule, grid_level):
+        """
+        Determines XC Hessian grid level.
+
+        :param molecule:
+            The molecule.
+        :param grid_level:
+            The input grid_level.
+
+        :return:
+            The recommended grid_level for XC Hessian.
+        """
+
+        # make sure to use high grid level for DFT Hessian
+        # see J. Chem. Phys. 119, 12763-12768 (2003)
+
+        # determine grid level for XC Hessian based on default_grid_level
+        # and max_elem_id
+
+        default_grid_level = get_default_grid_level(self.scf_driver.xcfun)
+        elem_ids = molecule.get_identifiers()
+        max_elem_id = max(elem_ids)
+
+        errmsg = 'Hessian calculation with '
+        errmsg += self.scf_driver.xcfun.get_func_label().upper()
+        errmsg += f' functional and max element id {max_elem_id} '
+        errmsg += 'is not supported.'
+
+        if default_grid_level <= 4:
+            if max_elem_id <= 18:
+                grid_level = max(6, grid_level)
+            elif max_elem_id <= 36:
+                grid_level = max(7, grid_level)
+            else:
+                assert_msg_critical(False, errmsg)
+
+        elif default_grid_level in [5, 6]:
+            if max_elem_id <= 10:
+                grid_level = max(6, grid_level)
+            elif max_elem_id <= 18:
+                grid_level = max(7, grid_level)
+            else:
+                assert_msg_critical(False, errmsg)
+
+        else:
+            assert_msg_critical(False, errmsg)
+
+        return grid_level
 
     def compute_dipole_gradient(self, molecule, ao_basis, dist_cphf_ov):
         """
