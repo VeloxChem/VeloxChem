@@ -36,6 +36,24 @@
 namespace xchessmgga {  // xchessmgga namespace
 
 /**
+ Integrates meta-GGA exchnage-correlation functional contribution to
+ closed-shell molecular Hessian.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param gsDensityPointers the pointers to ground state AO density matrix.
+ @param molecularGrid the molecular grid.
+ @param xcFunctional the exchange-correlation functional.
+ @return the molecular Hessian.
+ */
+auto integrateExcHessianForMetaGgaClosedShell(const CMolecule&                  molecule,
+                                              const CMolecularBasis&            basis,
+                                              const std::vector<const double*>& gsDensityPointers,
+                                              const CMolecularGrid&             molecularGrid,
+                                              const double                      screeningThresholdForGTOValues,
+                                              const CXCFunctional&              xcFunctional) -> CDenseMatrix;
+
+/**
  Integrates meta-GGA exchnage-correlation functional contribution to molecular
  gradient of Vxc matrix element.
 

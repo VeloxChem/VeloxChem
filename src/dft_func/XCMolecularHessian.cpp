@@ -59,9 +59,7 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
         }
         else
         {
-            std::string errxcfuntype("XCMolecularHessian.integrateExcHessian: Only implemented for LDA/GGA");
-
-            errors::assertMsgCritical(false, errxcfuntype);
+            return xchessmgga::integrateExcHessianForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
     }
     else
