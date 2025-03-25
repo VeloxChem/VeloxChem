@@ -49,6 +49,7 @@ from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
 from .veloxchemlib import ThreeCenterOverlapDriver
+from .veloxchemlib import ThreeCenterOverlapGradientDriver
 from .veloxchemlib import ThreeCenterElectronRepulsionDriver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver

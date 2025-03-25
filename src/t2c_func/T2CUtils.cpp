@@ -391,6 +391,58 @@ comp_distances_ga(CSimdArray<double>& buffer, const size_t index_ga, const size_
 }
 
 auto
+comp_distances_gc(CSimdArray<double>& buffer, const size_t index_gc, const size_t index_p, const TPoint<double>& r_c, const double a_exp, const double c_exp) -> void
+{
+    // Set up exponents
+
+    auto b_exps = buffer.data(0);
+    
+    // set up R(GB) distances
+
+    auto gc_x = buffer.data(index_gc);
+
+    auto gc_y = buffer.data(index_gc + 1);
+
+    auto gc_z = buffer.data(index_gc + 2);
+
+    // set up Cartesian P coordinates
+
+    auto p_x = buffer.data(index_p);
+
+    auto p_y = buffer.data(index_p + 1);
+
+    auto p_z = buffer.data(index_p + 2);
+    
+    // set up Cartesian C coordinates
+
+    const auto xyz = r_c.coordinates();
+
+    const auto c_x = xyz[0];
+
+    const auto c_y = xyz[1];
+
+    const auto c_z = xyz[2];
+
+    // compute R(PB) distances
+
+    const auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(gc_x, gc_y, gc_z, p_x, p_y, p_z : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        const auto fact = a_exp + b_exps[i];
+        
+        const auto finv = 1.0 / (fact + c_exp);
+        
+        gc_x[i] = (fact * p_x[i] + c_exp * c_x) * finv - c_x;
+
+        gc_y[i] = (fact * p_y[i] + c_exp * c_y) * finv - c_y;
+
+        gc_z[i] = (fact * p_z[i] + c_exp * c_z) * finv - c_z;
+    }
+}
+
+auto
 comp_distances_pc(CSimdArray<double>& buffer, const size_t index_pc, const size_t index_p, const TPoint<double>& r_c) -> void
 {
     t2cfunc::comp_distances_pa_from_p(buffer, index_pc, index_p, r_c);

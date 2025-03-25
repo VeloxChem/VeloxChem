@@ -1,0 +1,35 @@
+target_sources(vlxobjs
+  PRIVATE
+    ThreeCenterOverlapGradientDriver.cpp
+    ThreeCenterOverlapGradientPrimRecSS.cpp
+    ThreeCenterOverlapGradientPrimRecFF.cpp
+    ThreeCenterOverlapGradientPrimRecGP.cpp
+    ThreeCenterOverlapGradientPrimRecSD.cpp
+    ThreeCenterOverlapGradientPrimRecDD.cpp
+    ThreeCenterOverlapGradientPrimRecFG.cpp
+    ThreeCenterOverlapGradientPrimRecGS.cpp
+    ThreeCenterOverlapGradientPrimRecSF.cpp
+    ThreeCenterOverlapGradientPrimRecDF.cpp
+    ThreeCenterOverlapGradientPrimRecFP.cpp
+    ThreeCenterOverlapGradientPrimRecPD.cpp	
+    ThreeCenterOverlapGradientPrimRecSG.cpp
+    ThreeCenterOverlapGradientPrimRecDG.cpp	
+    ThreeCenterOverlapGradientPrimRecFS.cpp	
+    ThreeCenterOverlapGradientPrimRecPF.cpp	
+    ThreeCenterOverlapGradientPrimRecSP.cpp
+    ThreeCenterOverlapGradientPrimRecDP.cpp
+    ThreeCenterOverlapGradientPrimRecGD.cpp
+    ThreeCenterOverlapGradientPrimRecPG.cpp
+    ThreeCenterOverlapGradientPrimRecSS.cpp
+    ThreeCenterOverlapGradientPrimRecDS.cpp
+    ThreeCenterOverlapGradientPrimRecGF.cpp
+    ThreeCenterOverlapGradientPrimRecPP.cpp
+    ThreeCenterOverlapGradientPrimRecFD.cpp	
+    ThreeCenterOverlapGradientPrimRecGG.cpp
+    ThreeCenterOverlapGradientPrimRecPS.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

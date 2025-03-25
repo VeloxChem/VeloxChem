@@ -135,21 +135,21 @@ comp_sum_overlap_dp(T& distributor,
 
                 for (size_t l = 0; l < npoints; l++)
                 {
-                    t2cfunc::comp_distances_pc(factors, 11, 8, coords[l]);
+                    t2cfunc::comp_distances_pc(factors, 17, 8, coords[l]);
 
-                    t2cfunc::comp_distances_ga(factors, 14, 8, r_a, coords[l], a_exp, exgtos[l]);
+                    t2cfunc::comp_distances_ga(factors, 11, 8, r_a, coords[l], a_exp, exgtos[l]);
 
-                    t2cfunc::comp_distances_gb(factors, 17, 8, 2, coords[l], a_exp, exgtos[l]);
+                    t2cfunc::comp_distances_gb(factors, 14, 8, 2, coords[l], a_exp, exgtos[l]);
 
-                    t3ovlrec::comp_prim_overlap_ss(pbuffer, 1, 0, factors, 11, a_exp, exgtos[l], exgtos[npoints + l]);
+                    t3ovlrec::comp_prim_overlap_ss(pbuffer, 1, 0, factors, 17, a_exp, exgtos[l], exgtos[npoints + l]);
 
-                    t3ovlrec::comp_prim_overlap_sp(pbuffer, 2, 1, factors, 17);
+                    t3ovlrec::comp_prim_overlap_sp(pbuffer, 2, 1, factors, 14);
 
-                    t3ovlrec::comp_prim_overlap_ps(pbuffer, 5, 1, factors, 14);
+                    t3ovlrec::comp_prim_overlap_ps(pbuffer, 5, 1, factors, 11);
 
-                    t3ovlrec::comp_prim_overlap_pp(pbuffer, 8, 1, 2, factors, 14, a_exp, exgtos[l]);
+                    t3ovlrec::comp_prim_overlap_pp(pbuffer, 8, 1, 2, factors, 11, a_exp, exgtos[l]);
 
-                    t3ovlrec::comp_prim_overlap_dp(pbuffer, 17, 2, 5, 8, factors, 14, a_exp, exgtos[l]);
+                    t3ovlrec::comp_prim_overlap_dp(pbuffer, 17, 2, 5, 8, factors, 11, a_exp, exgtos[l]);
 
                     t2cfunc::reduce(cbuffer, pbuffer, 17, ket_width, ket_npgtos);
                 }

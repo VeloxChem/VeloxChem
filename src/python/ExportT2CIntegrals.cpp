@@ -44,6 +44,7 @@
 #include "OverlapGeomX00Driver.hpp"
 #include "OverlapGeomX0YDriver.hpp"
 #include "ThreeCenterOverlapDriver.hpp"
+#include "ThreeCenterOverlapGradientDriver.hpp"
 #include "TwoCenterElectronRepulsionDriver.hpp"
 #include "TwoCenterElectronRepulsionGeomX00Driver.hpp"
 
@@ -416,6 +417,24 @@ export_t2cintegrals(py::module& m)
                    return t3ovl_drv.compute(exponents, factors, points, basis, molecule);
             },
             "Computes overlap matrix for given molecule, basis and vector of external scaled Gaussians.");
+    
+    // CThreeCenterOverlapGradientDriver class
+    PyClass<CThreeCenterOverlapGradientDriver>(m, "ThreeCenterOverlapGradientDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+             [](const CThreeCenterOverlapGradientDriver& t3ovl_drv,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                exponents,
+               const std::vector<double>&                factors,
+               const std::vector<std::array<double, 3>>& coords) -> CMatrices {
+                auto points = std::vector<TPoint<double>>();
+                points.reserve(coords.size());
+                std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+                   return t3ovl_drv.compute(exponents, factors, points, basis, molecule);
+            },
+            "Computes overlap gradient matrices for given molecule, basis and vector of external scaled Gaussians.");
     
     // CTwoCenterElectronRepulsionDriver class
     PyClass<CTwoCenterElectronRepulsionDriver>(m, "TwoCenterElectronRepulsionDriver")
