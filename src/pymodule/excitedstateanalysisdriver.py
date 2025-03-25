@@ -52,7 +52,6 @@ class ExcitedStateAnalysisDriver:
         - include_avg_particle_hole_position: The flag for average particle.
           and hole positions.
         - include_relative_ct_length: The flag for relative CT length.
-        - _tda: The flag for the Tamm-Dankoff Approximation.
     """
 
     def __init__(self, ostream=None):
@@ -69,7 +68,6 @@ class ExcitedStateAnalysisDriver:
         self.include_participation_ratios = True
         self.include_avg_particle_hole_position = True
         self.include_relative_ct_length = True
-        self._tda = False
 
         # output stream
         self.ostream = ostream
@@ -185,10 +183,10 @@ class ExcitedStateAnalysisDriver:
         self.ostream.flush()
 
         return ret_dict
-    
+
     def read_from_h5(self, filename):
         """
-        Reads data from hdf5 checkpoint file and 
+        Reads data from hdf5 checkpoint file and
         returns it as tuple containing the scf and rsp dictionaries.
 
         :param filename:
@@ -215,18 +213,18 @@ class ExcitedStateAnalysisDriver:
             elif key == "rsp":
                 rsp_tensors_dict = dict(h5f.get(key))
                 for rsp_key in rsp_tensors_dict:
-                    rsp_tensors[rsp_key] = np.array(rsp_tensors_dict[rsp_key]) 
+                    rsp_tensors[rsp_key] = np.array(rsp_tensors_dict[rsp_key])
         h5f.close()
 
         return scf_tensors, rsp_tensors
-    
+
     def format_rsp_tensors(self, rsp_tensors):
         """
         Reads the eigenvectors in rsp_tensors and adds them
         as numpy arrays with individual keys to the dictionary.
 
         :param rsp_tensors:
-            The dictionary containing the results from a 
+            The dictionary containing the results from a
             rsp calculation.
 
         :return:
@@ -238,12 +236,12 @@ class ExcitedStateAnalysisDriver:
             rsp_drv = LinearResponseEigenSolver()
             num_states = len(rsp_tensors['eigenvectors_distributed'])
             for i in range(num_states):
-                name = 'S'+str(i+1)
+                name = 'S' + str(i + 1)
                 rsp_tensors[name] = rsp_drv.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][i])
         else:
             num_states = len(rsp_tensors['eigenvectors'][0, :])
             for i in range(num_states):
-                name = 'S'+str(i+1)
+                name = 'S' + str(i + 1)
                 rsp_tensors[name] = rsp_tensors['eigenvectors'][:, i]
         rsp_tensors['formatted'] = True
 
@@ -295,7 +293,6 @@ class ExcitedStateAnalysisDriver:
         norb = scf_tensors["C_alpha"].shape[1]
         nvirt = norb - nocc
 
-        
         excstate = "S" + str(state_index)
         eigvec = rsp_tensors[excstate]
 
@@ -664,14 +661,6 @@ class ExcitedStateAnalysisDriver:
                 cur_str = f'Fragment {key:15s}        : ' + str(
                     self.fragment_dict[key])[1:-1]
                 self.ostream.print_header(cur_str.ljust(str_width))
-
-        # is this part necessary and if so, what is the best way to add it?
-        #if self._tda:
-        #    cur_str = 'Tamm-Dancoff Approximation      : yes'
-        #    self.ostream.print_header(cur_str.ljust(str_width))
-        #else:
-        #    cur_str = 'Tamm-Dancoff Approximation      : no'
-        #    self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()
