@@ -652,7 +652,7 @@ export_dft(py::module& m)
                const CMolecularGrid&                   molecularGrid,
                const std::string&                      xcFuncLabel) -> CAOKohnShamMatrix {
                 auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-                return CXCIntegrator_integrate_vxc_fock(self, molecule, basis, gsDensityArrays, molecularGrid, fvxc);
+                return CXCIntegrator_new_integrate_vxc_fock(self, molecule, basis, gsDensityArrays, molecularGrid, fvxc);
             },
             "Integrates 1st-order exchange-correlation contribution.")
         .def(
@@ -686,7 +686,7 @@ export_dft(py::module& m)
                const std::vector<py::array_t<double>>& gsDensityArrays,
                const CMolecularGrid&                   molecularGrid,
                const CXCFunctional&                    fvxc) -> CAOKohnShamMatrix {
-                return CXCIntegrator_integrate_vxc_fock(self, molecule, basis, gsDensityArrays, molecularGrid, fvxc);
+                return CXCIntegrator_new_integrate_vxc_fock(self, molecule, basis, gsDensityArrays, molecularGrid, fvxc);
             },
             "Integrates 1st-order exchange-correlation contribution.")
         .def(

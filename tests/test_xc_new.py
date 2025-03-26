@@ -50,8 +50,8 @@ class TestXCMolGrad:
 
     def test_xc_new_lda(self):
 
-        molecule = Molecule.read_xyz_file('caffeine.xyz')
-        basis = MolecularBasis.read(molecule, 'def2-tzvpd', ostream=None)
+        molecule = Molecule.read_xyz_file('tagrisso.xyz')
+        basis = MolecularBasis.read(molecule, 'def2-svpd', ostream=None)
         
         self.run_xc_new(molecule, basis, 'slda')
         

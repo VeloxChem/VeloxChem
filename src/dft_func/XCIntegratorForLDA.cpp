@@ -671,11 +671,11 @@ integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValu
 
 auto
 new_integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
-                                  const CMolecularBasis&            basis,
-                                  const std::vector<const double*>& gsDensityPointers,
-                                  const CMolecularGrid&             molecularGrid,
-                                  const double                      screeningThresholdForGTOValues,
-                                  const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix
+                                      const CMolecularBasis&            basis,
+                                      const std::vector<const double*>& gsDensityPointers,
+                                      const CMolecularGrid&             molecularGrid,
+                                      const double                      screeningThresholdForGTOValues,
+                                      const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix
 {
     // GTOs blocks and number of AOs
 
@@ -750,7 +750,15 @@ new_integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule
                     std::vector<std::vector<int>> cgto_mask_blocks, pre_ao_inds_blocks;
 
                     std::vector<int> aoinds;
+                    
+                    // reserve prescreening vectors
 
+                    cgto_mask_blocks.reserve(ngblocks);
+                    
+                    pre_ao_inds_blocks.reserve(ngblocks);
+                    
+                    aoinds.reserve(naos); 
+                    
                     for (size_t i = 0; i < ngblocks; i++)
                     {
                         // 0th order GTO derivative
