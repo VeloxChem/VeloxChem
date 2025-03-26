@@ -317,7 +317,7 @@ class PolarizabilityGradient:
         for f, w in enumerate(self.frequencies):
 
             profiler.set_timing_key(f"Polgrad w = {w:.4f}")
-            profiler.start_timer('polgrad')
+            profiler.start_timer('total')
 
             full_vec = [
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
@@ -576,7 +576,7 @@ class PolarizabilityGradient:
 #            if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
-            profiler.stop_timer('polgrad')
+            profiler.stop_timer('total')
 
         profiler.print_memory_subspace({
             'polgrad dict': polgrad_results
