@@ -310,7 +310,6 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_rhs_imag_list = dm_ao_list_imag + xpmy_ao_list_imag
 
                 if self._dft:
-                    profiler.start_timer('E[3]')
                     # construct density matrices for E[3] term
 
                     perturbed_dm_ao_list_rere = []
@@ -347,8 +346,6 @@ class PolOrbitalResponse(CphfSolver):
                             zero_dm_ao_list.extend([
                                 np.array(0 * x_minus_y_ao[x].real),
                                 np.array(0 * x_minus_y_ao[y].real)])
-
-                profiler.stop_timer('E[3]')
             else:
                 dm_ao_rhs_real_list = None
                 dm_ao_rhs_imag_list = None
@@ -574,6 +571,7 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_memory_subspace({
             'dist_cphf_rhs': dist_cphf_rhs
         }, self.ostream)
+        profiler.check_memory_usage('End of RHS')
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the orbrsp RHS for '
@@ -733,10 +731,8 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_rhs_list = dm_ao_list + xpmy_ao_list
 
                 if self._dft:
-                    profiler.start_timer('E[3]')
                     # construct density matrices for E[3] term:
                     perturbed_dm_ao_list, zero_dm_ao_list = self.construct_dft_e3_dm_real(x_minus_y_ao)
-                    profiler.stop_timer('E[3]')
             else:
                 dm_ao_rhs_list = None
 
@@ -871,6 +867,7 @@ class PolOrbitalResponse(CphfSolver):
         profiler.print_memory_subspace({
             'dist_cphf_rhs': dist_cphf_rhs
         }, self.ostream)
+        profiler.check_memory_usage('End of RHS')
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
@@ -1736,12 +1733,10 @@ class PolOrbitalResponse(CphfSolver):
                         omega[m, n] = (epsilon_dm_ao[m, n] + omega_1pdm_2pdm_contrib_mn
                                        + omega_dipole_contrib_ao[m, n])
                         if self._dft:
-                            profiler.start_timer('gXC')
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
                                 fock_gxc_ao[2 * (m * dof + n)], D_occ)
 
                             omega[m, n] += omega_gxc_contrib
-                            profiler.stop_timer('gXC')
 
                 # reduce dimensions
                 omega_red = []
@@ -1854,7 +1849,7 @@ class PolOrbitalResponse(CphfSolver):
 
         for f, w in enumerate(self.frequencies):
             profiler.set_timing_key(f'omega w={w:.4f}')
-            profiler.start_timer('omega')
+            profiler.start_timer('total')
 
             full_vec = [
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
@@ -2064,13 +2059,10 @@ class PolOrbitalResponse(CphfSolver):
                                 fock_gxc_ao_reim[2 * (m * dof + n)],
                                 fock_gxc_ao_imre[2 * (m * dof + n)],
                             ]
-                            profiler.start_timer('gXC')
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_complex(
                                 fock_gxc_ao_mn_list, D_occ
                             )
                             omega[m, n] += omega_gxc_contrib
-                            profiler.stop_timer('gXC')
-
                 # reduce dimensions for storage
                 omega_red = []
                 for x, y in xy_pairs:
@@ -2100,7 +2092,7 @@ class PolOrbitalResponse(CphfSolver):
             dist_omega.extend(dist_polorb_omega_re + dist_polorb_omega_im)
             del dist_polorb_omega_re, dist_polorb_omega_im
 
-            profiler.stop_timer('omega')
+            profiler.stop_timer('total')
             profiler.check_memory_usage(f'omega w={w:.4f}')
 
         self.cphf_results['dist_omega_ao'] = dist_omega

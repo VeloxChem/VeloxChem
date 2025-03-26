@@ -581,6 +581,7 @@ class PolarizabilityGradient:
         profiler.print_memory_subspace({
             'polgrad dict': polgrad_results
         }, self.ostream)
+        profiler.check_memory_usage('End of polgrad')
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
