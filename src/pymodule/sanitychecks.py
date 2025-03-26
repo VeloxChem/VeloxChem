@@ -212,25 +212,23 @@ def raman_sanity_check(obj):
         obj.ostream.flush()
         obj.do_raman = False
 
-    # This check is due to convergence/singulaity issues in the cphf
+    # This check is due to convergence/singularity issues in the cphf
     # subspace solver for some molecules.
     if obj.do_resonance_raman:
         try:
             idx0 = obj.frequencies.index(0.0)
-            warn_msg = 'Zero in frequency list for resonance Raman!\n'
+            warn_msg = 'Zero frequency in input frequencies for resonance Raman!\n'
             if len(obj.frequencies) == 1:
                 warn_msg += 'No other frequencies requested.'
                 warn_msg += 'Will continue with normal Raman.'
                 obj.do_raman = True
                 obj.do_resonance_raman = False
             else:
-                # out-commented lines below left from a merge conflict,
-                # I don't remember why I made this list-trick
-                # but I am sure I had a good reason
-                #freq_list = list(obj.frequencies)
-                #freq_list.pop(idx0)
-                obj.frequencies.pop(idx0)
-                warn_msg += 'It has been removed from the list.\n'
+                # converting to a list because "pop()" does not exist for tuples
+                freq_list = list(obj.frequencies)
+                freq_list.pop(idx0)
+                obj.frequencies = freq_list
+                warn_msg += 'Zero has been removed from the list.\n'
                 warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
                 warn_msg += str(obj.frequencies)
             obj.ostream.print_warning(warn_msg)

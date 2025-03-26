@@ -721,8 +721,7 @@ class OpenMMDynamics:
                                 lowest_conformations=None,
                                 qm_driver=None,
                                 basis=None,
-                                constraints=None,
-                                minimize=True):
+                                constraints=None):
 
         """
         Runs a high-temperature MD simulation to sample conformations and minimize the energy of these conformations.
@@ -784,51 +783,35 @@ class OpenMMDynamics:
         energies = []
         opt_coordinates = []
 
-        for step in range(nsteps):
-            self.simulation.step(1)
-
-            if step % save_freq == 0:
-                state = self.simulation.context.getState(getPositions=True, getEnergy=True)
-                energy = state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                coordinates = state.getPositions()
-                self.simulation.context.setPositions(coordinates)
-
-                if minimize:
-                    self.ostream.print_info(f'Step: {step}, Potential energy: {energy}')
-                    self.ostream.flush()
-                    self.simulation.minimizeEnergy()
-                    minimized_state = self.simulation.context.getState(getPositions=True, getEnergy=True)
-                    minimized_energy = minimized_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-                    minimized_coordinates = minimized_state.getPositions()
-
-                    # Create a xyz with the minimized coordinates
-                    energies.append(minimized_energy)
-                    self.ostream.print_info(f'Minimized energy: {minimized_energy}')
-                    self.ostream.flush()
-                    xyz = f"{len(self.labels)}\n\n"
-                    for label, coord in zip(self.labels, minimized_coordinates):
-                        xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
-                    self.ostream.print_info(f'Saved coordinates for step {step}')
-                    self.ostream.flush()
-                    opt_coordinates.append(xyz)
-
-                else:
-                    # Create a xyz with the coordinates
-                    self.ostream.print_info(f'Step: {step}, Potential energy: {energy}')
-                    self.ostream.flush()
-                    self.ostream.print_info(f'Energy of the conformation: {energy}')
-                    self.ostream.flush()
-                    xyz = f"{len(self.labels)}\n\n"
-                    for label, coord in zip(self.labels, coordinates):
-                        xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"
-                    opt_coordinates.append(xyz)
-                    energies.append(energy)
-                    self.ostream.print_info(f'Saved coordinates for step {step}')
+        # Run MD
+        for i in range(snapshots):
+            self.simulation.step(save_freq)
+        
+            minimized_system = app.Simulation(topology, self.system, self._create_integrator())
+            minimized_system.context.setPositions(self.simulation.context.getState(getPositions=True).getPositions())
+            
+            minimized_system.minimizeEnergy()
+            minimized_state = minimized_system.context.getState(getPositions=True, getEnergy=True)
+            
+            minimized_coordinates = minimized_state.getPositions()
+            minimized_energy = minimized_state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
+            energies.append(minimized_energy)
+            
+            self.ostream.print_info(f'Minimized energy: {minimized_energy}')
+            self.ostream.flush()
+            xyz = f"{len(self.labels)}\n\n"
+            for label, coord in zip(self.labels, minimized_coordinates):
+                xyz += f"{label} {coord.x * 10} {coord.y * 10} {coord.z * 10}\n"  
+            self.ostream.print_info(f'Saved coordinates for step {save_freq * (i + 1)}')
+            self.ostream.flush()
+            opt_coordinates.append(xyz)
 
         self.ostream.print_info('Conformational sampling completed!')
         self.ostream.print_info(f'Number of conformations: {len(opt_coordinates)}')
         self.ostream.flush()
 
+
+        # TODO: Replace this with the unique_conformers function
         if lowest_conformations:
             msg = f'Looking for the {lowest_conformations} lowest energy conformations.'
             self.ostream.print_info(msg)

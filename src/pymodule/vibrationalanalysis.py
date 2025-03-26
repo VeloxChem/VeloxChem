@@ -62,9 +62,9 @@ class VibrationalAnalysis:
         - reduced_masses: The reduced masses of the normal modes in amu.
         - force_constants: The force constants in mdyn/Angstrom.
         - vib_frequencies: The vibrational frequencies in cm**-1.
-        - normal_modes: The non-normalized vibrational normal modes in
+        - raw_normal_modes: The non-normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
-        - normed_normal_modes: The normalized vibrational normal modes in
+        - normal_modes: The normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
         - dipole_gradient: The gradient of the dipole moment.
         - ir_intensities: The IR intensities in km/mol.
@@ -141,8 +141,8 @@ class VibrationalAnalysis:
         self.force_constants = None
         self.vib_frequencies = None
 
-        self.normal_modes = None  # not normalized, not mass-weighted
-        self.normed_normal_modes = None  # normalized, not mass-weighted
+        self.raw_normal_modes = None  # not normalized, not mass-weighted
+        self.normal_modes = None  # normalized, not mass-weighted
         self.dipole_gradient = None
         self.ir_intensities = None
         self.polarizability_gradient = None
@@ -307,6 +307,7 @@ class VibrationalAnalysis:
             vib_results['free_energy_summary'] = self.free_energy_summary
             vib_results['vib_frequencies'] = self.vib_frequencies
             # FIXME: normalized or not? What should the user get?
+            # NOTE: JHA changes -- now they get for normalized ones
             vib_results['normal_modes'] = self.normal_modes
 
             # calculate force constants
@@ -318,14 +319,14 @@ class VibrationalAnalysis:
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
                 self.ir_intensities = self.calculate_ir_intensity(
-                    self.normal_modes)
+                    self.raw_normal_modes)
                 vib_results['ir_intensities'] = self.ir_intensities
 
             # calculate the analytical polarizability gradient for Raman activities
             if (self.do_raman or self.do_resonance_raman) and self.is_scf:
                 (self.raman_activities, self.int_pol, self.int_depol,
                  self.depol_ratio) = self.calculate_raman_activity(
-                     self.normal_modes)
+                     self.raw_normal_modes)
                 vib_results['raman_activities'] = self.raman_activities
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
@@ -379,7 +380,7 @@ class VibrationalAnalysis:
         fname = 'vlx_' + get_random_string_serial() + '.vdata'
         vdata_file = Path(temp_path, fname)
 
-        self.vib_frequencies, self.normal_modes, self.gibbs_free_energy = (
+        self.vib_frequencies, self.raw_normal_modes, self.gibbs_free_energy = (
             geometric.normal_modes.frequency_analysis(
                 coords,
                 self.hessian,
@@ -459,7 +460,7 @@ class VibrationalAnalysis:
                 self.polarizability_gradient[freq])
             size_x = current_polarizability_gradient.shape[0]
             size_y = current_polarizability_gradient.shape[1]
-            size_k = self.normal_modes.shape[0]
+            size_k = self.raw_normal_modes.shape[0]
 
             # einsum 'xyi,ik->xyk'
             raman_transmom = np.matmul(
@@ -528,7 +529,7 @@ class VibrationalAnalysis:
 
         # diagonalizes Hessian and calculates the reduced masses
         # einsum 'ki->i'
-        reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
+        reduced_masses = 1.0 / np.sum(self.raw_normal_modes.T**2, axis=0)
 
         force_constants = (4.0 * np.pi**2 *
                            (c * (self.vib_frequencies / cm_to_m))**2 *
@@ -698,7 +699,8 @@ class VibrationalAnalysis:
 
         self.print_vibrational_analysis_ostream(molecule, normal_mode_idx_lst,
                                                 filename, rsp_drv)
-        self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
+        if number_of_modes > n_dom_modes:
+            self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
         if self.vib_results_txt_file is not None:
             fulltxt_msg = 'Full vibrational analysis results written to: '
@@ -728,10 +730,10 @@ class VibrationalAnalysis:
         elem = molecule.get_labels()
 
         # normalize the normal modes
-        self.normal_modes /= np.linalg.norm(self.normal_modes,
+        self.raw_normal_modes /= np.linalg.norm(self.raw_normal_modes,
                                             axis=1)[:, np.newaxis]
-        self.normed_normal_modes = self.normal_modes / np.linalg.norm(
-            self.normal_modes, axis=1)[:, np.newaxis]
+        self.normal_modes = self.raw_normal_modes / np.linalg.norm(
+            self.raw_normal_modes, axis=1)[:, np.newaxis]
 
         width = 52
         for k in idx_lst:
@@ -797,11 +799,11 @@ class VibrationalAnalysis:
                 valstr = '{:<8d}'.format(atom_index + 1)
                 valstr += '{:<8s}'.format(elem[atom_index])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 0])
+                    self.normal_modes[k][atom_index * 3 + 0])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 1])
+                    self.normal_modes[k][atom_index * 3 + 1])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 2])
+                    self.normal_modes[k][atom_index * 3 + 2])
                 self.ostream.print_header(valstr.ljust(width))
 
             self.ostream.print_blank()
@@ -872,10 +874,10 @@ class VibrationalAnalysis:
         number_of_modes = len(self.vib_frequencies)
 
         # normalize the normal modes
-        self.normal_modes /= np.linalg.norm(self.normal_modes,
+        self.raw_normal_modes /= np.linalg.norm(self.raw_normal_modes,
                                             axis=1)[:, np.newaxis]
-        self.normed_normal_modes = self.normal_modes / np.linalg.norm(
-            self.normal_modes, axis=1)[:, np.newaxis]
+        self.normal_modes = self.raw_normal_modes / np.linalg.norm(
+            self.raw_normal_modes, axis=1)[:, np.newaxis]
 
         # check output file
         if self.vib_results_txt_file is None:
@@ -965,11 +967,11 @@ class VibrationalAnalysis:
                 valstr = '{:<8d}'.format(atom_index + 1)
                 valstr += '{:<8s}'.format(elem[atom_index])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 0])
+                    self.normal_modes[k][atom_index * 3 + 0])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 1])
+                    self.normal_modes[k][atom_index * 3 + 1])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 2])
+                    self.normal_modes[k][atom_index * 3 + 2])
                 fout.write(valstr.ljust(width))
                 fout.write('\n')
 
@@ -1036,8 +1038,8 @@ class VibrationalAnalysis:
 
         natm = molecule.number_of_atoms()
 
-        normal_mode_grp = hf.create_group(vib_group + 'normal_modes')
-        for n, Q in enumerate(self.normed_normal_modes, 1):
+        normal_mode_grp = hf.create_group('normal_modes')
+        for n, Q in enumerate(self.normal_modes, 1):
             normal_mode_grp.create_dataset(str(n),
                                            data=np.array([Q]).reshape(natm, 3))
 
