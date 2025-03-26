@@ -1,5 +1,14 @@
 #include "XCIntegratorForKx.hpp"
 
+#include <omp.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <iomanip>
+#include <sstream>
+#include <iostream>
+
 #include "GtoFunc.hpp"
 #include "OpenMPFunc.hpp"
 #include "Prescreener.hpp"
@@ -9,7 +18,7 @@
 #include "DenseLinearAlgebra.hpp"
 #include "NuclearPotentialDriver.hpp"
 
-#include <iostream>
+//#include <iostream>
 
 namespace xcintkx {  // xcintkx namespace
 

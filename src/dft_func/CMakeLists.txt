@@ -29,6 +29,7 @@ target_sources(vlxobjs
     XCIntegratorForGGA.cpp
     XCIntegratorForLDA.cpp
     XCIntegratorForMGGA.cpp
+    XCIntegratorForKx.cpp
     XCMolecularGradient.cpp
     XCMolecularGradientForLDA.cpp
     XCMolecularGradientForGGA.cpp
