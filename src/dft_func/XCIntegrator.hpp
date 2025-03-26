@@ -93,6 +93,40 @@ class CXCIntegrator
                           const CXCFunctional&              fvxc) const -> CAOKohnShamMatrix;
     
     /**
+     Integrates first-order exchange-correlation functional contribution to AO
+     Kohn-Sham matrix.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param gsDensityPointers the pointers to AO density matrices.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the AO Kohn-Sham matrix.
+     */
+    auto new_integrateVxcFock(const CMolecule&                  molecule,
+                              const CMolecularBasis&            basis,
+                              const std::vector<const double*>& gsDensityPointers,
+                              const CMolecularGrid&             molecularGrid,
+                              const std::string&                xcFuncLabel) const -> CAOKohnShamMatrix;
+    
+    /**
+     Integrates first-order exchange-correlation functional contribution to AO
+     Kohn-Sham matrix.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param gsDensityPointers the pointers to AO density matrices.
+     @param molecularGrid the molecular grid.
+     @param fvxc the exchange-correlation functional.
+     @return the AO Kohn-Sham matrix.
+     */
+    auto new_integrateVxcFock(const CMolecule&                  molecule,
+                              const CMolecularBasis&            basis,
+                              const std::vector<const double*>& gsDensityPointers,
+                              const CMolecularGrid&             molecularGrid,
+                              const CXCFunctional&              fvxc) const -> CAOKohnShamMatrix;
+    
+    /**
      Integrates seminumerical exchange contribution to AO Kohn-Sham matrix.
 
      @param molecule the molecule.

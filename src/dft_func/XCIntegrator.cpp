@@ -125,6 +125,74 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
 }
 
 auto
+CXCIntegrator::new_integrateVxcFock(const CMolecule&                  molecule,
+                                    const CMolecularBasis&            basis,
+                                    const std::vector<const double*>& gsDensityPointers,
+                                    const CMolecularGrid&             molecularGrid,
+                                    const std::string&                xcFuncLabel) const -> CAOKohnShamMatrix
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    return new_integrateVxcFock(molecule, basis, gsDensityPointers, molecularGrid, fvxc);
+}
+
+auto
+CXCIntegrator::new_integrateVxcFock(const CMolecule&                  molecule,
+                                    const CMolecularBasis&            basis,
+                                    const std::vector<const double*>& gsDensityPointers,
+                                    const CMolecularGrid&             molecularGrid,
+                                    const CXCFunctional&              fvxc) const -> CAOKohnShamMatrix
+{
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    auto flag = (gsDensityPointers.size() == 1) ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
+
+    std::string erropenshell("XCIntegrator.integrateVxcFock: Only implemented for closed-shell");
+
+    if (xcfuntype == xcfun::lda)
+    {
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintlda::new_integrateVxcFockForLdaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintlda::integrateVxcFockForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+    }
+
+    if (xcfuntype == xcfun::gga)
+    {
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintgga::integrateVxcFockForGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintgga::integrateVxcFockForGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+    }
+
+    if (xcfuntype == xcfun::mgga)
+    {
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintmgga::integrateVxcFockForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintmgga::integrateVxcFockForMetaGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+    }
+
+    std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
+
+    errors::assertMsgCritical(false, errxcfuntype);
+
+    return CAOKohnShamMatrix();
+}
+
+auto
 CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers,
                                 const CMolecule&                  molecule,
                                 const CMolecularBasis&            basis,

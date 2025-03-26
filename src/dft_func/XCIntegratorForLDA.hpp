@@ -89,6 +89,24 @@ auto integrateVxcFockForLdaOpenShell(const CMolecule&                  molecule,
 auto integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer& timer) -> CDenseMatrix;
 
 /**
+ Integrates first-order LDA exchange-correlation functional contribution to
+ closed-shell AO Kohn-Sham matrix.
+
+ @param molecule the molecule.
+ @param basis the molecular basis.
+ @param gsDensityPointers the pointers to AO density matrices.
+ @param molecularGrid the molecular grid.
+ @param xcFunctional the exchange-correlation functional.
+ @return the AO Kohn-Sham matrix.
+ */
+auto new_integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
+                                           const CMolecularBasis&            basis,
+                                           const std::vector<const double*>& gsDensityPointers,
+                                           const CMolecularGrid&             molecularGrid,
+                                           const double                      screeningThresholdForGTOValues,
+                                           const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
+
+/**
  Integrates second-order LDA exchange-correlation functional contribution
  to AO Fock matrix.
 
