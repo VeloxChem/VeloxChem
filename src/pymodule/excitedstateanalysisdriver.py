@@ -35,6 +35,7 @@ from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
+from .densityviewer import DensityViewer
 
 
 class ExcitedStateAnalysisDriver:
@@ -622,6 +623,31 @@ class ExcitedStateAnalysisDriver:
         })
         viewer.zoomTo()
         viewer.show()
+
+    def show_density(self, molecule, basis, descriptors):
+        """Displays the particle and hole densities of molecule.
+        
+        :param molecule:
+            The molecule object.
+        :param basis:
+            The basis object.
+        :param descriptors:
+            Either descriptor dictionary for one excited state or
+            dictionary containing the descriptor dictionaries of
+            multiple excited states.
+        """
+
+        dens_viewer = DensityViewer()
+        dens_viewer_dict = {}
+        if 'hole_density_matrix_AO' in descriptors.keys():
+            dens_viewer_dict['particle'] = descriptors['particle_density_matrix_AO']
+            dens_viewer_dict['hole'] = descriptors['hole_density_matrix_AO']
+        else:
+            for key in descriptors.keys():
+                dens_viewer_dict[key+' particle'] = descriptors[key]['particle_density_matrix_AO']
+                dens_viewer_dict[key+' hole'] = descriptors[key]['hole_density_matrix_AO']
+        dens_viewer.plot(molecule, basis, dens_viewer_dict)
+        
 
     def print_header(self, title, state_index):
         """
