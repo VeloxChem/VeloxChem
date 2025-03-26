@@ -186,6 +186,14 @@ from .imforcefieldgenerator import IMForceFieldGenerator
 from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .externalscfdriver import ExternalScfDriver
+from .externalgradientdriver import ExternalGradientDriver
+from .externalhessiandriver import ExternalHessianDriver
+from .externalexcitedstatedriver import ExternalExcitedStatesScfDriver
+from .externalexcitedstategradientdriver import ExternalExcitedStatesGradientDriver
+from .externalexcitedstatehessiandriver import ExternalExcitedStatesHessianDriver
+from .clustermanager import ClusterManager
+from .atommapper import AtomMapper
 from .mofbuilder import MofBuilder
 
 # for backward compatibility only

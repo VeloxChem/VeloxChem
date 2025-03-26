@@ -253,7 +253,7 @@ class InterpolationDatapoint:
 
             # self.b2_matrix[i] = second_derivative
                
-    def transform_gradient_to_internal_coordinates(self, tol=1e-8):
+    def transform_gradient_to_internal_coordinates(self, tol=1e-6):
         """
         Transforms the gradient from Cartesian to internal coordinates.
 
@@ -275,12 +275,13 @@ class InterpolationDatapoint:
         
         U, s, Vt = np.linalg.svd(g_matrix)
         
+        print('eigenvalues', s)
         # Make zero the values of s_inv that are smaller than tol
         s_inv = np.array([1 / s_i if s_i > tol else 0.0 for s_i in s])
         
         # Critical assertion, check that the remaining positive values are equal to dimension (3N-6)
         number_of_positive_values = np.count_nonzero(s_inv)
-        
+
         # If more elements are zero than allowed, restore the largest ones
         if number_of_positive_values > dimension:
             print('InterpolationDatapoint: The number of positive singular values is not equal to the dimension of the Hessian., restoring the last biggest elements')
@@ -302,7 +303,7 @@ class InterpolationDatapoint:
         gradient_flat = self.gradient.flatten()
         self.internal_gradient = np.dot(g_minus_matrix, np.dot(self.b_matrix, gradient_flat))
 
-    def transform_hessian_to_internal_coordinates(self, tol=1e-8):
+    def transform_hessian_to_internal_coordinates(self, tol=1e-6):
         """
         Transforms the Hessian from Cartesian to internal coordinates.
 

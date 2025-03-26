@@ -1,9 +1,9 @@
-#
-#                              VELOXCHEM
+#                           VELOXCHEM 1.0-RC2
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
 #
@@ -23,8 +23,15 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+import multiprocessing as mp
+from collections import Counter
+import os
 import numpy as np
+import math
+import random
+from scipy.optimize import linear_sum_assignment
 import sys
+from .profiler import Profiler
 import h5py
 from contextlib import redirect_stderr
 from io import StringIO
@@ -40,6 +47,11 @@ from .inputparser import (parse_input, print_keywords, print_attributes)
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
+def process_data_point(args):
+    index, data_point, cartesian_distance = args
+
+    distance, weight_gradient, _, swapped = cartesian_distance(data_point)
+    return abs(distance), (distance, index, weight_gradient, swapped)
 
 class InterpolationDriver():
     """
@@ -70,21 +82,21 @@ class InterpolationDriver():
         Initializes the IMPES driver.
         """
 
-        if comm is None:
-            comm = MPI.COMM_WORLD
+        # if comm is None:
+        #     comm = MPI.COMM_WORLD
 
-        if ostream is None:
-            if comm.Get_rank() == mpi_master():
-                ostream = OutputStream(sys.stdout)
-            else:
-                ostream = OutputStream(None)
+        # if ostream is None:
+        #     if comm.Get_rank() == mpi_master():
+        #         ostream = OutputStream(sys.stdout)
+        #     else:
+        #         ostream = OutputStream(None)
 
-        # MPI information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-        ostream = OutputStream(sys.stdout)
-        self.ostream = ostream
+        # # MPI information
+        # self.comm = comm
+        # self.rank = self.comm.Get_rank()
+        # self.nodes = self.comm.Get_size()
+        # ostream = OutputStream(sys.stdout)
+        # self.ostream = ostream
 
         # Create InterpolationDatapoint, z-matrix required!
         self.impes_coordinate = InterpolationDatapoint(z_matrix)#, self.comm,self.ostream)
@@ -125,19 +137,19 @@ class InterpolationDriver():
             }
         }
 
-    def print_keywords(self):
-        """
-        Prints the input keywords of the ImpesDriver.
-        """
+    # def print_keywords(self):
+    #     """
+    #     Prints the input keywords of the ImpesDriver.
+    #     """
 
-        print_keywords(self._input_keywords, self.ostream)
+    #     print_keywords(self._input_keywords, self.ostream)
 
-    def print_attributes(self):
-        """
-        Prints the attributes of the ImpesDriver.
-        """
+    # def print_attributes(self):
+    #     """
+    #     Prints the attributes of the ImpesDriver.
+    #     """
 
-        print_attributes(self._input_keywords, self.ostream)
+    #     print_attributes(self._input_keywords, self.ostream)
 
     def update_settings(self, impes_dict=None):
         """
@@ -312,8 +324,33 @@ class InterpolationDriver():
                 weights[i] * gradients[i] +
                 potentials[i] * weight_gradients[i] / sum_weights -
                 potentials[i] * weights[i] * sum_weight_gradients / sum_weights)
+
+
+
         
+    def process_in_parallel(self):
+        # Prepare the data for parallel processing.
+        # Each task is a tuple: (index, data_point, reference to self.cartesian_distance)
     
+        tasks = [(i, data_point, self.cartesian_distance) 
+                 for i, data_point in enumerate(self.qm_data_points)]
+        print('initialize tasks', tasks)
+        # Use a Pool to map the tasks.
+        with mp.Pool() as pool:
+            results = pool.map(process_data_point, tasks)
+        
+        # Initialize your variables.
+        min_distance = float('inf')
+        distances_and_gradients = []
+        
+        # Combine results from each process.
+        for abs_distance, info in results:
+            if abs_distance < min_distance:
+                min_distance = abs_distance
+            distances_and_gradients.append(info)
+        
+        return min_distance, distances_and_gradients
+
     def shepard_interpolation(self):
         """Performs a simple interpolation.
 
@@ -336,7 +373,13 @@ class InterpolationDriver():
         distances_and_gradients = []
         min_distance = float('inf')
         self.time_step_reducer = False
+        
+        org_internal_coordinates = self.impes_coordinate.internal_coordinates_values.copy()
+        org_b_matrix = self.impes_coordinate.b_matrix.copy()
+        org_mask = np.arange(len(self.impes_coordinate.z_matrix))
 
+        z_matrix_dict = { tuple(sorted(element)): i 
+                  for i, element in enumerate(self.impes_coordinate.z_matrix) }
         for i, data_point in enumerate(self.qm_data_points):
             
             distance, weight_gradient, _, swapped = self.cartesian_distance(data_point)
@@ -345,7 +388,8 @@ class InterpolationDriver():
                 min_distance = abs(distance)
 
             distances_and_gradients.append((distance, i, weight_gradient, swapped))   
-        
+        # min_distance, distances_and_gradients = self.process_in_parallel()
+
         used_labels = []
         close_distances = None
         close_distances = [
@@ -353,14 +397,31 @@ class InterpolationDriver():
             for distance, index, wg, swapped_tuple in distances_and_gradients 
             if abs(distance) <= min_distance + self.distance_thrsh]
         distances_from_points = [] 
+        cointer_idx = 0
         for qm_data_point, distance, weight_grad, label_idx, swapped_tuple_obj in close_distances:
             confidence_radius = 1.0
             if qm_data_point.confidence_radius is not None:
                 confidence_radius = qm_data_point.confidence_radius
-            coordiantes_swapped = False
+            new_coordintes = False
+            reordered_int_coord_values = org_internal_coordinates.copy()
+            mask = []
+            org_b_matrix_cp = org_b_matrix.copy()
             if swapped_tuple_obj is not None:
-                self.define_impes_coordinate(swapped_tuple_obj[2])
-                coordiantes_swapped = True
+                for i, element in enumerate(self.impes_coordinate.z_matrix):
+                    # Otherwise, reorder the element
+                    reordered_element = [swapped_tuple_obj[3].get(x, x) for x in element]
+                    key = tuple(sorted(reordered_element))
+                    z_mat_index = z_matrix_dict.get(key)
+                    mask.append(z_mat_index)
+                    # print(z_mat_index, key, element)
+                    reordered_int_coord_values[i] = (float(org_internal_coordinates[z_mat_index]))
+                
+                org_b_matrix_cp[org_mask] = org_b_matrix[mask]
+                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()), 3)
+                org_b_matrix_cp = org_b_matrix_cp[:, swapped_tuple_obj[1], :]
+                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()) * 3)
+                # print('reordered internal coordinates', reordered_int_coord_values)
+                new_coordintes = True
             denominator = (
                 (distance / confidence_radius)**(2 * self.exponent_p) +
                 (distance / confidence_radius)**(2 * self.exponent_q))
@@ -369,16 +430,21 @@ class InterpolationDriver():
             sum_weights += weight
             sum_weight_gradients += weight_grad
 
-            potential = self.compute_potential(qm_data_point)
-            gradient = self.compute_gradient(qm_data_point, swapped_tuple_obj)
+            potential = self.compute_potential(qm_data_point, reordered_int_coord_values)
+            gradient = self.compute_gradient(qm_data_point, swapped_tuple_obj, reordered_int_coord_values, org_b_matrix_cp)
             gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
             weight_gradients.append(weight_grad)
             distances_from_points.append(distance)
-            if coordiantes_swapped:
-                self.define_impes_coordinate(self.molecule.get_coordinates_in_bohr())
             
+            if new_coordintes:
+                # print('B-matrix', self.impes_coordinate.internal_coordinates_values, '\n org B-Matrix \n', org_internal_coordinates)
+                # print('\n difference B-matrix', np.linalg.norm(self.impes_coordinate.b_matrix[:, :] - org_b_matrix_cp[:, :]))
+                # print('\n ', np.linalg.norm(np.array(reordered_int_coord_values) - np.array(self.impes_coordinate.internal_coordinates_values)))
+                self.impes_coordinate.internal_coordinates_values = org_internal_coordinates
+                self.impes_coordinate.b_matrix = org_b_matrix
+
         n_points = len(close_distances)
         self.impes_coordinate.energy = 0
         self.impes_coordinate.gradient = np.zeros((natms, 3))
@@ -429,7 +495,7 @@ class InterpolationDriver():
     def principal_angle(self, angle_rad):
         return (angle_rad + np.pi) % (2.0 * np.pi) - np.pi
 
-    def compute_potential(self, data_point):
+    def compute_potential(self, data_point, current_internal_coordinates_values):
         """Calculates the potential energy surface at self.impes_coordinate
            based on the energy, gradient and Hessian of data_point.
 
@@ -440,7 +506,7 @@ class InterpolationDriver():
         energy = data_point.energy
         grad = data_point.internal_gradient
         hessian = data_point.internal_hessian
-        dist_check = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
+        dist_check = (current_internal_coordinates_values - data_point.internal_coordinates_values)
 
         # implement sin for keeping the structure
         # change the code so it can take on any function that is being used for the dihedral
@@ -455,7 +521,7 @@ class InterpolationDriver():
         
         return pes
 
-    def compute_gradient(self, data_point, mapping_list):
+    def compute_gradient(self, data_point, mapping_list, current_internal_coordinates_values, current_b_matrix):
         """Calculates part of the cartesian gradient
            for self.impes_coordinate based on the gradient
            and Hessian of data_point.
@@ -469,10 +535,10 @@ class InterpolationDriver():
         natm = data_point.cartesian_coordinates.shape[0]
         grad = data_point.internal_gradient.copy()
         hessian = data_point.internal_hessian
-        im_b_matrix = self.impes_coordinate.b_matrix                
+             
 
-        dist_check = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
-        dist_org = (self.impes_coordinate.internal_coordinates_values - data_point.internal_coordinates_values)
+        dist_check = (current_internal_coordinates_values - data_point.internal_coordinates_values)
+        dist_org = (current_internal_coordinates_values - data_point.internal_coordinates_values)
         for i, element in enumerate(self.impes_coordinate.z_matrix):
             if len(element) == 4:    
                 dist_check[i] = np.sin(dist_check[i])
@@ -487,7 +553,7 @@ class InterpolationDriver():
             
         internal_gradient_hess_cos = grad + dist_hessian
 
-        gradient = (np.matmul(im_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
+        gradient = (np.matmul(current_b_matrix.T, internal_gradient_hess_cos)).reshape(natm, 3)
 
         if mapping_list is not None:
 
@@ -556,10 +622,12 @@ class InterpolationDriver():
         target_coordinates_core = target_coordinates.copy()
         reference_coordinates_core = reference_coordinates.copy()
 
-        if self.perform_mapping and len(self.symmetry_sub_groups) != 0:
+        core_detected = False
+        if self.perform_mapping and len(self.symmetry_sub_groups[1]) != 0 and (len(self.symmetry_sub_groups[0]) - len(self.symmetry_sub_groups[1][0]) > 1):
             
-            target_coordinates_core = np.delete(target_coordinates, self.symmetry_sub_groups[0], axis=0)
-            reference_coordinates_core = np.delete(reference_coordinates, self.symmetry_sub_groups[0], axis=0)
+            target_coordinates_core = np.delete(target_coordinates, self.symmetry_sub_groups[1][0], axis=0)
+            reference_coordinates_core = np.delete(reference_coordinates, self.symmetry_sub_groups[1][0], axis=0)
+            core_detected = True
 
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
@@ -577,14 +645,23 @@ class InterpolationDriver():
         org_reference_coord = reference_coordinates.copy()
         org_mapping_list = [i for i in range(reference_coordinates.shape[0])]
         mapping_list = [[i for i in range(reference_coordinates.shape[0])]]
-        if len(self.symmetry_sub_groups) != 0:
-            current_molecule = Molecule(self.molecule.get_labels(), reference_coordinates, 'bohr')
-            data_point_molecule = Molecule(self.molecule.get_labels(), rotated_coordinates_cp, 'bohr')
-            
+        swapped = None
 
-            atom_mapper = AtomMapper(data_point_molecule, current_molecule)
+        if core_detected:
+    
+            non_group_atoms = []
+            for i in range(len(self.molecule.get_labels())):
+                if i not in self.symmetry_sub_groups[1][0]:
+                    non_group_atoms.append(i)
 
-            mapping_list = atom_mapper.perform()
+            current_molecule_trunc_coords = np.delete(reference_coordinates, non_group_atoms, axis=0)
+            data_point_molecule_trun_coords = np.delete(rotated_coordinates, non_group_atoms, axis=0)
+
+            mapping_list, mapping_dict, assigned = self.perform_symmetry_assignment(self.symmetry_sub_groups[0], self.symmetry_sub_groups[1][0], 
+                                                                      current_molecule_trunc_coords, data_point_molecule_trun_coords)
+            if assigned:
+                swapped = (org_mapping_list, mapping_list[0], reference_coordinates, mapping_dict)
+            # mapping_list = atom_mapper.perform(atom_map_1=self.symmetry_sub_groups[0], env_groups_1=self.symmetry_sub_groups[1])
 
         reference_coordinates[org_mapping_list] = org_reference_coord[mapping_list[0]]
         # Calculate the Cartesian distance
@@ -592,9 +669,7 @@ class InterpolationDriver():
         # Calculate the gradient of the interpolation weights
         # (required for energy gradient interpolation)
         distance_vector = (reference_coordinates - rotated_coordinates)
-        swapped = None
-        if list(org_mapping_list) != list(mapping_list[0]) :
-            swapped = (org_mapping_list, mapping_list[0], reference_coordinates)
+        
         distance_vector_norm = np.zeros(reference_coordinates.shape[0])
         for i in range(len(distance_vector_norm)):
             distance_vector_norm[i] += np.linalg.norm(distance_vector[i])
@@ -660,7 +735,7 @@ class InterpolationDriver():
 
             # The sum of partial_energies should match the total second-order approx:
             # total_energy_diff = sum(partial_energies)
-            pred_E = self.compute_potential(datapoint)
+            pred_E = self.compute_potential(datapoint, current_internal_coordinates_values=self.impes_coordinate.internal_coordinates_values)
             delta_E = abs(qm_energy - pred_E)
             single_energy_error = []
             weights = []
@@ -702,3 +777,23 @@ class InterpolationDriver():
         """
         return self.impes_coordinate.gradient
     
+
+    def perform_symmetry_assignment(self, atom_map, sym_group, reference_group, datapoint_group):
+        """ Performs the atom mapping. """
+
+        new_map = atom_map.copy()
+        mapping_dict = {}
+        # cost = self.get_dihedral_cost(atom_map, sym_group, non_group_atoms)
+        cost = np.linalg.norm(datapoint_group[:, np.newaxis, :] - reference_group[np.newaxis, :, :], axis=2)
+        row, col = linear_sum_assignment(cost)
+        assigned = False
+
+        if not np.equal(row, col).all():
+            assigned = True
+            
+            # atom_maps = self.linear_assignment_solver(cost)
+            reordred_arr = np.array(sym_group)[col]
+            new_map[sym_group] = new_map[reordred_arr]
+            mapping_dict = {org: new for org, new in zip(np.array(sym_group), reordred_arr)}
+        
+        return [new_map], mapping_dict, assigned

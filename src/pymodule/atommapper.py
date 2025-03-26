@@ -57,20 +57,32 @@ class AtomMapper:
     def determine_symmetry_group(self):
 
         atom_map, symmetry_groups, rc_groups = self.detect_reaction_center()
-        _, refined_symmetry_groups = self.refine_environment(atom_map, symmetry_groups, rc_groups)
+        atom_map, refined_symmetry_groups = self.refine_environment(atom_map, symmetry_groups, rc_groups)
     
-        return refined_symmetry_groups
+        return (atom_map, refined_symmetry_groups, rc_groups)
     
-    def perform(self, write_xyz=False):
+    
+    def perform(self, write_xyz=False, atom_map_1=None, env_groups_1=None, rc_groups_1=[]):
         """ Performs the atom mapping. """
+        atom_map = None
+        env_groups = None
         # Construct initial atom map and detects reaction center.
-        atom_map, env_groups, rc_groups = self.detect_reaction_center()
-        # Refine environment groups.
-        atom_map, env_groups = self.refine_environment(atom_map, env_groups, rc_groups)
+        if atom_map_1 is None or env_groups_1 is None:
+            atom_map, env_groups, rc_groups = self.detect_reaction_center()
+            # Refine environment groups.
+            atom_map, env_groups = self.refine_environment(atom_map, env_groups, rc_groups)
+        # if not np.array_equal(atom_map_1, atom_map) or not np.array_equal(env_groups_1, env_groups):
+        #     print("Atom map is different")
+        #     print(atom_map_1, atom_map)
+        #     print(env_groups_1, env_groups)
+        #     print(rc_groups_1, rc_groups)
+        #     exit()
         # Permute reaction center groups and optimize mappings for all atom maps.
-        atom_maps = self.run_optimization(atom_map, env_groups, rc_groups)
+        atom_maps = self.run_optimization(np.array(atom_map_1), env_groups_1, rc_groups_1)
         # Evaluate and print final atom maps.
-        atom_maps = self.evaluate_results(atom_maps, write_xyz)
+        # atom_maps = self.evaluate_results(atom_maps_1, write_xyz)
+        # atom_maps = [np.array(atom_map)]
+        
         return atom_maps
 
     def detect_reaction_center(self):
@@ -142,25 +154,25 @@ class AtomMapper:
                             break
                     if not in_group:
                         rc_atoms.append(list_r[i])
-        self.output("            Reaction Center Analysis  \n"
-             + "          ----------------------------\n", self.print_output)
-        if len(self.mono_el) > 0:
-            self.output("     Element(s) treated as monovalent: " + " ".join(self.mono_el), self.print_output)
-            self.output("     (These elements are excluded from the\n"
-                 + "      reaction center analysis.)          \n", self.print_output)
-        if len(rc_groups) > 0 or len(rc_atoms) > 0:
-            self.output("   Atoms associated with the reaction center:    \n\n"
-                 + "  Group | Element | No. reactant | No. product     \n"
-                 + "  --------------------------------------------       ", self.print_output)
-            for g, group in enumerate(rc_groups):
-                g_str = str(g + 1)
-                for i in group:
-                    self.output("{:>5}{:>9}{:>14}{:>14}".format(g_str, self.labels_r[i], i + 1, atom_map[i] + 1), self.print_output)
-                    g_str = ""
-            for i in rc_atoms:
-                self.output("{:>5}{:>9}{:>14}{:>14}".format("-", self.labels_r[i], i + 1, atom_map[i] + 1), self.print_output)
-        else:
-            self.output("          No reaction center was found.", self.print_output)
+        # self.output("            Reaction Center Analysis  \n"
+        #      + "          ----------------------------\n", self.print_output)
+        # if len(self.mono_el) > 0:
+        #     # self.output("     Element(s) treated as monovalent: " + " ".join(self.mono_el), self.print_output)
+        #     # self.output("     (These elements are excluded from the\n"
+        #          + "      reaction center analysis.)          \n", self.print_output)
+        # if len(rc_groups) > 0 or len(rc_atoms) > 0:
+        #     # self.output("   Atoms associated with the reaction center:    \n\n"
+        #          + "  Group | Element | No. reactant | No. product     \n"
+        #          + "  --------------------------------------------       ", self.print_output)
+        #     for g, group in enumerate(rc_groups):
+        #         g_str = str(g + 1)
+        #         for i in group:
+        #             # self.output("{:>5}{:>9}{:>14}{:>14}".format(g_str, self.labels_r[i], i + 1, atom_map[i] + 1), self.print_output)
+        #             g_str = ""
+        #     for i in rc_atoms:
+        #         # self.output("{:>5}{:>9}{:>14}{:>14}".format("-", self.labels_r[i], i + 1, atom_map[i] + 1), self.print_output)
+        # else:
+        #     # self.output("          No reaction center was found.", self.print_output)
         for el in self.mono_el:
             group = []
             for i in range(self.n_atoms):
@@ -318,31 +330,31 @@ class AtomMapper:
         Returns:
             atom_maps:  Constructed atom maps.
         """
-        self.output("\n"
-             + "            Atom Mapping Optimization  \n"
-             + "          -----------------------------\n", self.print_output)
+        # self.output("\n"
+            #  + "            Atom Mapping Optimization  \n"
+            #  + "          -----------------------------\n", self.print_output)
         atom_maps = []
         if len(rc_groups) > 0:
-            self.output("         Searching for atom maps through\n"
-                 + "         permutation of groups.\n", self.print_output)
+            # self.output("         Searching for atom maps through\n"
+                #  + "         permutation of groups.\n", self.print_output)
             for g, rc_group in enumerate(rc_groups):
-                if math.factorial(len(rc_group)) > self.max_maps:
-                    self.output("         Maximum number of atom maps is\n"
-                         + "         exceeded for group {}.".format(g + 1), self.print_output)
-                    if self.tau > 0:
-                        self.output("         You could decrease --tau.\n", self.print_output)
-                    else:
-                        self.output("         You could increase --max_maps.\n", self.print_output)
-                else:
-                    groups = rc_groups + env_groups
-                    groups.remove(rc_group)
-                    tmp_atom_maps = self.permute_reaction_center(atom_map, groups, rc_group)
-                    for i in range(len(tmp_atom_maps)):
-                        tmp_atom_maps[i] = self.optimize_mapping(tmp_atom_maps[i], groups)
-                    atom_maps.extend(tmp_atom_maps)
+                # if math.factorial(len(rc_group)) > self.max_maps:
+                    # self.output("         Maximum number of atom maps is\n"
+                        #  + "         exceeded for group {}.".format(g + 1), self.print_output)
+                    # if self.tau > 0:
+                    #     # self.output("         You could decrease --tau.\n", self.print_output)
+                    # else:
+                        # self.output("         You could increase --max_maps.\n", self.print_output)
+                # else:
+                groups = rc_groups + env_groups
+                groups.remove(rc_group)
+                tmp_atom_maps = self.permute_reaction_center(atom_map, groups, rc_group)
+                for i in range(len(tmp_atom_maps)):
+                    tmp_atom_maps[i] = self.optimize_mapping(tmp_atom_maps[i], groups)
+                atom_maps.extend(tmp_atom_maps)
         if len(atom_maps) == 0:
-            if len(rc_groups) > 0:
-                self.output("     Continue without permutation of groups!\n", self.print_output)
+            # if len(rc_groups) > 0:
+                # self.output("     Continue without permutation of groups!\n", self.print_output)
             groups = rc_groups + env_groups
             atom_maps.append(self.optimize_mapping(atom_map, groups))
         return atom_maps
@@ -417,6 +429,7 @@ class AtomMapper:
             for i in range(self.n_atoms):
                 if i not in group_atoms:
                     non_group_atoms.append(i)
+   
             for group in groups:
                 cost = np.zeros((len(group), len(group)), dtype=int)
                 for i, a in enumerate(group):
@@ -439,6 +452,7 @@ class AtomMapper:
                     atom_map[group[i]] = tmp[group[sub_map[i]]]
                 cost[:, :] = cost[:, sub_map]
                 sub_groups = []
+                
                 for i in range(len(group)):
                     for j in range(i + 1, len(group)):
                         if (cost[i, j] + cost[j, i] - cost[i, i] - cost[j, j]) == 0:
@@ -457,6 +471,7 @@ class AtomMapper:
                 sub_groups = self.fix_groups(sub_groups)
                 amb_dihs = False
                 amb_sub_group = []
+
                 for sub_group in sub_groups:
                     cost = self.get_dihedral_cost(atom_map, sub_group, non_group_atoms)
                     if np.sum(cost == 0.0) > len(sub_group):
@@ -658,28 +673,28 @@ class AtomMapper:
                 filename = self.product.filename.split(".xyz")[0] + "_" + str(self.product.file_index) + ".xyz"
                 self.product.write_xyz(filename, atom_map)
                 self.product.file_index += 1
-                self.output("  => {} has been created.\n\n".format(filename)
-                     + "      Properties related to this atom map:", self.print_output)
-            if abs(delta).sum() > 0:
-                self.output("\n"
-                     + "  Change | Element | No. reactant | No. product\n"
-                     + "  ---------------------------------------------  ", self.print_output)
-                for i in range(self.n_atoms):
-                    for j in range(i + 1, self.n_atoms):
-                        if delta[i, j] == 1:
-                            self.output("  Formed {:>5}-{:<5} {:>6}-{:<5} {:>8}-{:<5}".format(
-                                self.labels_r[i], self.labels_r[j], i + 1, j + 1, atom_map[i] + 1, atom_map[j] + 1), self.print_output)
-                        elif delta[i, j] == -1:
-                            self.output("  Broke  {:>5}-{:<5} {:>6}-{:<5} {:>8}-{:<5}".format(
-                                self.labels_r[i], self.labels_r[j], i + 1, j + 1, atom_map[i] + 1, atom_map[j] + 1), self.print_output)
-            self.output("\n      RMSD of dihedrals in degrees: {:5.2f}\n".format(dih_rmsd), self.print_output)
-            if len(inv_centers) > 0:
-                self.output("    Inverted stereocenters have been traced!\n\n"
-                     + "      Element | No. reactant | No. product\n"
-                     + "      ------------------------------------", self.print_output)
-                for i in inv_centers:
-                    self.output("{:>11}{:>12}{:>15}".format(self.labels_r[i], i + 1, atom_map[i] + 1), self.print_output)
-                self.output("", self.print_output)
+                # self.output("  => {} has been created.\n\n".format(filename)
+                    #  + "      Properties related to this atom map:", self.print_output)
+            # if abs(delta).sum() > 0:
+                # self.output("\n"
+                    #  + "  Change | Element | No. reactant | No. product\n"
+                    #  + "  ---------------------------------------------  ", self.print_output)
+                # for i in range(self.n_atoms):
+                #     for j in range(i + 1, self.n_atoms):
+                        # if delta[i, j] == 1:
+                        #     # self.output("  Formed {:>5}-{:<5} {:>6}-{:<5} {:>8}-{:<5}".format(
+                        #         self.labels_r[i], self.labels_r[j], i + 1, j + 1, atom_map[i] + 1, atom_map[j] + 1), self.print_output)
+                        # elif delta[i, j] == -1:
+                        #     # self.output("  Broke  {:>5}-{:<5} {:>6}-{:<5} {:>8}-{:<5}".format(
+                        #         self.labels_r[i], self.labels_r[j], i + 1, j + 1, atom_map[i] + 1, atom_map[j] + 1), self.print_output)
+            # self.output("\n      RMSD of dihedrals in degrees: {:5.2f}\n".format(dih_rmsd), self.print_output)
+            # if len(inv_centers) > 0:
+            #     # self.output("    Inverted stereocenters have been traced!\n\n"
+            #          + "      Element | No. reactant | No. product\n"
+            #          + "      ------------------------------------", self.print_output)
+            #     for i in inv_centers:
+            #         # self.output("{:>11}{:>12}{:>15}".format(self.labels_r[i], i + 1, atom_map[i] + 1), self.print_output)
+            #     # self.output("", self.print_output)
         return final_atom_maps
     
     def get_dihedral_rmsd(self, atom_map, allowed_atoms):
