@@ -576,8 +576,8 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the orbrsp RHS for '
             valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -876,8 +876,8 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the orbrsp RHS for '
             valstr += f'{len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1773,7 +1773,7 @@ class PolOrbitalResponse(CphfSolver):
             self.ostream.print_blank()
             valstr = '** Time spent on constructing omega multipliers '
             valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -2108,7 +2108,7 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '
             valstr += f'for {n_freqs} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()

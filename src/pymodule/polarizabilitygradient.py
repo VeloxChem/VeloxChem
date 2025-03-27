@@ -233,7 +233,7 @@ class PolarizabilityGradient:
                 self.print_polarizability_gradient(molecule)
 
             valstr = '*** Time spent in polarizability gradient driver: '
-            valstr += f'{(tm.time() - start_time):.6f} sec ***'
+            valstr += f'{(tm.time() - start_time):.2f} sec ***'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -590,8 +590,8 @@ class PolarizabilityGradient:
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += f'{n_freqs:d} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1326,12 +1326,12 @@ class PolarizabilityGradient:
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
 
-        if self.rank == mpi_master():
-            valstr = f'** Time spent on orbital response for {len(self.frequencies)} '
-            valstr += f'frequencies: {(tm.time() - orbrsp_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
+        #if self.rank == mpi_master():
+        #    valstr = f'** Time spent on orbital response for {len(self.frequencies)} '
+        #    valstr += f'frequencies: {(tm.time() - orbrsp_start_time):.6f} sec **'
+        #    self.ostream.print_header(valstr)
+        #    self.ostream.print_blank()
+        #    self.ostream.flush()
 
         return orbrsp_drv.cphf_results
 
@@ -1893,8 +1893,8 @@ class PolarizabilityGradient:
                 polgrad_results[w] = num_polgradient[f]
 
             valstr = '** Time spent on constructing the numerical gradient for '
-            valstr += f'{n_freqs:d} frequencies: {(tm.time() - loop_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
+            valstr += f'{n_freqs:d} frequencies: {(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
