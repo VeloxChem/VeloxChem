@@ -28,7 +28,7 @@ import time as tm
 import sys
 from mpi4py import MPI
 
-from .veloxchemlib import LebedevGrid
+from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import ThreeCenterOverlapDriver
 from .veloxchemlib import ThreeCenterOverlapGradientDriver
@@ -134,23 +134,41 @@ class GostshypDriver:
         # (definition of V_pr unnecessarily complicated)
         e_pr, V_pr = 0.0, np.zeros(den_mat.shape)
 
+        # exponents = width_params.tolist()
+        # centers = self.tessellation[:3, :].T.tolist()
+        # norm_vecs = self.tessellation[4:7, :].T.tolist()
+        # pre_factors = np.ones(self.num_tes_points).tolist()
+
+        # tcog_mats = tcog_drv.compute(self.molecule, self.basis, exponents, pre_factors, centers)
+
+        # x_mat = tcog_mats.matrix('X').to_numpy()
+        # y_mat = tcog_mats.matrix('Y').to_numpy()
+        # z_mat = tcog_mats.matrix('Z').to_numpy()
+
         # first try: loop over tessellation points j
         for j in range(self.num_tes_points):
 
             # define Gaussian functions and normal vector components
-            exp = width_params[j]
-            center = self.tessellation[:3, j]
+            exp = [width_params[j]]
+            center = [self.tessellation[:3, j].tolist()]
             norm_vec = self.tessellation[4:7, j]
+            pre_fac = [1]
 
             # first naive try to calculate F^tilde (with doing everything in
             # numpy and ignoring object functions that may exist (but most
             # likely don't)
 
-            tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, center)
+            #tcog_mats = tcog_drv.compute(exp, pre_fac, center, self.basis, self.molecule)
 
-            x_mat = tcog_mats.get_matrix('x').get_full_matrix().to_numpy()
-            y_mat = tcog_mats.get_matrix('y').get_full_matrix().to_numpy()
-            z_mat = tcog_mats.get_matrix('z').get_full_matrix().to_numpy()
+            tcog_mats = tcog_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
+
+            # x_mat = tcog_mats.get_matrix('x').get_full_matrix().to_numpy()
+            # y_mat = tcog_mats.get_matrix('y').get_full_matrix().to_numpy()
+            # z_mat = tcog_mats.get_matrix('z').get_full_matrix().to_numpy()
+
+            x_mat = tcog_mats.matrix('X').to_numpy()
+            y_mat = tcog_mats.matrix('Y').to_numpy()
+            z_mat = tcog_mats.matrix('Z').to_numpy()
 
             f_italic = (  norm_vec[0] * x_mat
                         + norm_vec[1] * y_mat
@@ -162,9 +180,9 @@ class GostshypDriver:
             p = -self.pressure * self.tessellation[3, j] / f_tilde
 
             # same naive try to calculate the energy contribution
-            tco_mat = tco_drv.compute(self.molecule, self.basis, exp, center)
+            tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
 
-            gauss_mat = p * tco_mat.get_full_matrix().to_numpy()
+            gauss_mat = p * tco_mat.to_numpy()
 
             amplitude = np.einsum('pq,pq->', den_mat, gauss_mat) * self.tessellation[-1, j]
 
@@ -183,7 +201,7 @@ class GostshypDriver:
 
             # 'correction' term in two steps:
             g_tilde_contr = np.einsum('rs,rs->', den_mat,
-                                      tco_mat.get_full_matrix().to_numpy())
+                                      tco_mat.to_numpy())
 
             correction_term = (f_italic * g_tilde_contr * self.pressure * 
                                self.tessellation[3, j] * (1.0 / f_tilde**2))
