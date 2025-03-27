@@ -92,6 +92,7 @@ from .veloxchemlib import parse_xc_func
 from .veloxchemlib import make_matrix
 from .veloxchemlib import make_matrices
 from .veloxchemlib import partition_atoms
+from .veloxchemlib import gen_lebedev_grid
 
 # C++ enums
 from .veloxchemlib import mat_t
@@ -188,6 +189,8 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder import MofBuilder
+from .tessellation import TessellationDriver
+from .gostshyp import GostshypDriver
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver

@@ -29,7 +29,7 @@ import math
 import sys
 from mpi4py import MPI
 
-from .veloxchemlib import LebedevGrid
+from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import bohr_in_angstrom
 from .outputstream import OutputStream
@@ -145,14 +145,14 @@ class TessellationDriver:
 
         norm_vecs = self.get_norm_vecs(unit_sphere)
 
-        vdw_radii = molecule.vdw_radii_to_numpy(self.tssf)
+        vdw_radii = molecule.vdw_radii_to_numpy() * self.tssf
 
         # create a scaled sphere for every unique atom type
         vdw_spheres = {
             i: self.scale_sphere(unit_sphere, i) for i in np.unique(vdw_radii)
         }
 
-        unscaled_w = unit_sphere.w_to_numpy() * 4.0 * np.pi
+        unscaled_w = unit_sphere[:, 3] * 4.0 * np.pi
 
         # find neighboring atoms for a more efficient removal of points
         neighbors = self.find_neighbors(molecule, vdw_radii, unscaled_w.max())
@@ -210,8 +210,8 @@ class TessellationDriver:
         # Get grid generated from the C++ class. The spheres are not scaled.
         # Generating from tabulated angles would allow a wider range of
         # different grid points and an on-the-fly scaling.
-        leb_grid = LebedevGrid(self.num_leb_points)
-        leb_grid.generate_grid()
+        leb_grid = gen_lebedev_grid(self.num_leb_points)
+        #leb_grid.generate_grid()
 
         return leb_grid
 
@@ -226,8 +226,8 @@ class TessellationDriver:
             The normal vectors for each grid point.
         """
 
-        return np.vstack((grid.x_to_numpy(), grid.y_to_numpy(),
-                          grid.z_to_numpy()))
+        return np.vstack((grid[:, 0], grid[:, 1],
+                          grid[:, 2]))
 
     def get_contribution_mask(self, sphere, idx, neighbors, molecule, vdw_radii,
                               weights):
@@ -356,13 +356,13 @@ class TessellationDriver:
 
         scaled_sphere = np.zeros((4, self.num_leb_points))
 
-        scaled_sphere[0, :] = grid.x_to_numpy() * radius
-        scaled_sphere[1, :] = grid.y_to_numpy() * radius
-        scaled_sphere[2, :] = grid.z_to_numpy() * radius
+        scaled_sphere[0, :] = grid[:, 0] * radius
+        scaled_sphere[1, :] = grid[:, 1] * radius
+        scaled_sphere[2, :] = grid[:, 2] * radius
 
         # make weights sum to the total surface area in bohr^2
         surface_area = 4.0 * np.pi * radius**2
-        scaled_sphere[3, :] = grid.w_to_numpy() * surface_area
+        scaled_sphere[3, :] = grid[:, 3] * surface_area
 
         return scaled_sphere
 
