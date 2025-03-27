@@ -23,6 +23,7 @@ class TestScfGradientDriverWithRI:
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_drv.ri_coulomb = True
+        scf_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
         scf_drv.conv_thresh = 1.0e-5
         scf_results = scf_drv.compute(mol, bas)
 
