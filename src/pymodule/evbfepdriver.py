@@ -76,8 +76,8 @@ class EvbFepDriver():
         self.crash_reporting_interval: int = 1
 
         self.constrain_H: bool = True
-        self.calculate_forces: bool = False
-        self.calculate_forcegroups: bool = True
+        self.report_forces: bool = False
+        self.report_forcegroups: bool = True
 
     def run_FEP(
         self,
@@ -250,6 +250,11 @@ class EvbFepDriver():
                             self.ostream,
                             force_file=str(self.run_folder /
                                            f"forces_equil_{l:.3f}.csv"),
+                            velocity_file=str(self.run_folder /
+                                              f"velocities_equil_{l:.3f}.csv"),
+                            forcegroup_file=str(
+                                self.run_folder /
+                                f"forcegroups_equil_{l:.3f}.csv"),
                             append=False,
                         )
                         equil_simulation.reporters.append(mimin_reporter)
@@ -267,7 +272,7 @@ class EvbFepDriver():
                     system.removeConstraint(0)
 
             # Updating the system requires recreating the simulation, and integrators can only be bound to one context
-            run_integrator = mm.LangevinMiddleIntegrator(
+            run_integrator = mm.VariableLangevinIntegrator(
                 integrator_temperature,
                 integrator_friction_coeff,
                 step_size * mmunit.picoseconds,
@@ -286,12 +291,12 @@ class EvbFepDriver():
             else:
                 append = True
 
-            if self.calculate_forces:
+            if self.report_forces:
                 force_file = str(self.data_folder / f"Forces.csv")
             else:
                 force_file = None
 
-            if self.calculate_forcegroups:
+            if self.report_forcegroups:
                 forcegroup_file = str(self.data_folder / f"ForceGroups.csv")
             else:
                 forcegroup_file = None
@@ -339,51 +344,53 @@ class EvbFepDriver():
                     finished_run = True
                 except (mm.OpenMMException, ValueError) as e:
                     pass
-                    # if run_crashed:
-                    #     self.ostream.print_warning(
-                    #         "Sampling crashed again, saving state and exiting")
-                    #     run_simulation.saveCheckpoint(
-                    #         str(self.run_folder / f"state_{l:.3f}.chk"))
-                    #     run_simulation.saveState(
-                    #         str(self.run_folder / f"state_{l:.3f}.xml"))
-                    #     with open(self.run_folder / f"run_sys_{l:.3f}.xml",
-                    #               mode="w",
-                    #               encoding="utf-8") as output:
-                    #         output.write(mm.XmlSerializer.serialize(system))
-                    #     self.ostream.print_info(str(e))
-                    #     self.ostream.flush()
-                    #     raise e
-                    # else:
-                    #     run_crashed = True
-                    #     traj_detail_roporter = mmapp.PDBReporter(
-                    #         str(self.run_folder / f"traj_run_{l:.3f}.pdb"),
-                    #         self.crash_reporting_interval,
-                    #         enforcePeriodicBox=True,
-                    #     )
-                    #     evb_detail_repertor = EvbReporter(
-                    #         str(self.run_folder / f"energies_run_{l:.3f}.csv"),
-                    #         self.crash_reporting_interval,
-                    #         systems[0],
-                    #         systems[1],
-                    #         topology,
-                    #         l,
-                    #         self.ostream,
-                    #         force_file=str(self.run_folder /
-                    #                        f"forces_run_{l:.3f}.csv"),
-                    #         velocity_file=str(self.run_folder /
-                    #                           f"velocities_run_{l:.3f}.csv"),
-                    #         append=False,
-                    #     )
-                    #     run_simulation.reporters.append(traj_detail_roporter)
-                    #     run_simulation.reporters.append(evb_detail_repertor)
-                    #     self.ostream.print_warning(
-                    #         "Sampling crashed, trying again to sample and writing more detailed data"
-                    #     )
-                    #     self.ostream.print_info(str(e))
-                    #     self.ostream.print_warning(
-                    #         "Generated data is unreliable, make sure to complete a run without generating these warnings"
-                    #     )
-                    #     self.ostream.flush()
+                    if run_crashed:
+                        self.ostream.print_warning(
+                            "Sampling crashed again, saving state and exiting")
+                        run_simulation.saveCheckpoint(
+                            str(self.run_folder / f"state_{l:.3f}.chk"))
+                        run_simulation.saveState(
+                            str(self.run_folder / f"state_{l:.3f}.xml"))
+                        with open(self.run_folder / f"run_sys_{l:.3f}.xml",
+                                  mode="w",
+                                  encoding="utf-8") as output:
+                            output.write(mm.XmlSerializer.serialize(system))
+                        self.ostream.print_info(str(e))
+                        self.ostream.flush()
+                        raise e
+                    else:
+                        run_crashed = True
+                        traj_detail_roporter = mmapp.PDBReporter(
+                            str(self.run_folder / f"traj_run_{l:.3f}.pdb"),
+                            self.crash_reporting_interval,
+                            enforcePeriodicBox=True,
+                        )
+                        evb_detail_repertor = EvbReporter(
+                            str(self.run_folder / f"energies_run_{l:.3f}.csv"),
+                            self.crash_reporting_interval,
+                            systems[0],
+                            systems[1],
+                            topology,
+                            l,
+                            self.ostream,
+                            force_file=str(self.run_folder /
+                                           f"forces_run_{l:.3f}.csv"),
+                            velocity_file=str(self.run_folder /
+                                              f"velocities_run_{l:.3f}.csv"),
+                            forcegroup_file=str(self.run_folder /
+                                                f"forcegroups_run_{l:.3f}.csv"),
+                            append=False,
+                        )
+                        run_simulation.reporters.append(traj_detail_roporter)
+                        run_simulation.reporters.append(evb_detail_repertor)
+                        self.ostream.print_warning(
+                            "Sampling crashed, trying again to sample and writing more detailed data"
+                        )
+                        self.ostream.print_info(str(e))
+                        self.ostream.print_warning(
+                            "Generated data is unreliable, make sure to complete a run without generating these warnings"
+                        )
+                        self.ostream.flush()
 
             state = run_simulation.context.getState(getPositions=True)
             positions = state.getPositions()

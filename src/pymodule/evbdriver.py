@@ -1001,23 +1001,22 @@ class EvbDriver():
         E2_pes = E_data[2, sub_indices]
         E1_int = E_data[3, sub_indices]
         E2_int = E_data[4, sub_indices]
-        E_constraints = E_data[5, sub_indices]
-        # E_m_pes = E_data[6, sub_indices]
-        # E_m_int = E_data[7, sub_indices]
+        E_m_pes = E_data[5, sub_indices]
+        E_m_int = E_data[6, sub_indices]
 
-        step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file,
-                                                   skiprows=1,
-                                                   delimiter=',').T[:,
-                                                                    sub_indices]
+        step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(
+            data_file,
+            skiprows=1,
+            delimiter=',',
+        ).T[:, sub_indices]
 
         specific_result = {
             "E1_pes": E1_pes,
             "E2_pes": E2_pes,
             "E1_int": E1_int,
             "E2_int": E2_int,
-            # "E_m_pes": E_m_pes,
-            # "E_m_int": E_m_int,
-            "E_constraints": E_constraints,
+            "E_m_pes": E_m_pes,
+            "E_m_int": E_m_int,
             "Ep": Ep,
             "Ek": Ek,
             "Temp_step": Temp,
@@ -1040,7 +1039,7 @@ class EvbDriver():
             "Lambda_frame":
             Lambda_frame,
             "Lambda_indices":
-            [np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame],
+            [np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame]
         }
         return specific_result, common_result
 

@@ -26,6 +26,7 @@ from importlib.metadata import version
 
 import sys
 import numpy as np
+import copy
 
 from .errorhandler import assert_msg_critical
 from .evbsystembuilder import EvbForceGroup
@@ -156,13 +157,15 @@ class EvbReporter():
 
             return {'steps': steps, 'periodic': True, 'include': include}
 
-    def report(self, simulation, state):
+    def report(self, _simulation, state):
 
+        simulation = copy.copy(_simulation)
         positions = state.getPositions(asNumpy=True)
         boxvectors = state.getPeriodicBoxVectors(asNumpy=True)
         # apparently this is necessary
-        # simulation.context.setPositions(positions)
-        # simulation.context.setPeriodicBoxVectors(*boxvectors)
+
+        simulation.context.setPositions(positions)
+        simulation.context.setPeriodicBoxVectors(*boxvectors)
 
         line = f"{self.Lambda}"
         E = []
