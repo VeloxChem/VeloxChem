@@ -27,6 +27,7 @@ import numpy as np
 import py3Dmol as p3d
 import sys
 import time as tm
+from copy import deepcopy
 
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import Molecule
@@ -47,12 +48,6 @@ class ExcitedStateAnalysisDriver:
 
     Instance variables
         - fragment_dict: dictionary of indices for atoms in each fragment.
-        - include_particle_hole_density_matrices: The flag for particle and
-          hole density matrices.
-        - include_participation_ratios: The flag for participation ratios.
-        - include_avg_particle_hole_position: The flag for average particle.
-          and hole positions.
-        - include_relative_ct_length: The flag for relative CT length.
     """
 
     def __init__(self, ostream=None):
@@ -65,15 +60,10 @@ class ExcitedStateAnalysisDriver:
 
         self.fragment_dict = None
 
-        self.include_particle_hole_density_matrices = True
-        self.include_participation_ratios = True
-        self.include_avg_particle_hole_position = True
-        self.include_relative_ct_length = True
-
         # output stream
         self.ostream = ostream
 
-    def compute(self, state_index, molecule, basis, scf_tensors, rsp_tensors):
+    def compute(self, state_index, molecule, basis, scf_results, rsp_results):
         """
         Computes dictionary containing excited state descriptors for
         excited state nstate.
@@ -84,23 +74,23 @@ class ExcitedStateAnalysisDriver:
             The molecule
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-        :param rsp_tensors:
-            The dictionary containing the rsp tensors.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param rsp_results:
+            The dictionary containing the rsp results.
 
         :return:
             A dictionary containing the transition, hole and particle density matrices
             in MO and AO basis, the charge transfer matrix,
             the hole/particle/average participation ratios,
             the average hole/particle position and their difference vector,
-            and the relative charge transfer length.
+            and the charge transfer length.
         """
 
         assert_msg_critical(self.fragment_dict is not None,
                             'fragment_dict not defined ')
 
-        num_exc_states = len(rsp_tensors['eigenvalues'])
+        num_exc_states = len(rsp_results['eigenvalues'])
 
         assert_msg_critical(state_index <= num_exc_states,
                             'excited state not included in rsp calculation')
@@ -110,67 +100,43 @@ class ExcitedStateAnalysisDriver:
         self.print_header('Excited State Analysis.', state_index)
 
         start_time = tm.time()
-
-        # necessary objects for some descriptor calculations
-        tdens_mo, tdens_ao = self.compute_transition_density_matrix(
-            molecule, scf_tensors, rsp_tensors, state_index)
-
-        self.ostream.print_info("Transition density matrix computed in " +
+        dens_dict = self.compute_density_matrices(molecule, scf_results,
+                                                  rsp_results, state_index)
+        tdens_ao = dens_dict['transition_density_matrix_AO']
+        ret_dict.update(dens_dict)
+        self.ostream.print_info("Density matrices computed in " +
                                 "{:.3f} sec.".format(tm.time() - start_time))
+
         self.ostream.print_blank()
 
         tmp_start_time = tm.time()
-        ct_matrix = self.compute_ct_matrix(molecule, basis, scf_tensors,
+        ct_matrix = self.compute_ct_matrix(molecule, basis, scf_results,
                                            tdens_ao, self.fragment_dict)
+        ret_dict['ct_matrix'] = ct_matrix
         self.ostream.print_info("Charge transfer matrix computed in " +
                                 "{:.3f} sec.".format(tm.time() -
-                                                     tmp_start_time))
+                                tmp_start_time))
+
         self.ostream.print_blank()
 
         tmp_start_time = tm.time()
-        ret_dict['transition_density_matrix_MO'] = tdens_mo
-        ret_dict['transition_density_matrix_AO'] = tdens_ao
+        pr_dict = self.compute_participation_ratios(ct_matrix)
+        ret_dict.update(pr_dict)
+        self.ostream.print_info("Participation ratios computed in " +
+                                "{:.3f} sec.".format(tm.time() - 
+                                tmp_start_time))
 
-        ret_dict['ct_matrix'] = ct_matrix
+        self.ostream.print_blank()
 
-        if self.include_particle_hole_density_matrices:
+        tmp_start_time = tm.time()
+        avg_pos_dict = self.compute_avg_position(molecule, ct_matrix, 
+                                                 self.fragment_dict)
+        ret_dict.update(avg_pos_dict)
+        self.ostream.print_info(
+            "Average positions and ct length computed in " +
+            "{:.3f} sec.".format(tm.time() - tmp_start_time))
 
-            ret_dict['hole_density_matrix_MO'], ret_dict[
-                'hole_density_matrix_AO'] = self.compute_hole_density_matrix(
-                    molecule, scf_tensors, rsp_tensors, state_index)
-            ret_dict['particle_density_matrix_MO'], ret_dict[
-                'particle_density_matrix_AO'] = self.compute_particle_density_matrix(
-                    molecule, scf_tensors, rsp_tensors, state_index)
-            self.ostream.print_info(
-                "Particle and hole density matrices computed in " +
-                "{:.3f} sec.".format(tm.time() - tmp_start_time))
-            self.ostream.print_blank()
-            tmp_start_time = tm.time()
-
-        if self.include_participation_ratios:
-
-            ret_dict['hole_participation_ratio'], ret_dict[
-                'particle_participation_ratio'], ret_dict[
-                    'avg_participation_ratio'] = self.compute_participation_ratios(
-                        ct_matrix)
-            self.ostream.print_info("Participation ratios computed in " +
-                                    "{:.3f} sec.".format(tm.time() -
-                                                         tmp_start_time))
-            self.ostream.print_blank()
-            tmp_start_time = tm.time()
-
-        if self.include_avg_particle_hole_position or self.include_relative_ct_length:
-
-            ret_dict['avg_particle_position'], ret_dict[
-                'avg_hole_position'], ret_dict[
-                    'avg_difference_vector'] = self.compute_avg_position(
-                        molecule, ct_matrix, self.fragment_dict)
-            ret_dict['relative_ct_length'] = self.compute_relative_ct_length(
-                molecule, ret_dict['avg_difference_vector'])
-            self.ostream.print_info(
-                "Average positions and relative ct length computed in " +
-                "{:.3f} sec.".format(tm.time() - tmp_start_time))
-            self.ostream.print_blank()
+        self.ostream.print_blank()
 
         self.ostream.print_info(
             "Total time spent performing excited state analysis: " +
@@ -198,33 +164,33 @@ class ExcitedStateAnalysisDriver:
         """
         h5f = h5py.File(filename, "r")
 
-        scf_tensors = {}
-        rsp_tensors = {}
+        scf_results = {}
+        rsp_results = {}
         for key in h5f:
             if key == "atom_coordinates":
-                scf_tensors[key] = np.array(h5f[key])
+                scf_results[key] = np.array(h5f[key])
             if key == "nuclear_charges":
-                scf_tensors[key] = np.array(h5f[key])
+                scf_results[key] = np.array(h5f[key])
             if key == "basis_set":
-                scf_tensors[key] = np.array(h5f[key])
+                scf_results[key] = np.array(h5f[key])
             if key == "scf":
-                scf_tensors_dict = dict(h5f.get(key))
-                for scf_key in scf_tensors_dict:
-                    scf_tensors[scf_key] = np.array(scf_tensors_dict[scf_key])
+                scf_results_dict = dict(h5f.get(key))
+                for scf_key in scf_results_dict:
+                    scf_results[scf_key] = np.array(scf_results_dict[scf_key])
             elif key == "rsp":
-                rsp_tensors_dict = dict(h5f.get(key))
-                for rsp_key in rsp_tensors_dict:
-                    rsp_tensors[rsp_key] = np.array(rsp_tensors_dict[rsp_key])
+                rsp_results_dict = dict(h5f.get(key))
+                for rsp_key in rsp_results_dict:
+                    rsp_results[rsp_key] = np.array(rsp_results_dict[rsp_key])
         h5f.close()
 
-        return scf_tensors, rsp_tensors
+        return scf_results, rsp_results
 
-    def format_rsp_tensors(self, rsp_tensors):
+    def format_rsp_results(self, rsp_results):
         """
-        Reads the eigenvectors in rsp_tensors and adds them
+        Reads the eigenvectors in rsp_results and adds them
         as numpy arrays with individual keys to the dictionary.
 
-        :param rsp_tensors:
+        :param rsp_results:
             The dictionary containing the results from a
             rsp calculation.
 
@@ -233,69 +199,75 @@ class ExcitedStateAnalysisDriver:
             the excited state analysis driver class.
         """
 
-        if 'eigenvectors_distributed' in rsp_tensors.keys():
+        if 'eigenvectors_distributed' in rsp_results.keys():
             rsp_drv = LinearResponseEigenSolver()
-            num_states = len(rsp_tensors['eigenvectors_distributed'])
+            num_states = len(rsp_results['eigenvectors_distributed'])
             for i in range(num_states):
                 name = 'S' + str(i + 1)
-                rsp_tensors[name] = rsp_drv.get_full_solution_vector(rsp_tensors['eigenvectors_distributed'][i])
+                rsp_results[name] = rsp_drv.get_full_solution_vector(
+                    rsp_results['eigenvectors_distributed'][i])
         else:
-            num_states = len(rsp_tensors['eigenvectors'][0, :])
+            num_states = len(rsp_results['eigenvectors'][0, :])
             for i in range(num_states):
                 name = 'S' + str(i + 1)
-                rsp_tensors[name] = rsp_tensors['eigenvectors'][:, i]
-        rsp_tensors['formatted'] = True
+                rsp_results[name] = rsp_results['eigenvectors'][:, i]
+        rsp_results['formatted'] = True
 
-        return rsp_tensors
+        return rsp_results
 
-    def create_molecule_basis(self, scf_tensors):
+    def create_molecule_and_basis(self, scf_results):
         """
         Creates molecule and basis objects from scf dictionary.
 
-        :param scf_tensors:
-            The dictionary containing the scf tensors.
+        :param scf_results:
+            The dictionary containing the scf results dictionary.
 
         :return:
             A tuple containing the Molecule and Basis objects.
         """
 
-        coordinates = scf_tensors['atom_coordinates']
-        nuclear_charges = np.array(scf_tensors['nuclear_charges'])
+        coordinates = scf_results['atom_coordinates']
+        nuclear_charges = np.array(scf_results['nuclear_charges'])
         nuclear_charges = nuclear_charges.astype(int)
-        basis_set_label = scf_tensors['basis_set'][0].decode("utf-8")
+        basis_set_label = scf_results['basis_set'][0].decode("utf-8")
         molecule = Molecule(nuclear_charges, coordinates, units="au")
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         return molecule, basis
 
-    def compute_transition_density_matrix(self, molecule, scf_tensors,
-                                          rsp_tensors, state_index):
+    def compute_density_matrices(self, molecule, scf_results,
+                                          rsp_results, state_index):
         """
         Computes the transition density matrix (TDM) for state
         nstate in MO and AO basis.
 
         :param molecule:
             The Molecule object
-        :param scf_tensors:
-            The dictionary containing the scf tensors.
-        :param rsp_tensors:
-            The dictionary containing the rsp tensors.
+        :param scf_results:
+            The dictionary containing the scf results.
+        :param rsp_results:
+            The dictionary containing the rsp results.
         :param state_index:
             The excited state for which the TDM is computed.
 
         :return:
-            A tuple containing the TDM in MO and AO basis.
+            A tuple containing the transition, particle, and hole
+            density matrices in MO and AO basis.
         """
 
-        if any(key.startswith('eigenvector') for key in rsp_tensors.keys()) and 'formatted' not in rsp_tensors.keys():
-            rsp_tensors = self.format_rsp_tensors(rsp_tensors)
+        dens_dict = {}
+
+        if any(key.startswith('eigenvector') for key in rsp_results.keys()) and 'formatted' not in rsp_results.keys():
+            rsp_results = self.format_rsp_results(rsp_results)
 
         nocc = molecule.number_of_alpha_electrons()
-        norb = scf_tensors["C_alpha"].shape[1]
+        norb = scf_results["C_alpha"].shape[1]
         nvirt = norb - nocc
+        c_mat_occ = deepcopy(scf_results["C_alpha"][:, :nocc])
+        c_mat_virt = deepcopy(scf_results["C_alpha"][:, nocc:])
 
         excstate = "S" + str(state_index)
-        eigvec = rsp_tensors[excstate]
+        eigvec = rsp_results[excstate]
 
         nexc = nocc * nvirt
         z_mat = eigvec[:nexc]
@@ -306,81 +278,26 @@ class ExcitedStateAnalysisDriver:
             tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvirt))
 
         tdens_ao = np.linalg.multi_dot([
-            scf_tensors["C_alpha"][:, :nocc], tdens_mo,
-            scf_tensors["C_alpha"][:, nocc:].T
+            c_mat_occ, tdens_mo, c_mat_virt.T
         ])
-
-        return tdens_mo, tdens_ao
-
-    def compute_hole_density_matrix(self, molecule, scf_tensors, rsp_tensors,
-                                    state_index):
-        """
-        Computes the hole density matrix for state nstate in MO and AO basis.
-
-        :param molecule:
-            The Molecule object
-        :param scf_tensors:
-            The dictionary containing the scf tensors.
-        :param rsp_tensors:
-            The dictionary containing the rsp tensors.
-        :param state_index:
-            The excited state for which the hole density matrix is computed.
-
-        :return:
-            A tuple containing the hole density matrix in MO and AO basis.
-        """
-
-        if any(key.startswith('eigenvector') for key in rsp_tensors.keys()) and 'formatted' not in rsp_tensors.keys():
-            rsp_tensors = self.format_rsp_tensors(rsp_tensors)
-
-        nocc = molecule.number_of_alpha_electrons()
-
-        tdens_mo, tdens_ao = self.compute_transition_density_matrix(
-            molecule, scf_tensors, rsp_tensors, state_index)
 
         hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
         hole_dens_ao = np.linalg.multi_dot([
-            scf_tensors["C_alpha"][:, :nocc], hole_dens_mo,
-            scf_tensors["C_alpha"][:, :nocc].T
+            c_mat_occ, hole_dens_mo, c_mat_occ.T
         ])
-
-        return hole_dens_mo, hole_dens_ao
-
-    def compute_particle_density_matrix(self, molecule, scf_tensors,
-                                        rsp_tensors, state_index):
-        """
-        Computes the particle density matrix for state nstate in MO and
-        AO basis.
-
-        :param molecule:
-            The Molecule object
-        :param scf_tensors:
-            The dictionary containing the scf tensors.
-        :param rsp_tensors:
-            The dictionary containing the rsp tensors.
-        :param state_index:
-            The excited state for which the particle density matrix is
-            computed.
-
-        :return:
-            A tuple containing the particle density matrix in MO and AO basis.
-        """
-
-        if any(key.startswith('eigenvector') for key in rsp_tensors.keys()) and 'formatted' not in rsp_tensors.keys():
-            rsp_tensors = self.format_rsp_tensors(rsp_tensors)
-
-        nocc = molecule.number_of_alpha_electrons()
-
-        tdens_mo, tdens_ao = self.compute_transition_density_matrix(
-            molecule, scf_tensors, rsp_tensors, state_index)
 
         part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
         part_dens_ao = np.linalg.multi_dot([
-            scf_tensors["C_alpha"][:, nocc:], part_dens_mo,
-            scf_tensors["C_alpha"][:, nocc:].T
+            c_mat_virt, part_dens_mo, c_mat_virt.T
         ])
 
-        return part_dens_mo, part_dens_ao
+        dens_dict['transition_density_matrix_MO'] = tdens_mo
+        dens_dict['transition_density_matrix_AO'] = tdens_ao
+        dens_dict['particle_density_matrix_MO'] = part_dens_mo
+        dens_dict['particle_density_matrix_AO'] = part_dens_ao
+        dens_dict['hole_density_matrix_MO'] = hole_dens_mo
+        dens_dict['hole_density_matrix_AO'] = hole_dens_ao
+        return dens_dict
 
     def map_fragments_to_atomic_orbitals(self, molecule, basis, fragment_dict):
         """
@@ -406,11 +323,11 @@ class ExcitedStateAnalysisDriver:
         for fragment in fragment_dict:
             ao_map_fragments[fragment] = []
             for i in fragment_dict[fragment]:
-                ao_map_fragments[fragment] += ao_list[i -
-                                                      1]  # i is 1-based index
+                # i is 1-based index
+                ao_map_fragments[fragment] += ao_list[i - 1]  
         return ao_map_fragments
 
-    def compute_ct_matrix(self, molecule, basis, scf_tensors, T, fragment_dict):
+    def compute_ct_matrix(self, molecule, basis, scf_results, T, fragment_dict):
         """
         Computes the charge transfer (CT) matrix from the
         transition density matrix (TDM).
@@ -419,8 +336,8 @@ class ExcitedStateAnalysisDriver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
         :param T:
             The TDM in AO basis.
         :param fragment_dict:
@@ -432,11 +349,11 @@ class ExcitedStateAnalysisDriver:
 
         ao_map_fragments = self.map_fragments_to_atomic_orbitals(
             molecule, basis, fragment_dict)
-        S = scf_tensors["S"]
+        S = scf_results["S"]
 
         TS = np.matmul(T, S)
         ST = np.matmul(S, T)
-        STS = np.linalg.multi_dot([S, T, S])
+        STS = np.linalg.multi_dot([S, TS])
         TS_ST = TS * ST  # element by element
         T_STS = T * STS
 
@@ -460,8 +377,11 @@ class ExcitedStateAnalysisDriver:
             The CT matrix.
 
         :return:
-            A tuple containing the hole, particle, and average participation ratios.
+            A dictionary containing the hole, particle,
+            and average participation ratios.
         """
+
+        pr_dict = {}
 
         omega = np.sum(ct_matrix)
         hole_weight = np.sum(ct_matrix, axis=1) / omega
@@ -470,7 +390,11 @@ class ExcitedStateAnalysisDriver:
         particle_pr = 1 / np.sum(particle_weight**2)
         avg_pr = (hole_pr + particle_pr) / 2
 
-        return hole_pr, particle_pr, avg_pr
+        pr_dict['hole_participation_ratio'] = hole_pr
+        pr_dict['particle_participation_ratio'] = particle_pr
+        pr_dict['avg_participation_ratio'] = avg_pr
+
+        return pr_dict
 
     def compute_fragment_coordinates(self, molecule, fragment_dict):
         """
@@ -526,44 +450,34 @@ class ExcitedStateAnalysisDriver:
             The dictionary containing the indices of atoms in each fragment.
 
         :return:
-            A tuple containing the average particle position,
-            average hole position, and the difference vector
-            from average hole to average particle.
+            A dictionary containing the average particle position,
+            average hole position, the difference vector
+            from average hole to average particle,
+            and the charge transfer length.
         """
 
-        avg_coord_list = self.compute_fragment_coordinates(
-            molecule, fragment_dict)
+        avg_pos_dict = {}
+
+        avg_coord_list = np.array(self.compute_fragment_coordinates(
+            molecule, fragment_dict))
 
         omega = np.sum(ct_matrix)
         hole_weight = np.sum(ct_matrix, axis=1) / omega
         particle_weight = np.sum(ct_matrix, axis=0) / omega
 
-        avg_hole_position = [0, 0, 0]
-        avg_particle_position = [0, 0, 0]
-
-        for j in range(len(avg_coord_list)):
-            avg_hole_position += (avg_coord_list[j] * hole_weight[j] *
-                                  bohr_in_angstrom())
-            avg_particle_position += (avg_coord_list[j] * particle_weight[j] *
-                                      bohr_in_angstrom())
+        avg_hole_position = np.matmul(hole_weight,
+                                      avg_coord_list)*bohr_in_angstrom()
+        avg_particle_position = np.matmul(particle_weight,
+                                          avg_coord_list)*bohr_in_angstrom()
         avg_diff_vec = avg_particle_position - avg_hole_position
-        return avg_particle_position, avg_hole_position, avg_diff_vec
+        ct_length = np.linalg.norm(avg_diff_vec)
 
-    def compute_relative_ct_length(self, molecule, avg_diff_vec):
-        """
-        Compute the relative charge transfer (CT) length.
+        avg_pos_dict['avg_hole_position'] = avg_hole_position
+        avg_pos_dict['avg_particle_position'] = avg_particle_position
+        avg_pos_dict['avg_difference_vector'] = avg_diff_vec
+        avg_pos_dict['ct_length'] = ct_length
 
-        :param molecule:
-            The molecule.
-        :param avg_diff_vec:
-            The difference vector from average position of hole to average
-            position of particle.
-
-        :return:
-            The relative charge transfer length.
-        """
-        return np.linalg.norm(avg_diff_vec) / self.max_dist_from_mol_center(
-            molecule)
+        return avg_pos_dict
 
     def show_avg_ph_position(self,
                              molecule,
@@ -670,8 +584,8 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_header(cur_str.ljust(str_width))
 
         for key in self.fragment_dict:
-            if len(self.fragment_dict[key]
-                  ) >= 7:  # Splice atomic index list if longer than 7 indices
+            if len(self.fragment_dict[key]) >= 7:  
+                # Splice atomic index list if longer than 7 indices
                 fragment_slice = [
                     self.fragment_dict[key][i:i + 7]
                     for i in range(0, len(self.fragment_dict[key]), 7)
@@ -745,20 +659,20 @@ class ExcitedStateAnalysisDriver:
 
         self.ostream.print_blank()
 
-    def print_relative_charge_transfer_length(self, descriptor_dict):
+    def print_charge_transfer_length(self, descriptor_dict):
         """
-        Prints relative charge transfer length.
+        Prints charge transfer length.
 
         :param descriptor_dict:
             The dictionary of descriptors.
         """
-        rel_ct_length = descriptor_dict['relative_ct_length']
+        rel_ct_length = descriptor_dict['ct_length']
 
-        valstr = "Relative Charge Transfer Length"
+        valstr = "Charge Transfer Length (Angstrom)"
         self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_header(('-' * len(valstr)).ljust(92))
-        valstr = 'Distance:                 '
-        valstr += '{:.6f}'.format(rel_ct_length)
+        valstr = 'Distance:            '
+        valstr += '{:13.6f}'.format(rel_ct_length)
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
@@ -771,11 +685,6 @@ class ExcitedStateAnalysisDriver:
             The dictionary of descriptors.
         """
 
-        if self.include_avg_particle_hole_position or self.include_relative_ct_length:
-            self.print_avg_particle_hole_positions(descriptor_dict)
-
-        if self.include_participation_ratios:
-            self.print_participation_ratios(descriptor_dict)
-
-        if self.include_avg_particle_hole_position or self.include_relative_ct_length:
-            self.print_relative_charge_transfer_length(descriptor_dict)
+        self.print_avg_particle_hole_positions(descriptor_dict)
+        self.print_participation_ratios(descriptor_dict)
+        self.print_charge_transfer_length(descriptor_dict)
