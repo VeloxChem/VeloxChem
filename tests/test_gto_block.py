@@ -27,6 +27,26 @@ class TestGtoBlock:
         b_block = GtoBlock(bas_svp, mol_h2o, [1, 2], 0, 3)
         assert a_block == b_block
 
+    def test_reduce(self):
+
+        tol = 1.0e-12
+
+        mol_h2o, bas_svp = self.get_data()
+        gblock = GtoBlock(bas_svp, mol_h2o, 0, 1)
+        rblock = gblock.reduce([1,0,1,0])
+        
+        a_coords = rblock.coordinates()
+        b_coords = [
+            Point([0.000, 0.000, -1.000]),
+            Point([0.000, 1.400, -2.100]),
+        ]
+        assert a_coords == b_coords
+        
+        a_indexes = rblock.orbital_indices()
+        b_indexes = [7, 1, 4]
+        assert a_indexes == b_indexes
+        
+
     def test_coordinates(self):
 
         tol = 1.0e-12

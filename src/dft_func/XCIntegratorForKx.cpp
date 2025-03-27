@@ -96,6 +96,13 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
             // 0th order GTO derivative
             auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 0, screeningThresholdForGTOValues, boxdim);
 
+            std::cout << " * Mask : " << cgto_mask.size() << " : ";
+            for (const auto mask : cgto_mask)
+            {
+                std::cout << mask << " ";
+            }
+            std::cout << std::endl;
+            
             cgto_mask_blocks.push_back(cgto_mask);
 
             pre_ao_inds_blocks.push_back(pre_ao_inds);
@@ -121,19 +128,19 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
         
         auto ptr_mask = &mask;
         
-        std::cout << "INDICES : ";
-        for (const auto ao_idx : aoinds)
-        {
-            std::cout << ao_idx << " ";
-        }
-        std::cout << std::endl;
-        
-        std::cout << "MASK : ";
-        for (const auto m : mask)
-        {
-            std::cout << "(" << m.first << "," << m.second << ")" ;
-        }
-        std::cout << std::endl;
+//        std::cout << "INDICES : ";
+//        for (const auto ao_idx : aoinds)
+//        {
+//            std::cout << ao_idx << " ";
+//        }
+//        std::cout << std::endl;
+//        
+//        std::cout << "MASK : ";
+//        for (const auto m : mask)
+//        {
+//            std::cout << "(" << m.first << "," << m.second << ")" ;
+//        }
+//        std::cout << std::endl;
 
         timer.start("Density matrix slicing");
 
@@ -213,12 +220,12 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
             
             mat_ggv.zero();
             
-            const auto npot_drv = CNuclearPotentialDriver();
-            
-            for (int g = 0; g < grid_batch_size; g++)
-            {
-                npot_drv.compute(mat_ggv, gto_blocks, mat_fvg, *ptr_mask, g, grid_x[g], grid_y[g], grid_z[g], local_weights[g]);
-            }
+//            const auto npot_drv = CNuclearPotentialDriver();
+//            
+//            for (int g = 0; g < grid_batch_size; g++)
+//            {
+//                npot_drv.compute(mat_ggv, gto_blocks, mat_fvg, *ptr_mask, g, grid_x[g], grid_y[g], grid_z[g], local_weights[g]);
+//            }
             
             omptimers[thread_id].stop("Generate G_gv matrix");
             
