@@ -27,7 +27,6 @@ import numpy as np
 import py3Dmol as p3d
 import sys
 import time as tm
-from copy import deepcopy
 
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import Molecule
@@ -77,7 +76,8 @@ class ExcitedStateAnalysisDriver:
         :param rsp_results:
             The dictionary containing the rsp results.
         :param state_index:
-            The excited state for which the descriptors are computed (indexing starts at 1).
+            The excited state for which the descriptors are
+            computed (indexing starts at 1).
 
         :return:
             A dictionary containing the transition, hole and particle density matrices
@@ -115,7 +115,7 @@ class ExcitedStateAnalysisDriver:
         ret_dict['ct_matrix'] = ct_matrix
         self.ostream.print_info("Charge transfer matrix computed in " +
                                 "{:.3f} sec.".format(tm.time() -
-                                tmp_start_time))
+                                                     tmp_start_time))
 
         self.ostream.print_blank()
 
@@ -123,18 +123,18 @@ class ExcitedStateAnalysisDriver:
         pr_dict = self.compute_participation_ratios(ct_matrix)
         ret_dict.update(pr_dict)
         self.ostream.print_info("Participation ratios computed in " +
-                                "{:.3f} sec.".format(tm.time() - 
-                                tmp_start_time))
+                                "{:.3f} sec.".format(tm.time() -
+                                                     tmp_start_time))
 
         self.ostream.print_blank()
 
         tmp_start_time = tm.time()
-        avg_pos_dict = self.compute_avg_position(molecule, ct_matrix, 
+        avg_pos_dict = self.compute_avg_position(molecule, ct_matrix,
                                                  self.fragment_dict)
         ret_dict.update(avg_pos_dict)
-        self.ostream.print_info(
-            "Average positions and ct length computed in " +
-            "{:.3f} sec.".format(tm.time() - tmp_start_time))
+        self.ostream.print_info("Average positions and ct length computed in " +
+                                "{:.3f} sec.".format(tm.time() -
+                                                     tmp_start_time))
 
         self.ostream.print_blank()
 
@@ -235,8 +235,8 @@ class ExcitedStateAnalysisDriver:
 
         return molecule, basis
 
-    def compute_density_matrices(self, molecule, scf_results,
-                                 rsp_results, state_index):
+    def compute_density_matrices(self, molecule, scf_results, rsp_results,
+                                 state_index):
         """
         Computes the transition density matrix (TDM) for state
         nstate in MO and AO basis.
@@ -255,7 +255,8 @@ class ExcitedStateAnalysisDriver:
             density matrices in MO and AO basis.
         """
 
-        if any(key.startswith('eigenvector') for key in rsp_results.keys()) and 'formatted' not in rsp_results.keys():
+        if any(key.startswith('eigenvector') for key in rsp_results.keys()
+              ) and 'formatted' not in rsp_results.keys():
             rsp_results = self.format_rsp_results(rsp_results)
 
         mo = scf_results["C_alpha"]
@@ -276,19 +277,13 @@ class ExcitedStateAnalysisDriver:
             y_mat = eigvec[nexc:]
             tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvirt))
 
-        tdens_ao = np.linalg.multi_dot([
-            mo_occ, tdens_mo, mo_vir.T
-        ])
+        tdens_ao = np.linalg.multi_dot([mo_occ, tdens_mo, mo_vir.T])
 
         hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
-        hole_dens_ao = np.linalg.multi_dot([
-            mo_occ, hole_dens_mo, mo_occ.T
-        ])
+        hole_dens_ao = np.linalg.multi_dot([mo_occ, hole_dens_mo, mo_occ.T])
 
         part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
-        part_dens_ao = np.linalg.multi_dot([
-            mo_vir, part_dens_mo, mo_vir.T
-        ])
+        part_dens_ao = np.linalg.multi_dot([mo_vir, part_dens_mo, mo_vir.T])
 
         return {
             'transition_density_matrix_MO': tdens_mo,
@@ -324,7 +319,7 @@ class ExcitedStateAnalysisDriver:
             ao_map_fragments[fragment] = []
             for i in fragment_dict[fragment]:
                 # i is 1-based index
-                ao_map_fragments[fragment] += ao_list[i - 1]  
+                ao_map_fragments[fragment] += ao_list[i - 1]
         return ao_map_fragments
 
     def compute_ct_matrix(self, molecule, basis, scf_results, T, fragment_dict):
@@ -353,7 +348,7 @@ class ExcitedStateAnalysisDriver:
 
         TS = np.matmul(T, S)
         ST = np.matmul(S, T)
-        STS = np.linalg.multi_dot([S, TS])
+        STS = np.matmul(S, TS)
         TS_ST = TS * ST  # element by element
         T_STS = T * STS
 
@@ -380,8 +375,6 @@ class ExcitedStateAnalysisDriver:
             A dictionary containing the hole, particle,
             and average participation ratios.
         """
-
-        pr_dict = {}
 
         omega = np.sum(ct_matrix)
         hole_weight = np.sum(ct_matrix, axis=1) / omega
@@ -436,10 +429,8 @@ class ExcitedStateAnalysisDriver:
             and the charge transfer length.
         """
 
-        avg_pos_dict = {}
-
-        avg_coord_list = np.array(self.compute_fragment_coordinates(
-            molecule, fragment_dict))
+        avg_coord_list = np.array(
+            self.compute_fragment_coordinates(molecule, fragment_dict))
 
         omega = np.sum(ct_matrix)
         hole_weight = np.sum(ct_matrix, axis=1) / omega
@@ -520,7 +511,7 @@ class ExcitedStateAnalysisDriver:
 
     def show_density(self, molecule, basis, descriptors):
         """Displays the particle and hole densities of molecule.
-        
+
         :param molecule:
             The molecule object.
         :param basis:
@@ -534,14 +525,16 @@ class ExcitedStateAnalysisDriver:
         dens_viewer = DensityViewer()
         dens_viewer_dict = {}
         if 'hole_density_matrix_AO' in descriptors.keys():
-            dens_viewer_dict['particle'] = descriptors['particle_density_matrix_AO']
+            dens_viewer_dict['particle'] = descriptors[
+                'particle_density_matrix_AO']
             dens_viewer_dict['hole'] = descriptors['hole_density_matrix_AO']
         else:
             for key in descriptors.keys():
-                dens_viewer_dict[key+' particle'] = descriptors[key]['particle_density_matrix_AO']
-                dens_viewer_dict[key+' hole'] = descriptors[key]['hole_density_matrix_AO']
+                dens_viewer_dict[key + ' particle'] = descriptors[key][
+                    'particle_density_matrix_AO']
+                dens_viewer_dict[
+                    key + ' hole'] = descriptors[key]['hole_density_matrix_AO']
         dens_viewer.plot(molecule, basis, dens_viewer_dict)
-        
 
     def print_header(self, title, state_index):
         """
@@ -564,7 +557,7 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_header(cur_str.ljust(str_width))
 
         for key in self.fragment_dict:
-            if len(self.fragment_dict[key]) >= 7:  
+            if len(self.fragment_dict[key]) >= 7:
                 # Splice atomic index list if longer than 7 indices
                 fragment_slice = [
                     self.fragment_dict[key][i:i + 7]
@@ -583,6 +576,10 @@ class ExcitedStateAnalysisDriver:
                 self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
+
+        self.ostream.print_reference(self.get_reference())
+        self.ostream.print_blank()
+
         self.ostream.flush()
 
     def print_avg_particle_hole_positions(self, descriptor_dict):
@@ -668,3 +665,13 @@ class ExcitedStateAnalysisDriver:
         self.print_avg_particle_hole_positions(descriptor_dict)
         self.print_participation_ratios(descriptor_dict)
         self.print_charge_transfer_length(descriptor_dict)
+
+    def get_reference(self):
+        """
+        Gets reference string for excited state descriptors.
+        """
+
+        ref_str = "F. Plasser, M. Wormit, A. Dreuw, "
+        ref_str += "J. Chem. Phys., 2014, 141, 024106"
+
+        return ref_str
