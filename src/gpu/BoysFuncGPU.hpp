@@ -64,7 +64,7 @@ private:
     ValueType* buffer;
 
 public:
-    __device__ AmdFastBuffer(ValueType* buffer) : buffer(buffer) {}
+    __device__ __attribute__((always_inline)) AmdFastBuffer(ValueType* buffer) : buffer(buffer) {}
     template<typename IndexType, std::enable_if_t<std::is_integral<IndexType>::value && std::is_const_v<std::remove_pointer_t<ValueType>>, bool> = true>
     inline __device__ __attribute__((always_inline)) const ValueType& operator[](IndexType idx) const
     {
@@ -77,7 +77,7 @@ public:
     }
 };
 
-__device__ static void
+__device__ __attribute__((always_inline)) static void
 computeBoysFunction(double* values_in, const double fa, const uint32_t N, const double* bf_table, const double* ft_in)
 {
     // Note: 847 = 121 * 7
