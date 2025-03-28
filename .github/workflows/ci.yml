@@ -9,6 +9,7 @@ on:
       - embedding_test
       - c_pcm
       - dft-update
+      - hessian-update
       - ri-test
       - ri-grad-test
       - tddft_vibanalysis_test
