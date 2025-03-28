@@ -357,15 +357,12 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        self._print_mem_debug_info('before screener')
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
         else:
             screening = None
-        self._print_mem_debug_info('after  screener')
         screening = self.comm.bcast(screening, root=mpi_master())
-        self._print_mem_debug_info('after  bcast screener')
 
         if self.ri_coulomb:
             assert_msg_critical(basis.get_label().lower().startswith('def2-'),
@@ -626,20 +623,6 @@ class LinearSolver:
                                                    distribute=False)
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
-
-    def _print_mem_debug_info(self, label):
-        """
-        Prints memory debug information.
-
-        :param label:
-            The label of memory debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
 
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
@@ -948,13 +931,9 @@ class LinearSolver:
 
                 # form Fock matrices
 
-                self._print_mem_debug_info('before Fock build')
-
                 fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler,
                                           local_comm)
-
-                self._print_mem_debug_info('after  Fock build')
 
                 if is_local_master:
                     raw_fock_ger = []
@@ -1235,12 +1214,8 @@ class LinearSolver:
 
             # form Fock matrices
 
-            self._print_mem_debug_info('before Fock build')
-
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
-
-            self._print_mem_debug_info('after  Fock build')
 
             if self.rank == mpi_master():
                 raw_fock_ger = []
@@ -1453,11 +1428,9 @@ class LinearSolver:
                 den_mat_for_fock = make_matrix(basis, mat_t.general)
                 den_mat_for_fock.set_values(dens[idx])
 
-                self._print_mem_debug_info('before restgen Fock build')
                 fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                             fock_type, exchange_scaling_factor,
                                             0.0, thresh_int)
-                self._print_mem_debug_info('after  restgen Fock build')
 
                 fock_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -1468,11 +1441,9 @@ class LinearSolver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_mem_debug_info('before restgen erf Fock build')
                 fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                             'kx_rs', erf_k_coef, omega,
                                             thresh_int)
-                self._print_mem_debug_info('after  restgen erf Fock build')
 
                 fock_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()

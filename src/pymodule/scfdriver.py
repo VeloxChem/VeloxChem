@@ -1370,15 +1370,12 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
-        self._print_debug_info('before screener')
         if self.rank == mpi_master():
             screener = T4CScreener()
             screener.partition(ao_basis, molecule, 'eri')
         else:
             screener = None
-        self._print_debug_info('after  screener')
         screener = self.comm.bcast(screener, root=mpi_master())
-        self._print_debug_info('after  bcast screener')
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1928,20 +1925,6 @@ class ScfDriver:
 
         return npot_mat
 
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
     def _comp_2e_fock(self,
                       den_mat,
                       molecule,
@@ -2066,12 +2049,8 @@ class ScfDriver:
 
         fock_mat = None
 
-        self._print_debug_info('before Fock build')
-
         if self.scf_type == 'restricted':
             # restricted SCF
-            self._print_debug_info('before rest Fock build')
-
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2095,18 +2074,14 @@ class ScfDriver:
                 fock_mat_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-            self._print_debug_info('after  rest Fock build')
-
             if fock_type == 'j':
                 # for pure functional
                 fock_mat_np *= 2.0
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before rest erf Fock build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  rest erf Fock build')
 
                 fock_mat_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2132,8 +2107,6 @@ class ScfDriver:
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_Jab is D_total
-                self._print_debug_info('before unrest Fock J build')
-
                 if self.ri_coulomb:
                     local_gvec = np.array(
                         self._ri_drv.compute_local_bq_vector(den_mat_for_Jab))
@@ -2150,35 +2123,27 @@ class ScfDriver:
                     J_ab_np = fock_mat.to_numpy()
                     fock_mat = Matrix()
 
-                self._print_debug_info('after  unrest Fock J build')
-
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
 
             else:
-                self._print_debug_info('before unrest Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_a_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_b_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock J build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock J build')
 
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2188,18 +2153,14 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before unrest erf Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Ka build')
 
                 fock_mat_a_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest erf Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Kb build')
 
                 fock_mat_b_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2216,8 +2177,6 @@ class ScfDriver:
                 fock_mat = [fock_mat_a_np, fock_mat_b_np]
             else:
                 fock_mat = None
-
-        self._print_debug_info('after  Fock build')
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
