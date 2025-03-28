@@ -382,16 +382,11 @@ class MMForceFieldGenerator:
         # Identify the dihedral indices for the rotatable bond
         dihedral_indices = []
         dihedral_types = []
-        multiple_dihedrals = []
 
         for (i,j,k,l), dihedral in self.dihedrals.items():
             if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
                 dihedral_indices.append([i,j,k,l])
                 dihedral_types.append(dihedral['comment'])
-                if dihedral['multiple'] == True:
-                    multiple_dihedrals.append(True)
-                else:
-                    multiple_dihedrals.append(False)
 
         # Transform the dihedral indices to 1-indexed for printing
         dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
@@ -472,7 +467,7 @@ class MMForceFieldGenerator:
         for i, j, k, l in dihedral_indices:
             dihedral = self.dihedrals[(i, j, k, l)]
             # If the dihedral is multiple add all the types
-            if dihedral['multiple'] == True:
+            if dihedral['multiple']:
                 # Handle multiple dihedrals
                 for idx, dihedral_type in enumerate(dihedral['comment']):
                     dihedral_groups[dihedral_type].append((i, j, k, l))
@@ -486,7 +481,7 @@ class MMForceFieldGenerator:
         periodicities = []
         for i, j, k, l in dihedral_indices:
             dihedral = self.dihedrals[(i, j, k, l)]
-            if dihedral['multiple'] == True:
+            if dihedral['multiple']:
                 # Handle multiple dihedrals
                 for idx, dihedral_type in enumerate(dihedral['comment']):
                     barrier = dihedral['barrier'][idx]
@@ -516,7 +511,7 @@ class MMForceFieldGenerator:
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
-            if self.dihedrals[(i, j, k, l)]['multiple'] == True:
+            if self.dihedrals[(i, j, k, l)]['multiple']:
                 for idx, dihedral_type in enumerate(self.dihedrals[(i, j, k, l)]['comment']):
                     self.dihedrals[(i, j, k, l)]['barrier'][idx] = 0.0
             else:
@@ -702,37 +697,35 @@ class MMForceFieldGenerator:
         fit_barrier_to_print = fitted_barriers.copy()
         self.ostream.print_info(f'New fitted barriers: {fit_barrier_to_print}')
 
-        # If there are multiple dihedrals group them in list of lists
-        if any(multiple_dihedrals):
-            fitted_barriers_grouped = []
-            for i, j, k, l in dihedral_indices:
-                dihedral = self.dihedrals[(i, j, k, l)]
-                if dihedral['multiple'] == True:
-                    # Handle multiple dihedrals
-                    number_dihedrals = len(dihedral['comment'])
-                    fitted_barriers_grouped.append(fitted_barriers[:number_dihedrals])
-                    fitted_barriers = fitted_barriers[number_dihedrals:]
-                else:
-                    fitted_barriers_grouped.append([fitted_barriers[0]])
-                    fitted_barriers = fitted_barriers[1:]
+        # If there are multiple dihedrals, group them in list of lists
+        fitted_barriers_grouped = []
 
-            fitted_barriers = fitted_barriers_grouped
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            if dihedral['multiple']:
+                number_dihedrals = len(dihedral['comment'])
+                fitted_barriers_grouped.append(fitted_barriers[:number_dihedrals])
+                fitted_barriers = np.array(fitted_barriers[number_dihedrals:])
+            else:
+                fitted_barriers_grouped.append([fitted_barriers[0]])
+                fitted_barriers = np.array(fitted_barriers[1:])
 
+        fitted_barriers = fitted_barriers_grouped
 
         # Assign the fitted barriers to the dihedrals
         for idx, (i, j, k, l) in enumerate(dihedral_indices):
             dihedral = self.dihedrals[(i, j, k, l)]
-            if dihedral['multiple'] == True:
-                dihedral['barrier'] = fitted_barriers[idx]
-                # The comment is a list of strings, add ' (fitted)' to each string
-                dihedral['comment'] = [str(dihedral['comment'][idx] + ' (fitted)') for idx in range(len(dihedral['comment']))]
+            if dihedral['multiple']:
+                # make sure that the barrier is a list of float and not a list of numpy.float
+                dihedral['barrier'] = [float(x) for x in fitted_barriers[idx]]
+                for comment_idx in range(len(dihedral['comment'])):
+                    if not dihedral['comment'][comment_idx].endswith(' (fitted)'):
+                        dihedral['comment'][comment_idx] += ' (fitted)'
             else:
-                if any(multiple_dihedrals):
-                    dihedral['barrier'] = fitted_barriers[idx][0]
-                else:
-                    dihedral['barrier'] = fitted_barriers[idx]
-
-                dihedral['comment'] = str(dihedral['comment'] + ' (fitted)')
+                # make sure that the barrier is float and not numpy.float
+                dihedral['barrier'] = float(fitted_barriers[idx][0])
+                if not dihedral['comment'].endswith(' (fitted)'):
+                    dihedral['comment'] += ' (fitted)'
 
         # Validate the fitted parameters
         self.ostream.print_info('Validating the fitted force field...')

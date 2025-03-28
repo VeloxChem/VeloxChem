@@ -233,7 +233,7 @@ class PolarizabilityGradient:
                 self.print_polarizability_gradient(molecule)
 
             valstr = '*** Time spent in polarizability gradient driver: '
-            valstr += f'{(tm.time() - start_time):.6f} sec ***'
+            valstr += f'{(tm.time() - start_time):.2f} sec ***'
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -263,19 +263,17 @@ class PolarizabilityGradient:
             'memory_tracing': self.memory_tracing,
         })
 
-        # get orbital response results
+        # compute orbital response (CPHF)
         orbrsp_results = self.compute_orbital_response(
             molecule, basis, scf_tensors, lr_results)
 
         # dictionary for polarizability gradient
         polgrad_results = {}
 
-        # timings
-        loop_start_time = tm.time()
-
         # partition atoms for parallelisation
         natm = molecule.number_of_atoms()
 
+        # partition atoms
         local_atoms = partition_atoms(natm, self.rank, self.nodes)
 
         # operator components and permutation pairs
@@ -287,10 +285,9 @@ class PolarizabilityGradient:
         nao = basis.get_dimensions_of_basis()
 
         if self.rank == mpi_master():
-            mo = scf_tensors['C_alpha']  # only alpha part
-
             # MO coefficients
             nocc = molecule.number_of_alpha_electrons()
+            mo = scf_tensors['C_alpha']  # only alpha part
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
             nvir = mo_vir.shape[1]
@@ -302,6 +299,7 @@ class PolarizabilityGradient:
             # read it from dict into variable on master
             if 'dist_cphf_ov' not in orbrsp_results.keys():
                 all_cphf_red = orbrsp_results['cphf_ov']
+
                 if self.is_complex:
                     all_cphf_red = all_cphf_red.reshape(
                         n_freqs, 2 * dof_red, nocc * nvir)
@@ -313,9 +311,13 @@ class PolarizabilityGradient:
 
         nocc, nvir = self.comm.bcast((nocc, nvir), root=mpi_master())
 
+        # timings
+        loop_start_time = tm.time()
+
         for f, w in enumerate(self.frequencies):
 
-            profiler.set_timing_key(f"Polgrad w = {w}")
+            profiler.set_timing_key(f"Polgrad w = {w:.4f}")
+            profiler.start_timer('total')
 
             full_vec = [
                 self.get_full_solution_vector(lr_results['solutions'][x, w])
@@ -356,6 +358,7 @@ class PolarizabilityGradient:
                             if y != x:
                                 cphf_ov[y, x] += cphf_ov[x, y]
 
+            # get omega Lagrangian multipliers
             omega_ao = self.get_omega_response_vector(
                 basis, orbrsp_results['dist_omega_ao'], f
             )
@@ -441,7 +444,7 @@ class PolarizabilityGradient:
             npot_grad_100_drv = NuclearPotentialGeom100Driver()
             npot_grad_010_drv = NuclearPotentialGeom010Driver()
 
-            profiler.start_timer("1-elec contribs")
+            profiler.start_timer("1-elec")
 
             # loop over atoms and contract integral derivatives with density matrices
             for iatom in local_atoms:
@@ -525,54 +528,70 @@ class PolarizabilityGradient:
 
                 gmats_dip = Matrices()
 
-            profiler.stop_timer("1-elec contribs")
-            profiler.check_memory_usage(f"1-elec grad w = {w}")
+            profiler.stop_timer("1-elec")
+            profiler.check_memory_usage(f"1-elec")
 
             # ERI contribution
-            profiler.start_timer("ERI contrib")
+            profiler.start_timer("ERI")
             eri_contrib = self.compute_eri_contrib(molecule, basis, gs_dm,
                                                    rel_dm_ao, x_plus_y_ao, x_minus_y_ao,
                                                    local_atoms)
-            profiler.stop_timer("ERI contrib")
-            profiler.check_memory_usage(f"ERI grad w = {w}")
+            profiler.stop_timer("ERI")
+            profiler.check_memory_usage(f"ERI grad")
 
             pol_gradient += eri_contrib
-            pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
+            #pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
 
             del eri_contrib
 
-            if self.rank == mpi_master():
-                for x in range(dof):
-                    for y in range(x + 1, dof):
-                        pol_gradient[y, x] += pol_gradient[x, y]
+            # if self.rank == mpi_master():
+            #     for x in range(dof):
+            #         for y in range(x + 1, dof):
+            #             pol_gradient[y, x] += pol_gradient[x, y]
 
             if self._dft:
-                profiler.start_timer("XC contrib")
+                profiler.start_timer("XC")
 
                 # compute the XC contribution
                 polgrad_xc_contrib = self.compute_polgrad_xc_contrib(
                     molecule, basis, gs_dm, rel_dm_ao, x_minus_y_ao, profiler)
 
                 # add contribution to the SCF polarizability gradient
-                if self.rank == mpi_master():
-                    pol_gradient += polgrad_xc_contrib
+               # if self.rank == mpi_master():
+               #     pol_gradient += polgrad_xc_contrib
+                pol_gradient += polgrad_xc_contrib
 
-                profiler.stop_timer("XC contrib")
-                profiler.check_memory_usage(f'XC contrib w = {w}')
+                profiler.stop_timer("XC")
+                profiler.check_memory_usage(f'XC')
 
                 del polgrad_xc_contrib
 
+            pol_gradient = self.comm.reduce(pol_gradient, root=mpi_master())
+
             if self.rank == mpi_master():
+                for x in range(dof):
+                    for y in range(x + 1, dof):
+                        pol_gradient[y, x] += pol_gradient[x, y]
+
+#            if self.rank == mpi_master():
                 polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
+
+            profiler.stop_timer('total')
+
+        profiler.print_memory_subspace({
+            'polgrad dict': polgrad_results
+        }, self.ostream)
+        profiler.check_memory_usage('End of polgrad')
 
         profiler.print_timing(self.ostream)
         profiler.print_memory_usage(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing the analytical gradient for '
             valstr += f'{n_freqs:d} frequencies: '
-            valstr += f'{(tm.time() - loop_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
+            valstr += f'{(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1284,12 +1303,20 @@ class PolarizabilityGradient:
             The results of the linear response calculation.
         """
 
+        # profiler keywords
+        cphf_keywords = {
+            'timing', 'profiling', 'memory_profiling', 'memory_tracing'
+        }
+
         # timings
         orbrsp_start_time = tm.time()
 
         # setup orbital response driver
         orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        # inherit profiler settings from polarizability gradient driver
+        for key in cphf_keywords:
+            setattr(orbrsp_drv, key, getattr(self, key))
 
         # enforce the frequencies to be the same as in current driver
         orbrsp_drv.frequencies = self.frequencies
@@ -1299,12 +1326,12 @@ class PolarizabilityGradient:
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
 
-        if self.rank == mpi_master():
-            valstr = f'** Time spent on orbital response for {len(self.frequencies)} frequencies: '
-            valstr += f'{(tm.time() - orbrsp_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
+        #if self.rank == mpi_master():
+        #    valstr = f'** Time spent on orbital response for {len(self.frequencies)} '
+        #    valstr += f'frequencies: {(tm.time() - orbrsp_start_time):.6f} sec **'
+        #    self.ostream.print_header(valstr)
+        #    self.ostream.print_blank()
+        #    self.ostream.flush()
 
         return orbrsp_drv.cphf_results
 
@@ -1363,15 +1390,14 @@ class PolarizabilityGradient:
             The XC-contribution to the polarizability gradient
         """
 
+        dof = len(self.vector_components)
+
         if self.rank == mpi_master():
             natm = molecule.number_of_atoms()
-            dof = len(self.vector_components)
             xc_pol_gradient = np.zeros((dof, dof, natm, 3))
         else:
-            dof = None
             xc_pol_gradient = None
 
-        dof = self.comm.bcast(dof, root=mpi_master())
         xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         for m in range(dof):
@@ -1401,13 +1427,12 @@ class PolarizabilityGradient:
                     [x_minus_y_sym_m], [x_minus_y_sym_n],
                     [gs_dm], xcfun_label, profiler)
 
-                #if self.rank == mpi_master():
                 xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                if n != m:
-                    xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
+        #        if n != m:
+        #            xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
 
-        xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
+        #xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
@@ -1434,16 +1459,15 @@ class PolarizabilityGradient:
             The XC-contribution to the polarizability gradient
         """
 
+        dof = len(self.vector_components)
+
         if self.rank == mpi_master():
             natm = molecule.number_of_atoms()
-            dof = len(self.vector_components)
             xc_pol_gradient = np.zeros((dof, dof, natm, 3),
                                        dtype=np.dtype('complex128'))
         else:
-            dof = None
             xc_pol_gradient = None
 
-        dof = self.comm.bcast(dof, root=mpi_master())
         xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         # FIXME change "m,n" to "x,y" for consistency
@@ -1498,13 +1522,12 @@ class PolarizabilityGradient:
                     [gs_dm], xcfun_label,
                     profiler)
 
-                #if self.rank == mpi_master():
                 xc_pol_gradient[m, n] += polgrad_xcgrad
 
-                if n != m:
-                    xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
+        #        if n != m:
+        #            xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
 
-        xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
+        #xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
@@ -1558,8 +1581,6 @@ class PolarizabilityGradient:
         polgrad_xcgrad += 0.5 * xcgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, x_minus_y_den_n, x_minus_y_den_m, gs_density,
             mol_grid, xcfun_label)
-
-        #polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
 
         return polgrad_xcgrad
 
@@ -1627,9 +1648,6 @@ class PolarizabilityGradient:
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_imag_m,
             gs_density, mol_grid, xcfun_label)
 
-        #polgrad_xcgrad_real = self.comm.reduce(polgrad_xcgrad_real,
-        #                                       root=mpi_master())
-
         # imaginary contribution
         polgrad_xcgrad_imag = xcgrad_drv.integrate_vxc_gradient(  # Im DM
             molecule, ao_basis, rhow_den_imag, gs_density, mol_grid,
@@ -1664,13 +1682,6 @@ class PolarizabilityGradient:
             molecule, ao_basis, x_minus_y_den_imag_n, x_minus_y_den_real_m,
             gs_density, mol_grid, xcfun_label)
 
-        #polgrad_xcgrad_imag = self.comm.reduce(polgrad_xcgrad_imag,
-        #                                       root=mpi_master())
-
-        #if self.rank == mpi_master():
-        #    return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
-        #else:
-        #    return None
         return polgrad_xcgrad_real + 1j * polgrad_xcgrad_imag
 
     def get_fock_type_and_x_frac(self):
@@ -1882,8 +1893,8 @@ class PolarizabilityGradient:
                 polgrad_results[w] = num_polgradient[f]
 
             valstr = '** Time spent on constructing the numerical gradient for '
-            valstr += f'{n_freqs:d} frequencies: {(tm.time() - loop_start_time):.6f} sec **'
-            self.ostream.print_header(valstr)
+            valstr += f'{n_freqs:d} frequencies: {(tm.time() - loop_start_time):.2f} sec **'
+            self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
 
