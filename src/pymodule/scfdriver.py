@@ -58,7 +58,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
-                           pe_sanity_check, solvation_model_sanity_check)
+                           pe_sanity_check, gostshyp_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
@@ -115,6 +115,12 @@ class ScfDriver:
         - pe: The flag for running polarizable embedding calculation.
         - pe_options: The dictionary with options for polarizable embedding.
         - pe_summary: The summary string for polarizable embedding.
+        - gostshyp: The flag for running a gostshyp pressure calculation.
+        - pressure: The applied hydrostatic pressure.
+        - pressure_units: The units of the applied pressure.
+        - num_leb_points: The number of Lebedev points per van der Waals sphere.
+        - tssf: The tessellation sphere scaling factor.
+        - discretization: The surface discretization method.
         - dispersion: The flag for calculating D4 dispersion correction.
         - d4_energy: The D4 dispersion correction to energy.
         - electric_field: The static electric field.
@@ -227,6 +233,14 @@ class ScfDriver:
         self.embedding = None
         self._embedding_drv = None
 
+        # gostshyp setup
+        self._gostshyp = False
+        self.pressure = 0.0
+        self.pressure_units = 'MPa'
+        self.num_leb_points = 110
+        self.tssf = 1.2
+        self.discretization = 'fixed'
+
         # solvation model
         self.solvation_model = None
         self._cpcm = False
@@ -311,6 +325,11 @@ class ScfDriver:
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
+                'pressure': ('float', 'applied hydrostatic pressure'),
+                'pressure_units': ('str', 'units of the applied pressure'),
+                'num_leb_points': ('int', 'number of grid points per sphere'),
+                'tssf': ('float', 'tessellation sphere scaling factor'),
+                'discretization': ('str', 'surface discretization method'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('int', 'number of grid points per sphere (C-PCM)'),
@@ -433,6 +452,22 @@ class ScfDriver:
 
         return self._history
 
+    # @property
+    # def filename(self):
+    #     """
+    #     Getter function for protected filename attribute.
+    #     """
+
+    #     return self.filename
+
+    # @filename.setter
+    # def filename(self, value):
+    #     """
+    #     Setter function for protected filename attribute.
+    #     """
+
+    #     self.filename = value
+
     def print_keywords(self):
         """
         Prints input keywords in SCF driver.
@@ -483,6 +518,8 @@ class ScfDriver:
         dft_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
+
+        gostshyp_sanity_check(self, method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
@@ -542,6 +579,9 @@ class ScfDriver:
 
         # check pe setup
         pe_sanity_check(self)
+
+        # check gostshyp setup
+        #gostshyp_sanity_check(self)
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -812,6 +852,29 @@ class ScfDriver:
                 self._nuc_mm_energy += vdw_ene
 
             self._nuc_mm_energy = self.comm.allreduce(self._nuc_mm_energy)
+
+# set up gostshyp method by creating a surface tessellation
+        if self._gostshyp:
+            from .gostshyp import GostshypDriver
+            self._gostshyp_drv = GostshypDriver(molecule, ao_basis,
+                    self.pressure, self.pressure_units, self.comm, self.ostream)
+
+            tessellation_settings = {
+                'num_leb_points': self.num_leb_points,
+                'tssf': self.tssf,
+                'discretization': self.discretization,
+                'filename': self.filename,
+            }
+
+            tess_t0 = tm.time()
+            tessellation = self._gostshyp_drv.generate_tessellation(
+                                                        tessellation_settings)
+
+            tess_info = 'Surface tessellation with '
+            tess_info += '{0:d} grid points generated in {1:.2f} sec.'.format(
+                tessellation.shape[1], tm.time() - tess_t0)
+            self.ostream.print_info(tess_info)
+            self.ostream.print_blank()
 
         # C2-DIIS method
         if self.acc_type.upper() == 'DIIS':
@@ -1453,15 +1516,15 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock(
+            fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
 
-            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat,
+            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, e_pr, kin_mat,
                                      npot_mat, den_mat)
 
-            self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
+            self._comp_full_fock(fock_mat, vxc_mat, V_emb, V_pr, kin_mat, npot_mat)
 
             if self._cpcm:
                 if self.scf_type == 'restricted':
@@ -1951,10 +2014,10 @@ class ScfDriver:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
-        fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
+        fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
             den_mat, molecule, basis, screener, e_grad, profiler)
 
-        return fock_mat, vxc_mat, e_emb, V_emb
+        return fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr
 
     def _comp_2e_fock_single_comm(self,
                                   den_mat,
@@ -2239,10 +2302,25 @@ class ScfDriver:
 
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
+        
+        gostshyp_t0 = tm.time()
+        if self._gostshyp and not self._first_step:
+            # which density matrix is needed?
+            if self.scf_type == 'restricted':
+                density_matrix = 2.0 * den_mat[0]
+            else:
+                density_matrix = den_mat[0] + den_mat[1]
+            e_pr, V_pr = self._gostshyp_drv.get_gostshyp_contribution(density_matrix)
+            print('Energy contribution from  GOSTSHYP: ', e_pr)
+        else:
+            e_pr, V_pr = 0.0, None
 
-        return fock_mat, vxc_mat, e_emb, V_emb
+        if self.timing and self._gostshyp:
+            profiler.add_timing_info('FockGOSTSHYP', tm.time() - gostshyp_t0)
 
-    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat,
+        return fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr
+
+    def _comp_energy(self, fock_mat, vxc_mat, e_emb, e_pr, kin_mat, npot_mat,
                      den_mat):
         """
         Computes the sum of SCF energy components: electronic energy, kinetic
@@ -2254,6 +2332,8 @@ class ScfDriver:
             The Vxc matrix.
         :param e_emb:
             The embedding energy.
+        :param e_pr:
+            The pressure (GOSTSHYP) energy.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -2290,6 +2370,10 @@ class ScfDriver:
 
             if self._pe and not self._first_step:
                 e_ee += e_emb
+
+            if self._gostshyp and not self._first_step:
+                e_ee += e_pr
+            
             elif self.point_charges is not None and not self._first_step:
                 e_ee += e_emb
 
@@ -2300,7 +2384,7 @@ class ScfDriver:
 
         return e_sum
 
-    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, kin_mat, npot_mat):
+    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, pr_mat, kin_mat, npot_mat):
         """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
         Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
@@ -2311,7 +2395,9 @@ class ScfDriver:
         :param vxc_mat:
             The Vxc matrix.
         :param V_emb:
-            The embedding Fock matrix contributions.
+            The embedding Fock matrix contributions.        
+        :param pr_mat:
+            The pressure (GOSTSHYP) matrix.
         :param kin_mat:
             The kinetic energy matrix.
         :param npot_mat:
@@ -2342,6 +2428,12 @@ class ScfDriver:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
                     fock_mat[1] += V_emb
+
+            elif self._gostshyp and not self._first_step:
+                fock_mat[0] += pr_mat
+                if self.scf_type != 'restricted':
+                    fock_mat[1] += pr_mat
+            
             elif self.point_charges is not None and not self._first_step:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':
