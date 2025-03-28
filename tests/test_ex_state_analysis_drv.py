@@ -1,10 +1,12 @@
 import numpy as np
+
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.excitedstateanalysisdriver import ExcitedStateAnalysisDriver
+
 
 class TestCTNumbers:
     def test_tda(self):
@@ -58,6 +60,7 @@ class TestCTNumbers:
         tda_results = tda_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.ostream.mute()
 
         # add fragment dictionary to ExcitedStateAnalysisDriver
         exc_drv.fragment_dict = fragment_dict
@@ -125,6 +128,7 @@ class TestCTNumbers:
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()
+        exc_drv.ostream.mute()
 
         # add fragment dictionary to ExcitedStateAnalysisDriver
         exc_drv.fragment_dict = fragment_dict

@@ -132,7 +132,7 @@ class ExcitedStateAnalysisDriver:
         avg_pos_dict = self.compute_avg_position(molecule, ct_matrix,
                                                  self.fragment_dict)
         ret_dict.update(avg_pos_dict)
-        self.ostream.print_info("Average positions and ct length computed in " +
+        self.ostream.print_info("Average positions and CT length computed in " +
                                 "{:.3f} sec.".format(tm.time() -
                                                      tmp_start_time))
 
@@ -255,8 +255,8 @@ class ExcitedStateAnalysisDriver:
             density matrices in MO and AO basis.
         """
 
-        if any(key.startswith('eigenvector') for key in rsp_results.keys()
-              ) and 'formatted' not in rsp_results.keys():
+        if (any(key.startswith('eigenvector') for key in rsp_results.keys()) and
+            ('formatted' not in rsp_results.keys())):
             rsp_results = self.format_rsp_results(rsp_results)
 
         mo = scf_results["C_alpha"]
@@ -359,7 +359,7 @@ class ExcitedStateAnalysisDriver:
             for b, B in enumerate(fragment_dict.keys()):
                 TSST_AB = TS_ST[ao_map_fragments[A]][:, ao_map_fragments[B]]
                 T_STS_AB = T_STS[ao_map_fragments[A]][:, ao_map_fragments[B]]
-                ct_matrix[a, b] = np.einsum("mn->", TSST_AB + T_STS_AB)
+                ct_matrix[a, b] = np.sum(TSST_AB + T_STS_AB)
 
         return 0.5 * ct_matrix
 
@@ -379,9 +379,9 @@ class ExcitedStateAnalysisDriver:
         omega = np.sum(ct_matrix)
         hole_weight = np.sum(ct_matrix, axis=1) / omega
         particle_weight = np.sum(ct_matrix, axis=0) / omega
-        hole_pr = 1 / np.sum(hole_weight**2)
-        particle_pr = 1 / np.sum(particle_weight**2)
-        avg_pr = (hole_pr + particle_pr) / 2
+        hole_pr = 1.0 / np.sum(hole_weight**2)
+        particle_pr = 1.0 / np.sum(particle_weight**2)
+        avg_pr = (hole_pr + particle_pr) / 2.0
 
         return {
             'hole_participation_ratio': hole_pr,
@@ -577,7 +577,7 @@ class ExcitedStateAnalysisDriver:
 
         self.ostream.print_blank()
 
-        self.ostream.print_reference(self.get_reference())
+        self.ostream.print_reference('Reference: ' + self.get_reference())
         self.ostream.print_blank()
 
         self.ostream.flush()
@@ -617,7 +617,8 @@ class ExcitedStateAnalysisDriver:
         :param descriptor_dict:
             The dictionary of descriptors.
         """
-        pr = [None] * 3
+
+        pr = [None for x in range(3)]
 
         pr[0] = descriptor_dict['particle_participation_ratio']
         pr[1] = descriptor_dict['hole_participation_ratio']
@@ -630,7 +631,7 @@ class ExcitedStateAnalysisDriver:
         valstr += '{:>13s}{:>13s}{:>13s}'.format('Particle', 'Hole', 'Average')
         self.ostream.print_header(valstr.ljust(92))
 
-        valstr = '                    '
+        valstr = '                     '
         valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(pr[0], pr[1], pr[2])
         self.ostream.print_header(valstr.ljust(92))
 
@@ -643,6 +644,7 @@ class ExcitedStateAnalysisDriver:
         :param descriptor_dict:
             The dictionary of descriptors.
         """
+
         rel_ct_length = descriptor_dict['ct_length']
 
         valstr = "Charge Transfer Length (Angstrom)"
