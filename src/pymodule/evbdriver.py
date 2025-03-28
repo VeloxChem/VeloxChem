@@ -763,13 +763,13 @@ class EvbDriver():
 
     def run_FEP(
         self,
-        equil_steps=5000,
+        equil_steps=10000,
         sample_steps=100000,
         write_step=1000,
-        initial_equil_steps=5000,
+        initial_equil_steps=10000,
         step_size=0.001,
-        equil_step_size=0.002,
-        initial_equil_step_size=0.002,
+        equil_step_size=0.001,
+        initial_equil_step_size=0.001,
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
 
@@ -824,6 +824,7 @@ class EvbDriver():
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver()
+            FEP.debug = self.debug
             FEP.run_FEP(
                 equilibration_steps=equil_steps,
                 total_sample_steps=sample_steps,

@@ -105,9 +105,9 @@ class ScfHessianDriver(HessianDriver):
 
         self._input_keywords['hessian'].update({
             'orbrsp_only':
-                ('bool', 'whether to only run CPHF orbital response'),
+            ('bool', 'whether to only run CPHF orbital response'),
             'use_subcomms':
-                ('bool', 'whether to use subcommunicators in orbital response'),
+            ('bool', 'whether to use subcommunicators in orbital response'),
         })
 
     def update_settings(self, method_dict, hess_dict=None, cphf_dict=None):
@@ -342,9 +342,11 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # TODO: double check analytical Hessian with PE
-        assert_msg_critical(not self.scf_driver._pe,
-                            'ScfHessianDriver: Analytical Hessian with ' +
-                            'polarizable embedding (PE) not yet ''available')
+        assert_msg_critical(
+            not self.scf_driver._pe,
+            'ScfHessianDriver: Analytical Hessian with ' +
+            'polarizable embedding (PE) not yet '
+            'available')
 
         if self.scf_driver._pe:
             from .embedding import PolarizableEmbeddingHess
@@ -550,9 +552,8 @@ class ScfHessianDriver(HessianDriver):
                 thresh_int)
 
             # 'XX', 'XY', 'XZ', 'YY', 'YZ', 'ZZ'
-            xy_pairs_upper_triang = [
-                (x, y) for x in range(3) for y in range(x, 3)
-            ]
+            xy_pairs_upper_triang = [(x, y) for x in range(3)
+                                     for y in range(x, 3)]
 
             for idx, (x, y) in enumerate(xy_pairs_upper_triang):
                 hess_val = fock_factor * fock_hess_2000[idx]

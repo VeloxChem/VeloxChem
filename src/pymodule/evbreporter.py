@@ -53,8 +53,10 @@ class EvbReporter():
         force_file=None,
         velocity_file=None,
         append=False,
+        debug=False,
     ):
-
+        self.ostream = outputstream
+        self.debug = debug
         # OpenMM HIP version is slighly older and uses a different format for reporters
         if version('openmm') < '8.2':
             outputstream.print_info(
@@ -157,28 +159,16 @@ class EvbReporter():
 
             return {'steps': steps, 'periodic': True, 'include': include}
 
-    def report(self, _simulation, state):
-
-        simulation = copy.copy(_simulation)
-        positions = state.getPositions(asNumpy=True)
-        boxvectors = state.getPeriodicBoxVectors(asNumpy=True)
-        # apparently this is necessary
-
-        simulation.context.setPositions(positions)
-        simulation.context.setPeriodicBoxVectors(*boxvectors)
-
+    def report(self, simulation, state):
         line = f"{self.Lambda}"
         E = []
         for simulation_dict in self.simulation_dicts.values():
-            simulation_dict['simulation'].context.setPositions(positions)
-            simulation_dict['simulation'].context.setPeriodicBoxVectors(
-                *boxvectors)
-            _state = simulation_dict['simulation'].context.getState(
+            simulation_dict['simulation'].context.setState(state)
+            e = simulation_dict['simulation'].context.getState(
                 getEnergy=True,
                 groups=simulation_dict['forcegroups'],
-            )
-            E.append(_state.getPotentialEnergy().value_in_unit(
-                mm.unit.kilojoules_per_mole))
+            ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
+            E.append(e)
 
         Em_pes = simulation.context.getState(
             getEnergy=True,
@@ -193,84 +183,6 @@ class EvbReporter():
         for e in E:
             line += f", {e}"
         line += f", {Em_pes}, {Em_int}\n"
-
-        # verification
-        #todo so this keeps failing for condensed systems, why
-        pes_recalc = (1 - self.Lambda) * E[0] + self.Lambda * E[1]
-        # pes_recalc = E[0]
-        self.E_out.write(line)
-
-        if abs(pes_recalc - Em_pes) > 1e1:
-            # just go by every forcegroup, only shas to be done in pes
-
-            simulations = [
-                simulation,
-                self.simulation_dicts['reactant_pes']['simulation'],
-                self.simulation_dicts['product_pes']['simulation'],
-            ]
-            forcegroups = EvbForceGroup.pes_force_groups()
-            E_contributions = np.zeros((len(simulations), len(forcegroups)))
-            for si, simulation in enumerate(simulations):
-                for fg, forcegroup in enumerate(forcegroups):
-                    e = simulation.context.getState(
-                        getEnergy=True,
-                        groups=set([forcegroup]),
-                    ).getPotentialEnergy().value_in_unit(
-                        mm.unit.kilojoules_per_mole)
-                    E_contributions[si, fg] = e
-            dif = E_contributions[0] - (1 - self.Lambda) * E_contributions[
-                1] + self.Lambda * E_contributions[2]
-            dif = E_contributions[0] - E_contributions[1]
-            print(
-                f"Lambda: {self.Lambda}, pes difference: {Em_pes - pes_recalc}, NB force difference: {dif[3]}"
-            )
-
-            context0 = simulations[0].context
-            sys0 = context0.getSystem()
-            state0 = context0.getState(
-                positions=True,
-                energy=True,
-                groups=EvbForceGroup.pes_force_groups(),
-            )
-            pos0 = state0.getPositions(asNumpy=True).value_in_unit(
-                mm.unit.nanometer)
-            E0 = state0.getPotentialEnergy().value_in_unit(
-                mm.unit.kilojoules_per_mole)
-
-            context1 = simulations[1].context
-            sys1 = context1.getSystem()
-
-            state1 = context1.getState(
-                positions=True,
-                energy=True,
-                groups=EvbForceGroup.pes_force_groups(),
-            )
-
-            pos1 = state1.getPositions(asNumpy=True).value_in_unit(
-                mm.unit.nanometer)
-            E1 = state1.getPotentialEnergy().value_in_unit(
-                mm.unit.kilojoules_per_mole)
-
-            sys_string0 = mm.XmlSerializer.serialize(sys0)
-            sys_string1 = mm.XmlSerializer.serialize(sys1)
-            state_string0 = mm.XmlSerializer.serialize(state0)
-            state_string1 = mm.XmlSerializer.serialize(state1)
-            print(
-                f"Systems equal: {sys_string0==sys_string1}, States equal: {state_string0==state_string1}, Positions equal: {np.all(pos0== pos1)}, Energies difference: {E0 - E1}"
-            )
-            state_string0 = state_string0.splitlines()
-            state_string1 = state_string1.splitlines()
-            for i, (line0, line1) in enumerate(zip(state_string0,
-                                                   state_string1)):
-                if line0 != line1:
-                    print(f"line {i}: {line0} vs {line1}")
-
-            # what line are sys0 and sys1 different
-
-            pass
-
-        # if abs(int_recalc - Em_int) > 1e-6:
-        #     print(f"int difference: {Em_int - int_recalc}")
 
         if self.report_forces:
             forces = state.getForces(asNumpy=True)
@@ -291,6 +203,7 @@ class EvbReporter():
             line += '\n'
             self.v_out.write(line)
 
+        fg_E = []
         if self.report_forcegroups:
             line = ""
             for fg in EvbForceGroup:
@@ -299,6 +212,95 @@ class EvbReporter():
                     groups=set([fg.value]),
                 ).getPotentialEnergy().value_in_unit(
                     mm.unit.kilojoules_per_mole)
+                fg_E.append(e)
                 line += f"{e}, "
             line = line[:-2] + '\n'
-            self.FG_out.write(line)
+        self.E_out.write(line)
+
+        if self.debug:
+
+            # verification
+            pes_recalc = (1 - self.Lambda) * E[0] + self.Lambda * E[1]
+
+            if abs(pes_recalc - Em_pes) > 1e1:
+                self.ostream.print_info(
+                    f"Lambda: {self.Lambda}, pes difference: {Em_pes - pes_recalc}, NB force difference: {dif[3]}"
+                )
+
+                # simulations = [
+                #     simulation,
+                #     self.simulation_dicts['reactant_pes']['simulation'],
+                #     self.simulation_dicts['product_pes']['simulation'],
+                # ]
+                # forcegroups = EvbForceGroup.pes_force_groups()
+                # E_contributions = np.zeros((len(simulations), len(forcegroups)))
+                # for si, simulation in enumerate(simulations):
+                #     for fg, forcegroup in enumerate(forcegroups):
+                #         e = simulation.context.getState(
+                #             getEnergy=True,
+                #             groups=set([forcegroup]),
+                #         ).getPotentialEnergy().value_in_unit(
+                #             mm.unit.kilojoules_per_mole)
+                #         E_contributions[si, fg] = e
+                # dif = E_contributions[0] - (1 - self.Lambda) * E_contributions[
+                #     1] + self.Lambda * E_contributions[2]
+                # dif = E_contributions[0] - E_contributions[1]
+
+                # context0 = simulations[0].context
+                # sys0 = context0.getSystem()
+                # state0 = context0.getState(
+                #     positions=True,
+                #     energy=True,
+                #     groups=EvbForceGroup.pes_force_groups(),
+                # )
+                # pos0 = state0.getPositions(asNumpy=True).value_in_unit(
+                #     mm.unit.nanometer)
+                # E0 = state0.getPotentialEnergy().value_in_unit(
+                #     mm.unit.kilojoules_per_mole)
+
+                # context1 = simulations[1].context
+                # sys1 = context1.getSystem()
+
+                # state1 = context1.getState(
+                #     positions=True,
+                #     energy=True,
+                #     groups=EvbForceGroup.pes_force_groups(),
+                # )
+
+                # pos1 = state1.getPositions(asNumpy=True).value_in_unit(
+                #     mm.unit.nanometer)
+                # E1 = state1.getPotentialEnergy().value_in_unit(
+                #     mm.unit.kilojoules_per_mole)
+
+                # sys_string0 = mm.XmlSerializer.serialize(sys0)
+                # sys_string1 = mm.XmlSerializer.serialize(sys1)
+                # state_string0 = mm.XmlSerializer.serialize(state0)
+                # state_string1 = mm.XmlSerializer.serialize(state1)
+                # self.ostream.print_info(
+                #     f"Systems equal: {sys_string0==sys_string1}, States equal: {state_string0==state_string1}, Positions equal: {np.all(pos0== pos1)}, Energies difference: {E0 - E1}"
+                # )
+                # state_string0 = state_string0.splitlines()
+                # state_string1 = state_string1.splitlines()
+                # for i, (line0,
+                #         line1) in enumerate(zip(state_string0, state_string1)):
+                #     if line0 != line1:
+                #         self.ostream.print_info(f"line {i}: {line0} vs {line1}")
+                # self.ostream.flush()
+                # # what line are sys0 and sys1 different
+
+            if self.report_forcegroups:
+                pes_fg_recalc = 0
+                int_fg_recalc = 0
+                for i, e in enumerate(fg_E):
+                    if i + 1 in EvbForceGroup.pes_force_groups():
+                        pes_fg_recalc += e
+                    if i + 1 in EvbForceGroup.integration_force_groups():
+                        int_fg_recalc += e
+                if abs(pes_fg_recalc - Em_pes) > 1e-1:
+                    self.ostream.print_info(
+                        f"Force group pes difference: {Em_pes - pes_fg_recalc}")
+                if abs(int_fg_recalc - Em_int) > 1e-1:
+                    self.ostream.print_info(
+                        f"Force group int difference: {Em_int - int_fg_recalc}")
+                self.ostream.flush()
+                self.FG_out.write(line)
