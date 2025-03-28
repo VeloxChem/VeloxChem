@@ -63,13 +63,11 @@ class ExcitedStateAnalysisDriver:
         # output stream
         self.ostream = ostream
 
-    def compute(self, state_index, molecule, basis, scf_results, rsp_results):
+    def compute(self, molecule, basis, scf_results, rsp_results, state_index=1):
         """
         Computes dictionary containing excited state descriptors for
         excited state nstate.
 
-        :param state_index:
-            The excited state for which the descriptors are computed.
         :param molecule:
             The molecule
         :param basis:
@@ -78,6 +76,8 @@ class ExcitedStateAnalysisDriver:
             The dictionary of results from converged SCF wavefunction.
         :param rsp_results:
             The dictionary containing the rsp results.
+        :param state_index:
+            The excited state for which the descriptors are computed (indexing starts at 1).
 
         :return:
             A dictionary containing the transition, hole and particle density matrices
@@ -236,7 +236,7 @@ class ExcitedStateAnalysisDriver:
         return molecule, basis
 
     def compute_density_matrices(self, molecule, scf_results,
-                                          rsp_results, state_index):
+                                 rsp_results, state_index):
         """
         Computes the transition density matrix (TDM) for state
         nstate in MO and AO basis.
@@ -255,16 +255,15 @@ class ExcitedStateAnalysisDriver:
             density matrices in MO and AO basis.
         """
 
-        dens_dict = {}
-
         if any(key.startswith('eigenvector') for key in rsp_results.keys()) and 'formatted' not in rsp_results.keys():
             rsp_results = self.format_rsp_results(rsp_results)
 
+        mo = scf_results["C_alpha"]
         nocc = molecule.number_of_alpha_electrons()
-        norb = scf_results["C_alpha"].shape[1]
+        norb = mo.shape[1]
         nvirt = norb - nocc
-        c_mat_occ = deepcopy(scf_results["C_alpha"][:, :nocc])
-        c_mat_virt = deepcopy(scf_results["C_alpha"][:, nocc:])
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
 
         excstate = "S" + str(state_index)
         eigvec = rsp_results[excstate]
@@ -278,26 +277,27 @@ class ExcitedStateAnalysisDriver:
             tdens_mo = np.reshape(z_mat - y_mat, (nocc, nvirt))
 
         tdens_ao = np.linalg.multi_dot([
-            c_mat_occ, tdens_mo, c_mat_virt.T
+            mo_occ, tdens_mo, mo_vir.T
         ])
 
         hole_dens_mo = -np.matmul(tdens_mo, tdens_mo.T)
         hole_dens_ao = np.linalg.multi_dot([
-            c_mat_occ, hole_dens_mo, c_mat_occ.T
+            mo_occ, hole_dens_mo, mo_occ.T
         ])
 
         part_dens_mo = np.matmul(tdens_mo.T, tdens_mo)
         part_dens_ao = np.linalg.multi_dot([
-            c_mat_virt, part_dens_mo, c_mat_virt.T
+            mo_vir, part_dens_mo, mo_vir.T
         ])
 
-        dens_dict['transition_density_matrix_MO'] = tdens_mo
-        dens_dict['transition_density_matrix_AO'] = tdens_ao
-        dens_dict['particle_density_matrix_MO'] = part_dens_mo
-        dens_dict['particle_density_matrix_AO'] = part_dens_ao
-        dens_dict['hole_density_matrix_MO'] = hole_dens_mo
-        dens_dict['hole_density_matrix_AO'] = hole_dens_ao
-        return dens_dict
+        return {
+            'transition_density_matrix_MO': tdens_mo,
+            'transition_density_matrix_AO': tdens_ao,
+            'particle_density_matrix_MO': part_dens_mo,
+            'particle_density_matrix_AO': part_dens_ao,
+            'hole_density_matrix_MO': hole_dens_mo,
+            'hole_density_matrix_AO': hole_dens_ao,
+        }
 
     def map_fragments_to_atomic_orbitals(self, molecule, basis, fragment_dict):
         """
@@ -339,7 +339,7 @@ class ExcitedStateAnalysisDriver:
         :param scf_results:
             The dictionary of results from converged SCF wavefunction.
         :param T:
-            The TDM in AO basis.
+            The transition density matrix in AO basis.
         :param fragment_dict:
             The dictionary containing the indices of atoms in each fragment.
 
@@ -366,15 +366,15 @@ class ExcitedStateAnalysisDriver:
                 T_STS_AB = T_STS[ao_map_fragments[A]][:, ao_map_fragments[B]]
                 ct_matrix[a, b] = np.einsum("mn->", TSST_AB + T_STS_AB)
 
-        return (1 / 2) * ct_matrix
+        return 0.5 * ct_matrix
 
     def compute_participation_ratios(self, ct_matrix):
         """
         Computes the particle, hole, and average participation ratios
-        from the charge transfer (CT) matrix.
+        from the charge transfer matrix.
 
         :param ct_matrix:
-            The CT matrix.
+            The charge transfer matrix.
 
         :return:
             A dictionary containing the hole, particle,
@@ -390,11 +390,11 @@ class ExcitedStateAnalysisDriver:
         particle_pr = 1 / np.sum(particle_weight**2)
         avg_pr = (hole_pr + particle_pr) / 2
 
-        pr_dict['hole_participation_ratio'] = hole_pr
-        pr_dict['particle_participation_ratio'] = particle_pr
-        pr_dict['avg_participation_ratio'] = avg_pr
-
-        return pr_dict
+        return {
+            'hole_participation_ratio': hole_pr,
+            'particle_participation_ratio': particle_pr,
+            'avg_participation_ratio': avg_pr,
+        }
 
     def compute_fragment_coordinates(self, molecule, fragment_dict):
         """
@@ -416,26 +416,6 @@ class ExcitedStateAnalysisDriver:
             avg_coord_list.append(
                 np.sum(coord_array, axis=0) / coord_array.shape[0])
         return avg_coord_list
-
-    def max_dist_from_mol_center(self, molecule):
-        """
-        Computes the maximum distance from an atom in the molecule to the
-        center of the molecule.
-
-        :param molecule:
-            The molecule.
-
-        :return:
-            The maximum distance from an atom in the molecule to the
-            center of the molecule.
-        """
-
-        coordinates = molecule.get_coordinates_in_angstrom()
-        center = np.sum(coordinates, axis=0) / coordinates.shape[0]
-        atom_center_distance = []
-        for i in range(coordinates.shape[0]):
-            atom_center_distance.append(np.linalg.norm(coordinates[i] - center))
-        return np.max(np.array(atom_center_distance))
 
     def compute_avg_position(self, molecule, ct_matrix, fragment_dict):
         """
@@ -466,18 +446,18 @@ class ExcitedStateAnalysisDriver:
         particle_weight = np.sum(ct_matrix, axis=0) / omega
 
         avg_hole_position = np.matmul(hole_weight,
-                                      avg_coord_list)*bohr_in_angstrom()
+                                      avg_coord_list) * bohr_in_angstrom()
         avg_particle_position = np.matmul(particle_weight,
-                                          avg_coord_list)*bohr_in_angstrom()
+                                          avg_coord_list) * bohr_in_angstrom()
         avg_diff_vec = avg_particle_position - avg_hole_position
         ct_length = np.linalg.norm(avg_diff_vec)
 
-        avg_pos_dict['avg_hole_position'] = avg_hole_position
-        avg_pos_dict['avg_particle_position'] = avg_particle_position
-        avg_pos_dict['avg_difference_vector'] = avg_diff_vec
-        avg_pos_dict['ct_length'] = ct_length
-
-        return avg_pos_dict
+        return {
+            'avg_hole_position': avg_hole_position,
+            'avg_particle_position': avg_particle_position,
+            'avg_difference_vector': avg_diff_vec,
+            'ct_length': ct_length,
+        }
 
     def show_avg_ph_position(self,
                              molecule,

@@ -18,7 +18,7 @@ class TestCTNumbers:
         avg_particle_position = np.array([-1.46077909e-01,  1.08171427e-01, -8.18080571e-05])
         avg_difference_vec = np.array([-2.86029169e-01, -2.53473739e-02, -2.24560031e-06])
         
-        relative_ct_length = 0.0677115601152568
+        ct_length = 0.2871500913516519
 
         thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001  
         C   0.6775    0.0310   -0.0004  
@@ -38,8 +38,8 @@ class TestCTNumbers:
         """
 
         fragment_dict = {
-            "A": [1, 2, 3, 4, 5, 6, 7, 8],
-            "B": [9, 10, 11, 12, 13, 14, 15],
+            "Donor": [1, 2, 3, 4, 5, 6, 7, 8],
+            "Acceptor": [9, 10, 11, 12, 13, 14, 15],
         }
 
         molecule = Molecule.read_molecule_string(thienyl_thiazole_str)
@@ -59,17 +59,10 @@ class TestCTNumbers:
 
         exc_drv = ExcitedStateAnalysisDriver()
 
-        # set flags to True
-        exc_drv.include_avg_particle_hole_position = True
-        exc_drv.include_ct_matrix = True
-        exc_drv.include_participation_ratios = True
-        exc_drv._tda = True
-
         # add fragment dictionary to ExcitedStateAnalysisDriver
+        exc_drv.fragment_dict = fragment_dict
 
-        exc_drv.update_settings(fragment_dict=fragment_dict)
-
-        descriptor_dict_s1 = exc_drv.compute(1, molecule, basis, scf_results, tda_results)
+        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results, tda_results, 1)
 
         assert np.max(np.abs(descriptor_dict_s1['ct_matrix'] - ct_matrix)) <1.0e-06
         assert np.max(np.abs(descriptor_dict_s1['hole_participation_ratio'] - hole_participation_ratio)) <1.0e-06
@@ -78,7 +71,7 @@ class TestCTNumbers:
         assert np.max(np.abs(descriptor_dict_s1['avg_hole_position'] - avg_hole_position)) <1.0e-06
         assert np.max(np.abs(descriptor_dict_s1['avg_particle_position'] - avg_particle_position)) <1.0e-06
         assert np.max(np.abs(descriptor_dict_s1['avg_difference_vector'] - avg_difference_vec)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['relative_ct_length'] - relative_ct_length)) <1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1['ct_length'] - ct_length)) <1.0e-06
 
         
     def test_rpa(self):
@@ -92,7 +85,7 @@ class TestCTNumbers:
         avg_particle_position = np.array([-9.57159520e-02,  1.12634410e-01, -8.14126679e-05])
         avg_difference_vec = np.array([-2.46676975e-01, -2.18600555e-02, -1.93664826e-06])
         
-        relative_ct_length = 0.05839573238612395
+        ct_length =  0.2476436794645711
 
         thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001  
         C   0.6775    0.0310   -0.0004  
@@ -112,8 +105,8 @@ class TestCTNumbers:
         """
 
         fragment_dict = {
-            "A": [1, 2, 3, 4, 5, 6, 7, 8],
-            "B": [9, 10, 11, 12, 13, 14, 15],
+            "Donor": [1, 2, 3, 4, 5, 6, 7, 8],
+            "Acceptor": [9, 10, 11, 12, 13, 14, 15],
         }
 
         molecule = Molecule.read_molecule_string(thienyl_thiazole_str)
@@ -133,21 +126,17 @@ class TestCTNumbers:
 
         exc_drv = ExcitedStateAnalysisDriver()
 
-        # set flags to True
-        exc_drv.include_avg_particle_hole_position = True
-        exc_drv.include_participation_ratios = True
-
         # add fragment dictionary to ExcitedStateAnalysisDriver
 
-        exc_drv.update_settings(fragment_dict=fragment_dict)
+        exc_drv.fragment_dict = fragment_dict
 
-        for s in lreig_results['eigenvectors_distributed'].keys():
-            vector = lreig_results['eigenvectors_distributed'][s]
-            np_vector = lreig_drv.get_full_solution_vector(vector)
-            key = f"S{s + 1}"
-            lreig_results[key] = np_vector
+        ##for s in lreig_results['eigenvectors_distributed'].keys():
+        #    vector = lreig_results['eigenvectors_distributed'][s]
+        #    np_vector = lreig_drv.get_full_solution_vector(vector)
+        #    key = f"S{s + 1}"
+        #    lreig_results[key] = np_vector
 
-        descriptor_dict_s1 = exc_drv.compute(1, molecule, basis, scf_results, lreig_results)
+        descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results, lreig_results, 1)
 
         assert np.max(np.abs(descriptor_dict_s1['ct_matrix'] - ct_matrix)) <1.0e-06
         assert np.max(np.abs(descriptor_dict_s1['hole_participation_ratio'] - hole_participation_ratio)) <1.0e-06
@@ -156,4 +145,4 @@ class TestCTNumbers:
         assert np.max(np.abs(descriptor_dict_s1['avg_hole_position'] - avg_hole_position)) <1.0e-06
         assert np.max(np.abs(descriptor_dict_s1['avg_particle_position'] - avg_particle_position)) <1.0e-06
         assert np.max(np.abs(descriptor_dict_s1['avg_difference_vector'] - avg_difference_vec)) <1.0e-06
-        assert np.max(np.abs(descriptor_dict_s1['relative_ct_length'] - relative_ct_length)) <1.0e-06
+        assert np.max(np.abs(descriptor_dict_s1['ct_length'] - ct_length)) <1.0e-06
