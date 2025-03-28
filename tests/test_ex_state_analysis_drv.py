@@ -127,14 +127,7 @@ class TestCTNumbers:
         exc_drv = ExcitedStateAnalysisDriver()
 
         # add fragment dictionary to ExcitedStateAnalysisDriver
-
         exc_drv.fragment_dict = fragment_dict
-
-        ##for s in lreig_results['eigenvectors_distributed'].keys():
-        #    vector = lreig_results['eigenvectors_distributed'][s]
-        #    np_vector = lreig_drv.get_full_solution_vector(vector)
-        #    key = f"S{s + 1}"
-        #    lreig_results[key] = np_vector
 
         descriptor_dict_s1 = exc_drv.compute(molecule, basis, scf_results, lreig_results, 1)
 
