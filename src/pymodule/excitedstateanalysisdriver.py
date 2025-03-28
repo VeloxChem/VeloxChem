@@ -22,20 +22,19 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import h5py
 import numpy as np
-import py3Dmol as p3d
-import sys
 import time as tm
+import h5py
+import sys
 
 from .veloxchemlib import bohr_in_angstrom
-from .veloxchemlib import Molecule
-from .veloxchemlib import MolecularBasis
+from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
-from .errorhandler import assert_msg_critical
 from .visualizationdriver import VisualizationDriver
 from .lreigensolver import LinearResponseEigenSolver
 from .densityviewer import DensityViewer
+from .errorhandler import assert_msg_critical
 
 
 class ExcitedStateAnalysisDriver:
@@ -199,7 +198,7 @@ class ExcitedStateAnalysisDriver:
             the excited state analysis driver class.
         """
 
-        if 'eigenvectors_distributed' in rsp_results.keys():
+        if 'eigenvectors_distributed' in rsp_results:
             rsp_drv = LinearResponseEigenSolver()
             num_states = len(rsp_results['eigenvectors_distributed'])
             for i in range(num_states):
@@ -255,8 +254,8 @@ class ExcitedStateAnalysisDriver:
             density matrices in MO and AO basis.
         """
 
-        if (any(key.startswith('eigenvector') for key in rsp_results.keys()) and
-            ('formatted' not in rsp_results.keys())):
+        if (any(key.startswith('eigenvector') for key in rsp_results) and
+                'formatted' not in rsp_results):
             rsp_results = self.format_rsp_results(rsp_results)
 
         mo = scf_results["C_alpha"]
@@ -468,6 +467,11 @@ class ExcitedStateAnalysisDriver:
             The height of the plot.
         """
 
+        try:
+            import py3Dmol as p3d
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol.')
+
         avg_hole_position = descriptor_dict['avg_hole_position']
         avg_particle_position = descriptor_dict['avg_particle_position']
 
@@ -524,12 +528,12 @@ class ExcitedStateAnalysisDriver:
 
         dens_viewer = DensityViewer()
         dens_viewer_dict = {}
-        if 'hole_density_matrix_AO' in descriptors.keys():
+        if 'hole_density_matrix_AO' in descriptors:
             dens_viewer_dict['particle'] = descriptors[
                 'particle_density_matrix_AO']
             dens_viewer_dict['hole'] = descriptors['hole_density_matrix_AO']
         else:
-            for key in descriptors.keys():
+            for key in descriptors:
                 dens_viewer_dict[key + ' particle'] = descriptors[key][
                     'particle_density_matrix_AO']
                 dens_viewer_dict[
