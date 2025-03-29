@@ -221,7 +221,7 @@ class ConformerGenerator:
         # TODO: double check partial charge
         mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         mmff_gen.create_topology(molecule)
-        mmff_gen.write_gromacs_files(filename=self.top_file_name)
+        mmff_gen.write_gromacs_files(filename=top_file_name)
         self._comm.barrier()
 
         if self._rank == mpi_master():
@@ -237,27 +237,26 @@ class ConformerGenerator:
 
         return new_molecule
 
-    def generate(self, molecule, filename=None):
+    def generate(self, molecule):
 
-        if filename is None:
-            self.top_file_name = "MOL.top"
-        else:
-            self.top_file_name = f"{filename}.top"
+        top_file_name = self.top_file_name
+        if top_file_name is None:
+            top_file_name = "MOL.top"
 
         self.molecule = molecule
 
-        molecule = self._preoptimize_molecule(self.molecule, self.top_file_name, self.em_tolerance)
+        molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
 
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
 
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
-            self._get_dihedral_candidates(molecule, self.top_file_name))
+            self._get_dihedral_candidates(molecule, top_file_name))
 
         if rank == mpi_master():
             conformation_dih_arr = self._get_mol_comb(
-                molecule, self.top_file_name, dihedrals_candidates,
+                molecule, top_file_name, dihedrals_candidates,
                 atom_info_dict, dihedrals_dict)
         else:
             conformation_dih_arr = None
@@ -299,7 +298,7 @@ class ConformerGenerator:
 
         opt_start_time = time.time()
 
-        simulation = self._init_openmm_system(self.top_file_name)
+        simulation = self._init_openmm_system(top_file_name)
 
         energy_coords = []
 

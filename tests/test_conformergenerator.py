@@ -32,5 +32,5 @@ class TestConformerGenerator:
 
         if MPI.COMM_WORLD.Get_rank() == 0:
             minimum_potential_energy = conf.global_minimum_energy
-            assert (minimum_potential_energy > -74.0 and
-                    minimum_potential_energy < -73.0)
+            assert (minimum_potential_energy > -69.0 and
+                    minimum_potential_energy < -68.0)

@@ -2126,6 +2126,10 @@ class MMForceFieldGenerator:
             for atom2 in ['c2', 'n2', 'cd', 'cf', 'nd', 'nf']:
                 non_rotatable_bonds.add((atom1, atom2))
                 non_rotatable_bonds.add((atom2, atom1))
+        for atom1 in ['c ']:
+            for atom2 in ['n ', 'ns']:
+                non_rotatable_bonds.add((atom1, atom2))
+                non_rotatable_bonds.add((atom2, atom1))
         non_rotatable_bonds = list(non_rotatable_bonds)
 
         # Identify bonds to delete based on criteria
