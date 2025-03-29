@@ -855,7 +855,7 @@ def _Molecule_get_distance_matrix_in_angstrom(self):
     return distance_matrix
 
 
-def _Molecule_get_xyz_string(self, precision=12):
+def _Molecule_get_xyz_string(self, precision=12, comment=''):
     """
     Returns xyz string of molecule.
 
@@ -869,8 +869,13 @@ def _Molecule_get_xyz_string(self, precision=12):
     elem_ids = self.get_identifiers()
     atom_basis_labels = self.get_atom_basis_labels()
 
+    if comment and isinstance(comment, str):
+        trimmed_comment = comment.strip().splitlines()[0][:80]
+    else:
+        trimmed_comment = ''
+
     natoms = len(labels)
-    xyz = f'{natoms}\n\n'
+    xyz = f'{natoms}\n{trimmed_comment}\n'
 
     for a in range(natoms):
         xa, ya, za = coords_in_angstrom[a]
