@@ -4,28 +4,42 @@ from copy import deepcopy
 import numpy as np
 import itertools
 import time
+import sys
 import re
 
 from .veloxchemlib import bohr_in_angstrom, mpi_master
+from .outputstream import OutputStream
 from .molecule import Molecule
 from .mmforcefieldgenerator import MMForceFieldGenerator
+from .errorhandler import assert_msg_critical
 
-from openmm.app import GromacsTopFile, NoCutoff, Simulation
-from openmm import LangevinIntegrator
-from openmm import Platform  # Platform added
-from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond
+try:
+    from openmm import LangevinIntegrator, Platform
+    from openmm.app import GromacsTopFile, NoCutoff, Simulation
+    from openmm.unit import (nanometer, md_unit_system, kelvin, picoseconds,
+                             picosecond)
+except ImportError:
+    pass
 
 
 class ConformerGenerator:
 
-    def __init__(self, comm=None):
+    def __init__(self, comm=None, ostream=None):
 
         if comm is None:
             comm = MPI.COMM_WORLD
 
+        if ostream is None:
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
+            else:
+                ostream = OutputStream(None)
+
         self._comm = comm
         self._rank = comm.Get_rank()
         self._size = comm.Get_size()
+
+        self.ostream = ostream
 
         self.molecule = None
         self.number_of_conformers_to_select = 50
@@ -153,15 +167,14 @@ class ConformerGenerator:
 
     def _get_dihedral_combinations(self, dihedrals_candidates):
 
-        # assemble all possible combinations of dihedrals, each line pick a value from a list [180,0,300] for example
-
-        iter_stime = time.time()
+        # assemble all possible combinations of dihedrals
 
         test = [i[1] for i in dihedrals_candidates]
         dihedrals_combinations = list(itertools.product(*test))
         dihedral_list = [i[0] for i in dihedrals_candidates]
 
-        print(f"Combination of dihedrals took {time.time() - iter_stime:.2f} sec")
+        self.ostream.print_info(f"{len(dihedrals_combinations)} conformers will be generated.")
+        self.ostream.flush()
 
         return dihedrals_combinations, dihedral_list
 
@@ -183,6 +196,9 @@ class ConformerGenerator:
 
     def _init_openmm_system(self, topology_file):
 
+        assert_msg_critical('openmm' in sys.modules,
+                            'OpenMM is required for ConformerGenerator.')
+
         top = GromacsTopFile(topology_file)
         system = top.createSystem(NoCutoff)
 
@@ -196,6 +212,9 @@ class ConformerGenerator:
         return simulation
 
     def _minimize_energy(self, molecule, simulation, em_tolerance):
+
+        assert_msg_critical('openmm' in sys.modules,
+                            'OpenMM is required for ConformerGenerator.')
 
         coords_nm = molecule.get_coordinates_in_angstrom() * 0.1
         simulation.context.setPositions(coords_nm * nanometer)
@@ -239,6 +258,8 @@ class ConformerGenerator:
 
     def generate(self, molecule):
 
+        conf_gen_t0 = time.time()
+
         top_file_name = self.top_file_name
         if top_file_name is None:
             top_file_name = "MOL.top"
@@ -262,7 +283,14 @@ class ConformerGenerator:
             conformation_dih_arr = None
         conformation_dih_arr = comm.bcast(conformation_dih_arr, root=mpi_master())
 
-        dih_comb_arr_rank = conformation_dih_arr[rank::size, :, :].copy()
+        ave, rem = divmod(len(conformation_dih_arr), size)
+        counts = [ave + 1 if p < rem else ave for p in range(size)]
+        displs = [sum(counts[:p]) for p in range(size)]
+
+        num_total_conformers = len(conformation_dih_arr)
+
+        dih_comb_arr_rank = conformation_dih_arr[
+            displs[rank]:displs[rank] + counts[rank]].copy()
 
         # generate conformers based on the dihedral combinations and based on
         # previous conformer to save time
@@ -287,12 +315,21 @@ class ConformerGenerator:
 
             value_atom_index = dih_comb_arr_rank[i, :, 0:4] + 1
 
-            for j in diff_dih_ind[::-1]:
+            for j in diff_dih_ind:
                 new_molecule.set_dihedral_in_degrees(value_atom_index[j], dih_comb_arr_rank[i, j, 4])
 
             conformations.append(Molecule(new_molecule))
 
-        print(f"Rank {rank} generated {len(dih_comb_arr_rank)} conformations in {time.time() - conf_start_time:.2f} sec")
+        conf_dt = time.time() - conf_start_time
+
+        info = f"{num_total_conformers} conformers generated in {conf_dt:.2f} sec"
+        if comm.Get_size() > 1:
+            dt_list = comm.gather(conf_dt, root=mpi_master())
+            if comm.Get_rank() == mpi_master():
+                load_imb = 1.0 - sum(dt_list) / (len(dt_list) * max(dt_list))
+                info += f' (load imb.: {load_imb * 100:.1f}%)'
+        self.ostream.print_info(info)
+        self.ostream.flush()
 
         # optimize energy and coordinates for each conformation
 
@@ -307,13 +344,29 @@ class ConformerGenerator:
                 conformations[mol_i], simulation, self.em_tolerance)
             energy_coords.append([energy, opt_coords])
 
-        print(f"Rank {rank} finished minimization of {len(conformations)} conformations in {time.time() - opt_start_time:.2f} sec")
+        opt_dt = time.time() - opt_start_time
+
+        info = f"Energy minimization of {num_total_conformers} conformers took {opt_dt:.2f} sec"
+        if comm.Get_size() > 1:
+            dt_list = comm.gather(opt_dt, root=mpi_master())
+            if comm.Get_rank() == mpi_master():
+                load_imb = 1.0 - sum(dt_list) / (len(dt_list) * max(dt_list))
+                info += f' (load imb.: {load_imb * 100:.1f}%)'
+        self.ostream.print_info(info)
+        self.ostream.flush()
 
         # sort and select energy_coords
         sorted_energy_coords = sorted(energy_coords)[:self.number_of_conformers_to_select]
 
         # gather energy and opt_coords
         gathered_energy_coords = comm.gather(sorted_energy_coords, root=mpi_master())
+
+        if self.save_xyz_files:
+            if self.save_path is None:
+                save_path = Path("selected_conformers")
+            else:
+                save_path = Path(self.save_path)
+            save_path.mkdir(parents=True, exist_ok=True)
 
         if rank == mpi_master():
             # now we have all optimized conformer and energy, so we can analyze
@@ -327,8 +380,8 @@ class ConformerGenerator:
             all_sorted_energy_coords = sorted(all_sel_energy_coords)[:self.number_of_conformers_to_select]
 
             # get the lowest energy conformer
-            global_minimum_energy, global_minimum_conformer  = all_sorted_energy_coords[0]
-            print(f"Global minimum energy is {global_minimum_energy}")
+            global_minimum_energy, global_minimum_conformer = all_sorted_energy_coords[0]
+            self.ostream.print_info(f"Global minimum energy: {global_minimum_energy:.3f} kJ/mol")
 
             # return conformers and coordinates
             selected_conformers = []
@@ -341,25 +394,28 @@ class ConformerGenerator:
 
             # save the selected conformers to file
             if self.save_xyz_files:
-                if self.save_path is None:
-                    save_path = Path("selected_conformers")
-                else:
-                    save_path = Path(self.save_path)
-                save_path.mkdir(parents=True, exist_ok=True)
-
                 for i, conf in enumerate(selected_conformers):
-                    xyz_path = str(save_path / f"conformer_{i}.xyz")
+                    xyz_path = str(save_path / f"conformer_{i + 1}.xyz")
                     # assemble coordinates and atom labels to xyz file
                     self._write_molecule_xyz_file(
                         xyz_path,
                         conf["labels"],
                         conf["coordinates"],
-                        comment="Energy:" + str(conf["energy"]),
+                        comment=f"Energy: {conf['energy']:.3f} kJ/mol"
                     )
 
             self.global_minimum_conformer = global_minimum_conformer
             self.global_minimum_energy = global_minimum_energy
             self.selected_conformers = selected_conformers
+
+            if self.save_xyz_files:
+                self.ostream.print_info(
+                    f"{self.number_of_conformers_to_select} conformers with " +
+                    f"the lowest energies are saved in folder {str(save_path)}")
+
+            self.ostream.print_info(
+                "Total time spent in generating conformers: " +
+                f"{time.time() - conf_gen_t0:.2f} sec")
 
     def show_global_minimum(self, atom_indices=False, atom_labels=False):
 
@@ -370,5 +426,4 @@ class ConformerGenerator:
                 comment="Energy:" + str(self.global_minimum_energy),
             )
             min_conformer = Molecule.read_xyz_string(min_conformer_xyz_string)
-            print("Global minimum energy:", self.global_minimum_energy)
             min_conformer.show(atom_indices=atom_indices, atom_labels=atom_labels)
