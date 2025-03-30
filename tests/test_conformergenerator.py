@@ -23,6 +23,8 @@ class TestConformerGenerator:
             "CC1([C@@H](N2[C@H](S1)[C@@H](C2=O)NC(=O)CC3=CC=CC=C3)C(=O)O)C")
 
         conf = ConformerGenerator()
+        conf.ostream.mute()
+
         conf.top_file_name = "mol.top"
         conf.number_of_conformers_to_select = 10
         conf.save_xyz_files = False

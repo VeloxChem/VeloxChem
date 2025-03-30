@@ -121,38 +121,40 @@ class ConformerGenerator:
         rotatable_bonds = deepcopy(mmff_gen.rotatable_bonds)
         dihedrals_dict = deepcopy(mmff_gen.dihedrals)
 
-        rotatable_bonds = [[i[0] - 1, i[1] - 1] for i in rotatable_bonds]
+        rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
 
-        # only pick one dihedral for each rotatable bond
-        for key, value in dihedrals_dict.items():
-            bond = [key[1], key[2]]
-            sorted_bond = sorted(bond)
-
-            if [sorted_bond[0], sorted_bond[1]] in rotatable_bonds:
-                if (sorted_bond[0], sorted_bond[1]) not in rotatable_dihedrals_dict:
-                    rotatable_dihedrals_dict[(sorted_bond[0], sorted_bond[1])] = value
-                    rotatable_dihedrals_dict[(sorted_bond[0], sorted_bond[1])][
-                        "dihedral_indices"
-                    ] = key
-                else:
-                    continue
-
-        dihedrals_candidates = []
-
-        def fetch_periodicity_value(periodicity):
+        def get_max_periodicity(periodicity):
             if isinstance(periodicity, list):
                 return max([abs(p) for p in periodicity])
             else:
                 return periodicity
 
+        # only pick one dihedral for each rotatable bond
+        for (i, j, k, l), dih in dihedrals_dict.items():
+
+            sorted_bond = tuple(sorted([j, k]))
+            max_periodicity = get_max_periodicity(dih["periodicity"])
+
+            if sorted_bond in rotatable_bonds_zero_based:
+                if sorted_bond not in rotatable_dihedrals_dict:
+                    rotatable_dihedrals_dict[sorted_bond] = deepcopy(dih)
+                    rotatable_dihedrals_dict[sorted_bond]["dihedral_indices"] = (i, j, k, l)
+                    rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max_periodicity
+                else:
+                    curr_periodicity = rotatable_dihedrals_dict[sorted_bond]["max_periodicity"]
+                    rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max(
+                        curr_periodicity, max_periodicity)
+
+        dihedrals_candidates = []
+
         for k, v in rotatable_dihedrals_dict.items():
-            periodicity_value = fetch_periodicity_value(v["periodicity"])
-            if periodicity_value == 3:
+            max_periodicity = v["max_periodicity"]
+            if max_periodicity == 3:
                 dih_angle = [60, 180, 300]
-            elif periodicity_value == 2:
+            elif max_periodicity == 2:
                 dih_angle = [0, 180]
-            elif periodicity_value == 4:
+            elif max_periodicity == 4:
                 dih_angle = [0, 90, 180, 270]
             else:
                 continue
