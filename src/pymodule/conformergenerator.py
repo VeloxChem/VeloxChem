@@ -356,7 +356,8 @@ class ConformerGenerator:
         self.ostream.flush()
 
         # sort and select energy_coords
-        sorted_energy_coords = sorted(energy_coords)[:self.number_of_conformers_to_select]
+        sorted_energy_coords = sorted(
+            energy_coords, key=lambda x: x[0])[:self.number_of_conformers_to_select]
 
         # gather energy and opt_coords
         gathered_energy_coords = comm.gather(sorted_energy_coords, root=mpi_master())
@@ -377,7 +378,8 @@ class ConformerGenerator:
                 for ene_coord in local_energy_coords]
 
             # sort and select all_energy_coords
-            all_sorted_energy_coords = sorted(all_sel_energy_coords)[:self.number_of_conformers_to_select]
+            all_sorted_energy_coords = sorted(
+                all_sel_energy_coords, key=lambda x: x[0])[:self.number_of_conformers_to_select]
 
             # get the lowest energy conformer
             global_minimum_energy, global_minimum_conformer = all_sorted_energy_coords[0]

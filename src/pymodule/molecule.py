@@ -677,11 +677,19 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
 
     current_angle = self.get_dihedral(dihedral_indices_one_based, angle_unit)
 
+    updated_target_angle = target_angle
+    half_period = 180.0 if angle_unit.lower() == 'degree' else math.pi
+    while updated_target_angle - current_angle > half_period:
+        updated_target_angle -= 2.0 * half_period
+    while updated_target_angle - current_angle < -half_period:
+        updated_target_angle += 2.0 * half_period
+
     # make several attempts to rotate the dihedral angle, with the constraint
     # that the connectivity matrix should not change
     for attempt in range(10, -1, -1):
 
-        rotation_angle = (target_angle - current_angle) * (0.1 * attempt)
+        rotation_angle = (updated_target_angle - current_angle) * (0.1 *
+                                                                   attempt)
 
         new_coords_in_au = self._rotate_around_vector(coords_in_au,
                                                       coords_in_au[j], vij,
