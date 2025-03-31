@@ -1,11 +1,11 @@
 from mpi4py import MPI
 from pathlib import Path
+from copy import deepcopy
 import numpy as np
 import itertools
 import time
 import sys
 import re
-from copy import deepcopy
 
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
@@ -59,27 +59,12 @@ class ConformerGenerator:
         xyz_string = ""
         xyz_string += str(len(labels)) + "\n"
         xyz_string += comment + "\n"  # add comment line to second line
-        xyz_string += comment + "\n"  # add comment line to second line
         for i in range(len(labels)):
-            xyz_string += (
-                labels[i]
-                + "  "
-                + str(coords[i][0])
-                + "  "
-                + str(coords[i][1])
-                + "  "
-                + str(coords[i][2])
-                + "   "
-                + "%10.5f" % round(coords[i][0], 5)  # format the coordinates to 3 decimal places
-                + "   "
-                + "%10.5f" % round(coords[i][1], 5)
-                + "   "
-                + "%10.5f" % round(coords[i][2], 5)
-                + "\n"
-            )
+            xyz_string += (labels[i] +
+                f" {coords[i][0]:10.5f}" +
+                f" {coords[i][1]:10.5f}" +
+                f" {coords[i][2]:10.5f}\n")
         return xyz_string
-
-
 
     def _write_molecule_xyz_file(self, path, labels, coords, comment=""):
 
@@ -87,35 +72,34 @@ class ConformerGenerator:
         with open(path, "w") as f:
             f.write(xyz_string)
 
+    def analyze_equiv(self, molecule):
 
-    def analyze_equiv(self,molecule):
-        def get_equiv(mol):
-            idtf = AtomTypeIdentifier()
-            idtf.ostream.mute()
-            atom_type = idtf.generate_gaff_atomtypes(mol)
-            idtf.identify_equivalences()
-            equivalent_charges = idtf.equivalent_charges
-            return atom_type, equivalent_charges
+        idtf = AtomTypeIdentifier()
+        idtf.ostream.mute()
 
-        atom_type, equiv = get_equiv(molecule)
+        atom_type = idtf.generate_gaff_atomtypes(molecule)
+
+        idtf.identify_equivalences()
+        equivalent_charges = idtf.equivalent_charges
+
         equiv_atoms_groups = []
-        # Split the string by comma
-        substrings = equiv.split(",")
-        # Split each substring by "="
-        for substr in substrings:
-            unit = substr.split("=")
-            equiv_atoms_groups.append(unit)
-        # map str to int
+        for substr in equivalent_charges.split(","):
+            equiv_atoms_groups.append(substr.split("="))
+
         one_based_equiv_atoms_groups = [list(map(int, x)) for x in equiv_atoms_groups]
-        return  atom_type, one_based_equiv_atoms_groups
+
+        return one_based_equiv_atoms_groups
         
     # use equivalent atoms
     def _check_equivside_in_dihedrals(self, dihedral_indices,atom_info_dict,one_based_equiv_atoms_groups):
         
-        # according to the connected_atom and equivalent list, if one side is connected to a equivalent group "like methyl" then no need to sample and return False
+        # according to the connected_atom and equivalent list, if one side is
+        # connected to a equivalent group "like methyl" then no need to sample
+        # and return False
 
         #i,j,k,l we check side_j and side_k
         # we check twice because any side works
+
         # round1
         side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
         one_based_connected_atom_numbers = atom_info_dict[side_j_index]["ConnectedAtomsNumbers"]
@@ -124,6 +108,7 @@ class ConformerGenerator:
         for equiv_g in one_based_equiv_atoms_groups:
             if connected_set.issubset(set(equiv_g)):
                 return True
+
         # round2
         side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
         one_based_connected_atom_numbers = atom_info_dict[side_k_index]["ConnectedAtomsNumbers"]
@@ -132,24 +117,32 @@ class ConformerGenerator:
         for equiv_g in one_based_equiv_atoms_groups:
             if connected_set.issubset(set(equiv_g)):
                 return True
+
         # if not found, return False
         return False
     
+    def _use_mmff_generator(self, comm, mol, top_file_name):
 
-    def _useMMFF_generator(self, comm, mol, top_file_name="MOL"):
         # use MMFF generator to generate the topology and dihedrals
         mmff_gen = MMForceFieldGenerator(comm=comm)
+        mmff_gen.ostream.mute()
+
         mmff_gen.partial_charges = mol.get_partial_charges(mol.get_charge())
         mmff_gen.create_topology(mol)
         mmff_gen.write_gromacs_files(filename=top_file_name)
-        atom_info_dict = mmff_gen.atom_info_dict
-        rotatable_bonds = mmff_gen.rotatable_bonds
-        dihedrals_dict = mmff_gen.dihedrals
+
+        # make sure to sync the ranks after the top file is written
+        comm.barrier()
+
+        atom_info_dict = deepcopy(mmff_gen.atom_info_dict)
+        rotatable_bonds = deepcopy(mmff_gen.rotatable_bonds)
+        dihedrals_dict = deepcopy(mmff_gen.dihedrals)
+
         return atom_info_dict, rotatable_bonds, dihedrals_dict
 
     def _get_dihedral_candidates(self, molecule, top_file_name,atom_info_dict, rotatable_bonds, dihedrals_dict):
-        _,one_based_equiv_atoms_groups = self.analyze_equiv(molecule)
-        self._comm.barrier()
+
+        one_based_equiv_atoms_groups = self.analyze_equiv(molecule)
 
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
@@ -160,7 +153,8 @@ class ConformerGenerator:
             else:
                 return periodicity
 
-        # only pick one dihedral for each rotatable bond # dihedral with max periodicity absolute value
+        # only pick one dihedral for each rotatable bond
+        # also need to find max periodicity
         for (i, j, k, l), dih in dihedrals_dict.items():
 
             sorted_bond = tuple(sorted([j, k]))
@@ -208,8 +202,6 @@ class ConformerGenerator:
         self.ostream.flush()
 
         return dihedrals_combinations, dihedral_list
-    
-
     
     def _get_mol_comb(self, dihedrals_candidates):
 
@@ -266,25 +258,23 @@ class ConformerGenerator:
 
         return energy, optimized_coords
     
-    def _preoptimize_molecule(self, mol, top_file_name, em_tolerance_value):
-        # use MMFF generator to generate the topology and dihedrals in all ranks
-        _, _, _ = self._useMMFF_generator(self._comm, mol, top_file_name)
-        self._comm.barrier()
+    def _preoptimize_molecule(self, mol, top_file_name, em_tolerance):
+
+        atom_info_dict, rotatable_bonds, dihedrals_dict = self._use_mmff_generator(self._comm, mol, top_file_name)
 
         if self._rank == mpi_master():
             simulation = self._init_openmm_system(top_file_name)
-            energy, opt_coords = self._minimize_energy(mol, simulation, em_tolerance_value)
+            energy, opt_coords = self._minimize_energy(mol, simulation, em_tolerance)
         else:
-            opt_coords = None
-        opt_coords = self._comm.bcast(opt_coords, root=mpi_master())
+            energy, opt_coords = None, None
+        energy, opt_coords = self._comm.bcast((energy, opt_coords), root=mpi_master())
+
         # update the coordinates of the molecule to new_mol
         new_mol = Molecule(mol)
         for i in range(len(opt_coords)):
             new_mol.set_atom_coordinates(i, opt_coords[i] / bohr_in_angstrom())
 
-        return energy,new_mol
-    
-
+        return energy, new_mol
 
     def generate(self, molecule):
 
@@ -296,25 +286,21 @@ class ConformerGenerator:
 
         self.molecule = molecule
 
-        pre_molecule_energy,pre_molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
+        pre_molecule_energy, pre_molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
 
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
 
-
-        atom_info_dict, rotatable_bonds, dihedrals_dict = self._useMMFF_generator(
-            comm, pre_molecule, top_file_name
-        )
+        atom_info_dict, rotatable_bonds, dihedrals_dict = self._use_mmff_generator(comm, pre_molecule, top_file_name)
         
         if rank == mpi_master():
             dihedrals_candidates = self._get_dihedral_candidates(pre_molecule, top_file_name,atom_info_dict, rotatable_bonds, dihedrals_dict)
             num_dih_candidates = len(dihedrals_candidates)
-
         else:
             num_dih_candidates = None
-
         num_dih_candidates = comm.bcast(num_dih_candidates, root=mpi_master())
+
         if num_dih_candidates == 0:
             if rank == mpi_master():
                 self.ostream.print_info("No rotatable bonds found, no new conformers will be generated.")
@@ -328,10 +314,8 @@ class ConformerGenerator:
                 self.selected_conformers = [pre_molecule_conformer]
             return
 
-
         if rank == mpi_master():
-            conformation_dih_arr = self._get_mol_comb(
-                dihedrals_candidates)
+            conformation_dih_arr = self._get_mol_comb(dihedrals_candidates)
         else:
             conformation_dih_arr = None
         conformation_dih_arr = comm.bcast(conformation_dih_arr, root=mpi_master())
@@ -482,4 +466,3 @@ class ConformerGenerator:
             )
             min_conformer = Molecule.read_xyz_string(min_conformer_xyz_string)
             min_conformer.show(atom_indices=atom_indices, atom_labels=atom_labels)
-
