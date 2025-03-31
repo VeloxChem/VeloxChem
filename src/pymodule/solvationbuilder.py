@@ -117,6 +117,7 @@ class SolvationBuilder:
         self.centered_solute = None
         # This is a list of tuples with the molecule id, atom labels and coordinates of the system
         self.system = []
+        self.write_pdb_only = False
 
         # NPT Equilibration options
         self.equilibration_flag = False
@@ -570,7 +571,7 @@ class SolvationBuilder:
                         f.write(atomtype + '\n')
                     f.write('\n')
                     f.write(';Residue topologies\n')
-                    f.write('#include "solute.itp"\n')
+                    f.write('#include "solute.itp"\n') #TODO:maybe not hardcode this so that the user can specify their own itp
                     # Water model
                     if self.solvent_name in ['spce', 'tip3p']:
                         f.write(solvent_directive + '\n')
@@ -642,20 +643,23 @@ class SolvationBuilder:
         # Generate the forcefields
         self._generate_forcefields(solute_ff, solvent_ffs)
 
+        
         # Special case for 'itself' solvent
         if self.solvent_name == 'itself':
             # Write the XML and PDB files for the solute
-            self.solute_ff.write_openmm_files('liquid', 'MOL')
-            self.ostream.print_info("liquid.xml file written")
-            self.ostream.flush()
+            if self.write_pdb_only == False:
+                self.solute_ff.write_openmm_files('liquid', 'MOL')
+                self.ostream.print_info("liquid.xml file written")
+                self.ostream.flush()
             # Write the system PDB file
             filename = 'liquid.pdb'
 
         else:
             # Solute
-            self.solute_ff.write_openmm_files('solute', 'MOL')
-            self.ostream.print_info("system.pdb, solute.pdb, and solute.xml files written")
-            self.ostream.flush()
+            if self.write_pdb_only == False:
+                self.solute_ff.write_openmm_files('solute', 'MOL')
+                self.ostream.print_info("system.pdb, solute.pdb, and solute.xml files written")
+                self.ostream.flush()
 
             # Not standard solvents
             if self.solvent_name not in ['spce', 'tip3p']:
