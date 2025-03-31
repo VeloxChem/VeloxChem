@@ -112,6 +112,7 @@ class RespChargesDriver:
 
         # grid information
         self.grid_type = 'mk'
+        self.custom_mk_radii = None
 
         # MK grid settings (density in Angstrom^-2)
         self.number_layers = 4
@@ -151,6 +152,8 @@ class RespChargesDriver:
                 'max_iter': ('int', 'maximum iterations in RESP fit'),
                 'threshold': ('float', 'convergence threshold of RESP fit'),
                 'equal_charges': ('str', 'constraints for equal charges'),
+                'custom_mk_radii':
+                    ('seq_fixed_str', 'custom MK radii for RESP charges'),
                 'xyz_file': ('str', 'xyz file containing the conformers'),
                 'net_charge': ('float', 'net charge of the molecule'),
                 'multiplicity': ('int', 'spin multiplicity of the molecule'),
@@ -983,11 +986,36 @@ class RespChargesDriver:
         grid = []
         coords = molecule.get_coordinates_in_bohr()
 
+        mol_mk_radii = molecule.mk_radii_to_numpy()
+
+        if self.custom_mk_radii is not None:
+            assert_msg_critical(
+                len(self.custom_mk_radii) % 2 == 0,
+                'RespChargesDriver: expecting even number of entries for ' +
+                'custom MK radii')
+
+            keys = self.custom_mk_radii[0::2]
+            vals = self.custom_mk_radii[1::2]
+
+            for key, val in zip(keys, vals):
+                val_au = float(val) / bohr_in_angstrom()
+                try:
+                    idx = int(key) - 1
+                    assert_msg_critical(
+                        0 <= idx and idx < molecule.number_of_atoms(),
+                        'RespChargesDriver: invalid atom index for ' +
+                        'custom MK radii')
+                    mol_mk_radii[idx] = val_au
+                except ValueError:
+                    for idx, label in enumerate(molecule.get_labels()):
+                        if label.upper() == key.upper():
+                            mol_mk_radii[idx] = val_au
+
         for layer in range(self.number_layers):
 
             # MK radii with layer-dependent scaling factor
             scaling_factor = 1.4 + layer * 0.4 / np.sqrt(self.number_layers)
-            r = scaling_factor * molecule.mk_radii_to_numpy()
+            r = scaling_factor * mol_mk_radii
 
             for atom in range(molecule.number_of_atoms()):
                 # number of points fitting on the equator
