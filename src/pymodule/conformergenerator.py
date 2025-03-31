@@ -51,26 +51,6 @@ class ConformerGenerator:
 
         self.em_tolerance = 1.0
 
-    def _convert_molecule_xyz_string(self, labels, coords, comment=""):
-
-        if len(labels) != len(coords):
-            raise ValueError("The length of labels and coords should be the same")
-        xyz_string = ""
-        xyz_string += str(len(labels)) + "\n"
-        xyz_string += comment + "\n"  # add comment line to second line
-        for i in range(len(labels)):
-            xyz_string += (labels[i] +
-                f" {coords[i][0]:10.5f}" +
-                f" {coords[i][1]:10.5f}" +
-                f" {coords[i][2]:10.5f}\n")
-        return xyz_string
-
-    def _write_molecule_xyz_file(self, path, labels, coords, comment=""):
-
-        xyz_string = self._convert_molecule_xyz_string(labels, coords, comment)
-        with open(path, "w") as f:
-            f.write(xyz_string)
-
     def analyze_equiv(self, molecule):
 
         idtf = AtomTypeIdentifier()
@@ -155,6 +135,7 @@ class ConformerGenerator:
         mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         mmff_gen.create_topology(molecule)
         mmff_gen.write_gromacs_files(filename=top_file_name)
+        # make sure to sync the ranks after the top file is written
         self._comm.barrier()
 
         atom_info_dict = deepcopy(mmff_gen.atom_info_dict)
@@ -289,20 +270,21 @@ class ConformerGenerator:
         mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         mmff_gen.create_topology(molecule)
         mmff_gen.write_gromacs_files(filename=top_file_name)
+        # make sure to sync the ranks after the top file is written
         self._comm.barrier()
 
         if self._rank == mpi_master():
             simulation = self._init_openmm_system(top_file_name)
             energy, opt_coords = self._minimize_energy(molecule, simulation, em_tolerance)
         else:
-            opt_coords = None
-        opt_coords = self._comm.bcast(opt_coords, root=mpi_master())
+            energy, opt_coords = None, None
+        energy, opt_coords = self._comm.bcast((energy, opt_coords), root=mpi_master())
 
         new_molecule = Molecule(molecule)
         for i in range(len(opt_coords)):
             new_molecule.set_atom_coordinates(i, opt_coords[i] / bohr_in_angstrom())
 
-        return new_molecule
+        return energy, new_molecule
 
     def generate(self, molecule):
 
@@ -314,7 +296,7 @@ class ConformerGenerator:
 
         self.molecule = molecule
 
-        molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
+        energy, molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
 
         comm = self._comm
         rank = self._comm.Get_rank()
@@ -322,6 +304,23 @@ class ConformerGenerator:
 
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
             self._get_dihedral_candidates(molecule, top_file_name))
+
+        # exit early if there is no candidate dihedral to rotate
+        if not dihedrals_candidates:
+            self.ostream.print_info("No rotatable bond found, no new conformer will be generated.")
+            self.ostream.flush()
+
+            if rank == mpi_master():
+                self.global_minimum_conformer = molecule
+                self.global_minimum_energy = energy
+                return {
+                    'energies': [energy],
+                    'molecules': [Molecule(molecule)],
+                    'geometries': [molecule.get_xyz_string(
+                        comment=f"Energy: {energy:.3f} kJ/mol")],
+                }
+            else:
+                return None
 
         if rank == mpi_master():
             conformation_dih_arr = self._get_mol_comb(
@@ -410,13 +409,6 @@ class ConformerGenerator:
         # gather energy and opt_coords
         gathered_energy_coords = comm.gather(sorted_energy_coords, root=mpi_master())
 
-        if self.save_xyz_files:
-            if self.save_path is None:
-                save_path = Path("selected_conformers")
-            else:
-                save_path = Path(self.save_path)
-            save_path.mkdir(parents=True, exist_ok=True)
-
         if rank == mpi_master():
             # now we have all optimized conformer and energy, so we can analyze
             # the energy and get the lowest energy conformer reshape the
@@ -430,50 +422,64 @@ class ConformerGenerator:
                 all_sel_energy_coords, key=lambda x: x[0])[:self.number_of_conformers_to_select]
 
             # get the lowest energy conformer
-            global_minimum_energy, global_minimum_conformer = all_sorted_energy_coords[0]
-            self.ostream.print_info(f"Global minimum energy: {global_minimum_energy:.3f} kJ/mol")
+            min_energy, min_coords_angstrom = all_sorted_energy_coords[0]
+            min_mol = Molecule(molecule)
+            for iatom in range(min_mol.number_of_atoms()):
+                min_mol.set_atom_coordinates(
+                    i, min_coords_angstrom[iatom] / bohr_in_angstrom())
+            self.ostream.print_info(f"Global minimum energy: {min_energy:.3f} kJ/mol")
 
-            # return conformers and coordinates
-            selected_conformers = []
-            for i in range(len(all_sorted_energy_coords)):
-                conformer = {}
-                conformer["energy"] = all_sorted_energy_coords[i][0]
-                conformer["labels"] = molecule.get_labels()
-                conformer["coordinates"] = all_sorted_energy_coords[i][1]
-                selected_conformers.append(conformer)
+            self.global_minimum_conformer = min_mol
+            self.global_minimum_energy = min_energy
+
+            # return conformers info
+            conformers_dict = {
+                'energies': [],
+                'molecules': [],
+                'geometries': [],
+            }
+
+            for conf_energy, conf_coords_angstrom in all_sorted_energy_coords:
+                conformers_dict["energies"].append(conf_energy)
+                mol_copy = Molecule(molecule)
+                for iatom in range(mol_copy.number_of_atoms()):
+                    mol_copy.set_atom_coordinates(
+                        iatom, conf_coords_angstrom[iatom] / bohr_in_angstrom())
+                conformers_dict["molecules"].append(mol_copy)
+                conformers_dict["geometries"].append(
+                    mol_copy.get_xyz_string(
+                        comment=f"Energy: {conf_energy:.3f} kJ/mol"))
 
             # save the selected conformers to file
             if self.save_xyz_files:
-                for i, conf in enumerate(selected_conformers):
-                    xyz_path = str(save_path / f"conformer_{i + 1}.xyz")
-                    # assemble coordinates and atom labels to xyz file
-                    self._write_molecule_xyz_file(
-                        xyz_path,
-                        conf["labels"],
-                        conf["coordinates"],
-                        comment=f"Energy: {conf['energy']:.3f} kJ/mol"
-                    )
+                if self.save_path is None:
+                    save_path = Path("selected_conformers")
+                else:
+                    save_path = Path(self.save_path)
+                save_path.mkdir(parents=True, exist_ok=True)
 
-            self.global_minimum_conformer = global_minimum_conformer
-            self.global_minimum_energy = global_minimum_energy
-            self.selected_conformers = selected_conformers
+                for i in range(len(conformers_dict["energies"])):
+                    conf_energy = conformers_dict["energies"][i]
+                    conf_mol = conformers_dict["molecules"][i]
+                    xyz_path = save_path / f"conformer_{i + 1}.xyz"
+                    with xyz_path.open("w") as fh:
+                        fh.write(conf_mol.get_xyz_string(
+                            comment=f"Energy: {conf_energy:.3f} kJ/mol"))
 
-            if self.save_xyz_files:
                 self.ostream.print_info(
-                    f"{len(selected_conformers)} conformers with " +
+                    f"{len(conformers_dict['energies'])} conformers with " +
                     f"the lowest energies are saved in folder {str(save_path)}")
 
             self.ostream.print_info(
                 "Total time spent in generating conformers: " +
                 f"{time.time() - conf_gen_t0:.2f} sec")
 
+            return conformers_dict
+        else:
+            return None
+
     def show_global_minimum(self, atom_indices=False, atom_labels=False):
 
         if self._rank == mpi_master():
-            min_conformer_xyz_string = self._convert_molecule_xyz_string(
-                self.molecule.get_labels(),
-                self.global_minimum_conformer,
-                comment="Energy:" + str(self.global_minimum_energy),
-            )
-            min_conformer = Molecule.read_xyz_string(min_conformer_xyz_string)
-            min_conformer.show(atom_indices=atom_indices, atom_labels=atom_labels)
+            self.global_minimum_conformer.show(
+                atom_indices=atom_indices, atom_labels=atom_labels)

@@ -1,3 +1,4 @@
+from pathlib import Path
 from mpi4py import MPI
 import pytest
 import sys
@@ -25,14 +26,24 @@ class TestConformerGenerator:
         conf = ConformerGenerator()
         conf.ostream.mute()
 
-        conf.top_file_name = "mol.top"
+        here = Path(__file__).parent
+        top_fpath = here / 'data' / 'vlx_conf_gen.top'
+
+        conf.top_file_name = str(top_fpath)
         conf.number_of_conformers_to_select = 10
         conf.save_xyz_files = False
         conf.em_tolerance = 1
 
-        conf.generate(molecule)
+        conf_results = conf.generate(molecule)
 
         if MPI.COMM_WORLD.Get_rank() == 0:
-            minimum_potential_energy = conf.global_minimum_energy
-            assert (minimum_potential_energy > -69.0 and
-                    minimum_potential_energy < -68.0)
+            assert conf_results['energies'][0] == conf.global_minimum_energy
+            assert (conf.global_minimum_energy > -69.0 and
+                    conf.global_minimum_energy < -68.0)
+
+            if top_fpath.with_suffix('.gro').is_file():
+                top_fpath.with_suffix('.gro').unlink()
+            if top_fpath.with_suffix('.itp').is_file():
+                top_fpath.with_suffix('.itp').unlink()
+            if top_fpath.is_file():
+                top_fpath.unlink()
