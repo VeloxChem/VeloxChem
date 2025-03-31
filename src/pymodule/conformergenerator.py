@@ -268,7 +268,9 @@ class ConformerGenerator:
             simulation = self._init_openmm_system(top_file_name)
             energy, opt_coords = self._minimize_energy(mol, simulation, em_tolerance_value)
         else:
+            energy = None
             opt_coords = None
+        energy = self._comm.bcast(energy, root=mpi_master())
         opt_coords = self._comm.bcast(opt_coords, root=mpi_master())
         # update the coordinates of the molecule to new_mol
         new_mol = Molecule(mol)
@@ -475,4 +477,3 @@ class ConformerGenerator:
             )
             min_conformer = Molecule.read_xyz_string(min_conformer_xyz_string)
             min_conformer.show(atom_indices=atom_indices, atom_labels=atom_labels)
-
