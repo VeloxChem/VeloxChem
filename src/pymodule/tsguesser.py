@@ -169,8 +169,7 @@ class TransitionStateGuesser():
                 simulation = mmapp.Simulation(topology,
                                               EVB.system_confs[0]['systems'][l],
                                               integrator)
-                simulation.context.setPositions(
-                    mm_P)  #todo why is this necessary?
+                simulation.context.setPositions(mm_P)
 
                 simulation.minimizeEnergy()
                 if self.save_mm_traj:
@@ -208,6 +207,8 @@ class TransitionStateGuesser():
                 self.ostream.flush()
                 energies.append(mm_E)
                 positions.append(mm_P)
+                bohr_to_nm = 0.0529177249
+                mm_P = mm_P * bohr_to_nm
         except Exception as e:
             self.ostream.print_warning(f"Error in the ff scan: {e}")
             exception = e
