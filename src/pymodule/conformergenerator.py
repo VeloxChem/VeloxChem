@@ -59,16 +59,9 @@ class ConformerGenerator:
         xyz_string = ""
         xyz_string += str(len(labels)) + "\n"
         xyz_string += comment + "\n"  # add comment line to second line
-        xyz_string += comment + "\n"  # add comment line to second line
         for i in range(len(labels)):
             xyz_string += (
                 labels[i]
-                + "  "
-                + str(coords[i][0])
-                + "  "
-                + str(coords[i][1])
-                + "  "
-                + str(coords[i][2])
                 + "   "
                 + "%10.5f" % round(coords[i][0], 5)  # format the coordinates to 3 decimal places
                 + "   "
