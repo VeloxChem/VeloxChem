@@ -29,6 +29,7 @@ import time
 import json
 import h5py
 import sys
+import copy
 
 from .veloxchemlib import mpi_master
 from .molecule import Molecule
@@ -197,14 +198,14 @@ class EvbDriver():
                 product_multiplicity = [product.get_multiplicity()]
 
             rea_input = {
-                "molecule": reactant,
+                "molecule": copy.deepcopy(reactant),
                 "optimise": None,
                 "forcefield": None,
                 "hessian": None,
                 "charges": None
             }
             pro_input = [{
-                "molecule": pro,
+                "molecule": copy.deepcopy(pro),
                 "optimise": None,
                 "forcefield": None,
                 "hessian": None,
