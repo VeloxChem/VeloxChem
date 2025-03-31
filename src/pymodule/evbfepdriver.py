@@ -77,6 +77,7 @@ class EvbFepDriver():
 
         self.constrain_H: bool = False
         self.report_forces: bool = False
+        self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
 
@@ -171,17 +172,49 @@ class EvbFepDriver():
             self.ostream.print_info("Minimizing energy")
             self.ostream.flush()
             equil_simulation.minimizeEnergy()
-
             minim_positions = equil_simulation.context.getState(
                 getPositions=True).getPositions()
+            mmapp.PDBFile.writeFile(
+                topology,
+                np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
+                open(self.run_folder / f"minim_{l:.3f}.pdb", "w"),
+            )
+            if self.debug:
+                equil_simulation.saveCheckpoint(
+                    str(self.run_folder / f"minim_state_{l:.3f}.chk"))
+                equil_simulation.saveState(
+                    str(self.run_folder / f"minim_state_{l:.3f}.xml"))
 
-            equil_simulation.context.setPositions(minim_positions)
             equil_simulation.integrator.setStepSize(equil_step_size *
                                                     mmunit.picoseconds)
             self.ostream.print_info(
                 f"Running equilibration with step size {equil_simulation.integrator.getStepSize()}"
             )
             self.ostream.flush()
+            if self.debug:
+                equil_simulation.reporters.append(
+                    mmapp.PDBReporter(
+                        str(self.run_folder / f"traj_equil_{l:.3f}.pdb"),
+                        write_step,
+                        enforcePeriodicBox=True,
+                    ))
+                equil_simulation.reporters.append(
+                    EvbReporter(
+                        str(self.run_folder / f"energies_equil_{l:.3f}.csv"),
+                        write_step,
+                        systems[0],
+                        systems[1],
+                        topology,
+                        l,
+                        self.ostream,
+                        force_file=str(self.run_folder /
+                                       f"forces_equil_{l:.3f}.csv"),
+                        velocity_file=str(self.run_folder /
+                                          f"velocities_equil_{l:.3f}.csv"),
+                        forcegroup_file=str(self.run_folder /
+                                            f"forcegroups_equil_{l:.3f}.csv"),
+                        append=False,
+                    ))
             equil_simulation.step(equilibration_steps)
             equil_state = equil_simulation.context.getState(
                 positions=True,
@@ -193,6 +226,11 @@ class EvbFepDriver():
                 integratorParameters=True,
                 enforcePeriodicBox=True,
             )
+            if self.debug:
+                equil_simulation.saveCheckpoint(
+                    str(self.run_folder / f"equil_state_{l:.3f}.chk"))
+                equil_simulation.saveState(
+                    str(self.run_folder / f"equil_state_{l:.3f}.xml"))
 
             run_integrator = mm.LangevinMiddleIntegrator(
                 integrator_temperature,
@@ -235,12 +273,16 @@ class EvbFepDriver():
             )
             run_simulation.reporters.append(state_reporter)
 
-            if self.report_forces:
+            if self.report_forces or self.debug:
                 force_file = str(self.data_folder / f"Forces.csv")
             else:
                 force_file = None
+            if self.report_velocities or self.debug:
+                velocity_file = str(self.data_folder / f"Velocities.csv")
+            else:
+                velocity_file = None
 
-            if self.report_forcegroups:
+            if self.report_forcegroups or self.debug:
                 forcegroup_file = str(self.data_folder / f"ForceGroups.csv")
             else:
                 forcegroup_file = None
@@ -253,6 +295,7 @@ class EvbFepDriver():
                 l,
                 self.ostream,
                 forcegroup_file=forcegroup_file,
+                velocity_file=velocity_file,
                 force_file=force_file,
                 append=append,
                 debug=self.debug,
@@ -267,15 +310,6 @@ class EvbFepDriver():
             state = run_simulation.context.getState(getPositions=True)
             positions = state.getPositions()
 
-            # mmapp.PDBFile.writeFile(
-            #     topology,
-            #     np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
-            #     open(self.run_folder / f"minim_{l:.3f}.pdb", "w"),
-            # )
-            # simulation.saveCheckpoint(
-            #     str(self.run_folder / f"minim_state_{l:.3f}.chk"))
-            # simulation.saveState(
-            #     str(self.run_folder / f"minim_state_{l:.3f}.xml"))
             # if l == 0:
             #     self.ostream.print_info(
             #         f"Running initial equilibration with step size {simulation.integrator.getStepSize()}"
