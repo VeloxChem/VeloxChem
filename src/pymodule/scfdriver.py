@@ -219,6 +219,7 @@ class ScfDriver:
         self.grid_level = None
         self._dft = False
         self._mol_grid = None
+        self.semi_num_exchange = False
 
         # polarizable embedding
         self.potfile = None
@@ -1453,15 +1454,15 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock(
+            fock_mat, vxc_mat, vkx_mat, e_emb, V_emb = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
             profiler.start_timer('ErrVec')
 
-            e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, kin_mat,
+            e_el = self._comp_energy(fock_mat, vxc_mat, vkx_mat, e_emb, kin_mat,
                                      npot_mat, den_mat)
 
-            self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
+            self._comp_full_fock(fock_mat, vxc_mat, vkx_mat, V_emb, kin_mat, npot_mat)
 
             if self._cpcm:
                 if self.scf_type == 'restricted':
@@ -1951,10 +1952,10 @@ class ScfDriver:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
-        fock_mat, vxc_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
+        fock_mat, vxc_mat, vkx_mat, e_emb, V_emb = self._comp_2e_fock_single_comm(
             den_mat, molecule, basis, screener, e_grad, profiler)
 
-        return fock_mat, vxc_mat, e_emb, V_emb
+        return fock_mat, vxc_mat, vkx_mat, e_emb, V_emb
 
     def _comp_2e_fock_single_comm(self,
                                   den_mat,
@@ -2029,8 +2030,12 @@ class ScfDriver:
         exchange_scaling_factor = 1.0
         if self._dft and not self._first_step:
             if self.xcfun.is_hybrid():
-                fock_type = '2jkx'
-                exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+                if self.semi_num_exchange:
+                    fock_type = 'j'
+                    exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
+                else:
+                    fock_type = '2jkx'
+                    exchange_scaling_factor = self.xcfun.get_frac_exact_exchange()
             else:
                 fock_type = 'j'
                 exchange_scaling_factor = 0.0
@@ -2211,7 +2216,14 @@ class ScfDriver:
                     False, 'SCF driver: Unsupported XC functional type')
         else:
             vxc_mat = None
-
+                            
+            
+        if self.semi_num_exchange:
+            kx_drv = XCIntegrator()
+            vkx_mat = kx_drv.integrate_kx_fock(molecule, basis, den_mat, self._mol_grid, exchange_scaling_factor)
+        else:
+            vkx_mat = None
+                                        
         if self.timing and self._dft:
             profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
         pe_t0 = tm.time()
@@ -2240,9 +2252,9 @@ class ScfDriver:
         if self.timing and self._pe:
             profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
-        return fock_mat, vxc_mat, e_emb, V_emb
+        return fock_mat, vxc_mat, vkx_mat, e_emb, V_emb
 
-    def _comp_energy(self, fock_mat, vxc_mat, e_emb, kin_mat, npot_mat,
+    def _comp_energy(self, fock_mat, vxc_mat, vkx_mat, e_emb, kin_mat, npot_mat,
                      den_mat):
         """
         Computes the sum of SCF energy components: electronic energy, kinetic
@@ -2252,6 +2264,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (only 2e-part).
         :param vxc_mat:
             The Vxc matrix.
+        :param vkx_mat:
+            The seminumerical exchange matrix.
         :param e_emb:
             The embedding energy.
         :param kin_mat:
@@ -2280,6 +2294,8 @@ class ScfDriver:
                 e_ee = np.sum(D[0] * F[0])
                 e_kin = 2.0 * np.sum(D[0] * T)
                 e_en = 2.0 * np.sum(D[0] * V)
+                if self.semi_num_exchange:
+                    e_ee -= np.sum(D[0] * vkx_mat.alpha_to_numpy())
             else:
                 e_ee = 0.5 * (np.sum(D[0] * F[0]) + np.sum(D[1] * F[1]))
                 e_kin = np.sum((D[0] + D[1]) * T)
@@ -2300,7 +2316,7 @@ class ScfDriver:
 
         return e_sum
 
-    def _comp_full_fock(self, fock_mat, vxc_mat, V_emb, kin_mat, npot_mat):
+    def _comp_full_fock(self, fock_mat, vxc_mat, vkx_mat, V_emb, kin_mat, npot_mat):
         """
         Computes full Fock/Kohn-Sham matrix by adding to 2e-part of
         Fock/Kohn-Sham matrix the kinetic energy and nuclear potential
@@ -2310,6 +2326,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix (2e-part).
         :param vxc_mat:
             The Vxc matrix.
+        :param vkx_mat:
+            The seminumerical exchamge matrix.
         :param V_emb:
             The embedding Fock matrix contributions.
         :param kin_mat:
@@ -2325,6 +2343,11 @@ class ScfDriver:
             if self.scf_type != 'restricted':
                 np_xcmat_b = self.comm.reduce(vxc_mat.beta_to_numpy(),
                                               root=mpi_master())
+                                              
+        np_kxmat_a, np_kxmat_b = None, None
+        if self.semi_num_exchange:
+            np_kxmat_a = self.comm.reduce(vkx_mat.alpha_to_numpy(),
+                                          root=mpi_master())
 
         if self.rank == mpi_master():
             T = kin_mat
@@ -2337,7 +2360,10 @@ class ScfDriver:
                 fock_mat[0] += np_xcmat_a
                 if self.scf_type != 'restricted':
                     fock_mat[1] += np_xcmat_b
-
+                    
+            if self.semi_num_exchange:
+                fock_mat[0] -= np_kxmat_a
+                                
             if self._pe and not self._first_step:
                 fock_mat[0] += V_emb
                 if self.scf_type != 'restricted':

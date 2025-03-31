@@ -88,14 +88,23 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
         timer.start("GTO pre-screening");
 
         std::vector<std::vector<int>> cgto_mask_blocks, pre_ao_inds_blocks;
-
+        
         std::vector<int> aoinds;
 
+        std::vector<CGtoBlock> red_gto_blocks;
+        
         for (const auto& gto_block : gto_blocks)
         {
             // 0th order GTO derivative
             auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 0, screeningThresholdForGTOValues, boxdim);
 
+            auto red_gto_block = gto_block.reduce(cgto_mask);
+            
+            if (red_gto_block.number_of_basis_functions() > 0)
+            {
+                red_gto_blocks.push_back(red_gto_block);
+            }
+            
             std::cout << " * Mask : " << cgto_mask.size() << " : ";
             for (const auto mask : cgto_mask)
             {
@@ -220,12 +229,12 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
             
             mat_ggv.zero();
             
-//            const auto npot_drv = CNuclearPotentialDriver();
-//            
-//            for (int g = 0; g < grid_batch_size; g++)
-//            {
-//                npot_drv.compute(mat_ggv, gto_blocks, mat_fvg, *ptr_mask, g, grid_x[g], grid_y[g], grid_z[g], local_weights[g]);
-//            }
+            const auto npot_drv = CNuclearPotentialDriver();
+            
+            for (int g = 0; g < grid_batch_size; g++)
+            {
+                npot_drv.compute(mat_ggv, red_gto_blocks, mat_fvg, *ptr_mask, g, grid_x[g], grid_y[g], grid_z[g], local_weights[g]);
+            }
             
             omptimers[thread_id].stop("Generate G_gv matrix");
             
@@ -254,7 +263,9 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
         timer.stop("Kx matrix dist.");
     
     }
-
+    
+    mat_kx.inPlaceSymmetrizeAndScale(factor); 
+    
     timer.stop("Total timing");
     
     std::cout << "Timing of new integrator" << std::endl;

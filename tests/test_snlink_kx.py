@@ -7,6 +7,9 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.dftutils import get_default_grid_level
+from veloxchem.fockdriver import FockDriver
+from veloxchem.veloxchemlib import T4CScreener
+from veloxchem.veloxchemlib import make_matrix, mat_t
 
 class TestSNLinkK:
 
@@ -22,14 +25,32 @@ class TestSNLinkK:
         density = density.broadcast(scf_drv.comm, root=mpi_master())
 
         grid_drv = GridDriver(scf_drv.comm)
-        grid_drv.set_level(5)
+        grid_drv.set_level(1)
         mol_grid = grid_drv.generate(molecule)
 
         xc_drv = XCIntegrator()
         kx_mat = xc_drv.integrate_kx_fock(molecule, basis,
                                           [density.alpha_to_numpy(0)],
                                           mol_grid, 0.68)
-                                              
+        
+        dmat = make_matrix(basis, mat_t.symmetric)
+        dmat.set_values(density.alpha_to_numpy(0))
+        
+        # screen basis function pairs
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(basis, molecule, "eri")
+
+        # compute Fock matrix
+        fock_drv = FockDriver()
+        fock_mat = fock_drv._compute_fock_omp(t4c_drv, dmat, "kx", 0.68, 0.0, 12)
+        
+        #print("*** SEMINUMERICAL FOCK ***")
+        #print(kx_mat.alpha_to_numpy())
+        
+        #print("*** ANALYTICAL FOCK ***")
+        #print(fock_mat.full_matrix().to_numpy())
+        
+        print(" * Max. abs. diff. : ", np.max(np.abs(kx_mat.alpha_to_numpy() - fock_mat.full_matrix().to_numpy())), " For grid points : ", mol_grid.number_of_points())
         return kx_mat
 
     def test_sn_link_kx_h2o_svp(self):

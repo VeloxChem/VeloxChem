@@ -209,6 +209,35 @@ CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 }
 
 auto
+CDenseMatrix::inPlaceSymmetrizeAndScale(const double factor) -> void
+{
+    auto fmat = _values.data();
+
+    if (_nRows == _nColumns)
+    {
+        for (int i = 0; i < _nRows; i++)
+        {
+            auto iioff = i * _nColumns + i;
+            
+            fmat[iioff] *= factor;
+            
+            for (int j = i + 1; j < _nRows; j++)
+            {
+                auto ijoff = i * _nColumns + j;
+
+                auto jioff = j * _nColumns + i;
+
+                auto fval = 0.5 * factor * (fmat[ijoff] + fmat[jioff]);
+
+                fmat[ijoff] = fval;
+
+                fmat[jioff] = fval;
+            }
+        }
+    }
+}
+
+auto
 CDenseMatrix::getNumberOfRows() const -> int
 {
     return _nRows;

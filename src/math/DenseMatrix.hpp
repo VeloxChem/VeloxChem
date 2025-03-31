@@ -143,6 +143,13 @@ class CDenseMatrix
      @param factor the factor.
      */
     auto symmetrizeAndScale(const double factor) -> void;
+    
+    /**
+     Symmetrizes elements of square matrix: a_ij = a_ji = factor * (a_ij + a_ji)  for i != j and a_ii = factor * a_ii.
+
+     @param factor the factor.
+     */
+    auto inPlaceSymmetrizeAndScale(const double factor) -> void;
 
     /**
      Gets number of rows in dense matrix.

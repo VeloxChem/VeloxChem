@@ -87,19 +87,19 @@ CDenseMatrixDistributor::distribute(const CSimdArray<double>&        buffer,
         
         //if ((i * adim + refp) > 23) std::cout << "!!! Wrong values !!!" << std::endl;
         
-        if (_ao_mask.find(i * adim + refp) == _ao_mask.end())
-        {
-            std::cout << " *** Not Found :  " << i * adim + refp << std::endl;
-            
-            std::cout << "MASK (G) : ";
-            for (const auto m : _ao_mask)
-            {
-                std::cout << "(" << m.first << "," << m.second << ")" ;
-            }
-            std::cout << std::endl;
-        }
+//        if (_ao_mask.find(i * adim + refp) == _ao_mask.end())
+//        {
+//            std::cout << " *** Not Found :  " << i * adim + refp << std::endl;
+//            
+//            std::cout << "MASK (G) : ";
+//            for (const auto m : _ao_mask)
+//            {
+//                std::cout << "(" << m.first << "," << m.second << ")" ;
+//            }
+//            std::cout << std::endl;
+//        }
         
-        //const auto p = _ao_mask.at(i * adim + refp);
+        const auto p = _ao_mask.at(i * adim + refp);
         
         for (int j = 0; j < bcomps; j++)
         {
@@ -113,15 +113,17 @@ CDenseMatrixDistributor::distribute(const CSimdArray<double>&        buffer,
 
                 // compute q index
 
-                //const auto q = _ao_mask.at(static_cast<int>(j * bdim + refq));
+                const auto q = _ao_mask.at(static_cast<int>(j * bdim + refq));
                 
                 if (diagonal)
                 {
-                    //gmat[_gp_index * naos + p] += curr_buffer[m] * fmat[q * npoints + _gp_index];
+                    gmat[_gp_index * naos + p] += _weight * curr_buffer[m] * fmat[q * npoints + _gp_index];
                 }
                 else
                 {
-                    //gmat[_gp_index * naos + p] += 2.0 * curr_buffer[m] * fmat[q * npoints + _gp_index];
+                    gmat[_gp_index * naos + p] += _weight * curr_buffer[m] * fmat[q * npoints + _gp_index];
+                    
+                    gmat[_gp_index * naos + q] += _weight * curr_buffer[m] * fmat[p * npoints + _gp_index];
                 }
             }
         }
