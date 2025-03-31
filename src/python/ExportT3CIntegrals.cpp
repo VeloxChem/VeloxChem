@@ -6,6 +6,7 @@
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 #include "ThreeCenterElectronRepulsionGeomX00Driver.hpp"
 #include "ThreeCenterElectronRepulsionGeom0X0Driver.hpp"
+#include "ThreeCenterOverlapDriver.hpp"
 #include "T3FlatBuffer.hpp"
 #include "RIFockDriver.hpp"
 #include "RIFockGradDriver.hpp"
@@ -144,7 +145,25 @@ export_t3cintegrals(py::module& m)
                 return grad_drv.compute(screener, basis, aux_basis, molecule, gamma, density, atoms, ithreshold);
              },
           "Computes Coulomb Fock contribution to atoms gradient.");
-    
+
+    // CThreeCenterOverlapDriver class
+    PyClass<CThreeCenterOverlapDriver>(m, "ThreeCenterOverlapDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+             [](const CThreeCenterOverlapDriver&         t3ovl_drv,
+               const CMolecule&                          molecule,
+               const CMolecularBasis&                    basis,
+               const std::vector<double>&                exponents,
+               const std::vector<double>&                factors,
+               const std::vector<std::array<double, 3>>& coords) -> CMatrix {
+                auto points = std::vector<TPoint<double>>();
+                points.reserve(coords.size());
+                std::ranges::transform(coords, std::back_inserter(points), [](auto rxyz) { return TPoint<double>(rxyz); });
+                   return t3ovl_drv.compute(exponents, factors, points, basis, molecule);
+            },
+            "Computes overlap matrix for given molecule, basis and vector of external scaled Gaussians.");
+
     // ThreeCenterElectronRepulsionGeom100Driver class
     PyClass<CThreeCenterElectronRepulsionGeomX00Driver<1>>(m, "ThreeCenterElectronRepulsionGeom100Driver")
         .def(py::init<>())
@@ -154,8 +173,7 @@ export_t3cintegrals(py::module& m)
                 return std::make_shared<CT3FlatBuffer<double>>(geom_drv.compute(basis, aux_basis, molecule, iatom));
              },
             "Computes gradient integrals for given molecule, basis, auxilary basis and selected atom.");
-    
-    
+
     // ThreeCenterElectronRepulsionGeom010Driver class
     PyClass<CThreeCenterElectronRepulsionGeom0X0Driver<1>>(m, "ThreeCenterElectronRepulsionGeom010Driver")
         .def(py::init<>())
