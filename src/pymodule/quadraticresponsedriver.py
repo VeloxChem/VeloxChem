@@ -295,9 +295,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             setattr(N_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            N_drv.checkpoint_file = str(fpath) + '_qrf.h5'
+            N_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.qrf.h5'))
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, ABC)
 
@@ -572,9 +571,8 @@ class QuadraticResponseDriver(NonlinearSolver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + '_qrf_fock.h5'
+            fock_file = str(
+                Path(self.checkpoint_file).with_suffix('.qrf_fock.h5'))
         else:
             fock_file = None
 

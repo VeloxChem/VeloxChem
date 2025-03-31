@@ -278,7 +278,8 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.embedding is not None:
-            emb_type = ' with ' + self.embedding['settings']['embedding_method']
+            emb_type = ' with ' + self.embedding['settings'][
+                'embedding_method']
         else:
             emb_type = ''
 

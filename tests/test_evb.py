@@ -220,14 +220,14 @@ class TestEvb:
 
         specific_results = {}
 
-        E_file = folder / 'evb_RuVbdaO_Br_2_vacuum_Energies.dat'
-        data_file = folder / 'evb_RuVbdaO_Br_2_vacuum_Data_combined.dat'
+        E_file = folder / 'evb_RuVbdaO_Br_2_vacuum_Energies.csv'
+        data_file = folder / 'evb_RuVbdaO_Br_2_vacuum_Data_combined.csv'
         options_file = folder / 'evb_options.json'
         specific, common = EVB._load_output_files(E_file, data_file, options_file)
         specific_results.update({'vacuum': specific})
 
-        E_file = folder / 'evb_RuVbdaO_Br_2_water_Energies.dat'
-        data_file = folder / 'evb_RuVbdaO_Br_2_water_Data_combined.dat'
+        E_file = folder / 'evb_RuVbdaO_Br_2_water_Energies.csv'
+        data_file = folder / 'evb_RuVbdaO_Br_2_water_Data_combined.csv'
         options_file = folder / 'evb_options.json'
         specific, common = EVB._load_output_files(E_file, data_file, options_file)
         specific_results.update({'water': specific})

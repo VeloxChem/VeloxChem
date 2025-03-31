@@ -158,5 +158,3 @@ ConfigMKL.hpp
 
 # generated Python sources
 mklconf.py
-
-veloxchem.sh

@@ -269,9 +269,8 @@ class ShgDriver(NonlinearSolver):
             setattr(N_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            N_drv.checkpoint_file = str(fpath) + '_shg.h5'
+            N_drv.checkpoint_file = str(
+                Path(self.checkpoint_file).with_suffix('.shg.h5'))
 
         N_results = N_drv.compute(molecule, ao_basis, scf_results, AB)
 
@@ -705,12 +704,10 @@ class ShgDriver(NonlinearSolver):
 
         if self.checkpoint_file is not None:
             if self.shg_type == 'reduced':
-                fock_suffix = '_shg_fock_red.h5'
+                fock_suffix = '.shg_fock_red.h5'
             elif self.shg_type == 'full':
-                fock_suffix = '_shg_fock_full.h5'
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            fock_file = str(fpath) + fock_suffix
+                fock_suffix = '.shg_fock_full.h5'
+            fock_file = str(Path(self.checkpoint_file).with_suffix(fock_suffix))
         else:
             fock_file = None
 

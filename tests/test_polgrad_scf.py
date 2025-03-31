@@ -13,11 +13,18 @@ from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polarizabilitygradient import PolarizabilityGradient
 
 
-@pytest.mark.solvers
 class TestPolgrad:
 
     def run_polgrad_real(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
+        scf_dict = {}
+        method_settings = {}
+        #if xcfun is not None:
+        #    scf_drv._dft = True
+        #    scf_drv.xcfun = xcfun
+        #    method_settings = {'xcfun': xcfun}
+
+        scf_drv.update_settings(scf_dict, method_settings)
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
@@ -26,20 +33,20 @@ class TestPolgrad:
         lr_drv = LinearResponseSolver()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
-        lr_drv.update_settings(rsp_settings)
+        lr_drv.update_settings(rsp_settings, method_settings)
         lr_drv.ostream.mute()
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
         # test real analytical gradient
         an_polgrad_drv = PolarizabilityGradient(scf_drv)
-        cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'yes'}
+        cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'no'}
         polgrad_settings = {'frequencies': (0.0, 0.4)}
-        an_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
+        an_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         an_polgrad_drv.ostream.mute()
-        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
+        an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
 
         if scf_drv.rank == mpi_master():
-            #polgrad_results = an_polgrad_drv.polgradient
+            polgrad_results = an_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
@@ -59,12 +66,12 @@ class TestPolgrad:
         num_polgrad_drv = PolarizabilityGradient(scf_drv)
         polgrad_settings = {'numerical': 'yes', 'do_four_point': 'yes', 'frequencies': (0.0, 0.4)}
         cphf_settings = {}
-        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
+        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         num_polgrad_drv.ostream.mute()
-        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results=None)
+        num_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results=None)
 
         if scf_drv.rank == mpi_master():
-            #polgrad_results = num_polgrad_drv.polgradient
+            polgrad_results = num_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
@@ -81,6 +88,14 @@ class TestPolgrad:
 
     def run_polgrad_complex(self, molecule, basis, xcfun=None, label=None):
         scf_drv = ScfRestrictedDriver()
+        scf_dict = {}
+        method_settings = {}
+        #if xcfun is not None:
+        #    scf_drv._dft = True
+        #    scf_drv.xcfun = xcfun
+        #    method_settings = {'xcfun': xcfun}
+
+        scf_drv.update_settings(scf_dict, method_settings)
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
@@ -90,21 +105,21 @@ class TestPolgrad:
         lr_drv = ComplexResponse()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
-        lr_drv.update_settings(rsp_settings)
+        lr_drv.update_settings(rsp_settings, method_settings)
         lr_drv.ostream.mute()
         lr_results = lr_drv.compute(molecule, basis, scf_tensors)
 
         # test complex analytical gradient
         an_polgrad_drv = PolarizabilityGradient(scf_drv)
-        cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'yes'}
+        cphf_settings = {'conv_thresh':2e-7, 'use_subspace_solver': 'no'}
         polgrad_settings = {'frequencies': (0.0, 0.4), 'is_complex': 'yes',
                             'damping': 0.5}
-        an_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
+        an_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         an_polgrad_drv.ostream.mute()
-        polgrad_results = an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
+        an_polgrad_drv.compute(molecule, basis, scf_tensors, lr_results)
 
         if scf_drv.rank == mpi_master():
-            #polgrad_results = an_polgrad_drv.polgradient
+            polgrad_results = an_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
@@ -124,12 +139,12 @@ class TestPolgrad:
         num_polgrad_drv = PolarizabilityGradient(scf_drv)
         polgrad_settings = {'frequencies': (0.0, 0.4), 'is_complex': 'yes',
                             'damping': 0.5, 'numerical': 'yes', 'do_four_point': 'yes'}
-        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings)
+        num_polgrad_drv.update_settings(polgrad_settings, cphf_settings, method_settings)
         num_polgrad_drv.ostream.mute()
-        polgrad_results = num_polgrad_drv.compute(molecule, basis, scf_tensors)
+        num_polgrad_drv.compute(molecule, basis, scf_tensors)
 
         if scf_drv.rank == mpi_master():
-            #polgrad_results = num_polgrad_drv.polgradient
+            polgrad_results = num_polgrad_drv.polgradient
             polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)

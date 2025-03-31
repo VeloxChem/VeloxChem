@@ -33,9 +33,6 @@ from .veloxchemlib import NuclearPotentialGeom200Driver
 from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import compute_linear_momentum_integrals
 from .veloxchemlib import compute_angular_momentum_integrals
-from .veloxchemlib import compute_electric_field_integrals
-from .veloxchemlib import compute_electric_field_values
-from .veloxchemlib import compute_electric_field_potential_gradient
 from .veloxchemlib import compute_electric_field_fock_gradient
 from .veloxchemlib import compute_electric_field_potential_gradient_for_mm
 from .veloxchemlib import compute_electric_field_potential_hessian
@@ -132,7 +129,7 @@ def compute_electric_dipole_integrals(molecule, basis, origin=(0.0, 0.0, 0.0)):
 
 
 def compute_nuclear_potential_gradient_bfs(molecule, basis, charges,
-                                           coordinates, density):
+                                           coordinates, D):
     """
     Computes nuclear potential integrals contribution from point charges to
     molecular gradient.
@@ -163,7 +160,7 @@ def compute_nuclear_potential_gradient_bfs(molecule, basis, charges,
         for i, label in enumerate(['X', 'Y', 'Z']):
             gmat_100 = gmats_100.matrix_to_numpy(label)
 
-            grad[iatom, i] += np.sum((gmat_100 + gmat_100.T) * density)
+            grad[iatom, i] += np.sum((gmat_100 + gmat_100.T) * D)
 
         gmats_100 = Matrices()
 
@@ -189,8 +186,8 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
             for y, label_y in enumerate('XYZ'):
                 npot_label = label_x + label_y if x <= y else label_y + label_x
                 npot_200_iixy = hmats_200.matrix_to_numpy(npot_label)
-                hess[x,
-                     y] += np.sum(density * (npot_200_iixy + npot_200_iixy.T))
+                hess[x, y] += 2.0 * (np.sum(density *
+                                            (npot_200_iixy + npot_200_iixy.T)))
 
         hmats_200 = Matrices()
 
@@ -203,7 +200,8 @@ def compute_electrostatic_potential_hessian(molecule, basis, mm_charges,
         for y, label_y in enumerate('XYZ'):
             npot_xy_label = f'{label_x}_{label_y}'
             npot_101_ijxy = hmats_101.matrix_to_numpy(npot_xy_label)
-            hess[x, y] += np.sum(density * (npot_101_ijxy + npot_101_ijxy.T))
+            hess[x, y] += 2.0 * (np.sum(density *
+                                        (npot_101_ijxy + npot_101_ijxy.T)))
 
     hmats_101 = Matrices()
 

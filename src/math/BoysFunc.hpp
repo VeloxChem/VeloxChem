@@ -133,10 +133,6 @@ class CBoysFunc
                  const float              b_exp,
                  const float              omega) const -> void;
 
-    /// @brief Gets Boys function table.
-    /// @return The Boys function table.
-    auto get_table() const -> std::array<std::array<double, 7>, 121>;
-
    private:
     /// @brief The order of Boys function.
     int _order;
@@ -25173,11 +25169,5 @@ CBoysFunc<N>::compute(CSimdArray<float>&       buffer,
     }
 }
 
-template <int N>
-auto
-CBoysFunc<N>::get_table() const -> std::array<std::array<double, 7>, 121>
-{
-    return _table;
-}
 
 #endif /* BoysFunc_hpp */

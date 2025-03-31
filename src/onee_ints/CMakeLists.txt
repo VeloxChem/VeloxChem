@@ -4,12 +4,10 @@ target_sources(vlxobjs
     BoysFuncTable.cpp
     ElectricFieldFockGradient.cpp
     ElectricFieldIntegrals.cpp
-    ElectricFieldPotentialGradient.cpp
+    ElectricFieldIntegralsGradient.cpp
     ElectricFieldPotentialGradientAtMMSites.cpp
     ElectricFieldPotentialHessian.cpp
     ElectricFieldValues.cpp
-    ElectricFieldRec.cpp
-    ElectricFieldRecGrad.cpp
     GtoInfo.cpp
     LinearMomentumIntegrals.cpp
     NuclearPotentialValues.cpp
