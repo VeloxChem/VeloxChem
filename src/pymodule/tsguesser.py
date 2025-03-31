@@ -70,7 +70,7 @@ class TransitionStateGuesser():
         self.mute_scf = True
         self.mm_temperature = 600
         self.mm_steps = 1000
-        self.mm_step_size = 0.001
+        self.mm_step_size = 0.001 * mmunit.picoseconds
         self.save_mm_traj = False
 
     def find_TS(self, evb, scf=True):
@@ -95,7 +95,8 @@ class TransitionStateGuesser():
         self.results['formed_bonds'] = evb.formed_bonds
         if ff_exception:
             self.ostream.print_warning(
-                "The force field scan crashed. Saving results in self.results and raising exception")
+                "The force field scan crashed. Saving results in self.results and raising exception"
+            )
             raise ff_exception
 
         self.molecule = evb.reactant.molecule
@@ -105,25 +106,37 @@ class TransitionStateGuesser():
         max_mm_energy = mm_energies[max_mm_index]
         max_mm_lambda = self.lambda_vec[max_mm_index]
         if not scf:
-            self.ostream.print_info(f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}. Returning")
-            self.molecule = self.set_molecule_positions(self.molecule, max_mm_geom)
+            self.ostream.print_info(
+                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}. Returning"
+            )
+            self.molecule = self.set_molecule_positions(self.molecule,
+                                                        max_mm_geom)
             return self.molecule, self.results
         else:
-            self.ostream.print_info(f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}.")
+            self.ostream.print_info(
+                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
+            )
             self.ostream.print_blank()
-            self.ostream.print_header(f"Starting SCF scan at Lambda {max_mm_lambda}")
+            self.ostream.print_header(
+                f"Starting SCF scan at Lambda {max_mm_lambda}")
             self.ostream.flush()
 
             max_scf_lambda = self.scan_scf(max_mm_index)
             if max_scf_lambda is not None:
-                self.ostream.print_info(f"Found highest SCF E at Lambda: {max_scf_lambda}. Returning")
+                self.ostream.print_info(
+                    f"Found highest SCF E at Lambda: {max_scf_lambda}. Returning"
+                )
                 self.ostream.flush()
-                self.molecule = self.set_molecule_positions(self.molecule, self.results[max_scf_lambda]['mm_geometry'])
+                self.molecule = self.set_molecule_positions(
+                    self.molecule, self.results[max_scf_lambda]['mm_geometry'])
                 return self.molecule, self.results
             else:
-                self.ostream.print_info(f"Could not find a maximum in the SCF energy. Returning mm results")
+                self.ostream.print_info(
+                    f"Could not find a maximum in the SCF energy. Returning mm results"
+                )
                 self.ostream.flush()
-                self.molecule = self.set_molecule_positions(self.molecule, max_mm_geom)
+                self.molecule = self.set_molecule_positions(
+                    self.molecule, max_mm_geom)
                 return self.molecule, self.results
 
     def get_constraint_string(self, geom=None):
@@ -146,41 +159,52 @@ class TransitionStateGuesser():
                         os.unlink(file_path)
             ts_folder = Path().cwd() / 'ts_data'
 
-            mmapp.PDBFile.writeFile(topology, initial_positions, str(ts_folder / 'topology.pdb'))
+            mmapp.PDBFile.writeFile(topology, initial_positions,
+                                    str(ts_folder / 'topology.pdb'))
         exception = None
         mm_P = initial_positions
         try:
             for l in self.lambda_vec:
                 integrator = mm.VerletIntegrator(self.mm_step_size)
-                simulation = mmapp.Simulation(topology, EVB.system_confs[0]['systems'][l], integrator)
-                simulation.context.setPositions(mm_P)  #todo why is this necessary?
+                simulation = mmapp.Simulation(topology,
+                                              EVB.system_confs[0]['systems'][l],
+                                              integrator)
+                simulation.context.setPositions(
+                    mm_P)  #todo why is this necessary?
 
                 simulation.minimizeEnergy()
                 if self.save_mm_traj:
                     mmapp.PDBFile.writeFile(
                         topology,
-                        simulation.context.getState(getPositions=True).getPositions(),
+                        simulation.context.getState(
+                            getPositions=True).getPositions(),
                         str(ts_folder / f'{l}_begin_minim.pdb'),
                     )
-                    simulation.reporters.append(mmapp.XTCReporter(str(ts_folder / f'{l}_traj.xtc'), 1))
+                    simulation.reporters.append(
+                        mmapp.XTCReporter(str(ts_folder / f'{l}_traj.xtc'), 1))
                 simulation.step(self.mm_steps)
                 simulation.minimizeEnergy()
                 if self.save_mm_traj:
                     mmapp.PDBFile.writeFile(
                         topology,
-                        simulation.context.getState(getPositions=True).getPositions(),
+                        simulation.context.getState(
+                            getPositions=True).getPositions(),
                         str(ts_folder / f'{l}_end_minim.pdb'),
                     )
 
-                state = simulation.context.getState(getEnergy=True, getPositions=True)
-                mm_E = state.getPotentialEnergy().value_in_unit(mmunit.kilojoules_per_mole)
-                mm_P = state.getPositions(asNumpy=True).value_in_unit(mmunit.bohr)
+                state = simulation.context.getState(getEnergy=True,
+                                                    getPositions=True)
+                mm_E = state.getPotentialEnergy().value_in_unit(
+                    mmunit.kilojoules_per_mole)
+                mm_P = state.getPositions(asNumpy=True).value_in_unit(
+                    mmunit.bohr)
                 avg_x = np.mean(mm_P[:, 0])
                 avg_y = np.mean(mm_P[:, 1])
                 avg_z = np.mean(mm_P[:, 2])
                 mm_P -= [avg_x, avg_y, avg_z]
 
-                self.ostream.print_info(f"Lambda: {l}, MM Energy: {mm_E:.3f} kJ/mol")
+                self.ostream.print_info(
+                    f"Lambda: {l}, MM Energy: {mm_E:.3f} kJ/mol")
                 self.ostream.flush()
                 energies.append(mm_E)
                 positions.append(mm_P)
@@ -198,7 +222,9 @@ class TransitionStateGuesser():
             l = starting_lambda
             starting_index = np.where(self.lambda_vec == l)[0][0]
         else:
-            assert_msg_critical(False, "Either starting_index or starting_lambda must be provided")
+            assert_msg_critical(
+                False,
+                "Either starting_index or starting_lambda must be provided")
 
         if l == 1:
             l = self.lambda_vec[-1]
@@ -206,10 +232,12 @@ class TransitionStateGuesser():
         else:
             lp1 = self.lambda_vec[starting_index + 1]
         scf_E_1 = self._get_scf_energy(self.results[l]['mm_geometry'])
-        self.ostream.print_info(f"Lambda: {l}, SCF Energy: {scf_E_1:.3f} Hartree")
+        self.ostream.print_info(
+            f"Lambda: {l}, SCF Energy: {scf_E_1:.3f} Hartree")
         self.ostream.flush()
         scf_E_2 = self._get_scf_energy(self.results[lp1]['mm_geometry'])
-        self.ostream.print_info(f"Lambda: {lp1}, SCF Energy: {scf_E_2:.3f} Hartree")
+        self.ostream.print_info(
+            f"Lambda: {lp1}, SCF Energy: {scf_E_2:.3f} Hartree")
         self.ostream.flush()
         self.results[l]['scf_energy'] = scf_E_1
         self.results[lp1]['scf_energy'] = scf_E_2
@@ -232,7 +260,8 @@ class TransitionStateGuesser():
             scf_E = self._get_scf_energy(geom)
             self.results[l]['scf_energy'] = scf_E
 
-            self.ostream.print_info(f"Lambda: {l}, SCF Energy: {scf_E:.3f} Hartree")
+            self.ostream.print_info(
+                f"Lambda: {l}, SCF Energy: {scf_E:.3f} Hartree")
             self.ostream.flush()
             self.molecule = self.set_molecule_positions(self.molecule, geom)
             if last_scf_E > scf_E:
