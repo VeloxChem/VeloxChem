@@ -686,8 +686,10 @@ def main():
         chg_drv.update_settings(charges_dict, method_dict)
 
         if task_type == 'resp charges':
+            # TODO: use scf_results
             chg_drv.compute(task.molecule, task.ao_basis, 'resp')
         elif task_type == 'esp charges':
+            # TODO: use scf_results
             chg_drv.compute(task.molecule, task.ao_basis, 'esp')
 
     # All done
