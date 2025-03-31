@@ -183,6 +183,7 @@ class EvbReporter():
         for e in E:
             line += f", {e}"
         line += f", {Em_pes}, {Em_int}\n"
+        self.E_out.write(line)
 
         if self.report_forces:
             forces = state.getForces(asNumpy=True)
@@ -215,7 +216,7 @@ class EvbReporter():
                 fg_E.append(e)
                 line += f"{e}, "
             line = line[:-2] + '\n'
-        self.E_out.write(line)
+        self.FG_out.write(line)
 
         if self.debug:
 
@@ -303,4 +304,3 @@ class EvbReporter():
                     self.ostream.print_info(
                         f"Force group int difference: {Em_int - int_fg_recalc}")
                 self.ostream.flush()
-                self.FG_out.write(line)

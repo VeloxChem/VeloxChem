@@ -782,18 +782,18 @@ class EvbDriver():
             equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
             initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
-        if self.debug:
-            self.ostream.print_warning(
-                "Debugging enabled, using low number of steps. Do not use for production"
-            )
-            self.ostream.flush()
-            equil_steps = 100
-            sample_steps = 200
-            write_step = 5
-            initial_equil_steps = 100
-            step_size = 0.001
-            equil_step_size = 0.001
-            initial_equil_step_size = 0.001
+        # if self.debug:
+        #     self.ostream.print_warning(
+        #         "Debugging enabled, using low number of steps. Do not use for production"
+        #     )
+        #     self.ostream.flush()
+        #     equil_steps = 100
+        #     sample_steps = 200
+        #     write_step = 5
+        #     initial_equil_steps = 100
+        #     step_size = 0.001
+        #     equil_step_size = 0.001
+        #     initial_equil_step_size = 0.001
 
         if self.fast_run:
             self.ostream.print_warning(
@@ -1032,15 +1032,14 @@ class EvbDriver():
             E_m_int = E_data[7, sub_indices]
             specific_result.update({"E_m_pes": E_m_pes, "E_m_int": E_m_int})
 
+        lambda_indices = [
+            np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame
+        ]
         common_result = {
-            "step":
-            step,
-            "Lambda":
-            Lambda,
-            "Lambda_frame":
-            Lambda_frame,
-            "Lambda_indices":
-            [np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame]
+            "step": step,
+            "Lambda": Lambda,
+            "Lambda_frame": Lambda_frame,
+            "Lambda_indices": lambda_indices,
         }
         return specific_result, common_result
 
