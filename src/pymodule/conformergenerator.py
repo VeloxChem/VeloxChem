@@ -5,7 +5,6 @@ import numpy as np
 import itertools
 import time
 import sys
-import re
 
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
@@ -89,60 +88,78 @@ class ConformerGenerator:
         one_based_equiv_atoms_groups = [list(map(int, x)) for x in equiv_atoms_groups]
 
         return one_based_equiv_atoms_groups
-        
-    # use equivalent atoms
-    def _check_equivside_in_dihedrals(self, dihedral_indices,atom_info_dict,one_based_equiv_atoms_groups):
-        
+
+    def _check_equivside_in_dihedrals(self, dihedral_indices, atom_info_dict,
+                                      one_based_equiv_atoms_groups):
+
         # according to the connected_atom and equivalent list, if one side is
         # connected to a equivalent group "like methyl" then no need to sample
         # and return False
 
-        #i,j,k,l we check side_j and side_k
+        # for i,j,k,l we check side_j and side_k
         # we check twice because any side works
 
-        # round1
+        # check j side
         side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
-        one_based_connected_atom_numbers = atom_info_dict[side_j_index]["ConnectedAtomsNumbers"]
-        connected_set = set(one_based_connected_atom_numbers)
-        connected_set = connected_set - {dihedral_indices[2]+1}  # remove the dihedral atom_k
-        for equiv_g in one_based_equiv_atoms_groups:
-            if connected_set.issubset(set(equiv_g)):
-                return True
+        if atom_info_dict[side_j_index]["AtomicSymbol"] == "C":
+            one_based_connected_atom_numbers = atom_info_dict[side_j_index]["ConnectedAtomsNumbers"]
+            connected_set = set(one_based_connected_atom_numbers)
+            connected_set = connected_set - {dihedral_indices[2]+1}  # remove the dihedral atom_k
+            for equiv_g in one_based_equiv_atoms_groups:
+                if connected_set.issubset(set(equiv_g)):
+                    return True
 
-        # round2
+        # check k side
         side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
-        one_based_connected_atom_numbers = atom_info_dict[side_k_index]["ConnectedAtomsNumbers"]
-        connected_set = set(one_based_connected_atom_numbers)
-        connected_set = connected_set - {dihedral_indices[1]+1}  # remove the dihedral atom_j
-        for equiv_g in one_based_equiv_atoms_groups:
-            if connected_set.issubset(set(equiv_g)):
-                return True
+        if atom_info_dict[side_k_index]["AtomicSymbol"] == "C":
+            one_based_connected_atom_numbers = atom_info_dict[side_k_index]["ConnectedAtomsNumbers"]
+            connected_set = set(one_based_connected_atom_numbers)
+            connected_set = connected_set - {dihedral_indices[1]+1}  # remove the dihedral atom_j
+            for equiv_g in one_based_equiv_atoms_groups:
+                if connected_set.issubset(set(equiv_g)):
+                    return True
 
         # if not found, return False
         return False
-    
-    def _use_mmff_generator(self, comm, mol, top_file_name):
 
-        # use MMFF generator to generate the topology and dihedrals
-        mmff_gen = MMForceFieldGenerator(comm=comm)
+    def _check_methyl_group(self, dihedral_indices, atom_info_dict):
+
+        side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
+        side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
+
+        # check j side
+        if atom_info_dict[side_j_index]["AtomicSymbol"] == "C":
+            one_based_connected_atom_numbers = atom_info_dict[side_j_index]["ConnectedAtomsNumbers"]
+            connected_set = set(one_based_connected_atom_numbers)
+            connected_set = connected_set - {side_k_index}  # remove dihedral atom_k
+            connected_elements = [atom_info_dict[idx]["AtomicSymbol"] for idx in connected_set]
+            if tuple(connected_elements) == ("H", "H", "H"):
+                return True
+
+        # check k side
+        if atom_info_dict[side_k_index]["AtomicSymbol"] == "C":
+            one_based_connected_atom_numbers = atom_info_dict[side_k_index]["ConnectedAtomsNumbers"]
+            connected_set = set(one_based_connected_atom_numbers)
+            connected_set = connected_set - {side_j_index}  # remove dihedral atom_j
+            connected_elements = [atom_info_dict[idx]["AtomicSymbol"] for idx in connected_set]
+            if tuple(connected_elements) == ("H", "H", "H"):
+                return True
+
+        return False
+
+    def _get_dihedral_candidates(self, molecule, top_file_name):
+
+        mmff_gen = MMForceFieldGenerator(self._comm)
         mmff_gen.ostream.mute()
-
-        mmff_gen.partial_charges = mol.get_partial_charges(mol.get_charge())
-        mmff_gen.create_topology(mol)
+        # TODO: double check partial charge
+        mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+        mmff_gen.create_topology(molecule)
         mmff_gen.write_gromacs_files(filename=top_file_name)
-
-        # make sure to sync the ranks after the top file is written
-        comm.barrier()
+        self._comm.barrier()
 
         atom_info_dict = deepcopy(mmff_gen.atom_info_dict)
         rotatable_bonds = deepcopy(mmff_gen.rotatable_bonds)
         dihedrals_dict = deepcopy(mmff_gen.dihedrals)
-
-        return atom_info_dict, rotatable_bonds, dihedrals_dict
-
-    def _get_dihedral_candidates(self, molecule, top_file_name,atom_info_dict, rotatable_bonds, dihedrals_dict):
-
-        one_based_equiv_atoms_groups = self.analyze_equiv(molecule)
 
         rotatable_bonds_zero_based = [(i - 1, j - 1) for (i, j) in rotatable_bonds]
         rotatable_dihedrals_dict = {}
@@ -154,7 +171,6 @@ class ConformerGenerator:
                 return periodicity
 
         # only pick one dihedral for each rotatable bond
-        # also need to find max periodicity
         for (i, j, k, l), dih in dihedrals_dict.items():
 
             sorted_bond = tuple(sorted([j, k]))
@@ -172,28 +188,35 @@ class ConformerGenerator:
 
         dihedrals_candidates = []
 
+        # one_based_equiv_atoms_groups = self.analyze_equiv(molecule)
+
         for k, v in rotatable_dihedrals_dict.items():
             max_periodicity = v["max_periodicity"]
-            if max_periodicity == 3:
-                dih_angle = [60, 180, 300]
-            elif max_periodicity == 2:
+            if max_periodicity == 2:
                 dih_angle = [0, 180]
+            elif max_periodicity == 3:
+                dih_angle = [60, 180, 300]
             elif max_periodicity == 4:
                 dih_angle = [0, 90, 180, 270]
+            elif max_periodicity == 5:
+                dih_angle = [36, 54, 84, 144, 324]
             else:
                 continue
 
             dih_index = v["dihedral_indices"]
-            if self._check_equivside_in_dihedrals(dih_index, atom_info_dict, one_based_equiv_atoms_groups):
+            # skip dihedral angle involving methyl group
+            # TODO: use _check_equivside_in_dihedrals
+            if self._check_methyl_group(dih_index, atom_info_dict):
                 continue
 
             dihedrals_candidates.append((dih_index, dih_angle))
 
-        return dihedrals_candidates
+        return dihedrals_candidates, atom_info_dict, dihedrals_dict
 
     def _get_dihedral_combinations(self, dihedrals_candidates):
 
         # assemble all possible combinations of dihedrals
+
         test = [i[1] for i in dihedrals_candidates]
         dihedrals_combinations = list(itertools.product(*test))
         dihedral_list = [i[0] for i in dihedrals_candidates]
@@ -202,8 +225,8 @@ class ConformerGenerator:
         self.ostream.flush()
 
         return dihedrals_combinations, dihedral_list
-    
-    def _get_mol_comb(self, dihedrals_candidates):
+
+    def _get_mol_comb(self, molecule, top_file_name, dihedrals_candidates, atom_info_dict, dihedrals_dict):
 
         dihedrals_combinations, dihedral_list = self._get_dihedral_combinations(dihedrals_candidates)
 
@@ -257,24 +280,29 @@ class ConformerGenerator:
         optimized_coords = state.getPositions(asNumpy=True).value_in_unit_system(md_unit_system) * 10
 
         return energy, optimized_coords
-    
-    def _preoptimize_molecule(self, mol, top_file_name, em_tolerance):
 
-        atom_info_dict, rotatable_bonds, dihedrals_dict = self._use_mmff_generator(self._comm, mol, top_file_name)
+    def _preoptimize_molecule(self, molecule, top_file_name, em_tolerance):
+
+        mmff_gen = MMForceFieldGenerator(self._comm)
+        mmff_gen.ostream.mute()
+        # TODO: double check partial charge
+        mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+        mmff_gen.create_topology(molecule)
+        mmff_gen.write_gromacs_files(filename=top_file_name)
+        self._comm.barrier()
 
         if self._rank == mpi_master():
             simulation = self._init_openmm_system(top_file_name)
-            energy, opt_coords = self._minimize_energy(mol, simulation, em_tolerance)
+            energy, opt_coords = self._minimize_energy(molecule, simulation, em_tolerance)
         else:
-            energy, opt_coords = None, None
-        energy, opt_coords = self._comm.bcast((energy, opt_coords), root=mpi_master())
+            opt_coords = None
+        opt_coords = self._comm.bcast(opt_coords, root=mpi_master())
 
-        # update the coordinates of the molecule to new_mol
-        new_mol = Molecule(mol)
+        new_molecule = Molecule(molecule)
         for i in range(len(opt_coords)):
-            new_mol.set_atom_coordinates(i, opt_coords[i] / bohr_in_angstrom())
+            new_molecule.set_atom_coordinates(i, opt_coords[i] / bohr_in_angstrom())
 
-        return energy, new_mol
+        return new_molecule
 
     def generate(self, molecule):
 
@@ -286,36 +314,19 @@ class ConformerGenerator:
 
         self.molecule = molecule
 
-        pre_molecule_energy, pre_molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
+        molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
 
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
 
-        atom_info_dict, rotatable_bonds, dihedrals_dict = self._use_mmff_generator(comm, pre_molecule, top_file_name)
-        
-        if rank == mpi_master():
-            dihedrals_candidates = self._get_dihedral_candidates(pre_molecule, top_file_name,atom_info_dict, rotatable_bonds, dihedrals_dict)
-            num_dih_candidates = len(dihedrals_candidates)
-        else:
-            num_dih_candidates = None
-        num_dih_candidates = comm.bcast(num_dih_candidates, root=mpi_master())
-
-        if num_dih_candidates == 0:
-            if rank == mpi_master():
-                self.ostream.print_info("No rotatable bonds found, no new conformers will be generated.")
-                self.ostream.flush()
-                pre_molecule_conformer = {}
-                pre_molecule_conformer["energy"] = pre_molecule_energy
-                pre_molecule_conformer["labels"] = pre_molecule.get_labels()
-                pre_molecule_conformer["coordinates"] = pre_molecule.get_coordinates_in_angstrom()
-                self.global_minimum_conformer = pre_molecule_conformer["coordinates"]
-                self.global_minimum_energy = pre_molecule_energy
-                self.selected_conformers = [pre_molecule_conformer]
-            return
+        dihedrals_candidates, atom_info_dict, dihedrals_dict = (
+            self._get_dihedral_candidates(molecule, top_file_name))
 
         if rank == mpi_master():
-            conformation_dih_arr = self._get_mol_comb(dihedrals_candidates)
+            conformation_dih_arr = self._get_mol_comb(
+                molecule, top_file_name, dihedrals_candidates,
+                atom_info_dict, dihedrals_dict)
         else:
             conformation_dih_arr = None
         conformation_dih_arr = comm.bcast(conformation_dih_arr, root=mpi_master())
@@ -449,7 +460,7 @@ class ConformerGenerator:
 
             if self.save_xyz_files:
                 self.ostream.print_info(
-                    f"{self.number_of_conformers_to_select} conformers with " +
+                    f"{len(selected_conformers)} conformers with " +
                     f"the lowest energies are saved in folder {str(save_path)}")
 
             self.ostream.print_info(
