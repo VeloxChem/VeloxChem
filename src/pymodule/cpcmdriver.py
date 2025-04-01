@@ -163,7 +163,7 @@ class CpcmDriver:
         if self.custom_vdw_radii is not None:
             assert_msg_critical(
                 len(self.custom_vdw_radii) % 2 == 0,
-                'C-PCM: expecting even number of entries for custom vdw radii')
+                'C-PCM: expecting even number of entries for user-defined C-PCM radii')
 
             keys = self.custom_vdw_radii[0::2]
             vals = self.custom_vdw_radii[1::2]
@@ -174,12 +174,21 @@ class CpcmDriver:
                     idx = int(key) - 1
                     assert_msg_critical(
                         0 <= idx and idx < molecule.number_of_atoms(),
-                        'C-PCM: invalid atom index for custom vdw radii')
+                        'C-PCM: invalid atom index for user-defined C-PCM radii')
                     atom_radii[idx] = val_au
+                    self.ostream.print_info(
+                        f'Applying user-defined C-PCM radius {val} for atom {key}')
                 except ValueError:
+                    elem_found = False
                     for idx, label in enumerate(molecule.get_labels()):
                         if label.upper() == key.upper():
                             atom_radii[idx] = val_au
+                            elem_found = True
+                    if elem_found:
+                        self.ostream.print_info(
+                            f'Applying user-defined C-PCM radius {val} for atom {key}')
+
+            self.ostream.print_blank()
 
         return atom_radii
 

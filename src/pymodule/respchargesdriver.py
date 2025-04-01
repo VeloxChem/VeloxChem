@@ -992,10 +992,12 @@ class RespChargesDriver:
             assert_msg_critical(
                 len(self.custom_mk_radii) % 2 == 0,
                 'RespChargesDriver: expecting even number of entries for ' +
-                'custom MK radii')
+                'user-defined MK radii')
 
             keys = self.custom_mk_radii[0::2]
             vals = self.custom_mk_radii[1::2]
+
+            self.ostream.print_blank()
 
             for key, val in zip(keys, vals):
                 val_au = float(val) / bohr_in_angstrom()
@@ -1004,12 +1006,21 @@ class RespChargesDriver:
                     assert_msg_critical(
                         0 <= idx and idx < molecule.number_of_atoms(),
                         'RespChargesDriver: invalid atom index for ' +
-                        'custom MK radii')
+                        'user-defined MK radii')
                     mol_mk_radii[idx] = val_au
+                    self.ostream.print_info(
+                        f'Applying user-defined MK radius {val} for atom {key}')
                 except ValueError:
+                    elem_found = False
                     for idx, label in enumerate(molecule.get_labels()):
                         if label.upper() == key.upper():
                             mol_mk_radii[idx] = val_au
+                            elem_found = True
+                    if elem_found:
+                        self.ostream.print_info(
+                            f'Applying user-defined MK radius {val} for atom {key}')
+
+            self.ostream.print_blank()
 
         for layer in range(self.number_layers):
 
