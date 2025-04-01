@@ -321,7 +321,20 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_results=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extrema=False, initial_validation=True):
+    def reparameterize_dihedrals(self,
+                                 rotatable_bond,
+                                 scan_file=None,
+                                 scf_drv=None,
+                                 basis=None,
+                                 scf_results=None,
+                                 scan_range=[0, 360],
+                                 n_points=19,
+                                 scan_verbose=False,
+                                 visualize=False,
+                                 fit_extrema=False,
+                                 initial_validation=True,
+                                 show_diff=False,
+                                 verbose=True):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -524,7 +537,7 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        initial_data = self.validate_force_field(0)
+        initial_data = self.validate_force_field(0, verbose=verbose)
 
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
         mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
@@ -623,7 +636,7 @@ class MMForceFieldGenerator:
             self.print_validation_summary(fitted_dihedral_results)
 
             if visualize:
-                self.visualize(fitted_dihedral_results)
+                self.visualize(fitted_dihedral_results, show_diff=show_diff)
 
         self.ostream.print_info('Fitting the dihedral parameters...')
         if fit_extrema:
@@ -742,7 +755,7 @@ class MMForceFieldGenerator:
         self.print_validation_summary(fitted_dihedral_results)
 
         if visualize:
-            self.visualize(fitted_dihedral_results)
+            self.visualize(fitted_dihedral_results, show_diff=show_diff)
 
         self.ostream.print_info('Dihedral MM parameters have been reparameterized and updated in the topology.')
         self.ostream.flush()
@@ -2934,7 +2947,7 @@ class MMForceFieldGenerator:
                 dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(src.read_text())
 
-    def validate_force_field(self, i, print_summary=False):
+    def validate_force_field(self, i, verbose=True):
         """
         Validates force field by RMSD of dihedral potentials.
 
@@ -2953,40 +2966,29 @@ class MMForceFieldGenerator:
 
         geom = self.scan_geometries[i]
         angles = self.scan_dih_angles[i]
-        mm_scan = self.perform_mm_scan(dih, geom, angles)
+        mm_scan = self.perform_mm_scan(dih, geom, angles, verbose=verbose)
         mm_scan = np.array(mm_scan) - min(mm_scan)
 
         qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
         qm_scan *= hartree_in_kjpermol()
 
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
-        self.ostream.print_info(
-            '  ---------------------------------------------------------------')
-        for angle, e_mm, e_qm in zip(angles, mm_scan, qm_scan):
+        if verbose:
+            self.ostream.print_blank()
             self.ostream.print_info(
-                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
-                f'{(e_mm - e_qm):10.3f}')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        if print_summary:
-            # Summarize validation
-            self.ostream.print_info('Summary of validation')
-            self.ostream.print_info('---------------------')
-            # Maximum difference
-            max_diff = np.max(np.abs(mm_scan - qm_scan))
-            self.ostream.print_info(f'Maximum difference: {max_diff:.3f} kJ/mol')
-            # Standard deviation
-            std_diff = np.std(mm_scan - qm_scan)
-            self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
+                '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+            self.ostream.print_info(
+                '  ---------------------------------------------------------------')
+            for angle, e_mm, e_qm in zip(angles, mm_scan, qm_scan):
+                self.ostream.print_info(
+                    f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                    f'{(e_mm - e_qm):10.3f}')
             self.ostream.print_blank()
             self.ostream.flush()
-            self.fitting_summary = {'maximum_difference': max_diff,
-                                    'standard_deviation': std_diff}
-        else:
-            self.fitting_summary = None
+
+        self.fitting_summary = {
+            'maximum_difference': np.max(np.abs(mm_scan - qm_scan)),
+            'standard_deviation': np.std(mm_scan - qm_scan),
+        }
 
         return {
             'dihedral_indices': list(dih),
@@ -2999,7 +3001,7 @@ class MMForceFieldGenerator:
                         dihedral,
                         geometries,
                         angles,
-                        print_energies=True):
+                        verbose=True):
         """
         Performs MM scan of a specific dihedral.
 
@@ -3013,7 +3015,7 @@ class MMForceFieldGenerator:
 
         # select scan angles and geometries from QM data
 
-        if print_energies:
+        if verbose:
             self.ostream.print_info('      Dihedral           MM energy')
             self.ostream.print_info('  --------------------------------')
             self.ostream.flush()
@@ -3033,7 +3035,7 @@ class MMForceFieldGenerator:
             pot_energy *= hartree_in_kjpermol()
             energies.append(pot_energy)
 
-            if print_energies:
+            if verbose:
                 self.ostream.print_info(
                     f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
                 self.ostream.flush()
@@ -3090,7 +3092,7 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def visualize(self, validation_result):
+    def visualize(self, validation_result, show_diff=False):
         """
         Visualizes dihedral potential.
 
@@ -3120,6 +3122,10 @@ class MMForceFieldGenerator:
         # Plot spline
         plt.plot(dihedrals_dense, qm_scan_kJpermol_spl, color='black', linewidth=4,  label='QM (spline)', alpha=0.7)
         plt.plot(dihedrals_dense, mm_scan_kJpermol_spl, color='darkcyan', linewidth=4, label='MM (spline)' , alpha=0.7)
+
+        if show_diff:
+            plt.plot(dihedrals_dense, qm_scan_kJpermol_spl - mm_scan_kJpermol_spl, color='orange',
+                     linewidth=2, linestyle=':', label='diff (spline)', alpha=0.7)
 
         # Print the original points 
         plt.scatter(dihedral_angles, qm_scan_kJpermol, color='black', s=25, label='QM (points)')
