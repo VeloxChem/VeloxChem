@@ -1622,9 +1622,11 @@ class PolOrbitalResponse(CphfSolver):
         xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
         dof_red = len(xy_pairs)
 
+        nocc = molecule.number_of_alpha_electrons()
+
         if self.rank == mpi_master():
             # MO coefficients
-            nocc = molecule.number_of_alpha_electrons()
+            #nocc = molecule.number_of_alpha_electrons()
             mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
@@ -1644,16 +1646,16 @@ class PolOrbitalResponse(CphfSolver):
             if not self.use_subspace_solver:
                 all_cphf_red = self.cphf_results['cphf_ov']
                 all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
-        else:
+        #else:
             #xy_pairs = None
             #dof_red = None
-            nocc = None
-            nvir = None
+            #nocc = None
+        #    nvir = None
 
         #xy_pairs = self.comm.bcast(xy_pairs, root=mpi_master())
         #dof_red = self.comm.bcast(dof_red, root=mpi_master())
-        nocc = self.comm.bcast(nocc , root=mpi_master())
-        nvir = self.comm.bcast(nvir , root=mpi_master())
+        #nocc = self.comm.bcast(nocc , root=mpi_master())
+        #nvir = self.comm.bcast(nvir , root=mpi_master())
 
         # timings
         loop_start_time = tm.time()
@@ -1701,8 +1703,8 @@ class PolOrbitalResponse(CphfSolver):
                     full_vec[idx] *= -1.0
 
                 # get fock matrices from cphf_results
-                fock_ao_rhs = self.cphf_results[w]['fock_ao_rhs']
-                fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
+                #fock_ao_rhs = self.cphf_results[w]['fock_ao_rhs']
+                #fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
 
                 # relevant in later part of code where fock matrices
                 # are read from distributed arrays
@@ -1829,6 +1831,9 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs = tmp_fock_ao_rhs.copy()
                 fock_gxc_ao = tmp_fock_gxc_ao.copy()
 
+                tmp_fock_ao_rhs.clear()
+                tmp_fock_gxc_ao.clear()
+
                 for m in range(dof):
                     for n in range(m, dof):
                         # TODO: move outside for-loop when all Fock matrices can be
@@ -1844,9 +1849,6 @@ class PolOrbitalResponse(CphfSolver):
 
                         fock_ao_rhs_1_n = fock_ao_rhs[dof**2 + n]  # x_plus_y
                         fock_ao_rhs_2_n = fock_ao_rhs[dof**2 + dof + n]  # x_minus_y
-
-                        # NOTE DEBUG
-                        #print(np.max(np.abs(fock_ao_rhs_1_m - tmp_fock_ao_rhs[dof**2 + m])))
 
                         fmat = (fock_cphf[m * dof + n] +
                                 fock_cphf[m * dof + n].T +
@@ -1946,9 +1948,12 @@ class PolOrbitalResponse(CphfSolver):
         xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
         dof_red = len(xy_pairs)
 
+        # number of occupied MOs
+        nocc = molecule.number_of_alpha_electrons()
+
         if self.rank == mpi_master():
             # MO coefficients
-            nocc = molecule.number_of_alpha_electrons()
+            #nocc = molecule.number_of_alpha_electrons()
             mo = scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
             mo_vir = mo[:, nocc:].copy()
@@ -1969,16 +1974,16 @@ class PolOrbitalResponse(CphfSolver):
             if not self.use_subspace_solver:
                 all_cphf_red = self.cphf_results['cphf_ov']
                 all_cphf_red = all_cphf_red.reshape(n_freqs, 2 * dof_red, nocc * nvir)
-        else:
+        #else:
             #xy_pairs = None
             #dof_red = None
-            nocc = None
-            nvir = None
+            #nocc = None
+            #nvir = None
 
         #xy_pairs = self.comm.bcast(xy_pairs, root=mpi_master())
         #dof_red = self.comm.bcast(dof_red, root=mpi_master())
-        nocc = self.comm.bcast(nocc , root=mpi_master())
-        nvir = self.comm.bcast(nvir , root=mpi_master())
+        #nocc = self.comm.bcast(nocc , root=mpi_master())
+        #nvir = self.comm.bcast(nvir , root=mpi_master())
 
         # timings
         loop_start_time = tm.time()
@@ -2028,12 +2033,12 @@ class PolOrbitalResponse(CphfSolver):
                     full_vec[idx] *= -1.0
 
                 # get fock matrices from cphf_results
-                fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
-                fock_ao_rhs_imag = self.cphf_results[w]['fock_ao_rhs_imag']
-                fock_gxc_ao_rere = self.cphf_results[w]['fock_gxc_ao_rere']
-                fock_gxc_ao_imim = self.cphf_results[w]['fock_gxc_ao_imim']
-                fock_gxc_ao_reim = self.cphf_results[w]['fock_gxc_ao_reim']
-                fock_gxc_ao_imre = self.cphf_results[w]['fock_gxc_ao_imre']
+                #fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs_real']
+                #fock_ao_rhs_imag = self.cphf_results[w]['fock_ao_rhs_imag']
+                #fock_gxc_ao_rere = self.cphf_results[w]['fock_gxc_ao_rere']
+                #fock_gxc_ao_imim = self.cphf_results[w]['fock_gxc_ao_imim']
+                #fock_gxc_ao_reim = self.cphf_results[w]['fock_gxc_ao_reim']
+                #fock_gxc_ao_imre = self.cphf_results[w]['fock_gxc_ao_imre']
 
                 # NOTE WIP
                 # for fock matrices to be read from distributed arrays
@@ -2185,6 +2190,13 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao_imim = tmp_fock_gxc_ao_imim.copy()
                 fock_gxc_ao_reim = tmp_fock_gxc_ao_reim.copy()
                 fock_gxc_ao_imre = tmp_fock_gxc_ao_imre.copy()
+
+                tmp_fock_ao_rhs_real.clear()
+                tmp_fock_ao_rhs_imag.clear()
+                tmp_fock_gxc_ao_rere.clear()
+                tmp_fock_gxc_ao_imim.clear()
+                tmp_fock_gxc_ao_reim.clear()
+                tmp_fock_gxc_ao_imre.clear()
 
                 for m in range(dof):
                     for n in range(m, dof):
