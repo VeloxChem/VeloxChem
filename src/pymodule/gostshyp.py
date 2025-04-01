@@ -166,25 +166,25 @@ class GostshypDriver:
             # y_mat = tcog_mats.get_matrix('y').get_full_matrix().to_numpy()
             # z_mat = tcog_mats.get_matrix('z').get_full_matrix().to_numpy()
 
-            x_mat = tcog_mats.matrix('X').to_numpy()
-            y_mat = tcog_mats.matrix('Y').to_numpy()
-            z_mat = tcog_mats.matrix('Z').to_numpy()
+            x_mat = tcog_mats.matrix('X').to_numpy() #matrix
+            y_mat = tcog_mats.matrix('Y').to_numpy() #matrix
+            z_mat = tcog_mats.matrix('Z').to_numpy() #matrix
 
             f_italic = (  norm_vec[0] * x_mat
                         + norm_vec[1] * y_mat
-                        + norm_vec[2] * z_mat)
+                        + norm_vec[2] * z_mat) #matrix
 
-            f_tilde = np.einsum('pq,pq->', den_mat, f_italic)
+            f_tilde = np.einsum('pq,pq->', den_mat, f_italic) #scalar
 
             # calculate parameter p_j
-            p = -self.pressure * self.tessellation[3, j] / f_tilde
+            p = -self.pressure * self.tessellation[3, j] / f_tilde #scalar
 
             # same naive try to calculate the energy contribution
             tco_mat = tco_drv.compute(self.molecule, self.basis, exp, pre_fac, center)
 
             gauss_mat = p * tco_mat.to_numpy()
 
-            amplitude = np.einsum('pq,pq->', den_mat, gauss_mat) * self.tessellation[-1, j]
+            amplitude = np.einsum('pq,pq->', den_mat, gauss_mat) #* self.tessellation[-1, j]
 
             pos_amp = (amplitude >= 0.0)
 
@@ -206,7 +206,7 @@ class GostshypDriver:
             correction_term = (f_italic * g_tilde_contr * self.pressure * 
                                self.tessellation[3, j] * (1.0 / f_tilde**2))
 
-            V_pr += (gauss_mat + correction_term) * self.tessellation[-1, j]
+            V_pr += (gauss_mat + correction_term) #* self.tessellation[-1, j]
 
         return e_pr, V_pr
 
