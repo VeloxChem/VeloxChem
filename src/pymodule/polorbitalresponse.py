@@ -1460,13 +1460,6 @@ class PolOrbitalResponse(CphfSolver):
 
         return fock_gxc_ao_rere, fock_gxc_ao_imim, fock_gxc_ao_reim, fock_gxc_ao_imre
 
-    # NOTES:
-    #   - epsilon_dm_ao not returned from cphfsolver,
-    #     to be calculated inside compute_omega
-    #   - fock_ao_rhs and fock_gxc_ao come from cphfsolver dictionary
-    #   - fock_lambda not returned yet, put in dictionary from cphfsolver
-    #     (otherwise needs to be recalculated)
-
     def compute_omega(self, molecule, basis, scf_tensors, lr_results):
         """
         Guides the calculation of the polarizability Lagrange multipliers
