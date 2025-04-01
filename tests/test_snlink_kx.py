@@ -25,7 +25,7 @@ class TestSNLinkK:
         density = density.broadcast(scf_drv.comm, root=mpi_master())
 
         grid_drv = GridDriver(scf_drv.comm)
-        grid_drv.set_level(1)
+        grid_drv.set_level(3)
         mol_grid = grid_drv.generate(molecule)
 
         xc_drv = XCIntegrator()
