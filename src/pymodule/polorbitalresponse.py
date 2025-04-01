@@ -158,11 +158,11 @@ class PolOrbitalResponse(CphfSolver):
     def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
 
         if self.is_complex:
-            return self.compute_rhs_complex(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict,
-                                            lr_results)
+            return self.compute_rhs_complex(molecule, basis, scf_tensors, eri_dict,
+                                            dft_dict, pe_dict, lr_results)
         else:
-            return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict,
-                                         lr_results)
+            return self.compute_rhs_real(molecule, basis, scf_tensors, eri_dict,
+                                         dft_dict, pe_dict, lr_results)
 
     def compute_rhs_complex(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
         """
@@ -221,7 +221,6 @@ class PolOrbitalResponse(CphfSolver):
         dof_red = self.comm.bcast(dof_red, root=mpi_master())
 
         # TODO: double check dft_dict['gs_density']
-        # TODO: maybe rename to mol_grid
         molgrid = dft_dict['molgrid']
         gs_density = [density]
 
@@ -240,7 +239,10 @@ class PolOrbitalResponse(CphfSolver):
 
         orbrsp_rhs = {}
 
+        # list for distributed arrays
         dist_cphf_rhs = []
+        dist_fock_ao_rhs = []
+        dist_fock_gxc_ao = []
 
         for f, w in enumerate(self.frequencies):
             profiler.set_timing_key(f'RHS w={w:.4f}')
@@ -546,6 +548,63 @@ class PolOrbitalResponse(CphfSolver):
                         'fock_gxc_ao_imre': fock_gxc_ao_imre,
                     }, self.ostream)
 
+            # save intermediates in distributes array
+            dist_fock_ao_rhs_re = []
+            dist_fock_ao_rhs_im = []
+            dist_fock_gxc_ao_rere = []
+            dist_fock_gxc_ao_imim = []
+            dist_fock_gxc_ao_reim = []
+            dist_fock_gxc_ao_imre = []
+            if self._dft:
+                for k, fock_re_k in enumerate(fock_ao_rhs_real):
+                    if self.rank == mpi_master():
+                        fock_ao_rhs_re_k = fock_re_k.reshape(nao * nao)
+                        fock_ao_rhs_im_k = fock_ao_rhs_imag[k].copy().reshape(nao * nao)
+                    else:
+                        fock_ao_rhs_re_k = None
+                        fock_ao_rhs_im_k = None
+                    dist_fock_ao_rhs_re.append(DistributedArray(fock_ao_rhs_re_k,
+                                                                self.comm,
+                                                                root=mpi_master()))
+                    dist_fock_ao_rhs_im.append(DistributedArray(fock_ao_rhs_im_k,
+                                                                self.comm,
+                                                                root=mpi_master()))
+                dist_fock_ao_rhs.extend(dist_fock_ao_rhs_re + dist_fock_ao_rhs_im)
+
+                for k, fock_rere_k in enumerate(fock_gxc_ao_rere):
+                    if self.rank == mpi_master():
+                        fock_gxc_ao_rere_k = fock_rere_k.reshape(nao * nao)
+                        fock_gxc_ao_imim_k = fock_gxc_ao_imim[k].copy().reshape(nao * nao)
+                        fock_gxc_ao_reim_k = fock_gxc_ao_reim[k].copy().reshape(nao * nao)
+                        fock_gxc_ao_imre_k = fock_gxc_ao_imre[k].copy().reshape(nao * nao)
+                    else:
+                        fock_gxc_ao_rere_k = None
+                        fock_gxc_ao_imim_k = None
+                        fock_gxc_ao_reim_k = None
+                        fock_gxc_ao_imre_k = None
+
+                    dist_fock_gxc_ao_rere.append(DistributedArray(fock_gxc_ao_rere_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_imim.append(DistributedArray(fock_gxc_ao_imim_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_reim.append(DistributedArray(fock_gxc_ao_reim_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                    dist_fock_gxc_ao_imre.append(DistributedArray(fock_gxc_ao_imre_k,
+                                                                  self.comm,
+                                                                  root=mpi_master()))
+                dist_fock_gxc_ao.extend(dist_fock_gxc_ao_rere
+                                        + dist_fock_gxc_ao_imim
+                                        + dist_fock_gxc_ao_reim
+                                        + dist_fock_gxc_ao_imre
+                                        )
+                dist_fock_gxc_ao_rere.clear()
+                dist_fock_gxc_ao_imim.clear()
+                dist_fock_gxc_ao_reim.clear()
+                dist_fock_gxc_ao_imre.clear()
+
             # save RHS in distributed array
             dist_cphf_rhs_re = []
             dist_cphf_rhs_im = []
@@ -569,7 +628,9 @@ class PolOrbitalResponse(CphfSolver):
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
         profiler.print_memory_subspace({
-            'dist_cphf_rhs': dist_cphf_rhs
+            'dist_cphf_rhs': dist_cphf_rhs,
+            'dist_fock_ao_rhs': dist_fock_ao_rhs,
+            'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
         }, self.ostream)
         profiler.check_memory_usage('End of RHS')
 
@@ -588,10 +649,14 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
             orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
+            orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
             return orbrsp_rhs
         else:
             return {
                 'dist_cphf_rhs': dist_cphf_rhs,
+                'dist_fock_ao_rhs': dist_fock_ao_rhs,
+                'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
             }
 
     def compute_rhs_real(self, molecule, basis, scf_tensors, eri_dict, dft_dict, pe_dict, lr_results):
@@ -669,6 +734,8 @@ class PolOrbitalResponse(CphfSolver):
 
         # list for RHS distributed arrays
         dist_cphf_rhs = []
+        dist_fock_ao_rhs = []
+        dist_fock_gxc_ao = []
 
         for f, w in enumerate(self.frequencies):
             profiler.set_timing_key(f'RHS w={w:.4f}')
@@ -836,10 +903,12 @@ class PolOrbitalResponse(CphfSolver):
                     rhs_red.append(rhs_tmp[x, y].copy())
                 rhs_red = np.array(rhs_red)
 
+                # save intermediates in dict for use in compute_omega
                 orbrsp_rhs[(w)] = {
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
                 }
+
                 if f == 0:
                     tot_rhs_mo = rhs_red
                 else:
@@ -861,12 +930,34 @@ class PolOrbitalResponse(CphfSolver):
                 dist_cphf_rhs.append(DistributedArray(cphf_rhs_k, self.comm,
                                                       root=mpi_master()))
 
+            for fock_k in fock_ao_rhs:
+                if self.rank == mpi_master():
+                    fock_ao_rhs_k = fock_k.copy().reshape(nao * nao)
+                else:
+                    fock_ao_rhs_k = None
+
+                dist_fock_ao_rhs.append(DistributedArray(fock_ao_rhs_k, self.comm,
+                                                         root=mpi_master()))
+            if self._dft:
+                for fock_k in fock_gxc_ao:
+                    if self.rank == mpi_master():
+                        fock_gxc_ao_k = fock_k.copy().reshape(nao * nao)
+                    else:
+                        fock_gxc_ao_k = None
+
+                    dist_fock_gxc_ao.append(DistributedArray(fock_gxc_ao_k,
+                                                             self.comm,
+                                                             root=mpi_master()))
+
             profiler.stop_timer('total')
             profiler.check_memory_usage(f'RHS w={w:.4f}')
 
         profiler.print_memory_subspace({
-            'dist_cphf_rhs': dist_cphf_rhs
+            'dist_cphf_rhs': dist_cphf_rhs,
+            'dist_fock_ao_rhs': dist_fock_ao_rhs,
+            'dist_fock_gxc_ao': dist_fock_gxc_ao
         }, self.ostream)
+
         profiler.check_memory_usage('End of RHS')
 
         profiler.print_timing(self.ostream)
@@ -883,12 +974,17 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             orbrsp_rhs['dist_cphf_rhs'] = dist_cphf_rhs
+            orbrsp_rhs['dist_fock_ao_rhs'] = dist_fock_ao_rhs
+            orbrsp_rhs['dist_fock_gxc_ao'] = dist_fock_gxc_ao  # empty list if not DFT
+
             if not self.use_subspace_solver:
                 orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
             return orbrsp_rhs
         else:
             return {
                 'dist_cphf_rhs': dist_cphf_rhs,
+                'dist_fock_ao_rhs': dist_fock_ao_rhs,
+                'dist_fock_gxc_ao': dist_fock_gxc_ao  # empty list if not DFT
             }
 
     def calculate_1pdm(self, molecule, scf_tensors, x_plus_y, x_minus_y):
@@ -1593,6 +1689,11 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs = self.cphf_results[w]['fock_ao_rhs']
                 fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
 
+                # relevant in later part of code where fock matrices
+                # are read from distributed arrays
+                tmp_fock_ao_rhs = []
+                tmp_fock_gxc_ao = []
+
                 # note: conjugate gradient solver returns array in dictionary
                 # and the coefficients are therefore imported differently
                 # from subspace solver
@@ -1681,6 +1782,25 @@ class PolOrbitalResponse(CphfSolver):
             # to the contraction of x_plus_y; and other dof matrices corresponding to
             # the contraction of x_minus_y.
 
+            # NOTE WIP
+            # get Fock matrices from distributed arrays
+            dim_fock_rhs = dof**2 + 2 * dof
+            for idx in range(dim_fock_rhs):
+                fock_rhs_i = self.cphf_results['dist_fock_ao_rhs'][
+                    dim_fock_rhs * f + idx].get_full_vector()
+
+                if self.rank == mpi_master():
+                    tmp_fock_ao_rhs.append(fock_rhs_i.reshape(nao, nao))
+
+            if self._dft:
+                for idx in range(2 * dof**2):
+                    fock_gxc_i = self.cphf_results['dist_fock_gxc_ao'][
+                        (2 * dof**2) * f + idx
+                    ].get_full_vector()
+
+                    if self.rank == mpi_master():
+                        tmp_fock_gxc_ao.append(fock_gxc_i.reshape(nao, nao))
+
             if self.rank == mpi_master():
                 cphf_ao_list.clear()
 
@@ -1690,6 +1810,9 @@ class PolOrbitalResponse(CphfSolver):
                 epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
                                                           dm_oo, dm_vv, cphf_ov)
                 del dm_oo, dm_vv
+
+                fock_ao_rhs = tmp_fock_ao_rhs.copy()
+                fock_gxc_ao = tmp_fock_gxc_ao.copy()
 
                 for m in range(dof):
                     for n in range(m, dof):
@@ -1706,6 +1829,9 @@ class PolOrbitalResponse(CphfSolver):
 
                         fock_ao_rhs_1_n = fock_ao_rhs[dof**2 + n]  # x_plus_y
                         fock_ao_rhs_2_n = fock_ao_rhs[dof**2 + dof + n]  # x_minus_y
+
+                        # NOTE DEBUG
+                        #print(np.max(np.abs(fock_ao_rhs_1_m - tmp_fock_ao_rhs[dof**2 + m])))
 
                         fmat = (fock_cphf[m * dof + n] +
                                 fock_cphf[m * dof + n].T +
