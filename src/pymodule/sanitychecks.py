@@ -181,13 +181,38 @@ def polgrad_sanity_check(obj, method_flag, lr_results):
         A dictionary containing linear response results.
     """
 
+    # check that frequencies agree with LR
     response_results = lr_results.get('solutions', None)
     for frequency in obj.frequencies:
         if (obj.vector_components[0], frequency) not in response_results.keys():
-            error_msg = 'Frequency {:2.3f} in '.format(frequency)
+            error_msg = f'Frequency {frequency:2.3f} in '
             error_msg += method_flag + ' not found in linear response results '
             error_msg += 'for vector compontent ' + obj.vector_components[0]
             raise ValueError(error_msg)
+
+    # check that there is no zero frequency for the complex case
+    # this can cause divergence with the subspace solver
+    if obj.is_complex:
+        try:
+            idx0 = obj.frequencies.index(0.0)
+            warn_msg = 'Zero (0.0) frequency in input frequencies for complex'
+            warn_msg += ' polarizability gradient/orbital response!\n\n'
+            if len(obj.frequencies) == 1:
+                warn_msg += 'No other frequencies requested;'
+                warn_msg += ' Will continue with zero frequency,'
+                warn_msg += ' CPHF solver might diverge.'
+            else:
+                # converting to a list because "pop()" does not exist for tuples
+                freq_list = list(obj.frequencies)
+                freq_list.pop(idx0)
+                obj.frequencies = freq_list
+                warn_msg += 'Zero (0.0) has been removed from the list of frequencies'
+                warn_msg += ' due to risk of divergent CPHF solver.\n'
+                warn_msg += 'Computations will be carried out for frequencies: '
+                warn_msg += str(obj.frequencies)
+            obj.ostream.print_warning(warn_msg)
+        except ValueError:
+            pass
 
 
 def raman_sanity_check(obj):
