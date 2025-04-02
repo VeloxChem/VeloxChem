@@ -59,6 +59,14 @@ auto integrateVxcFockForLdaClosedShell(const CMolecule&                  molecul
                                        const double                      screeningThresholdForGTOValues,
                                        const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
 
+auto
+newIntegrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
+                                     const CMolecularBasis&            basis,
+                                     const std::vector<const double*>& gsDensityPointers,
+                                     const CMolecularGrid&             molecularGrid,
+                                     const double                      screeningThresholdForGTOValues,
+                                     const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
+
 /**
  Integrates first-order LDA exchange-correlation functional contribution to
  open-shell AO Kohn-Sham matrix.
