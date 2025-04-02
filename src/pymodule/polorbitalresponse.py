@@ -30,7 +30,7 @@ from .veloxchemlib import XCIntegrator
 from .veloxchemlib import mpi_master, denmat
 from .cphfsolver import CphfSolver
 from .inputparser import parse_input
-from .sanitychecks import polgrad_sanity_check
+from .sanitychecks import polorbrsp_sanity_check_1, polorbrsp_sanity_check_2#polgrad_sanity_check
 from .oneeints import compute_electric_dipole_integrals
 from .distributedarray import DistributedArray
 from .profiler import Profiler
@@ -190,6 +190,9 @@ class PolOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
+        # check if zero is in self.frequencies
+        polorbrsp_sanity_check_1(self)
+
         # Workflow:
         # 1) Construct the necessary density matrices
         # 2) Construct the RHS
@@ -209,7 +212,8 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             # check if response vectors exist for desired frequency of gradient
-            polgrad_sanity_check(self, self.flag, lr_results)
+            #polgrad_sanity_check(self, self.flag, lr_results)
+            polorbrsp_sanity_check_2(self, self.flag, lr_results)
 
             density = scf_tensors['D_alpha']
             mo = scf_tensors['C_alpha']  # only alpha part
@@ -373,8 +377,9 @@ class PolOrbitalResponse(CphfSolver):
                                                             root=mpi_master())
                 zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
 
-            molgrid = dft_dict['molgrid']
-            gs_density = dft_dict['gs_density']
+            # NOTE these have already been set in the beginning
+            #molgrid = dft_dict['molgrid']
+            #gs_density = dft_dict['gs_density']
 
             # Fock matrices with corresponding type
             # set the vector-related components to general Fock matrix
@@ -560,7 +565,7 @@ class PolOrbitalResponse(CphfSolver):
                 if self.rank == mpi_master():
                     #fock_ao_rhs_re_k = fock_re_k.reshape(nao * nao)
                     fock_ao_rhs_re_k = fock_ao_rhs_real[k].reshape(nao * nao)
-                    fock_ao_rhs_im_k = fock_ao_rhs_imag[k].copy().reshape(nao * nao)
+                    fock_ao_rhs_im_k = fock_ao_rhs_imag[k].reshape(nao * nao)
                 else:
                     fock_ao_rhs_re_k = None
                     fock_ao_rhs_im_k = None
@@ -690,6 +695,9 @@ class PolOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
+        # check if zero is in self.frequencies
+        polorbrsp_sanity_check_1(self)
+
         # Workflow:
         # 1) Construct the necessary density matrices
         # 2) Construct the RHS
@@ -709,7 +717,8 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             # check if response vectors exist for desired frequency of gradient
-            polgrad_sanity_check(self, self.flag, lr_results)
+            #polgrad_sanity_check(self, self.flag, lr_results)
+            polorbrsp_sanity_check_2(self, self.flag, lr_results)
 
             density = scf_tensors['D_alpha']
             mo = scf_tensors['C_alpha']  # only alpha part

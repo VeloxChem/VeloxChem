@@ -49,7 +49,8 @@ from .inputparser import parse_input
 from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, polgrad_sanity_check)
+                           dft_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
+                           #polgrad_sanity_check)
 
 
 class PolarizabilityGradient:
@@ -221,8 +222,11 @@ class PolarizabilityGradient:
                 error_message += 'for analytical gradient'
                 raise ValueError(error_message)
             if self.rank == mpi_master():
-                polgrad_sanity_check(self, self.flag, lr_results)
+                polgrad_sanity_check_2(self, self.flag, lr_results)
                 self._check_real_or_complex_input(lr_results)
+            # sanity check input frequencies
+            polgrad_sanity_check_1(self)
+
             # compute
             self.polgradient = self.compute_analytical(molecule, basis,
                                                        scf_tensors, lr_results)
