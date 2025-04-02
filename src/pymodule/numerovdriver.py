@@ -901,7 +901,7 @@ class NumerovDriver:
         if pec_energies[1]:
             es_energies = pec_energies[1] - np.min(pec_energies[0])
         else:
-            es_energies = [None] * len(gs_energies)
+            es_energies = [None for x in range(len(gs_energies))]
 
         width = 92
         title = 'Potential Energy Curve Information'
