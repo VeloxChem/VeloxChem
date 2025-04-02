@@ -224,28 +224,28 @@ class EvbReporter():
             pes_recalc = (1 - self.Lambda) * E[0] + self.Lambda * E[1]
 
             if abs(pes_recalc - Em_pes) > 1e1:
+                simulations = [
+                    simulation,
+                    self.simulation_dicts['reactant_pes']['simulation'],
+                    self.simulation_dicts['product_pes']['simulation'],
+                ]
+
+                forcegroups = EvbForceGroup.pes_force_groups()
+                E_contributions = np.zeros((len(simulations), len(forcegroups)))
+                for si, simulation in enumerate(simulations):
+                    for fg, forcegroup in enumerate(forcegroups):
+                        e = simulation.context.getState(
+                            getEnergy=True,
+                            groups=set([forcegroup]),
+                        ).getPotentialEnergy().value_in_unit(
+                            mm.unit.kilojoules_per_mole)
+                        E_contributions[si, fg] = e
+                dif = E_contributions[0] - (1 - self.Lambda) * E_contributions[
+                    1] + self.Lambda * E_contributions[2]
+                dif = E_contributions[0] - E_contributions[1]
                 self.ostream.print_info(
                     f"Lambda: {self.Lambda}, pes difference: {Em_pes - pes_recalc}, NB force difference: {dif[3]}"
                 )
-
-                # simulations = [
-                #     simulation,
-                #     self.simulation_dicts['reactant_pes']['simulation'],
-                #     self.simulation_dicts['product_pes']['simulation'],
-                # ]
-                # forcegroups = EvbForceGroup.pes_force_groups()
-                # E_contributions = np.zeros((len(simulations), len(forcegroups)))
-                # for si, simulation in enumerate(simulations):
-                #     for fg, forcegroup in enumerate(forcegroups):
-                #         e = simulation.context.getState(
-                #             getEnergy=True,
-                #             groups=set([forcegroup]),
-                #         ).getPotentialEnergy().value_in_unit(
-                #             mm.unit.kilojoules_per_mole)
-                #         E_contributions[si, fg] = e
-                # dif = E_contributions[0] - (1 - self.Lambda) * E_contributions[
-                #     1] + self.Lambda * E_contributions[2]
-                # dif = E_contributions[0] - E_contributions[1]
 
                 # context0 = simulations[0].context
                 # sys0 = context0.getSystem()

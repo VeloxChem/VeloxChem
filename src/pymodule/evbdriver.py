@@ -39,6 +39,7 @@ from .evbsystembuilder import EvbSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
+from .evbsystembuilder import EvbForceGroup
 from .solvationbuilder import SolvationBuilder
 from .errorhandler import assert_msg_critical
 
@@ -258,7 +259,8 @@ class EvbDriver():
         if reactant_partial_charges is not None:
             rea_input["charges"] = reactant_partial_charges
         if product_partial_charges is not None:
-            if isinstance(product_partial_charges[0], float):
+            if isinstance(product_partial_charges[0], float) or isinstance(
+                    product_partial_charges[0], int):
                 assert len(
                     product
                 ) == 1, "Provide a list of seperate partial charges for every separate product"
@@ -293,6 +295,7 @@ class EvbDriver():
             self.reactant = rea_input["forcefield"]
             self.product = self.load_forcefield_from_json(
                 str(combined_product_path))
+            self.product.molecule = EvbForceFieldBuilder.combine_molecule([pro['molecule'] for pro in pro_input])
         else:
             ffbuilder = EvbForceFieldBuilder()
             ffbuilder.reparameterize = reparameterize
@@ -572,16 +575,19 @@ class EvbDriver():
                     open(top_path, "w"),
                 )
 
-                options_path = cwd / data_folder / "options.json"
-                with open(options_path, "w") as file:
-                    json.dump(
-                        {
-                            "temperature": conf.get("temperature",
-                                                    self.temperature),
-                            "Lambda": Lambda,
-                        },
-                        file,
-                    )
+                dump_conf = copy.copy(conf)
+                dump_conf.pop('systems')
+                dump_conf.pop('topology')
+                dump_conf.pop('initial_positions')
+                self.update_options_json(dump_conf, conf)
+                self.update_options_json(
+                {
+                        "Lambda": Lambda,
+                        "integration forcegroups": list(EvbForceGroup.integration_force_groups()),
+                        "pes forcegroups": list(EvbForceGroup.pes_force_groups()),
+                    },
+                conf,
+                )
 
         self.system_confs = configurations
         self.ostream.flush()
@@ -783,18 +789,18 @@ class EvbDriver():
             equil_step_size (float, optional): The step size during the equilibration in picoseconds. Is typically larger then step_size as equilibration is done with frozen H-bonds. Defaults to 0.002.
             initial_equil_step_size (float, optional): The step size during initial equilibration in picoseconds. Defaults to 0.002.
         """
-        # if self.debug:
-        #     self.ostream.print_warning(
-        #         "Debugging enabled, using low number of steps. Do not use for production"
-        #     )
-        #     self.ostream.flush()
-        #     equil_steps = 100
-        #     sample_steps = 200
-        #     write_step = 5
-        #     initial_equil_steps = 100
-        #     step_size = 0.001
-        #     equil_step_size = 0.001
-        #     initial_equil_step_size = 0.001
+        if self.debug:
+            self.ostream.print_warning(
+                "Debugging enabled, using low number of steps. Do not use for production"
+            )
+            self.ostream.flush()
+            equil_steps = 100
+            sample_steps = 200
+            write_step = 5
+            initial_equil_steps = 100
+            step_size = 0.001
+            equil_step_size = 0.001
+            initial_equil_step_size = 0.001
 
         if self.fast_run:
             self.ostream.print_warning(
@@ -803,12 +809,7 @@ class EvbDriver():
             sample_steps = 25000
 
         for conf in self.system_confs:
-            cwd = Path().cwd()
-            options_path = cwd / conf["data_folder"] / "options.json"
-            with open(options_path, "r") as file:
-                options = json.load(file)
-
-            options.update({
+            self.update_options_json({
                 "equil_steps": equil_steps,
                 "sample_steps": sample_steps,
                 "write_step": write_step,
@@ -816,10 +817,7 @@ class EvbDriver():
                 "step_size": step_size,
                 "equil_step_size": equil_step_size,
                 "initial_equil_step_size": initial_equil_step_size,
-            })
-
-            with open(options_path, "w") as file:
-                json.dump(options, file, indent=4)
+            }, conf)
 
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
@@ -837,6 +835,20 @@ class EvbDriver():
                 Lambda=self.Lambda,
                 configuration=conf,
             )
+
+    def update_options_json(self, dict, conf):
+        
+        cwd = Path().cwd()
+        path = cwd / conf["data_folder"] / "options.json"
+        if not path.exists():
+            with open(path, "w") as file:
+                json.dump(dict, file, indent=4)
+        else:
+            with open(path, "r") as file:
+                options = json.load(file)
+            options.update(dict)
+            with open(path, "w") as file:
+                json.dump(options, file, indent=4)
 
     def compute_energy_profiles(
         self,
