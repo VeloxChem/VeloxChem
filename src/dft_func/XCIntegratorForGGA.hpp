@@ -58,14 +58,6 @@ auto integrateVxcFockForGgaClosedShell(const CMolecule&                  molecul
                                        const double                      screeningThresholdForGTOValues,
                                        const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
 
-auto
-newIntegrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
-                                     const CMolecularBasis&            basis,
-                                     const std::vector<const double*>& gsDensityPointers,
-                                     const CMolecularGrid&             molecularGrid,
-                                     const double                      screeningThresholdForGTOValues,
-                                     const CXCFunctional&              xcFunctional) -> CAOKohnShamMatrix;
-
 /**
  Integrates first-order GGA exchange-correlation functional contribution to
  open-shell AO Kohn-Sham matrix.
