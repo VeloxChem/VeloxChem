@@ -80,6 +80,7 @@ class EvbFepDriver():
         self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
+        self.save_frames: int = 20
 
     def run_FEP(
         self,
@@ -153,7 +154,7 @@ class EvbFepDriver():
             equil_integrator = mm.LangevinMiddleIntegrator(
                 integrator_temperature,
                 integrator_friction_coeff,
-                equil_step_size * mmunit.picoseconds,
+                initial_equil_step_size * mmunit.picoseconds,
             )
             equil_integrator.setIntegrationForceGroups(
                 EvbForceGroup.integration_force_groups())
@@ -215,7 +216,10 @@ class EvbFepDriver():
                                             f"forcegroups_equil_{l:.3f}.csv"),
                         append=False,
                     ))
-            equil_simulation.step(equilibration_steps)
+
+            states = self._safe_step(equil_simulation,
+                                                equilibration_steps)
+
             equil_state = equil_simulation.context.getState(
                 positions=True,
                 velocities=True,
@@ -306,219 +310,10 @@ class EvbFepDriver():
                 f"Running sampling with step size {run_simulation.integrator.getStepSize()}"
             )
             self.ostream.flush()
-            run_simulation.step(total_sample_steps)
-            state = run_simulation.context.getState(getPositions=True)
-            positions = state.getPositions()
+            states = self._safe_step(run_simulation,
+                                                total_sample_steps)
 
-            # if l == 0:
-            #     self.ostream.print_info(
-            #         f"Running initial equilibration with step size {simulation.integrator.getStepSize()}"
-            #     )
-            #     self.ostream.flush()
-            #     timer.start()
-
-            # simulation.reporters.append(
-            #     mmapp.PDBReporter(
-            #         str(self.run_folder / f"traj_equil_{l:.3f}.pdb"),
-            #         write_step,
-            #         enforcePeriodicBox=True,
-            #     ))
-
-            # simulation.step(equilibration_steps)
-
-            # equil_crashed = False
-            # finished_equil = False
-            # while not finished_equil:
-            #     try:
-            #         if l == 0:
-            #             simulation.integrator.setStepSize(
-            #                 initial_equil_step_size * mmunit.picoseconds)
-            #             simulation.step(lambda_0_equilibration_steps)
-            #         # equilibrate
-            #         simulation.integrator.setStepSize(equil_step_size *
-            #                                           mmunit.picoseconds)
-            #         self.ostream.print_info(
-            #             f"Running equilibration with step size {simulation.integrator.getStepSize()}"
-            #         )
-            #         self.ostream.flush()
-            #         # if it crashes, try again with more writing steps for debugging purposes
-            #         simulation.step(equilibration_steps)
-            #         equil_state = simulation.context.getState(
-            #             getPositions=True,
-            #             getVelocities=True,
-            #         )
-            #         equil_positions = equil_state.getPositions()
-            #         equil_velocities = equil_state.getVelocities()
-            #         finished_equil = True
-            #     except (mm.OpenMMException, ValueError) as e:
-            #         if equil_crashed:
-            #             self.ostream.print_warning(
-            #                 "Equilibration crashed again, saving data and exiting"
-            #             )
-            #             simulation.saveCheckpoint(
-            #                 str(self.run_folder / f"equil_state_{l:.3f}.chk"))
-            #             simulation.saveState(
-            #                 str(self.run_folder / f"equil_state_{l:.3f}.xml"))
-            #             with open(self.run_folder / f"equil_sys_{l:.3f}.xml",
-            #                       mode="w",
-            #                       encoding="utf-8") as output:
-            #                 output.write(mm.XmlSerializer.serialize(system))
-            #             self.ostream.flush()
-            #             raise e
-            #         else:
-            #             equil_crashed = True
-            #             mimin_reporter = mmapp.PDBReporter(
-            #                 str(self.run_folder /
-            #                     f"traj_minim_detail_{l:.3f}.pdb"),
-            #                 self.crash_reporting_interval,
-            #                 enforcePeriodicBox=True,
-            #             )
-            #             # evb_repertor = EvbReporter(
-            #             #     str(self.run_folder /
-            #             #         f"energies_equil_{l:.3f}.csv"),
-            #             #     self.crash_reporting_interval,
-            #             #     systems[0],
-            #             #     systems[1],
-            #             #     topology,
-            #             #     l,
-            #             #     self.ostream,
-            #             #     force_file=str(self.run_folder /
-            #             #                    f"forces_equil_{l:.3f}.csv"),
-            #             #     velocity_file=str(self.run_folder /
-            #             #                       f"velocities_equil_{l:.3f}.csv"),
-            #             #     forcegroup_file=str(
-            #             #         self.run_folder /
-            #             #         f"forcegroups_equil_{l:.3f}.csv"),
-            #             #     append=False,
-            #             # )
-            #             simulation.reporters.append(mimin_reporter)
-            #             # equil_simulation.reporters.append(evb_repertor)
-            #             simulation.context.setPositions(minim_positions)
-            #             self.ostream.print_warning(
-            #                 "Equilibration crashed, trying again to equilibrate and writing more detailed data"
-            #             )
-            #             self.ostream.flush()
-
-            # if self.constrain_H:
-            #     self.ostream.print_info(
-            #         "Removing constraints involving H atoms")
-            #     for i in range(system.getNumConstraints()):
-            #         system.removeConstraint(0)
-
-            # # Updating the system requires recreating the simulation, and integrators can only be bound to one context
-            # run_integrator = mm.LangevinMiddleIntegrator(
-            #     integrator_temperature,
-            #     integrator_friction_coeff,
-            #     step_size * mmunit.picoseconds,
-            # )
-
-            # run_integrator.setIntegrationForceGroups(
-            #     EvbForceGroup.integration_force_groups())
-            # run_simulation = mmapp.Simulation(
-            #     topology,
-            #     system,
-            #     run_integrator,
-            # )
-            # run_simulation.reporters.append(traj_roporter)
-
-            # # #todo remove the reports from the last lambda in case of a crash
-            # # evb_reporter = EvbReporter(
-            # #     str(self.data_folder / "Energies.csv"),
-            # #     write_step,
-            # #     systems[0],
-            # #     systems[1],
-            # #     topology,
-            # #     l,
-            # #     self.ostream,
-            # #     forcegroup_file=forcegroup_file,
-            # #     force_file=force_file,
-            # #     append=append,
-            # # )
-            # # run_simulation.reporters.append(evb_reporter)
-
-            # state_reporter = mmapp.StateDataReporter(
-            #     str(self.data_folder / "Data_combined.csv"),
-            #     write_step,
-            #     step=True,
-            #     potentialEnergy=True,
-            #     kineticEnergy=True,
-            #     temperature=True,
-            #     volume=True,
-            #     density=True,
-            #     append=append,
-            # )
-            # run_simulation.reporters.append(state_reporter)
-
-            # self.ostream.print_info(
-            #     f"Running sampling with step size {run_simulation.integrator.getStepSize()}"
-            # )
-            # self.ostream.flush()
-            # run_crashed = False
-            # finished_run = False
-            # while not finished_run:
-            #     try:
-            #         run_simulation.context.setPositions(equil_positions)
-            #         # run_simulation.context.setVelocities(equil_velocities)
-            #         run_simulation.context.setState
-            #         run_simulation.step(total_sample_steps)
-            #         finished_run = True
-            #     except (mm.OpenMMException, ValueError) as e:
-            #         pass
-            #         if run_crashed:
-            #             self.ostream.print_warning(
-            #                 "Sampling crashed again, saving state and exiting")
-            #             run_simulation.saveCheckpoint(
-            #                 str(self.run_folder / f"state_{l:.3f}.chk"))
-            #             run_simulation.saveState(
-            #                 str(self.run_folder / f"state_{l:.3f}.xml"))
-            #             with open(self.run_folder / f"run_sys_{l:.3f}.xml",
-            #                       mode="w",
-            #                       encoding="utf-8") as output:
-            #                 output.write(mm.XmlSerializer.serialize(system))
-            #             self.ostream.print_info(str(e))
-            #             self.ostream.flush()
-            #             raise e
-            #         else:
-            #             run_crashed = True
-            #             traj_detail_roporter = mmapp.PDBReporter(
-            #                 str(self.run_folder / f"traj_run_{l:.3f}.pdb"),
-            #                 self.crash_reporting_interval,
-            #                 enforcePeriodicBox=True,
-            #             )
-            #             evb_detail_repertor = EvbReporter(
-            #                 str(self.run_folder / f"energies_run_{l:.3f}.csv"),
-            #                 self.crash_reporting_interval,
-            #                 systems[0],
-            #                 systems[1],
-            #                 topology,
-            #                 l,
-            #                 self.ostream,
-            #                 force_file=str(self.run_folder /
-            #                                f"forces_run_{l:.3f}.csv"),
-            #                 velocity_file=str(self.run_folder /
-            #                                   f"velocities_run_{l:.3f}.csv"),
-            #                 forcegroup_file=str(self.run_folder /
-            #                                     f"forcegroups_run_{l:.3f}.csv"),
-            #                 append=False,
-            #             )
-            #             run_simulation.reporters.append(traj_detail_roporter)
-            #             run_simulation.reporters.append(evb_detail_repertor)
-            #             self.ostream.print_warning(
-            #                 "Sampling crashed, trying again to sample and writing more detailed data"
-            #             )
-            #             self.ostream.print_info(str(e))
-            #             self.ostream.print_warning(
-            #                 "Generated data is unreliable, make sure to complete a run without generating these warnings"
-            #             )
-            #             self.ostream.flush()
-
-            # state = run_simulation.context.getState(getPositions=True)
-            # positions = state.getPositions()
-            # if np.any(
-            #         np.array(positions.value_in_unit(mmunit.nanometer)) > 100):
-            #     self.ostream.print_info(
-            #         "Warning: Some positions are larger than 100 nm, system is probably unstable"
-            #     )
+            positions = states[-1].getPositions()
         self.ostream.flush()
 
     def _constrain_H_bonds(self, system):
@@ -542,6 +337,34 @@ class EvbFepDriver():
                         count += 1
         self.ostream.print_info(f"Constrained {count} bonds involving H atoms")
         return system
+
+    def _safe_step(self, simulation, steps):
+        states = []
+        for i in range(steps):
+            try:
+                simulation.step(1)
+            except Exception as e:
+                self.ostream.print_warning(
+                    f"Error during simulation step {i}: {e}")
+                self.ostream.print_info(f"Saving last {len(states)} states")
+                self.ostream.flush()
+                cwd = Path.cwd()
+                path = cwd / self.run_folder
+                for state in states:
+                    with open(path / f"state_step_{i}.xml", "w") as f:
+                        f.write(
+                            mm.XmlSerializer.serialize(state))
+                raise e
+
+            simulation.step(1)
+            state = simulation.context.getState(positions=True,
+                                                velocities=True,
+                                                forces=True)
+            states.append(state)
+            if len(states) > self.save_frames:
+                states.pop(0)
+
+        return states
 
 
 class Timer:
