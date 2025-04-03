@@ -595,6 +595,7 @@ class ConformerGenerator:
             ##          # TODO: double check threshold (rmsd in Angstrom and energy in kJ/mol)
             ##         if rmsd < self.rmsd_threshold and abs(ene_i - ene_j) < self.energy_threshold: # which means this i is a duplicate conformer
             ##              break
+            ##      break
             ##     unique_conformer_idx.append(i)
             ##  filtered_energies = [e for i, e in enumerate(conformers_dict['energies']) if i in unique_conformer_idx]
             ##  filtered_molecules = [m for i, m in enumerate(conformers_dict["molecules"]) if i in unique_conformer_idx]
