@@ -1663,8 +1663,8 @@ class PolOrbitalResponse(CphfSolver):
                     full_vec[idx] *= -1.0
 
                 # lists for reading Fock matrices from distributed arrays
-                tmp_fock_ao_rhs = []
-                tmp_fock_gxc_ao = []
+                fock_ao_rhs = []
+                fock_gxc_ao = []
 
                 # note: conjugate gradient solver returns array in dictionary
                 # and the coefficients are therefore imported differently
@@ -1754,7 +1754,7 @@ class PolOrbitalResponse(CphfSolver):
                     dim_fock_rhs * f + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    tmp_fock_ao_rhs.append(fock_rhs_i.reshape(nao, nao))
+                    fock_ao_rhs.append(fock_rhs_i.reshape(nao, nao))
 
             if self._dft:
                 for idx in range(2 * dof**2):
@@ -1763,7 +1763,7 @@ class PolOrbitalResponse(CphfSolver):
                     ].get_full_vector()
 
                     if self.rank == mpi_master():
-                        tmp_fock_gxc_ao.append(fock_gxc_i.reshape(nao, nao))
+                        fock_gxc_ao.append(fock_gxc_i.reshape(nao, nao))
 
             if self.rank == mpi_master():
                 cphf_ao_list.clear()
@@ -1774,12 +1774,6 @@ class PolOrbitalResponse(CphfSolver):
                 epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
                                                           dm_oo, dm_vv, cphf_ov)
                 del dm_oo, dm_vv
-
-                fock_ao_rhs = tmp_fock_ao_rhs.copy()
-                fock_gxc_ao = tmp_fock_gxc_ao.copy()
-
-                tmp_fock_ao_rhs.clear()
-                tmp_fock_gxc_ao.clear()
 
                 for m in range(dof):
                     for n in range(m, dof):
@@ -1973,12 +1967,12 @@ class PolOrbitalResponse(CphfSolver):
 
                 # FIXME remove "tmp"
                 # for fock matrices to be read from distributed arrays
-                tmp_fock_ao_rhs_real = []
-                tmp_fock_ao_rhs_imag = []
-                tmp_fock_gxc_ao_rere = []
-                tmp_fock_gxc_ao_imim = []
-                tmp_fock_gxc_ao_reim = []
-                tmp_fock_gxc_ao_imre = []
+                fock_ao_rhs_real = []
+                fock_ao_rhs_imag = []
+                fock_gxc_ao_rere = []
+                fock_gxc_ao_imim = []
+                fock_gxc_ao_reim = []
+                fock_gxc_ao_imre = []
 
                 # get Lagrangian lambda multipliers
                 if not self.use_subspace_solver:
@@ -2080,8 +2074,8 @@ class PolOrbitalResponse(CphfSolver):
                     2 * dim_fock_rhs * f + dim_fock_rhs + idx].get_full_vector()
 
                 if self.rank == mpi_master():
-                    tmp_fock_ao_rhs_real.append(fock_rhs_re_i.reshape(nao, nao))
-                    tmp_fock_ao_rhs_imag.append(fock_rhs_im_i.reshape(nao, nao))
+                    fock_ao_rhs_real.append(fock_rhs_re_i.reshape(nao, nao))
+                    fock_ao_rhs_imag.append(fock_rhs_im_i.reshape(nao, nao))
 
             if self._dft:
                 # dist_fock_gxc_ao contains all combinations of the complex
@@ -2098,10 +2092,10 @@ class PolOrbitalResponse(CphfSolver):
                         dim_fock_gxc * 4 * f + 3 * dim_fock_gxc + idx].get_full_vector()
 
                     if self.rank == mpi_master():
-                        tmp_fock_gxc_ao_rere.append(fock_gxc_rere_i.reshape(nao, nao))
-                        tmp_fock_gxc_ao_imim.append(fock_gxc_imim_i.reshape(nao, nao))
-                        tmp_fock_gxc_ao_reim.append(fock_gxc_reim_i.reshape(nao, nao))
-                        tmp_fock_gxc_ao_imre.append(fock_gxc_imre_i.reshape(nao, nao))
+                        fock_gxc_ao_rere.append(fock_gxc_rere_i.reshape(nao, nao))
+                        fock_gxc_ao_imim.append(fock_gxc_imim_i.reshape(nao, nao))
+                        fock_gxc_ao_reim.append(fock_gxc_reim_i.reshape(nao, nao))
+                        fock_gxc_ao_imre.append(fock_gxc_imre_i.reshape(nao, nao))
 
             if self.rank == mpi_master():
                 omega = np.zeros((dof, dof, nao, nao), dtype=np.dtype('complex128'))
@@ -2109,21 +2103,6 @@ class PolOrbitalResponse(CphfSolver):
                 # construct epsilon density matrix
                 epsilon_dm_ao = self.calculate_epsilon_dm(molecule, scf_tensors,
                                                           dm_oo, dm_vv, cphf_ov)
-
-                fock_ao_rhs_real = tmp_fock_ao_rhs_real.copy()
-                fock_ao_rhs_imag = tmp_fock_ao_rhs_imag.copy()
-
-                fock_gxc_ao_rere = tmp_fock_gxc_ao_rere.copy()
-                fock_gxc_ao_imim = tmp_fock_gxc_ao_imim.copy()
-                fock_gxc_ao_reim = tmp_fock_gxc_ao_reim.copy()
-                fock_gxc_ao_imre = tmp_fock_gxc_ao_imre.copy()
-
-                tmp_fock_ao_rhs_real.clear()
-                tmp_fock_ao_rhs_imag.clear()
-                tmp_fock_gxc_ao_rere.clear()
-                tmp_fock_gxc_ao_imim.clear()
-                tmp_fock_gxc_ao_reim.clear()
-                tmp_fock_gxc_ao_imre.clear()
 
                 for m in range(dof):
                     for n in range(m, dof):
