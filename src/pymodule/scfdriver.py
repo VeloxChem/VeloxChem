@@ -273,6 +273,9 @@ class ScfDriver:
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
 
+        # may be used in rare cases when user wants to skip the writing of h5
+        self._skip_writing_h5 = False
+
         # input keywords
         self._input_keywords = {
             'scf': {
@@ -1250,6 +1253,9 @@ class ScfDriver:
         :param basis_set:
             Name of the basis set.
         """
+
+        if self._skip_writing_h5:
+            return
 
         if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
@@ -2999,6 +3005,9 @@ class ScfDriver:
         :param ao_basis:
             The AO basis set.
         """
+
+        if self._skip_writing_h5:
+            return
 
         if self.filename is None:
             return
