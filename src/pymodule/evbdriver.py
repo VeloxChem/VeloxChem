@@ -176,6 +176,9 @@ class EvbDriver():
             assert isinstance(product, Molecule) or all(
                 isinstance(pro, Molecule) for pro in product
             ), "All products must be Molecule objects if the reactant is a Molecule object"
+            input_path = cwd / self.input_folder
+            if not input_path.exists():
+                input_path.mkdir(parents=True, exist_ok=True)
             if not isinstance(product, list):
                 product = [product]
 
@@ -295,7 +298,8 @@ class EvbDriver():
             self.reactant = rea_input["forcefield"]
             self.product = self.load_forcefield_from_json(
                 str(combined_product_path))
-            self.product.molecule = EvbForceFieldBuilder.combine_molecule([pro['molecule'] for pro in pro_input])
+            self.product.molecule = EvbForceFieldBuilder.combine_molecule(
+                [pro['molecule'] for pro in pro_input])
         else:
             ffbuilder = EvbForceFieldBuilder()
             ffbuilder.reparameterize = reparameterize
@@ -581,12 +585,15 @@ class EvbDriver():
                 dump_conf.pop('initial_positions')
                 self.update_options_json(dump_conf, conf)
                 self.update_options_json(
-                {
-                        "Lambda": Lambda,
-                        "integration forcegroups": list(EvbForceGroup.integration_force_groups()),
-                        "pes forcegroups": list(EvbForceGroup.pes_force_groups()),
+                    {
+                        "Lambda":
+                        Lambda,
+                        "integration forcegroups":
+                        list(EvbForceGroup.integration_force_groups()),
+                        "pes forcegroups":
+                        list(EvbForceGroup.pes_force_groups()),
                     },
-                conf,
+                    conf,
                 )
 
         self.system_confs = configurations
@@ -809,15 +816,16 @@ class EvbDriver():
             sample_steps = 25000
 
         for conf in self.system_confs:
-            self.update_options_json({
-                "equil_steps": equil_steps,
-                "sample_steps": sample_steps,
-                "write_step": write_step,
-                "initial_equil_steps": initial_equil_steps,
-                "step_size": step_size,
-                "equil_step_size": equil_step_size,
-                "initial_equil_step_size": initial_equil_step_size,
-            }, conf)
+            self.update_options_json(
+                {
+                    "equil_steps": equil_steps,
+                    "sample_steps": sample_steps,
+                    "write_step": write_step,
+                    "initial_equil_steps": initial_equil_steps,
+                    "step_size": step_size,
+                    "equil_step_size": equil_step_size,
+                    "initial_equil_step_size": initial_equil_step_size,
+                }, conf)
 
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
@@ -837,7 +845,7 @@ class EvbDriver():
             )
 
     def update_options_json(self, dict, conf):
-        
+
         cwd = Path().cwd()
         path = cwd / conf["data_folder"] / "options.json"
         if not path.exists():
