@@ -117,19 +117,15 @@ class EvbFepDriver():
 
         self.total_snapshots = total_sample_steps / write_step * len(
             self.Lambda)
-        self.ostream.print_info(f"Lambda: {self.Lambda}")
-        self.ostream.print_info(
-            f"Total lambda points: {len(self.Lambda)}, equilibration steps: {equilibration_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}"
-        )
         simulation_steps = (total_sample_steps + equilibration_steps) * len(
             self.Lambda) + lambda_0_equilibration_steps
-        self.ostream.print_info(
-            f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}, total simulation steps: {simulation_steps}"
-        )
-        self.ostream.print_info(
-            f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
-        )
+        self.ostream.print_info(f"Lambda: {self.Lambda}")
+        info = f"Total lambda points: {len(self.Lambda)}, equilibration steps: {equilibration_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
+        info += f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}, total simulation steps: {simulation_steps}\n"
+        info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
+        self.ostream.print_info(info)
         self.ostream.flush()
+
         integrator_temperature = temperature * mmunit.kelvin  #type: ignore
         integrator_friction_coeff = 1 / mmunit.picosecond
 
@@ -181,13 +177,10 @@ class EvbFepDriver():
                 open(self.run_folder / f"minim_{l:.3f}.pdb", "w"),
             )
             if self.debug:
-                equil_simulation.saveCheckpoint(
-                    str(self.run_folder / f"minim_state_{l:.3f}.chk"))
-                equil_simulation.saveState(
-                    str(self.run_folder / f"minim_state_{l:.3f}.xml"))
+                self._save_state(equil_simulation, f"minim_{l:.3f}")
 
-            equil_simulation.integrator.setStepSize(equil_step_size *
-                                                    mmunit.picoseconds)
+            sz = equil_step_size * mmunit.picoseconds
+            equil_simulation.integrator.setStepSize(sz)
             self.ostream.print_info(
                 f"Running equilibration with step size {equil_simulation.integrator.getStepSize()}"
             )
@@ -199,6 +192,9 @@ class EvbFepDriver():
                         write_step,
                         enforcePeriodicBox=True,
                     ))
+                f_file = str(self.run_folder / f"forces_equil_{l:.3f}.csv")
+                v_file = str(self.run_folder / f"velocities_equil_{l:.3f}.csv")
+                g_file = str(self.run_folder / f"forcegroups_equil_{l:.3f}.csv")
                 equil_simulation.reporters.append(
                     EvbReporter(
                         str(self.run_folder / f"energies_equil_{l:.3f}.csv"),
@@ -208,12 +204,9 @@ class EvbFepDriver():
                         topology,
                         l,
                         self.ostream,
-                        force_file=str(self.run_folder /
-                                       f"forces_equil_{l:.3f}.csv"),
-                        velocity_file=str(self.run_folder /
-                                          f"velocities_equil_{l:.3f}.csv"),
-                        forcegroup_file=str(self.run_folder /
-                                            f"forcegroups_equil_{l:.3f}.csv"),
+                        force_file=f_file,
+                        velocity_file=v_file,
+                        forcegroup_file=g_file,
                         append=False,
                     ))
 
@@ -230,10 +223,11 @@ class EvbFepDriver():
                 enforcePeriodicBox=True,
             )
             if self.debug:
-                equil_simulation.saveCheckpoint(
-                    str(self.run_folder / f"equil_state_{l:.3f}.chk"))
-                equil_simulation.saveState(
-                    str(self.run_folder / f"equil_state_{l:.3f}.xml"))
+                self._save_state(
+                    equil_simulation,
+                    f"equil_state_{l:.3f}",
+                    xml=False,
+                )
 
             run_integrator = mm.LangevinMiddleIntegrator(
                 integrator_temperature,
@@ -244,8 +238,8 @@ class EvbFepDriver():
                 EvbForceGroup.integration_force_groups())
 
             if self.constrain_H:
-                self.ostream.print_info(
-                    "Removing constraints involving H atoms")
+                info = "Removing constraints involving H atoms"
+                self.ostream.print_info(info)
                 for i in range(system.getNumConstraints()):
                     system.removeConstraint(0)
             run_simulation = mmapp.Simulation(
@@ -255,8 +249,8 @@ class EvbFepDriver():
             )
 
             run_simulation.reporters.append(traj_roporter)
-            run_simulation.integrator.setStepSize(step_size *
-                                                  mmunit.picoseconds)
+            sz = step_size * mmunit.picoseconds
+            run_simulation.integrator.setStepSize(sz)
             run_simulation.context.setState(equil_state)
             if l == 0:
                 append = False
@@ -277,18 +271,18 @@ class EvbFepDriver():
             run_simulation.reporters.append(state_reporter)
 
             if self.report_forces or self.debug:
-                force_file = str(self.data_folder / f"Forces.csv")
+                f_file = str(self.data_folder / f"Forces.csv")
             else:
-                force_file = None
+                f_file = None
             if self.report_velocities or self.debug:
-                velocity_file = str(self.data_folder / f"Velocities.csv")
+                v_file = str(self.data_folder / f"Velocities.csv")
             else:
-                velocity_file = None
-
+                v_file = None
             if self.report_forcegroups or self.debug:
-                forcegroup_file = str(self.data_folder / f"ForceGroups.csv")
+                g_file = str(self.data_folder / f"ForceGroups.csv")
             else:
-                forcegroup_file = None
+                g_file = None
+
             evb_reporter = EvbReporter(
                 str(self.data_folder / "Energies.csv"),
                 write_step,
@@ -297,9 +291,9 @@ class EvbFepDriver():
                 topology,
                 l,
                 self.ostream,
-                forcegroup_file=forcegroup_file,
-                velocity_file=velocity_file,
-                force_file=force_file,
+                forcegroup_file=g_file,
+                velocity_file=v_file,
+                force_file=f_file,
                 append=append,
                 debug=self.debug,
             )
@@ -336,6 +330,14 @@ class EvbFepDriver():
         self.ostream.print_info(f"Constrained {count} bonds involving H atoms")
         return system
 
+    def _save_state(self, simulation, name, xml=True, chk=True):
+        if xml:
+            chk_file = str(self.run_folder / f"{name}.chk")
+            simulation.saveCheckpoint(chk_file)
+        if chk:
+            xml_file = str(self.run_folder / f"{name}.xml")
+            simulation.saveState(xml_file)
+
     def _safe_step(self, simulation, steps):
         states = []
         for i in range(steps):
@@ -348,15 +350,49 @@ class EvbFepDriver():
                 self.ostream.flush()
                 cwd = Path.cwd()
                 path = cwd / self.run_folder
+
+                energies = np.zeros((len(states), len(EvbForceGroup) + 3))
+
                 for j, state in enumerate(states):
                     step_num = i - len(states) + j
                     with open(path / f"state_step_{step_num}.xml", "w") as f:
                         f.write(mm.XmlSerializer.serialize(state))
+
+                    kin = state.getKineticEnergy()
+                    kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
+                    pot = state.getPotentialEnergy()
+                    pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
+
+                    energies[j, 0] = step_num
+                    energies[j, 1] = kin
+                    energies[j, 2] = pot
+
+                    simulation.context.setState(state)
+                    energies[j, 0]
+                    for k, fg in enumerate(EvbForceGroup):
+                        fg_state = simulation.context.getState(
+                            energy=True,
+                            groups=set([fg.value]),
+                        )
+                        energy = fg_state.getPotentialEnergy()
+                        energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
+                        energies[j, k + 3] = energy
+                header = "step,kinetic,potential,"
+                header += ",".join([fg.name for fg in EvbForceGroup])
+                np.savetxt(
+                    path / f"crash_energies.csv",
+                    energies,
+                    delimiter=",",
+                    header=header,
+                )
                 raise e
 
-            state = simulation.context.getState(positions=True,
-                                                velocities=True,
-                                                forces=True)
+            state = simulation.context.getState(
+                positions=True,
+                velocities=True,
+                forces=True,
+                energy=True,
+            )
             states.append(state)
             if len(states) > self.save_frames:
                 states.pop(0)
