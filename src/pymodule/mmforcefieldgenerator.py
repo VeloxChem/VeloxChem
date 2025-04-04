@@ -106,7 +106,7 @@ class MMForceFieldGenerator:
         self.ostream = ostream
 
         # molecule
-        self.molecule_name = 'vlx_' + get_random_string_parallel(self.comm)
+        self.molecule_name = 'MOL'
         self.scan_xyz_files = None
         self.atom_types = None
         self.rotatable_bonds = []
@@ -2605,7 +2605,7 @@ class MMForceFieldGenerator:
                 )
 
             for (i, j, k, l), dih in self.impropers.items():
-                line_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1, k + 1)
+                line_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1, l + 1)
                 line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
                     4, dih['phase'], dih['barrier'], abs(dih['periodicity']),
                     dih['comment'])
@@ -2641,7 +2641,7 @@ class MMForceFieldGenerator:
 
             attributes = {
                 # Name is the atom type_molname
-                "name": atom['name'] + '_' + mol_name,
+                "name": atom['name'],
                 "class": str(i + 1),
                 "element": element,
                 "mass": str(atom['mass'])
@@ -2655,7 +2655,7 @@ class MMForceFieldGenerator:
             ET.SubElement(Residue,
                           "Atom",
                           name=atom_data['name'],
-                          type=atom_data['name'] + '_' + mol_name,
+                          type=atom_data['name'],
                           charge=str(atom_data['charge']))
         for bond_id, bond_data in self.bonds.items():
             ET.SubElement(Residue,
@@ -2687,6 +2687,7 @@ class MMForceFieldGenerator:
             ET.SubElement(Angles, "Angle", **attributes)
 
         # Periodic Dihedrals section
+        # Proper dihedrals
         Dihedrals = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for dihedral_id, dihedral_data in self.dihedrals.items():
             # Not multiple dihedrals has periodicity1, phase1, k1
@@ -2723,8 +2724,7 @@ class MMForceFieldGenerator:
 
                 ET.SubElement(Dihedrals, "Proper", **attributes)
 
-        # Improper Dihedrals section
-        Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        # Improper dihedrals
         for improper_id, improper_data in self.impropers.items():
 
             # The order of the atoms is defined in the OpenMM documentation
@@ -2739,7 +2739,7 @@ class MMForceFieldGenerator:
                 "phase1": str(improper_data['phase'] * np.pi / 180),
                 "k1": str(improper_data['barrier'])
             }
-            ET.SubElement(Impropers, "Improper", **attributes)
+            ET.SubElement(Dihedrals, "Improper", **attributes)
 
         # NonbondedForce section
         NonbondedForce = ET.SubElement(ForceField,
@@ -2748,7 +2748,7 @@ class MMForceFieldGenerator:
                                        lj14scale=str(self.fudgeLJ))
         for atom_id, atom_data in self.atoms.items():
             attributes = {
-                "type": atom_data['name'] + '_' + mol_name,
+                "type": atom_data['name'],
                 "charge": str(atom_data['charge']),
                 "sigma": str(atom_data['sigma']),
                 "epsilon": str(atom_data['epsilon'])

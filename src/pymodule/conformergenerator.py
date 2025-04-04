@@ -12,12 +12,13 @@ from .molecule import Molecule
 from .atomtypeidentifier import AtomTypeIdentifier
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .errorhandler import assert_msg_critical
+from .mofutils import svd_superimpose
 
 try:
+    import openmm
     from openmm import LangevinIntegrator, Platform
-    from openmm.app import GromacsTopFile, NoCutoff, Simulation
-    from openmm.unit import (nanometer, md_unit_system, kelvin, picoseconds,
-                             picosecond)
+    from openmm.app import NoCutoff, Simulation, PDBFile, ForceField, GromacsTopFile
+    from openmm.unit import nanometer, md_unit_system, kelvin, picoseconds, picosecond
 except ImportError:
     pass
 
@@ -42,14 +43,23 @@ class ConformerGenerator:
         self.ostream = ostream
 
         self.molecule = None
-        self.number_of_conformers_to_select = 50
+        self.number_of_conformers_to_select = 200
 
         self.top_file_name = None
+        self.partial_charges = None
 
         self.save_xyz_files = False
         self.save_path = None
 
         self.em_tolerance = 1.0
+        self.rmsd_threshold = 1.0
+        self.energy_threshold = 1.0
+
+        self.implicit_solvent_model = None
+        self.solute_dielectric = 1.0
+        self.solvent_dielectric = 78.39
+
+        self.use_gromacs_files = False
 
     def analyze_equiv(self, molecule):
 
@@ -127,14 +137,22 @@ class ConformerGenerator:
 
         return False
 
-    def _get_dihedral_candidates(self, molecule, top_file_name):
+    def _get_dihedral_candidates(self, molecule, top_file_name, partial_charges):
 
         mmff_gen = MMForceFieldGenerator(self._comm)
         mmff_gen.ostream.mute()
-        # TODO: double check partial charge
-        mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+        if partial_charges is None:
+            warn_text = "ConformerGenerator: Partial charge not provided. "
+            warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
+            self.ostream.print_warning(warn_text)
+            mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+        else:
+            mmff_gen.partial_charges = partial_charges
         mmff_gen.create_topology(molecule)
-        mmff_gen.write_gromacs_files(filename=top_file_name)
+        if self.use_gromacs_files:
+            mmff_gen.write_gromacs_files(filename=top_file_name)
+        else:
+            mmff_gen.write_openmm_files(filename=top_file_name)
         # make sure to sync the ranks after the top file is written
         self._comm.barrier()
 
@@ -198,8 +216,8 @@ class ConformerGenerator:
 
         # assemble all possible combinations of dihedrals
 
-        test = [i[1] for i in dihedrals_candidates]
-        dihedrals_combinations = list(itertools.product(*test))
+        dih_angles = [i[1] for i in dihedrals_candidates]
+        dihedrals_combinations = list(itertools.product(*dih_angles))
         dihedral_list = [i[0] for i in dihedrals_candidates]
 
         self.ostream.print_info(f"{len(dihedrals_combinations)} conformers will be generated.")
@@ -223,22 +241,64 @@ class ConformerGenerator:
         # should be aware that dihedral_dict count atom index from 0, but molecule to set dihedral count from 1
         return dih_comb_array
 
-    def _init_openmm_system(self, topology_file):
+    def _init_openmm_system(self, topology_file, implicit_solvent_model):
 
         assert_msg_critical('openmm' in sys.modules,
                             'OpenMM is required for ConformerGenerator.')
 
-        top = GromacsTopFile(topology_file)
-        system = top.createSystem(NoCutoff)
+        assert_msg_critical(
+            not (self.use_gromacs_files and implicit_solvent_model is not None),
+            'ConformerGenerator: Please set to use_gromacs_files to False ' +
+            'when using implicit solvent model.')
+
+        if self.use_gromacs_files:
+            top = GromacsTopFile(topology_file)
+            system = top.createSystem(NoCutoff)
+        else:
+            pdb_file = str(Path(topology_file).with_suffix(".pdb"))
+            xml_file = str(Path(topology_file).with_suffix(".xml"))
+            pdb = PDBFile(pdb_file)
+            if implicit_solvent_model is None:
+                forcefield = ForceField(xml_file)
+                system = forcefield.createSystem(pdb.topology,
+                                                 nonbondedMethod=NoCutoff)
+            else:
+                implicit_fpath = Path(openmm.__file__).parent / "app" / "data" / "implicit"
+                implicit_model_fname = str(implicit_fpath / f"{implicit_solvent_model}.xml")
+                assert_msg_critical(
+                    Path(implicit_model_fname).is_file(),
+                    f"ConformerGenerator: Could not find file {implicit_model_fname}")
+                forcefield = ForceField(xml_file, implicit_model_fname)
+                system = forcefield.createSystem(pdb.topology,
+                                                 nonbondedMethod=NoCutoff,
+                                                 soluteDielectric=self.solute_dielectric,
+                                                 solventDielectric=self.solvent_dielectric)
+                self.ostream.print_info(f"Using implicit solvent model {implicit_solvent_model}")
+                self.ostream.flush()
 
         # platform settings for small molecule
         platform = Platform.getPlatformByName("CPU")
         platform.setPropertyDefaultValue("Threads", "1")
 
         integrator = LangevinIntegrator(300 * kelvin, 1 / picosecond, 0.001 * picoseconds)
-        simulation = Simulation(top.topology, system, integrator, platform)
+        if self.use_gromacs_files:
+            simulation = Simulation(top.topology, system, integrator, platform)
+        else:
+            simulation = Simulation(pdb.topology, system, integrator, platform)
 
         return simulation
+
+    def show_available_implicit_solvent_models(self):
+
+        if self._rank == mpi_master():
+            implicit_folder_path = Path(openmm.__file__).parent / "app" / "data" / "implicit"
+            implicit_solvent_files = [
+                f for f in implicit_folder_path.iterdir()
+                if f.is_file() and f.suffix == ".xml"
+            ]
+            print("Available implicit solvent files:")
+            for f in implicit_solvent_files:
+                print(f.name)
 
     def _minimize_energy(self, molecule, simulation, em_tolerance):
 
@@ -253,7 +313,7 @@ class ConformerGenerator:
         state = simulation.context.getState(
             getPositions=True,
             getEnergy=True,
-            getForces=True,
+            #getForces=True,
         )
 
         energy = state.getPotentialEnergy().value_in_unit_system(md_unit_system)
@@ -262,19 +322,27 @@ class ConformerGenerator:
 
         return energy, optimized_coords
 
-    def _preoptimize_molecule(self, molecule, top_file_name, em_tolerance):
+    def _optimize_molecule(self, molecule, top_file_name, em_tolerance, partial_charges, implicit_solvent_model):
 
         mmff_gen = MMForceFieldGenerator(self._comm)
         mmff_gen.ostream.mute()
-        # TODO: double check partial charge
-        mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+        if partial_charges is None:
+            warn_text = "ConformerGenerator: Partial charges not provided. "
+            warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
+            self.ostream.print_warning(warn_text)
+            mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
+        else:
+            mmff_gen.partial_charges = partial_charges
         mmff_gen.create_topology(molecule)
-        mmff_gen.write_gromacs_files(filename=top_file_name)
+        if self.use_gromacs_files:
+            mmff_gen.write_gromacs_files(filename=top_file_name)
+        else:
+            mmff_gen.write_openmm_files(filename=top_file_name)
         # make sure to sync the ranks after the top file is written
         self._comm.barrier()
 
         if self._rank == mpi_master():
-            simulation = self._init_openmm_system(top_file_name)
+            simulation = self._init_openmm_system(top_file_name, implicit_solvent_model)
             energy, opt_coords = self._minimize_energy(molecule, simulation, em_tolerance)
         else:
             energy, opt_coords = None, None
@@ -288,27 +356,32 @@ class ConformerGenerator:
 
     def generate(self, molecule):
 
+        # sanity check
+        if self.implicit_solvent_model is not None:
+            self.use_gromacs_files = False
+
         conf_gen_t0 = time.time()
 
         top_file_name = self.top_file_name
         if top_file_name is None:
-            top_file_name = "MOL.top"
+            top_file_name = "MOL"
 
         self.molecule = molecule
-
-        energy, molecule = self._preoptimize_molecule(self.molecule, top_file_name, self.em_tolerance)
 
         comm = self._comm
         rank = self._comm.Get_rank()
         size = self._comm.Get_size()
 
         dihedrals_candidates, atom_info_dict, dihedrals_dict = (
-            self._get_dihedral_candidates(molecule, top_file_name))
+            self._get_dihedral_candidates(molecule, top_file_name, self.partial_charges))
 
         # exit early if there is no candidate dihedral to rotate
         if not dihedrals_candidates:
             self.ostream.print_info("No rotatable bond found, no new conformer will be generated.")
             self.ostream.flush()
+
+            energy, molecule = self._optimize_molecule(self.molecule, top_file_name, self.em_tolerance,
+                                                       self.partial_charges, self.implicit_solvent_model)
 
             if rank == mpi_master():
                 self.global_minimum_conformer = molecule
@@ -382,7 +455,7 @@ class ConformerGenerator:
 
         opt_start_time = time.time()
 
-        simulation = self._init_openmm_system(top_file_name)
+        simulation = self._init_openmm_system(top_file_name, self.implicit_solvent_model)
 
         energy_coords = []
 
@@ -449,6 +522,49 @@ class ConformerGenerator:
                 conformers_dict["geometries"].append(
                     mol_copy.get_xyz_string(
                         comment=f"Energy: {conf_energy:.3f} kJ/mol"))
+
+            num_conformers = len(conformers_dict["energies"])
+
+            equiv_conformer_pairs = []
+
+            for i in range(num_conformers):
+                xyz_i = conformers_dict["molecules"][i].get_coordinates_in_angstrom()
+                ene_i = conformers_dict["energies"][i]
+
+                for j in range(i + 1, num_conformers):
+                    xyz_j = conformers_dict["molecules"][j].get_coordinates_in_angstrom()
+                    ene_j = conformers_dict["energies"][j]
+
+                    rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
+
+                    # TODO: double check threshold (rmsd in Angstrom and energy in kJ/mol)
+                    if rmsd < self.rmsd_threshold and abs(ene_i - ene_j) < self.energy_threshold:
+                        equiv_conformer_pairs.append((i, j))
+
+            duplicate_conformers = [j for i, j in equiv_conformer_pairs]
+            duplicate_conformers = sorted(list(set(duplicate_conformers)))
+
+            filtered_energies = [
+                e
+                for i, e in enumerate(conformers_dict["energies"])
+                if i not in duplicate_conformers
+            ]
+            filtered_molecules = [
+                Molecule(m)
+                for i, m in enumerate(conformers_dict["molecules"])
+                if i not in duplicate_conformers
+            ]
+            filtered_geometries = [
+                g
+                for i, g in enumerate(conformers_dict["geometries"])
+                if i not in duplicate_conformers
+            ]
+
+            conformers_dict = {
+                "energies": filtered_energies,
+                "molecules": filtered_molecules,
+                "geometries": filtered_geometries,
+            }
 
             # save the selected conformers to file
             if self.save_xyz_files:
