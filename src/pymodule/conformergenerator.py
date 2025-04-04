@@ -499,7 +499,7 @@ class ConformerGenerator:
             min_mol = Molecule(molecule)
             for iatom in range(min_mol.number_of_atoms()):
                 min_mol.set_atom_coordinates(
-                    i, min_coords_angstrom[iatom] / bohr_in_angstrom())
+                    iatom, min_coords_angstrom[iatom] / bohr_in_angstrom())
             self.ostream.print_info(f"Global minimum energy: {min_energy:.3f} kJ/mol")
 
             self.global_minimum_conformer = min_mol
