@@ -187,6 +187,7 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder import MofBuilder
+from .class_test import Class_test # I imported this <----------------------------------
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
