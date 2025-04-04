@@ -9,7 +9,7 @@ from mpi4py import MPI
 from .veloxchemlib import mpi_master
 
 
-class MolecularPropertyCalculator:
+class MolecularPropertyCalculator2:
     def __init__(self, folder_path, xyz_filename):
         self.folder_path = folder_path
         self.xyz_filename = xyz_filename
