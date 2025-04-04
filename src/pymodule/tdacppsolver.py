@@ -40,9 +40,6 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
                          write_rsp_solution_with_multiple_keys)
-from .oneeints import (compute_electric_dipole_integrals,
-                       compute_linear_momentum_integrals,
-                       compute_angular_momentum_integrals)
 
 
 class ComplexResponseTDA(LinearSolver):
@@ -159,19 +156,20 @@ class ComplexResponseTDA(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag_unused = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
+        ediag, sdiag_unused = self.construct_ediag_sdiag_half(
+            orb_ene, nocc, norb)
 
         # constructing matrix block diagonals
 
-        A0mg = ediag-w
-        invdiag = 1/(A0mg*A0mg+d*d)
+        A0mg = ediag - w
+        invdiag = 1.0 / (A0mg * A0mg + d * d)
 
         pa_diag = invdiag * A0mg
         pb_diag = invdiag * d
 
         p_mat = np.hstack((
             pa_diag.reshape(-1, 1),
-            pb_diag.reshape(-1, 1)
+            pb_diag.reshape(-1, 1),
         ))
 
         return DistributedArray(p_mat, self.comm)
@@ -393,18 +391,14 @@ class ComplexResponseTDA(LinearSolver):
             else:
                 grad_mat = None
                 rhs_mat = None
-            
+
             dist_grad[key] = DistributedArray(grad_mat, self.comm)
             dist_rhs[key] = DistributedArray(rhs_mat, self.comm)
 
         if self.nonlinear:
-            rsp_vector_labels = [
-                'CLR_bger', 'CLR_e2bger', 'CLR_Fock_ger'
-            ]
+            rsp_vector_labels = ['CLR_bger', 'CLR_e2bger', 'CLR_Fock_ger']
         else:
-            rsp_vector_labels = [
-                'CLR_bger', 'CLR_e2bger'
-            ]
+            rsp_vector_labels = ['CLR_bger', 'CLR_e2bger']
 
         # check validity of checkpoint file
         if self.restart:
@@ -424,21 +418,23 @@ class ComplexResponseTDA(LinearSolver):
 
             profiler.set_timing_key('Preparation')
 
-            # We set up sigma in another way since we do not have ger ung 
+            # We set up sigma in another way since we do not have ger ung
 
             bger_loc = bger.get_full_matrix(root=mpi_master())
 
-            tdens = self._get_trans_densities(bger_loc, scf_tensors, molecule)     
+            tdens = self._get_trans_densities(bger_loc, scf_tensors, molecule)
 
-            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict, dft_dict, pe_dict)
-            
+            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict)
+
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_tensors, molecule, bger_loc)
+                sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                                           bger_loc)
             else:
                 sig_mat = None
 
-            sig_mat = DistributedArray(sig_mat,self.comm)
-            
+            sig_mat = DistributedArray(sig_mat, self.comm)
+
             self._append_trial_sigma_vectors(bger, sig_mat)
 
         profiler.check_memory_usage('Initial guess')
@@ -486,13 +482,12 @@ class ComplexResponseTDA(LinearSolver):
                         g = np.zeros(size)
 
                         g[:n_ger] = g_realger[:]
-                        g[size - n_ger:] = - g_imagger[:]
+                        g[size - n_ger:] = -g_imagger[:]
 
                         mat = np.zeros((size, size))
 
                         mat[:n_ger, :n_ger] += e2gg[:, :]
-                        mat[size - n_ger:, size - n_ger:] += -e2gg[:, :] 
-
+                        mat[size - n_ger:, size - n_ger:] += -e2gg[:, :]
 
                         mat[:n_ger, :n_ger] += -w * s2gg[:, :]
 
@@ -524,15 +519,15 @@ class ComplexResponseTDA(LinearSolver):
 
                     e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
                     e2imagger = self._dist_e2bger.matmul_AB_no_gather(c_imagger)
-                    
+
                     if self.nonlinear:
                         fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_realger)
                         fock_imagger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_imagger)
 
-                        fock_full_data = (
-                            fock_realger.data - 1j * fock_imagger.data)
+                        fock_full_data = (fock_realger.data -
+                                          1j * fock_imagger.data)
 
                         focks[(op, w)] = DistributedArray(fock_full_data,
                                                           self.comm,
@@ -546,7 +541,7 @@ class ComplexResponseTDA(LinearSolver):
                     r_realger = (e2realger.data - w * s2realger +
                                  d * s2imagger - grad_rg.data)
                     r_imagger = (-e2imagger.data + w * s2imagger +
-                                 d * s2realger + grad_ig.data)          
+                                 d * s2realger + grad_ig.data)
 
                     r_data = np.hstack((
                         r_realger.reshape(-1, 1),
@@ -623,8 +618,8 @@ class ComplexResponseTDA(LinearSolver):
 
             # spawning new trial vectors from residuals
 
-            new_trials_ger = self.setup_trials(
-                residuals, precond, self._dist_bger)
+            new_trials_ger = self.setup_trials(residuals, precond,
+                                               self._dist_bger)
 
             residuals.clear()
 
@@ -649,20 +644,24 @@ class ComplexResponseTDA(LinearSolver):
             # creating new sigma and rho linear transformations
 
             # Once again using the other way of computing sigma
-                
-            new_trials_ger_loc = new_trials_ger.get_full_matrix(root=mpi_master())
-        
-            tdens = self._get_trans_densities(new_trials_ger_loc, scf_tensors, molecule)     
 
-            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict, dft_dict, pe_dict)
-            
+            new_trials_ger_loc = new_trials_ger.get_full_matrix(
+                root=mpi_master())
+
+            tdens = self._get_trans_densities(new_trials_ger_loc, scf_tensors,
+                                              molecule)
+
+            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict)
+
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_tensors, molecule, new_trials_ger_loc)
+                sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                                           new_trials_ger_loc)
             else:
                 sig_mat = None
 
-            sig_mat = DistributedArray(sig_mat,self.comm)
-            
+            sig_mat = DistributedArray(sig_mat, self.comm)
+
             self._append_trial_sigma_vectors(new_trials_ger, sig_mat)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
@@ -771,7 +770,7 @@ class ComplexResponseTDA(LinearSolver):
             return x_realger + 1j * x_imagger
         else:
             return None
-        
+
     def _get_trans_densities(self, trial_mat, tensors, molecule):
         """
         Computes the transition densities.
@@ -805,8 +804,8 @@ class ComplexResponseTDA(LinearSolver):
         else:
             tdens = None
 
-        return tdens    
-    
+        return tdens
+
     def _get_sigmas(self, fock, tensors, molecule, trial_mat):
         """
         Computes the sigma vectors.
@@ -847,9 +846,9 @@ class ComplexResponseTDA(LinearSolver):
         sigma_mat = sigma_vecs[0]
         for vec in sigma_vecs[1:]:
             sigma_mat = np.hstack((sigma_mat, vec))
-        
-        return sigma_mat    
-    
+
+        return sigma_mat
+
     def _append_trial_sigma_vectors(self, b, e2b):
         """
         Appends distributed trial vectors and sigma vectors.
@@ -866,7 +865,7 @@ class ComplexResponseTDA(LinearSolver):
                                                distribute=False)
         else:
             self._dist_bger.append(b, axis=1)
-        
+
         if self._dist_e2bger is None:
             self._dist_e2bger = DistributedArray(e2b.data,
                                                  self.comm,
@@ -1045,12 +1044,8 @@ class ComplexResponseTDA(LinearSolver):
             spectrum['y_data'].append(Delta_epsilon)
 
         return spectrum
-    
-    def setup_trials(self,
-                      vectors,
-                      precond,
-                      dist_b=None,
-                      renormalize=True):
+
+    def setup_trials(self, vectors, precond, dist_b=None, renormalize=True):
         """
         Computes orthonormalized trial vectors.
 
@@ -1074,28 +1069,26 @@ class ComplexResponseTDA(LinearSolver):
             dist_new_b.data = np.zeros((dist_new_b.shape(0), 0))
 
         if dist_b is not None:
-            # t = t - (b (b.T t))           
-            bT_new = dist_b.matmul_AtB_allreduce(dist_new_b) 
+            # t = t - (b (b.T t))
+            bT_new = dist_b.matmul_AtB_allreduce(dist_new_b)
             dist_new_proj = dist_b.matmul_AB_no_gather(bT_new)
             dist_new_b.data -= dist_new_proj.data
-        
+
         if renormalize:
             if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
-                dist_new_b = self.remove_linear_dependence(  
-                        dist_new_b, self.lindep_thresh)
+                dist_new_b = self.remove_linear_dependence(
+                    dist_new_b, self.lindep_thresh)
 
-                dist_new_b = self.orthogonalize_gram_schmidt(
-                        dist_new_b)            
+                dist_new_b = self.orthogonalize_gram_schmidt(dist_new_b)
 
-                dist_new_b = self.normalize(dist_new_b) 
+                dist_new_b = self.normalize(dist_new_b)
 
         if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_b.data.size > 0,
-                'LinearSolver: trial vectors are empty')
-            
+            assert_msg_critical(dist_new_b.data.size > 0,
+                                'LinearSolver: trial vectors are empty')
+
         return dist_new_b
-    
+
     @staticmethod
     def lrmat2vec(mat, nocc, norb):
         """
@@ -1112,8 +1105,11 @@ class ComplexResponseTDA(LinearSolver):
             The vectors.
         """
 
-        # changed the linearsolver function such that we only include the excitation part 
-        # TODO: Should be changed at some point to still call linearsolver.py function 
+        # changed the linearsolver function such that we only include the
+        # excitation part
+
+        # TODO: Should be changed at some point to still call linearsolver.py
+        # function
 
         nvir = norb - nocc
 
@@ -1312,7 +1308,8 @@ class ComplexResponseTDA(LinearSolver):
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
-        Writes checkpoint file. Copied from linearsolver. Changed to work without ungerade.
+        Writes checkpoint file. Copied from linearsolver. Changed to work
+        without ungerade.
 
         :param molecule:
             The molecule.
@@ -1344,12 +1341,10 @@ class ComplexResponseTDA(LinearSolver):
         if success:
             if self.nonlinear:
                 dist_arrays = [
-                    self._dist_bger, self._dist_e2bger, self._dist_fock_ger,
+                    self._dist_bger, self._dist_e2bger, self._dist_fock_ger
                 ]
             else:
-                dist_arrays = [
-                    self._dist_bger, self._dist_e2bger
-                ]
+                dist_arrays = [self._dist_bger, self._dist_e2bger]
 
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
@@ -1375,7 +1370,8 @@ class ComplexResponseTDA(LinearSolver):
         ]
 
         if self.nonlinear:
-            (self._dist_bger, self._dist_e2bger, self._dist_fock_ger) = dist_arrays
+            (self._dist_bger, self._dist_e2bger,
+             self._dist_fock_ger) = dist_arrays
         else:
             (self._dist_bger, self._dist_e2bger) = dist_arrays
 
@@ -1384,7 +1380,7 @@ class ComplexResponseTDA(LinearSolver):
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
 
-    def remove_linear_dependence(self,basis, threshold):
+    def remove_linear_dependence(self, basis, threshold):
         """
         Removes linear dependence in a set of vectors.
         Based on the function in linearsolver.py, modified to work with full size
@@ -1410,7 +1406,7 @@ class ComplexResponseTDA(LinearSolver):
         Tmask = self.comm.bcast(Tmask, root=mpi_master())
 
         return basis.matmul_AB_no_gather(Tmask)
-    
+
     @staticmethod
     def orthogonalize_gram_schmidt(tvecs):
         """
@@ -1426,24 +1422,24 @@ class ComplexResponseTDA(LinearSolver):
         """
 
         if tvecs.shape(1) > 0:
-            
-            n2 = tvecs.dot(0,tvecs,0)
+
+            n2 = tvecs.dot(0, tvecs, 0)
             f = 1.0 / n2
             tvecs.data[:, 0] *= f
 
             for i in range(1, tvecs.shape(1)):
                 for j in range(i):
-                    dot_ij = tvecs.dot(i,tvecs,j)
-                    dot_jj = tvecs.dot(j,tvecs,j)
-                    f = dot_ij/dot_jj
+                    dot_ij = tvecs.dot(i, tvecs, j)
+                    dot_jj = tvecs.dot(j, tvecs, j)
+                    f = dot_ij / dot_jj
                     tvecs.data[:, i] -= f * tvecs.data[:, j]
-                
-                n2 = tvecs.dot(i,tvecs,i)
+
+                n2 = tvecs.dot(i, tvecs, i)
                 f = 1.0 / n2
                 tvecs.data[:, i] *= f
 
         return tvecs
-    
+
     @staticmethod
     def normalize(vecs):
         """
