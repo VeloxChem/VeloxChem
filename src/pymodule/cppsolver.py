@@ -819,8 +819,8 @@ class ComplexResponse(LinearSolver):
 
                     # write spectrum to h5 file
                     if final_h5_fname is not None:
-                        self.write_cpp_rsp_results_to_hdf5(final_h5_fname,
-                                                           ret_dict)
+                        self.write_cpp_rsp_results_to_hdf5(
+                            final_h5_fname, ret_dict)
 
                     return ret_dict
                 else:
@@ -1219,31 +1219,32 @@ class ComplexResponse(LinearSolver):
     def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
         """
         Writes the results of a linear response calculation to HDF5 file.
-    
+
         :param fname:
             Name of the HDF5 file.
         :param rsp_results:
             The dictionary containing the linear response results.
         """
-    
+
         if fname and isinstance(fname, str):
-    
+
             hf = h5py.File(fname, 'a')
-    
+
             # Write frequencies
-            label = 'rsp/frequencies'
-            hf.create_dataset(label, data=rsp_results['frequencies'])
+            xlabel = 'rsp/frequencies'
+            if xlabel in hf:
+                del hf[xlabel]
+            hf.create_dataset(xlabel, data=rsp_results['frequencies'])
 
             spectrum = self.get_spectrum(rsp_results, 'au')
             y_data = np.array(spectrum['y_data'])
 
             if self.cpp_flag == 'absorption':
-                label = 'rsp/sigma'
-
+                ylabel = 'rsp/sigma'
             elif self.cpp_flag == 'ecd':
-                label = 'rsp/delta-epsilon'
+                ylabel = 'rsp/delta-epsilon'
+            if ylabel in hf:
+                del hf[ylabel]
+            hf.create_dataset(ylabel, data=y_data)
 
-            hf.create_dataset(label, data=y_data)
-    
             hf.close()
-
