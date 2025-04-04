@@ -142,7 +142,9 @@ class ConformerGenerator:
         mmff_gen = MMForceFieldGenerator(self._comm)
         mmff_gen.ostream.mute()
         if partial_charges is None:
-            # TODO: double check partial charge
+            warn_text = "ConformerGenerator: Partial charge not provided. "
+            warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
+            self.ostream.print_warning(warn_text)
             mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         else:
             mmff_gen.partial_charges = partial_charges
@@ -151,7 +153,6 @@ class ConformerGenerator:
             mmff_gen.write_gromacs_files(filename=top_file_name)
         else:
             mmff_gen.write_openmm_files(filename=top_file_name)
-
         # make sure to sync the ranks after the top file is written
         self._comm.barrier()
 
@@ -272,6 +273,8 @@ class ConformerGenerator:
                                                  nonbondedMethod=NoCutoff,
                                                  soluteDielectric=self.solute_dielectric,
                                                  solventDielectric=self.solvent_dielectric)
+                self.ostream.print_info(f"Using implicit solvent model {implicit_solvent_model}")
+                self.ostream.flush()
 
         # platform settings for small molecule
         platform = Platform.getPlatformByName("CPU")
@@ -324,7 +327,9 @@ class ConformerGenerator:
         mmff_gen = MMForceFieldGenerator(self._comm)
         mmff_gen.ostream.mute()
         if partial_charges is None:
-            # TODO: double check partial charge
+            warn_text = "ConformerGenerator: Partial charges not provided. "
+            warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
+            self.ostream.print_warning(warn_text)
             mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
         else:
             mmff_gen.partial_charges = partial_charges
