@@ -1,4 +1,4 @@
-name: vlxenv
+name: vlxenv2
 channels:
   - conda-forge
 dependencies:
