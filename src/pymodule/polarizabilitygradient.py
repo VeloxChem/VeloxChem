@@ -49,7 +49,8 @@ from .inputparser import parse_input
 from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, polgrad_sanity_check)
+                           dft_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
+                           #polgrad_sanity_check)
 
 
 class PolarizabilityGradient:
@@ -221,8 +222,13 @@ class PolarizabilityGradient:
                 error_message += 'for analytical gradient'
                 raise ValueError(error_message)
             if self.rank == mpi_master():
-                polgrad_sanity_check(self, self.flag, lr_results)
+                polgrad_sanity_check_2(self, self.flag, lr_results)
+                # FIXME should this be moved to sanitychecks?
                 self._check_real_or_complex_input(lr_results)
+
+            # sanity check input frequencies
+            polgrad_sanity_check_1(self)
+
             # compute
             self.polgradient = self.compute_analytical(molecule, basis,
                                                        scf_tensors, lr_results)
@@ -305,11 +311,6 @@ class PolarizabilityGradient:
                         n_freqs, 2 * dof_red, nocc * nvir)
                 else:
                     all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
-        else:
-            nocc = None
-            nvir = None
-
-        nocc, nvir = self.comm.bcast((nocc, nvir), root=mpi_master())
 
         # timings
         loop_start_time = tm.time()
@@ -1134,6 +1135,7 @@ class PolarizabilityGradient:
         """
 
         if self.rank == mpi_master():
+            # MO coefficients
             mo = scf_tensors['C_alpha']  # only alpha part
             nocc = molecule.number_of_alpha_electrons()
             mo_vir = mo[:, nocc:].copy()
@@ -1154,7 +1156,6 @@ class PolarizabilityGradient:
         dof_red, xy_pairs = self.comm.bcast((dof_red, xy_pairs), root=mpi_master())
 
         if self.is_complex:
-
             for idx, xy in enumerate(xy_pairs):
                 tmp_lambda_re = lambda_list[
                     2 * dof_red * fdx + idx].get_full_vector()
@@ -1201,6 +1202,7 @@ class PolarizabilityGradient:
             dof = len(self.vector_components)
             xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
+
             nao = basis.get_dimensions_of_basis()
 
             omega_ao = np.zeros((dof, dof, nao * nao), dtype=self.grad_dt)
@@ -1325,14 +1327,7 @@ class PolarizabilityGradient:
         # compute orbital response
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
-
-        #if self.rank == mpi_master():
-        #    valstr = f'** Time spent on orbital response for {len(self.frequencies)} '
-        #    valstr += f'frequencies: {(tm.time() - orbrsp_start_time):.6f} sec **'
-        #    self.ostream.print_header(valstr)
-        #    self.ostream.print_blank()
-        #    self.ostream.flush()
-
+       
         return orbrsp_drv.cphf_results
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
@@ -1398,6 +1393,8 @@ class PolarizabilityGradient:
         else:
             xc_pol_gradient = None
 
+        # FIXME is this not a waste of communication?
+        # Maybe natm/xc_pol_gradient should both happen on all ranks
         xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         for m in range(dof):
@@ -1428,11 +1425,6 @@ class PolarizabilityGradient:
                     [gs_dm], xcfun_label, profiler)
 
                 xc_pol_gradient[m, n] += polgrad_xcgrad
-
-        #        if n != m:
-        #            xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
-
-        #xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
@@ -1468,6 +1460,8 @@ class PolarizabilityGradient:
         else:
             xc_pol_gradient = None
 
+        # FIXME is this not a waste of communication?
+        # Maybe natm/xc_pol_gradient should both happen on all ranks
         xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         # FIXME change "m,n" to "x,y" for consistency
@@ -1523,11 +1517,6 @@ class PolarizabilityGradient:
                     profiler)
 
                 xc_pol_gradient[m, n] += polgrad_xcgrad
-
-        #        if n != m:
-        #            xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
-
-        #xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
