@@ -1,7 +1,12 @@
 import os
+from tracemalloc import start
 import numpy as np
 import veloxchem as vlx
+import py3Dmol as p3d
 from collections import defaultdict
+from scipy import optimize
+from mpi4py import MPI
+from .veloxchemlib import mpi_master
 
 
 class MolecularPropertyCalculator:
@@ -19,12 +24,14 @@ class MolecularPropertyCalculator:
         self.loprop_charges = None
         self.resp_charges = None
         self.max_esp_values = None
-    
+        
+        print(f'Initialized MPC with folder with folder: {folder_path}, file {xyz_filename}')
+
     def load_molecule(self):
         file_path = os.path.join(self.folder_path, self.xyz_filename)
         if os.path.exists(file_path):
             self.molecule = vlx.Molecule.read_xyz_file(file_path)
-            self.molecule.show(atom_indices=True)
+            # self.molecule.show(atom_indices=True)
             self.basis = vlx.MolecularBasis.read(self.molecule, "def2-SVP")
         else:
             raise FileNotFoundError(f"Error: The file {file_path} does not exist.")
@@ -48,6 +55,16 @@ class MolecularPropertyCalculator:
             self.scf_drv.ri_coulomb = True
         self.scf_results = self.scf_drv.compute(self.molecule, self.basis)
 
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+
+        if rank == mpi_master():
+            self.scf_results = self.scf_drv.compute(self.molecule, self.basis)
+        else:
+            self.scf_results = None
+
+        self.scf_results = comm.bcast(self.scf_results, root = 0) # Broadcast the result to all ranks
+        return self.scf_results
     
     def optimize_geometry(self):
         # Run geometry optimization using BLYP functional
@@ -75,11 +92,18 @@ class MolecularPropertyCalculator:
         grid_drv.set_level(4)
         molgrid = grid_drv.generate(self.molecule)
         chi_g = vlx.XCIntegrator().compute_gto_values(self.molecule, self.basis, molgrid)
-
-        D = self.scf_results["D_alpha"] + self.scf_results["D_beta"]
-        G = np.einsum("ab,bg->ag", D, chi_g)
-        n_g = np.einsum("ag,ag->g", chi_g, G)
         
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        if rank == mpi_master():
+            D = self.scf_results["D_alpha"] + self.scf_results["D_beta"]
+            G = np.einsum("ab,bg->ag", D, chi_g)
+            n_g = np.einsum("ag,ag->g", chi_g, G)
+        else:
+            n_g = None
+        n_g = comm.bcast(n_g, root=0)  # Broadcast the density to all ranks
+
+
         # Extract surface points based on density range
         indices = np.where((n_g > 0.0095) & (n_g < 0.0105))
         self.surface_points = np.column_stack((molgrid.x_to_numpy()[indices],
