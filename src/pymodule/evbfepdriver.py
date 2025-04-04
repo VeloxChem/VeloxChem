@@ -80,7 +80,7 @@ class EvbFepDriver():
         self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
-        self.save_frames: int = 20
+        self.save_frames: int = 100
 
     def run_FEP(
         self,
@@ -217,8 +217,7 @@ class EvbFepDriver():
                         append=False,
                     ))
 
-            states = self._safe_step(equil_simulation,
-                                                equilibration_steps)
+            states = self._safe_step(equil_simulation, equilibration_steps)
 
             equil_state = equil_simulation.context.getState(
                 positions=True,
@@ -310,8 +309,7 @@ class EvbFepDriver():
                 f"Running sampling with step size {run_simulation.integrator.getStepSize()}"
             )
             self.ostream.flush()
-            states = self._safe_step(run_simulation,
-                                                total_sample_steps)
+            states = self._safe_step(run_simulation, total_sample_steps)
 
             positions = states[-1].getPositions()
         self.ostream.flush()
@@ -350,13 +348,12 @@ class EvbFepDriver():
                 self.ostream.flush()
                 cwd = Path.cwd()
                 path = cwd / self.run_folder
-                for state in states:
-                    with open(path / f"state_step_{i}.xml", "w") as f:
-                        f.write(
-                            mm.XmlSerializer.serialize(state))
+                for j, state in enumerate(states):
+                    step_num = i - len(states) + j
+                    with open(path / f"state_step_{step_num}.xml", "w") as f:
+                        f.write(mm.XmlSerializer.serialize(state))
                 raise e
 
-            simulation.step(1)
             state = simulation.context.getState(positions=True,
                                                 velocities=True,
                                                 forces=True)
