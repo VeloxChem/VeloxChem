@@ -55,8 +55,10 @@ class EvbForceGroup(Enum):
     DEFAULT = auto(
     )  # Default force group, included for both integration and energy calculations
     # THERMOSTAT = auto()  # Thermostat
-    INTLR = auto()  # Hard core long range potential
-    PESLR = auto()  # Soft core long range potential
+    INTLJ = auto()  # Integration lennard-jones potential
+    INTCOUL = auto()  # Integration coulombic potential
+    PESLJ = auto()  # Lennard-jones potential
+    PESCOUL = auto()  # Coulombic potential
     CONSTRAINT = auto()
 
     CMM_REMOVER = auto()  # Center of mass motion remover
@@ -94,7 +96,8 @@ class EvbForceGroup(Enum):
             cls.BAROSTAT.value,
             cls.E_FIELD.value,
             cls.REACTION_BONDED.value,
-            cls.INTLR.value,
+            cls.INTLJ.value,
+            cls.INTCOUL.value,
             cls.CONSTRAINT.value,
             cls.PES_CONSTRAINT.value,
             cls.RESTRAINT.value,
@@ -117,7 +120,8 @@ class EvbForceGroup(Enum):
             cls.E_FIELD.value,
             cls.REACTION_BONDED.value,
             cls.PES_CONSTRAINT.value,
-            cls.PESLR.value,
+            cls.PESLJ.value,
+            cls.PESCOUL.value,
             cls.SOLVENT.value,
             cls.CARBON.value,
             cls.PES.value,
@@ -930,7 +934,7 @@ class EvbSystemBuilder():
             coul_soft_core=self.soft_core_coulomb_int,
         )
         # The soft core forces are used for the PES calculations, and thus always have the 'correct' exceptions
-        softlj, softcoul = self._create_nonbonded_forces(
+        peslj, pescoul = self._create_nonbonded_forces(
             lam,
             bonded=False,
             lj_soft_core=self.soft_core_lj_pes,
@@ -945,10 +949,10 @@ class EvbSystemBuilder():
         torsion.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
         improper.setForceGroup(EvbForceGroup.REACTION_BONDED.value)
 
-        intlj.setForceGroup(EvbForceGroup.INTLR.value)
-        intcoul.setForceGroup(EvbForceGroup.DEBUG1INT.value)
-        softlj.setForceGroup(EvbForceGroup.PESLR.value)
-        softcoul.setForceGroup(EvbForceGroup.DEBUG1PES.value)
+        intlj.setForceGroup(EvbForceGroup.INTLJ.value)
+        intcoul.setForceGroup(EvbForceGroup.INTCOUL.value)
+        peslj.setForceGroup(EvbForceGroup.PESLJ.value)
+        pescoul.setForceGroup(EvbForceGroup.PESCOUL.value)
         bond_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
         constant_force.setForceGroup(EvbForceGroup.CONSTRAINT.value)
         angle_constraint.setForceGroup(EvbForceGroup.CONSTRAINT.value)
@@ -960,8 +964,8 @@ class EvbSystemBuilder():
         system.addForce(improper)
         system.addForce(intlj)
         system.addForce(intcoul)
-        system.addForce(softlj)
-        system.addForce(softcoul)
+        system.addForce(peslj)
+        system.addForce(pescoul)
         system.addForce(bond_constraint)
         system.addForce(constant_force)
         system.addForce(angle_constraint)

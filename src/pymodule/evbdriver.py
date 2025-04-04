@@ -97,7 +97,7 @@ class EvbDriver():
                                         | list[Molecule],
                                         barrier,
                                         free_energy,
-                                        ordered_input=False):
+                                        ordered_input=False,):
         """Automatically perform an EVB calculation using a vacuum system as reference and a system solvated in water as target system.
 
         Args:
