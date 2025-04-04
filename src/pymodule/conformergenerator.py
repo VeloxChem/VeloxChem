@@ -43,7 +43,7 @@ class ConformerGenerator:
         self.ostream = ostream
 
         self.molecule = None
-        self.number_of_conformers_to_select = 200
+        self.number_of_conformers_to_select = 300
 
         self.top_file_name = None
         self.partial_charges = None
@@ -51,9 +51,14 @@ class ConformerGenerator:
         self.save_xyz_files = False
         self.save_path = None
 
+        # thresholds for energy minimization
         self.em_tolerance = 1.0
-        self.rmsd_threshold = 1.0
-        self.energy_threshold = 1.0
+
+        # thresholds for removing duplicate conformers
+        # rmsd threshold in Angstrom, energy threshold in kJ/mol
+        # TODO: double check the thresholds
+        self.rmsd_threshold = 1.5
+        self.energy_threshold = 1.5
 
         self.implicit_solvent_model = None
         self.solute_dielectric = 1.0
@@ -142,7 +147,7 @@ class ConformerGenerator:
         mmff_gen = MMForceFieldGenerator(self._comm)
         mmff_gen.ostream.mute()
         if partial_charges is None:
-            warn_text = "ConformerGenerator: Partial charge not provided. "
+            warn_text = "ConformerGenerator: Partial charges not provided. "
             warn_text += "Will use a quick (and likely inaccurate) estimation of partial charges."
             self.ostream.print_warning(warn_text)
             mmff_gen.partial_charges = molecule.get_partial_charges(molecule.get_charge())
@@ -225,7 +230,7 @@ class ConformerGenerator:
 
         return dihedrals_combinations, dihedral_list
 
-    def _get_mol_comb(self, molecule, top_file_name, dihedrals_candidates, atom_info_dict, dihedrals_dict):
+    def _get_mol_comb(self, molecule, top_file_name, dihedrals_candidates):
 
         dihedrals_combinations, dihedral_list = self._get_dihedral_combinations(dihedrals_candidates)
 
@@ -396,9 +401,7 @@ class ConformerGenerator:
                 return None
 
         if rank == mpi_master():
-            conformation_dih_arr = self._get_mol_comb(
-                molecule, top_file_name, dihedrals_candidates,
-                atom_info_dict, dihedrals_dict)
+            conformation_dih_arr = self._get_mol_comb(molecule, top_file_name, dihedrals_candidates)
         else:
             conformation_dih_arr = None
         conformation_dih_arr = comm.bcast(conformation_dih_arr, root=mpi_master())
@@ -535,11 +538,10 @@ class ConformerGenerator:
                     xyz_j = conformers_dict["molecules"][j].get_coordinates_in_angstrom()
                     ene_j = conformers_dict["energies"][j]
 
-                    rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
-
-                    # TODO: double check threshold (rmsd in Angstrom and energy in kJ/mol)
-                    if rmsd < self.rmsd_threshold and abs(ene_i - ene_j) < self.energy_threshold:
-                        equiv_conformer_pairs.append((i, j))
+                    if abs(ene_i - ene_j) < self.energy_threshold:
+                        rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
+                        if rmsd < self.rmsd_threshold:
+                            equiv_conformer_pairs.append((i, j))
 
             duplicate_conformers = [j for i, j in equiv_conformer_pairs]
             duplicate_conformers = sorted(list(set(duplicate_conformers)))
