@@ -27,6 +27,7 @@ import numpy as np
 import time as tm
 import math
 import sys
+import h5py
 
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
@@ -816,6 +817,11 @@ class ComplexResponse(LinearSolver):
 
                     self._print_results(ret_dict)
 
+                    # write spectrum to h5 file
+                    if final_h5_fname is not None:
+                        self.write_cpp_rsp_results_to_hdf5(final_h5_fname,
+                                                           ret_dict)
+
                     return ret_dict
                 else:
                     return {'solutions': solutions}
@@ -1209,3 +1215,35 @@ class ComplexResponse(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+
+    def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
+        """
+        Writes the results of a linear response calculation to HDF5 file.
+    
+        :param fname:
+            Name of the HDF5 file.
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        """
+    
+        if fname and isinstance(fname, str):
+    
+            hf = h5py.File(fname, 'a')
+    
+            # Write frequencies
+            label = 'rsp/frequencies'
+            hf.create_dataset(label, data=rsp_results['frequencies'])
+
+            spectrum = self.get_spectrum(rsp_results, 'au')
+            y_data = np.array(spectrum['y_data'])
+
+            if self.cpp_flag == 'absorption':
+                label = 'rsp/sigma'
+
+            elif self.cpp_flag == 'ecd':
+                label = 'rsp/delta-epsilon'
+
+            hf.create_dataset(label, data=y_data)
+    
+            hf.close()
+
