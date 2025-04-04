@@ -23,7 +23,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -39,7 +38,7 @@ from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, create_hdf5, write_rsp_hdf5,
+from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
                          write_rsp_solution_with_multiple_keys)
 from .oneeints import (compute_electric_dipole_integrals,
                        compute_linear_momentum_integrals,
@@ -123,7 +122,7 @@ class ComplexResponseTDA(LinearSolver):
         """
 
         assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
-                            'ComplexResponse: invalide CPP flag')
+                            'ComplexResponse: invalid CPP flag')
 
         self.cpp_flag = flag.lower()
 
@@ -138,7 +137,7 @@ class ComplexResponseTDA(LinearSolver):
             self.a_components = 'xyz'
             self.b_operator = 'linear momentum'
             self.b_components = 'xyz'
-    
+
     def _get_precond(self, orb_ene, nocc, norb, w, d):
         """
         Constructs the preconditioners.
@@ -160,7 +159,7 @@ class ComplexResponseTDA(LinearSolver):
 
         # spawning needed components
 
-        ediag, _ = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
+        ediag, sdiag_unused = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 
         # constructing matrix block diagonals
 
@@ -193,7 +192,7 @@ class ComplexResponseTDA(LinearSolver):
         pa = precond.data[:, 0]
         pb = precond.data[:, 1]
 
-        v_in_rg = v_in.data[:, 0] 
+        v_in_rg = v_in.data[:, 0]
         v_in_ig = v_in.data[:, 1]
 
         v_out_rg = (pa * v_in_rg + pb * v_in_ig)
@@ -223,7 +222,7 @@ class ComplexResponseTDA(LinearSolver):
 
         for (op, w), vec in vectors.items():
             v = self._preconditioning(precond[w], vec)
-            norms_2 = 2.0 * v.squared_norm(axis=0) 
+            norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.norm_thresh:
@@ -279,11 +278,21 @@ class ComplexResponseTDA(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
+
+        # check solvation model setup
+        if self.rank == mpi_master():
+            assert_msg_critical(
+                'solvation_model' not in scf_tensors,
+                type(self).__name__ + ': Solvation model not implemented')
 
         # check print level (verbosity of output)
         if self.print_level < 2:
@@ -320,9 +329,6 @@ class ComplexResponseTDA(LinearSolver):
         norb = orb_ene.shape[0]
         nocc = molecule.number_of_alpha_electrons()
 
-        self.nocc = nocc
-        self.nvir = norb - nocc
-
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
 
@@ -340,8 +346,7 @@ class ComplexResponseTDA(LinearSolver):
         if not self.nonlinear:
             b_grad = self.get_complex_prop_grad(self.b_operator,
                                                 self.b_components, molecule,
-                                                basis, scf_tensors)      
-            
+                                                basis, scf_tensors)
             if self.rank == mpi_master():
                 v_grad = {
                     (op, w): v for op, v in zip(self.b_components, b_grad)
@@ -382,8 +387,8 @@ class ComplexResponseTDA(LinearSolver):
                     gradger.imag.reshape(-1, 1),
                 ))
                 rhs_mat = np.hstack((
-                    gradger.real.reshape(-1, 1),            
-                    - gradger.imag.reshape(-1, 1),
+                    gradger.real.reshape(-1, 1),
+                    -gradger.imag.reshape(-1, 1),
                 ))
             else:
                 grad_mat = None
@@ -394,8 +399,7 @@ class ComplexResponseTDA(LinearSolver):
 
         if self.nonlinear:
             rsp_vector_labels = [
-                'CLR_bger',
-                'CLR_e2bger', 'CLR_Fock_ger'
+                'CLR_bger', 'CLR_e2bger', 'CLR_Fock_ger'
             ]
         else:
             rsp_vector_labels = [
@@ -416,7 +420,6 @@ class ComplexResponseTDA(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            
             bger = self.setup_trials(dist_rhs, precond)
 
             profiler.set_timing_key('Preparation')
@@ -452,8 +455,6 @@ class ComplexResponseTDA(LinearSolver):
         # start iterations
         for iteration in range(self.max_iter):
 
-            self.iteration = iteration
-
             iter_start_time = tm.time()
 
             profiler.set_timing_key(f'Iteration {iteration + 1}')
@@ -465,14 +466,12 @@ class ComplexResponseTDA(LinearSolver):
 
             n_ger = self._dist_bger.shape(1)
 
-
             e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger)
             s2gg = self._dist_bger.matmul_AtB(self._dist_bger)
 
             for op, w in op_freq_keys:
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
-                    
 
                     grad_rg = dist_grad[(op, w)].get_column(0)
                     grad_ig = dist_grad[(op, w)].get_column(1)
@@ -482,7 +481,7 @@ class ComplexResponseTDA(LinearSolver):
 
                     # creating gradient and matrix for linear equation
 
-                    size = 2 * (n_ger)
+                    size = 2 * n_ger
 
                     if self.rank == mpi_master():
 
@@ -522,7 +521,7 @@ class ComplexResponseTDA(LinearSolver):
 
                     x_realger = self._dist_bger.matmul_AB_no_gather(c_realger)
                     x_imagger = self._dist_bger.matmul_AB_no_gather(c_imagger)
-                    
+
                     # composing E2 matrices projected onto solution subspace
 
                     e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
@@ -535,8 +534,7 @@ class ComplexResponseTDA(LinearSolver):
                             c_imagger)
 
                         fock_full_data = (
-                            fock_realger.data - 1j *
-                            (fock_imagger.data))
+                            fock_realger.data - 1j * fock_imagger.data)
 
                         focks[(op, w)] = DistributedArray(fock_full_data,
                                                           self.comm,
@@ -570,13 +568,11 @@ class ComplexResponseTDA(LinearSolver):
                     x = DistributedArray(x_data, self.comm, distribute=False)
 
                     x_full = self.get_full_solution_vector(x)
-
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
-                    
-                    # Velox wat rel. residual norm
-                    r_norms_2 = 2.0 * r.squared_norm(axis=0)           
+
+                    r_norms_2 = 2.0 * r.squared_norm(axis=0)
                     x_norms_2 = 2.0 * x.squared_norm(axis=0)
 
                     rn = np.sqrt(np.sum(r_norms_2))
@@ -649,7 +645,7 @@ class ComplexResponseTDA(LinearSolver):
                                         rsp_vector_labels)
 
             if self.force_checkpoint:
-                self._write_checkpoint(molecule, basis, dft_dict, pe_dict,         
+                self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                        rsp_vector_labels)
 
             # creating new sigma and rho linear transformations
@@ -680,7 +676,7 @@ class ComplexResponseTDA(LinearSolver):
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
-        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,        
+        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
                                rsp_vector_labels)
 
         # converged?
@@ -709,15 +705,11 @@ class ComplexResponseTDA(LinearSolver):
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
 
-                    # create h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                        final_h5_fname = str(
-                            Path(self.checkpoint_file).with_suffix(
-                                '.solutions.h5'))
-                        create_hdf5(final_h5_fname, molecule, basis,
-                                    dft_dict['dft_func_label'],
-                                    pe_dict['potfile_text'])
+                    # final h5 file for response solutions
+                    if self.filename is not None:
+                        final_h5_fname = f'{self.filename}.h5'
+                    else:
+                        final_h5_fname = None
 
                 for bop, w in solutions:
                     x = self.get_full_solution_vector(solutions[(bop, w)])
@@ -726,10 +718,8 @@ class ComplexResponseTDA(LinearSolver):
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
-
                         # write to h5 file for response solutions
-                        if (self.save_solutions and
-                                self.checkpoint_file is not None):
+                        if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
                                 for aop in self.a_components
@@ -739,11 +729,10 @@ class ComplexResponseTDA(LinearSolver):
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                        checkpoint_text = 'Response solution vectors written to file: '
-                        checkpoint_text += final_h5_fname
-                        self.ostream.print_info(checkpoint_text)
+                    if (self.save_solutions and final_h5_fname is not None):
+                        self.ostream.print_info(
+                            'Response solution vectors written to file: ' +
+                            final_h5_fname)
                         self.ostream.print_blank()
 
                     ret_dict = {

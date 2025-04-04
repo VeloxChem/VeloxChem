@@ -28,7 +28,7 @@ import sys
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
-from .tda_cppsolver import ComplexResponseTDA
+from .tdacppsolver import ComplexResponseTDA
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6driver import C6Driver
@@ -139,6 +139,10 @@ class ResponseProperty:
                 self._rsp_driver = ComplexResponseTDA(self.comm, self.ostream)
             else:
                 self._rsp_driver = ComplexResponse(self.comm, self.ostream)
+
+            self._rsp_driver._input_keywords['response'].update({
+                'tamm_dancoff': ('bool', 'use Tamm-Dancoff approximation'),
+            })
 
             if self.prop_type in [
                     'linear absorption cross-section',
