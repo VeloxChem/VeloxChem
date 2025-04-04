@@ -257,6 +257,10 @@ class ConformerGenerator:
             'when using implicit solvent model.')
 
         if self.use_gromacs_files:
+            if topology_file.endswith(".top"):
+                topology_file = str(Path(topology_file))
+            else:
+                topology_file = str(Path(topology_file).with_suffix(".top"))
             top = GromacsTopFile(topology_file)
             system = top.createSystem(NoCutoff)
         else:
@@ -502,7 +506,7 @@ class ConformerGenerator:
             min_mol = Molecule(molecule)
             for iatom in range(min_mol.number_of_atoms()):
                 min_mol.set_atom_coordinates(
-                    i, min_coords_angstrom[iatom] / bohr_in_angstrom())
+                    iatom, min_coords_angstrom[iatom] / bohr_in_angstrom())
             self.ostream.print_info(f"Global minimum energy: {min_energy:.3f} kJ/mol")
 
             self.global_minimum_conformer = min_mol
