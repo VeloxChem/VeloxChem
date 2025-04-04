@@ -252,6 +252,10 @@ class ConformerGenerator:
             'when using implicit solvent model.')
 
         if self.use_gromacs_files:
+            if topology_file.endswith(".top"):
+                topology_file = str(Path(topology_file))
+            else:
+                topology_file = str(Path(topology_file).with_suffix(".top"))
             top = GromacsTopFile(topology_file)
             system = top.createSystem(NoCutoff)
         else:
