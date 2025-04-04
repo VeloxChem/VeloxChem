@@ -22,6 +22,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -59,7 +60,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 try:
@@ -211,7 +212,7 @@ class ScfDriver:
 
         # RI-J
         self.ri_coulomb = False
-        self.ri_auxiliary_basis = 'def2-universal-jkfit'
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
         self._ri_drv = None
 
         # dft
@@ -234,6 +235,7 @@ class ScfDriver:
         self.cpcm_epsilon = 78.39
         self.cpcm_grid_per_sphere = 194
         self.cpcm_x = 0
+        self.cpcm_custom_vdw_radii = None
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
@@ -274,8 +276,6 @@ class ScfDriver:
         # input keywords
         self._input_keywords = {
             'scf': {
-                'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'acc_type':
                     ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
@@ -307,6 +307,8 @@ class ScfDriver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
@@ -317,6 +319,8 @@ class ScfDriver:
                 'cpcm_epsilon':
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
+                'cpcm_custom_vdw_radii':
+                    ('seq_fixed_str', 'custom vdw radii for C-PCM'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -471,7 +475,7 @@ class ScfDriver:
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}_scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -528,6 +532,9 @@ class ScfDriver:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_scf.h5'
+
         # check RI-J
         # for now, force DIIS for RI-J
         # TODO: double check
@@ -541,7 +548,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -550,6 +557,7 @@ class ScfDriver:
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
             self.cpcm_drv.x = self.cpcm_x
+            self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
         else:
             self.cpcm_drv = None
 
@@ -1228,7 +1236,7 @@ class ScfDriver:
             else:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
-            self.checkpoint_file = f'{base_fname}.scf.h5'
+            self.checkpoint_file = f'{base_fname}_scf.h5'
         self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
 
         self.comm.barrier()
@@ -1248,9 +1256,8 @@ class ScfDriver:
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 self.ostream.print_blank()
-                checkpoint_text = 'Checkpoint written to file: '
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
+                self.ostream.print_info('Checkpoint written to file: ' +
+                                        self.checkpoint_file)
 
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
@@ -1367,19 +1374,16 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
-        self._print_debug_info('before screener')
         if self.rank == mpi_master():
             screener = T4CScreener()
             screener.partition(ao_basis, molecule, 'eri')
         else:
             screener = None
-        self._print_debug_info('after  screener')
         screener = self.comm.bcast(screener, root=mpi_master())
-        self._print_debug_info('after  bcast screener')
 
         profiler.check_memory_usage('Initial guess')
 
-        if self.ri_coulomb and self.rank == mpi_master():
+        if self.ri_coulomb:
             assert_msg_critical(
                 ao_basis.get_label().lower().startswith('def2-'),
                 'SCF Driver: Invalid basis set for RI-J')
@@ -1389,7 +1393,12 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-            basis_ri_j = MolecularBasis.read(molecule, self.ri_auxiliary_basis)
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule,
+                                                 self.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
             self.ostream.print_info('Dimension of RI auxiliary basis set ' +
                                     f'({self.ri_auxiliary_basis.upper()}): ' +
@@ -1427,7 +1436,10 @@ class ScfDriver:
             inv_mat_j.set_values(inv_mat_j_np)
 
             self._ri_drv = RIFockDriver(inv_mat_j)
-            self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j)
+
+            local_atoms = molecule.partition_atoms(self.comm)
+            self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j,
+                                         local_atoms)
 
             self.ostream.print_info(
                 f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
@@ -1477,7 +1489,7 @@ class ScfDriver:
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                    self._cpcm_q = np.linalg.solve(self._cpcm_Amat, rhs)
+                    self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
 
                     e_sol = self.cpcm_drv.compute_solv_energy(
                         self._cpcm_Bzvec, Cvec, self._cpcm_q)
@@ -1683,6 +1695,7 @@ class ScfDriver:
                     'scf_type': self.scf_type,
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
+                    'filename': self.filename,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -1699,6 +1712,12 @@ class ScfDriver:
 
                 # for backward compatibility only
                 self._scf_tensors['F'] = (F_alpha, F_beta)
+
+                if self.ri_coulomb:
+                    # RI info
+                    self._scf_tensors['ri_coulomb'] = self.ri_coulomb
+                    self._scf_tensors[
+                        'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
                 if self._dft:
                     # dft info
@@ -1910,20 +1929,6 @@ class ScfDriver:
 
         return npot_mat
 
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
     def _comp_2e_fock(self,
                       den_mat,
                       molecule,
@@ -2048,24 +2053,24 @@ class ScfDriver:
 
         fock_mat = None
 
-        self._print_debug_info('before Fock build')
-
         if self.scf_type == 'restricted':
             # restricted SCF
-            self._print_debug_info('before rest Fock build')
-
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
                     'SCF driver: RI is only applicable to pure DFT functional')
 
             if self.ri_coulomb and fock_type == 'j':
-                if self.rank == mpi_master():
-                    fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
-                    fock_mat_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
-                else:
-                    fock_mat_np = np.zeros(den_mat[0].shape)
+                local_gvec = np.array(
+                    self._ri_drv.compute_local_bq_vector(den_mat_for_fock))
+                gvec = np.zeros(local_gvec.shape)
+                self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                fock_mat = self._ri_drv.local_compute(den_mat_for_fock, gvec,
+                                                      'j')
+                fock_mat_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
             else:
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock,
                                             fock_type, exchange_scaling_factor,
@@ -2073,18 +2078,14 @@ class ScfDriver:
                 fock_mat_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-            self._print_debug_info('after  rest Fock build')
-
             if fock_type == 'j':
                 # for pure functional
                 fock_mat_np *= 2.0
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before rest erf Fock build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  rest erf Fock build')
 
                 fock_mat_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2110,50 +2111,43 @@ class ScfDriver:
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_Jab is D_total
-                self._print_debug_info('before unrest Fock J build')
-
                 if self.ri_coulomb:
-                    if self.rank == mpi_master():
-                        fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
-                        J_ab_np = fock_mat.to_numpy()
-                        fock_mat = Matrix()
-                    else:
-                        J_ab_np = np.zeros(den_mat[0].shape)
+                    local_gvec = np.array(
+                        self._ri_drv.compute_local_bq_vector(den_mat_for_Jab))
+                    gvec = np.zeros(local_gvec.shape)
+                    self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                    fock_mat = self._ri_drv.local_compute(
+                        den_mat_for_Jab, gvec, 'j')
+                    J_ab_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
                 else:
                     fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                                 0.0, 0.0, thresh_int)
                     J_ab_np = fock_mat.to_numpy()
                     fock_mat = Matrix()
 
-                self._print_debug_info('after  unrest Fock J build')
-
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
 
             else:
-                self._print_debug_info('before unrest Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_a_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_b_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock J build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock J build')
 
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2163,18 +2157,14 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before unrest erf Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Ka build')
 
                 fock_mat_a_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest erf Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Kb build')
 
                 fock_mat_b_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2191,8 +2181,6 @@ class ScfDriver:
                 fock_mat = [fock_mat_a_np, fock_mat_b_np]
             else:
                 fock_mat = None
-
-        self._print_debug_info('after  Fock build')
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
@@ -2685,6 +2673,10 @@ class ScfDriver:
             self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
@@ -2692,6 +2684,10 @@ class ScfDriver:
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.dispersion:
+            cur_str = 'Dispersion Correction           : D4'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._cpcm:
@@ -3004,11 +3000,11 @@ class ScfDriver:
             The AO basis set.
         """
 
-        if self.checkpoint_file is None:
+        if self.filename is None:
             return
 
-        final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.results.h5'))
+        # Final hdf5 file to save scf results
+        final_h5_fname = f'{self.filename}.h5'
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
@@ -3026,6 +3022,5 @@ class ScfDriver:
                                   self.history)
 
         self.ostream.print_blank()
-        checkpoint_text = 'SCF results written to file: '
-        checkpoint_text += final_h5_fname
-        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_info('SCF results written to file: ' +
+                                final_h5_fname)

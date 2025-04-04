@@ -83,59 +83,6 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
-    def partition_atoms(self, molecule):
-        """
-        Partition atoms for parallel computation of gradient.
-
-        :param molecule:
-            The molecule.
-
-        :return:
-            The list of atom indices for the current MPI rank.
-        """
-
-        if self.rank == mpi_master():
-            elem_ids = molecule.get_identifiers()
-            coords = molecule.get_coordinates_in_bohr()
-            mol_com = molecule.center_of_mass_in_bohr()
-
-            r2_array = np.sum((coords - mol_com)**2, axis=1)
-            sorted_r2_list = sorted([
-                (r2, nchg, i)
-                for i, (r2, nchg) in enumerate(zip(r2_array, elem_ids))
-            ])
-
-            dict_atoms = {}
-            for r2, nchg, i in sorted_r2_list:
-                if nchg not in dict_atoms:
-                    dict_atoms[nchg] = []
-                dict_atoms[nchg].append(i)
-
-            list_atoms = []
-            for nchg in sorted(dict_atoms.keys(), reverse=True):
-                list_atoms += dict_atoms[nchg]
-
-        else:
-            list_atoms = None
-
-        list_atoms = self.comm.bcast(list_atoms, root=mpi_master())
-
-        return list_atoms[self.rank::self.nodes]
-
     def compute(self, molecule, basis, scf_results=None):
         """
         Performs calculation of gradient.
@@ -237,15 +184,13 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = np.zeros((natoms, 3))
 
-        local_atoms = self.partition_atoms(molecule)
+        local_atoms = molecule.partition_atoms(self.comm)
 
         # kinetic energy contribution to gradient
 
         t0 = time.time()
 
         kin_grad_drv = KineticEnergyGeom100Driver()
-
-        self._print_debug_info('before kin_grad')
 
         for iatom in local_atoms:
             gmats = kin_grad_drv.compute(molecule, basis, iatom)
@@ -256,15 +201,11 @@ class ScfGradientDriver(GradientDriver):
 
             gmats = Matrices()
 
-        self._print_debug_info('after  kin_grad')
-
         grad_timing['Kinetic_energy_grad'] += time.time() - t0
 
         # nuclear potential contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before npot_grad')
 
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
@@ -284,8 +225,6 @@ class ScfGradientDriver(GradientDriver):
 
             gmats_100 = Matrices()
             gmats_010 = Matrices()
-
-        self._print_debug_info('after  npot_grad')
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
@@ -322,8 +261,6 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        self._print_debug_info('before ovl_grad')
-
         ovl_grad_drv = OverlapGeom100Driver()
 
         for iatom in local_atoms:
@@ -335,8 +272,6 @@ class ScfGradientDriver(GradientDriver):
                 self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
 
             gmats = Matrices()
-
-        self._print_debug_info('after  ovl_grad')
 
         grad_timing['Overlap_grad'] += time.time() - t0
 
@@ -380,8 +315,6 @@ class ScfGradientDriver(GradientDriver):
         den_mat_for_fock2 = make_matrix(basis, mat_t.general)
         den_mat_for_fock2.set_values(D)
 
-        self._print_debug_info('before fock_grad')
-
         fock_grad_drv = FockGeom1000Driver()
         fock_grad_drv._set_block_size_factor(self._block_size_factor)
 
@@ -407,26 +340,26 @@ class ScfGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
                     molecule, self.scf_driver.ri_auxiliary_basis)
-                ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(
-                    den_mat_for_fock)
             else:
                 basis_ri_j = None
-                ri_gvec = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
-            ri_gvec = self.comm.bcast(ri_gvec, root=mpi_master())
+
+            local_ri_gvec = np.array(
+                self.scf_driver._ri_drv.compute_local_bq_vector(
+                    den_mat_for_fock))
+            ri_gvec = np.zeros(local_ri_gvec.shape)
+            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
 
             ri_grad_drv = RIFockGradDriver()
 
-        if self.scf_driver.ri_coulomb:
-
             t0 = time.time()
 
-            natoms = molecule.number_of_atoms()
+            for iatom in local_atoms:
+                atomgrad = ri_grad_drv.direct_compute(screener, basis,
+                                                      basis_ri_j, molecule,
+                                                      ri_gvec, den_mat_for_fock,
+                                                      iatom, thresh_int)
 
-            ri_grad = ri_grad_drv.compute(basis, basis_ri_j, molecule, ri_gvec,
-                                          den_mat_for_fock, local_atoms)
-
-            for iatom, atomgrad in zip(local_atoms, ri_grad):
                 # Note: RI gradient already contains factor of 2 for
                 # closed-shell
                 self.gradient[iatom, :] += np.array(atomgrad.coordinates())
@@ -459,13 +392,9 @@ class ScfGradientDriver(GradientDriver):
 
                 self.gradient[iatom, :] += np.array(atomgrad) * factor
 
-        self._print_debug_info('after  fock_grad')
-
         # XC contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before xc_grad')
 
         if use_dft:
             if self.rank == mpi_master():
@@ -480,8 +409,6 @@ class ScfGradientDriver(GradientDriver):
 
         else:
             xcfun_label = 'hf'
-
-        self._print_debug_info('after  xc_grad')
 
         grad_timing['XC_grad'] += time.time() - t0
 
@@ -638,7 +565,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.gradient = np.zeros((natoms, 3))
 
-        local_atoms = self.partition_atoms(molecule)
+        local_atoms = molecule.partition_atoms(self.comm)
 
         # kinetic energy contribution to gradient
 
@@ -773,32 +700,66 @@ class ScfGradientDriver(GradientDriver):
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
-        for iatom in local_atoms:
+        if self.scf_driver.ri_coulomb:
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
 
-            screener_atom = T4CScreener()
-            screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-            atomgrad_Jab = fock_grad_drv.compute(basis, screener_atom, screener,
-                                                 Dab_for_fock, Dab_for_fock_2,
-                                                 iatom, 'j', 0.0, 0.0,
-                                                 thresh_int)
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(
+                    molecule, self.scf_driver.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            self.gradient[iatom, :] += 0.5 * np.array(atomgrad_Jab)
+            local_ri_gvec = np.array(
+                self.scf_driver._ri_drv.compute_local_bq_vector(Dab_for_fock))
+            ri_gvec = np.zeros(local_ri_gvec.shape)
+            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
 
-            if fock_type != 'j':
-                atomgrad_Ka = fock_grad_drv.compute(basis, screener_atom,
-                                                    screener, Da_for_fock,
-                                                    Da_for_fock_2, iatom, 'kx',
-                                                    exchange_scaling_factor,
-                                                    0.0, thresh_int)
-                atomgrad_Kb = fock_grad_drv.compute(basis, screener_atom,
-                                                    screener, Db_for_fock,
-                                                    Db_for_fock_2, iatom, 'kx',
-                                                    exchange_scaling_factor,
-                                                    0.0, thresh_int)
+            ri_grad_drv = RIFockGradDriver()
 
-                self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
-                self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
+            for iatom in local_atoms:
+                atomgrad = ri_grad_drv.direct_compute(screener, basis,
+                                                      basis_ri_j, molecule,
+                                                      ri_gvec, Dab_for_fock,
+                                                      iatom, thresh_int)
+                # Note: RI gradient already contains factor of 2 for
+                # closed-shell, so for unrestricted factor becomes 0.25
+                self.gradient[iatom, :] += 0.25 * np.array(
+                    atomgrad.coordinates())
+
+        else:
+
+            for iatom in local_atoms:
+
+                screener_atom = T4CScreener()
+                screener_atom.partition_atom(basis, molecule, 'eri', iatom)
+
+                atomgrad_Jab = fock_grad_drv.compute(basis, screener_atom,
+                                                     screener, Dab_for_fock,
+                                                     Dab_for_fock_2, iatom, 'j',
+                                                     0.0, 0.0, thresh_int)
+
+                self.gradient[iatom, :] += 0.5 * np.array(atomgrad_Jab)
+
+                if fock_type != 'j':
+                    atomgrad_Ka = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Da_for_fock,
+                        Da_for_fock_2, iatom, 'kx', exchange_scaling_factor,
+                        0.0, thresh_int)
+                    atomgrad_Kb = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Db_for_fock,
+                        Db_for_fock_2, iatom, 'kx', exchange_scaling_factor,
+                        0.0, thresh_int)
+
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
+                    self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
 
         # XC contribution to gradient
 

@@ -31,7 +31,6 @@
 #include "ExportOneElecInts.hpp"
 #include "ExportOrbdata.hpp"
 #include "ExportVisualization.hpp"
-#include "ExportXtb.hpp"
 #include "ExportT2CIntegrals.hpp"
 #include "ExportT3CIntegrals.hpp"
 #include "ExportT4CIntegrals.hpp"
@@ -51,8 +50,6 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_oneeints::export_oneeints(m);
 
     vlx_visualization::export_visualization(m);
-
-    vlx_xtb::export_xtb(m);
 
     vlx_t2cintegrals::export_t2cintegrals(m);
     

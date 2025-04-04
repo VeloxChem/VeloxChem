@@ -1,12 +1,12 @@
 target_sources(vlxobjs
   PRIVATE
     Dense4DTensor.cpp
-    DenseDiagonalizer.cpp
     DenseLinearAlgebra.cpp
     DenseMatrix.cpp
     Matrices.cpp
     Matrix.cpp
     MatrixFunc.cpp
+    SerialDenseLinearAlgebra.cpp
     SubMatrix.cpp
   )
 

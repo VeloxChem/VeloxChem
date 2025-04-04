@@ -36,7 +36,7 @@ from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 
 
 class RespChargesDriver:
@@ -112,6 +112,7 @@ class RespChargesDriver:
 
         # grid information
         self.grid_type = 'mk'
+        self.custom_mk_radii = None
 
         # MK grid settings (density in Angstrom^-2)
         self.number_layers = 4
@@ -151,6 +152,8 @@ class RespChargesDriver:
                 'max_iter': ('int', 'maximum iterations in RESP fit'),
                 'threshold': ('float', 'convergence threshold of RESP fit'),
                 'equal_charges': ('str', 'constraints for equal charges'),
+                'custom_mk_radii':
+                    ('seq_fixed_str', 'custom MK radii for RESP charges'),
                 'xyz_file': ('str', 'xyz file containing the conformers'),
                 'net_charge': ('float', 'net charge of the molecule'),
                 'multiplicity': ('int', 'spin multiplicity of the molecule'),
@@ -437,7 +440,6 @@ class RespChargesDriver:
                     scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
                 if self.filename is not None:
                     scf_drv.filename = self.filename
-                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
@@ -465,7 +467,6 @@ class RespChargesDriver:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
                 if self.filename is not None:
                     scf_drv.filename = self.filename
-                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
@@ -590,7 +591,7 @@ class RespChargesDriver:
         # generate and solve equation system (ESP fit)
         a, b = self.generate_equation_system(molecules, grids, esp, weights,
                                              None, constr)
-        q = np.linalg.solve(a, b)
+        q = safe_solve(a, b)
 
         n_atoms = molecules[0].number_of_atoms()
 
@@ -680,7 +681,7 @@ class RespChargesDriver:
                 a[i, n_points + 1 + j] = -1
                 j += 1
 
-        q = np.linalg.solve(a, b)
+        q = safe_solve(a, b)
 
         # print results
         for i in range(n_points):
@@ -767,7 +768,7 @@ class RespChargesDriver:
                                                             0.1**2)
             a_tot = a + np.diag(rstr)
 
-            q_new = np.linalg.solve(a_tot, b)
+            q_new = safe_solve(a_tot, b)
             dq_norm = np.linalg.norm(q_new - q_old)
 
             current_iteration = iteration
@@ -985,11 +986,47 @@ class RespChargesDriver:
         grid = []
         coords = molecule.get_coordinates_in_bohr()
 
+        mol_mk_radii = molecule.mk_radii_to_numpy()
+
+        if self.custom_mk_radii is not None:
+            assert_msg_critical(
+                len(self.custom_mk_radii) % 2 == 0,
+                'RespChargesDriver: expecting even number of entries for ' +
+                'user-defined MK radii')
+
+            keys = self.custom_mk_radii[0::2]
+            vals = self.custom_mk_radii[1::2]
+
+            self.ostream.print_blank()
+
+            for key, val in zip(keys, vals):
+                val_au = float(val) / bohr_in_angstrom()
+                try:
+                    idx = int(key) - 1
+                    assert_msg_critical(
+                        0 <= idx and idx < molecule.number_of_atoms(),
+                        'RespChargesDriver: invalid atom index for ' +
+                        'user-defined MK radii')
+                    mol_mk_radii[idx] = val_au
+                    self.ostream.print_info(
+                        f'Applying user-defined MK radius {val} for atom {key}')
+                except ValueError:
+                    elem_found = False
+                    for idx, label in enumerate(molecule.get_labels()):
+                        if label.upper() == key.upper():
+                            mol_mk_radii[idx] = val_au
+                            elem_found = True
+                    if elem_found:
+                        self.ostream.print_info(
+                            f'Applying user-defined MK radius {val} for atom {key}')
+
+            self.ostream.print_blank()
+
         for layer in range(self.number_layers):
 
             # MK radii with layer-dependent scaling factor
             scaling_factor = 1.4 + layer * 0.4 / np.sqrt(self.number_layers)
-            r = scaling_factor * molecule.mk_radii_to_numpy()
+            r = scaling_factor * mol_mk_radii
 
             for atom in range(molecule.number_of_atoms()):
                 # number of points fitting on the equator

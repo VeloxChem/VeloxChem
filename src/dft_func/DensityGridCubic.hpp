@@ -482,28 +482,49 @@ class CDensityGridCubic
      @param rwDensityGrid  one-time transformed densities evaluated on the grid
      @param densityThreshold the screening threshold for density values.
      @param numdens the number of densities.
-     @param quadMode a string that specifies which densities should be combined.
+     @param cubeMode a string that specifies which densities should be combined.
      */
     void DensityProd(const CDensityGrid& rwDensityGrid,
                      const CDensityGrid& rw2DensityGrid,
                      const xcfun         xcFuncType,
                      const int           numdens,
-                     const std::string&  quadMode);
+                     const std::string&  cubeMode);
 
-    void DensityProdForLDA(const CDensityGrid& rwDensityGrid,
-                           const CDensityGrid& rw2DensityGrid,
-                           const int           numdens,
-                           const std::string&  quadMode);
+    void DensityProdForLDA_TPA(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
 
-    void DensityProdForGGA(const CDensityGrid& rwDensityGrid,
-                           const CDensityGrid& rw2DensityGrid,
-                           const int           numdens,
-                           const std::string&  quadMode);
+    void DensityProdForLDA_CRF(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
 
-    void DensityProdForMGGA(const CDensityGrid& rwDensityGrid,
-                            const CDensityGrid& rw2DensityGrid,
-                            const int           numdens,
-                            const std::string&  quadMode);
+    void DensityProdForLDA_3PA(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
+    void DensityProdForGGA_TPA(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
+    void DensityProdForGGA_CRF(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
+    void DensityProdForGGA_3PA(const CDensityGrid& rwDensityGrid,
+                               const CDensityGrid& rw2DensityGrid,
+                               const int           numdens);
+
+    void DensityProdForMGGA_TPA(const CDensityGrid& rwDensityGrid,
+                                const CDensityGrid& rw2DensityGrid,
+                                const int           numdens);
+
+    void DensityProdForMGGA_CRF(const CDensityGrid& rwDensityGrid,
+                                const CDensityGrid& rw2DensityGrid,
+                                const int           numdens);
+
+    void DensityProdForMGGA_3PA(const CDensityGrid& rwDensityGrid,
+                                const CDensityGrid& rw2DensityGrid,
+                                const int           numdens);
 };
 
 #endif /* DensityGridQuad_hpp */

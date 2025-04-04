@@ -520,6 +520,35 @@ make_bra_ket_work_group(const std::vector<CBlockedGtoPairBlock>& bra_gto_pair_bl
 }
 
 auto
+make_aux_work_tasks(const std::vector<CGtoBlock>&            gto_blocks,
+                    const std::vector<CBlockedGtoPairBlock>& gto_pair_blocks,
+                    const int                                ithreshold) -> std::vector<std::array<size_t, 3>>
+{
+    auto wtasks = std::vector<std::array<size_t, 3>>();
+
+    if (const auto nblocks = gto_blocks.size(); nblocks > 0)
+    {
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            if (const auto ngpblocks = gto_pair_blocks.size(); ngpblocks > 0)
+            {
+                for (size_t j = 0; j < ngpblocks; j++)
+                {
+                    for (size_t k = 0; k < ithreshold; k++)
+                    {
+                        if (gto_pair_blocks[j].is_empty_gto_pair_block(static_cast<int>(k))) continue;
+
+                        wtasks.push_back(std::array<size_t, 3>({i, j, k}));
+                    }
+                }
+            }
+        }
+    }
+
+    return wtasks;
+}
+
+auto
 angular_momentum_scale(const std::pair<int, int>& ang_pair) -> size_t
 {
     const auto angmom = ang_pair.first + ang_pair.second;

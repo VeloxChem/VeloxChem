@@ -77,8 +77,6 @@ monkey:cmake_build:
     - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
-    - export DFTD4_HOME=/usr/local
-    - export XTBHOME=/usr/local
     - cmake
         -S.
         -Bbuild
@@ -100,11 +98,6 @@ monkey:pip_install:
         MDAnalysis
     - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
-    - CXX=g++ python -m pip install
-        git+https://gitlab.com/FraME-projects/PyFraME.git@84a356bfe3b9af17345ec754383a38792291dbbb
-    - python -m pip install openmm rdkit pymbar
-    - export DFTD4_HOME=/usr/local
-    - export XTBHOME=/usr/local
     - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++"
         python -m pip install -v .[test,qmmm]
   artifacts:

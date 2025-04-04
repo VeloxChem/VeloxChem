@@ -22,7 +22,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import sys
@@ -35,7 +34,7 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .batchsize import get_batch_size
@@ -79,7 +78,9 @@ class CphfSolver(LinearSolver):
         self._input_keywords['orbitalresponse'] = {
             'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
             'print_residuals': ('bool', 'print iteration to output'),
-            'max_iter': ('int', 'maximum number of iterations')
+            'max_iter': ('int', 'maximum number of iterations'),
+            'force_checkpoint':
+                ('bool', 'flag for writing checkpoint every iteration'),
         }
 
     def update_settings(self, cphf_dict, method_dict=None):
@@ -100,6 +101,202 @@ class CphfSolver(LinearSolver):
         }
 
         parse_input(self, cphf_keywords, cphf_dict)
+
+    def compute_solution_vectors(self, molecule, basis, scf_tensors, dist_rhs,
+                                 eri_dict, dft_dict, pe_dict):
+        """
+        Performs CPHF calculation for a specific atom of a molecule and a basis set.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param dist_rhs:
+            The right-hand side as a list of distributed arrays.
+
+        :return:
+            A dictionary containing the RHS and solution (ov block)
+            of the CPHF equations.
+        """
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
+
+        # sanity check
+        nalpha = molecule.number_of_alpha_electrons()
+        nbeta = molecule.number_of_beta_electrons()
+        assert_msg_critical(
+            nalpha == nbeta,
+            'CphfSolver: not implemented for unrestricted case')
+
+        self.start_time = tm.time()
+
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
+
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
+
+        # check dft setup
+        dft_sanity_check(self, 'compute')
+
+        # check pe setup
+        pe_sanity_check(self, molecule=molecule)
+
+        if self.rank == mpi_master():
+            if self._dft:
+                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
+            else:
+                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
+
+        if self.rank == mpi_master():
+            mo_energies = scf_tensors['E_alpha']
+            # nmo is sometimes different than nao (because of linear
+            # dependencies which get removed during SCF)
+            nmo = mo_energies.shape[0]
+            nocc = molecule.number_of_alpha_electrons()
+            nvir = nmo - nocc
+            nao = scf_tensors['C_alpha'].shape[0]
+            eocc = mo_energies[:nocc]
+            evir = mo_energies[nocc:]
+            eov = eocc.reshape(-1, 1) - evir
+        else:
+            mo_energies = None
+            eov = None
+            nao = None
+
+        mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
+        eov = self.comm.bcast(eov, root=mpi_master())
+        nao = self.comm.bcast(nao, root=mpi_master())
+
+        nmo = mo_energies.shape[0]
+        nocc = molecule.number_of_alpha_electrons()
+        nvir = nmo - nocc
+
+        dof = len(dist_rhs)
+
+        # Initialize trial and sigma vectors
+        self.dist_trials = None
+        self.dist_sigmas = None
+
+        # the preconditioner: 1 / (eocc - evir)
+        precond = (1.0 / eov).reshape(nocc * nvir)
+        dist_precond = DistributedArray(precond, self.comm)
+
+        # no restart for atom calculation
+
+        # setup and precondition trial vectors
+        dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
+
+        # construct the sigma (E*t) vectors
+        self.build_sigmas(molecule, basis, scf_tensors, dist_trials, eri_dict,
+                          dft_dict, pe_dict)
+
+        # lists that will hold the solutions and residuals
+        # TODO: double check residuals in setup_trials
+        solutions = [None for x in range(dof)]
+        residuals = list(np.zeros((dof)))
+        relative_residual_norm = [None for x in range(dof)]
+
+        # start iterations
+        for iteration in range(self.max_iter):
+
+            # Orbital Hessian in reduced subspace
+            orbhess_red = self.dist_trials.matmul_AtB(self.dist_sigmas)
+
+            self._cur_iter = iteration
+            num_vecs = self.dist_trials.shape(1)
+
+            for x in range(dof):
+                if (iteration > 0 and
+                        relative_residual_norm[x] < self.conv_thresh):
+                    continue
+
+                # CPHF RHS in reduced space
+                cphf_rhs_red = self.dist_trials.matmul_AtB(dist_rhs[x])
+
+                if self.rank == mpi_master():
+                    # solve the equations exactly in the subspace
+                    u_red = safe_solve(orbhess_red, cphf_rhs_red)
+                else:
+                    u_red = None
+                u_red = self.comm.bcast(u_red, root=mpi_master())
+
+                # solution vector in full space
+                u = self.dist_trials.matmul_AB_no_gather(u_red)
+
+                # calculate residuals
+                sigmas_u_red = self.dist_sigmas.matmul_AB_no_gather(u_red)
+                residual = sigmas_u_red.data - dist_rhs[x].data
+
+                # make distributed array out of residuals and current vectors
+                dist_residual = DistributedArray(residual,
+                                                 self.comm,
+                                                 distribute=False)
+
+                # calculate norms
+                r_norm = np.sqrt(dist_residual.squared_norm(axis=0))
+                u_norm = np.sqrt(u.squared_norm(axis=0))
+
+                if u_norm != 0:
+                    relative_residual_norm[x] = r_norm / u_norm
+                else:
+                    relative_residual_norm[x] = r_norm
+
+                if relative_residual_norm[x] < self.conv_thresh:
+                    solutions[x] = u
+                else:
+                    residuals[x] = dist_residual
+
+            # write to output
+            if self.rank == mpi_master():
+                self.ostream.print_info(
+                    '{:d} trial vectors in reduced space'.format(num_vecs))
+                self.ostream.print_blank()
+
+                self.print_iteration(relative_residual_norm, molecule)
+
+            # check convergence
+            self.check_convergence(relative_residual_norm)
+
+            if self.is_converged:
+                break
+
+            # update trial vectors
+            new_trials = self.setup_trials(molecule, dist_precond, residuals,
+                                           self.dist_trials)
+
+            if self.rank == mpi_master():
+                n_new_trials = new_trials.shape(1)
+            else:
+                n_new_trials = None
+            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
+
+            # update sigma vectors
+            self.build_sigmas(molecule, basis, scf_tensors, new_trials,
+                              eri_dict, dft_dict, pe_dict)
+
+        # converged?
+        if self.rank == mpi_master():
+            if self._dft:
+                self._print_convergence('Coupled-Perturbed Kohn-Sham')
+            else:
+                self._print_convergence('Coupled-Perturbed Hartree-Fock')
+
+        # only return the solution
+        return solutions
 
     def compute(self, molecule, basis, scf_tensors, *args):
         """
@@ -171,26 +368,25 @@ class CphfSolver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         if self.rank == mpi_master():
             if self._dft:
                 self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
             else:
                 self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
-
-        # checkpoint info
-        if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.orbrsp.h5'
-        elif (self.checkpoint_file is not None and
-              self.checkpoint_file.endswith('.rsp.h5')):
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -295,7 +491,7 @@ class CphfSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     # solve the equations exactly in the subspace
-                    u_red = np.linalg.solve(orbhess_red, cphf_rhs_red)
+                    u_red = safe_solve(orbhess_red, cphf_rhs_red)
                 else:
                     u_red = None
                 u_red = self.comm.bcast(u_red, root=mpi_master())
@@ -413,8 +609,15 @@ class CphfSolver(LinearSolver):
             'dist_cphf_ov': solutions,
         }
 
-    def build_sigmas(self, molecule, basis, scf_tensors, dist_trials, eri_dict,
-                     dft_dict, pe_dict, profiler):
+    def build_sigmas(self,
+                     molecule,
+                     basis,
+                     scf_tensors,
+                     dist_trials,
+                     eri_dict,
+                     dft_dict,
+                     pe_dict,
+                     profiler=None):
 
         if self.use_subcomms:
             self.build_sigmas_subcomms(molecule, basis, scf_tensors,
@@ -425,8 +628,15 @@ class CphfSolver(LinearSolver):
                                           dist_trials, eri_dict, dft_dict,
                                           pe_dict, profiler)
 
-    def build_sigmas_subcomms(self, molecule, basis, scf_tensors, dist_trials,
-                              eri_dict, dft_dict, pe_dict, profiler):
+    def build_sigmas_subcomms(self,
+                              molecule,
+                              basis,
+                              scf_tensors,
+                              dist_trials,
+                              eri_dict,
+                              dft_dict,
+                              pe_dict,
+                              profiler=None):
         """
         Apply orbital Hessian matrix to a set of trial vectors.
         Appends sigma and trial vectors to member variable.
@@ -611,9 +821,15 @@ class CphfSolver(LinearSolver):
         else:
             self.dist_trials.append(dist_trials, axis=1)
 
-    def build_sigmas_single_comm(self, molecule, basis, scf_tensors,
-                                 dist_trials, eri_dict, dft_dict, pe_dict,
-                                 profiler):
+    def build_sigmas_single_comm(self,
+                                 molecule,
+                                 basis,
+                                 scf_tensors,
+                                 dist_trials,
+                                 eri_dict,
+                                 dft_dict,
+                                 pe_dict,
+                                 profiler=None):
         """
         Apply orbital Hessian matrix to a set of trial vectors.
         Appends sigma and trial vectors to member variable.
@@ -752,7 +968,7 @@ class CphfSolver(LinearSolver):
                                  distribute=False)
             norm = np.sqrt(v.squared_norm())
 
-            if norm > 1e-10:  # small_thresh of lrsolver
+            if norm > self.norm_thresh:
                 trials.append(v.data[:])
 
         dist_trials = DistributedArray(np.array(trials).T,
@@ -837,7 +1053,7 @@ class CphfSolver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         if self.rank == mpi_master():
             if self._dft:
@@ -854,9 +1070,9 @@ class CphfSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        profiler.set_timing_key('CPHF RHS')
-        # TODO: double check use of profiler
-        profiler.start_timer('CPHF RHS')
+        profiler.set_timing_key('CPHF')
+
+        profiler.start_timer('RHS')
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E_alpha']
@@ -891,9 +1107,9 @@ class CphfSolver(LinearSolver):
         else:
             cphf_rhs = None
 
-        profiler.stop_timer('CPHF RHS')
-
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
+
+        profiler.stop_timer('RHS')
 
         # Solve the CPHF equations using conjugate gradient (cg)
         cphf_ov = self.solve_cphf_cg(
@@ -1073,13 +1289,24 @@ class CphfSolver(LinearSolver):
         b = cphf_rhs.reshape(dof * nocc * nvir)
         x0 = cphf_guess.reshape(dof * nocc * nvir)
 
-        cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
-                                                  b=b,
-                                                  x0=x0,
-                                                  M=PrecondOp,
-                                                  rtol=self.conv_thresh,
-                                                  atol=0,
-                                                  maxiter=self.max_iter)
+        try:
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      rtol=self.conv_thresh,
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
+        except TypeError:
+            # workaround for scipy < 1.11
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      tol=(self.conv_thresh *
+                                                           np.linalg.norm(b)),
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
 
         self._is_converged = (cg_conv == 0)
 
@@ -1188,12 +1415,11 @@ class CphfSolver(LinearSolver):
             return
 
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.orbrsp.h5'
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
         elif (self.checkpoint_file is not None and
-              self.checkpoint_file.endswith('.rsp.h5')):
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
 
         t0 = tm.time()
 

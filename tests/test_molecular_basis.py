@@ -563,6 +563,11 @@ class TestMolecularBasis:
         a_indexes = basis.atomic_indices([0, 2], 0, 3)
         b_indexes = [2]
         assert a_indexes == b_indexes
+        
+        # test getter for atomic indexes
+        a_indexes = basis.atomic_indices([2, 1], 0, 3)
+        b_indexes = [2, 1]
+        assert a_indexes == b_indexes
 
         # test getter for atomic indexes
         a_indexes = basis.atomic_indices(0, 1)
@@ -577,6 +582,11 @@ class TestMolecularBasis:
         # test getter for atomic indexes
         a_indexes = basis.atomic_indices([0, 2], 0, 1)
         b_indexes = [0, 0, 2]
+        assert a_indexes == b_indexes
+        
+        # test getter for atomic indexes
+        a_indexes = basis.atomic_indices([2, 0, 1], 0, 1)
+        b_indexes = [2, 0, 0, 1]
         assert a_indexes == b_indexes
 
         # test getter for atomic indexes
@@ -756,6 +766,7 @@ class TestMolecularBasis:
         assert basis.get_index_map([1, 2], 0, 5) == [7]
         assert basis.get_index_map([1, 2], 0, 3) == [7, 3, 5]
         assert basis.get_index_map([1, 2], 0, 1) == [7, 4, 6]
+        assert basis.get_index_map([2, 1], 0, 3) == [7, 5, 3]
 
         # test compressed indexes map
         assert basis.get_index_map([1, 2], 1, 5) == [4]

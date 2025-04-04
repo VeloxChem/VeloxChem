@@ -22,6 +22,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from datetime import datetime
 import numpy as np
 import time as tm
@@ -29,6 +30,8 @@ import math
 import sys
 
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import RIFockDriver, SubMatrix
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -36,6 +39,7 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
+from .molecularbasis import MolecularBasis
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -52,6 +56,11 @@ from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
 
 
 class LinearSolver:
@@ -110,6 +119,11 @@ class LinearSolver:
         # ERI settings
         self.eri_thresh = 1.0e-15
         self.batch_size = None
+
+        # RI-J
+        self.ri_coulomb = False
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_drv = None
 
         # dft
         self.xcfun = None
@@ -209,6 +223,8 @@ class LinearSolver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
@@ -302,7 +318,7 @@ class LinearSolver:
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}.rsp.h5'
+                self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -341,21 +357,81 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        self._print_mem_debug_info('before screener')
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
         else:
             screening = None
-        self._print_mem_debug_info('after  screener')
         screening = self.comm.bcast(screening, root=mpi_master())
-        self._print_mem_debug_info('after  bcast screener')
+
+        if self.ri_coulomb:
+            assert_msg_critical(basis.get_label().lower().startswith('def2-'),
+                                'SCF Driver: Invalid basis set for RI-J')
+
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule,
+                                                 self.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+
+            self.ostream.print_info('Dimension of RI auxiliary basis set ' +
+                                    f'({self.ri_auxiliary_basis.upper()}): ' +
+                                    f'{basis_ri_j.get_dimensions_of_basis()}')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            ri_prep_t0 = tm.time()
+
+            t2c_drv = TwoCenterElectronRepulsionDriver()
+            mat_j = t2c_drv.compute(molecule, basis_ri_j)
+            mat_j_np = mat_j.to_numpy()
+
+            self.ostream.print_info('Two-center integrals for RI done in ' +
+                                    f'{tm.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            if 'scipy' in sys.modules:
+                lu, piv = lu_factor(mat_j_np)
+                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            else:
+                inv_mat_j_np = np.linalg.inv(mat_j_np)
+
+            self.ostream.print_info(
+                f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            inv_mat_j = SubMatrix(
+                [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
+            inv_mat_j.set_values(inv_mat_j_np)
+
+            self._ri_drv = RIFockDriver(inv_mat_j)
+
+            local_atoms = molecule.partition_atoms(self.comm)
+            self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j,
+                                         local_atoms)
+
+            self.ostream.print_info(
+                f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         return {
             'screening': screening,
         }
 
-    def _init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors, silent=False):
         """
         Initializes DFT.
 
@@ -369,7 +445,8 @@ class LinearSolver:
         """
 
         if self._dft:
-            print_xc_reference(self.xcfun, self.ostream)
+            if not silent:
+                print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
@@ -379,11 +456,12 @@ class LinearSolver:
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
+            if not silent:
+                self.ostream.print_info(
+                    'Molecular grid with {0:d} points generated in {1:.2f} sec.'
+                    .format(n_grid_points,
+                            tm.time() - grid_t0))
+                self.ostream.print_blank()
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
@@ -546,20 +624,6 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
-    def _print_mem_debug_info(self, label):
-        """
-        Prints memory debug information.
-
-        :param label:
-            The label of memory debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the linear equations.
@@ -590,6 +654,15 @@ class LinearSolver:
                        dft_dict,
                        pe_dict,
                        profiler=None):
+
+        if self.use_subcomms and self.ri_coulomb:
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-J.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # TODO: enable RI-J with subcomms
 
         if self.use_subcomms:
             self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
@@ -858,13 +931,9 @@ class LinearSolver:
 
                 # form Fock matrices
 
-                self._print_mem_debug_info('before Fock build')
-
                 fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler,
                                           local_comm)
-
-                self._print_mem_debug_info('after  Fock build')
 
                 if is_local_master:
                     raw_fock_ger = []
@@ -1145,12 +1214,8 @@ class LinearSolver:
 
             # form Fock matrices
 
-            self._print_mem_debug_info('before Fock build')
-
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
-
-            self._print_mem_debug_info('after  Fock build')
 
             if self.rank == mpi_master():
                 raw_fock_ger = []
@@ -1338,17 +1403,37 @@ class LinearSolver:
         fock_arrays = []
 
         for idx in range(num_densities):
-            den_mat_for_fock = make_matrix(basis, mat_t.general)
-            den_mat_for_fock.set_values(dens[idx])
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'LinearSolver: RI is only applicable to pure DFT functional'
+                )
 
-            self._print_mem_debug_info('before restgen Fock build')
-            fock_mat = fock_drv.compute(screening, den_mat_for_fock, fock_type,
-                                        exchange_scaling_factor, 0.0,
-                                        thresh_int)
-            self._print_mem_debug_info('after  restgen Fock build')
+            if self.ri_coulomb and fock_type == 'j':
+                # symmetrize density for RI-J
+                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
+                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
 
-            fock_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
+                local_gvec = np.array(
+                    self._ri_drv.compute_local_bq_vector(den_mat_for_ri_j))
+                gvec = np.zeros(local_gvec.shape)
+                self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                fock_mat = self._ri_drv.local_compute(den_mat_for_ri_j, gvec,
+                                                      'j')
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
+
+            else:
+                den_mat_for_fock = make_matrix(basis, mat_t.general)
+                den_mat_for_fock.set_values(dens[idx])
+
+                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
+
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             if fock_type == 'j':
                 # for pure functional
@@ -1356,11 +1441,9 @@ class LinearSolver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_mem_debug_info('before restgen erf Fock build')
                 fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                             'kx_rs', erf_k_coef, omega,
                                             thresh_int)
-                self._print_mem_debug_info('after  restgen erf Fock build')
 
                 fock_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -1425,7 +1508,7 @@ class LinearSolver:
             return
 
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.rsp.h5'
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         t0 = tm.time()
 
@@ -1559,6 +1642,10 @@ class LinearSolver:
         cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
             self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

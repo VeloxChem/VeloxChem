@@ -36,8 +36,8 @@
 namespace xchessgga {  // xchessgga namespace
 
 /**
- Integrates GGA exchnage-correlation functional contribution to molecular
- Hessian.
+ Integrates GGA exchnage-correlation functional contribution to closed-shell
+ molecular Hessian.
 
  @param molecule the molecule.
  @param basis the molecular basis.
@@ -46,12 +46,12 @@ namespace xchessgga {  // xchessgga namespace
  @param xcFunctional the exchange-correlation functional.
  @return the molecular Hessian.
  */
-auto integrateExcHessianForGGA(const CMolecule&                  molecule,
-                               const CMolecularBasis&            basis,
-                               const std::vector<const double*>& gsDensityPointers,
-                               const CMolecularGrid&             molecularGrid,
-                               const double                      screeningThresholdForGTOValues,
-                               const CXCFunctional&              xcFunctional) -> CDenseMatrix;
+auto integrateExcHessianForGgaClosedShell(const CMolecule&                  molecule,
+                                          const CMolecularBasis&            basis,
+                                          const std::vector<const double*>& gsDensityPointers,
+                                          const CMolecularGrid&             molecularGrid,
+                                          const double                      screeningThresholdForGTOValues,
+                                          const CXCFunctional&              xcFunctional) -> CDenseMatrix;
 
 /**
  Integrates GGA exchnage-correlation functional contribution to molecular
@@ -66,13 +66,13 @@ auto integrateExcHessianForGGA(const CMolecule&                  molecule,
  computed.
  @return the Vxc gradient.
  */
-auto integrateVxcFockGradientForGGA(const CMolecule&                  molecule,
-                                    const CMolecularBasis&            basis,
-                                    const std::vector<const double*>& gsDensityPointers,
-                                    const CMolecularGrid&             molecularGrid,
-                                    const double                      screeningThresholdForGTOValues,
-                                    const CXCFunctional&              xcFunctional,
-                                    const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
+auto integrateVxcFockGradientForGgaClosedShell(const CMolecule&                  molecule,
+                                               const CMolecularBasis&            basis,
+                                               const std::vector<const double*>& gsDensityPointers,
+                                               const CMolecularGrid&             molecularGrid,
+                                               const double                      screeningThresholdForGTOValues,
+                                               const CXCFunctional&              xcFunctional,
+                                               const std::vector<int>&           atomIdxVec) -> std::vector<CDenseMatrix>;
 
 }  // namespace xchessgga
 

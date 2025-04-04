@@ -28,6 +28,7 @@
 #include "FunctionalParser.hpp"
 #include "XCMolecularHessianForLDA.hpp"
 #include "XCMolecularHessianForGGA.hpp"
+#include "XCMolecularHessianForMGGA.hpp"
 
 CXCMolecularHessian::CXCMolecularHessian()
 
@@ -50,17 +51,15 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return xchesslda::integrateExcHessianForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+            return xchesslda::integrateExcHessianForLdaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return xchessgga::integrateExcHessianForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+            return xchessgga::integrateExcHessianForGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
         {
-            std::string errxcfuntype("XCMolecularHessian.integrateExcHessian: Only implemented for LDA/GGA");
-
-            errors::assertMsgCritical(false, errxcfuntype);
+            return xchessmgga::integrateExcHessianForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
     }
     else
@@ -89,17 +88,15 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return xchesslda::integrateVxcFockGradientForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
+            return xchesslda::integrateVxcFockGradientForLdaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return xchessgga::integrateVxcFockGradientForGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
+            return xchessgga::integrateVxcFockGradientForGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
         else
         {
-            std::string errxcfuntype("XCMolecularHessian.integrateVxcFockGradient: Only implemented for LDA/GGA");
-
-            errors::assertMsgCritical(false, errxcfuntype);
+            return xchessmgga::integrateVxcFockGradientForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, atomIdxVec);
         }
     }
     else

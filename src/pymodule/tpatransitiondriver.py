@@ -135,6 +135,10 @@ class TpaTransitionDriver(NonlinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_results)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
 
@@ -219,8 +223,9 @@ class TpaTransitionDriver(NonlinearSolver):
             setattr(rpa_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            rpa_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpatrans_rpa.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            rpa_drv.checkpoint_file = str(fpath) + '_tpatrans_rpa.h5'
 
         rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
 
@@ -272,8 +277,9 @@ class TpaTransitionDriver(NonlinearSolver):
             setattr(N_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            N_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpatrans_cpp.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            N_drv.checkpoint_file = str(fpath) + '_tpatrans_cpp.h5'
 
         N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
@@ -801,8 +807,9 @@ class TpaTransitionDriver(NonlinearSolver):
         # examine checkpoint for distributed Focks
 
         if self.checkpoint_file is not None:
-            fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpatrans_fock.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            fock_file = str(fpath) + '_tpatrans_fock.h5'
         else:
             fock_file = None
 
