@@ -222,7 +222,7 @@ class ComplexResponseTDA(LinearSolver):
 
         for (op, w), vec in vectors.items():
             v = self._preconditioning(precond[w], vec)
-            norms_2 = 2.0 * v.squared_norm(axis=0)
+            norms_2 = v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.norm_thresh:
@@ -428,14 +428,12 @@ class ComplexResponseTDA(LinearSolver):
 
             bger_loc = bger.get_full_matrix(root=mpi_master())
 
-            tdens = self._get_trans_densities(bger_loc, scf_tensors,       
-                                                  molecule)     
-            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict)
+            tdens = self._get_trans_densities(bger_loc, scf_tensors, molecule)     
+
+            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict, dft_dict, pe_dict)
             
             if self.rank == mpi_master():
-                sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
-                                               bger_loc)
+                sig_mat = self._get_sigmas(fock, scf_tensors, molecule, bger_loc)
             else:
                 sig_mat = None
 
@@ -572,16 +570,16 @@ class ComplexResponseTDA(LinearSolver):
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
 
-                    r_norms_2 = 2.0 * r.squared_norm(axis=0)
-                    x_norms_2 = 2.0 * x.squared_norm(axis=0)
+                    r_norms_2 = r.squared_norm(axis=0)
+                    x_norms_2 = x.squared_norm(axis=0)
 
                     rn = np.sqrt(np.sum(r_norms_2))
                     xn = np.sqrt(np.sum(x_norms_2))
 
                     if xn != 0:
-                        relative_residual_norm[(op, w)] = 2.0 * rn / xn
+                        relative_residual_norm[(op, w)] = rn / xn
                     else:
-                        relative_residual_norm[(op, w)] = 2.0 * rn
+                        relative_residual_norm[(op, w)] = rn
 
                     if relative_residual_norm[(op, w)] < self.conv_thresh:
                         solutions[(op, w)] = x
@@ -654,15 +652,12 @@ class ComplexResponseTDA(LinearSolver):
                 
             new_trials_ger_loc = new_trials_ger.get_full_matrix(root=mpi_master())
         
-            tdens = self._get_trans_densities(new_trials_ger_loc, scf_tensors,
-                                                  molecule)     
-            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict)
+            tdens = self._get_trans_densities(new_trials_ger_loc, scf_tensors, molecule)     
+
+            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict, dft_dict, pe_dict)
             
             if self.rank == mpi_master():
-
-                sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
-                                               new_trials_ger_loc)
+                sig_mat = self._get_sigmas(fock, scf_tensors, molecule, new_trials_ger_loc)
             else:
                 sig_mat = None
 
@@ -1101,109 +1096,6 @@ class ComplexResponseTDA(LinearSolver):
             
         return dist_new_b
     
-    def get_complex_prop_grad(self, operator, components, molecule, basis,
-                              scf_tensors):
-        """
-        Computes complex property gradients for linear response equations for TDA.
-        Copied from linearsolver.py, but changed factor 
-
-        :param operator:
-            The string for the operator.
-        :param components:
-            The string for Cartesian components.
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-
-        :return:
-            The complex property gradients.
-        """
-
-        # compute 1e integral
-
-        assert_msg_critical(
-            operator in [
-                'dipole', 'electric dipole', 'electric_dipole',
-                'linear_momentum', 'linear momentum', 'angular_momentum',
-                'angular momentum', 'magnetic dipole', 'magnetic_dipole'
-            ],
-            f'LinearSolver.get_complex_prop_grad: unsupported operator {operator}'
-        )
-
-        if operator in ['dipole', 'electric dipole', 'electric_dipole']:
-            if self.rank == mpi_master():
-                dipole_mats = compute_electric_dipole_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    dipole_mats[0] + 0j,
-                    dipole_mats[1] + 0j,
-                    dipole_mats[2] + 0j,
-                )
-            else:
-                integrals = tuple()
-
-        elif operator in ['linear_momentum', 'linear momentum']:
-            if self.rank == mpi_master():
-                linmom_mats = compute_linear_momentum_integrals(molecule, basis)
-                integrals = (
-                    -1j * linmom_mats[0],
-                    -1j * linmom_mats[1],
-                    -1j * linmom_mats[2],
-                )
-            else:
-                integrals = tuple()
-
-        elif operator in ['angular_momentum', 'angular momentum']:
-            if self.rank == mpi_master():
-                angmom_mats = compute_angular_momentum_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    -1j * angmom_mats[0],
-                    -1j * angmom_mats[1],
-                    -1j * angmom_mats[2],
-                )
-            else:
-                integrals = tuple()
-
-        elif operator in ['magnetic_dipole', 'magnetic dipole']:
-            if self.rank == mpi_master():
-                angmom_mats = compute_angular_momentum_integrals(
-                    molecule, basis, [0.0, 0.0, 0.0])
-                integrals = (
-                    0.5j * angmom_mats[0],
-                    0.5j * angmom_mats[1],
-                    0.5j * angmom_mats[2],
-                )
-            else:
-                integrals = tuple()
-
-        # compute right-hand side
-
-        if self.rank == mpi_master():
-            indices = {'x': 0, 'y': 1, 'z': 2}
-            integral_comps = [integrals[indices[p]] for p in components]
-
-            mo = scf_tensors['C_alpha']
-            nocc = molecule.number_of_alpha_electrons()
-            norb = mo.shape[1]
-
-            # This factor is changed to 1 bc TDA
-            factor = 1              
-            matrices = [
-                factor * (-1.0) * self.commut_mo_density(
-                    np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
-                for P in integral_comps
-            ]
-
-            gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
-            return gradients
-
-        else:
-            return tuple()
-    
     @staticmethod
     def lrmat2vec(mat, nocc, norb):
         """
@@ -1219,8 +1111,9 @@ class ComplexResponseTDA(LinearSolver):
         :return:
             The vectors.
         """
-        #changed the linearsolver function such that we only include the excitation part 
-        # Should be changed at some point to still call linearsolver.py function 
+
+        # changed the linearsolver function such that we only include the excitation part 
+        # TODO: Should be changed at some point to still call linearsolver.py function 
 
         nvir = norb - nocc
 
@@ -1466,10 +1359,10 @@ class ComplexResponseTDA(LinearSolver):
             self.ostream.print_info(checkpoint_text)
             self.ostream.print_blank()
 
-
     def _read_checkpoint(self, rsp_vector_labels):
         """
-        Reads distributed arrays from checkpoint file. Copied from linearsolver.py and adjusted for TDA
+        Reads distributed arrays from checkpoint file. Copied from
+        linearsolver.py and adjusted for TDA
 
         :param rsp_vector_labels:
             The list of labels of vectors.
@@ -1482,11 +1375,9 @@ class ComplexResponseTDA(LinearSolver):
         ]
 
         if self.nonlinear:
-            (self._dist_bger, self._dist_e2bger, self._dist_fock_ger,
-             ) = dist_arrays
+            (self._dist_bger, self._dist_e2bger, self._dist_fock_ger) = dist_arrays
         else:
-            (self._dist_bger, self._dist_e2bger,
-             ) = dist_arrays
+            (self._dist_bger, self._dist_e2bger) = dist_arrays
 
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
@@ -1496,7 +1387,6 @@ class ComplexResponseTDA(LinearSolver):
     def remove_linear_dependence(self,basis, threshold):
         """
         Removes linear dependence in a set of vectors.
-
         Based on the function in linearsolver.py, modified to work with full size
         distributed arrays.
 
@@ -1525,7 +1415,6 @@ class ComplexResponseTDA(LinearSolver):
     def orthogonalize_gram_schmidt(tvecs):
         """
         Applies modified Gram Schmidt orthogonalization to trial vectors.
-
         Based on the function in linearsolver.py, modified to work with full size
         distributed arrays.
 
@@ -1559,7 +1448,6 @@ class ComplexResponseTDA(LinearSolver):
     def normalize(vecs):
         """
         Normalizes vectors by dividing by vector norm.
-
         Based on the function in linearsolver.py, modified to work with full size
         distributed arrays.
 
