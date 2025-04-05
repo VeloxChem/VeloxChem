@@ -149,8 +149,9 @@ from .rspabsorption import Absorption
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
+from .rixsdriverold import oldRixsDriver
 from .rixsdriver import RixsDriver
-from .rixsdrivernew import newRixsDriver
+from .altrixsdriver import altRixsDriver
 #from .rspcustomproperty import CustomProperty
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
