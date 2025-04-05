@@ -818,4 +818,74 @@ class InterpolationDatapoint:
                 
         return trust_radius
 
+    def remove_point_from_hdf5(fname, label, use_inverse_bond_length=False, use_cosine_dihedral=False):
+        """
+        Removes a point (i.e., corresponding datasets) from an HDF5 file based on label and internal settings.
+        
+        :param fname: HDF5 filename
+        :param label: base label for the data
+        :param use_inverse_bond_length: whether to append '_rinv' or '_r'
+        :param use_cosine_dihedral: whether to append '_cosine' or '_dihedral'
+        """
+        if use_inverse_bond_length:
+            label += "_rinv"
+        else:
+            label += "_r"
 
+        if use_cosine_dihedral:
+            label += "_cosine"
+        else:
+            label += "_dihedral"
+
+        keys_to_remove = [
+            label + "_energy",
+            label + "_gradient",
+            label + "_hessian",
+            label + "_internal_coordinates",
+            label + "_cartesian_coordinates",
+            label + "_confidence_radius",
+            label + "_bonds",
+            label + "_angles",
+            label + "_dihedrals"
+        ]
+
+        with h5py.File(fname, 'r+') as h5f:
+            for key in keys_to_remove:
+                if key in h5f:
+                    del h5f[key]
+                    print(f"Deleted: {key}")
+                else:
+                    print(f"Key not found (skipped): {key}")
+
+
+    def update_confidence_radius(self, fname, label, new_confidence_radius):
+        """
+        Updates the confidence radius in the HDF5 file.
+
+        :param fname: HDF5 filename
+        :param label: base label for dataset lookup
+        :param new_confidence_radius: new value(s) to store
+        """
+        with h5py.File(fname, 'r+') as h5f:
+            if self.use_inverse_bond_length:
+                label += "_rinv"
+            else:
+                label += "_r"
+
+            if self.use_cosine_dihedral:
+                label += "_cosine"
+            else:
+                label += "_dihedral"
+
+            confidence_radius_label = label + "_confidence_radius"
+
+            if confidence_radius_label in h5f:
+                dataset = h5f[confidence_radius_label]
+
+                # Check if shape matches before replacing
+                if np.shape(dataset) == np.shape(new_confidence_radius):
+                    dataset[...] = new_confidence_radius
+                else:
+                    raise ValueError(f"Shape mismatch: existing {dataset.shape}, new {np.shape(new_confidence_radius)}")
+            else:
+                raise KeyError(f"{confidence_radius_label} not found in file.")

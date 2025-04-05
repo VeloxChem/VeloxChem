@@ -112,11 +112,14 @@ class InterpolationDriver():
         self.distance_thrsh = 2.0
         self.z_matrix = z_matrix
         self.impes_dict = None
-
+        self.sum_of_weights = None
+        self.print = False
         self.store_weights = False
         self.perform_mapping = True
         self.symmetry_sub_groups = None
-        self.weights = {}
+        self.weights = []
+        self.int_coord_weights = {}
+        self.potentials = []
 
         # kpoint file with QM data
         self.imforcefield_file = None
@@ -295,30 +298,102 @@ class InterpolationDriver():
         weight_gradients = []
         sum_weight_gradients = np.zeros((natms, 3))
 
-        n_points = len(self.qm_data_points)
+        distances_and_gradients = []
+        min_distance = float('inf')
+        self.time_step_reducer = False
+        
+        org_internal_coordinates = self.impes_coordinate.internal_coordinates_values.copy()
+        org_b_matrix = self.impes_coordinate.b_matrix.copy()
+        org_mask = np.arange(len(self.impes_coordinate.z_matrix))
+
+        z_matrix_dict = { tuple(sorted(element)): i 
+                  for i, element in enumerate(self.impes_coordinate.z_matrix) }
 
         # Determine weights, weight gradients,
         # energy values, and energy gradients for interpolation
-        for data_point in self.qm_data_points:
-            distance, weight_gradient, _ = self.cartesian_distance(data_point)
+        for i, data_point in enumerate(self.qm_data_points):
+            
+            distance, weight_gradient, _, swapped = self.cartesian_distance(data_point)
+
+            if abs(distance) < min_distance:
+                min_distance = abs(distance)
+
+            distances_and_gradients.append((distance, i, weight_gradient, swapped))
+
+        # min_distance, distances_and_gradients = self.process_in_parallel()
+
+        used_labels = []
+        close_distances = None
+        close_distances = [
+            (self.qm_data_points[index], distance, wg, index, swapped_tuple) 
+            for distance, index, wg, swapped_tuple in distances_and_gradients 
+            if abs(distance) <= min_distance + self.distance_thrsh]
+        distances_from_points = [] 
+        internal_distance_dict = []
+        counter_idx = 0
+        for qm_data_point, distance, weight_grad, label_idx, swapped_tuple_obj in close_distances:
+            confidence_radius = 1.0
+            if qm_data_point.confidence_radius is not None:
+                confidence_radius = qm_data_point.confidence_radius
+            new_coordintes = False
+            reordered_int_coord_values = org_internal_coordinates.copy()
+            mask = []
+            org_b_matrix_cp = org_b_matrix.copy()
+            if swapped_tuple_obj is not None:
+                for i, element in enumerate(self.impes_coordinate.z_matrix):
+                    # Otherwise, reorder the element
+                    reordered_element = [swapped_tuple_obj[3].get(x, x) for x in element]
+                    key = tuple(sorted(reordered_element))
+                    z_mat_index = z_matrix_dict.get(key)
+                    mask.append(z_mat_index)
+                    # print(z_mat_index, key, element)
+                    reordered_int_coord_values[i] = (float(org_internal_coordinates[z_mat_index]))
+                
+                org_b_matrix_cp[org_mask] = org_b_matrix[mask]
+                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()), 3)
+                org_b_matrix_cp = org_b_matrix_cp[:, swapped_tuple_obj[1], :]
+                org_b_matrix_cp = org_b_matrix_cp.reshape(len(self.impes_coordinate.z_matrix), len(self.molecule.get_labels()) * 3)
+                # print('reordered internal coordinates', reordered_int_coord_values)
+                new_coordintes = True
             weight = 1.0 / (distance**(2 * self.exponent_p))
+            used_labels.append(label_idx)
             sum_weights += weight
-            sum_weight_gradients += weight_gradient
-            potential = self.compute_potential(data_point)
-            gradient = self.compute_gradient(data_point)
+            sum_weight_gradients += weight_grad
+            cuurent_int_dist = []
+            for i, element in enumerate(self.impes_coordinate.z_matrix):
+                current_diff = qm_data_point.internal_coordinates_values[i] - reordered_int_coord_values[i]
+                if len(element) == 4:
+                    current_diff = np.sin(current_diff)
+                cuurent_int_dist.append(current_diff)
+            internal_distance_dict.append(np.array(cuurent_int_dist))
+
+            
+            potential = self.compute_potential(qm_data_point, reordered_int_coord_values)
+            gradient = self.compute_gradient(qm_data_point, swapped_tuple_obj, reordered_int_coord_values, org_b_matrix_cp)
             gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
-            weight_gradients.append(weight_gradient)
+            self.weights.append(weight)
+            self.potentials.append(potential)
+            weight_gradients.append(weight_grad)
+            distances_from_points.append(distance)
+            counter_idx += 1
+            if new_coordintes:
+                # print('B-matrix', self.impes_coordinate.internal_coordinates_values, '\n org B-Matrix \n', org_internal_coordinates)
+                # print('\n difference B-matrix', np.linalg.norm(self.impes_coordinate.b_matrix[:, :] - org_b_matrix_cp[:, :]))
+                # print('\n ', np.linalg.norm(np.array(reordered_int_coord_values) - np.array(self.impes_coordinate.internal_coordinates_values)))
+                self.impes_coordinate.internal_coordinates_values = org_internal_coordinates
+                self.impes_coordinate.b_matrix = org_b_matrix
 
         # Perform the interpolation and save the result in
         # self.impes_coordinate.energy and self.impes_coordinate.gradient
         self.impes_coordinate.energy = 0
         self.impes_coordinate.gradient = np.zeros((natms, 3))
-
+        n_points = len(close_distances)
         weights = np.array(weights) / sum_weights
 
         for i in range(n_points):
+            self.int_coord_weight[self.labels[used_labels[i]]] = weights[i]
             self.impes_coordinate.energy += weights[i] * potentials[i]
             self.impes_coordinate.gradient += (
                 weights[i] * gradients[i] +
@@ -387,7 +462,8 @@ class InterpolationDriver():
             if abs(distance) < min_distance:
                 min_distance = abs(distance)
 
-            distances_and_gradients.append((distance, i, weight_gradient, swapped))   
+            distances_and_gradients.append((distance, i, weight_gradient, swapped))
+
         # min_distance, distances_and_gradients = self.process_in_parallel()
 
         used_labels = []
@@ -395,13 +471,15 @@ class InterpolationDriver():
         close_distances = [
             (self.qm_data_points[index], distance, wg, index, swapped_tuple) 
             for distance, index, wg, swapped_tuple in distances_and_gradients 
-            if abs(distance) <= min_distance + self.distance_thrsh]
+            if abs(distance) <= min_distance + self.distance_thrsh + 10000]
         distances_from_points = [] 
-        cointer_idx = 0
+        internal_distance_dict = []
+        counter_idx = 0
         for qm_data_point, distance, weight_grad, label_idx, swapped_tuple_obj in close_distances:
-            confidence_radius = 1.0
-            if qm_data_point.confidence_radius is not None:
-                confidence_radius = qm_data_point.confidence_radius
+            
+            # confidence_radius = 1.0
+            # if qm_data_point.confidence_radius is not None:
+            #     confidence_radius = qm_data_point.confidence_radius
             new_coordintes = False
             reordered_int_coord_values = org_internal_coordinates.copy()
             mask = []
@@ -423,38 +501,56 @@ class InterpolationDriver():
                 # print('reordered internal coordinates', reordered_int_coord_values)
                 new_coordintes = True
             denominator = (
-                (distance / confidence_radius)**(2 * self.exponent_p) +
-                (distance / confidence_radius)**(2 * self.exponent_q))
+                (distance / qm_data_point.confidence_radius)**(2 * self.exponent_p) +
+                (distance / qm_data_point.confidence_radius)**(2 * self.exponent_q))
             weight = 1.0 / denominator
             used_labels.append(label_idx)
             sum_weights += weight
             sum_weight_gradients += weight_grad
+            cuurent_int_dist = []
+            for i, element in enumerate(self.impes_coordinate.z_matrix):
+                current_diff = qm_data_point.internal_coordinates_values[i] - reordered_int_coord_values[i]
+                if len(element) == 4:
+                    current_diff = np.sin(current_diff)
+                cuurent_int_dist.append(current_diff)
+            internal_distance_dict.append(np.array(cuurent_int_dist))
 
+            
             potential = self.compute_potential(qm_data_point, reordered_int_coord_values)
             gradient = self.compute_gradient(qm_data_point, swapped_tuple_obj, reordered_int_coord_values, org_b_matrix_cp)
             gradients.append(gradient)
             potentials.append(potential)
             weights.append(weight)
+            self.weights.append(weight)
+            self.potentials.append(potential)
             weight_gradients.append(weight_grad)
             distances_from_points.append(distance)
-            
+            counter_idx += 1
             if new_coordintes:
                 # print('B-matrix', self.impes_coordinate.internal_coordinates_values, '\n org B-Matrix \n', org_internal_coordinates)
                 # print('\n difference B-matrix', np.linalg.norm(self.impes_coordinate.b_matrix[:, :] - org_b_matrix_cp[:, :]))
                 # print('\n ', np.linalg.norm(np.array(reordered_int_coord_values) - np.array(self.impes_coordinate.internal_coordinates_values)))
                 self.impes_coordinate.internal_coordinates_values = org_internal_coordinates
                 self.impes_coordinate.b_matrix = org_b_matrix
-
+        
         n_points = len(close_distances)
+        if self.print:
+            for i in range(n_points - 1):
+                print('\nint distane \n', i, distances_from_points[i], np.linalg.norm(internal_distance_dict[i]), '\n',
+                      i + 1, distances_from_points[i+ 1], np.linalg.norm(internal_distance_dict[i+ 1]), '\n\n', internal_distance_dict[i], '\n\n', internal_distance_dict[i + 1], '\n\n', internal_distance_dict[i] - internal_distance_dict[i + 1])
+        
+                
+        
         self.impes_coordinate.energy = 0
         self.impes_coordinate.gradient = np.zeros((natms, 3))
         self.impes_coordinate.NAC = np.zeros((natms, 3))
         weights = np.array(weights) / sum_weights
+        self.sum_of_weights = sum_weights
         
-
         for i in range(n_points):
+            
             if self.store_weights:
-                self.weights[self.labels[used_labels[i]]] = weights[i]
+                self.int_coord_weights[self.labels[used_labels[i]]] = weights[i]
             self.impes_coordinate.energy += weights[i] * potentials[i]
 
             self.impes_coordinate.gradient += (
@@ -577,6 +673,17 @@ class InterpolationDriver():
                            (distance**(2 * self.exponent_p + 2)))
 
         return weight_gradient
+    
+    def trust_radius_weight_gradient(self, datapoint):
+        
+        confidence_radius = datapoint.confidence_radius
+        distance, _, _, _ = self.cartesian_distance(datapoint)
+        denominator = (
+                (distance / confidence_radius)**(2 * self.exponent_p) +
+                (distance / confidence_radius)**(2 * self.exponent_q))**2
+        trust_radius_weight_gradient = -2.0 * (( -1.0 * (self.exponent_p * ((distance)**(2 * self.exponent_p) * (1/confidence_radius)**(2 * self.exponent_p)) / confidence_radius) - 
+                                             (self.exponent_q * ((distance)**(2 * self.exponent_q) * (1/confidence_radius)**(2 * self.exponent_q)) / confidence_radius))) / denominator
+        return trust_radius_weight_gradient
 
     def shepard_weight_gradient(self, distance_vector, distance, confidence_radius):
         """ Returns the derivative of an unormalized Shepard interpolation
@@ -641,13 +748,12 @@ class InterpolationDriver():
         # rotation_weights = geometric.rotate.get_rot(rotated_coordinates,
         #                                             target_coordinates)
 
-        rotated_coordinates_cp = rotated_coordinates.copy()
         org_reference_coord = reference_coordinates.copy()
         org_mapping_list = [i for i in range(reference_coordinates.shape[0])]
         mapping_list = [[i for i in range(reference_coordinates.shape[0])]]
         swapped = None
 
-        if core_detected:
+        if core_detected and 1 == 2:
     
             non_group_atoms = []
             for i in range(len(self.molecule.get_labels())):
@@ -685,7 +791,7 @@ class InterpolationDriver():
                 distance_vector, distance, confidence_radius)
         elif self.interpolation_type == 'simple':
             weight_gradient = self.simple_weight_gradient(
-                distance_vector, distance, confidence_radius)
+                distance_vector, distance)
         else:
             errtxt = "Unrecognized interpolation type: "
             errtxt += self.interpolation_type
@@ -756,9 +862,13 @@ class InterpolationDriver():
             # Print the sorted contributions with internal coordinates
             print('Delta E:', delta_E * hartree_in_kcalpermol())
             for contrib, error, ind_weight, coord in sorted_contributions[:]:
-                if ind_weight > max(weights) * 0.7:
+                if len(coord) == 2 and ind_weight == max(weights):
                     constraints.append(tuple(int(x) for x in coord))
-                print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()}')
+                elif len(coord) == 3 and ind_weight == max(weights):
+                    constraints.append(tuple(int(x) for x in coord))
+                elif len(coord) == 4 and ind_weight > max(weights) * 0.8:
+                    constraints.append(tuple(int(x) for x in coord))
+                print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()}')
             print('Sum of Weights', sum(weights), sum(single_energy_error) * hartree_in_kcalpermol())
             
             if coordinates_swapped:
