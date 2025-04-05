@@ -22,7 +22,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "XCMolecularHessianForGGA.hpp"
+#include "XCMolecularHessianForMGGA.hpp"
 
 #include <omp.h>
 
@@ -48,15 +48,15 @@
 #include "SerialDensityGridGenerator.hpp"
 #include "XCFunctional.hpp"
 
-namespace xchessgga {  // xchessgga namespace
+namespace xchessmgga {  // xchessmgga namespace
 
 auto
-integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
-                                     const CMolecularBasis&  basis,
-                                     const std::vector<const double*>& gsDensityPointers,
-                                     const CMolecularGrid&   molecularGrid,
-                                     const double            screeningThresholdForGTOValues,
-                                     const CXCFunctional&    xcFunctional) -> CDenseMatrix
+integrateExcHessianForMetaGgaClosedShell(const CMolecule&        molecule,
+                                         const CMolecularBasis&  basis,
+                                         const std::vector<const double*>& gsDensityPointers,
+                                         const CMolecularGrid&   molecularGrid,
+                                         const double            screeningThresholdForGTOValues,
+                                         const CXCFunctional&    xcFunctional) -> CDenseMatrix
 {
     CMultiTimer timer;
 
@@ -95,28 +95,44 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 
     // density and functional derivatives
 
-    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
-    const auto dim     = &(ggafunc->dim);
+    auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
     std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
 
     std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
+    // ground-state
     std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
     std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
     std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_lapl_data(nthreads, std::vector<double>(dim->lapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_tau_data(nthreads, std::vector<double>(dim->tau * omp_max_npoints));
 
+    // First-order
     std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
     std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vlapl_data(nthreads, std::vector<double>(dim->vlapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vtau_data(nthreads, std::vector<double>(dim->vtau * omp_max_npoints));
 
+    // Second-order
     std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
     std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rholapl_data(nthreads, std::vector<double>(dim->v2rholapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rhotau_data(nthreads, std::vector<double>(dim->v2rhotau * omp_max_npoints));
     std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigmalapl_data(nthreads, std::vector<double>(dim->v2sigmalapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigmatau_data(nthreads, std::vector<double>(dim->v2sigmatau * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2lapl2_data(nthreads, std::vector<double>(dim->v2lapl2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2lapltau_data(nthreads, std::vector<double>(dim->v2lapltau * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2tau2_data(nthreads, std::vector<double>(dim->v2tau2 * omp_max_npoints));
 
     std::vector<std::vector<double>> omp_weighted_vrho(nthreads, std::vector<double>(omp_max_npoints));
     std::vector<std::vector<double>> omp_weighted_vnabla_x(nthreads, std::vector<double>(omp_max_npoints));
     std::vector<std::vector<double>> omp_weighted_vnabla_y(nthreads, std::vector<double>(omp_max_npoints));
     std::vector<std::vector<double>> omp_weighted_vnabla_z(nthreads, std::vector<double>(omp_max_npoints));
+
+    std::vector<std::vector<double>> omp_weighted_vtau(nthreads, std::vector<double>(omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -325,23 +341,39 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 
             auto local_weights = omp_local_weights_data[thread_id].data();
 
+            // ground-state
             auto rho     = omp_rho_data[thread_id].data();
             auto rhograd = omp_rhograd_data[thread_id].data();
             auto sigma   = omp_sigma_data[thread_id].data();
+            auto lapl    = omp_lapl_data[thread_id].data();
+            auto tau     = omp_tau_data[thread_id].data();
 
+            // First-order
             auto vrho   = omp_vrho_data[thread_id].data();
             auto vsigma = omp_vsigma_data[thread_id].data();
+            auto vlapl  = omp_vlapl_data[thread_id].data();
+            auto vtau   = omp_vtau_data[thread_id].data();
 
-            auto v2rho2     = omp_v2rho2_data[thread_id].data();
-            auto v2rhosigma = omp_v2rhosigma_data[thread_id].data();
-            auto v2sigma2   = omp_v2sigma2_data[thread_id].data();
+            // Second-order
+            auto v2rho2      = omp_v2rho2_data[thread_id].data();
+            auto v2rhosigma  = omp_v2rhosigma_data[thread_id].data();
+            auto v2rholapl   = omp_v2rholapl_data[thread_id].data();
+            auto v2rhotau    = omp_v2rhotau_data[thread_id].data();
+            auto v2sigma2    = omp_v2sigma2_data[thread_id].data();
+            auto v2sigmalapl = omp_v2sigmalapl_data[thread_id].data();
+            auto v2sigmatau  = omp_v2sigmatau_data[thread_id].data();
+            auto v2lapl2     = omp_v2lapl2_data[thread_id].data();
+            auto v2lapltau   = omp_v2lapltau_data[thread_id].data();
+            auto v2tau2      = omp_v2tau2_data[thread_id].data();
 
             auto w0 = omp_weighted_vrho[thread_id].data();
             auto wx = omp_weighted_vnabla_x[thread_id].data();
             auto wy = omp_weighted_vnabla_y[thread_id].data();
             auto wz = omp_weighted_vnabla_z[thread_id].data();
 
-            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            auto wtau = omp_weighted_vtau[thread_id].data();
+
+            sdengridgen::serialGenerateDensityForMGGA(rho, rhograd, sigma, lapl, tau, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             // generate density gradient grid
 
@@ -363,6 +395,10 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
             CDenseMatrix dengradzy(natoms, grid_batch_size);
             CDenseMatrix dengradzz(natoms, grid_batch_size);
 
+            CDenseMatrix taugradx(natoms, grid_batch_size);
+            CDenseMatrix taugrady(natoms, grid_batch_size);
+            CDenseMatrix taugradz(natoms, grid_batch_size);
+
             auto gdenx = dengradx.values();
             auto gdeny = dengrady.values();
             auto gdenz = dengradz.values();
@@ -378,6 +414,10 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
             auto gdenzx = dengradzx.values();
             auto gdenzy = dengradzy.values();
             auto gdenzz = dengradzz.values();
+
+            auto gtaux = taugradx.values();
+            auto gtauy = taugrady.values();
+            auto gtauz = taugradz.values();
 
             omptimers[thread_id].stop("Density grad. grid prep.");
 
@@ -395,9 +435,10 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("XC functional eval.");
 
-            omp_xcfuncs[thread_id].compute_vxc_for_gga(grid_batch_size, rho, sigma, vrho, vsigma);
+            omp_xcfuncs[thread_id].compute_vxc_for_mgga(grid_batch_size, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
 
-            omp_xcfuncs[thread_id].compute_fxc_for_gga(grid_batch_size, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+            omp_xcfuncs[thread_id].compute_fxc_for_mgga(
+                grid_batch_size, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 
             omptimers[thread_id].stop("XC functional eval.");
 
@@ -455,6 +496,9 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                 wx[g] = local_weights[g] * vx;
                 wy[g] = local_weights[g] * vy;
                 wz[g] = local_weights[g] * vz;
+
+                // Note that we include a factor of 0.5 in wtau
+                wtau[g] = local_weights[g] * 0.5 * vtau[2 * g + 0];
             }
 
             // prepare gradient grid
@@ -489,10 +533,23 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                     gdenzx[atom_g] -= 2.0 * (F_z_val[mu_g] * chi_x_val[mu_g] + F_val[mu_g] * chi_xz_val[mu_g]);
                     gdenzy[atom_g] -= 2.0 * (F_z_val[mu_g] * chi_y_val[mu_g] + F_val[mu_g] * chi_yz_val[mu_g]);
                     gdenzz[atom_g] -= 2.0 * (F_z_val[mu_g] * chi_z_val[mu_g] + F_val[mu_g] * chi_zz_val[mu_g]);
+
+                    gtaux[atom_g] -= (F_x_val[mu_g] * chi_xx_val[mu_g] +
+                                      F_y_val[mu_g] * chi_xy_val[mu_g] +
+                                      F_z_val[mu_g] * chi_xz_val[mu_g]);
+                    gtauy[atom_g] -= (F_x_val[mu_g] * chi_xy_val[mu_g] +
+                                      F_y_val[mu_g] * chi_yy_val[mu_g] +
+                                      F_z_val[mu_g] * chi_yz_val[mu_g]);
+                    gtauz[atom_g] -= (F_x_val[mu_g] * chi_xz_val[mu_g] +
+                                      F_y_val[mu_g] * chi_yz_val[mu_g] +
+                                      F_z_val[mu_g] * chi_zz_val[mu_g]);
                 }
             }
 
-            // first contribution to
+            // -- First contrib, term 4 (a) --
+            // -- Second contrib, term 5 (a) --
+            // -- Third contrib, term 4 (a) --
+
             // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
             // and
             // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
@@ -526,17 +583,17 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 
                     // factor of 2 is added outside of the for loop
 
-                    double gdenxx = F_val[mu_g] * chi_xx_val[mu_g];
-                    double gdenxy = F_val[mu_g] * chi_xy_val[mu_g];
-                    double gdenxz = F_val[mu_g] * chi_xz_val[mu_g];
+                    double F_chi_xx = F_val[mu_g] * chi_xx_val[mu_g];
+                    double F_chi_xy = F_val[mu_g] * chi_xy_val[mu_g];
+                    double F_chi_xz = F_val[mu_g] * chi_xz_val[mu_g];
 
-                    double gdenyx = F_val[mu_g] * chi_xy_val[mu_g];
-                    double gdenyy = F_val[mu_g] * chi_yy_val[mu_g];
-                    double gdenyz = F_val[mu_g] * chi_yz_val[mu_g];
+                    double F_chi_yx = F_val[mu_g] * chi_xy_val[mu_g];
+                    double F_chi_yy = F_val[mu_g] * chi_yy_val[mu_g];
+                    double F_chi_yz = F_val[mu_g] * chi_yz_val[mu_g];
 
-                    double gdenzx = F_val[mu_g] * chi_xz_val[mu_g];
-                    double gdenzy = F_val[mu_g] * chi_yz_val[mu_g];
-                    double gdenzz = F_val[mu_g] * chi_zz_val[mu_g];
+                    double F_chi_zx = F_val[mu_g] * chi_xz_val[mu_g];
+                    double F_chi_zy = F_val[mu_g] * chi_yz_val[mu_g];
+                    double F_chi_zz = F_val[mu_g] * chi_zz_val[mu_g];
 
                     // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
                     // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi,\zeta)}
@@ -553,59 +610,110 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 
                     // === x ===
 
-                    double gdenxxx = F_x_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxx_val[mu_g];
-                    double gdenxxy = F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g];
-                    double gdenxxz = F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g];
+                    double F_chi_xxx = F_x_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxx_val[mu_g];
+                    double F_chi_xxy = F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g];
+                    double F_chi_xxz = F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g];
 
-                    double gdenxyx = F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g];
-                    double gdenxyy = F_x_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g];
-                    double gdenxyz = F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_chi_xyx = F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g];
+                    double F_chi_xyy = F_x_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g];
+                    double F_chi_xyz = F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
 
-                    double gdenxzx = F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g];
-                    double gdenxzy = F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
-                    double gdenxzz = F_x_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g];
+                    double F_chi_xzx = F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g];
+                    double F_chi_xzy = F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_chi_xzz = F_x_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g];
 
                     // === y ===
 
-                    double gdenyxx = F_y_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g];
-                    double gdenyxy = F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g];
-                    double gdenyxz = F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_chi_yxx = F_y_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g];
+                    double F_chi_yxy = F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g];
+                    double F_chi_yxz = F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
 
-                    double gdenyyx = F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g];
-                    double gdenyyy = F_y_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyy_val[mu_g];
-                    double gdenyyz = F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g];
+                    double F_chi_yyx = F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g];
+                    double F_chi_yyy = F_y_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyy_val[mu_g];
+                    double F_chi_yyz = F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g];
 
-                    double gdenyzx = F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
-                    double gdenyzy = F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g];
-                    double gdenyzz = F_y_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g];
+                    double F_chi_yzx = F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_chi_yzy = F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g];
+                    double F_chi_yzz = F_y_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g];
 
                     // === z ===
 
-                    double gdenzxx = F_z_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g];
-                    double gdenzxy = F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
-                    double gdenzxz = F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g];
+                    double F_chi_zxx = F_z_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g];
+                    double F_chi_zxy = F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_chi_zxz = F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g];
 
-                    double gdenzyx = F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
-                    double gdenzyy = F_z_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g];
-                    double gdenzyz = F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g];
+                    double F_chi_zyx = F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_chi_zyy = F_z_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g];
+                    double F_chi_zyz = F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g];
 
-                    double gdenzzx = F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g];
-                    double gdenzzy = F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g];
-                    double gdenzzz = F_z_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_zzz_val[mu_g];
+                    double F_chi_zzx = F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g];
+                    double F_chi_zzy = F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g];
+                    double F_chi_zzz = F_z_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_zzz_val[mu_g];
+
+                    // f_{\tau_{\alpha}} \tau_{\alpha}^{(\xi,\zeta)}
+
+                    // \tau_{\alpha}^{(\xi,\zeta)} (first contrib.)
+                    // = \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \nabla\phi_{\mu}^{(\xi,\zeta)} \nabla\phi_{\nu}
+                    // = \sum_{\mu} \nabla F_{\mu} \nabla\phi_{\mu}^{(\xi,\zeta)}
+
+                    // factor of 2 is added outside of the for loop
+                    // factor of 0.5 is included in wtau
+
+                    // === x ===
+
+                    double F_tau_chi_xx = F_x_val[mu_g] * chi_xxx_val[mu_g];
+                    double F_tau_chi_xy = F_x_val[mu_g] * chi_xxy_val[mu_g];
+                    double F_tau_chi_xz = F_x_val[mu_g] * chi_xxz_val[mu_g];
+
+                    double F_tau_chi_yx = F_x_val[mu_g] * chi_xxy_val[mu_g];
+                    double F_tau_chi_yy = F_x_val[mu_g] * chi_xyy_val[mu_g];
+                    double F_tau_chi_yz = F_x_val[mu_g] * chi_xyz_val[mu_g];
+
+                    double F_tau_chi_zx = F_x_val[mu_g] * chi_xxz_val[mu_g];
+                    double F_tau_chi_zy = F_x_val[mu_g] * chi_xyz_val[mu_g];
+                    double F_tau_chi_zz = F_x_val[mu_g] * chi_xzz_val[mu_g];
+
+                    // === y ===
+
+                    F_tau_chi_xx += F_y_val[mu_g] * chi_xxy_val[mu_g];
+                    F_tau_chi_xy += F_y_val[mu_g] * chi_xyy_val[mu_g];
+                    F_tau_chi_xz += F_y_val[mu_g] * chi_xyz_val[mu_g];
+
+                    F_tau_chi_yx += F_y_val[mu_g] * chi_xyy_val[mu_g];
+                    F_tau_chi_yy += F_y_val[mu_g] * chi_yyy_val[mu_g];
+                    F_tau_chi_yz += F_y_val[mu_g] * chi_yyz_val[mu_g];
+
+                    F_tau_chi_zx += F_y_val[mu_g] * chi_xyz_val[mu_g];
+                    F_tau_chi_zy += F_y_val[mu_g] * chi_yyz_val[mu_g];
+                    F_tau_chi_zz += F_y_val[mu_g] * chi_yzz_val[mu_g];
+
+                    // === z ===
+
+                    F_tau_chi_xx += F_z_val[mu_g] * chi_xxz_val[mu_g];
+                    F_tau_chi_xy += F_z_val[mu_g] * chi_xyz_val[mu_g];
+                    F_tau_chi_xz += F_z_val[mu_g] * chi_xzz_val[mu_g];
+
+                    F_tau_chi_yx += F_z_val[mu_g] * chi_xyz_val[mu_g];
+                    F_tau_chi_yy += F_z_val[mu_g] * chi_yyz_val[mu_g];
+                    F_tau_chi_yz += F_z_val[mu_g] * chi_yzz_val[mu_g];
+
+                    F_tau_chi_zx += F_z_val[mu_g] * chi_xzz_val[mu_g];
+                    F_tau_chi_zy += F_z_val[mu_g] * chi_yzz_val[mu_g];
+                    F_tau_chi_zz += F_z_val[mu_g] * chi_zzz_val[mu_g];
 
                     // accumulate contribution
 
-                    gatmxx += w0[g] * gdenxx + (wx[g] * gdenxxx + wy[g] * gdenyxx + wz[g] * gdenzxx);
-                    gatmxy += w0[g] * gdenxy + (wx[g] * gdenxxy + wy[g] * gdenyxy + wz[g] * gdenzxy);
-                    gatmxz += w0[g] * gdenxz + (wx[g] * gdenxxz + wy[g] * gdenyxz + wz[g] * gdenzxz);
+                    gatmxx += w0[g] * F_chi_xx + (wx[g] * F_chi_xxx + wy[g] * F_chi_yxx + wz[g] * F_chi_zxx) + wtau[g] * F_tau_chi_xx;
+                    gatmxy += w0[g] * F_chi_xy + (wx[g] * F_chi_xxy + wy[g] * F_chi_yxy + wz[g] * F_chi_zxy) + wtau[g] * F_tau_chi_xy;
+                    gatmxz += w0[g] * F_chi_xz + (wx[g] * F_chi_xxz + wy[g] * F_chi_yxz + wz[g] * F_chi_zxz) + wtau[g] * F_tau_chi_xz;
 
-                    gatmyx += w0[g] * gdenyx + (wx[g] * gdenxyx + wy[g] * gdenyyx + wz[g] * gdenzyx);
-                    gatmyy += w0[g] * gdenyy + (wx[g] * gdenxyy + wy[g] * gdenyyy + wz[g] * gdenzyy);
-                    gatmyz += w0[g] * gdenyz + (wx[g] * gdenxyz + wy[g] * gdenyyz + wz[g] * gdenzyz);
+                    gatmyx += w0[g] * F_chi_yx + (wx[g] * F_chi_xyx + wy[g] * F_chi_yyx + wz[g] * F_chi_zyx) + wtau[g] * F_tau_chi_yx;
+                    gatmyy += w0[g] * F_chi_yy + (wx[g] * F_chi_xyy + wy[g] * F_chi_yyy + wz[g] * F_chi_zyy) + wtau[g] * F_tau_chi_yy;
+                    gatmyz += w0[g] * F_chi_yz + (wx[g] * F_chi_xyz + wy[g] * F_chi_yyz + wz[g] * F_chi_zyz) + wtau[g] * F_tau_chi_yz;
 
-                    gatmzx += w0[g] * gdenzx + (wx[g] * gdenxzx + wy[g] * gdenyzx + wz[g] * gdenzzx);
-                    gatmzy += w0[g] * gdenzy + (wx[g] * gdenxzy + wy[g] * gdenyzy + wz[g] * gdenzzy);
-                    gatmzz += w0[g] * gdenzz + (wx[g] * gdenxzz + wy[g] * gdenyzz + wz[g] * gdenzzz);
+                    gatmzx += w0[g] * F_chi_zx + (wx[g] * F_chi_xzx + wy[g] * F_chi_yzx + wz[g] * F_chi_zzx) + wtau[g] * F_tau_chi_zx;
+                    gatmzy += w0[g] * F_chi_zy + (wx[g] * F_chi_xzy + wy[g] * F_chi_yzy + wz[g] * F_chi_zzy) + wtau[g] * F_tau_chi_zy;
+                    gatmzz += w0[g] * F_chi_zz + (wx[g] * F_chi_xzz + wy[g] * F_chi_yzz + wz[g] * F_chi_zzz) + wtau[g] * F_tau_chi_zz;
                 }
 
                 // factor of 2 from differentiation
@@ -624,7 +732,10 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                 gatm[iz * (natoms * 3) + iz] += 4.0 * gatmzz;
             }
 
-            // second contribution to
+            // -- First contrib, term 4 (b) --
+            // -- Second contrib, term 5 (b) --
+            // -- Third contrib, term 4 (b) --
+
             // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
             // and
             // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
@@ -738,19 +849,69 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                         double gzzy = chi_zz_val[mu_g] * chi_y_val[nu_g] + chi_yz_val[nu_g] * chi_z_val[mu_g];
                         double gzzz = chi_zz_val[mu_g] * chi_z_val[nu_g] + chi_zz_val[nu_g] * chi_z_val[mu_g];
 
+                        // f_{\tau_{\alpha}} \tau_{\alpha}^{(\xi,\zeta)}
+
+                        // \tau_{\alpha}^{(\xi,\zeta)} (second contrib.)
+                        // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \nabla\phi_{\mu}^{(\xi)} \nabla\phi_{\nu}^{(\zeta)}
+
+                        // factor of 2 and D_{\mu\nu,sym}^{\alpha} are added outside of the for loop
+                        // factor of 0.5 is included in wtau
+
+                        // === x ===
+
+                        double gtxx = chi_xx_val[mu_g] * chi_xx_val[nu_g];
+                        double gtxy = chi_xx_val[mu_g] * chi_xy_val[nu_g];
+                        double gtxz = chi_xx_val[mu_g] * chi_xz_val[nu_g];
+
+                        double gtyx = chi_xy_val[mu_g] * chi_xx_val[nu_g];
+                        double gtyy = chi_xy_val[mu_g] * chi_xy_val[nu_g];
+                        double gtyz = chi_xy_val[mu_g] * chi_xz_val[nu_g];
+
+                        double gtzx = chi_xz_val[mu_g] * chi_xx_val[nu_g];
+                        double gtzy = chi_xz_val[mu_g] * chi_xy_val[nu_g];
+                        double gtzz = chi_xz_val[mu_g] * chi_xz_val[nu_g];
+
+                        // === y ===
+
+                        gtxx += chi_xy_val[mu_g] * chi_xy_val[nu_g];
+                        gtxy += chi_xy_val[mu_g] * chi_yy_val[nu_g];
+                        gtxz += chi_xy_val[mu_g] * chi_yz_val[nu_g];
+
+                        gtyx += chi_yy_val[mu_g] * chi_xy_val[nu_g];
+                        gtyy += chi_yy_val[mu_g] * chi_yy_val[nu_g];
+                        gtyz += chi_yy_val[mu_g] * chi_yz_val[nu_g];
+
+                        gtzx += chi_yz_val[mu_g] * chi_xy_val[nu_g];
+                        gtzy += chi_yz_val[mu_g] * chi_yy_val[nu_g];
+                        gtzz += chi_yz_val[mu_g] * chi_yz_val[nu_g];
+
+                        // === z ===
+
+                        gtxx += chi_xz_val[mu_g] * chi_xz_val[nu_g];
+                        gtxy += chi_xz_val[mu_g] * chi_yz_val[nu_g];
+                        gtxz += chi_xz_val[mu_g] * chi_zz_val[nu_g];
+
+                        gtyx += chi_yz_val[mu_g] * chi_xz_val[nu_g];
+                        gtyy += chi_yz_val[mu_g] * chi_yz_val[nu_g];
+                        gtyz += chi_yz_val[mu_g] * chi_zz_val[nu_g];
+
+                        gtzx += chi_zz_val[mu_g] * chi_xz_val[nu_g];
+                        gtzy += chi_zz_val[mu_g] * chi_yz_val[nu_g];
+                        gtzz += chi_zz_val[mu_g] * chi_zz_val[nu_g];
+
                         // accumulate contributions
 
-                        gatmxx += w0[g] * gxx + (wx[g] * gxxx + wy[g] * gyxx + wz[g] * gzxx);
-                        gatmxy += w0[g] * gxy + (wx[g] * gxxy + wy[g] * gyxy + wz[g] * gzxy);
-                        gatmxz += w0[g] * gxz + (wx[g] * gxxz + wy[g] * gyxz + wz[g] * gzxz);
+                        gatmxx += w0[g] * gxx + (wx[g] * gxxx + wy[g] * gyxx + wz[g] * gzxx) + wtau[g] * gtxx;
+                        gatmxy += w0[g] * gxy + (wx[g] * gxxy + wy[g] * gyxy + wz[g] * gzxy) + wtau[g] * gtxy;
+                        gatmxz += w0[g] * gxz + (wx[g] * gxxz + wy[g] * gyxz + wz[g] * gzxz) + wtau[g] * gtxz;
 
-                        gatmyx += w0[g] * gyx + (wx[g] * gxyx + wy[g] * gyyx + wz[g] * gzyx);
-                        gatmyy += w0[g] * gyy + (wx[g] * gxyy + wy[g] * gyyy + wz[g] * gzyy);
-                        gatmyz += w0[g] * gyz + (wx[g] * gxyz + wy[g] * gyyz + wz[g] * gzyz);
+                        gatmyx += w0[g] * gyx + (wx[g] * gxyx + wy[g] * gyyx + wz[g] * gzyx) + wtau[g] * gtyx;
+                        gatmyy += w0[g] * gyy + (wx[g] * gxyy + wy[g] * gyyy + wz[g] * gzyy) + wtau[g] * gtyy;
+                        gatmyz += w0[g] * gyz + (wx[g] * gxyz + wy[g] * gyyz + wz[g] * gzyz) + wtau[g] * gtyz;
 
-                        gatmzx += w0[g] * gzx + (wx[g] * gxzx + wy[g] * gyzx + wz[g] * gzzx);
-                        gatmzy += w0[g] * gzy + (wx[g] * gxzy + wy[g] * gyzy + wz[g] * gzzy);
-                        gatmzz += w0[g] * gzz + (wx[g] * gxzz + wy[g] * gyzz + wz[g] * gzzz);
+                        gatmzx += w0[g] * gzx + (wx[g] * gxzx + wy[g] * gyzx + wz[g] * gzzx) + wtau[g] * gtzx;
+                        gatmzy += w0[g] * gzy + (wx[g] * gxzy + wy[g] * gyzy + wz[g] * gzzy) + wtau[g] * gtzy;
+                        gatmzz += w0[g] * gzz + (wx[g] * gxzz + wy[g] * gyzz + wz[g] * gzzz) + wtau[g] * gtzz;
                     }
 
                     auto D_mn = D_val[mu * aocount + nu];
@@ -802,6 +963,8 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 
                         double w = local_weights[g];
 
+                        // -- First contrib, term 1 --
+
                         // (f_{\rho_{\alpha} \rho_{\alpha}} + f_{\rho_{\alpha} \rho_{\beta}})
                         // \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
 
@@ -818,6 +981,27 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                         gatmzx += prefac * gdenz[ig] * gdenx[jg];
                         gatmzy += prefac * gdenz[ig] * gdeny[jg];
                         gatmzz += prefac * gdenz[ig] * gdenz[jg];
+
+                        // -- First contrib, term 3 --
+
+                        // (f_{\rho_{\alpha} \tau_{\alpha}} + f_{\rho_{\alpha} \tau_{\beta}})
+                        // \rho_{\alpha}^{(\xi)} \tau_{\alpha}^{(\zeta)}
+
+                        prefac = w * (v2rhotau[4 * g + 0] + v2rhotau[4 * g + 1]);
+
+                        gatmxx += prefac * gdenx[ig] * gtaux[jg];
+                        gatmxy += prefac * gdenx[ig] * gtauy[jg];
+                        gatmxz += prefac * gdenx[ig] * gtauz[jg];
+
+                        gatmyx += prefac * gdeny[ig] * gtaux[jg];
+                        gatmyy += prefac * gdeny[ig] * gtauy[jg];
+                        gatmyz += prefac * gdeny[ig] * gtauz[jg];
+
+                        gatmzx += prefac * gdenz[ig] * gtaux[jg];
+                        gatmzy += prefac * gdenz[ig] * gtauy[jg];
+                        gatmzz += prefac * gdenz[ig] * gtauz[jg];
+
+                        // -- First contrib, term 2 --
 
                         // (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
                         //  2 f_{\rho_{\alpha} \sigma_{\alpha\beta}} +
@@ -846,6 +1030,8 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                         gatmzy += prefac * gdenz[ig] * ycomp_j;
                         gatmzz += prefac * gdenz[ig] * zcomp_j;
 
+                        // -- Second contrib, term 1 --
+
                         // (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
                         //  2 f_{\rho_{\beta} \sigma_{\alpha\alpha}} +
                         //  f_{\rho_{\alpha} \sigma_{\alpha\beta}} +
@@ -873,6 +1059,37 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                         gatmzy += prefac * zcomp_i * gdeny[jg];
                         gatmzz += prefac * zcomp_i * gdenz[jg];
 
+                        // -- Second contrib, term 3 --
+
+                        // (2 f_{\sigma_{\alpha\alpha} \tau_{\alpha}} +
+                        //  2 f_{\sigma_{\alpha\alpha} \tau_{\beta}} +
+                        //  f_{\sigma_{\alpha\beta} \tau_{\alpha}} +
+                        //  f_{\sigma_{\alpha\beta} \tau_{\beta}})
+                        // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi)} \tau_{\alpha}^{(\zeta)}
+
+                        f_aa = v2sigmatau[6 * g + 0] + v2sigmatau[6 * g + 1];
+                        f_ab = v2sigmatau[6 * g + 2] + v2sigmatau[6 * g + 3];
+
+                        prefac = w * (2.0 * f_aa + f_ab);
+
+                        //xcomp_i = (gx * gdenxx[ig] + gy * gdenyx[ig] + gz * gdenzx[ig]);
+                        //ycomp_i = (gx * gdenxy[ig] + gy * gdenyy[ig] + gz * gdenzy[ig]);
+                        //zcomp_i = (gx * gdenxz[ig] + gy * gdenyz[ig] + gz * gdenzz[ig]);
+
+                        gatmxx += prefac * xcomp_i * gtaux[jg];
+                        gatmxy += prefac * xcomp_i * gtauy[jg];
+                        gatmxz += prefac * xcomp_i * gtauz[jg];
+
+                        gatmyx += prefac * ycomp_i * gtaux[jg];
+                        gatmyy += prefac * ycomp_i * gtauy[jg];
+                        gatmyz += prefac * ycomp_i * gtauz[jg];
+
+                        gatmzx += prefac * zcomp_i * gtaux[jg];
+                        gatmzy += prefac * zcomp_i * gtauy[jg];
+                        gatmzz += prefac * zcomp_i * gtauz[jg];
+
+                        // -- Second contrib, term 2 --
+
                         // (4 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\alpha}} +
                         //  6 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\beta}} +
                         //  4 f_{\sigma_{\alpha\alpha} \sigma_{\beta\beta}} +
@@ -898,6 +1115,8 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                         gatmzy += prefac * zcomp_i * ycomp_j;
                         gatmzz += prefac * zcomp_i * zcomp_j;
 
+                        // -- Second contrib, term 4 --
+
                         // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
                         // \nabla\rho_{\alpha}^{(\xi)} \cdot \nabla\rho_{\alpha}^{(\zeta)}
 
@@ -917,6 +1136,69 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
                         gatmzx += prefac * (gdenxz[ig] * gdenxx[jg] + gdenyz[ig] * gdenyx[jg] + gdenzz[ig] * gdenzx[jg]);
                         gatmzy += prefac * (gdenxz[ig] * gdenxy[jg] + gdenyz[ig] * gdenyy[jg] + gdenzz[ig] * gdenzy[jg]);
                         gatmzz += prefac * (gdenxz[ig] * gdenxz[jg] + gdenyz[ig] * gdenyz[jg] + gdenzz[ig] * gdenzz[jg]);
+
+                        // -- Third contrib, term 1 --
+
+                        // (f_{\rho_{\alpha} \tau_{\alpha}} + f_{\rho_{\beta} \tau_{\alpha}})
+                        // \tau_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
+
+                        prefac = w * (v2rhotau[4 * g + 0] + v2rhotau[4 * g + 2]);
+
+                        gatmxx += prefac * gtaux[ig] * gdenx[jg];
+                        gatmxy += prefac * gtaux[ig] * gdeny[jg];
+                        gatmxz += prefac * gtaux[ig] * gdenz[jg];
+
+                        gatmyx += prefac * gtauy[ig] * gdenx[jg];
+                        gatmyy += prefac * gtauy[ig] * gdeny[jg];
+                        gatmyz += prefac * gtauy[ig] * gdenz[jg];
+
+                        gatmzx += prefac * gtauz[ig] * gdenx[jg];
+                        gatmzy += prefac * gtauz[ig] * gdeny[jg];
+                        gatmzz += prefac * gtauz[ig] * gdenz[jg];
+
+                        // -- Third contrib, term 3 --
+
+                        // (f_{\tau_{\alpha} \tau_{\alpha}} + f_{\tau_{\alpha} \tau_{\beta}})
+                        // \tau_{\alpha}^{(\xi)} \tau_{\alpha}^{(\zeta)}
+
+                        prefac = w * (v2tau2[3 * g + 0] + v2tau2[3 * g + 1]);
+
+                        gatmxx += prefac * gtaux[ig] * gtaux[jg];
+                        gatmxy += prefac * gtaux[ig] * gtauy[jg];
+                        gatmxz += prefac * gtaux[ig] * gtauz[jg];
+
+                        gatmyx += prefac * gtauy[ig] * gtaux[jg];
+                        gatmyy += prefac * gtauy[ig] * gtauy[jg];
+                        gatmyz += prefac * gtauy[ig] * gtauz[jg];
+
+                        gatmzx += prefac * gtauz[ig] * gtaux[jg];
+                        gatmzy += prefac * gtauz[ig] * gtauy[jg];
+                        gatmzz += prefac * gtauz[ig] * gtauz[jg];
+
+                        // -- Third contrib, term 2 --
+
+                        // (2 f_{\sigma_{\alpha\alpha}\tau_{\alpha}} +
+                        //  2 f_{\sigma_{\alpha\beta}\tau_{\alpha}} +
+                        //  2 f_{\sigma_{\beta\beta}\tau_{\alpha}})
+                        // \tau_{\alpha}^{(\xi)} \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\zeta)}
+
+                        prefac = w * 2.0 * (v2sigmatau[6 * g + 0] + v2sigmatau[6 * g + 2] + v2sigmatau[6 * g + 4]);
+
+                        //xcomp_j = (gx * gdenxx[jg] + gy * gdenyx[jg] + gz * gdenzx[jg]);
+                        //ycomp_j = (gx * gdenxy[jg] + gy * gdenyy[jg] + gz * gdenzy[jg]);
+                        //zcomp_j = (gx * gdenxz[jg] + gy * gdenyz[jg] + gz * gdenzz[jg]);
+
+                        gatmxx += prefac * gtaux[ig] * xcomp_j;
+                        gatmxy += prefac * gtaux[ig] * ycomp_j;
+                        gatmxz += prefac * gtaux[ig] * zcomp_j;
+
+                        gatmyx += prefac * gtauy[ig] * xcomp_j;
+                        gatmyy += prefac * gtauy[ig] * ycomp_j;
+                        gatmyz += prefac * gtauy[ig] * zcomp_j;
+
+                        gatmzx += prefac * gtauz[ig] * xcomp_j;
+                        gatmzy += prefac * gtauz[ig] * ycomp_j;
+                        gatmzz += prefac * gtauz[ig] * zcomp_j;
                     }
 
                     // factor of 2 from sum of alpha and beta contributions
@@ -997,13 +1279,13 @@ integrateExcHessianForGgaClosedShell(const CMolecule&        molecule,
 }
 
 auto
-integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const std::vector<const double*>& gsDensityPointers,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const double            screeningThresholdForGTOValues,
-                                          const CXCFunctional&    xcFunctional,
-                                          const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
+integrateVxcFockGradientForMetaGgaClosedShell(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const std::vector<const double*>& gsDensityPointers,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const double            screeningThresholdForGTOValues,
+                                              const CXCFunctional&    xcFunctional,
+                                              const std::vector<int>& atomIdxVec) -> std::vector<CDenseMatrix>
 {
     CMultiTimer timer;
 
@@ -1042,23 +1324,37 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
 
     // density and functional derivatives
 
-    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
-    const auto dim     = &(ggafunc->dim);
+    auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
     std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
 
     std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
 
+    // ground-state
     std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
     std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
     std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_lapl_data(nthreads, std::vector<double>(dim->lapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_tau_data(nthreads, std::vector<double>(dim->tau * omp_max_npoints));
 
+    // First-order
     std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
     std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vlapl_data(nthreads, std::vector<double>(dim->vlapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_vtau_data(nthreads, std::vector<double>(dim->vtau * omp_max_npoints));
 
+    // Second-order
     std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
     std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rholapl_data(nthreads, std::vector<double>(dim->v2rholapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2rhotau_data(nthreads, std::vector<double>(dim->v2rhotau * omp_max_npoints));
     std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigmalapl_data(nthreads, std::vector<double>(dim->v2sigmalapl * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2sigmatau_data(nthreads, std::vector<double>(dim->v2sigmatau * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2lapl2_data(nthreads, std::vector<double>(dim->v2lapl2 * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2lapltau_data(nthreads, std::vector<double>(dim->v2lapltau * omp_max_npoints));
+    std::vector<std::vector<double>> omp_v2tau2_data(nthreads, std::vector<double>(dim->v2tau2 * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -1242,18 +1538,32 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
 
             auto local_weights = omp_local_weights_data[thread_id].data();
 
+            // ground-state
             auto rho     = omp_rho_data[thread_id].data();
             auto rhograd = omp_rhograd_data[thread_id].data();
             auto sigma   = omp_sigma_data[thread_id].data();
+            auto lapl    = omp_lapl_data[thread_id].data();
+            auto tau     = omp_tau_data[thread_id].data();
 
+            // First-order
             auto vrho   = omp_vrho_data[thread_id].data();
             auto vsigma = omp_vsigma_data[thread_id].data();
+            auto vlapl  = omp_vlapl_data[thread_id].data();
+            auto vtau   = omp_vtau_data[thread_id].data();
 
-            auto v2rho2     = omp_v2rho2_data[thread_id].data();
-            auto v2rhosigma = omp_v2rhosigma_data[thread_id].data();
-            auto v2sigma2   = omp_v2sigma2_data[thread_id].data();
+            // Second-order
+            auto v2rho2      = omp_v2rho2_data[thread_id].data();
+            auto v2rhosigma  = omp_v2rhosigma_data[thread_id].data();
+            auto v2rholapl   = omp_v2rholapl_data[thread_id].data();
+            auto v2rhotau    = omp_v2rhotau_data[thread_id].data();
+            auto v2sigma2    = omp_v2sigma2_data[thread_id].data();
+            auto v2sigmalapl = omp_v2sigmalapl_data[thread_id].data();
+            auto v2sigmatau  = omp_v2sigmatau_data[thread_id].data();
+            auto v2lapl2     = omp_v2lapl2_data[thread_id].data();
+            auto v2lapltau   = omp_v2lapltau_data[thread_id].data();
+            auto v2tau2      = omp_v2tau2_data[thread_id].data();
 
-            sdengridgen::serialGenerateDensityForGGA(rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
+            sdengridgen::serialGenerateDensityForMGGA(rho, rhograd, sigma, lapl, tau, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat);
 
             omptimers[thread_id].stop("Generate density grid");
 
@@ -1290,9 +1600,10 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
 
             omptimers[thread_id].start("XC functional eval.");
 
-            omp_xcfuncs[thread_id].compute_vxc_for_gga(grid_batch_size, rho, sigma, vrho, vsigma);
+            omp_xcfuncs[thread_id].compute_vxc_for_mgga(grid_batch_size, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
 
-            omp_xcfuncs[thread_id].compute_fxc_for_gga(grid_batch_size, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+            omp_xcfuncs[thread_id].compute_fxc_for_mgga(
+                grid_batch_size, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 
             omptimers[thread_id].stop("XC functional eval.");
 
@@ -1308,10 +1619,28 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
 
             CDenseMatrix dengradxx(9, grid_batch_size);
 
+            CDenseMatrix taugradx(3, grid_batch_size);
+
             CDenseMatrix vxc_w(aocount, grid_batch_size);
             CDenseMatrix vxc_wx(aocount, grid_batch_size);
             CDenseMatrix vxc_wy(aocount, grid_batch_size);
             CDenseMatrix vxc_wz(aocount, grid_batch_size);
+
+            // matrices for tau contributions
+            // n{x|y|z} for gradient on atoms
+            // vxc_{x|y|z} for derivative on GTOs
+
+            CDenseMatrix nx_vxc_x(aocount, grid_batch_size);
+            CDenseMatrix nx_vxc_y(aocount, grid_batch_size);
+            CDenseMatrix nx_vxc_z(aocount, grid_batch_size);
+
+            CDenseMatrix ny_vxc_x(aocount, grid_batch_size);
+            CDenseMatrix ny_vxc_y(aocount, grid_batch_size);
+            CDenseMatrix ny_vxc_z(aocount, grid_batch_size);
+
+            CDenseMatrix nz_vxc_x(aocount, grid_batch_size);
+            CDenseMatrix nz_vxc_y(aocount, grid_batch_size);
+            CDenseMatrix nz_vxc_z(aocount, grid_batch_size);
 
             for (int vecind = 0; vecind < natoms; vecind++)
             {
@@ -1337,6 +1666,12 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                 auto gdenzy = dengradxx.row(7);
                 auto gdenzz = dengradxx.row(8);
 
+                taugradx.zero();
+
+                auto gtaux = taugradx.row(0);
+                auto gtauy = taugradx.row(1);
+                auto gtauz = taugradx.row(2);
+
                 vxc_w.zero();
                 vxc_wx.zero();
                 vxc_wy.zero();
@@ -1346,6 +1681,30 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                 auto vxc_wx_val = vxc_wx.values();
                 auto vxc_wy_val = vxc_wy.values();
                 auto vxc_wz_val = vxc_wz.values();
+
+                nx_vxc_x.zero();
+                nx_vxc_y.zero();
+                nx_vxc_z.zero();
+
+                ny_vxc_x.zero();
+                ny_vxc_y.zero();
+                ny_vxc_z.zero();
+
+                nz_vxc_x.zero();
+                nz_vxc_y.zero();
+                nz_vxc_z.zero();
+
+                auto nx_vxc_x_val = nx_vxc_x.values();
+                auto nx_vxc_y_val = nx_vxc_y.values();
+                auto nx_vxc_z_val = nx_vxc_z.values();
+
+                auto ny_vxc_x_val = ny_vxc_x.values();
+                auto ny_vxc_y_val = ny_vxc_y.values();
+                auto ny_vxc_z_val = ny_vxc_z.values();
+
+                auto nz_vxc_x_val = nz_vxc_x.values();
+                auto nz_vxc_y_val = nz_vxc_y.values();
+                auto nz_vxc_z_val = nz_vxc_z.values();
 
                 // prepare gradient density
 
@@ -1377,6 +1736,16 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         gdenzx[g] -= 2.0 * (F_z_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
                         gdenzy[g] -= 2.0 * (F_z_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
                         gdenzz[g] -= 2.0 * (F_z_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_zz_val[nu_g]);
+
+                        gtaux[g] -= (F_x_val[nu_g] * chi_xx_val[nu_g] +
+                                     F_y_val[nu_g] * chi_xy_val[nu_g] +
+                                     F_z_val[nu_g] * chi_xz_val[nu_g]);
+                        gtauy[g] -= (F_x_val[nu_g] * chi_xy_val[nu_g] +
+                                     F_y_val[nu_g] * chi_yy_val[nu_g] +
+                                     F_z_val[nu_g] * chi_yz_val[nu_g]);
+                        gtauz[g] -= (F_x_val[nu_g] * chi_xz_val[nu_g] +
+                                     F_y_val[nu_g] * chi_yz_val[nu_g] +
+                                     F_z_val[nu_g] * chi_zz_val[nu_g]);
                     }
                 }
 
@@ -1397,6 +1766,8 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
 
                         auto w = local_weights[g];
 
+                        // -- First contrib, 4th term --
+
                         // 2 f_{\rho_{\alpha}} \phi_{\mu}^{(\xi)} \phi_{\nu}
 
                         // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atomvec_chi_{xyz})
@@ -1404,6 +1775,8 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         auto prefac = w * vrho[2 * g + 0];
 
                         vxc_w_val[nu_g] += -2.0 * prefac * chi_val[nu_g];
+
+                        // -- First contrib, 1st term --
 
                         // (f_{\rho_{\alpha} \rho_{\alpha}} + f_{\rho_{\alpha} \rho_{\beta}})
                         // \rho_{\alpha}^{(\xi)} \phi_{\mu} \phi_{\nu}
@@ -1415,6 +1788,21 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         vxc_wx_val[nu_g] += prefac * gdenx[g] * chi_val[nu_g];
                         vxc_wy_val[nu_g] += prefac * gdeny[g] * chi_val[nu_g];
                         vxc_wz_val[nu_g] += prefac * gdenz[g] * chi_val[nu_g];
+
+                        // -- First contrib, 3rd term --
+
+                        // (f_{\rho_{\alpha} \tau_{\alpha}} + f_{\rho_{\alpha} \tau_{\beta}})
+                        // \tau_{\alpha}^{(\xi)} \phi_{\mu} \phi_{\nu}
+
+                        // note: \phi_{\mu} will be added later (from mat_chi)
+
+                        prefac = w * (v2rhotau[4 * g + 0] + v2rhotau[4 * g + 1]);
+
+                        vxc_wx_val[nu_g] += prefac * gtaux[g] * chi_val[nu_g];
+                        vxc_wy_val[nu_g] += prefac * gtauy[g] * chi_val[nu_g];
+                        vxc_wz_val[nu_g] += prefac * gtauz[g] * chi_val[nu_g];
+
+                        // -- First contrib, 2nd term --
 
                         // (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
                         //  2 f_{\rho_{\alpha} \sigma_{\alpha\beta}} +
@@ -1437,6 +1825,8 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         vxc_wy_val[nu_g] += prefac * ycomp * chi_val[nu_g];
                         vxc_wz_val[nu_g] += prefac * zcomp * chi_val[nu_g];
 
+                        // -- Second contrib, 4th term --
+
                         // 2 (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
                         // \nabla\rho_{\alpha}^{(\xi)} \cdot \nabla\phi_{\nu} \phi_{\mu}
 
@@ -1454,6 +1844,8 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         vxc_wx_val[nu_g] += 2.0 * prefac * xcomp;
                         vxc_wy_val[nu_g] += 2.0 * prefac * ycomp;
                         vxc_wz_val[nu_g] += 2.0 * prefac * zcomp;
+
+                        // -- Second contrib, 5th term (a) --
 
                         // 2 (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
                         // \nabla\rho_{\alpha} \cdot \nabla\phi_{\nu}^{(\xi)} \phi_{\mu}
@@ -1473,6 +1865,8 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                             vxc_wz_val[nu_g] += -2.0 * prefac * zcomp;
                         }
 
+                        // -- Second contrib, 5th term (b) --
+
                         // 2 (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
                         // \nabla\rho_{\alpha} \cdot \nabla\phi_{\nu} \phi_{\mu}^{(\xi)}
 
@@ -1483,6 +1877,8 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         auto dot_val = (gx * chi_x_val[nu_g] + gy * chi_y_val[nu_g] + gz * chi_z_val[nu_g]);
 
                         vxc_w_val[nu_g] += -2.0 * prefac * dot_val;
+
+                        // -- Second contrib, 1st term --
 
                         // 2 (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
                         //    2 f_{\rho_{\beta} \sigma_{\alpha\alpha}} +
@@ -1500,6 +1896,27 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         vxc_wx_val[nu_g] += 2.0 * prefac * dot_val * gdenx[g];
                         vxc_wy_val[nu_g] += 2.0 * prefac * dot_val * gdeny[g];
                         vxc_wz_val[nu_g] += 2.0 * prefac * dot_val * gdenz[g];
+
+                        // -- Second contrib, 3rd term --
+
+                        // 2 (2 f_{\sigma_{\alpha\alpha} \tau_{\alpha}} +
+                        //    2 f_{\sigma_{\alpha\alpha} \tau_{\beta}} +
+                        //    f_{\sigma_{\alpha\beta} \tau_{\alpha}} +
+                        //    f_{\sigma_{\alpha\beta} \tau_{\beta}})
+                        // \tau_{\alpha}^{(\xi)} \nabla\phi_{\nu} \cdot \nabla\rho_{\alpha} \phi_{\mu}
+
+                        // note: \phi_{\mu} will be added later (from mat_chi)
+
+                        f_aa = v2sigmatau[6 * g + 0] + v2sigmatau[6 * g + 1];
+                        f_ab = v2sigmatau[6 * g + 2] + v2sigmatau[6 * g + 3];
+
+                        prefac = w * (2.0 * f_aa + f_ab);
+
+                        vxc_wx_val[nu_g] += 2.0 * prefac * dot_val * gtaux[g];
+                        vxc_wy_val[nu_g] += 2.0 * prefac * dot_val * gtauy[g];
+                        vxc_wz_val[nu_g] += 2.0 * prefac * dot_val * gtauz[g];
+
+                        // -- Second contrib, 2nd term --
 
                         // 2 (4 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\alpha}} +
                         //    6 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\beta}} +
@@ -1523,6 +1940,98 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                         vxc_wx_val[nu_g] += 2.0 * prefac * dot_val * xcomp;
                         vxc_wy_val[nu_g] += 2.0 * prefac * dot_val * ycomp;
                         vxc_wz_val[nu_g] += 2.0 * prefac * dot_val * zcomp;
+
+                        // -- Third contrib, 4th term --
+
+                        // 2 f_tau_alpha (nabla_phi_nu)^(xi) nabla_phi_mu
+
+                        // note: nabla_phi_mu will be added later (from mat_chi_{nabla})
+
+                        if (nu_on_atom)
+                        {
+                            prefac = w * vtau[2 * g + 0];
+
+                            nx_vxc_x_val[nu_g] += -2.0 * prefac * chi_xx_val[nu_g];
+                            nx_vxc_y_val[nu_g] += -2.0 * prefac * chi_xy_val[nu_g];
+                            nx_vxc_z_val[nu_g] += -2.0 * prefac * chi_xz_val[nu_g];
+
+                            ny_vxc_x_val[nu_g] += -2.0 * prefac * chi_xy_val[nu_g];
+                            ny_vxc_y_val[nu_g] += -2.0 * prefac * chi_yy_val[nu_g];
+                            ny_vxc_z_val[nu_g] += -2.0 * prefac * chi_yz_val[nu_g];
+
+                            nz_vxc_x_val[nu_g] += -2.0 * prefac * chi_xz_val[nu_g];
+                            nz_vxc_y_val[nu_g] += -2.0 * prefac * chi_yz_val[nu_g];
+                            nz_vxc_z_val[nu_g] += -2.0 * prefac * chi_zz_val[nu_g];
+                        }
+
+                        // -- Third contrib, 1st term --
+
+                        // (f_rho_alpha_tau_alpha + f_rho_beta_tau_alpha)
+                        // rho_alpha^(xi) nabla_phi_mu nabla_phi_nu
+
+                        // note: nabla_phi_mu will be added later (from mat_chi_{nabla})
+
+                        prefac = w * (v2rhotau[4 * g + 0] + v2rhotau[4 * g + 2]);
+
+                        nx_vxc_x_val[nu_g] += prefac * gdenx[g] * chi_x_val[nu_g];
+                        nx_vxc_y_val[nu_g] += prefac * gdenx[g] * chi_y_val[nu_g];
+                        nx_vxc_z_val[nu_g] += prefac * gdenx[g] * chi_z_val[nu_g];
+
+                        ny_vxc_x_val[nu_g] += prefac * gdeny[g] * chi_x_val[nu_g];
+                        ny_vxc_y_val[nu_g] += prefac * gdeny[g] * chi_y_val[nu_g];
+                        ny_vxc_z_val[nu_g] += prefac * gdeny[g] * chi_z_val[nu_g];
+
+                        nz_vxc_x_val[nu_g] += prefac * gdenz[g] * chi_x_val[nu_g];
+                        nz_vxc_y_val[nu_g] += prefac * gdenz[g] * chi_y_val[nu_g];
+                        nz_vxc_z_val[nu_g] += prefac * gdenz[g] * chi_z_val[nu_g];
+
+                        // -- Third contrib, 3rd term --
+
+                        // (f_tau_alpha_tau_alpha + f_tau_alpha_tau_beta)
+                        // tau_alpha^(xi) nabla_phi_mu nabla_phi_nu
+
+                        // note: nabla_phi_mu will be added later (from mat_chi_{nabla})
+
+                        prefac = w * (v2tau2[3 * g + 0] + v2tau2[3 * g + 1]);
+
+                        nx_vxc_x_val[nu_g] += prefac * gtaux[g] * chi_x_val[nu_g];
+                        nx_vxc_y_val[nu_g] += prefac * gtaux[g] * chi_y_val[nu_g];
+                        nx_vxc_z_val[nu_g] += prefac * gtaux[g] * chi_z_val[nu_g];
+
+                        ny_vxc_x_val[nu_g] += prefac * gtauy[g] * chi_x_val[nu_g];
+                        ny_vxc_y_val[nu_g] += prefac * gtauy[g] * chi_y_val[nu_g];
+                        ny_vxc_z_val[nu_g] += prefac * gtauy[g] * chi_z_val[nu_g];
+
+                        nz_vxc_x_val[nu_g] += prefac * gtauz[g] * chi_x_val[nu_g];
+                        nz_vxc_y_val[nu_g] += prefac * gtauz[g] * chi_y_val[nu_g];
+                        nz_vxc_z_val[nu_g] += prefac * gtauz[g] * chi_z_val[nu_g];
+
+                        // -- Third contrib, 2nd term --
+
+                        // (2 f_{\sigma_{\alpha\alpha}\tau_{\alpha}} +
+                        //  2 f_{\sigma_{\alpha\beta}\tau_{\alpha}} +
+                        //  2 f_{\sigma_{\beta\beta}\tau_{\alpha}})
+                        // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi)} \nabla\phi_{\mu} \nabla\phi_{\nu}
+
+                        // note: \nabla\phi_{\mu} will be added later (from mat_chi_{nabla})
+
+                        prefac = w * 2.0 * (v2sigmatau[6 * g + 0] + v2sigmatau[6 * g + 2] + v2sigmatau[6 * g + 4]);
+
+                        xcomp = (gx * gdenxx[g] + gy * gdenyx[g] + gz * gdenzx[g]);
+                        ycomp = (gx * gdenxy[g] + gy * gdenyy[g] + gz * gdenzy[g]);
+                        zcomp = (gx * gdenxz[g] + gy * gdenyz[g] + gz * gdenzz[g]);
+
+                        nx_vxc_x_val[nu_g] += prefac * xcomp * chi_x_val[nu_g];
+                        nx_vxc_y_val[nu_g] += prefac * xcomp * chi_y_val[nu_g];
+                        nx_vxc_z_val[nu_g] += prefac * xcomp * chi_z_val[nu_g];
+
+                        ny_vxc_x_val[nu_g] += prefac * ycomp * chi_x_val[nu_g];
+                        ny_vxc_y_val[nu_g] += prefac * ycomp * chi_y_val[nu_g];
+                        ny_vxc_z_val[nu_g] += prefac * ycomp * chi_z_val[nu_g];
+
+                        nz_vxc_x_val[nu_g] += prefac * zcomp * chi_x_val[nu_g];
+                        nz_vxc_y_val[nu_g] += prefac * zcomp * chi_y_val[nu_g];
+                        nz_vxc_z_val[nu_g] += prefac * zcomp * chi_z_val[nu_g];
                     }
                 }
 
@@ -1537,6 +2046,22 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
                 sdenblas::serialInPlaceAddAB(vxc_gx, vxc_gx_2);
                 sdenblas::serialInPlaceAddAB(vxc_gy, vxc_gy_2);
                 sdenblas::serialInPlaceAddAB(vxc_gz, vxc_gz_2);
+
+                // tau contributions
+
+                sdenblas::serialInPlaceAddAB(vxc_gx, sdenblas::serialMultABt(mat_chi_x, nx_vxc_x), 0.5);
+                sdenblas::serialInPlaceAddAB(vxc_gx, sdenblas::serialMultABt(mat_chi_y, nx_vxc_y), 0.5);
+                sdenblas::serialInPlaceAddAB(vxc_gx, sdenblas::serialMultABt(mat_chi_z, nx_vxc_z), 0.5);
+
+                sdenblas::serialInPlaceAddAB(vxc_gy, sdenblas::serialMultABt(mat_chi_x, ny_vxc_x), 0.5);
+                sdenblas::serialInPlaceAddAB(vxc_gy, sdenblas::serialMultABt(mat_chi_y, ny_vxc_y), 0.5);
+                sdenblas::serialInPlaceAddAB(vxc_gy, sdenblas::serialMultABt(mat_chi_z, ny_vxc_z), 0.5);
+
+                sdenblas::serialInPlaceAddAB(vxc_gz, sdenblas::serialMultABt(mat_chi_x, nz_vxc_x), 0.5);
+                sdenblas::serialInPlaceAddAB(vxc_gz, sdenblas::serialMultABt(mat_chi_y, nz_vxc_y), 0.5);
+                sdenblas::serialInPlaceAddAB(vxc_gz, sdenblas::serialMultABt(mat_chi_z, nz_vxc_z), 0.5);
+
+                // symmetrize Vxc Fock gradient
 
                 vxc_gx.symmetrizeAndScale(0.5);
                 vxc_gy.symmetrizeAndScale(0.5);
@@ -1580,4 +2105,4 @@ integrateVxcFockGradientForGgaClosedShell(const CMolecule&        molecule,
     return vxcgrads;
 }
 
-}  // namespace xchessgga
+}  // namespace xchessmgga

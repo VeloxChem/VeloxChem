@@ -83,20 +83,6 @@ class ScfGradientDriver(GradientDriver):
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
 
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
     def compute(self, molecule, basis, scf_results=None):
         """
         Performs calculation of gradient.
@@ -206,8 +192,6 @@ class ScfGradientDriver(GradientDriver):
 
         kin_grad_drv = KineticEnergyGeom100Driver()
 
-        self._print_debug_info('before kin_grad')
-
         for iatom in local_atoms:
             gmats = kin_grad_drv.compute(molecule, basis, iatom)
 
@@ -217,15 +201,11 @@ class ScfGradientDriver(GradientDriver):
 
             gmats = Matrices()
 
-        self._print_debug_info('after  kin_grad')
-
         grad_timing['Kinetic_energy_grad'] += time.time() - t0
 
         # nuclear potential contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before npot_grad')
 
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
@@ -245,8 +225,6 @@ class ScfGradientDriver(GradientDriver):
 
             gmats_100 = Matrices()
             gmats_010 = Matrices()
-
-        self._print_debug_info('after  npot_grad')
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
@@ -283,8 +261,6 @@ class ScfGradientDriver(GradientDriver):
 
         t0 = time.time()
 
-        self._print_debug_info('before ovl_grad')
-
         ovl_grad_drv = OverlapGeom100Driver()
 
         for iatom in local_atoms:
@@ -296,8 +272,6 @@ class ScfGradientDriver(GradientDriver):
                 self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
 
             gmats = Matrices()
-
-        self._print_debug_info('after  ovl_grad')
 
         grad_timing['Overlap_grad'] += time.time() - t0
 
@@ -340,8 +314,6 @@ class ScfGradientDriver(GradientDriver):
 
         den_mat_for_fock2 = make_matrix(basis, mat_t.general)
         den_mat_for_fock2.set_values(D)
-
-        self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
         fock_grad_drv._set_block_size_factor(self._block_size_factor)
@@ -420,13 +392,9 @@ class ScfGradientDriver(GradientDriver):
 
                 self.gradient[iatom, :] += np.array(atomgrad) * factor
 
-        self._print_debug_info('after  fock_grad')
-
         # XC contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before xc_grad')
 
         if use_dft:
             if self.rank == mpi_master():
@@ -441,8 +409,6 @@ class ScfGradientDriver(GradientDriver):
 
         else:
             xcfun_label = 'hf'
-
-        self._print_debug_info('after  xc_grad')
 
         grad_timing['XC_grad'] += time.time() - t0
 

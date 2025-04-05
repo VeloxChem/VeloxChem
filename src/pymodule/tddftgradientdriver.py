@@ -375,8 +375,6 @@ class TddftGradientDriver(GradientDriver):
 
         kin_grad_drv = KineticEnergyGeom100Driver()
 
-        self._print_debug_info('before kin_grad')
-
         for iatom in local_atoms:
             gmats = kin_grad_drv.compute(molecule, basis, iatom)
 
@@ -389,15 +387,11 @@ class TddftGradientDriver(GradientDriver):
 
             gmats = Matrices()
 
-        self._print_debug_info('after  kin_grad')
-
         grad_timing['Kinetic_energy_grad'] += time.time() - t0
 
         # nuclear potential contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before npot_grad')
 
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
@@ -422,15 +416,11 @@ class TddftGradientDriver(GradientDriver):
             gmats_100 = Matrices()
             gmats_010 = Matrices()
 
-        self._print_debug_info('after  npot_grad')
-
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
         # orbital response contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before ovl_grad')
 
         ovl_grad_drv = OverlapGeom100Driver()
 
@@ -443,8 +433,6 @@ class TddftGradientDriver(GradientDriver):
                     self.gradient[s, iatom, i] += 2.0 * np.sum(
                         (gmat + gmat.T) * omega_ao[s])
             gmats = Matrices()
-
-        self._print_debug_info('after  ovl_grad')
 
         grad_timing['Overlap_grad'] += time.time() - t0
 
@@ -470,8 +458,6 @@ class TddftGradientDriver(GradientDriver):
             assert_msg_critical(
                 False, 'ScfGradientDriver: Not implemented for' +
                 ' range-separated functional')
-
-        self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
         fock_grad_drv._set_block_size_factor(self._block_size_factor)
@@ -600,8 +586,6 @@ class TddftGradientDriver(GradientDriver):
                     self.gradient[idx, iatom, :] += np.array(atomgrad_rel) * factor
                     self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xpy) * factor
                     self.gradient[idx, iatom, :] += 0.5 * np.array(atomgrad_xmy) * factor
-
-        self._print_debug_info('after  fock_grad')
 
         grad_timing['Fock_grad'] += time.time() - t0
 
@@ -772,22 +756,6 @@ class TddftGradientDriver(GradientDriver):
         scf_drv.ostream.unmute()
 
         return dipole_moment
-
-    # TODO: this routine is used by both ScfGradientDriver and
-    # TddftGradientDriver. It can be moved to the parent class.
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
 
     @staticmethod
     def get_sym_mat(array):

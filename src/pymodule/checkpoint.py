@@ -322,11 +322,11 @@ def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
                                       pe_dict)
 
     if not valid_checkpoint:
-        return tuple([None] * len(labels))
+        return tuple([None for x in range(len(labels))])
 
     hf = h5py.File(fname, 'r')
 
-    arrays = [None] * len(labels)
+    arrays = [None for x in range(len(labels))]
 
     for i in range(len(labels)):
         if labels[i] in hf.keys():

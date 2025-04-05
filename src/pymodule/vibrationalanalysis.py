@@ -391,6 +391,10 @@ class VibrationalAnalysis:
                 outfnm=vdata_file.as_posix(),
                 normalized=False))
 
+        # normalize the normal modes
+        self.normal_modes = self.raw_normal_modes / np.linalg.norm(
+            self.raw_normal_modes, axis=1)[:, np.newaxis]
+
         assert_msg_critical(
             vdata_file.is_file(),
             'VibrationalAnalysis.frequency_analysis: cannot find vdata file ' +
@@ -553,10 +557,10 @@ class VibrationalAnalysis:
         bohr_in_km = bohr_in_angstrom() * 1e-13
 
         # conversion factor of IR intensity to km/mol
-        if (prop == 'ir'):
+        if prop == 'ir':
             conv_factor = (electron_mass_in_amu() * avogadro_constant() *
                            alpha**2 * bohr_in_km * np.pi / 3.0)
-        elif (prop == 'raman'):
+        elif prop == 'raman':
             conv_factor = 0.078424
 
         return conv_factor
@@ -728,13 +732,7 @@ class VibrationalAnalysis:
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-
-        # normalize the normal modes
-        self.raw_normal_modes /= np.linalg.norm(self.raw_normal_modes,
-                                            axis=1)[:, np.newaxis]
-        self.normal_modes = self.raw_normal_modes / np.linalg.norm(
-            self.raw_normal_modes, axis=1)[:, np.newaxis]
-
+       
         width = 52
         for k in idx_lst:
 
@@ -872,12 +870,6 @@ class VibrationalAnalysis:
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
         number_of_modes = len(self.vib_frequencies)
-
-        # normalize the normal modes
-        self.raw_normal_modes /= np.linalg.norm(self.raw_normal_modes,
-                                            axis=1)[:, np.newaxis]
-        self.normal_modes = self.raw_normal_modes / np.linalg.norm(
-            self.raw_normal_modes, axis=1)[:, np.newaxis]
 
         # check output file
         if self.vib_results_txt_file is None:

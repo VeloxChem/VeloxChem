@@ -36,6 +36,7 @@ target_sources(vlxobjs
     XCMolecularHessian.cpp
     XCMolecularHessianForLDA.cpp
     XCMolecularHessianForGGA.cpp
+    XCMolecularHessianForMGGA.cpp
   )
 
 target_include_directories(vlxobjs

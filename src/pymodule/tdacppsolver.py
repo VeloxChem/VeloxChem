@@ -27,7 +27,6 @@ import numpy as np
 import time as tm
 import math
 import sys
-import h5py
 
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
@@ -38,13 +37,14 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical, safe_solve
-from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
+from .errorhandler import assert_msg_critical
+from .checkpoint import (check_rsp_hdf5, write_rsp_hdf5,
+                         write_rsp_solution_with_multiple_keys)
 
 
-class ComplexResponse(LinearSolver):
+class ComplexResponseTDA(LinearSolver):
     """
-    Implements the complex linear response solver.
+    Implements the complex linear response solver using the Tamm-Dancoff approximation.
 
     :param comm:
         The MPI communicator.
@@ -156,32 +156,20 @@ class ComplexResponse(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
-        ediag_sq = ediag**2
-        sdiag_sq = sdiag**2
-        sdiag_fp = sdiag**4
-        w_sq = w**2
-        d_sq = d**2
+        ediag, sdiag_unused = self.construct_ediag_sdiag_half(
+            orb_ene, nocc, norb)
 
         # constructing matrix block diagonals
 
-        a_diag = ediag * (ediag_sq - (w_sq - d_sq) * sdiag_sq)
-        b_diag = (w * sdiag) * (ediag_sq - (w_sq + d_sq) * sdiag_sq)
-        c_diag = (d * sdiag) * (ediag_sq + (w_sq + d_sq) * sdiag_sq)
-        d_diag = (2 * w * d * ediag) * sdiag_sq
-        p_diag = 1.0 / ((ediag_sq - (w_sq - d_sq) * sdiag_sq)**2 +
-                        (4 * w_sq * d_sq * sdiag_fp))
+        A0mg = ediag - w
+        invdiag = 1.0 / (A0mg * A0mg + d * d)
 
-        pa_diag = p_diag * a_diag
-        pb_diag = p_diag * b_diag
-        pc_diag = p_diag * c_diag
-        pd_diag = p_diag * d_diag
+        pa_diag = invdiag * A0mg
+        pb_diag = invdiag * d
 
         p_mat = np.hstack((
             pa_diag.reshape(-1, 1),
             pb_diag.reshape(-1, 1),
-            pc_diag.reshape(-1, 1),
-            pd_diag.reshape(-1, 1),
         ))
 
         return DistributedArray(p_mat, self.comm)
@@ -201,23 +189,15 @@ class ComplexResponse(LinearSolver):
 
         pa = precond.data[:, 0]
         pb = precond.data[:, 1]
-        pc = precond.data[:, 2]
-        pd = precond.data[:, 3]
 
         v_in_rg = v_in.data[:, 0]
-        v_in_ru = v_in.data[:, 1]
-        v_in_iu = v_in.data[:, 2]
-        v_in_ig = v_in.data[:, 3]
+        v_in_ig = v_in.data[:, 1]
 
-        v_out_rg = pa * v_in_rg + pb * v_in_ru + pc * v_in_iu + pd * v_in_ig
-        v_out_ru = pb * v_in_rg + pa * v_in_ru + pd * v_in_iu + pc * v_in_ig
-        v_out_iu = pc * v_in_rg + pd * v_in_ru - pa * v_in_iu - pb * v_in_ig
-        v_out_ig = pd * v_in_rg + pc * v_in_ru - pb * v_in_iu - pa * v_in_ig
+        v_out_rg = (pa * v_in_rg + pb * v_in_ig)
+        v_out_ig = (pb * v_in_rg - pa * v_in_ig)
 
         v_mat = np.hstack((
             v_out_rg.reshape(-1, 1),
-            v_out_ru.reshape(-1, 1),
-            v_out_iu.reshape(-1, 1),
             v_out_ig.reshape(-1, 1),
         ))
 
@@ -237,11 +217,10 @@ class ComplexResponse(LinearSolver):
         """
 
         trials_ger = []
-        trials_ung = []
 
         for (op, w), vec in vectors.items():
             v = self._preconditioning(precond[w], vec)
-            norms_2 = 2.0 * v.squared_norm(axis=0)
+            norms_2 = v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
             if vn > self.norm_thresh:
@@ -249,23 +228,15 @@ class ComplexResponse(LinearSolver):
                 # real gerade
                 if norms[0] > self.norm_thresh:
                     trials_ger.append(v.data[:, 0])
-                # real ungerade
-                if norms[1] > self.norm_thresh:
-                    trials_ung.append(v.data[:, 1])
-                # imaginary ungerade
-                if norms[2] > self.norm_thresh:
-                    trials_ung.append(v.data[:, 2])
                 # imaginary gerade
-                if norms[3] > self.norm_thresh:
-                    trials_ger.append(v.data[:, 3])
+                if norms[1] > self.norm_thresh:
+                    trials_ger.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
-        new_ung = np.array(trials_ung).T
 
         dist_new_ger = DistributedArray(new_ger, self.comm, distribute=False)
-        dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
 
-        return dist_new_ger, dist_new_ung
+        return dist_new_ger
 
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
@@ -294,13 +265,10 @@ class ComplexResponse(LinearSolver):
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         self._dist_bger = None
-        self._dist_bung = None
         self._dist_e2bger = None
-        self._dist_e2bung = None
 
         self.nonlinear = False
         self._dist_fock_ger = None
-        self._dist_fock_ung = None
 
         # check molecule
         molecule_sanity_check(molecule)
@@ -339,7 +307,7 @@ class ComplexResponse(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self._print_header('Complex Response Solver',
+            self._print_header('TDA Complex Response Solver',
                                n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
@@ -410,36 +378,27 @@ class ComplexResponse(LinearSolver):
         dist_rhs = {}
         for key in op_freq_keys:
             if self.rank == mpi_master():
-                gradger, gradung = self._decomp_grad(v_grad[key])
+                # No decomposing into ger ung
+                gradger = v_grad[key]
                 grad_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
-                    gradung.real.reshape(-1, 1),
-                    gradung.imag.reshape(-1, 1),
                     gradger.imag.reshape(-1, 1),
                 ))
                 rhs_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
-                    gradung.real.reshape(-1, 1),
-                    -gradung.imag.reshape(-1, 1),
                     -gradger.imag.reshape(-1, 1),
                 ))
             else:
                 grad_mat = None
                 rhs_mat = None
+
             dist_grad[key] = DistributedArray(grad_mat, self.comm)
             dist_rhs[key] = DistributedArray(rhs_mat, self.comm)
 
         if self.nonlinear:
-            rsp_vector_labels = [
-                'CLR_bger_half_size', 'CLR_bung_half_size',
-                'CLR_e2bger_half_size', 'CLR_e2bung_half_size', 'CLR_Fock_ger',
-                'CLR_Fock_ung'
-            ]
+            rsp_vector_labels = ['CLR_bger', 'CLR_e2bger', 'CLR_Fock_ger']
         else:
-            rsp_vector_labels = [
-                'CLR_bger_half_size', 'CLR_bung_half_size',
-                'CLR_e2bger_half_size', 'CLR_e2bung_half_size'
-            ]
+            rsp_vector_labels = ['CLR_bger', 'CLR_e2bger']
 
         # check validity of checkpoint file
         if self.restart:
@@ -455,12 +414,28 @@ class ComplexResponse(LinearSolver):
 
         # generate initial guess from scratch
         else:
-            bger, bung = self._setup_trials(dist_rhs, precond)
+            bger = self.setup_trials(dist_rhs, precond)
 
             profiler.set_timing_key('Preparation')
 
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict, profiler)
+            # We set up sigma in another way since we do not have ger ung
+
+            bger_loc = bger.get_full_matrix(root=mpi_master())
+
+            tdens = self._get_trans_densities(bger_loc, scf_tensors, molecule)
+
+            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict)
+
+            if self.rank == mpi_master():
+                sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                                           bger_loc)
+            else:
+                sig_mat = None
+
+            sig_mat = DistributedArray(sig_mat, self.comm)
+
+            self._append_trial_sigma_vectors(bger, sig_mat)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -484,87 +459,48 @@ class ComplexResponse(LinearSolver):
             self._cur_iter = iteration
 
             n_ger = self._dist_bger.shape(1)
-            n_ung = self._dist_bung.shape(1)
 
-            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
-            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
-            s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
+            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger)
+            s2gg = self._dist_bger.matmul_AtB(self._dist_bger)
 
             for op, w in op_freq_keys:
                 if (iteration == 0 or
                         relative_residual_norm[(op, w)] > self.conv_thresh):
 
                     grad_rg = dist_grad[(op, w)].get_column(0)
-                    grad_ru = dist_grad[(op, w)].get_column(1)
-                    grad_iu = dist_grad[(op, w)].get_column(2)
-                    grad_ig = dist_grad[(op, w)].get_column(3)
+                    grad_ig = dist_grad[(op, w)].get_column(1)
 
-                    # projections onto gerade and ungerade subspaces:
-
-                    g_realger = self._dist_bger.matmul_AtB(grad_rg, 2.0)
-                    g_imagger = self._dist_bger.matmul_AtB(grad_ig, 2.0)
-                    g_realung = self._dist_bung.matmul_AtB(grad_ru, 2.0)
-                    g_imagung = self._dist_bung.matmul_AtB(grad_iu, 2.0)
+                    g_realger = self._dist_bger.matmul_AtB(grad_rg)
+                    g_imagger = self._dist_bger.matmul_AtB(grad_ig)
 
                     # creating gradient and matrix for linear equation
 
-                    size = 2 * (n_ger + n_ung)
+                    size = 2 * n_ger
 
                     if self.rank == mpi_master():
-
-                        # gradient
 
                         g = np.zeros(size)
 
                         g[:n_ger] = g_realger[:]
-                        g[n_ger:n_ger + n_ung] = g_realung[:]
-                        g[n_ger + n_ung:size - n_ger] = -g_imagung[:]
                         g[size - n_ger:] = -g_imagger[:]
-
-                        # matrix
 
                         mat = np.zeros((size, size))
 
-                        # filling E2gg
+                        mat[:n_ger, :n_ger] += e2gg[:, :]
+                        mat[size - n_ger:, size - n_ger:] += -e2gg[:, :]
 
-                        mat[:n_ger, :n_ger] = e2gg[:, :]
-                        mat[size - n_ger:, size - n_ger:] = -e2gg[:, :]
+                        mat[:n_ger, :n_ger] += -w * s2gg[:, :]
 
-                        # filling E2uu
+                        mat[:n_ger, size - n_ger:] += d * s2gg[:, :]
 
-                        mat[n_ger:n_ger + n_ung,
-                            n_ger:n_ger + n_ung] = e2uu[:, :]
+                        mat[size - n_ger:, :n_ger] += d * s2gg[:, :]
 
-                        mat[n_ger + n_ung:size - n_ger,
-                            n_ger + n_ung:size - n_ger] = -e2uu[:, :]
-
-                        # filling S2ug
-
-                        mat[n_ger:n_ger + n_ung, :n_ger] = -w * s2ug[:, :]
-
-                        mat[n_ger + n_ung:size - n_ger, :n_ger] = d * s2ug[:, :]
-
-                        mat[n_ger:n_ger + n_ung, size - n_ger:] = d * s2ug[:, :]
-
-                        mat[n_ger + n_ung:size - n_ger,
-                            size - n_ger:] = w * s2ug[:, :]
-
-                        # filling S2ug.T (interchanging of row and col)
-
-                        mat[:n_ger, n_ger:n_ger + n_ung] = -w * s2ug.T[:, :]
-
-                        mat[:n_ger,
-                            n_ger + n_ung:size - n_ger] = d * s2ug.T[:, :]
-
-                        mat[size - n_ger:,
-                            n_ger:n_ger + n_ung] = d * s2ug.T[:, :]
-
-                        mat[size - n_ger:,
-                            n_ger + n_ung:size - n_ger] = w * s2ug.T[:, :]
+                        mat[size - n_ger:, size - n_ger:] += w * s2gg[:, :]
 
                         # solving matrix equation
 
-                        c = safe_solve(mat, g)
+                        c = np.linalg.solve(mat, g)
+
                     else:
                         c = None
                     c = self.comm.bcast(c, root=mpi_master())
@@ -572,37 +508,26 @@ class ComplexResponse(LinearSolver):
                     # extracting the 4 components of c...
 
                     c_realger = c[:n_ger]
-                    c_realung = c[n_ger:n_ger + n_ung]
-                    c_imagung = c[n_ger + n_ung:size - n_ger]
                     c_imagger = c[size - n_ger:]
 
                     # ...and projecting them onto respective subspace
 
                     x_realger = self._dist_bger.matmul_AB_no_gather(c_realger)
-                    x_realung = self._dist_bung.matmul_AB_no_gather(c_realung)
-                    x_imagung = self._dist_bung.matmul_AB_no_gather(c_imagung)
                     x_imagger = self._dist_bger.matmul_AB_no_gather(c_imagger)
 
                     # composing E2 matrices projected onto solution subspace
 
                     e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
                     e2imagger = self._dist_e2bger.matmul_AB_no_gather(c_imagger)
-                    e2realung = self._dist_e2bung.matmul_AB_no_gather(c_realung)
-                    e2imagung = self._dist_e2bung.matmul_AB_no_gather(c_imagung)
 
                     if self.nonlinear:
                         fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_realger)
                         fock_imagger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_imagger)
-                        fock_realung = self._dist_fock_ung.matmul_AB_no_gather(
-                            c_realung)
-                        fock_imagung = self._dist_fock_ung.matmul_AB_no_gather(
-                            c_imagung)
 
-                        fock_full_data = (
-                            fock_realger.data + fock_realung.data - 1j *
-                            (fock_imagger.data + fock_imagung.data))
+                        fock_full_data = (fock_realger.data -
+                                          1j * fock_imagger.data)
 
                         focks[(op, w)] = DistributedArray(fock_full_data,
                                                           self.comm,
@@ -612,22 +537,14 @@ class ComplexResponse(LinearSolver):
 
                     s2realger = x_realger.data
                     s2imagger = x_imagger.data
-                    s2realung = x_realung.data
-                    s2imagung = x_imagung.data
 
-                    r_realger = (e2realger.data - w * s2realung +
-                                 d * s2imagung - grad_rg.data)
-                    r_realung = (e2realung.data - w * s2realger +
-                                 d * s2imagger - grad_ru.data)
-                    r_imagung = (-e2imagung.data + w * s2imagger +
-                                 d * s2realger + grad_iu.data)
-                    r_imagger = (-e2imagger.data + w * s2imagung +
-                                 d * s2realung + grad_ig.data)
+                    r_realger = (e2realger.data - w * s2realger +
+                                 d * s2imagger - grad_rg.data)
+                    r_imagger = (-e2imagger.data + w * s2imagger +
+                                 d * s2realger + grad_ig.data)
 
                     r_data = np.hstack((
                         r_realger.reshape(-1, 1),
-                        r_realung.reshape(-1, 1),
-                        r_imagung.reshape(-1, 1),
                         r_imagger.reshape(-1, 1),
                     ))
 
@@ -638,8 +555,6 @@ class ComplexResponse(LinearSolver):
 
                     x_data = np.hstack((
                         x_realger.data.reshape(-1, 1),
-                        x_realung.data.reshape(-1, 1),
-                        x_imagung.data.reshape(-1, 1),
                         x_imagger.data.reshape(-1, 1),
                     ))
 
@@ -650,16 +565,16 @@ class ComplexResponse(LinearSolver):
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
 
-                    r_norms_2 = 2.0 * r.squared_norm(axis=0)
-                    x_norms_2 = 2.0 * x.squared_norm(axis=0)
+                    r_norms_2 = r.squared_norm(axis=0)
+                    x_norms_2 = x.squared_norm(axis=0)
 
                     rn = np.sqrt(np.sum(r_norms_2))
                     xn = np.sqrt(np.sum(x_norms_2))
 
                     if xn != 0:
-                        relative_residual_norm[(op, w)] = 2.0 * rn / xn
+                        relative_residual_norm[(op, w)] = rn / xn
                     else:
-                        relative_residual_norm[(op, w)] = 2.0 * rn
+                        relative_residual_norm[(op, w)] = rn
 
                     if relative_residual_norm[(op, w)] < self.conv_thresh:
                         solutions[(op, w)] = x
@@ -671,18 +586,13 @@ class ComplexResponse(LinearSolver):
 
                 self.ostream.print_info(
                     '{:d} gerade trial vectors in reduced space'.format(n_ger))
-                self.ostream.print_info(
-                    '{:d} ungerade trial vectors in reduced space'.format(
-                        n_ung))
                 self.ostream.print_blank()
 
                 if self.print_level > 1:
                     profiler.print_memory_subspace(
                         {
                             'dist_bger': self._dist_bger,
-                            'dist_bung': self._dist_bung,
                             'dist_e2bger': self._dist_e2bger,
-                            'dist_e2bung': self._dist_e2bung,
                             'precond': precond,
                             'solutions': solutions,
                             'residuals': residuals,
@@ -708,15 +618,15 @@ class ComplexResponse(LinearSolver):
 
             # spawning new trial vectors from residuals
 
-            new_trials_ger, new_trials_ung = self._setup_trials(
-                residuals, precond, self._dist_bger, self._dist_bung)
+            new_trials_ger = self.setup_trials(residuals, precond,
+                                               self._dist_bger)
 
             residuals.clear()
 
             profiler.stop_timer('Orthonorm.')
 
             if self.rank == mpi_master():
-                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
+                n_new_trials = new_trials_ger.shape(1)
             else:
                 n_new_trials = None
             n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
@@ -733,9 +643,26 @@ class ComplexResponse(LinearSolver):
 
             # creating new sigma and rho linear transformations
 
-            self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                                profiler)
+            # Once again using the other way of computing sigma
+
+            new_trials_ger_loc = new_trials_ger.get_full_matrix(
+                root=mpi_master())
+
+            tdens = self._get_trans_densities(new_trials_ger_loc, scf_tensors,
+                                              molecule)
+
+            fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
+                                      dft_dict, pe_dict)
+
+            if self.rank == mpi_master():
+                sig_mat = self._get_sigmas(fock, scf_tensors, molecule,
+                                           new_trials_ger_loc)
+            else:
+                sig_mat = None
+
+            sig_mat = DistributedArray(sig_mat, self.comm)
+
+            self._append_trial_sigma_vectors(new_trials_ger, sig_mat)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -757,12 +684,9 @@ class ComplexResponse(LinearSolver):
         profiler.print_memory_usage(self.ostream)
 
         self._dist_bger = None
-        self._dist_bung = None
         self._dist_e2bger = None
-        self._dist_e2bung = None
 
         self._dist_fock_ger = None
-        self._dist_fock_ung = None
 
         # calculate response functions
         if not self.nonlinear:
@@ -817,11 +741,6 @@ class ComplexResponse(LinearSolver):
 
                     self._print_results(ret_dict)
 
-                    # write spectrum to h5 file
-                    if final_h5_fname is not None:
-                        self.write_cpp_rsp_results_to_hdf5(
-                            final_h5_fname, ret_dict)
-
                     return ret_dict
                 else:
                     return {'solutions': solutions}
@@ -845,18 +764,114 @@ class ComplexResponse(LinearSolver):
         """
 
         x_realger = solution.get_full_vector(0)
-        x_realung = solution.get_full_vector(1)
-        x_imagung = solution.get_full_vector(2)
-        x_imagger = solution.get_full_vector(3)
+        x_imagger = solution.get_full_vector(1)
 
         if solution.rank == mpi_master():
-            x_real = np.hstack((x_realger, x_realger)) + np.hstack(
-                (x_realung, -x_realung))
-            x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
-                (x_imagger, x_imagger))
-            return x_real + 1j * x_imag
+            return x_realger + 1j * x_imagger
         else:
             return None
+
+    def _get_trans_densities(self, trial_mat, tensors, molecule):
+        """
+        Computes the transition densities.
+
+        :param trial_mat:
+            The matrix containing the Z vectors as columns.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+
+        :return:
+            The transition density matrix.
+        """
+
+        # form transition densities
+
+        if self.rank == mpi_master():
+            nocc = molecule.number_of_alpha_electrons()
+            norb = tensors['C_alpha'].shape[1]
+            nvir = norb - nocc
+
+            mo_occ = tensors['C_alpha'][:, :nocc].copy()
+            mo_vir = tensors['C_alpha'][:, nocc:].copy()
+
+            tdens = []
+            for k in range(trial_mat.shape[1]):
+                mat = trial_mat[:, k].reshape(nocc, nvir)
+                mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
+                tdens.append(mat)
+        else:
+            tdens = None
+
+        return tdens
+
+    def _get_sigmas(self, fock, tensors, molecule, trial_mat):
+        """
+        Computes the sigma vectors.
+
+        :param fock:
+            The Fock matrix.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param trial_mat:
+            The trial vectors as 2D Numpy array.
+
+        :return:
+            The sigma vectors as 2D Numpy array.
+        """
+
+        nocc = molecule.number_of_alpha_electrons()
+        norb = tensors['C_alpha'].shape[1]
+        nvir = norb - nocc
+
+        mo_occ = tensors['C_alpha'][:, :nocc].copy()
+        mo_vir = tensors['C_alpha'][:, nocc:].copy()
+        orb_ene = tensors['E_alpha']
+
+        sigma_vecs = []
+
+        for fockind in range(len(fock)):
+            # 2e contribution
+            mat = fock[fockind].copy()
+            mat = np.matmul(mo_occ.T, np.matmul(mat, mo_vir))
+            # 1e contribution
+            cjb = trial_mat[:, fockind].reshape(nocc, nvir)
+            mat += np.matmul(cjb, np.diag(orb_ene[nocc:]).T)
+            mat -= np.matmul(np.diag(orb_ene[:nocc]), cjb)
+            sigma_vecs.append(mat.reshape(nocc * nvir, 1))
+
+        sigma_mat = sigma_vecs[0]
+        for vec in sigma_vecs[1:]:
+            sigma_mat = np.hstack((sigma_mat, vec))
+
+        return sigma_mat
+
+    def _append_trial_sigma_vectors(self, b, e2b):
+        """
+        Appends distributed trial vectors and sigma vectors.
+
+        :param bger:
+            The distributed gerade trial vectors.
+        :param bung:
+            The distributed ungerade trial vectors.
+        """
+
+        if self._dist_bger is None:
+            self._dist_bger = DistributedArray(b.data,
+                                               self.comm,
+                                               distribute=False)
+        else:
+            self._dist_bger.append(b, axis=1)
+
+        if self._dist_e2bger is None:
+            self._dist_e2bger = DistributedArray(e2b.data,
+                                                 self.comm,
+                                                 distribute=False)
+        else:
+            self._dist_e2bger.append(e2b, axis=1)
 
     def _print_iteration(self, relative_residual_norm, xvs):
         """
@@ -1029,6 +1044,81 @@ class ComplexResponse(LinearSolver):
             spectrum['y_data'].append(Delta_epsilon)
 
         return spectrum
+
+    def setup_trials(self, vectors, precond, dist_b=None, renormalize=True):
+        """
+        Computes orthonormalized trial vectors.
+
+        :param vectors:
+            The set of vectors.
+        :param precond:
+            The preconditioner.
+        :param dist_bger:
+            The distributed gerade subspace.
+        :param dist_bung:
+            The distributed ungerade subspace.
+        :param renormalize:
+            The flag for normalization.
+
+        :return:
+            The orthonormalized gerade and ungerade trial vectors.
+        """
+        dist_new_b = self._precond_trials(vectors, precond)
+
+        if dist_new_b.data.size == 0:
+            dist_new_b.data = np.zeros((dist_new_b.shape(0), 0))
+
+        if dist_b is not None:
+            # t = t - (b (b.T t))
+            bT_new = dist_b.matmul_AtB_allreduce(dist_new_b)
+            dist_new_proj = dist_b.matmul_AB_no_gather(bT_new)
+            dist_new_b.data -= dist_new_proj.data
+
+        if renormalize:
+            if dist_new_b.data.ndim > 0 and dist_new_b.shape(0) > 0:
+                dist_new_b = self.remove_linear_dependence(
+                    dist_new_b, self.lindep_thresh)
+
+                dist_new_b = self.orthogonalize_gram_schmidt(dist_new_b)
+
+                dist_new_b = self.normalize(dist_new_b)
+
+        if self.rank == mpi_master():
+            assert_msg_critical(dist_new_b.data.size > 0,
+                                'LinearSolver: trial vectors are empty')
+
+        return dist_new_b
+
+    @staticmethod
+    def lrmat2vec(mat, nocc, norb):
+        """
+        Converts matrices to vectors.
+
+        :param mat:
+            The matrices.
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The vectors.
+        """
+
+        # changed the linearsolver function such that we only include the
+        # excitation part
+
+        # TODO: Should be changed at some point to still call linearsolver.py
+        # function
+
+        nvir = norb - nocc
+
+        n_ov = nocc * nvir
+        vec = np.zeros(n_ov, dtype=mat.dtype)
+        # excitation only
+        vec[:n_ov] = mat[:nocc, nocc:].reshape(n_ov)
+
+        return vec
 
     def _print_results(self, rsp_results, ostream=None):
         """
@@ -1216,35 +1306,156 @@ class ComplexResponse(LinearSolver):
 
         ostream.print_blank()
 
-    def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
+    def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
-        Writes the results of a linear response calculation to HDF5 file.
+        Writes checkpoint file. Copied from linearsolver. Changed to work
+        without ungerade.
 
-        :param fname:
-            Name of the HDF5 file.
-        :param rsp_results:
-            The dictionary containing the linear response results.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param labels:
+            The list of labels.
         """
 
-        if fname and isinstance(fname, str):
+        if self.checkpoint_file is None and self.filename is None:
+            return
 
-            hf = h5py.File(fname, 'a')
+        if self.checkpoint_file is None and self.filename is not None:
+            self.checkpoint_file = f'{self.filename}.rsp.h5'
 
-            # Write frequencies
-            xlabel = 'rsp/frequencies'
-            if xlabel in hf:
-                del hf[xlabel]
-            hf.create_dataset(xlabel, data=rsp_results['frequencies'])
+        t0 = tm.time()
 
-            spectrum = self.get_spectrum(rsp_results, 'au')
-            y_data = np.array(spectrum['y_data'])
+        if self.rank == mpi_master():
+            success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
+                                     basis, dft_dict, pe_dict, self.ostream)
+        else:
+            success = False
+        success = self.comm.bcast(success, root=mpi_master())
 
-            if self.cpp_flag == 'absorption':
-                ylabel = 'rsp/sigma'
-            elif self.cpp_flag == 'ecd':
-                ylabel = 'rsp/delta-epsilon'
-            if ylabel in hf:
-                del hf[ylabel]
-            hf.create_dataset(ylabel, data=y_data)
+        if success:
+            if self.nonlinear:
+                dist_arrays = [
+                    self._dist_bger, self._dist_e2bger, self._dist_fock_ger
+                ]
+            else:
+                dist_arrays = [self._dist_bger, self._dist_e2bger]
 
-            hf.close()
+            for dist_array, label in zip(dist_arrays, labels):
+                dist_array.append_to_hdf5_file(self.checkpoint_file, label)
+
+            checkpoint_text = 'Time spent in writing checkpoint file: '
+            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
+
+    def _read_checkpoint(self, rsp_vector_labels):
+        """
+        Reads distributed arrays from checkpoint file. Copied from
+        linearsolver.py and adjusted for TDA
+
+        :param rsp_vector_labels:
+            The list of labels of vectors.
+        """
+
+        dist_arrays = [
+            DistributedArray.read_from_hdf5_file(self.checkpoint_file, label,
+                                                 self.comm)
+            for label in rsp_vector_labels
+        ]
+
+        if self.nonlinear:
+            (self._dist_bger, self._dist_e2bger,
+             self._dist_fock_ger) = dist_arrays
+        else:
+            (self._dist_bger, self._dist_e2bger) = dist_arrays
+
+        checkpoint_text = 'Restarting from checkpoint file: '
+        checkpoint_text += self.checkpoint_file
+        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_blank()
+
+    def remove_linear_dependence(self, basis, threshold):
+        """
+        Removes linear dependence in a set of vectors.
+        Based on the function in linearsolver.py, modified to work with full size
+        distributed arrays.
+
+        :param basis:
+            The set of vectors.
+        :param threshold:
+            The threshold for removing linear dependence.
+
+        :return:
+            The new set of vectors.
+        """
+
+        Sb = basis.matmul_AtB(basis)
+        if self.rank == mpi_master():
+            l, T = np.linalg.eigh(Sb)
+            b_norm = np.sqrt(Sb.diagonal())
+            mask = l > b_norm * threshold
+            Tmask = T[:, mask].copy()
+        else:
+            Tmask = None
+        Tmask = self.comm.bcast(Tmask, root=mpi_master())
+
+        return basis.matmul_AB_no_gather(Tmask)
+
+    @staticmethod
+    def orthogonalize_gram_schmidt(tvecs):
+        """
+        Applies modified Gram Schmidt orthogonalization to trial vectors.
+        Based on the function in linearsolver.py, modified to work with full size
+        distributed arrays.
+
+        :param tvecs:
+            The trial vectors.
+
+        :return:
+            The orthogonalized trial vectors.
+        """
+
+        if tvecs.shape(1) > 0:
+
+            n2 = tvecs.dot(0, tvecs, 0)
+            f = 1.0 / n2
+            tvecs.data[:, 0] *= f
+
+            for i in range(1, tvecs.shape(1)):
+                for j in range(i):
+                    dot_ij = tvecs.dot(i, tvecs, j)
+                    dot_jj = tvecs.dot(j, tvecs, j)
+                    f = dot_ij / dot_jj
+                    tvecs.data[:, i] -= f * tvecs.data[:, j]
+
+                n2 = tvecs.dot(i, tvecs, i)
+                f = 1.0 / n2
+                tvecs.data[:, i] *= f
+
+        return tvecs
+
+    @staticmethod
+    def normalize(vecs):
+        """
+        Normalizes vectors by dividing by vector norm.
+        Based on the function in linearsolver.py, modified to work with full size
+        distributed arrays.
+
+        :param vecs:
+            The vectors.
+
+        :param Retruns:
+            The normalized vectors.
+        """
+
+        invnorm = 1 / vecs.norm(axis=0)
+
+        vecs.data *= invnorm
+
+        return vecs

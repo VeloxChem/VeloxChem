@@ -698,11 +698,19 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
 
     current_angle = self.get_dihedral(dihedral_indices_one_based, angle_unit)
 
+    updated_target_angle = target_angle
+    half_period = 180.0 if angle_unit.lower() == 'degree' else math.pi
+    while updated_target_angle - current_angle > half_period:
+        updated_target_angle -= 2.0 * half_period
+    while updated_target_angle - current_angle < -half_period:
+        updated_target_angle += 2.0 * half_period
+
     # make several attempts to rotate the dihedral angle, with the constraint
     # that the connectivity matrix should not change
     for attempt in range(10, -1, -1):
 
-        rotation_angle = (target_angle - current_angle) * (0.1 * attempt)
+        rotation_angle = (updated_target_angle - current_angle) * (0.1 *
+                                                                   attempt)
 
         new_coords_in_au = self._rotate_around_vector(coords_in_au,
                                                       coords_in_au[j], vij,
@@ -876,7 +884,7 @@ def _Molecule_get_distance_matrix_in_angstrom(self):
     return distance_matrix
 
 
-def _Molecule_get_xyz_string(self, precision=12):
+def _Molecule_get_xyz_string(self, precision=12, comment=''):
     """
     Returns xyz string of molecule.
 
@@ -890,8 +898,13 @@ def _Molecule_get_xyz_string(self, precision=12):
     elem_ids = self.get_identifiers()
     atom_basis_labels = self.get_atom_basis_labels()
 
+    if comment and isinstance(comment, str):
+        trimmed_comment = comment.strip().splitlines()[0][:80]
+    else:
+        trimmed_comment = ''
+
     natoms = len(labels)
-    xyz = f'{natoms}\n\n'
+    xyz = f'{natoms}\n{trimmed_comment}\n'
 
     for a in range(natoms):
         xa, ya, za = coords_in_angstrom[a]

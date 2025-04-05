@@ -85,6 +85,8 @@ class CpcmDriver:
         self.epsilon         = 78.39 
         self.grid_per_sphere = 194
         self.x               = 0
+
+        self.custom_vdw_radii = None
         
         # input keywords
         self.input_keywords = {
@@ -144,6 +146,52 @@ class CpcmDriver:
             The C-PCM energy.
         """
         return 0.5 * np.vdot(q, Bzvec + Cvec)
+    
+    def get_cpcm_vdw_radii(self, molecule):
+        """
+        Get C-PCM VDW radii.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The VDW radii of the atoms.
+        """
+ 
+        atom_radii = molecule.vdw_radii_to_numpy()
+        if self.custom_vdw_radii is not None:
+            assert_msg_critical(
+                len(self.custom_vdw_radii) % 2 == 0,
+                'C-PCM: expecting even number of entries for user-defined C-PCM radii')
+ 
+            keys = self.custom_vdw_radii[0::2]
+            vals = self.custom_vdw_radii[1::2]
+ 
+            for key, val in zip(keys, vals):
+                val_au = float(val) / bohr_in_angstrom()
+                try:
+                    idx = int(key) - 1
+                    assert_msg_critical(
+                        0 <= idx and idx < molecule.number_of_atoms(),
+                        'C-PCM: invalid atom index for user-defined C-PCM radii')
+                    atom_radii[idx] = val_au
+                    self.ostream.print_info(
+                        f'Applying user-defined C-PCM radius {val} for atom {key}')
+
+                except ValueError:
+                    elem_found = False
+                    for idx, label in enumerate(molecule.get_labels()):
+                        if label.upper() == key.upper():
+                            atom_radii[idx] = val_au
+                            elem_found = True
+ 
+                    if elem_found:
+                        self.ostream.print_info(
+                            f'Applying user-defined C-PCM radius {val} for atom {key}')
+
+            self.ostream.print_blank()
+
+        return atom_radii
 
     def generate_cpcm_grid(self, molecule):
         """
@@ -174,7 +222,7 @@ class CpcmDriver:
         zeta = self.get_zeta_dict()[self.grid_per_sphere]
 
         # increase radii by 20%
-        atom_radii = molecule.vdw_radii_to_numpy() * 1.2
+        atom_radii = self.get_cpcm_vdw_radii(molecule) * 1.2
         atom_coords = molecule.get_coordinates_in_bohr()
 
         cpcm_grid_raw = np.zeros((0, 6))
@@ -528,7 +576,7 @@ class CpcmDriver:
         scale_f       = -(eps - 1) / (eps + x)
         natoms        = molecule.number_of_atoms()
         atom_coords   = molecule.get_coordinates_in_bohr()
-        atom_radii    = molecule.vdw_radii_to_numpy() * 1.2
+        atom_radii    = self.get_cpcm_vdw_radii(molecule) * 1.2
         
         # Grid info
         M           = grid.shape[0]
@@ -557,7 +605,7 @@ class CpcmDriver:
         # Compute fiJ
         term_m = zeta_i[:, np.newaxis] * (RJ - r_iJ_norm)
         term_p = zeta_i[:, np.newaxis] * (RJ + r_iJ_norm)
-        fiJ = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
+        fiJ    = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
 
         # Derivative of fiJ: dfiJ_driJ
         z2 = zeta_i[:, np.newaxis]**2
@@ -579,7 +627,7 @@ class CpcmDriver:
         idx = np.arange(M)
         for a in range(natoms - 1):
             contrib_a = final_contribution[a, :, :]
-            # SEt the diagonal
+            # Set the diagonal
             grad[idx, idx, a, :] = contrib_a
 
         # Translational invariance
@@ -626,7 +674,7 @@ class CpcmDriver:
         dr_iA  = r_iA / d_iA[:, :, np.newaxis]
 
         zeta_r   = zeta_i[:, np.newaxis] * d_iA
-        erf_term    = self.erf_array(zeta_r)
+        erf_term = self.erf_array(zeta_r)
         exp_term = np.exp(-1.0 * (zeta_i[:, np.newaxis]**2) * r_iA_2)
         dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
 
@@ -634,7 +682,7 @@ class CpcmDriver:
         I_vals       = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
         A_vals       = np.arange(natoms)[np.newaxis, np.newaxis, :]
         atom_idx_exp = atom_idx[np.newaxis, :, np.newaxis]
-        factor    = ((I_vals == atom_idx_exp).astype(int)
+        factor       = ((I_vals == atom_idx_exp).astype(int)
                     - (I_vals == A_vals).astype(int))
         
         # Calculate for the n-1 first atoms
@@ -672,14 +720,14 @@ class CpcmDriver:
         geom100_drv = NuclearPotentialErfGeom100Driver()
         geom010_drv = NuclearPotentialErfGeom010Driver()
         
-        # DEfine constants
-        natoms = molecule.number_of_atoms()
-        grad_C_nuc = np.zeros((natoms, 3))
-        grad_C_cav = np.zeros((natoms, 3))
+        # Define constants
+        natoms       = molecule.number_of_atoms()
+        grad_C_nuc   = np.zeros((natoms, 3))
+        grad_C_cav   = np.zeros((natoms, 3))
         grid_coords  = grid[:, :3]
         zeta         = grid[:, 4]
         atom_indices = grid[:, 5].astype(int)
-        labels = ['X', 'Y', 'Z']
+        labels       = ['X', 'Y', 'Z']
 
         # Compute both the nuclear and cavity contributions
         for a in range(natoms - 1):
@@ -691,9 +739,13 @@ class CpcmDriver:
             
             geom100_mats, geom010_mats, geom001_mats = [], [], []
 
-            for i, charge in enumerate(q_subset):
-                grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i]], [zeta_a[i]])
-                geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
+            if q_subset.size == 0:
+                # for fully buried atoms, DM shape 0 and 1 in case of orthogonalization
+                geom010_mats = np.zeros((1, 1, DM.shape[0], DM.shape[1]))
+            else:
+                for i, charge in enumerate(q_subset):
+                    grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i]], [zeta_a[i]])
+                    geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
 
             grad_100 = geom100_drv.compute(molecule, basis, a, grid_coords, q, zeta)
             
@@ -706,11 +758,13 @@ class CpcmDriver:
             geom010_mats = np.array(geom010_mats)
             geom001_mats = np.array(geom001_mats)
             geom100_mats += geom001_mats
-            
-            partial_nuc = np.tensordot(geom010_mats, DM, axes=([2, 3], [0, 1]))
-            grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
 
-            grad_C_cav[a] = np.tensordot(DM, geom100_mats, axes=([0, 1], [1, 2]))
+            partial_nuc = np.squeeze(np.matmul(
+                geom010_mats.reshape(geom010_mats.shape[0], geom010_mats.shape[1], -1), DM.reshape(-1, 1)), -1)
+            
+            grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
+            grad_C_cav[a] = np.matmul(DM.reshape(-1), geom100_mats.reshape(geom100_mats.shape[0], -1).T)
+            
 
         # Translational invariance
         grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
