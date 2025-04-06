@@ -39,7 +39,6 @@
 #include <cstring>
 #include <iomanip>
 #include <sstream>
-#include <iostream>
 
 #include "DenseMatrix.hpp"
 #include "DftSubMatrix.hpp"
@@ -239,11 +238,12 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Generate density grid");
 
-            auto       ggafunc = ptr_xcFunctional->getFunctionalPointerToGgaComponent();
+            auto local_xcfunc = CXCFunctional(*ptr_xcFunctional);
+
+            auto       ggafunc = local_xcfunc.getFunctionalPointerToGgaComponent();
             const auto dim     = &(ggafunc->dim);
 
-            std::vector<double> local_weights_data(weights + gridblockpos,
-                                                   weights + gridblockpos + npoints);
+            std::vector<double> local_weights_data(weights + gridblockpos, weights + gridblockpos + npoints);
 
             auto rho_data     = std::vector<double>(dim->rho * npoints);
             auto rhograd_data = std::vector<double>(dim->rho * 3 * npoints);
@@ -269,9 +269,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("XC functional eval.");
 
-            auto loc_xcfunc = CXCFunctional(*ptr_xcFunctional);
-
-            loc_xcfunc.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
+            local_xcfunc.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
             omptimers[thread_id].stop("XC functional eval.");
 

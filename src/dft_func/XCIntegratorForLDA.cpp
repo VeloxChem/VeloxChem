@@ -226,11 +226,12 @@ integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("Generate density grid");
 
-            auto       ldafunc = ptr_xcFunctional->getFunctionalPointerToLdaComponent();
+            auto local_xcfunc = CXCFunctional(*ptr_xcFunctional);
+
+            auto       ldafunc = local_xcfunc.getFunctionalPointerToLdaComponent();
             const auto dim     = &(ldafunc->dim);
 
-            std::vector<double> local_weights_data(weights + gridblockpos,
-                                                   weights + gridblockpos + npoints);
+            std::vector<double> local_weights_data(weights + gridblockpos, weights + gridblockpos + npoints);
 
             auto rho_data  = std::vector<double>(dim->rho * npoints);
 
@@ -250,9 +251,7 @@ integrateVxcFockForLdaClosedShell(const CMolecule&                  molecule,
 
             omptimers[thread_id].start("XC functional eval.");
 
-            auto loc_xcfunc = CXCFunctional(*ptr_xcFunctional);
-
-            loc_xcfunc.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
+            local_xcfunc.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
             omptimers[thread_id].stop("XC functional eval.");
 
