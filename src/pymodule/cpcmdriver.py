@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 import numpy as np
@@ -146,7 +154,7 @@ class CpcmDriver:
             The C-PCM energy.
         """
         return 0.5 * np.vdot(q, Bzvec + Cvec)
-
+    
     def get_cpcm_vdw_radii(self, molecule):
         """
         Get C-PCM VDW radii.
@@ -157,17 +165,16 @@ class CpcmDriver:
         :return:
             The VDW radii of the atoms.
         """
-
+ 
         atom_radii = molecule.vdw_radii_to_numpy()
-
         if self.custom_vdw_radii is not None:
             assert_msg_critical(
                 len(self.custom_vdw_radii) % 2 == 0,
                 'C-PCM: expecting even number of entries for user-defined C-PCM radii')
-
+ 
             keys = self.custom_vdw_radii[0::2]
             vals = self.custom_vdw_radii[1::2]
-
+ 
             for key, val in zip(keys, vals):
                 val_au = float(val) / bohr_in_angstrom()
                 try:
@@ -178,12 +185,14 @@ class CpcmDriver:
                     atom_radii[idx] = val_au
                     self.ostream.print_info(
                         f'Applying user-defined C-PCM radius {val} for atom {key}')
+
                 except ValueError:
                     elem_found = False
                     for idx, label in enumerate(molecule.get_labels()):
                         if label.upper() == key.upper():
                             atom_radii[idx] = val_au
                             elem_found = True
+ 
                     if elem_found:
                         self.ostream.print_info(
                             f'Applying user-defined C-PCM radius {val} for atom {key}')
@@ -604,7 +613,7 @@ class CpcmDriver:
         # Compute fiJ
         term_m = zeta_i[:, np.newaxis] * (RJ - r_iJ_norm)
         term_p = zeta_i[:, np.newaxis] * (RJ + r_iJ_norm)
-        fiJ = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
+        fiJ    = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
 
         # Derivative of fiJ: dfiJ_driJ
         z2 = zeta_i[:, np.newaxis]**2
@@ -626,7 +635,7 @@ class CpcmDriver:
         idx = np.arange(M)
         for a in range(natoms - 1):
             contrib_a = final_contribution[a, :, :]
-            # SEt the diagonal
+            # Set the diagonal
             grad[idx, idx, a, :] = contrib_a
 
         # Translational invariance
@@ -673,7 +682,7 @@ class CpcmDriver:
         dr_iA  = r_iA / d_iA[:, :, np.newaxis]
 
         zeta_r   = zeta_i[:, np.newaxis] * d_iA
-        erf_term    = self.erf_array(zeta_r)
+        erf_term = self.erf_array(zeta_r)
         exp_term = np.exp(-1.0 * (zeta_i[:, np.newaxis]**2) * r_iA_2)
         dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
 
@@ -681,7 +690,7 @@ class CpcmDriver:
         I_vals       = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
         A_vals       = np.arange(natoms)[np.newaxis, np.newaxis, :]
         atom_idx_exp = atom_idx[np.newaxis, :, np.newaxis]
-        factor    = ((I_vals == atom_idx_exp).astype(int)
+        factor       = ((I_vals == atom_idx_exp).astype(int)
                     - (I_vals == A_vals).astype(int))
         
         # Calculate for the n-1 first atoms
@@ -719,14 +728,14 @@ class CpcmDriver:
         geom100_drv = NuclearPotentialErfGeom100Driver()
         geom010_drv = NuclearPotentialErfGeom010Driver()
         
-        # DEfine constants
-        natoms = molecule.number_of_atoms()
-        grad_C_nuc = np.zeros((natoms, 3))
-        grad_C_cav = np.zeros((natoms, 3))
+        # Define constants
+        natoms       = molecule.number_of_atoms()
+        grad_C_nuc   = np.zeros((natoms, 3))
+        grad_C_cav   = np.zeros((natoms, 3))
         grid_coords  = grid[:, :3]
         zeta         = grid[:, 4]
         atom_indices = grid[:, 5].astype(int)
-        labels = ['X', 'Y', 'Z']
+        labels       = ['X', 'Y', 'Z']
 
         # Compute both the nuclear and cavity contributions
         for a in range(natoms - 1):
@@ -738,9 +747,13 @@ class CpcmDriver:
             
             geom100_mats, geom010_mats, geom001_mats = [], [], []
 
-            for i, charge in enumerate(q_subset):
-                grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i]], [zeta_a[i]])
-                geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
+            if q_subset.size == 0:
+                # for fully buried atoms, DM shape 0 and 1 in case of orthogonalization
+                geom010_mats = np.zeros((1, 1, DM.shape[0], DM.shape[1]))
+            else:
+                for i, charge in enumerate(q_subset):
+                    grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i]], [zeta_a[i]])
+                    geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
 
             grad_100 = geom100_drv.compute(molecule, basis, a, grid_coords, q, zeta)
             
@@ -753,11 +766,13 @@ class CpcmDriver:
             geom010_mats = np.array(geom010_mats)
             geom001_mats = np.array(geom001_mats)
             geom100_mats += geom001_mats
-            
-            partial_nuc = np.tensordot(geom010_mats, DM, axes=([2, 3], [0, 1]))
-            grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
 
-            grad_C_cav[a] = np.tensordot(DM, geom100_mats, axes=([0, 1], [1, 2]))
+            partial_nuc = np.squeeze(np.matmul(
+                geom010_mats.reshape(geom010_mats.shape[0], geom010_mats.shape[1], -1), DM.reshape(-1, 1)), -1)
+            
+            grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
+            grad_C_cav[a] = np.matmul(DM.reshape(-1), geom100_mats.reshape(geom100_mats.shape[0], -1).T)
+            
 
         # Translational invariance
         grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)

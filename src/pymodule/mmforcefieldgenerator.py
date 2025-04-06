@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path, PurePath
@@ -106,7 +114,7 @@ class MMForceFieldGenerator:
         self.ostream = ostream
 
         # molecule
-        self.molecule_name = 'vlx_' + get_random_string_parallel(self.comm)
+        self.molecule_name = 'MOL'
         self.scan_xyz_files = None
         self.atom_types = None
         self.rotatable_bonds = []
@@ -2605,7 +2613,7 @@ class MMForceFieldGenerator:
                 )
 
             for (i, j, k, l), dih in self.impropers.items():
-                line_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1, k + 1)
+                line_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1, l + 1)
                 line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
                     4, dih['phase'], dih['barrier'], abs(dih['periodicity']),
                     dih['comment'])
@@ -2641,7 +2649,7 @@ class MMForceFieldGenerator:
 
             attributes = {
                 # Name is the atom type_molname
-                "name": atom['name'] + '_' + mol_name,
+                "name": atom['name'],
                 "class": str(i + 1),
                 "element": element,
                 "mass": str(atom['mass'])
@@ -2655,7 +2663,7 @@ class MMForceFieldGenerator:
             ET.SubElement(Residue,
                           "Atom",
                           name=atom_data['name'],
-                          type=atom_data['name'] + '_' + mol_name,
+                          type=atom_data['name'],
                           charge=str(atom_data['charge']))
         for bond_id, bond_data in self.bonds.items():
             ET.SubElement(Residue,
@@ -2687,6 +2695,7 @@ class MMForceFieldGenerator:
             ET.SubElement(Angles, "Angle", **attributes)
 
         # Periodic Dihedrals section
+        # Proper dihedrals
         Dihedrals = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for dihedral_id, dihedral_data in self.dihedrals.items():
             # Not multiple dihedrals has periodicity1, phase1, k1
@@ -2723,8 +2732,7 @@ class MMForceFieldGenerator:
 
                 ET.SubElement(Dihedrals, "Proper", **attributes)
 
-        # Improper Dihedrals section
-        Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        # Improper dihedrals
         for improper_id, improper_data in self.impropers.items():
 
             # The order of the atoms is defined in the OpenMM documentation
@@ -2739,7 +2747,7 @@ class MMForceFieldGenerator:
                 "phase1": str(improper_data['phase'] * np.pi / 180),
                 "k1": str(improper_data['barrier'])
             }
-            ET.SubElement(Impropers, "Improper", **attributes)
+            ET.SubElement(Dihedrals, "Improper", **attributes)
 
         # NonbondedForce section
         NonbondedForce = ET.SubElement(ForceField,
@@ -2748,7 +2756,7 @@ class MMForceFieldGenerator:
                                        lj14scale=str(self.fudgeLJ))
         for atom_id, atom_data in self.atoms.items():
             attributes = {
-                "type": atom_data['name'] + '_' + mol_name,
+                "type": atom_data['name'],
                 "charge": str(atom_data['charge']),
                 "sigma": str(atom_data['sigma']),
                 "epsilon": str(atom_data['epsilon'])

@@ -29,20 +29,23 @@ Contributors
 * Jonas Vester
 * Erik Vitols
 * Nanna H. List
+* Carl Svennerstedt
 * Xiaoyu Chen
 * Lukas Lampe
+* Chenxi Li
+* Julia Rune
 * Mathieu Linares
 * Noah Deveaux
 * Magnus Ringholm
-* Julia Rune
 * Valentin LindFeld
 * Thomas Fransson
+* Rasmine Knudsen
+* Magnus Johansen
 * Gabriel L. S. Rodrigues
 * Mikael T. Scott
 * Maximilian Scheurer
-* Chenxi Li
 * Vanda Le
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2025-03-05 by ``git shortlog -sn``
+The list of contributors was obtained 2025-04-04 by ``git shortlog -sn``
