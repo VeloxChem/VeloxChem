@@ -2233,6 +2233,8 @@ class IMDatabasePointCollecter:
                 #         self.qm_data_point_dict[state + i] = self.qm_data_point_dict[state + i][:cut_off - 1]
 
                 #         exit()  
+                trust_radius_multi = self.determine_trust_radius_single(self.sampled_molecules[state + i]['molecules'], self.sampled_molecules[state + i]['qm_energies'], self.sampled_molecules[state + i]['im_energies'], self.qm_data_point_dict[state + i][:-1], self.qm_data_point_dict[state + i][-1], self.interpolation_settings[state + i])
+                self.qm_data_point_dict[state + i][-1].confidence_radius = 0.5
                 trust_radius_multi = self.determine_trust_radius(self.sampled_molecules[state + i]['molecules'], self.sampled_molecules[state + i]['qm_energies'], self.sampled_molecules[state + i]['im_energies'], self.qm_data_point_dict[state + i], self.interpolation_settings[state + i])
                 bey_trust_radius = self.determine_beysian_trust_radius(self.sampled_molecules[state + i]['molecules'], self.sampled_molecules[state + i]['qm_energies'], self.qm_data_point_dict[state + i], self.interpolation_settings[state + i])
                 print('Trust radius', trust_radius_multi, bey_trust_radius)
@@ -2306,7 +2308,6 @@ class IMDatabasePointCollecter:
             new_im_energy = interpolation_driver.get_energy()
             diff = (new_im_energy - qm_energies[i]) * hartree_in_kcalpermol()
             sum_sq_error += (diff)**2 / (0.1**2 * distance**6)
-            # interpolation_driver.determine_important_internal_coordinates(qm_e[i], mol, self.z_matrix, combined_datapoints)
 
         bey_trust_radius = (1/sum_sq_error)**(1/6)
 
@@ -2322,7 +2323,6 @@ class IMDatabasePointCollecter:
                 dp.confidence_radius = alphas[i]
 
             for i, mol in enumerate(structure_list):
-                # _, distance, _ = self.calculate_distance_to_ref(mol.get_coordinates_in_bohr(), new_datapoint.cartesian_coordinates)
 
                 interpolation_driver = InterpolationDriver(self.z_matrix)
                 interpolation_driver.update_settings(impes_dict)
@@ -2337,9 +2337,6 @@ class IMDatabasePointCollecter:
                 diff = (new_im_energy - qm_e[i]) * hartree_in_kcalpermol()
                 sum_sq_error += (diff)**2
 
-                old_diff = abs(im_e[i] - qm_e[i]) * hartree_in_kcalpermol()
-
-                # interpolation_driver.determine_important_internal_coordinates(qm_e[i], mol, self.z_matrix, combined_datapoints)
             print('sum_of_sqaure', sum_sq_error, alphas)
             return sum_sq_error
         
@@ -2347,7 +2344,6 @@ class IMDatabasePointCollecter:
             
             n_points = len(dps)
             dF_dalphas = np.zeros(n_points, dtype=float)
-            dF_dalpha = 0.0
 
             for i, dp in enumerate(dps):
                 dp.confidence_radius = alphas[i]
@@ -2369,6 +2365,8 @@ class IMDatabasePointCollecter:
                     
                 for j, dp in enumerate(dps):
                     
+                    dF_dalpha = 0.0
+
                     gradient_weight = interpolation_driver.trust_radius_weight_gradient(dp)
 
                     part_1 = 0.0
@@ -2389,6 +2387,7 @@ class IMDatabasePointCollecter:
                     dF_dalpha += 2 * diff * energy_gradient
                     
                     dF_dalphas[j] += dF_dalpha
+
 
             return dF_dalphas
         
@@ -2453,9 +2452,9 @@ class IMDatabasePointCollecter:
                 sum_sq_error += (diff)**2
 
                 old_diff = abs(im_e[i] - qm_e[i]) * hartree_in_kcalpermol()
-                print('Energy diff', abs(diff), old_diff, alpha[0], distance, '\n#############\n')
+                
                 # interpolation_driver.determine_important_internal_coordinates(qm_e[i], mol, self.z_matrix, combined_datapoints)
-
+            print('sum_of_sqaure', sum_sq_error, alpha)
             return sum_sq_error
         
         def obj_gradient_function(alpha, structure_list, qm_e, im_e, old_dps, curr_dp, impes_dict):
@@ -2525,7 +2524,7 @@ class IMDatabasePointCollecter:
         current_dps_list = old_datapoints.copy()
         trust_radius = optimize_trust_radius(current_datapoint.confidence_radius, molecules, qm_energies, im_energies, current_dps_list, current_datapoint, interpolation_setting)
         
-        return trust_radius['x'][0]
+        return trust_radius['x']
 
     def compute_energy(self, qm_driver, molecule, basis=None):
         """ Computes the QM energy using self.qm_driver.

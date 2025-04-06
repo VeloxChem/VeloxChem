@@ -316,8 +316,7 @@ class IMForceFieldGenerator:
                 else:
                     curr_periodicity = rotatable_dihedrals_dict[sorted_bond]["max_periodicity"]
                     rotatable_dihedrals_dict[sorted_bond]["max_periodicity"] = max(
-                        curr_periodicity, max_periodicity)
-        print(rotatable_dihedrals_dict)           
+                        curr_periodicity, max_periodicity)          
         
         target_dihedrals = []
         for key in rotatable_dihedrals_dict.keys():
@@ -329,35 +328,13 @@ class IMForceFieldGenerator:
                 n_sampling = 6
             elif perodicity == 3:
                 n_sampling = 3                
-            
-            # conectivity_matrix = molecule.get_connectivity_matrix()
-            
-            # print('conectivity matrix', conectivity_matrix[dihedral[2]])
-            
-            # for rot_bond_atom in key:
-            #     label_list = []
-            #     for i, atom in enumerate(conectivity_matrix[rot_bond_atom]):
-            #         if atom == 1 and sum(conectivity_matrix[i]) == 1:
-            #             label_list.append(molecule.get_label(i))
-            #             print('bond', rot_bond_atom, i, conectivity_matrix[i], label_list)
-
-            #     H_counter = sum([1 for i, atom in enumerate(conectivity_matrix[rot_bond_atom]) if atom == 1 and sum(conectivity_matrix[i]) == 1])
-            #     print('H_counter', H_counter)
-            # exit()
 
             target_dihedrals.append((dihedral, perodicity, n_sampling))
 
-        
-
-
-        # self.symmetry_groups = [] 
-        # self.z_matrix = sorted(self.z_matrix, key=len)
 
         self.z_matrix = self.define_z_matrix(molecule)
        
         self.conformal_structures = self.determine_conformal_structures(molecule, specific_dihedrals=target_dihedrals)
-
-        # self.interpolation_settings['dihedrals'] = target_dihedrals
 
     def compute(self, molecule, basis):
 
@@ -470,6 +447,8 @@ class IMForceFieldGenerator:
                             self.add_point(mol, current_basis, self.states_interpolation_settings)
                             self.z_matrix = self.define_z_matrix(molecule)
                             print('Molecule added to the database',  self.density_of_datapoints)
+            
+            
             if self.minimize:       
                 opt_qm_driver = ScfRestrictedDriver()
                 opt_qm_driver.xcfun = 'b3lyp'
@@ -477,7 +456,7 @@ class IMForceFieldGenerator:
                 current_basis = MolecularBasis.read(molecule, 'def2-svp')
                 _, scf_results = self.compute_energy(opt_qm_driver, molecule, current_basis)
                 opt_drv.ostream.mute()
-                opt_results = opt_drv.compute(mol, current_basis, scf_results)
+                opt_results = opt_drv.compute(molecule, current_basis, scf_results)
                 optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                 molecule = optimized_molecule
                 print(optimized_molecule.get_xyz_string())
@@ -631,8 +610,7 @@ class IMForceFieldGenerator:
                             self.add_point(mol, current_basis, self.states_interpolation_settings)
                             self.z_matrix = self.define_z_matrix(molecule)
                             print('Molecule added to the database',  self.density_of_datapoints)
-            
-            
+
             if self.minimize:       
                 opt_qm_driver = ScfRestrictedDriver()
                 opt_qm_driver.xcfun = 'b3lyp'
@@ -671,8 +649,7 @@ class IMForceFieldGenerator:
                 self.add_point(molecule, current_basis, self.states_interpolation_settings)
                 self.z_matrix = self.define_z_matrix(molecule)
                 print('Molecule added to the database',  self.density_of_datapoints)
-            
-            
+
             self.density_of_datapoints, self.molecules_along_rp, self.allowed_deviation = self.determine_reaction_path_molecules(molecule, specific_dihedrals=self.dihedrals_dict)
             density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.molecules_along_rp, imforcefieldfile)
             self.states_data_point_density[self.roots_to_follow[0]] = density_of_datapoints

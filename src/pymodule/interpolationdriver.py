@@ -866,7 +866,7 @@ class InterpolationDriver():
                     constraints.append(tuple(int(x) for x in coord))
                 elif len(coord) == 3 and ind_weight == max(weights):
                     constraints.append(tuple(int(x) for x in coord))
-                elif len(coord) == 4 and ind_weight > max(weights) * 0.8:
+                elif len(coord) == 4 and ind_weight > max(weights) * 0.7:
                     constraints.append(tuple(int(x) for x in coord))
                 print(f'Internal Coordinate: {tuple(int(x) for x in coord)}, distance {internal_coord_elem_distance[z_matrix.index(coord)]}, Contribution: {contrib}, weight {ind_weight}, Error: {error * hartree_in_kcalpermol()}')
             print('Sum of Weights', sum(weights), sum(single_energy_error) * hartree_in_kcalpermol())
