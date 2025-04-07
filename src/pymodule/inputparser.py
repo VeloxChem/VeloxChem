@@ -524,8 +524,7 @@ def get_random_string_serial():
 
     datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
     datetime_string = datetime_string.replace('-', '')
-    datetime_string = datetime_string.replace('T', '_')
-    datetime_string = datetime_string.replace(':', '')
+    datetime_string = datetime_string.split('T')[0]
 
     random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
 
