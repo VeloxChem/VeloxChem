@@ -91,6 +91,8 @@ class ScfHessianDriver(HessianDriver):
         # flag for printing the Hessian
         self.do_print_hessian = False
 
+        self.atom_pairs = None
+
         # TODO: determine _block_size_factor for SCF Hessian driver
         # self._block_size_factor = 4
 
@@ -133,7 +135,7 @@ class ScfHessianDriver(HessianDriver):
         self.cphf_dict = dict(cphf_dict)
 
     #todo add optional parameter for atom pairs
-    def compute(self, molecule, ao_basis, atom_pairs=None):
+    def compute(self, molecule, ao_basis):
         """
         Computes the analytical or numerical nuclear Hessian.
 
@@ -171,7 +173,7 @@ class ScfHessianDriver(HessianDriver):
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
         else:
-            self.compute_analytical(molecule, ao_basis, profiler, atom_pairs)
+            self.compute_analytical(molecule, ao_basis, profiler, self.atom_pairs)
 
         if self.rank == mpi_master():
             # print Hessian
@@ -292,6 +294,8 @@ class ScfHessianDriver(HessianDriver):
             The AO basis set.
         :param profiler:
             The profiler.
+        :param atom_pairs:
+            The atom pairs to compute the Hessian for.
         """
 
         assert_msg_critical(
@@ -371,7 +375,7 @@ class ScfHessianDriver(HessianDriver):
             setattr(cphf_solver, key, getattr(self, key))
 
         # todo add atom pair option to cphf solver
-        cphf_solver.compute(molecule, ao_basis, scf_tensors)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
@@ -489,7 +493,17 @@ class ScfHessianDriver(HessianDriver):
 
         # TODO: use alternative way to partition atoms
         # todo only do atoms in atom pairs
-        local_atoms = list(range(natm))[self.rank::self.nodes]
+        if atom_pairs is not None:
+            atoms = []
+            for i, j in atom_pairs:
+                if not i in atoms:
+                    atoms.append(i)
+                if not j in atoms:
+                    atoms.append(j)
+        else:
+            atoms = list(range(natm))
+        local_atoms = atoms[self.rank::self.nodes]
+
 
         for i in local_atoms:
 
@@ -569,11 +583,14 @@ class ScfHessianDriver(HessianDriver):
                     hessian_2nd_order_derivatives[i, i, y, x] += hess_val
 
         # do only upper triangular matrix
-        all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
 
         # TODO: use alternative way to partition atom pairs
         # todo only do this with the given atom pairs
-        local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
+        all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
+        if atom_pairs is None:
+            local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
+        else:
+            local_atom_pairs = atom_pairs[self.rank::self.nodes]
 
         for i, j in local_atom_pairs:
 

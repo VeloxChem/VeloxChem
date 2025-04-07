@@ -80,8 +80,14 @@ class HessianOrbitalResponse(CphfSolver):
 
         super().update_settings(cphf_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, eri_dict, dft_dict,
-                    pe_dict):
+    def compute_rhs(self,
+                    molecule,
+                    basis,
+                    scf_tensors,
+                    eri_dict,
+                    dft_dict,
+                    pe_dict,
+                    atom_pairs=None):
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
@@ -96,6 +102,9 @@ class HessianOrbitalResponse(CphfSolver):
         :returns:
             The RHS of the CPHF equations.
         """
+
+        if atom_pairs is not None:
+            pass
 
         profiler = Profiler({
             'timing': self.timing,
@@ -141,6 +150,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         # partition atoms for parallellisation
         # TODO: use partition_atoms in e.g. scfgradientdriver
+
         local_atoms = partition_atoms(natm, self.rank, self.nodes)
 
         atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
@@ -165,7 +175,9 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.start_timer('dOvlp')
 
         ovlp_deriv_ao_dict = {
-            (iatom, x): None for iatom in range(natm) for x in range(3)
+            (iatom, x): None
+            for iatom in range(natm)
+            for x in range(3)
         }
 
         ovlp_grad_drv = OverlapGeom100Driver()
@@ -200,7 +212,9 @@ class HessianOrbitalResponse(CphfSolver):
         profiler.start_timer('dFock')
 
         fock_deriv_ao_dict = {
-            (iatom, x): None for iatom in range(natm) for x in range(3)
+            (iatom, x): None
+            for iatom in range(natm)
+            for x in range(3)
         }
 
         for iatom in local_atoms:
@@ -488,7 +502,8 @@ class HessianOrbitalResponse(CphfSolver):
             # 'ovlp_deriv_oo': ovlp_deriv_oo,
             # 'fock_deriv_ao': fock_deriv_ao,
             # 'fock_uij': fock_uij,
-            'hessian_first_integral_derivatives': hessian_first_integral_derivatives,
+            'hessian_first_integral_derivatives':
+            hessian_first_integral_derivatives,
             'hessian_eri_overlap': hessian_eri_overlap,
         }
 
@@ -573,7 +588,8 @@ class HessianOrbitalResponse(CphfSolver):
             gmats_100 = Matrices()
 
         if self._embedding_hess_drv is not None:
-            pe_fock_grad_contr = self._embedding_hess_drv.compute_pe_fock_gradient_contributions(i=i)
+            pe_fock_grad_contr = self._embedding_hess_drv.compute_pe_fock_gradient_contributions(
+                i=i)
             for x in range(3):
                 fmat_deriv[x] += pe_fock_grad_contr[x]
 
