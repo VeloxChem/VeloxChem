@@ -1,13 +1,10 @@
 import os
-from tracemalloc import start
 import numpy as np
 import veloxchem as vlx
 import py3Dmol as p3d
 from collections import defaultdict
-from scipy import optimize
 
-
-class MolecularPropertyCalculator1:
+class MolecularPropertyCalculator:
     def __init__(self, folder_path, xyz_filename):
         self.folder_path = folder_path
         self.xyz_filename = xyz_filename
@@ -22,19 +19,17 @@ class MolecularPropertyCalculator1:
         self.loprop_charges = None
         self.resp_charges = None
         self.max_esp_values = None
-        
-        print(f'Initialized MPC with folder with folder: {folder_path}, file {xyz_filename}')
-
+    
     def load_molecule(self):
         file_path = os.path.join(self.folder_path, self.xyz_filename)
         if os.path.exists(file_path):
             self.molecule = vlx.Molecule.read_xyz_file(file_path)
-            # self.molecule.show(atom_indices=True)
+            self.molecule.show(atom_indices=True)
             self.basis = vlx.MolecularBasis.read(self.molecule, "def2-SVP")
         else:
             raise FileNotFoundError(f"Error: The file {file_path} does not exist.")
     
-    def run_scf(self, functional='BLYP', solvation_model=None):
+    def run_scf(self, functional='BLYP', solvation_model='CPCM'):
 
         self.scf_drv = vlx.ScfRestrictedDriver()
         self.scf_drv.xcfun = functional
@@ -51,16 +46,16 @@ class MolecularPropertyCalculator1:
             self.scf_drv.ri_coulomb = False
         else:
             self.scf_drv.ri_coulomb = True
-
         self.scf_results = self.scf_drv.compute(self.molecule, self.basis)
 
     
     def optimize_geometry(self):
+
         # Run geometry optimization using BLYP functional
         self.run_scf(functional='BLYP')
 
         opt_drv = vlx.OptimizationDriver(self.scf_drv)
-        # opt_drv.ostream.mute()
+        opt_drv.ostream.mute()
         opt_drv.conv_energy = 1e-04
         opt_drv.conv_drms = 5e-03
         opt_drv.conv_dmax = 1e-02
@@ -81,21 +76,21 @@ class MolecularPropertyCalculator1:
         grid_drv.set_level(4)
         molgrid = grid_drv.generate(self.molecule)
         chi_g = vlx.XCIntegrator().compute_gto_values(self.molecule, self.basis, molgrid)
-        
+
         D = self.scf_results["D_alpha"] + self.scf_results["D_beta"]
         G = np.einsum("ab,bg->ag", D, chi_g)
         n_g = np.einsum("ag,ag->g", chi_g, G)
-
+        
         # Extract surface points based on density range
         indices = np.where((n_g > 0.0095) & (n_g < 0.0105))
         self.surface_points = np.column_stack((molgrid.x_to_numpy()[indices],
                                                molgrid.y_to_numpy()[indices],
                                                molgrid.z_to_numpy()[indices]))
         
-        
     def _get_surface_point_atom_indices(self):
 
         atom_positions = self.molecule.get_coordinates_in_bohr()
+        atom_vdw_radii = self.molecule.vdw_radii_to_numpy()  # Get van der Waals radii for each atom in bohr
         atom_indices = []
 
         for point in self.surface_points:
@@ -103,7 +98,11 @@ class MolecularPropertyCalculator1:
             # Calculate distances from this point to all atoms
             distances = np.linalg.norm(atom_positions - point, axis=1)
 
-            closest_atom_index = np.argmin(distances)
+            # Adjust distances by subtracting van der Waals radii
+            adjusted_distances = distances - atom_vdw_radii
+
+            # Find the closest atom considering van der Waals radii
+            closest_atom_index = np.argmin(adjusted_distances)
             atom_indices.append(closest_atom_index)
         
         self.atom_indices = atom_indices
@@ -113,8 +112,12 @@ class MolecularPropertyCalculator1:
         grid_drv = vlx.GridDriver() # Handles the numerical grid used to evaluate the electron density
         molgrid = grid_drv.generate(self.molecule)
         xc_drv = vlx.XCIntegrator()
+        
         # generate AOs on the grid points
         chi_g = xc_drv.compute_gto_values(self.molecule, self.basis, molgrid) # Computes the values of atomic orbitals (GTOs) at grid points
+
+
+
 
         mol_orb_coeff = self.scf_results["C_alpha"]
         occ_mo_val, unocc_mo_val = [], []
@@ -139,7 +142,9 @@ class MolecularPropertyCalculator1:
 
         occ_mo_val, unocc_mo_val = self.compute_molecular_orbitals()
         energy_occ = self.scf_results['E_alpha'][:len(occ_mo_val)]
-        energy_unocc = self.scf_results['E_alpha'][len(occ_mo_val):]              
+        energy_unocc = self.scf_results['E_alpha'][len(occ_mo_val):]
+        # den_val = self.compute_electron_density() # Electron density values at surface points
+              
 
         EA, IE = [], []
         for idx, point in enumerate(self.surface_points):
@@ -160,16 +165,21 @@ class MolecularPropertyCalculator1:
                 ie_point_val += occ_mo_val_squared * abs(energy_occ[j]) # Sum over all occupied MOs
 
             ie_point_val /= sum(occ_mo_val[j][idx]**2 for j in range(len(occ_mo_val)))
-            
+            # ie_point_val /= den_val[idx]
+
+            # Previously wrong code:
+            # ea_val = sum(unocc_mo_val[j][idx]**2 * energy_unocc[j] for j in range(len(unocc_mo_val)))
+            # ie_val = sum(occ_mo_val[j][idx]**2 * energy_occ[j] for j in range(len(occ_mo_val)))
+
             EA.append(ea_point_val)
             IE.append(ie_point_val)
-        
 
+        
         self.ea_values = EA
         self.ie_values = IE
     
         data_bank = [{'atom': int(self.atom_indices[idx]), 'IE': IE[idx], 'EA': EA[idx]} for idx in range(len(IE))]
-        print(f"Data bank: {data_bank}")
+        # print(f"Data bank: {data_bank}")
 
 	    # Organize data into a dictionary where keys are atoms and values are lists of (EA, index) tuples
         self.EA_data = defaultdict(lambda: {"EA": [], "indices": []})
@@ -191,10 +201,15 @@ class MolecularPropertyCalculator1:
             if values["EA"]:  # Ensure there's at least one EA value
                 min_EA_value = min(values["EA"])  # Get min EA value
                 min_EA_index = values["indices"][values["EA"].index(min_EA_value)]  # Find corresponding surface point index
+                max_EA_value = max(values["EA"])  # Get max EA value
+                mean_EA_value = np.mean(values["EA"])  # Calculate mean EA value
+                median_EA_value = np.median(values["EA"])  # Calculate median EA value
 
                 self.EA_results[atom] = {
                     "min_EA": min_EA_value,
-                    "max_EA": max(values["EA"]),
+                    "max_EA": max_EA_value,
+                    "mean_EA": mean_EA_value,
+                    "median_EA": median_EA_value,
                     "min_EA_index": min_EA_index
                 }
 
@@ -211,10 +226,15 @@ class MolecularPropertyCalculator1:
             if values["IE"]:  # Ensure there's at least one IE value
                 min_IE_value = min(values["IE"])  # Get min IE value
                 min_IE_index = values["indices"][values["IE"].index(min_IE_value)]  # Find corresponding surface point index
+                max_IE_value = max(values["IE"])  # Get max IE value
+                mean_IE_value = np.mean(values["IE"])  # Calculate mean IE value
+                median_IE_value = np.median(values["IE"])  # Calculate median IE value
 
                 self.IE_results[atom] = {
                     "min_IE": min_IE_value,
-                    "max_IE": max(values["IE"]),
+                    "max_IE": max_IE_value,
+                    "mean_IE": mean_IE_value,
+                    "median_IE": median_IE_value,
                     "min_IE_index": min_IE_index
                 }
 
@@ -235,7 +255,6 @@ class MolecularPropertyCalculator1:
         resp_drv.ostream.mute()
         self.resp_charges = resp_drv.compute(self.molecule, self.basis, self.scf_results, 'resp')
         
-        # Remove this when cpcm is added in LoPropDriver
         if 'solvation_model' in self.scf_results:
             del self.scf_results['solvation_model']
 
@@ -243,30 +262,58 @@ class MolecularPropertyCalculator1:
         loprop_drv.ostream.mute()
         self.loprop_charges = loprop_drv.compute(self.molecule, self.basis, self.scf_results)
 
+        localized_polarizabilities = self.loprop_charges['localized_polarizabilities']
+        self.local_polarizabilities = []
+
+        # Compute the polarizability vector for each atom
+        for polarizability_tensor in localized_polarizabilities:
+            # Reshape the tensor components into a 3x3 matrix
+            polarizability_matrix = np.array([
+                [polarizability_tensor[0], polarizability_tensor[1], polarizability_tensor[2]],
+                [polarizability_tensor[1], polarizability_tensor[3], polarizability_tensor[4]],
+                [polarizability_tensor[2], polarizability_tensor[4], polarizability_tensor[5]]
+            ])
+
+            # Compute the eigenvalues and eigenvectors of the polarizability matrix
+            eigenvalues, eigenvectors = np.linalg.eigh(polarizability_matrix)
+
+            # Find the principal polarizability vector (corresponding to the largest eigenvalue)
+            max_index = np.argmax(eigenvalues)
+            principal_vector = eigenvectors[:, max_index]
+
+            # Store the principal polarizability vector for the atom
+            self.local_polarizabilities.append(principal_vector)
+
     
     def compute_esp(self):
 
         respdrv = vlx.RespChargesDriver()
         respdrv.ostream.mute()
-        self.max_esp_values = respdrv.get_electrostatic_potential_with_maximum_values(
+        self.max_esp_values, self.min_esp_values = respdrv.get_electrostatic_potential_with_maximum_and_minimum_values(
             self.surface_points, self.molecule, self.basis, self.scf_results, self.atom_indices
         )
     
     def generate_data_matrix(self):
-        num_atoms = self.molecule.number_of_atoms()
-        data_matrix = np.zeros((num_atoms, 15))
+        num_atoms = len(self.resp_charges)
+        data_matrix = np.zeros((num_atoms, 18))
 
         for i, atom_idx in enumerate(range(num_atoms)):
             data_matrix[i, 0] = atom_idx + 1
             data_matrix[i, 1] = self.molecule.get_element_ids()[atom_idx]
             data_matrix[i, 2] = self.result_EA[atom_idx]['min_EA']
             data_matrix[i, 3] = self.result_EA[atom_idx]['max_EA']
-            data_matrix[i, 4] = self.result_IE[atom_idx]['min_IE']
-            data_matrix[i, 5] = self.result_IE[atom_idx]['max_IE']
-            data_matrix[i, 6] = self.loprop_charges['localized_charges'][i]
-            data_matrix[i, 7:13] = self.loprop_charges['localized_polarizabilities'][i]
-            data_matrix[i, 13] = self.resp_charges[i]
-            data_matrix[i, 14] = self.max_esp_values.get(atom_idx, np.nan)
+            data_matrix[i, 4] = self.result_EA[atom_idx]['mean_EA']
+            data_matrix[i, 5] = self.result_EA[atom_idx]['median_EA']
+            data_matrix[i, 6] = self.result_IE[atom_idx]['min_IE']
+            data_matrix[i, 7] = self.result_IE[atom_idx]['max_IE']
+            data_matrix[i, 8] = self.result_IE[atom_idx]['mean_IE']
+            data_matrix[i, 9] = self.result_IE[atom_idx]['median_IE']
+            data_matrix[i, 10] = self.loprop_charges['localized_charges'][i]
+            data_matrix[i, 11] = self.resp_charges[i]
+            data_matrix[i, 12] = self.max_esp_values.get(atom_idx, np.nan)
+            data_matrix[i, 13] = self.min_esp_values.get(atom_idx, np.nan)
+            data_matrix[i, 14:17] = self.local_polarizabilities[i]  # Principal polarizability vector
+            data_matrix[i,17] = self.scf_results['scf_energy'] # SCF energy
 
         return data_matrix
 
@@ -284,3 +331,5 @@ class MolecularPropertyCalculator1:
         self._compute_resp_loprop()
         self.compute_esp()
         return self.generate_data_matrix()
+    
+

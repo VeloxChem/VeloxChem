@@ -1179,7 +1179,7 @@ class RespChargesDriver:
         else:
             return None
         
-    def get_electrostatic_potential_with_maximum_values(self, grid, molecule, basis, scf_results, Atom_indices):
+    def get_electrostatic_potential_with_maximum_and_minimum_values(self, grid, molecule, basis, scf_results, Atom_indices):
         """
         Gets the QM ESP on the grid points and assigns them to atoms.
 
@@ -1233,7 +1233,11 @@ class RespChargesDriver:
             # Get the maximum ESP value for each atom
             max_esp_per_atom = {atom: max(esp_values) for atom, esp_values in atom_esp.items()}
 
-            return max_esp_per_atom
+            # Get the minimum ESP value for each atom
+            min_esp_per_atom = {atom: min(esp_values) for atom, esp_values in atom_esp.items()}
+
+
+            return max_esp_per_atom, min_esp_per_atom
 
         else:
             return None
