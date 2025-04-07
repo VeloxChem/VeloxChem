@@ -58,7 +58,7 @@ class EvbReporter():
         self.ostream = outputstream
         self.debug = debug
         # OpenMM HIP version is slighly older and uses a different format for reporters
-        if version('openmm') < '8.2':
+        if not append and version('openmm') < '8.2':
             outputstream.print_info(
                 'Older version of OpenMM detected. Using tuple format for returning reporter information.'
             )
