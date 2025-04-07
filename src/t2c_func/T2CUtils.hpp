@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <utility>
+#include <vector>
 
 #include "Matrix.hpp"
 #include "Point.hpp"
@@ -296,6 +297,42 @@ auto distribute(CSubMatrix*                      matrix,
                 const size_t                     bra_igto,
                 const std::pair<size_t, size_t>& ket_range,
                 const bool                       ang_order) -> void;
+
+
+/// @brief Computes R(PC) = P - C distances on grid.
+/// @param buffer The buffer with factors.
+/// @param index_pc The primary row index of R(PC) distances in buffer.
+/// @param gcoords_x The Cartesian X coordinates of grid points.
+/// @param gcoords_y The Cartesian Y coordinates of grid points.
+/// @param gcoords_z The Cartesian Z coordinates of grid points.
+/// @param p_x The Cartesian X coordinate of P point.
+/// @param p_y The Cartesian Y coordinate of P point.
+/// @param p_z The Cartesian Z coordinate of P point.
+auto comp_distances_pc(      CSubMatrix&          buffer,
+                       const size_t               index_pc,
+                       const std::vector<double>& gcoords_x,
+                       const std::vector<double>& gcoords_y,
+                       const std::vector<double>& gcoords_z,
+                       const double               p_x,
+                       const double               p_y,
+                       const double               p_z) -> void;
+
+/// @brief Computes Boys function arguments  on grid.
+/// @param buffer The buffer with factors.
+/// @param index_args The primary row index of Boys function arguments in buffer.
+/// @param index_pc The primary row index of R(PC) distances in buffer.
+/// @param factor The Boys function argumnet scaling factor.
+auto comp_boys_args(     CSubMatrix& buffer,
+                    const size_t     index_args,
+                    const size_t     index_pc,
+                    const double     factor) -> void;
+
+/// @brief Reduces primitive array to contracted array.
+/// @param buffer The buffer with factors.
+/// @param index_contr The primary row index  of contracted integrals in buffer.
+/// @param index_prim The primary row index  of primitive integrals in buffer.
+/// @param ndims The dimensions of contracted rows.
+auto reduce(CSubMatrix& buffer, const size_t index_contr, const size_t index_prim, const size_t ndims) -> void;
 
 }  // namespace t2cfunc
 

@@ -768,4 +768,99 @@ distribute(CSubMatrix*                      matrix,
     });
 }
 
+auto
+comp_distances_pc(      CSubMatrix&          buffer,
+                  const size_t               index_pc,
+                  const std::vector<double>& gcoords_x,
+                  const std::vector<double>& gcoords_y,
+                  const std::vector<double>& gcoords_z,
+                  const double               p_x,
+                  const double               p_y,
+                  const double               p_z) -> void
+{
+    // set up number of grid points
+    
+    const auto npoints = buffer.number_of_columns();
+    
+    // set up R(PC) = P - C distances
+    
+    auto pc_x = &(buffer.data()[npoints * index_pc]);
+    
+    auto pc_y = &(buffer.data()[npoints * (index_pc + 1)]);
+    
+    auto pc_z = &(buffer.data()[npoints * (index_pc + 2)]);
+    
+    // set up grid point coordinates
+    
+    auto g_x = gcoords_x.data();
+    
+    auto g_y = gcoords_y.data();
+    
+    auto g_z = gcoords_z.data();
+    
+    // compute R(PC) distances on grid points
+    
+    #pragma omp simd
+    for (size_t i = 0; i < npoints; i++)
+    {
+        pc_x[i] = p_x - g_x[i];
+        
+        pc_y[i] = p_y - g_y[i];
+        
+        pc_z[i] = p_z - g_z[i];
+    }
+}
+
+auto
+comp_boys_args(     CSubMatrix& buffer,
+               const size_t     index_args,
+               const size_t     index_pc,
+               const double     factor) -> void
+{
+    // set up number of grid points
+    
+    const auto npoints = buffer.number_of_columns();
+    
+    // set up R(PC) = P - C distances
+    
+    auto pc_x = &(buffer.data()[npoints * index_pc]);
+    
+    auto pc_y = &(buffer.data()[npoints * (index_pc + 1)]);
+    
+    auto pc_z = &(buffer.data()[npoints * (index_pc + 2)]);
+    
+    // set up Boys function arguments
+    
+    auto bargs = &(buffer.data()[npoints * index_args]);
+    
+    #pragma omp simd
+    for (size_t i = 0; i < npoints; i++)
+    {
+        bargs[i] = factor * (pc_x[i] * pc_x[i] + pc_y[i] * pc_y[i] + pc_z[i] * pc_z[i]);
+    }
+}
+
+auto
+reduce(CSubMatrix& buffer, const size_t index_contr, const size_t index_prim, const size_t ndims) -> void
+{
+    // set up number of grid points
+    
+    const auto npoints = buffer.number_of_columns();
+    
+    for (size_t i = 0; i < ndims; i++)
+    {
+        // set up buffers
+        
+        auto cvals = &(buffer.data()[npoints * (index_contr + i)]);
+        
+        auto pvals = &(buffer.data()[npoints * (index_prim + i)]);
+        
+        #pragma omp simd
+        for (size_t j = 0; j < npoints; j++)
+        {
+            cvals[j] += pvals[j];
+        }
+    }
+}
+
 }  // namespace t2cfunc

@@ -31,6 +31,7 @@
 
 #include "MathConst.hpp"
 #include "SimdArray.hpp"
+#include "SubMatrix.hpp"
 
 /// @brief Class CBoysFunc implements computation of Boys function.
 /// @tparam N The order of Boys function.
@@ -132,6 +133,12 @@ class CBoysFunc
                  const float              a_exp,
                  const float              b_exp,
                  const float              omega) const -> void;
+    
+    /// @brief Computes Boys function values up to specified order (inclusively) for given vector of arguments.
+    /// @param buffer The Boys function data buffer (values, arguments).
+    /// @param index_vals The primary row index of values in Boys function data.
+    /// @param index_args The primary row index of arguments in Boys function data.
+    auto compute(CSubMatrix& buffer, const size_t index_vals, const size_t index_args) const -> void;
 
     /// @brief Gets Boys function table.
     /// @return The Boys function table.
@@ -25169,6 +25176,90 @@ CBoysFunc<N>::compute(CSimdArray<float>&       buffer,
             facts[j] *= omega * omega / (omega * omega + frho);
 
             bvals[j] *= facts[j];
+        }
+    }
+}
+
+template <int N>
+auto
+CBoysFunc<N>::compute(CSubMatrix& buffer, const size_t index_vals, const size_t index_args) const -> void
+{
+    const double fpi = 0.5 * std::sqrt(mathconst::pi_value());
+
+    const std::array<double, 28> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
+                                    1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0,
+                                    1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
+                                    1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
+
+    const auto nelems = static_cast<int>(buffer.number_of_columns());
+
+    for (int i = 0; i < nelems; i++)
+    {
+        size_t zidx = static_cast<size_t>(i);
+        
+        int pnt = (buffer.at({index_args, zidx}) > 1.0e5) ? 1000000 : static_cast<int>(10.0 * buffer.at({index_args, zidx}) + 0.5);
+
+        if (pnt < 121)
+        {
+            const double fa = buffer.at({index_args, zidx});
+
+            const double w = fa - 0.1 * pnt;
+
+            const double w2 = w * w;
+
+            const double w4 = w2 * w2;
+
+            buffer.at({index_vals + N, zidx}) = _table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
+
+                                              + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
+
+            const double f2a = fa + fa;
+
+            const double fx = std::exp(-fa);
+
+            for (int j = 0; j < N; j++)
+            {
+                buffer.at({index_vals + N - j - 1, zidx}) = ft[N - j - 1] * (f2a * buffer.at({index_vals + N - j, zidx}) + fx);
+            }
+        }
+        else
+        {
+            const double fia = 1.0 / buffer.at({index_args, zidx});
+
+            double pf = 0.5 * fia;
+
+            buffer.at({index_vals, zidx}) = fpi * std::sqrt(fia);
+
+            if (pnt < 921)
+            {
+                const double fia2 = fia * fia;
+
+                const double f = 0.4999489092 * fia - 0.2473631686 * fia2
+
+                               + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+
+                const double fx = std::exp(-buffer.at({index_args, zidx}));
+
+                buffer.at({index_vals, zidx}) -= f * fx;
+
+                const double rterm = pf * fx;
+
+                for (int j = 1; j <= N; j++)
+                {
+                    buffer.at({index_vals + j, zidx}) = pf * buffer.at({index_vals + j - 1, zidx}) - rterm;
+
+                    pf += fia;
+                }
+            }
+            else
+            {
+                for (int j = 1; j <= N; j++)
+                {
+                    buffer.at({index_vals + j, zidx}) = pf * buffer.at({index_vals + j - 1, zidx});
+
+                    pf += fia;
+                }
+            }
         }
     }
 }

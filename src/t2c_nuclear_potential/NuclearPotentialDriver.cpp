@@ -140,7 +140,7 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
             
             const auto bra_mom = gto_blocks[i].angular_momentum();
             
-            const auto nbra_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{bra_mom, });
+            // const auto nbra_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{bra_mom, });
             
             const auto nbra_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{bra_mom, });
             
@@ -150,13 +150,15 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
                 
                 const auto ket_mom = gto_blocks[i].angular_momentum();
                 
-                const auto nket_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{ket_mom, });
+                // const auto nket_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{ket_mom, });
                 
                 const auto nket_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{ket_mom, });
                 
                 // allocate local buffers
                 
-                const std::array<size_t, 4> cdims{0, 0, static_cast<size_t>(nbra_cart_comps * nket_cart_comps), static_cast<size_t>(npoints)};
+                const size_t ncomps = 7;
+                
+                const std::array<size_t, 4> cdims{0, 0, ncomps, static_cast<size_t>(npoints)};
                 
                 auto cbuffer = CSubMatrix(cdims);
                 
@@ -172,7 +174,9 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
                     
                     for (int l = lstart; l < nket_gtos; l++)
                     {
-                        npotfunc::compute(sbuffer, cbuffer, gto_blocks[i], gto_blocks[j], k, l, i == j);
+                        npotfunc::compute(sbuffer, cbuffer, gcoords_x, gcoords_y, gcoords_z, gweights, gto_blocks[i], gto_blocks[j], k, l);
+                        
+                        // FIX ME: Add distributor here....
                     }
                 }
             }
