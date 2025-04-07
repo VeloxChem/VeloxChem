@@ -1674,6 +1674,7 @@ class ExcitonModelDriver:
         self.ostream.print_header(valstr)
         self.ostream.print_header(line)
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_title(self, num_LE, num_CT):
         """
@@ -1704,6 +1705,7 @@ class ExcitonModelDriver:
             valstr = 'Monomer  {}  has  {}  atoms'.format(i + 1, n)
             self.ostream.print_header(valstr.ljust(54))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_absorption(self, title, eigvals, osc_str):
         """
@@ -1727,6 +1729,7 @@ class ExcitonModelDriver:
             valstr += '    Osc.Str. {:9.4f}'.format(f)
             self.ostream.print_header(valstr.ljust(80))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_ecd(self, title, rot_str):
         """
@@ -1748,3 +1751,4 @@ class ExcitonModelDriver:
             valstr += f'{R:11.4f} [10**(-40) cgs]'
             self.ostream.print_header(valstr.ljust(80))
         self.ostream.print_blank()
+        self.ostream.flush()

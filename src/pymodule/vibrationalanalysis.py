@@ -617,6 +617,7 @@ class VibrationalAnalysis:
 
         if self.hessian_driver.hessian is None:
             self.ostream.print_warning('Hessian is not available.')
+            self.ostream.flush()
         else:
             self.hessian_driver.print_hessian(molecule)
 

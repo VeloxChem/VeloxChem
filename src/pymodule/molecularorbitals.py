@@ -208,6 +208,7 @@ class MolecularOrbitals:
                                          ao_map, 0.15, ostream)
 
             ostream.print_blank()
+            ostream.flush()
 
         elif self._orbitals_type == molorb.unrest:
 
@@ -262,6 +263,7 @@ class MolecularOrbitals:
                                          ao_map, 0.15, ostream)
 
             ostream.print_blank()
+            ostream.flush()
 
         else:
 

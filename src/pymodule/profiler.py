@@ -162,6 +162,7 @@ class Profiler:
                     line = '{:s} ...{:s}:{:s}'.format(text, fname, lineno)
                 ostream.print_info(line)
             ostream.print_blank()
+            ostream.flush()
 
     def print_memory_tracing(self, ostream):
         """
@@ -187,6 +188,7 @@ class Profiler:
                 ostream.print_info('{:<45s} {:s}'.format(
                     text, self.memory_to_string(stat.size)))
             ostream.print_blank()
+            ostream.flush()
 
     def set_timing_key(self, key):
         """
@@ -285,6 +287,7 @@ class Profiler:
 
             ostream.print_blank()
             ostream.print_blank()
+            ostream.flush()
 
     def check_memory_usage(self, remark=''):
         """
@@ -330,6 +333,7 @@ class Profiler:
 
             ostream.print_blank()
             ostream.print_blank()
+            ostream.flush()
 
     def comp_memory_object(self, obj, counted_ids=None):
         """

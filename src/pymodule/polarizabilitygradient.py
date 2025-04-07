@@ -1977,7 +1977,6 @@ class PolarizabilityGradient:
         self.ostream.print_blank()
         self.ostream.print_info(info_on_threshold)
         self.ostream.print_blank()
-        self.ostream.flush()
 
         for i in range(natm):
             atom_info = f'** Atom #{i + 1}: {labels[i]} **'
@@ -2026,7 +2025,8 @@ class PolarizabilityGradient:
             self.ostream.print_block(gradient_block)
             self.ostream.print_blank()
             self.ostream.print_blank()
-            self.ostream.flush()
+
+        self.ostream.flush()
 
     def print_geometry(self, molecule):
         """
@@ -2037,6 +2037,7 @@ class PolarizabilityGradient:
         """
 
         self.ostream.print_block(molecule.get_string())
+        self.ostream.flush()
 
     def _check_real_or_complex_input(self, lr_results):
         """
