@@ -121,38 +121,31 @@ class ConformerGenerator:
 
         # according to the connected_atom and equivalent list, if one side is
         # connected to a equivalent group "like methyl" then no need to sample
-        # and return True
 
         # for i,j,k,l we check side_j and side_k
         # we check twice because any side works
 
-        # check j side
+        side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
+        side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
+
         side_equiv = False
         max_equiv_atoms = 0
-        side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
-        if atom_info_dict[side_j_index]["AtomicSymbol"] == "C":
-            one_based_connected_atom_numbers = atom_info_dict[side_j_index]["ConnectedAtomsNumbers"]
-            connected_set = set(one_based_connected_atom_numbers)
-            connected_set = connected_set - {dihedral_indices[2]+1}  # remove the dihedral atom_k
-            for equiv_g in one_based_equiv_atoms_groups:
-                if connected_set.issubset(set(equiv_g)):
-                    side_equiv = True
-                    max_equiv_atoms  = max(max_equiv_atoms, len(connected_set))
-                    break
-        
 
-        # check k side
-        side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
-        if atom_info_dict[side_k_index]["AtomicSymbol"] == "C":
-            one_based_connected_atom_numbers = atom_info_dict[side_k_index]["ConnectedAtomsNumbers"]
-            connected_set = set(one_based_connected_atom_numbers)
-            connected_set = connected_set - {dihedral_indices[1]+1}  # remove the dihedral atom_j
-            for equiv_g in one_based_equiv_atoms_groups:
-                if connected_set.issubset(set(equiv_g)):
-                    side_equiv = True
-                    max_equiv_atoms  = max(max_equiv_atoms, len(connected_set))
+        # check j and k side of dihedral
+        for a, b in [(side_j_index, side_k_index), (side_k_index, side_j_index)]:
 
-        # if not found, return False
+            # check equiv_atoms on one dihedral atom
+            if atom_info_dict[a]["AtomicSymbol"] == "C":
+                one_based_connected_atom_numbers = atom_info_dict[a]["ConnectedAtomsNumbers"]
+                connected_set = set(one_based_connected_atom_numbers)
+                connected_set = connected_set - {b}  # remove the other dihedral atom
+
+                for equiv_g in one_based_equiv_atoms_groups:
+                    if connected_set.issubset(set(equiv_g)):
+                        side_equiv = True
+                        max_equiv_atoms = max(max_equiv_atoms, len(connected_set))
+                        break
+
         return side_equiv, max_equiv_atoms
 
     def _check_methyl_group(self, dihedral_indices, atom_info_dict):
@@ -160,23 +153,16 @@ class ConformerGenerator:
         side_j_index = dihedral_indices[1] + 1  # convert to 1 based index
         side_k_index = dihedral_indices[2] + 1  # convert to 1 based index
 
-        # check j side
-        if atom_info_dict[side_j_index]["AtomicSymbol"] == "C":
-            one_based_connected_atom_numbers = atom_info_dict[side_j_index]["ConnectedAtomsNumbers"]
-            connected_set = set(one_based_connected_atom_numbers)
-            connected_set = connected_set - {side_k_index}  # remove dihedral atom_k
-            connected_elements = [atom_info_dict[idx]["AtomicSymbol"] for idx in connected_set]
-            if tuple(connected_elements) == ("H", "H", "H"):
-                return True
+        # check j and k side of dihedral
+        for a, b in [(side_j_index, side_k_index), (side_k_index, side_j_index)]:
 
-        # check k side
-        if atom_info_dict[side_k_index]["AtomicSymbol"] == "C":
-            one_based_connected_atom_numbers = atom_info_dict[side_k_index]["ConnectedAtomsNumbers"]
-            connected_set = set(one_based_connected_atom_numbers)
-            connected_set = connected_set - {side_j_index}  # remove dihedral atom_j
-            connected_elements = [atom_info_dict[idx]["AtomicSymbol"] for idx in connected_set]
-            if tuple(connected_elements) == ("H", "H", "H"):
-                return True
+            if atom_info_dict[a]["AtomicSymbol"] == "C":
+                one_based_connected_atom_numbers = atom_info_dict[a]["ConnectedAtomsNumbers"]
+                connected_set = set(one_based_connected_atom_numbers)
+                connected_set = connected_set - {b}  # remove the other dihedral atom
+                connected_elements = [atom_info_dict[idx]["AtomicSymbol"] for idx in connected_set]
+                if tuple(connected_elements) == ("H", "H", "H"):
+                    return True
 
         return False
 
@@ -230,7 +216,8 @@ class ConformerGenerator:
 
         dihedrals_candidates = []
 
-        one_based_equiv_atoms_groups = self._analyze_equiv(molecule) #used for _check_equivside_in_dihedrals
+        # needed by _check_equivside_in_dihedrals
+        one_based_equiv_atoms_groups = self._analyze_equiv(molecule)
 
         for k, v in rotatable_dihedrals_dict.items():
             max_periodicity = v["max_periodicity"]
@@ -246,15 +233,17 @@ class ConformerGenerator:
                 continue
 
             dih_index = v["dihedral_indices"]
-            # skip dihedral angle involving methyl group
-            # TODO: use _check_equivside_in_dihedrals and if equiv atoms number equal to max_periodicity then skip
 
+            # skip dihedral angle involving methyl group
             if self._check_methyl_group(dih_index, atom_info_dict):
                 continue
 
-            side_equiv, max_equiv_atoms = self._check_equivside_in_dihedrals(dih_index,atom_info_dict,one_based_equiv_atoms_groups)
+            # look for equiv_atoms, and skip if number of equiv_atoms equals max_periodicity
+            side_equiv, max_equiv_atoms = self._check_equivside_in_dihedrals(
+                dih_index, atom_info_dict, one_based_equiv_atoms_groups)
             if side_equiv and max_equiv_atoms == max_periodicity:
                 continue
+
             dihedrals_candidates.append((dih_index, dih_angle))
 
         return dihedrals_candidates, atom_info_dict, dihedrals_dict
@@ -634,11 +623,18 @@ class ConformerGenerator:
                 self.ostream.print_info(
                     f"{len(conformers_dict['energies'])} conformers with " +
                     f"the lowest energies are saved in folder {str(save_path)}")
+            else:
+                self.ostream.print_info(
+                    f"{len(conformers_dict['energies'])} conformers remain " +
+                    f"after removal of duplicate conformers.")
 
             self.ostream.print_info(
                 "Total time spent in generating conformers: " +
                 f"{time.time() - conf_gen_t0:.2f} sec")
+            self.ostream.flush()
+
             self.conformer_dict = conformers_dict
+
             return conformers_dict
         else:
             return None
@@ -646,17 +642,17 @@ class ConformerGenerator:
     def show_global_minimum(self, atom_indices=False, atom_labels=False):
 
         if self._rank == mpi_master():
-            print(f"Global minimum conformer with Energy {self.global_minimum_energy:.3f} kJ/mol:")
+            print(f"Global minimum conformer with energy {self.global_minimum_energy:.3f} kJ/mol")
             self.global_minimum_conformer.show(
                 atom_indices=atom_indices, atom_labels=atom_labels)
 
-    def show_filtered_conformers(self, number=1 ,atom_indices=False, atom_labels=False):
+    def show_conformers(self, number=1, atom_indices=False, atom_labels=False):
+
         if self._rank == mpi_master():
-            print(f"Filtered conformers:")
             if number > len(self.conformer_dict["energies"]):
                 number = len(self.conformer_dict["energies"])
                 print(f"Only {number} conformers available, showing all.")
             for i in range(number):
-                print(f"Conformer {i + 1} with Energy {self.conformer_dict["energies"][i]}:")
+                print(f"Conformer {i + 1} with energy {self.conformer_dict["energies"][i]:.3f} kJ/mol")
                 self.conformer_dict["molecules"][i].show(
                     atom_indices=atom_indices, atom_labels=atom_labels)
