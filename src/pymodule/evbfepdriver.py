@@ -213,13 +213,13 @@ class EvbFepDriver():
             states = self._safe_step(equil_simulation, equilibration_steps)
 
             equil_state = equil_simulation.context.getState(
-                positions=True,
-                velocities=True,
-                forces=True,
-                energy=True,
-                parameters=True,
-                parameterDerivatives=True,
-                integratorParameters=True,
+                getPositions=True,
+                getVelocities=True,
+                getForces=True,
+                getEnergy=True,
+                getParameters=True,
+                getParameterDerivatives=True,
+                getIntegratorParameters=True,
                 enforcePeriodicBox=True,
             )
             if self.debug:
@@ -388,10 +388,10 @@ class EvbFepDriver():
                 raise e
 
             state = simulation.context.getState(
-                positions=True,
-                velocities=True,
-                forces=True,
-                energy=True,
+                getPositions=True,
+                getVelocities=True,
+                getForces=True,
+                getEnergy=True,
             )
             states.append(state)
             if len(states) > self.save_frames:
