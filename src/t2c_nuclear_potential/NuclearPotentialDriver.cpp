@@ -177,6 +177,15 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
                         npotfunc::compute(sbuffer, cbuffer, gcoords_x, gcoords_y, gcoords_z, gweights, gto_blocks[i], gto_blocks[j], k, l);
                         
                         // FIX ME: Add distributor here....
+                        
+                        if ((bra_mom + ket_mom) == 0)
+                        {
+                            // distribute integrals in Cartesian buffer 
+                        }
+                        else
+                        {
+                            // distribute integrals in spherical buffer
+                        }
                     }
                 }
             }
