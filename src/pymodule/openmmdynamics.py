@@ -52,6 +52,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .optimizationdriver import OptimizationDriver
 from .interpolationdriver import InterpolationDriver
 from .errorhandler import assert_msg_critical
+from .mofutils import svd_superimpose
 
 try:
     import openmm as mm
@@ -164,6 +165,10 @@ class OpenMMDynamics:
         self.molecule = None
         self.unique_residues = []
         self.unique_molecules = []
+
+        # filtering
+        self.rmsd_threshold = 1.5
+        self.energy_threshold = 1.5 # kj/mol
 
         # QM Region parameters
         self.qm_driver = None
@@ -726,7 +731,7 @@ class OpenMMDynamics:
                                 timestep=2.0, 
                                 nsteps=10000, 
                                 snapshots=10,
-                                lowest_conformations=None,
+                                unique_conformers=True,
                                 qm_driver=None,
                                 basis=None,
                                 constraints=None):
@@ -820,33 +825,88 @@ class OpenMMDynamics:
 
 
         # TODO: Replace this with the unique_conformers function
-        if lowest_conformations:
-            msg = f'Looking for the {lowest_conformations} lowest energy conformations.'
+        equiv_conformer_pairs= []
+        if unique_conformers:
+            msg = f'Filtering for unique conformers'
             self.ostream.print_info(msg)
             self.ostream.flush()
+            
+            # reorder coordinates and energies by increasing energy
+            index_ẹnergy = [(i, energies[i]) for i in range(len(energies))]
+            sorted_index_energy = sorted(index_ẹnergy, key=lambda x: x[1]) # sorted by increasing energy
+            sorted_indices = [i[0] for i in sorted_index_energy]
+
+
+            minimized_energy = [energies[i] for i in sorted_indices]
+            opt_coordinates = [opt_coordinates[i] for i in sorted_indices]
+
 
             # Filter out the conformations with RMSD < 0.1 and keep the lowest energy one.
-
             for i, coord in enumerate(opt_coordinates):
-                molecule = Molecule.from_xyz_string(coord)
-                molecule_coords = molecule.get_coordinates_in_angstrom()
-                energy = energies[i]
-                for j, coord2 in enumerate(opt_coordinates):
-                    if i != j:
-                        molecule2 = Molecule.from_xyz_string(coord2)
-                        molecule2_coords = molecule2.get_coordinates_in_angstrom()
-                        rmsd = self._calculate_rmsd(molecule_coords, molecule2_coords)
-                        if rmsd < 0.1:
-                            if energies[j] < energy:
-                                energies[i] = energies[j]
-                                opt_coordinates[i] = opt_coordinates[j]
+                mol= Molecule.read_xyz_string(coord)
+                xyz_i = mol.get_coordinates_in_angstrom()
+                ene_i = minimized_energy[i]
 
-            energies = sorted(energies)[:lowest_conformations]
-            opt_coordinates = opt_coordinates[:lowest_conformations]
+                for j in range(i + 1, len(opt_coordinates)):
+                    mol_j= Molecule.read_xyz_string(opt_coordinates[j])
+                    xyz_j = mol_j.get_coordinates_in_angstrom()
+                    ene_j = minimized_energy[j]
+                    if abs(ene_i - ene_j) < self.energy_threshold:
+                        rmsd, rot, trans = svd_superimpose(xyz_j, xyz_i)
+                        if rmsd < self.rmsd_threshold:
+                            equiv_conformer_pairs.append((i, j))
+
+            duplicate_conformers = [j for i, j in equiv_conformer_pairs]
+            duplicate_conformers = sorted(list(set(duplicate_conformers)))
+
+            filtered_energies = [
+                e
+                for i, e in enumerate(minimized_energy)
+                if i not in duplicate_conformers
+            ]
+
+            filtered_geometries = [
+                g
+                for i, g in enumerate(opt_coordinates)
+                if i not in duplicate_conformers
+            ]
             
-            msg = 'Lowest energy conformations saved'
+            opt_coordinates = filtered_geometries
+            energies = filtered_energies
+
+            def calculate_boltzmann(energies, T=300, unit='kj/mol'):
+                if unit=='kj/mol':
+                    R = 0.008314462618
+                elif unit=='kcal/mol':
+                    R = 1.98720425864083e-3
+                elif unit=='hartree':
+                    R = 3.166811563671e-6
+                else:
+                    raise ValueError('Invalid unit')
+                # calculate relative energies
+                relative_energies = [energy - min(energies) for energy in energies]
+                # calculate the boltzmann factors
+                boltzmann_factors = [np.exp(-energy/(R*T)) for energy in relative_energies]
+                # calculate the partition function
+                partition_function = sum(boltzmann_factors)
+                # calculate the probabilities
+                probabilities = [factor/partition_function for factor in boltzmann_factors]
+                return probabilities
+        
+            weights = calculate_boltzmann(energies, T=300, unit='kj/mol')
+            # print table of results
+            msg = f'\nNumber of unique conformers: {len(opt_coordinates)}'
             self.ostream.print_info(msg)
             self.ostream.flush()
+            for i, (energy, weight) in enumerate(zip(energies, weights)):
+                # on the first line of the msg, print the energy in kJ/mol and the weight
+                # on the second line, add a visulization of the conformer
+                
+                msg = f'\nConformation {i+1}: Energy: {energy:.2f} kJ/mol, Weight: {weight:.4f}'
+                msg += f'\n{Molecule.from_xyz_string(opt_coordinates[i]).show()}'    
+
+                self.ostream.print_info(msg)
+                self.ostream.flush()
 
         if qm_driver:
             # Use qm_miniization to minimize the energy of the conformations
@@ -885,6 +945,9 @@ class OpenMMDynamics:
         # Convert the opt_coordinates to molecule objects
 
         opt_molecules = [Molecule.from_xyz_string(coords) for coords in opt_coordinates]
+
+
+
 
         return energies, opt_molecules
 
