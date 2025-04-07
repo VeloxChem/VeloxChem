@@ -161,6 +161,12 @@ class EvbFepDriver():
             )
             equil_simulation.context.setPositions(positions)
 
+            if i == 0:
+                platform = equil_simulation.context.getPlatform()
+                self.ostream.print_info(
+                    f"Running FEP on platform: {platform.getName()}")
+                self.ostream.flush()
+
             if self.constrain_H:
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
