@@ -353,7 +353,7 @@ class ConformerGenerator:
         state = simulation.context.getState(
             getPositions=True,
             getEnergy=True,
-            #getForces=True,
+            # getForces=True,
         )
 
         energy = state.getPotentialEnergy().value_in_unit_system(md_unit_system)
@@ -626,7 +626,7 @@ class ConformerGenerator:
             else:
                 self.ostream.print_info(
                     f"{len(conformers_dict['energies'])} conformers remain " +
-                    f"after removal of duplicate conformers.")
+                    "after removal of duplicate conformers.")
 
             self.ostream.print_info(
                 "Total time spent in generating conformers: " +
@@ -653,6 +653,6 @@ class ConformerGenerator:
                 number = len(self.conformer_dict["energies"])
                 print(f"Only {number} conformers available, showing all.")
             for i in range(number):
-                print(f"Conformer {i + 1} with energy {self.conformer_dict["energies"][i]:.3f} kJ/mol")
+                print(f"Conformer {i + 1} with energy {self.conformer_dict['energies'][i]:.3f} kJ/mol")
                 self.conformer_dict["molecules"][i].show(
                     atom_indices=atom_indices, atom_labels=atom_labels)
