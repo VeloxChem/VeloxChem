@@ -5,13 +5,14 @@ import shutil
 import logging
 import numpy as np
 import pandas as pd
+import veloxchem as vlx
 
 from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
 from veloxchem import Molecule
 from Atom_mapping import MCS
 from Class import MolecularPropertyCalculator
-from Deprotonation import OxygenDeprotonation
+# from Deprotonation import OxygenDeprotonation
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
@@ -85,7 +86,7 @@ class MoleculeProcessor:
             mol = Chem.MolFromXYZFile(file)
             try:
                 rdDetermineBonds.DetermineBonds(mol, 0)
-                deprot = OxygenDeprotonation(mol, filename, output_folder=self.deprotonated_dir)
+                deprot = vlx.OxygenDeprotonation(mol, filename, output_folder=self.deprotonated_dir)
                 deprot.Deprotonate()
             except Exception as e:
                 logging.error(f"Failed to deprotonate {filename}: {e}")
@@ -124,7 +125,7 @@ class MoleculeProcessor:
 
                 try:
                     mol = Molecule.read_xyz_file(deprot_path)
-                    calc = MolecularPropertyCalculator(mol, deprotonated=True)
+                    calc = vlx.MolecularPropertyCalculator(mol, deprotonated=True)
                     data_matrix = calc.run_all_calculations()
                     xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
                     df = pd.DataFrame(data_matrix, columns=[
