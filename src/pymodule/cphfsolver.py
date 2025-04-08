@@ -31,7 +31,6 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import sys
@@ -88,7 +87,9 @@ class CphfSolver(LinearSolver):
         self._input_keywords['orbitalresponse'] = {
             'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
             'print_residuals': ('bool', 'print iteration to output'),
-            'max_iter': ('int', 'maximum number of iterations')
+            'max_iter': ('int', 'maximum number of iterations'),
+            'force_checkpoint':
+                ('bool', 'flag for writing checkpoint every iteration'),
         }
 
     def update_settings(self, cphf_dict, method_dict=None):
@@ -152,8 +153,8 @@ class CphfSolver(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_orbrsp.h5'
-        elif (self.checkpoint_file is not None
-              and self.checkpoint_file.endswith('_rsp.h5')):
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('_rsp.h5')):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
 
@@ -228,8 +229,8 @@ class CphfSolver(LinearSolver):
             num_vecs = self.dist_trials.shape(1)
 
             for x in range(dof):
-                if (iteration > 0
-                        and relative_residual_norm[x] < self.conv_thresh):
+                if (iteration > 0 and
+                        relative_residual_norm[x] < self.conv_thresh):
                     continue
 
                 # CPHF RHS in reduced space
@@ -379,8 +380,8 @@ class CphfSolver(LinearSolver):
         # update checkpoint_file after scf_results_sanity_check
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_orbrsp.h5'
-        elif (self.checkpoint_file is not None
-              and self.checkpoint_file.endswith('_rsp.h5')):
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('_rsp.h5')):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
 
@@ -388,7 +389,7 @@ class CphfSolver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         if self.rank == mpi_master():
             if self._dft:
@@ -490,8 +491,8 @@ class CphfSolver(LinearSolver):
             num_vecs = self.dist_trials.shape(1)
 
             for x in range(dof):
-                if (iteration > 0
-                        and relative_residual_norm[x] < self.conv_thresh):
+                if (iteration > 0 and
+                        relative_residual_norm[x] < self.conv_thresh):
                     continue
 
                 # CPHF RHS in reduced space
@@ -499,7 +500,7 @@ class CphfSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     # solve the equations exactly in the subspace
-                    u_red = np.linalg.solve(orbhess_red, cphf_rhs_red)
+                    u_red = safe_solve(orbhess_red, cphf_rhs_red)
                 else:
                     u_red = None
                 u_red = self.comm.bcast(u_red, root=mpi_master())
@@ -976,7 +977,7 @@ class CphfSolver(LinearSolver):
                                  distribute=False)
             norm = np.sqrt(v.squared_norm())
 
-            if norm > 1e-10:  # small_thresh of lrsolver
+            if norm > self.norm_thresh:
                 trials.append(v.data[:])
 
         dist_trials = DistributedArray(np.array(trials).T,
@@ -1061,7 +1062,7 @@ class CphfSolver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         if self.rank == mpi_master():
             if self._dft:
@@ -1078,9 +1079,9 @@ class CphfSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        profiler.set_timing_key('CPHF RHS')
-        # TODO: double check use of profiler
-        profiler.start_timer('CPHF RHS')
+        profiler.set_timing_key('CPHF')
+
+        profiler.start_timer('RHS')
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E_alpha']
@@ -1115,9 +1116,9 @@ class CphfSolver(LinearSolver):
         else:
             cphf_rhs = None
 
-        profiler.stop_timer('CPHF RHS')
-
         cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
+
+        profiler.stop_timer('RHS')
 
         # Solve the CPHF equations using conjugate gradient (cg)
         cphf_ov = self.solve_cphf_cg(
@@ -1140,12 +1141,10 @@ class CphfSolver(LinearSolver):
             else:
                 self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
-            # merge the rhs dict with the solution
-            cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
+        # merge the rhs dict with the solution
+        cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
 
-            return cphf_ov_dict
-
-        return None
+        return cphf_ov_dict
 
     def solve_cphf_cg(self, molecule, basis, scf_tensors, cphf_rhs):
         """
@@ -1299,13 +1298,24 @@ class CphfSolver(LinearSolver):
         b = cphf_rhs.reshape(dof * nocc * nvir)
         x0 = cphf_guess.reshape(dof * nocc * nvir)
 
-        cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
-                                                  b=b,
-                                                  x0=x0,
-                                                  M=PrecondOp,
-                                                  rtol=self.conv_thresh,
-                                                  atol=0,
-                                                  maxiter=self.max_iter)
+        try:
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      rtol=self.conv_thresh,
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
+        except TypeError:
+            # workaround for scipy < 1.11
+            cphf_coefficients_ov, cg_conv = linalg.cg(A=LinOp,
+                                                      b=b,
+                                                      x0=x0,
+                                                      M=PrecondOp,
+                                                      tol=(self.conv_thresh *
+                                                           np.linalg.norm(b)),
+                                                      atol=0,
+                                                      maxiter=self.max_iter)
 
         self._is_converged = (cg_conv == 0)
 
@@ -1414,12 +1424,11 @@ class CphfSolver(LinearSolver):
             return
 
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.orbrsp.h5'
-        elif (self.checkpoint_file is not None
-              and self.checkpoint_file.endswith('.rsp.h5')):
-            fpath = Path(self.checkpoint_file)
-            fpath = fpath.with_name(fpath.stem)
-            self.checkpoint_file = str(fpath.with_suffix('.orbrsp.h5'))
+            self.checkpoint_file = f'{self.filename}_orbrsp.h5'
+        elif (self.checkpoint_file is not None and
+              self.checkpoint_file.endswith('_rsp.h5')):
+            self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
+                                    '_orbrsp.h5')
 
         t0 = tm.time()
 

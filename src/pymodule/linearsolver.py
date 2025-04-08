@@ -38,6 +38,8 @@ import math
 import sys
 
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import RIFockDriver, SubMatrix
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -45,6 +47,7 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
+from .molecularbasis import MolecularBasis
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -61,6 +64,11 @@ from .dftutils import get_default_grid_level, print_xc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
 
 
 class LinearSolver:
@@ -119,6 +127,11 @@ class LinearSolver:
         # ERI settings
         self.eri_thresh = 1.0e-15
         self.batch_size = None
+
+        # RI-J
+        self.ri_coulomb = False
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_drv = None
 
         # dft
         self.xcfun = None
@@ -206,7 +219,7 @@ class LinearSolver:
                 'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
                 'force_checkpoint':
-                ('bool', 'flag for writing checkpoint every iteration'),
+                    ('bool', 'flag for writing checkpoint every iteration'),
                 'save_solutions': ('bool', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
@@ -218,6 +231,8 @@ class LinearSolver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
@@ -301,8 +316,7 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['response'].items()
+            key: val[0] for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -312,7 +326,7 @@ class LinearSolver:
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}.rsp.h5'
+                self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -425,7 +439,7 @@ class LinearSolver:
             'screening': screening,
         }
 
-    def _init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors, silent=False):
         """
         Initializes DFT.
 
@@ -439,7 +453,8 @@ class LinearSolver:
         """
 
         if self._dft:
-            print_xc_reference(self.xcfun, self.ostream)
+            if not silent:
+                print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
@@ -449,15 +464,16 @@ class LinearSolver:
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
             n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
+            if not silent:
+                self.ostream.print_info(
+                    'Molecular grid with {0:d} points generated in {1:.2f} sec.'
+                    .format(n_grid_points,
+                            tm.time() - grid_t0))
+                self.ostream.print_blank()
 
             if self.rank == mpi_master():
                 # Note: make gs_density a tuple
-                gs_density = (scf_tensors['D_alpha'].copy(), )
+                gs_density = (scf_tensors['D_alpha'].copy(),)
             else:
                 gs_density = None
             gs_density = self.comm.bcast(gs_density, root=mpi_master())
@@ -1424,8 +1440,8 @@ class LinearSolver:
                                             fock_type, exchange_scaling_factor,
                                             0.0, thresh_int)
 
-            fock_np = fock_mat.to_numpy()
-            fock_mat = Matrix()
+                fock_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
             if fock_type == 'j':
                 # for pure functional
@@ -1500,7 +1516,7 @@ class LinearSolver:
             return
 
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.rsp.h5'
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         t0 = tm.time()
 

@@ -91,7 +91,7 @@ class ComplexResponse(LinearSolver):
 
         self.cpp_flag = None
 
-        self.frequencies = (0, )
+        self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
 
         self._input_keywords['response'].update({
@@ -127,7 +127,7 @@ class ComplexResponse(LinearSolver):
         """
 
         assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
-                            'ComplexResponse: invalide CPP flag')
+                            'ComplexResponse: invalid CPP flag')
 
         self.cpp_flag = flag.lower()
 
@@ -324,7 +324,7 @@ class ComplexResponse(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         if self.rank == mpi_master():
@@ -387,8 +387,7 @@ class ComplexResponse(LinearSolver):
                                                 basis, scf_tensors)
             if self.rank == mpi_master():
                 v_grad = {
-                    (op, w): v
-                    for op, v in zip(self.b_components, b_grad)
+                    (op, w): v for op, v in zip(self.b_components, b_grad)
                     for w in self.frequencies
                 }
 
@@ -500,8 +499,8 @@ class ComplexResponse(LinearSolver):
             s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             for op, w in op_freq_keys:
-                if (iteration == 0
-                        or relative_residual_norm[(op, w)] > self.conv_thresh):
+                if (iteration == 0 or
+                        relative_residual_norm[(op, w)] > self.conv_thresh):
 
                     grad_rg = dist_grad[(op, w)].get_column(0)
                     grad_ru = dist_grad[(op, w)].get_column(1)
@@ -798,8 +797,7 @@ class ComplexResponse(LinearSolver):
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
                         # write to h5 file for response solutions
-                        if (self.save_solutions
-                                and self.checkpoint_file is not None):
+                        if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
                                 for aop in self.a_components
@@ -809,11 +807,10 @@ class ComplexResponse(LinearSolver):
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
-                    if (self.save_solutions
-                            and self.checkpoint_file is not None):
-                        checkpoint_text = 'Response solution vectors written to file: '
-                        checkpoint_text += final_h5_fname
-                        self.ostream.print_info(checkpoint_text)
+                    if (self.save_solutions and final_h5_fname is not None):
+                        self.ostream.print_info(
+                            'Response solution vectors written to file: ' +
+                            final_h5_fname)
                         self.ostream.print_blank()
 
                     ret_dict = {

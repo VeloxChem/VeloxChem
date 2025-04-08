@@ -104,12 +104,14 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         The list containing SCF history.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str)
-                        and Path(fname).is_file())
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
 
     if valid_checkpoint:
 
         hf = h5py.File(fname, 'a')
+
+        scf_group = hf.create_group('scf')
 
         # write SCF tensors
         keys = ['S'] + [
@@ -119,18 +121,23 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         for key in keys:
             # TODO: remove this if statement since all keys should be available
             if key in scf_results:
-                hf.create_dataset(key, data=scf_results[key])
+                scf_group.create_dataset(key, data=scf_results[key])
+
+        # write dipole moment
+        scf_group.create_dataset('dipole_moment',
+                                 data=scf_results['dipole_moment'])
 
         # write SCF energy
-        hf.create_dataset('scf_type', data=np.bytes_([scf_results['scf_type']]))
-        hf.create_dataset('scf_energy',
-                          data=np.array([scf_results['scf_energy']]))
+        scf_group.create_dataset('scf_type',
+                                 data=np.bytes_([scf_results['scf_type']]))
+        scf_group.create_dataset('scf_energy',
+                                 data=np.array([scf_results['scf_energy']]))
 
         # write SCF history
         keys = list(scf_history[0].keys())
         for key in keys:
             data = np.array([step[key] for step in scf_history])
-            hf.create_dataset(f'scf_history_{key}', data=data)
+            scf_group.create_dataset(f'scf_history_{key}', data=data)
 
         hf.close()
 
@@ -367,8 +374,8 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
         True if the checkpoint file is valid, False otherwise.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str)
-                        and Path(fname).is_file())
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
 
     if not valid_checkpoint:
         return False
@@ -420,8 +427,9 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
 
     hf.close()
 
-    return (match_labels and match_nuclear_repulsion and match_nuclear_charges
-            and match_basis_set and match_dft_func and match_potfile)
+    return (match_labels and match_nuclear_repulsion and
+            match_nuclear_charges and match_basis_set and match_dft_func and
+            match_potfile)
 
 
 def write_distributed_focks(fname, dist_focks, key_freq_pairs, comm, ostream):
@@ -514,8 +522,8 @@ def check_distributed_focks(fname, key_freq_pairs):
         True if the checkpoint file is valid, False otherwise.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str)
-                        and Path(fname).is_file())
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
 
     if not valid_checkpoint:
         return False
@@ -528,8 +536,8 @@ def check_distributed_focks(fname, key_freq_pairs):
         x.decode('utf-8') for x in np.array(hf.get('key_freq_pairs'))
     ]
 
-    valid_checkpoint = (str_key_freq_pairs == hf_key_freq_pairs
-                        and 'distributed_focks' in hf.keys())
+    valid_checkpoint = (str_key_freq_pairs == hf_key_freq_pairs and
+                        'distributed_focks' in hf.keys())
 
     hf.close()
 

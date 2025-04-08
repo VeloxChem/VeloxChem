@@ -235,7 +235,7 @@ class ExcitonModelDriver:
         if 'filename' in exciton_dict:
             self.filename = exciton_dict['filename']
             if 'checkpoint_file' not in exciton_dict:
-                self.checkpoint_file = f'{self.filename}.exciton.h5'
+                self.checkpoint_file = f'{self.filename}_exciton.h5'
 
         method_keywords = {
             key: val[0]
@@ -306,7 +306,7 @@ class ExcitonModelDriver:
         """
 
         if self.checkpoint_file is None and self.filename is not None:
-            self.checkpoint_file = f'{self.filename}.exciton.h5'
+            self.checkpoint_file = f'{self.filename}_exciton.h5'
 
         # sanity check
         assert_msg_critical(
@@ -524,7 +524,8 @@ class ExcitonModelDriver:
 
                 assert_msg_critical(
                     dimer.check_multiplicity(),
-                    'Molecule: Incompatible multiplicity and number of electrons')
+                    'Molecule: Incompatible multiplicity and number of electrons'
+                )
 
                 dimer_bas = basis.slice(monomer_atomlists[ind_A] +
                                         monomer_atomlists[ind_B])
@@ -945,10 +946,11 @@ class ExcitonModelDriver:
             self.ostream.flush()
 
         # checkpoint file for SCF
-        monomer_scf_h5 = f'monomer_{ind + 1}.scf.h5'
+        monomer_scf_h5 = f'monomer_{ind + 1}_scf.h5'
         if self.checkpoint_file is not None:
-            monomer_scf_h5 = Path(
-                self.checkpoint_file).with_suffix(f'.{monomer_scf_h5}')
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            monomer_scf_h5 = str(fpath) + '_' + monomer_scf_h5
 
         # SCF calculation
         scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
@@ -989,10 +991,11 @@ class ExcitonModelDriver:
         """
 
         # checkpoint file for TDA
-        monomer_rsp_h5 = f'monomer_{ind + 1}.rsp.h5'
+        monomer_rsp_h5 = f'monomer_{ind + 1}_rsp.h5'
         if self.checkpoint_file is not None:
-            monomer_rsp_h5 = Path(
-                self.checkpoint_file).with_suffix(f'.{monomer_rsp_h5}')
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            monomer_rsp_h5 = str(fpath) + '_' + monomer_rsp_h5
 
         # TDA calculation
         rsp_dict = {

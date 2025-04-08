@@ -220,7 +220,7 @@ class ScfDriver:
 
         # RI-J
         self.ri_coulomb = False
-        self.ri_auxiliary_basis = 'def2-universal-jkfit'
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
         self._ri_drv = None
 
         # dft
@@ -287,17 +287,15 @@ class ScfDriver:
         # input keywords
         self._input_keywords = {
             'scf': {
-                'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'acc_type':
-                ('str_upper', 'type of SCF convergence accelerator'),
+                    ('str_upper', 'type of SCF convergence accelerator'),
                 'max_iter': ('int', 'maximum number of SCF iterations'),
                 'max_err_vecs': ('int', 'maximum number of DIIS error vectors'),
                 'pfon': ('bool', 'use pFON to accelerate convergence'),
                 'pfon_temperature': ('float', 'pFON temperature'),
                 'pfon_delta_temperature': ('float', 'pFON delta temperature'),
                 'pfon_nocc':
-                ('int', 'number of occupied orbitals used in pFON'),
+                    ('int', 'number of occupied orbitals used in pFON'),
                 'pfon_nvir': ('int', 'number of virtual orbitals used in pFON'),
                 'level_shifting': ('float', 'level shifting parameter'),
                 'level_shifting_delta': ('float', 'level shifting delta'),
@@ -312,7 +310,7 @@ class ScfDriver:
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 'guess_unpaired_electrons':
-                ('str', 'unpaired electrons for initila guess'),
+                    ('str', 'unpaired electrons for initila guess'),
                 'point_charges': ('str', 'potential file for point charges'),
                 'qm_vdw_params': ('str', 'vdw parameter file for QM atoms'),
                 '_debug': ('bool', 'print debug info'),
@@ -320,18 +318,20 @@ class ScfDriver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
-                ('int', 'number of grid points per sphere (C-PCM)'),
+                    ('int', 'number of grid points per sphere (C-PCM)'),
                 'cpcm_epsilon':
-                ('float', 'dielectric constant of solvent (C-PCM)'),
+                    ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'cpcm_custom_vdw_radii':
-                ('seq_fixed_str', 'custom vdw radii for C-PCM'),
+                    ('seq_fixed_str', 'custom vdw radii for C-PCM'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -476,8 +476,7 @@ class ScfDriver:
             method_dict = {}
 
         scf_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['scf'].items()
+            key: val[0] for key, val in self._input_keywords['scf'].items()
         }
 
         parse_input(self, scf_keywords, scf_dict)
@@ -487,7 +486,7 @@ class ScfDriver:
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}_scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -560,7 +559,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -1099,8 +1098,8 @@ class ScfDriver:
         valid = False
 
         if self.rank == mpi_master():
-            if (isinstance(self.checkpoint_file, str)
-                    and Path(self.checkpoint_file).is_file()):
+            if (isinstance(self.checkpoint_file, str) and
+                    Path(self.checkpoint_file).is_file()):
                 valid = MolecularOrbitals.match_hdf5(self.checkpoint_file,
                                                      nuclear_charges, basis_set,
                                                      scf_type)
@@ -1248,7 +1247,7 @@ class ScfDriver:
             else:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
-            self.checkpoint_file = f'{base_fname}.scf.h5'
+            self.checkpoint_file = f'{base_fname}_scf.h5'
         self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
 
         self.comm.barrier()
@@ -1271,9 +1270,8 @@ class ScfDriver:
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
                 self.ostream.print_blank()
-                checkpoint_text = 'Checkpoint written to file: '
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
+                self.ostream.print_info('Checkpoint written to file: ' +
+                                        self.checkpoint_file)
 
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
@@ -1524,8 +1522,8 @@ class ScfDriver:
                     if self.scf_type != 'restricted':
                         fock_mat[1] += Fock_sol
 
-            if (self.rank == mpi_master() and i > 0
-                    and self.level_shifting > 0.0):
+            if (self.rank == mpi_master() and i > 0 and
+                    self.level_shifting > 0.0):
 
                 self.ostream.print_info(
                     f'Applying level-shifting ({self.level_shifting:.2f}au)')
@@ -1728,6 +1726,12 @@ class ScfDriver:
 
                 # for backward compatibility only
                 self._scf_tensors['F'] = (F_alpha, F_beta)
+
+                if self.ri_coulomb:
+                    # RI info
+                    self._scf_tensors['ri_coulomb'] = self.ri_coulomb
+                    self._scf_tensors[
+                        'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
                 if self._dft:
                     # dft info
@@ -2051,8 +2055,8 @@ class ScfDriver:
                 exchange_scaling_factor = 0.0
 
         # further determine exchange_scaling_factor, erf_k_coef and omega
-        need_omega = (self._dft and (not self._first_step)
-                      and self.xcfun.is_range_separated())
+        need_omega = (self._dft and (not self._first_step) and
+                      self.xcfun.is_range_separated())
         if need_omega:
             exchange_scaling_factor = (self.xcfun.get_rs_alpha() +
                                        self.xcfun.get_rs_beta())
@@ -2586,8 +2590,8 @@ class ScfDriver:
                     nalpha = molecule.number_of_alpha_electrons()
                     nbeta = molecule.number_of_beta_electrons()
                     calc_nelec = self._comp_number_of_electrons(ovl_mat)
-                    if (abs(calc_nelec[0] - nalpha) < 1.0e-3
-                            and abs(calc_nelec[1] - nbeta) < 1.0e-3):
+                    if (abs(calc_nelec[0] - nalpha) < 1.0e-3 and
+                            abs(calc_nelec[1] - nbeta) < 1.0e-3):
                         self._is_converged = True
                 else:
                     self._is_converged = True
@@ -3035,6 +3039,5 @@ class ScfDriver:
                                   self.history)
 
         self.ostream.print_blank()
-        checkpoint_text = 'SCF results written to file: '
-        checkpoint_text += final_h5_fname
-        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_info('SCF results written to file: ' +
+                                final_h5_fname)

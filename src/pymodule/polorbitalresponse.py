@@ -41,8 +41,6 @@ from .inputparser import parse_input
 from .sanitychecks import polorbrsp_sanity_check_1, polorbrsp_sanity_check_2#polgrad_sanity_check
 from .oneeints import compute_electric_dipole_integrals
 from .distributedarray import DistributedArray
-from .batchsize import get_batch_size
-from .batchsize import get_number_of_batches
 from .profiler import Profiler
 
 
@@ -76,7 +74,6 @@ class PolOrbitalResponse(CphfSolver):
 
         self.frequencies = (0,)
         self.vector_components = 'xyz'
-        self.cphf_results = None
 
         self._input_keywords['orbitalresponse'].update({
             'vector_components': ('str_lower', 'Cartesian components of operator'),
@@ -230,7 +227,7 @@ class PolOrbitalResponse(CphfSolver):
             nvir = mo_vir.shape[1]
 
             # reduce dimensions of RHS to unique operator component combinations
-            xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+            xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
 
             # dictionary for RHS and Fock matrices
@@ -270,15 +267,13 @@ class PolOrbitalResponse(CphfSolver):
                 for idx, tmp in enumerate(full_vec):
                     full_vec[idx] *= -1.0
 
-                # number of vector components
-                dof = len(self.vector_components)
-
                 # extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1.0 / self.sqrt2 *
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
                                dof, nocc, nvir))
-                deexc_vec = (1.0 / self.sqrt2 *
+                deexc_vec = (1.0 / sqrt2 *
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
@@ -360,7 +355,6 @@ class PolOrbitalResponse(CphfSolver):
                                 np.array(0 * x_minus_y_ao[x].real),
                                 np.array(0 * x_minus_y_ao[y].real)])
             else:
-                dof = None
                 dm_ao_rhs_real_list = None
                 dm_ao_rhs_imag_list = None
 
@@ -370,8 +364,6 @@ class PolOrbitalResponse(CphfSolver):
                     perturbed_dm_ao_list_reim = None
                     perturbed_dm_ao_list_imre = None
                     zero_dm_ao_list = None
-
-            dof = self.comm.bcast(dof, root=mpi_master())
 
             dm_ao_rhs_real_list = self.comm.bcast(dm_ao_rhs_real_list, root=mpi_master())
             dm_ao_rhs_imag_list = self.comm.bcast(dm_ao_rhs_imag_list, root=mpi_master())
@@ -623,7 +615,6 @@ class PolOrbitalResponse(CphfSolver):
                 dist_cphf_rhs_im.append(DistributedArray(cphf_rhs_k_im, self.comm,
                                                          root=mpi_master()))
 
-            # NOTE Xin
             dist_cphf_rhs.extend(dist_cphf_rhs_re + dist_cphf_rhs_im)
 
             del dist_cphf_rhs_re, dist_cphf_rhs_im
@@ -701,9 +692,6 @@ class PolOrbitalResponse(CphfSolver):
         # number of vector components
         dof = len(self.vector_components)
 
-        # number of vector components
-        dof = len(self.vector_components)
-
         if self.rank == mpi_master():
             # check if response vectors exist for desired frequency of gradient
             polorbrsp_sanity_check_2(self, self.flag, lr_results)
@@ -723,7 +711,7 @@ class PolOrbitalResponse(CphfSolver):
             nvir = mo_vir.shape[1]
 
             # reduce dimensions of RHS to unique operator component combinations
-            xy_pairs = [(x,y) for x in range(3) for y in range(x,3)]
+            xy_pairs = [(x,y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
 
             # dictionary for RHS and intermediates
@@ -765,10 +753,11 @@ class PolOrbitalResponse(CphfSolver):
 
                 # extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1.0 / self.sqrt2 *
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
                                dof, nocc, nvir))
-                deexc_vec = (1.0 / self.sqrt2 *
+                deexc_vec = (1.0 / sqrt2 *
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
@@ -807,7 +796,6 @@ class PolOrbitalResponse(CphfSolver):
                     # construct density matrices for E[3] term:
                     perturbed_dm_ao_list, zero_dm_ao_list = self.construct_dft_e3_dm_real(x_minus_y_ao)
             else:
-                #dof = None
                 dm_ao_rhs_list = None
 
                 if self._dft:
@@ -1462,115 +1450,6 @@ class PolOrbitalResponse(CphfSolver):
         return (perturbed_dm_ao_rere, perturbed_dm_ao_imim,
                 perturbed_dm_ao_reim, perturbed_dm_ao_imre, zero_dm_ao)
 
-    def set_dft_fmat_factor_and_type_real(self, fock_ao_rhs, zero_dm_ao):#fock_gxc_ao):
-        """
-        Sets of scale factor and fock type for Fock matrices to compute DFT E[3] term
-        for real RHS.
-
-        :param fock_ao_rhs:
-            The general Fock matrix in AO basis.
-        :param zero_dm_ao:
-            Empty AODensityMatrix in same dimensions as the Fock matrices.
-        :param fock_gxc_ao:
-            Fock matrix for g^xc term in AO basis.
-
-        :return fock_ao_rhs:
-            Input param modified with set scale factor and fock type.
-        :return fock_gxc_ao:
-            Input param modified with set scale factor and fock type.
-        """
-
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        # Fock matrix for computing the DFT E[3] term g^xc
-        fock_gxc_ao = AOFockMatrix(zero_dm_ao)
-
-        if self.xcfun.is_hybrid():
-            fact_xc = self.xcfun.get_frac_exact_exchange()
-            for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
-                fock_ao_rhs.set_scale_factor(fact_xc, ifock)
-            for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                fock_gxc_ao.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
-            for ifock in range(dof**2):
-                fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
-        else:
-            for ifock in range(dof**2):
-                fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
-            for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
-
-        return fock_ao_rhs, fock_gxc_ao
-
-    def set_dft_fmat_factor_and_type_complex(self, fock_ao_rhs_real, fock_ao_rhs_imag,
-                                          zero_dm_ao):
-        """
-        Sets of scale factor and fock type for Fock matrices to compute DFT E[3] term
-        for complex RHS.
-
-        :param fock_ao_rhs_real/imag:
-            The general Fock matrix in AO basis.
-        :param zero_dm_ao:
-            Empty AODensityMatrix in same dimensions as the Fock matrices.
-        :param fock_gxc_ao:
-            Fock matrix for g^xc term in AO basis.
-
-        :return fock_ao_rhs_real/imag:
-            Input param modified with set scale factor and fock type.
-        :return fock_gxc_ao_rere/imim/reim/imre:
-            Input param modified with set scale factor and fock type.
-        """
-
-        # degrees of freedom
-        dof = len(self.vector_components)
-
-        # Fock matrix for computing the DFT E[3] term g^xc
-        fock_gxc_ao_rere = AOFockMatrix(zero_dm_ao)
-        fock_gxc_ao_imim = AOFockMatrix(zero_dm_ao)
-        fock_gxc_ao_reim = AOFockMatrix(zero_dm_ao)
-        fock_gxc_ao_imre = AOFockMatrix(zero_dm_ao)
-
-        if self.xcfun.is_hybrid():
-            fact_xc = self.xcfun.get_frac_exact_exchange()
-            for ifock in range(fock_ao_rhs_real.number_of_fock_matrices()):
-                fock_ao_rhs_real.set_scale_factor(fact_xc, ifock)
-                fock_ao_rhs_imag.set_scale_factor(fact_xc, ifock)
-            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                fock_gxc_ao_rere.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_imim.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_reim.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_imre.set_scale_factor(fact_xc, ifock)
-                fock_gxc_ao_rere.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_gxc_ao_imim.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_gxc_ao_reim.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_gxc_ao_imre.set_fock_type(fockmat.rgenjkx, ifock)
-            for ifock in range(dof**2):
-                fock_ao_rhs_real.set_fock_type(fockmat.restjkx, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.restjkx, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs_real.set_fock_type(fockmat.rgenjkx, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.rgenjkx, ifock)
-        else:
-            for ifock in range(dof**2):
-                fock_ao_rhs_real.set_fock_type(fockmat.restj, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.restj, ifock)
-            for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs_real.set_fock_type(fockmat.rgenj, ifock)
-                fock_ao_rhs_imag.set_fock_type(fockmat.rgenj, ifock)
-            for ifock in range(fock_gxc_ao_rere.number_of_fock_matrices()):
-                fock_gxc_ao_rere.set_fock_type(fockmat.rgenj, ifock)
-                fock_gxc_ao_imim.set_fock_type(fockmat.rgenj, ifock)
-                fock_gxc_ao_reim.set_fock_type(fockmat.rgenj, ifock)
-                fock_gxc_ao_imre.set_fock_type(fockmat.rgenj, ifock)
-
-        return (fock_ao_rhs_real, fock_ao_rhs_imag, fock_gxc_ao_rere,
-                fock_gxc_ao_imim, fock_gxc_ao_reim, fock_gxc_ao_imre)
-
     def integrate_gxc_real(self, molecule, basis, molgrid, gs_density,
                            zero_dm_ao, perturbed_dm_ao, fock_gxc_ao):
         """
@@ -1702,7 +1581,6 @@ class PolOrbitalResponse(CphfSolver):
         :param lr_results:
             The results from the linear response calculation.
         """
-        # NOTE Xin
 
         profiler = Profiler({
             'timing': self.timing,
@@ -1743,23 +1621,7 @@ class PolOrbitalResponse(CphfSolver):
             # number of frequencies
             n_freqs = len(self.frequencies)
 
-            # get CPHF results in reduced dimensions
-            if self.use_subspace_solver:
-                dist_all_cphf_red = self.cphf_results['dist_cphf_ov']
-
-                all_cphf_ov = np.zeros((n_freqs, dof, dof, nocc * nvir))
-                for n, w in enumerate(self.frequencies):
-                    for idx, xy in enumerate(xy_pairs):
-                        x = xy[0]
-                        y = xy[1]
-
-                        tmp_cphf_ov = dist_all_cphf_red[dof_red * n + idx].get_full_vector()
-                        all_cphf_ov[n, x, y] += tmp_cphf_ov
-
-                        if (y != x):
-                            all_cphf_ov[n, y, x] += all_cphf_ov[n, x, y]
-
-            else:
+            if not self.use_subspace_solver:
                 all_cphf_red = self.cphf_results['cphf_ov']
                 all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
 
@@ -1812,9 +1674,12 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs = []
                 fock_gxc_ao = []
 
-                # get response vectors from cphf_results
-                #x_plus_y_ao = self.cphf_results[w]['x_plus_y_ao']
-                #x_minus_y_ao = self.cphf_results[w]['x_minus_y_ao']
+                # note: conjugate gradient solver returns array in dictionary
+                # and the coefficients are therefore imported differently
+                # from subspace solver
+                if not self.use_subspace_solver:
+                    cphf_ov_red = all_cphf_red[f]
+                    cphf_ov = np.zeros((dof, dof, nocc * nvir))
 
                     for idx, xy in enumerate(xy_pairs):
                         x = xy[0]
@@ -1830,10 +1695,11 @@ class PolOrbitalResponse(CphfSolver):
                 cphf_ov = cphf_ov.reshape(dof**2, nocc, nvir)
 
                 # create response vectors in MO basis
-                exc_vec = (1.0 / self.sqrt2 *
+                sqrt2 = np.sqrt(2.0)
+                exc_vec = (1.0 / sqrt2 *
                            np.array(full_vec)[:, :nocc * nvir].reshape(
                                dof, nocc, nvir))
-                deexc_vec = (1.0 / self.sqrt2 *
+                deexc_vec = (1.0 / sqrt2 *
                              np.array(full_vec)[:, nocc * nvir:].reshape(
                                  dof, nocc, nvir))
 
@@ -1842,7 +1708,6 @@ class PolOrbitalResponse(CphfSolver):
 
                 del exc_vec, deexc_vec
 
-                # NOTE WIP
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])
@@ -1871,8 +1736,8 @@ class PolOrbitalResponse(CphfSolver):
                 # construct fock_lambda (or fock_cphf)
                 # transform to AO basis: mi,xia,na->xmn
                 cphf_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
-                    for x in range(dof**2)
+                    np.linalg.multi_dot([mo_occ, cphf_ov[xy], mo_vir.T])
+                    for xy in range(dof**2)
                 ])
 
                 cphf_ao_list = [cphf_ao[x] for x in range(dof**2)]
@@ -1958,12 +1823,13 @@ class PolOrbitalResponse(CphfSolver):
                             omega_gxc_contrib = self.calculate_omega_gxc_contrib_real(
                                 fock_gxc_ao[2 * (m * dof + n)], D_occ)
 
-                            #omega[m * dof + n] += omega_gxc_contrib
                             omega[m, n] += omega_gxc_contrib
 
-                        # set values in lower off-diagonal
-                        if (n != m):
-                            omega[n, m] = omega[m, n]
+                # reduce dimensions
+                omega_red = []
+                for x, y in xy_pairs:
+                    omega_red.append(omega[x, y].copy())
+                omega_red = np.array(omega_red)
 
                 del omega
 
@@ -2149,7 +2015,6 @@ class PolOrbitalResponse(CphfSolver):
 
                 del exc_vec, deexc_vec
 
-                # NOTE WIP
                 # transform to AO basis: mi,xia,na->xmn
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y_mo[x], mo_vir.T])

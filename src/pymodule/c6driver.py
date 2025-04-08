@@ -262,7 +262,7 @@ class C6Driver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         if self.rank == mpi_master():
@@ -324,8 +324,7 @@ class C6Driver(LinearSolver):
         v_grad = None
         if self.rank == mpi_master():
             v_grad = {
-                (op, iw): v
-                for op, v in zip(self.b_components, b_grad)
+                (op, iw): v for op, v in zip(self.b_components, b_grad)
                 for iw in imagfreqs
             }
 
@@ -337,8 +336,7 @@ class C6Driver(LinearSolver):
         op_imagfreq_keys = self.comm.bcast(op_imagfreq_keys, root=mpi_master())
 
         precond = {
-            iw: self._get_precond(orb_ene, nocc, norb, iw)
-            for iw in imagfreqs
+            iw: self._get_precond(orb_ene, nocc, norb, iw) for iw in imagfreqs
         }
 
         # distribute the gradient and right-hand side:
@@ -421,8 +419,8 @@ class C6Driver(LinearSolver):
             s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             for op, iw in op_imagfreq_keys:
-                if (iteration == 0
-                        or relative_residual_norm[(op, iw)] > self.conv_thresh):
+                if (iteration == 0 or
+                        relative_residual_norm[(op, iw)] > self.conv_thresh):
 
                     grad_ru = dist_grad[(op, iw)].get_column(0)
                     grad_ig = dist_grad[(op, iw)].get_column(1)
@@ -640,8 +638,7 @@ class C6Driver(LinearSolver):
                         rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
 
                     # write to h5 file for response solutions
-                    if (self.save_solutions
-                            and self.checkpoint_file is not None):
+                    if (self.save_solutions and final_h5_fname is not None):
                         solution_keys = [
                             '{:s}_{:s}_{:.8f}'.format(aop, bop, iw)
                             for aop in self.a_components
@@ -651,10 +648,10 @@ class C6Driver(LinearSolver):
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    checkpoint_text = 'Response solution vectors written to file: '
-                    checkpoint_text += final_h5_fname
-                    self.ostream.print_info(checkpoint_text)
+                if (self.save_solutions and final_h5_fname is not None):
+                    self.ostream.print_info(
+                        'Response solution vectors written to file: ' +
+                        final_h5_fname)
                     self.ostream.print_blank()
 
                 c6 = self._integrate_c6(self.w0, points, weights, imagfreqs,

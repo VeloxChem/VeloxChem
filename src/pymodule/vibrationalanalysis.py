@@ -119,8 +119,8 @@ class VibrationalAnalysis:
 
         # filenames
         self.filename = None
-        self.checkpoint_file = None
-        self.result_file = None
+        self.results_h5_file = None
+        self.vib_results_txt_file = None
 
         # option dictionaries from input
         # TODO: cleanup
@@ -173,7 +173,7 @@ class VibrationalAnalysis:
         self.do_raman = False
         self.do_resonance_raman = False
         self.rr_damping = None
-        self.frequencies = (0, )
+        self.frequencies = (0,)
 
         # flag for printing
         self.do_print_hessian = False
@@ -191,28 +191,28 @@ class VibrationalAnalysis:
         self._input_keywords = {
             'vibrational': {
                 'numerical_hessian': ('bool', 'do numerical hessian'),
-                'numerical_raman': ('bool',
-                                    'do numerical polarizability gradient'),
+                'numerical_raman':
+                    ('bool', 'do numerical polarizability gradient'),
                 'do_four_point_hessian':
-                ('bool', 'do four-point numerical integration'),
-                'do_four_point_raman': ('bool',
-                                        'do four-point numerical integration'),
+                    ('bool', 'do four-point numerical integration'),
+                'do_four_point_raman':
+                    ('bool', 'do four-point numerical integration'),
                 'do_ir': ('bool', 'whether to calculate IR intensities'),
                 'do_raman': ('bool', 'whether to calculate Raman activity'),
                 'do_resonance_raman':
-                ('bool', 'whether to calculate resonance Raman activity'),
+                    ('bool', 'whether to calculate resonance Raman activity'),
                 'rr_damping':
-                ('float',
-                 'the damping factor in CPP for resonance Raman (a.u.)'),
+                    ('float',
+                     'the damping factor in CPP for resonance Raman (a.u.)'),
                 'do_print_hessian': ('bool', 'whether to print the Hessian'),
-                'do_print_polgrad': ('bool',
-                                     'whether to print the pol. gradient'),
+                'do_print_polgrad':
+                    ('bool', 'whether to print the pol. gradient'),
                 'print_depolarization_ratio':
-                ('bool', 'whether to print Raman depolarization ratio'),
+                    ('bool', 'whether to print Raman depolarization ratio'),
                 'temperature': ('float', 'the temperature'),
                 'pressure': ('float', 'the pressure'),
-                'frequencies': ('seq_range',
-                                'frequencies of external electric field'),
+                'frequencies':
+                    ('seq_range', 'frequencies of external electric field'),
                 'filename': ('str', 'base name of output files'),
             },
         }
@@ -255,10 +255,8 @@ class VibrationalAnalysis:
 
         if 'filename' in vib_dict:
             self.filename = vib_dict['filename']
-            self.checkpoint_file = f'{self.filename}-vib-results.h5'
-            self.result_file = f'{self.filename}-vib-results.out'
-        else:
-            self.result_file = 'vib-results.out'
+            self.results_h5_file = f'{self.filename}.h5'
+            self.vib_results_txt_file = f'{self.filename}-vib-results.out'
 
         # settings for property modules
         if hessian_dict is None:
@@ -340,7 +338,6 @@ class VibrationalAnalysis:
                 vib_results['raman_activities'] = self.raman_activities
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
-
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
                 self.do_raman = False
@@ -674,10 +671,11 @@ class VibrationalAnalysis:
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
         # compute polarizability gradient
-        polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors,
+                                      lr_results)
 
         # save the gradient
-        self.polarizability_gradient = polgrad_drv.polgradient
+        self.polarizability_gradient = polgrad
 
     def print_vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
         """
@@ -717,11 +715,12 @@ class VibrationalAnalysis:
         if number_of_modes > n_dom_modes:
             self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
-        fulltxt_msg = 'Full vibrational analysis results written to: '
-        fulltxt_msg += f'{self.result_file}'
-        self.ostream.print_info(fulltxt_msg)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        if self.vib_results_txt_file is not None:
+            fulltxt_msg = 'Full vibrational analysis results written to: '
+            fulltxt_msg += f'{self.vib_results_txt_file}'
+            self.ostream.print_info(fulltxt_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def print_vibrational_analysis_ostream(self,
                                            molecule,
@@ -742,7 +741,7 @@ class VibrationalAnalysis:
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-
+       
         width = 52
         for k in idx_lst:
 
@@ -886,7 +885,7 @@ class VibrationalAnalysis:
             return
 
         # open output file
-        fout = open(self.result_file, 'w')
+        fout = open(self.vib_results_txt_file, 'w')
 
         title = 'Vibrational Analysis'
         fout.write(title.center(52))
@@ -1015,12 +1014,8 @@ class VibrationalAnalysis:
             The molecule.
         """
 
-        if self.checkpoint_file is None:
-            return
-
-        final_h5_fname = self.checkpoint_file
-
-        self.write_vib_results_to_hdf5(molecule, final_h5_fname)
+        if self.results_h5_file is not None:
+            self.write_vib_results_to_hdf5(molecule, self.results_h5_file)
 
     def write_vib_results_to_hdf5(self, molecule, fname):
         """
@@ -1032,20 +1027,15 @@ class VibrationalAnalysis:
             Name of the HDF5 file.
         """
 
-        valid_checkpoint = (fname and isinstance(fname, str))
+        if not (fname and isinstance(fname, str) and Path(fname).is_file()):
+            return
 
-        if not valid_checkpoint:
-            return False
+        hf = h5py.File(fname, 'a')
 
-        # check if h5 file exists and deletes if True
-        file_path = Path(fname)
-        if file_path.is_file():
-            file_path.unlink()
-
-        hf = h5py.File(fname, 'w')
+        vib_group = 'vib/'
 
         nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset('nuclear_repulsion', data=nuc_rep)
+        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         natm = molecule.number_of_atoms()
 
@@ -1054,33 +1044,31 @@ class VibrationalAnalysis:
             normal_mode_grp.create_dataset(str(n),
                                            data=np.array([Q]).reshape(natm, 3))
 
-        hf.create_dataset('hessian', data=self.hessian)
-        hf.create_dataset('vib_frequencies',
+        hf.create_dataset(vib_group + 'hessian', data=self.hessian)
+        hf.create_dataset(vib_group + 'vib_frequencies',
                           data=np.array([self.vib_frequencies]))
-        hf.create_dataset('force_constants',
+        hf.create_dataset(vib_group + 'force_constants',
                           data=np.array([self.force_constants]))
-        hf.create_dataset('reduced_masses',
+        hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array([self.reduced_masses]))
         if self.do_ir:
-            hf.create_dataset('ir_intensities',
+            hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array([self.ir_intensities]))
         if self.do_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('raman_activity')
+            raman_grp = hf.create_group(vib_group + 'raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('resonance_raman_activity')
+            raman_grp = hf.create_group(vib_group + 'resonance_raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         hf.close()
-
-        return True
 
     def print_header(self):
         """

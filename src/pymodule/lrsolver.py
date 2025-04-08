@@ -84,7 +84,7 @@ class LinearResponseSolver(LinearSolver):
         self.a_components = 'xyz'
         self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
-        self.frequencies = (0, )
+        self.frequencies = (0,)
 
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
@@ -155,7 +155,7 @@ class LinearResponseSolver(LinearSolver):
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         if self.rank == mpi_master():
@@ -218,8 +218,7 @@ class LinearResponseSolver(LinearSolver):
                                         molecule, basis, scf_tensors)
             if self.rank == mpi_master():
                 v_grad = {
-                    (op, w): v
-                    for op, v in zip(self.b_components, b_grad)
+                    (op, w): v for op, v in zip(self.b_components, b_grad)
                     for w in self.frequencies
                 }
 
@@ -311,8 +310,8 @@ class LinearResponseSolver(LinearSolver):
             self._cur_iter = iteration
 
             for op, freq in op_freq_keys:
-                if (iteration > 0 and relative_residual_norm[(op, freq)]
-                        < self.conv_thresh):
+                if (iteration > 0 and
+                        relative_residual_norm[(op, freq)] < self.conv_thresh):
                     continue
 
                 gradger = dist_grad[(op, freq)].get_column(0)
@@ -502,8 +501,7 @@ class LinearResponseSolver(LinearSolver):
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
                         # write to h5 file for response solutions
-                        if (self.save_solutions
-                                and self.checkpoint_file is not None):
+                        if (self.save_solutions and final_h5_fname is not None):
                             solution_keys = [
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
                                 for aop in self.a_components
@@ -513,11 +511,10 @@ class LinearResponseSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
-                    if (self.save_solutions
-                            and self.checkpoint_file is not None):
-                        checkpoint_text = 'Response solution vectors written to file: '
-                        checkpoint_text += final_h5_fname
-                        self.ostream.print_info(checkpoint_text)
+                    if (self.save_solutions and final_h5_fname is not None):
+                        self.ostream.print_info(
+                            'Response solution vectors written to file: ' +
+                            final_h5_fname)
                         self.ostream.print_blank()
 
                     self._print_results(rsp_funcs, self.ostream)

@@ -189,7 +189,6 @@ from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
-from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter

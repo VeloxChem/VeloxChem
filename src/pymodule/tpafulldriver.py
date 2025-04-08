@@ -372,8 +372,9 @@ class TpaFullDriver(TpaDriver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpa_fock_1_full.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            fock_file = str(fpath) + '_tpa_fock_1_full.h5'
         else:
             fock_file = None
 
@@ -666,8 +667,9 @@ class TpaFullDriver(TpaDriver):
             setattr(N_total_drv, key, getattr(self, key))
 
         if self.checkpoint_file is not None:
-            N_total_drv.checkpoint_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpa_2_full.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            N_total_drv.checkpoint_file = str(fpath) + '_tpa_2_full.h5'
 
         # commutpute second-order response vectors
 
@@ -1181,8 +1183,9 @@ class TpaFullDriver(TpaDriver):
         # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
-            fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.tpa_fock_2_full.h5'))
+            fpath = Path(self.checkpoint_file)
+            fpath = fpath.with_name(fpath.stem)
+            fock_file = str(fpath) + '_tpa_fock_2_full.h5'
         else:
             fock_file = None
 

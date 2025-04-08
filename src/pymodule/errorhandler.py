@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from sys import stderr
+import numpy as np
 import math
 
 
