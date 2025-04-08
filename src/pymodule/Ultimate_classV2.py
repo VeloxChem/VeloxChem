@@ -9,10 +9,7 @@ import veloxchem as vlx
 
 from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
-from veloxchem import Molecule
-from Atom_mapping import MCS
-from Class import MolecularPropertyCalculator
-# from Deprotonation import OxygenDeprotonation
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
@@ -48,7 +45,7 @@ class MoleculeProcessor:
         for xyz_file in self.non_iodine_files:
             folder, filename = os.path.split(xyz_file)
             try:
-                calc = MolecularPropertyCalculator(folder, xyz_filename=filename)
+                calc = vlx.MolecularPropertyCalculator(folder, xyz_filename=filename)
 
                 print('Starting calculations for', filename)
 
@@ -115,7 +112,7 @@ class MoleculeProcessor:
                     continue
 
                 try:
-                    mapping = MCS(prot_mol, deprot_mol).get_atom_mapping()
+                    mapping = vlx.MCS(prot_mol, deprot_mol).get_atom_mapping()
                     if mapping is None:
                         raise ValueError("Atom mapping failed.")
                 except Exception as e:
@@ -124,7 +121,7 @@ class MoleculeProcessor:
                     continue
 
                 try:
-                    mol = Molecule.read_xyz_file(deprot_path)
+                    mol = vlx.Molecule.read_xyz_file(deprot_path)
                     calc = vlx.MolecularPropertyCalculator(mol, deprotonated=True)
                     data_matrix = calc.run_all_calculations()
                     xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
