@@ -58,37 +58,31 @@ class TestEvb:
 
         reactant_input = {
             "molecule": Molecule.from_xyz_string(ethanol_xyz),
-            "optimise": False,
+            "optimize": False,
             "forcefield": None,
             "hessian": None,
             "charges": None,
         }
-        product_input = [
-            {
-                "molecule": Molecule.from_xyz_string(ethene_xyz),
-                "optimise": False,
-                "forcefield": None,
-                "hessian": None,
-                "charges": None,
-            }
-            ,
-            {
-                "molecule": Molecule.from_xyz_string(water_xyz),
-                "optimise": False,
-                "forcefield": None,
-                "hessian": None,
-                "charges": None,
-            }
-        ]
+        product_input = [{
+            "molecule": Molecule.from_xyz_string(ethene_xyz),
+            "optimize": False,
+            "forcefield": None,
+            "hessian": None,
+            "charges": None,
+        }, {
+            "molecule": Molecule.from_xyz_string(water_xyz),
+            "optimize": False,
+            "forcefield": None,
+            "hessian": None,
+            "charges": None,
+        }]
 
-        reactant, product = ffbuilder.build_forcefields(
-            reactant_input,
-            product_input,
-            reactant_charge=0,
-            product_charge=[0,0],
-            reactant_multiplicity=1,
-            product_multiplicity=[1,1]
-        )
+        reactant, product = ffbuilder.build_forcefields(reactant_input,
+                                                        product_input,
+                                                        reactant_charge=0,
+                                                        product_charge=[0, 0],
+                                                        reactant_multiplicity=1,
+                                                        product_multiplicity=[1, 1])
 
         here = Path(__file__).parent
         reapath = str(here / 'data' / 'evb_ethanol_ff_data.json')
@@ -105,7 +99,7 @@ class TestEvb:
         self._compare_dict(product.angles, product_ref.angles)
         self._compare_dict(product.dihedrals, product_ref.dihedrals)
         self._compare_dict(product.impropers, product_ref.impropers)
-    
+
     def _compare_dict(self, dict1, dict2, float_tol=1e-2):
 
         assert sorted(list(dict1.keys())) == sorted(list(dict2.keys()))
@@ -171,7 +165,7 @@ class TestEvb:
         wat_conf = EVB.default_system_configurations("water")
 
         # 0.4 is chosen instead of 0.5 because for lambda=0.4, 1-lambda=/=lambda
-        Lambda = [0,0.4,1]
+        Lambda = [0, 0.4, 1]
         system_builder = EvbSystemBuilder()
         vac_systems, vac_topology, vac_positions = system_builder.build_systems(reactant, product, Lambda, vac_conf)
         wat_systems, wat_topology, wat_positions = system_builder.build_systems(reactant, product, Lambda, wat_conf)
@@ -181,14 +175,18 @@ class TestEvb:
         assert TestEvb._compare_systems(vac_systems[0], str(data_path / 'evb_ethanol_vac_0.000_sys.xml'))
         assert TestEvb._compare_systems(vac_systems[0.4], str(data_path / 'evb_ethanol_vac_0.400_sys.xml'))
         assert TestEvb._compare_systems(vac_systems[1], str(data_path / 'evb_ethanol_vac_1.000_sys.xml'))
-        assert TestEvb._compare_systems(vac_systems['reactant'], str(data_path / 'evb_ethanol_vac_recalc_reactant_sys.xml'))
-        assert TestEvb._compare_systems(vac_systems['product'], str(data_path / 'evb_ethanol_vac_recalc_product_sys.xml'))
+        assert TestEvb._compare_systems(vac_systems['reactant'],
+                                        str(data_path / 'evb_ethanol_vac_recalc_reactant_sys.xml'))
+        assert TestEvb._compare_systems(vac_systems['product'],
+                                        str(data_path / 'evb_ethanol_vac_recalc_product_sys.xml'))
 
         assert TestEvb._compare_systems(wat_systems[0], str(data_path / 'evb_ethanol_solv_0.000_sys.xml'))
         assert TestEvb._compare_systems(wat_systems[0.4], str(data_path / 'evb_ethanol_solv_0.400_sys.xml'))
         assert TestEvb._compare_systems(wat_systems[1], str(data_path / 'evb_ethanol_solv_1.000_sys.xml'))
-        assert TestEvb._compare_systems(wat_systems['reactant'], str(data_path / 'evb_ethanol_solv_recalc_reactant_sys.xml'))
-        assert TestEvb._compare_systems(wat_systems['product'], str(data_path / 'evb_ethanol_solv_recalc_product_sys.xml'))
+        assert TestEvb._compare_systems(wat_systems['reactant'],
+                                        str(data_path / 'evb_ethanol_solv_recalc_reactant_sys.xml'))
+        assert TestEvb._compare_systems(wat_systems['product'],
+                                        str(data_path / 'evb_ethanol_solv_recalc_product_sys.xml'))
 
     @staticmethod
     def _compare_systems(system, path):
@@ -200,7 +198,9 @@ class TestEvb:
             ref_lines = ref_string.splitlines()
             result = True
             if len(sys_lines) != len(ref_lines):
-                print(f"The amount of lines in the test and reference system mismatch: {len(sys_lines)} != {len(ref_lines)}")
+                print(
+                    f"The amount of lines in the test and reference system mismatch: {len(sys_lines)} != {len(ref_lines)}"
+                )
                 result = False
             min_len = min(len(sys_lines), len(ref_lines))
             for i, (sys_line, ref_line) in enumerate(zip(sys_lines[:min_len], ref_lines[:min_len])):
@@ -235,15 +235,13 @@ class TestEvb:
         input_results.update(common)
         input_results.update({"configuration_results": specific_results})
 
-
         # EVB.load_initialisation(str(vac_folder), 'vacuum', skip_systems=True, skip_pdb=True)
         # EVB.load_initialisation(str(water_folder), 'water', skip_systems=True, skip_pdb=True)
         # do data processing
         dp = EvbDataProcessing()
-        
+
         comp_results = dp.compute(input_results, 5, 10)
 
         # compare with final results
         reference_results = EVB._load_dict_from_h5(folder / "evb_reference_results.h5")
         self._compare_dict(comp_results, reference_results)
-        

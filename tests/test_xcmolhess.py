@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import h5py
+import pytest
 
 from veloxchem.veloxchemlib import XCMolecularHessian
 from veloxchem.veloxchemlib import mpi_master
@@ -10,6 +11,7 @@ from veloxchem.griddriver import GridDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
+@pytest.mark.solvers
 class TestXCMolHess:
 
     def run_xc_mol_hess(self,
@@ -105,6 +107,34 @@ class TestXCMolHess:
 
         here = Path(__file__).parent
         h5file = str(here / 'data' / 'hessian_gga_data.h5')
+        hf = h5py.File(h5file, 'r')
+        ref_exc_deriv_2 = np.array(hf.get('exc_geom_deriv_2'))
+        ref_vxc_deriv_1 = np.array(hf.get('vxc_geom_deriv_1'))
+        hf.close()
+
+        self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2,
+                             ref_vxc_deriv_1)
+
+    def test_xc_mol_hess_mgga(self):
+
+        molecule_string = """
+        O   0.0   0.0   0.0
+        H   0.0   1.4   1.1
+        H   0.0  -1.4   1.1
+        O  10.0   0.0   0.0
+        H  10.0   1.4   1.1
+        H  10.0  -1.4   1.1
+        """
+        units = 'au'
+
+        basis_set_label = 'def2-svp'
+        xcfun_label = 'm06-l'
+
+        molecule = Molecule.read_molecule_string(molecule_string, units=units)
+        basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
+
+        here = Path(__file__).parent
+        h5file = str(here / 'data' / 'hessian_mgga_data.h5')
         hf = h5py.File(h5file, 'r')
         ref_exc_deriv_2 = np.array(hf.get('exc_geom_deriv_2'))
         ref_vxc_deriv_1 = np.array(hf.get('vxc_geom_deriv_1'))

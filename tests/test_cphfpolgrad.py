@@ -182,8 +182,8 @@ class TestCphfPolgrad:
             here = Path(__file__).parent
             hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
-            cphfpolgrad_reference = np.array(hf.get(label1))
-            cphfpolgrad_omega_reference = np.array(hf.get(label2))
+            cphfpolgrad_reference = np.array(hf.get(label1))[12:]
+            cphfpolgrad_omega_reference = np.array(hf.get(label2))[12:]
             hf.close()
 
             # Here we ar comparing the CPHF coefficients in MO basis, so
@@ -246,8 +246,8 @@ class TestCphfPolgrad:
             here = Path(__file__).parent
             hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
-            cphfpolgrad_reference = np.array(hf.get(label1))
-            cphfpolgrad_omega_reference = np.array(hf.get(label2))
+            cphfpolgrad_reference = np.array(hf.get(label1))[12:]
+            cphfpolgrad_omega_reference = np.array(hf.get(label2))[12:]
             hf.close()
 
             cphfpolgrad_coefficients = np.array(cphfpolgrad_coefficients)

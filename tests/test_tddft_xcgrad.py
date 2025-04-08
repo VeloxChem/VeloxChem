@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import pytest
 import h5py
 
 from veloxchem.veloxchemlib import mpi_master
@@ -9,6 +10,7 @@ from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.gradientdriver import GradientDriver
 
 
+@pytest.mark.solvers
 class TestTddftXCgrad:
 
     def run_tddft_xcgrad(self, xcfun_label, tamm_dancoff, ref_xcgrad):

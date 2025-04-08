@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from os import environ
 from pathlib import Path
@@ -34,6 +42,7 @@ from .veloxchemlib import MolecularBasis
 from .veloxchemlib import tensor_order
 from .veloxchemlib import chemical_element_name
 from .veloxchemlib import chemical_element_identifier
+from .environment import get_basis_path
 
 
 def _known_aliases_for_basis_sets():
@@ -191,6 +200,7 @@ def _read_basis_file(basis_name, basis_path, ostream):
     # 1. given basis_path
     # 2. current directory
     # 3. VLXBASISPATH
+    # 4. built-in basis path
 
     basis_file = Path(basis_path, fname)
 
@@ -199,6 +209,9 @@ def _read_basis_file(basis_name, basis_path, ostream):
 
     if not basis_file.is_file() and 'VLXBASISPATH' in environ:
         basis_file = Path(environ['VLXBASISPATH'], fname)
+
+    if not basis_file.is_file():
+        basis_file = get_basis_path() / fname
 
     assert_msg_critical(
         basis_file.is_file(),
@@ -373,7 +386,7 @@ def _MolecularBasis_read_dict(molecule,
 
 
 @staticmethod
-def _MolecularBasis_get_avail_basis(element_label):
+def _MolecularBasis_get_avail_basis(element_label=None):
     """
     Gets the names of available basis sets for an element.
 
@@ -386,7 +399,7 @@ def _MolecularBasis_get_avail_basis(element_label):
 
     avail_basis = set()
 
-    basis_path = Path(environ['VLXBASISPATH'])
+    basis_path = get_basis_path()
     basis_files = sorted((x for x in basis_path.iterdir() if x.is_file()))
 
     for x in basis_files:
@@ -394,10 +407,13 @@ def _MolecularBasis_get_avail_basis(element_label):
         basis = InputParser(str(x)).input_dict
         # check that the given element appears as key
         # and that its value is a non-empty list
-        elem = f'atombasis_{element_label.lower()}'
-        if elem in basis.keys():
-            if basis[elem]:
-                avail_basis.add(name)
+        if element_label is not None:
+            elem = f'atombasis_{element_label.lower()}'
+            if elem in basis.keys():
+                if basis[elem]:
+                    avail_basis.add(name)
+        else:
+            avail_basis.add(name)
 
     return sorted(list(avail_basis))
 
