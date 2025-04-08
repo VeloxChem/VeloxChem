@@ -176,6 +176,7 @@ class EvbDriver():
             assert isinstance(product, Molecule) or all(
                 isinstance(pro, Molecule) for pro in product
             ), "All products must be Molecule objects if the reactant is a Molecule object"
+            cwd = Path().cwd()
             input_path = cwd / self.input_folder
             if not input_path.exists():
                 input_path.mkdir(parents=True, exist_ok=True)
