@@ -1318,8 +1318,6 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
     timer.start("Total timing");
 
-    timer.start("Preparation");
-
     auto nthreads = omp_get_max_threads();
 
     std::vector<CMultiTimer> omptimers(nthreads);
@@ -1329,69 +1327,6 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // GTOs on grid points
-
-    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
-
-    auto omp_max_npoints = max_npoints_per_box / nthreads;
-    if (max_npoints_per_box % nthreads != 0) omp_max_npoints++;
-
-    // density and functional derivatives
-
-    auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
-    const auto dim      = &(mggafunc->dim);
-
-    std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
-
-    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
-
-    // Input
-    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
-    std::vector<std::vector<double>> omp_rhograd_data(nthreads, std::vector<double>(dim->rho * 3 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_sigma_data(nthreads, std::vector<double>(dim->sigma * omp_max_npoints));
-    std::vector<std::vector<double>> omp_lapl_data(nthreads, std::vector<double>(dim->lapl * omp_max_npoints));
-    std::vector<std::vector<double>> omp_tau_data(nthreads, std::vector<double>(dim->tau * omp_max_npoints));
-
-    // First-order
-    std::vector<std::vector<double>> omp_vrho_data(nthreads, std::vector<double>(dim->vrho * omp_max_npoints));
-    std::vector<std::vector<double>> omp_vsigma_data(nthreads, std::vector<double>(dim->vsigma * omp_max_npoints));
-    std::vector<std::vector<double>> omp_vlapl_data(nthreads, std::vector<double>(dim->vlapl * omp_max_npoints));
-    std::vector<std::vector<double>> omp_vtau_data(nthreads, std::vector<double>(dim->vtau * omp_max_npoints));
-
-    // Second-order
-    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2rhosigma_data(nthreads, std::vector<double>(dim->v2rhosigma * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2rholapl_data(nthreads, std::vector<double>(dim->v2rholapl * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2rhotau_data(nthreads, std::vector<double>(dim->v2rhotau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2sigma2_data(nthreads, std::vector<double>(dim->v2sigma2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2sigmalapl_data(nthreads, std::vector<double>(dim->v2sigmalapl * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2sigmatau_data(nthreads, std::vector<double>(dim->v2sigmatau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2lapl2_data(nthreads, std::vector<double>(dim->v2lapl2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2lapltau_data(nthreads, std::vector<double>(dim->v2lapltau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v2tau2_data(nthreads, std::vector<double>(dim->v2tau2 * omp_max_npoints));
-
-    // Third-order
-    std::vector<std::vector<double>> omp_v3rho3_data(nthreads, std::vector<double>(dim->v3rho3 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rho2sigma_data(nthreads, std::vector<double>(dim->v3rho2sigma * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rho2lapl_data(nthreads, std::vector<double>(dim->v3rho2lapl * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rho2tau_data(nthreads, std::vector<double>(dim->v3rho2tau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rhosigma2_data(nthreads, std::vector<double>(dim->v3rhosigma2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rhosigmalapl_data(nthreads, std::vector<double>(dim->v3rhosigmalapl * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rhosigmatau_data(nthreads, std::vector<double>(dim->v3rhosigmatau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rholapl2_data(nthreads, std::vector<double>(dim->v3rholapl2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rholapltau_data(nthreads, std::vector<double>(dim->v3rholapltau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rhotau2_data(nthreads, std::vector<double>(dim->v3rhotau2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3sigma3_data(nthreads, std::vector<double>(dim->v3sigma3 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3sigma2lapl_data(nthreads, std::vector<double>(dim->v3sigma2lapl * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3sigma2tau_data(nthreads, std::vector<double>(dim->v3sigma2tau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3sigmalapl2_data(nthreads, std::vector<double>(dim->v3sigmalapl2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3sigmalapltau_data(nthreads, std::vector<double>(dim->v3sigmalapltau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3sigmatau2_data(nthreads, std::vector<double>(dim->v3sigmatau2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3lapl3_data(nthreads, std::vector<double>(dim->v3lapl3 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3lapl2tau_data(nthreads, std::vector<double>(dim->v3lapl2tau * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3lapltau2_data(nthreads, std::vector<double>(dim->v3lapltau2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3tau3_data(nthreads, std::vector<double>(dim->v3tau3 * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -1407,10 +1342,42 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    timer.stop("Preparation");
+    // set up number of grid blocks
 
-    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    const auto n_boxes = counts.size();
+
+    const auto n_gto_blocks = gto_blocks.size();
+
+    const auto n_rw2_densities = rw2DensityPointers.size();
+
+    // set up pointers to OMP data
+
+    auto ptr_counts = counts.data();
+
+    auto ptr_displacements = displacements.data();
+
+    auto ptr_gto_blocks = gto_blocks.data();
+
+    auto ptr_gsDensityPointers = gsDensityPointers.data();
+
+    auto ptr_xcFunctional = &xcFunctional;
+
+#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+                            n_boxes, n_gto_blocks, n_rw2_densities, naos, \
+                            aoFockPointers, rwDensityPointers, rw2DensityPointers)
     {
+
+#pragma omp single nowait
+    {
+
+    for (size_t box_id = 0; box_id < n_boxes; box_id++)
+    {
+
+    #pragma omp task firstprivate(box_id)
+    {
+        auto thread_id = omp_get_thread_num();
+
         // grid points in box
 
         auto npoints = counts.data()[box_id];
@@ -1421,18 +1388,24 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
         auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
-        // pre-screening of GTOs
+        // prescreening
 
-        timer.start("GTO pre-screening");
+        omptimers[thread_id].start("GTO pre-screening");
 
         std::vector<std::vector<int>> cgto_mask_blocks, pre_ao_inds_blocks;
 
         std::vector<int> aoinds;
 
-        for (const auto& gto_block : gto_blocks)
+        cgto_mask_blocks.reserve(n_gto_blocks);
+
+        pre_ao_inds_blocks.reserve(n_gto_blocks);
+
+        aoinds.reserve(naos); 
+
+        for (size_t i = 0; i < n_gto_blocks; i++)
         {
             // 1st order GTO derivative
-            auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 1, screeningThresholdForGTOValues, boxdim);
+            auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(ptr_gto_blocks[i], 1, screeningThresholdForGTOValues, boxdim);
 
             cgto_mask_blocks.push_back(cgto_mask);
 
@@ -1446,56 +1419,42 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
         const auto aocount = static_cast<int>(aoinds.size());
 
-        timer.stop("GTO pre-screening");
+        omptimers[thread_id].stop("GTO pre-screening");
 
-        if (aocount == 0) continue;
-
-        // generate sub density matrix
-
-        timer.start("Density matrix slicing");
-
-        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
-
-        auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityPointers, aoinds, naos);
-
-        auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityPointers, aoinds, naos);
-
-        timer.stop("Density matrix slicing");
-
-        // GTO values on grid points
-
-        timer.start("OMP Kxc calc.");
-
-        std::vector<CDenseMatrix> sum_partial_mat_Kxc(rw2DensityPointers.size(), CDenseMatrix(aocount, aocount));
-
-#pragma omp parallel
+        if (aocount > 0)
         {
-            auto thread_id = omp_get_thread_num();
+            omptimers[thread_id].start("Density matrix slicing");
+
+            auto sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
+
+            auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityPointers, aoinds, naos);
+
+            auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityPointers, aoinds, naos);
+
+            omptimers[thread_id].stop("Density matrix slicing");
+
+            // GTO values on grid points
 
             omptimers[thread_id].start("gtoeval");
 
-            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+            CDenseMatrix mat_chi(aocount, npoints);
+            CDenseMatrix mat_chi_x(aocount, npoints);
+            CDenseMatrix mat_chi_y(aocount, npoints);
+            CDenseMatrix mat_chi_z(aocount, npoints);
 
-            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+            const auto grid_x_ptr = xcoords + gridblockpos;
+            const auto grid_y_ptr = ycoords + gridblockpos;
+            const auto grid_z_ptr = zcoords + gridblockpos;
 
-            CDenseMatrix mat_chi(aocount, grid_batch_size);
-            CDenseMatrix mat_chi_x(aocount, grid_batch_size);
-            CDenseMatrix mat_chi_y(aocount, grid_batch_size);
-            CDenseMatrix mat_chi_z(aocount, grid_batch_size);
-
-            const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
-            const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
-            const auto grid_z_ptr = zcoords + gridblockpos + grid_batch_offset;
-
-            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + grid_batch_size);
-            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + grid_batch_size);
-            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + grid_batch_size);
+            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + npoints);
+            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + npoints);
+            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + npoints);
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < gto_blocks.size(); i_block++)
+            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
             {
-                const auto& gto_block = gto_blocks[i_block];
+                const auto& gto_block = ptr_gto_blocks[i_block];
 
                 const auto& cgto_mask = cgto_mask_blocks[i_block];
 
@@ -1517,10 +1476,10 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
                 for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(mat_chi.row(idx), submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_x.row(idx), submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_y.row(idx), submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(mat_chi_z.row(idx), submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx), submat_0_data + nu * npoints, npoints * sizeof(double));
+                    std::memcpy(mat_chi_x.row(idx), submat_x_data + nu * npoints, npoints * sizeof(double));
+                    std::memcpy(mat_chi_y.row(idx), submat_y_data + nu * npoints, npoints * sizeof(double));
+                    std::memcpy(mat_chi_z.row(idx), submat_z_data + nu * npoints, npoints * sizeof(double));
                 }
             }
 
@@ -1530,58 +1489,112 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
             omptimers[thread_id].start("Generate density grid");
 
-            auto local_weights = omp_local_weights_data[thread_id].data();
+            auto local_xcfunc = CXCFunctional(*ptr_xcFunctional);
+
+            auto       mggafunc = local_xcfunc.getFunctionalPointerToMetaGgaComponent();
+            const auto dim      = &(mggafunc->dim);
+
+            std::vector<double> local_weights_data(weights + gridblockpos, weights + gridblockpos + npoints);
 
             // Input
-            auto rho     = omp_rho_data[thread_id].data();
-            auto rhograd = omp_rhograd_data[thread_id].data();
-            auto sigma   = omp_sigma_data[thread_id].data();
-            auto lapl    = omp_lapl_data[thread_id].data();
-            auto tau     = omp_tau_data[thread_id].data();
+            std::vector<double> rho_data(dim->rho * npoints);
+            std::vector<double> rhograd_data(dim->rho * 3 * npoints);
+            std::vector<double> sigma_data(dim->sigma * npoints);
+            std::vector<double> lapl_data(dim->lapl * npoints);
+            std::vector<double> tau_data(dim->tau * npoints);
 
             // First-order
-            auto vrho   = omp_vrho_data[thread_id].data();
-            auto vsigma = omp_vsigma_data[thread_id].data();
-            auto vlapl  = omp_vlapl_data[thread_id].data();
-            auto vtau   = omp_vtau_data[thread_id].data();
+            std::vector<double> vrho_data(dim->vrho * npoints);
+            std::vector<double> vsigma_data(dim->vsigma * npoints);
+            std::vector<double> vlapl_data(dim->vlapl * npoints);
+            std::vector<double> vtau_data(dim->vtau * npoints);
 
             // Second-order
-            auto v2rho2      = omp_v2rho2_data[thread_id].data();
-            auto v2rhosigma  = omp_v2rhosigma_data[thread_id].data();
-            auto v2rholapl   = omp_v2rholapl_data[thread_id].data();
-            auto v2rhotau    = omp_v2rhotau_data[thread_id].data();
-            auto v2sigma2    = omp_v2sigma2_data[thread_id].data();
-            auto v2sigmalapl = omp_v2sigmalapl_data[thread_id].data();
-            auto v2sigmatau  = omp_v2sigmatau_data[thread_id].data();
-            auto v2lapl2     = omp_v2lapl2_data[thread_id].data();
-            auto v2lapltau   = omp_v2lapltau_data[thread_id].data();
-            auto v2tau2      = omp_v2tau2_data[thread_id].data();
+            std::vector<double> v2rho2_data(dim->v2rho2 * npoints);
+            std::vector<double> v2rhosigma_data(dim->v2rhosigma * npoints);
+            std::vector<double> v2rholapl_data(dim->v2rholapl * npoints);
+            std::vector<double> v2rhotau_data(dim->v2rhotau * npoints);
+            std::vector<double> v2sigma2_data(dim->v2sigma2 * npoints);
+            std::vector<double> v2sigmalapl_data(dim->v2sigmalapl * npoints);
+            std::vector<double> v2sigmatau_data(dim->v2sigmatau * npoints);
+            std::vector<double> v2lapl2_data(dim->v2lapl2 * npoints);
+            std::vector<double> v2lapltau_data(dim->v2lapltau * npoints);
+            std::vector<double> v2tau2_data(dim->v2tau2 * npoints);
 
             // Third-order
-            auto v3rho3         = omp_v3rho3_data[thread_id].data();
-            auto v3rho2sigma    = omp_v3rho2sigma_data[thread_id].data();
-            auto v3rho2lapl     = omp_v3rho2lapl_data[thread_id].data();
-            auto v3rho2tau      = omp_v3rho2tau_data[thread_id].data();
-            auto v3rhosigma2    = omp_v3rhosigma2_data[thread_id].data();
-            auto v3rhosigmalapl = omp_v3rhosigmalapl_data[thread_id].data();
-            auto v3rhosigmatau  = omp_v3rhosigmatau_data[thread_id].data();
-            auto v3rholapl2     = omp_v3rholapl2_data[thread_id].data();
-            auto v3rholapltau   = omp_v3rholapltau_data[thread_id].data();
-            auto v3rhotau2      = omp_v3rhotau2_data[thread_id].data();
-            auto v3sigma3       = omp_v3sigma3_data[thread_id].data();
-            auto v3sigma2lapl   = omp_v3sigma2lapl_data[thread_id].data();
-            auto v3sigma2tau    = omp_v3sigma2tau_data[thread_id].data();
-            auto v3sigmalapl2   = omp_v3sigmalapl2_data[thread_id].data();
-            auto v3sigmalapltau = omp_v3sigmalapltau_data[thread_id].data();
-            auto v3sigmatau2    = omp_v3sigmatau2_data[thread_id].data();
-            auto v3lapl3        = omp_v3lapl3_data[thread_id].data();
-            auto v3lapl2tau     = omp_v3lapl2tau_data[thread_id].data();
-            auto v3lapltau2     = omp_v3lapltau2_data[thread_id].data();
-            auto v3tau3         = omp_v3tau3_data[thread_id].data();
+            std::vector<double> v3rho3_data(dim->v3rho3 * npoints);
+            std::vector<double> v3rho2sigma_data(dim->v3rho2sigma * npoints);
+            std::vector<double> v3rho2lapl_data(dim->v3rho2lapl * npoints);
+            std::vector<double> v3rho2tau_data(dim->v3rho2tau * npoints);
+            std::vector<double> v3rhosigma2_data(dim->v3rhosigma2 * npoints);
+            std::vector<double> v3rhosigmalapl_data(dim->v3rhosigmalapl * npoints);
+            std::vector<double> v3rhosigmatau_data(dim->v3rhosigmatau * npoints);
+            std::vector<double> v3rholapl2_data(dim->v3rholapl2 * npoints);
+            std::vector<double> v3rholapltau_data(dim->v3rholapltau * npoints);
+            std::vector<double> v3rhotau2_data(dim->v3rhotau2 * npoints);
+            std::vector<double> v3sigma3_data(dim->v3sigma3 * npoints);
+            std::vector<double> v3sigma2lapl_data(dim->v3sigma2lapl * npoints);
+            std::vector<double> v3sigma2tau_data(dim->v3sigma2tau * npoints);
+            std::vector<double> v3sigmalapl2_data(dim->v3sigmalapl2 * npoints);
+            std::vector<double> v3sigmalapltau_data(dim->v3sigmalapltau * npoints);
+            std::vector<double> v3sigmatau2_data(dim->v3sigmatau2 * npoints);
+            std::vector<double> v3lapl3_data(dim->v3lapl3 * npoints);
+            std::vector<double> v3lapl2tau_data(dim->v3lapl2tau * npoints);
+            std::vector<double> v3lapltau2_data(dim->v3lapltau2 * npoints);
+            std::vector<double> v3tau3_data(dim->v3tau3 * npoints);
+
+            auto local_weights = local_weights_data.data();
+
+            // Input
+            auto rho     = rho_data.data();
+            auto rhograd = rhograd_data.data();
+            auto sigma   = sigma_data.data();
+            auto lapl    = lapl_data.data();
+            auto tau     = tau_data.data();
+
+            // First-order
+            auto vrho   = vrho_data.data();
+            auto vsigma = vsigma_data.data();
+            auto vlapl  = vlapl_data.data();
+            auto vtau   = vtau_data.data();
+
+            // Second-order
+            auto v2rho2      = v2rho2_data.data();
+            auto v2rhosigma  = v2rhosigma_data.data();
+            auto v2rholapl   = v2rholapl_data.data();
+            auto v2rhotau    = v2rhotau_data.data();
+            auto v2sigma2    = v2sigma2_data.data();
+            auto v2sigmalapl = v2sigmalapl_data.data();
+            auto v2sigmatau  = v2sigmatau_data.data();
+            auto v2lapl2     = v2lapl2_data.data();
+            auto v2lapltau   = v2lapltau_data.data();
+            auto v2tau2      = v2tau2_data.data();
+
+            // Third-order
+            auto v3rho3         = v3rho3_data.data();
+            auto v3rho2sigma    = v3rho2sigma_data.data();
+            auto v3rho2lapl     = v3rho2lapl_data.data();
+            auto v3rho2tau      = v3rho2tau_data.data();
+            auto v3rhosigma2    = v3rhosigma2_data.data();
+            auto v3rhosigmalapl = v3rhosigmalapl_data.data();
+            auto v3rhosigmatau  = v3rhosigmatau_data.data();
+            auto v3rholapl2     = v3rholapl2_data.data();
+            auto v3rholapltau   = v3rholapltau_data.data();
+            auto v3rhotau2      = v3rhotau2_data.data();
+            auto v3sigma3       = v3sigma3_data.data();
+            auto v3sigma2lapl   = v3sigma2lapl_data.data();
+            auto v3sigma2tau    = v3sigma2tau_data.data();
+            auto v3sigmalapl2   = v3sigmalapl2_data.data();
+            auto v3sigmalapltau = v3sigmalapltau_data.data();
+            auto v3sigmatau2    = v3sigmatau2_data.data();
+            auto v3lapl3        = v3lapl3_data.data();
+            auto v3lapl2tau     = v3lapl2tau_data.data();
+            auto v3lapltau2     = v3lapltau2_data.data();
+            auto v3tau3         = v3tau3_data.data();
 
             sdengridgen::serialGenerateDensityForMGGA(rho, rhograd, sigma, lapl, tau, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat);
 
-            auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
+            auto xcfuntype = local_xcfunc.getFunctionalType();
 
             auto rwdengrid = sdengridgen::serialGenerateDensityGridForMGGA(mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rw_sub_dens_mat, xcfuntype);
 
@@ -1594,9 +1607,9 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
             omptimers[thread_id].start("Density grid quad");
 
-            auto numdens_rw2 = static_cast<int>(rw2DensityPointers.size());
+            auto numdens_rw2 = static_cast<int>(n_rw2_densities);
 
-            CDensityGridQuad rwdengridquad(grid_batch_size, numdens_rw2, xcfuntype, dengrid::ab);
+            CDensityGridQuad rwdengridquad(npoints, numdens_rw2, xcfuntype, dengrid::ab);
 
             rwdengridquad.DensityProd(rwdengrid, xcfuntype, numdens_rw2, quadMode);
 
@@ -1606,12 +1619,12 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
 
             omptimers[thread_id].start("XC functional eval.");
 
-            omp_xcfuncs[thread_id].compute_vxc_for_mgga(grid_batch_size, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
+            local_xcfunc.compute_vxc_for_mgga(npoints, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
 
-            omp_xcfuncs[thread_id].compute_fxc_for_mgga(
-                grid_batch_size, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
+            local_xcfunc.compute_fxc_for_mgga(
+                npoints, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 
-            omp_xcfuncs[thread_id].compute_kxc_for_mgga(grid_batch_size,
+            local_xcfunc.compute_kxc_for_mgga(npoints,
                                           rho,
                                           sigma,
                                           lapl,
@@ -1638,12 +1651,6 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
                                           v3tau3);
 
             omptimers[thread_id].stop("XC functional eval.");
-
-            omptimers[thread_id].start("Copy grid weights");
-
-            std::memcpy(local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
-
-            omptimers[thread_id].stop("Copy grid weights");
 
             // go through density matrices
 
@@ -1701,7 +1708,7 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
                 std::vector<const double*> rw2dengrid_pointers({rhow12a, tauw12a, laplw12a,
                                                                 gradw12a_x, gradw12a_y, gradw12a_z});
 
-                auto partial_mat_Kxc = integratePartialKxcFockForMetaGgaClosedShell(omp_xcfuncs[thread_id],
+                auto partial_mat_Kxc = integratePartialKxcFockForMetaGgaClosedShell(local_xcfunc,
                                                                   local_weights,
                                                                   mat_chi,
                                                                   mat_chi_x,
@@ -1743,27 +1750,17 @@ integrateKxcFockForMetaGgaClosedShell(const std::vector<double*>& aoFockPointers
                                                                   rw2dengrid_pointers,
                                                                   omptimers[thread_id]);
 
-                // accumulate partial Kxc
-
-                omptimers[thread_id].start("Kxc local matrix dist.");
+                omptimers[thread_id].start("Kxc dist.");
 
                 #pragma omp critical
-                sdenblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
+                dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity, partial_mat_Kxc, aoinds, naos);
 
-                omptimers[thread_id].stop("Kxc local matrix dist.");
+                omptimers[thread_id].stop("Kxc dist.");
             }
         }
-
-        timer.stop("OMP Kxc calc.");
-
-        timer.start("Kxc matrix dist.");
-
-        for (size_t idensity = 0; idensity < rw2DensityPointers.size(); idensity++)
-        {
-            dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity, sum_partial_mat_Kxc[idensity], aoinds, naos);
-        }
-
-        timer.stop("Kxc matrix dist.");
+    }
+    }
+    }
     }
 
     timer.stop("Total timing");
