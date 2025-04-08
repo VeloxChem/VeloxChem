@@ -1180,8 +1180,6 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
     timer.start("Total timing");
 
-    timer.start("Preparation");
-
     auto nthreads = omp_get_max_threads();
 
     std::vector<CMultiTimer> omptimers(nthreads);
@@ -1191,28 +1189,6 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // GTOs on grid points
-
-    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
-
-    auto omp_max_npoints = max_npoints_per_box / nthreads;
-    if (max_npoints_per_box % nthreads != 0) omp_max_npoints++;
-
-    // density and functional derivatives
-
-    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
-    const auto dim     = &(ldafunc->dim);
-
-    std::vector<CXCFunctional> omp_xcfuncs(nthreads, CXCFunctional(xcFunctional));
-
-    std::vector<std::vector<double>> omp_local_weights_data(nthreads, std::vector<double>(omp_max_npoints));
-
-    std::vector<std::vector<double>> omp_rho_data(nthreads, std::vector<double>(dim->rho * omp_max_npoints));
-
-    std::vector<std::vector<double>> omp_v2rho2_data(nthreads, std::vector<double>(dim->v2rho2 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v3rho3_data(nthreads, std::vector<double>(dim->v3rho3 * omp_max_npoints));
-    std::vector<std::vector<double>> omp_v4rho4_data(nthreads, std::vector<double>(dim->v4rho4 * omp_max_npoints));
 
     // coordinates and weights of grid points
 
@@ -1228,10 +1204,45 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    timer.stop("Preparation");
+    // set up number of grid blocks
 
-    for (size_t box_id = 0; box_id < counts.size(); box_id++)
+    const auto n_boxes = counts.size();
+
+    const auto n_gto_blocks = gto_blocks.size();
+
+    const auto n_rw2_densities = rw2DensityPointers.size();
+
+    const auto n_rw3_densities = rw3DensityPointers.size();
+
+    // set up pointers to OMP data
+
+    auto ptr_counts = counts.data();
+
+    auto ptr_displacements = displacements.data();
+
+    auto ptr_gto_blocks = gto_blocks.data();
+
+    auto ptr_gsDensityPointers = gsDensityPointers.data();
+
+    auto ptr_xcFunctional = &xcFunctional;
+
+#pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
+                            ptr_gto_blocks, ptr_gsDensityPointers, ptr_xcFunctional, \
+                            n_boxes, n_gto_blocks, n_rw2_densities, n_rw3_densities, naos, \
+                            aoFockPointers, rwDensityPointers, rw2DensityPointers, \
+                            rw3DensityPointers)
     {
+
+#pragma omp single nowait
+    {
+
+    for (size_t box_id = 0; box_id < n_boxes; box_id++)
+    {
+
+    #pragma omp task firstprivate(box_id)
+    {
+        auto thread_id = omp_get_thread_num();
+
         // grid points in box
 
         auto npoints = counts.data()[box_id];
@@ -1244,16 +1255,22 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
         // prescreening
 
-        timer.start("GTO pre-screening");
+        omptimers[thread_id].start("GTO pre-screening");
 
         std::vector<std::vector<int>> cgto_mask_blocks, pre_ao_inds_blocks;
 
         std::vector<int> aoinds;
 
-        for (const auto& gto_block : gto_blocks)
+        cgto_mask_blocks.reserve(n_gto_blocks);
+
+        pre_ao_inds_blocks.reserve(n_gto_blocks);
+
+        aoinds.reserve(naos); 
+
+        for (size_t i = 0; i < n_gto_blocks; i++)
         {
             // 0th order GTO derivative
-            auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 0, screeningThresholdForGTOValues, boxdim);
+            auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(ptr_gto_blocks[i], 0, screeningThresholdForGTOValues, boxdim);
 
             cgto_mask_blocks.push_back(cgto_mask);
 
@@ -1267,57 +1284,41 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
         const auto aocount = static_cast<int>(aoinds.size());
 
-        timer.stop("GTO pre-screening");
+        omptimers[thread_id].stop("GTO pre-screening");
 
-        if (aocount == 0) continue;
-
-        // generate sub density matrix
-
-        timer.start("Density matrix slicing");
-
-        auto gs_sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
-
-        auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityPointers, aoinds, naos);
-
-        auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityPointers, aoinds, naos);
-
-        auto rw3_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw3DensityPointers, aoinds, naos);
-
-        timer.stop("Density matrix slicing");
-
-        // GTO values on grid points
-
-        timer.start("OMP KxcLxc calc.");
-
-        std::vector<CDenseMatrix> sum_partial_mat_Kxc(rw2DensityPointers.size(), CDenseMatrix(aocount, aocount));
-
-        std::vector<CDenseMatrix> sum_partial_mat_Lxc(rw3DensityPointers.size(), CDenseMatrix(aocount, aocount));
-
-#pragma omp parallel
+        if (aocount > 0)
         {
-            auto thread_id = omp_get_thread_num();
+            omptimers[thread_id].start("Density matrix slicing");
+
+            auto gs_sub_dens_mat = dftsubmat::getSubDensityMatrix(gsDensityPointers[0], aoinds, naos);
+
+            auto rw_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rwDensityPointers, aoinds, naos);
+
+            auto rw2_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw2DensityPointers, aoinds, naos);
+
+            auto rw3_sub_dens_mat = dftsubmat::getSubAODensityMatrix(rw3DensityPointers, aoinds, naos);
+
+            omptimers[thread_id].stop("Density matrix slicing");
+
+            // GTO values on grid points
 
             omptimers[thread_id].start("gtoeval");
 
-            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+            CDenseMatrix mat_chi(aocount, npoints);
 
-            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+            const auto grid_x_ptr = xcoords + gridblockpos;
+            const auto grid_y_ptr = ycoords + gridblockpos;
+            const auto grid_z_ptr = zcoords + gridblockpos;
 
-            CDenseMatrix mat_chi(aocount, grid_batch_size);
-
-            const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
-            const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
-            const auto grid_z_ptr = zcoords + gridblockpos + grid_batch_offset;
-
-            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + grid_batch_size);
-            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + grid_batch_size);
-            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + grid_batch_size);
+            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + npoints);
+            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + npoints);
+            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + npoints);
 
             // go through GTO blocks
 
-            for (size_t i_block = 0, idx = 0; i_block < gto_blocks.size(); i_block++)
+            for (size_t i_block = 0, idx = 0; i_block < n_gto_blocks; i_block++)
             {
-                const auto& gto_block = gto_blocks[i_block];
+                const auto& gto_block = ptr_gto_blocks[i_block];
 
                 const auto& cgto_mask = cgto_mask_blocks[i_block];
 
@@ -1333,7 +1334,7 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
                 for (int nu = 0; nu < static_cast<int>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(mat_chi.row(idx), submat_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx), submat_data + nu * npoints, npoints * sizeof(double));
                 }
             }
 
@@ -1343,17 +1344,30 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
             omptimers[thread_id].start("Generate density grid");
 
-            auto local_weights = omp_local_weights_data[thread_id].data();
+            auto local_xcfunc = CXCFunctional(*ptr_xcFunctional);
 
-            auto rho = omp_rho_data[thread_id].data();
+            auto       ldafunc = local_xcfunc.getFunctionalPointerToLdaComponent();
+            const auto dim     = &(ldafunc->dim);
 
-            auto v2rho2 = omp_v2rho2_data[thread_id].data();
-            auto v3rho3 = omp_v3rho3_data[thread_id].data();
-            auto v4rho4 = omp_v4rho4_data[thread_id].data();
+            std::vector<double> local_weights_data(weights + gridblockpos, weights + gridblockpos + npoints);
+
+            std::vector<double> rho_data(dim->rho * npoints);
+
+            std::vector<double> v2rho2_data(dim->v2rho2 * npoints);
+            std::vector<double> v3rho3_data(dim->v3rho3 * npoints);
+            std::vector<double> v4rho4_data(dim->v4rho4 * npoints);
+
+            auto local_weights = local_weights_data.data();
+
+            auto rho = rho_data.data();
+
+            auto v2rho2 = v2rho2_data.data();
+            auto v3rho3 = v3rho3_data.data();
+            auto v4rho4 = v4rho4_data.data();
 
             sdengridgen::serialGenerateDensityForLDA(rho, mat_chi, gs_sub_dens_mat);
 
-            auto xcfuntype = omp_xcfuncs[thread_id].getFunctionalType();
+            auto xcfuntype = local_xcfunc.getFunctionalType();
 
             auto rwdengrid = sdengridgen::serialGenerateDensityGridForLDA(mat_chi, rw_sub_dens_mat, xcfuntype);
 
@@ -1365,11 +1379,11 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
             omptimers[thread_id].start("Density grid cube");
 
-            auto numdens_rw3 = static_cast<int>(rw3DensityPointers.size());
+            auto numdens_rw3 = static_cast<int>(n_rw3_densities);
 
-            auto numdens_rw2 = static_cast<int>(rw2DensityPointers.size());
+            auto numdens_rw2 = static_cast<int>(n_rw2_densities);
 
-            CDensityGridCubic rwdengridcube(grid_batch_size, numdens_rw2 + numdens_rw3, xcfuntype, dengrid::ab);
+            CDensityGridCubic rwdengridcube(npoints, numdens_rw2 + numdens_rw3, xcfuntype, dengrid::ab);
 
             rwdengridcube.DensityProd(rwdengrid, rw2dengrid, xcfuntype, (numdens_rw2 + numdens_rw3), cubeMode);
 
@@ -1379,19 +1393,13 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
 
             omptimers[thread_id].start("XC functional eval.");
 
-            omp_xcfuncs[thread_id].compute_fxc_for_lda(grid_batch_size, rho, v2rho2);
+            local_xcfunc.compute_fxc_for_lda(npoints, rho, v2rho2);
 
-            omp_xcfuncs[thread_id].compute_kxc_for_lda(grid_batch_size, rho, v3rho3);
+            local_xcfunc.compute_kxc_for_lda(npoints, rho, v3rho3);
 
-            omp_xcfuncs[thread_id].compute_lxc_for_lda(grid_batch_size, rho, v4rho4);
+            local_xcfunc.compute_lxc_for_lda(npoints, rho, v4rho4);
 
             omptimers[thread_id].stop("XC functional eval.");
-
-            omptimers[thread_id].start("Copy grid weights");
-
-            std::memcpy(local_weights, weights + gridblockpos + grid_batch_offset, grid_batch_size * sizeof(double));
-
-            omptimers[thread_id].stop("Copy grid weights");
 
             // go through density matrices
 
@@ -1409,17 +1417,17 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
                 std::vector<const double*> rw2dengrid_pointers({rhow12a, rhow12b});
 
                 auto partial_mat_Kxc = integratePartialKxcFockForLdaClosedShell(
-                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3,
+                    local_xcfunc, local_weights, mat_chi, v2rho2, v3rho3,
                     rwdengrid_pointers, rw2dengrid_pointers, omptimers[thread_id]);
 
                 // accumulate partial Kxc
 
-                omptimers[thread_id].start("Kxc local matrix dist.");
+                omptimers[thread_id].start("Kxc dist.");
 
                 #pragma omp critical
-                sdenblas::serialInPlaceAddAB(sum_partial_mat_Kxc[idensity], partial_mat_Kxc);
+                dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity, partial_mat_Kxc, aoinds, naos);
 
-                omptimers[thread_id].stop("Kxc local matrix dist.");
+                omptimers[thread_id].stop("Kxc dist.");
             }
 
             for (int idensity = 0; idensity < numdens_rw3; idensity++)
@@ -1427,38 +1435,21 @@ integrateKxcLxcFockForLdaClosedShell(const std::vector<double*>& aoFockPointers,
                 // compute partial contribution to Lxc matrix
 
                 auto partial_mat_Lxc = integratePartialLxcFockForLdaClosedShell(
-                    omp_xcfuncs[thread_id], local_weights, mat_chi, v2rho2, v3rho3, v4rho4, rwdengridcube, rw3dengrid, idensity, omptimers[thread_id]);
+                    local_xcfunc, local_weights, mat_chi, v2rho2, v3rho3, v4rho4, rwdengridcube, rw3dengrid, idensity, omptimers[thread_id]);
 
                 // accumulate partial Lxc
 
-                omptimers[thread_id].start("Lxc local matrix dist.");
+                omptimers[thread_id].start("Lxc dist.");
 
                 #pragma omp critical
-                sdenblas::serialInPlaceAddAB(sum_partial_mat_Lxc[idensity], partial_mat_Lxc);
+                dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity + numdens_rw2, partial_mat_Lxc, aoinds, naos);
 
-                omptimers[thread_id].stop("Lxc local matrix dist.");
+                omptimers[thread_id].stop("Lxc dist.");
             }
         }
-
-        timer.stop("OMP KxcLxc calc.");
-
-        timer.start("Kxc matrix dist.");
-
-        for (size_t idensity = 0; idensity < rw2DensityPointers.size(); idensity++)
-        {
-            dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity, sum_partial_mat_Kxc[idensity], aoinds, naos);
-        }
-
-        timer.stop("Kxc matrix dist.");
-
-        timer.start("Lxc matrix dist.");
-
-        for (size_t idensity = 0; idensity < rw3DensityPointers.size(); idensity++)
-        {
-            dftsubmat::distributeSubMatrixToFock(aoFockPointers, idensity + rw2DensityPointers.size(), sum_partial_mat_Lxc[idensity], aoinds, naos);
-        }
-
-        timer.stop("Lxc matrix dist.");
+    }
+    }
+    }
     }
 
     timer.stop("Total timing");
