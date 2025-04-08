@@ -354,6 +354,8 @@ class EvbForceFieldBuilder():
             new_product_atoms.update({key: val})
 
         # Sort the atoms by index
+        forcefield.molecule = EvbForceFieldBuilder._apply_mapping_to_molecule(
+            forcefield.molecule, mapping)
         forcefield.atoms = dict(sorted(new_product_atoms.items()))
 
         forcefield.bonds = EvbForceFieldBuilder._apply_mapping_to_parameters(
@@ -365,6 +367,12 @@ class EvbForceFieldBuilder():
         forcefield.impropers = EvbForceFieldBuilder._apply_mapping_to_parameters(
             forcefield.impropers, mapping)
         return forcefield
+
+    @staticmethod
+    def _apply_mapping_to_molecule(molecule,mapping):
+        pass
+        new_molecule = Molecule()
+        positions = molecule.get_coordinates_in_angstrom()
 
     #Remap the indices in a specific set of parameters
     @staticmethod
