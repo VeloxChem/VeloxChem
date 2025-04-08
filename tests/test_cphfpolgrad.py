@@ -41,9 +41,13 @@ class TestCphfPolgrad:
 
         # test real analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
-        cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
-                                'use_subspace_solver': 'no'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_settings = {
+            'conv_thresh': 2e-7,
+            'frequencies': (0.0, 0.4),
+            'use_subspace_solver': 'no'
+        }
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings,
+                                           method_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
 
@@ -52,14 +56,16 @@ class TestCphfPolgrad:
             cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here / 'data' / 'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label))
             hf.close()
 
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
+            assert np.max(
+                np.abs(cphfpolgrad_coefficients) -
+                np.abs(cphfpolgrad_reference)) < 1.0e-6
 
     def run_cphfpolgrad_ss_real(self, molecule, basis, xcfun=None, label=None):
         # subspace solver
@@ -86,9 +92,13 @@ class TestCphfPolgrad:
 
         # test real analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
-        cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
-                                'use_subspace_solver': 'yes'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_settings = {
+            'conv_thresh': 2e-7,
+            'frequencies': (0.0, 0.4),
+            'use_subspace_solver': 'yes'
+        }
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings,
+                                           method_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
 
@@ -106,19 +116,26 @@ class TestCphfPolgrad:
             #cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here / 'data' / 'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
             cphfpolgrad_reference = np.array(hf.get(label))
             hf.close()
 
             cphfpolgrad_coefficients = np.array(cphfpolgrad_coefficients)
-            cphfpolgrad_coefficients = cphfpolgrad_coefficients.reshape(cphfpolgrad_reference.shape)
+            cphfpolgrad_coefficients = cphfpolgrad_coefficients.reshape(
+                cphfpolgrad_reference.shape)
 
             # Here we are comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
+            assert np.max(
+                np.abs(cphfpolgrad_coefficients) -
+                np.abs(cphfpolgrad_reference)) < 1.0e-6
 
-    def run_cphfpolgrad_cg_complex(self, molecule, basis, xcfun=None, label=None):
+    def run_cphfpolgrad_cg_complex(self,
+                                   molecule,
+                                   basis,
+                                   xcfun=None,
+                                   label=None):
         # conjugate gradient solver
         scf_drv = ScfRestrictedDriver()
         scf_dict = {}
@@ -133,8 +150,11 @@ class TestCphfPolgrad:
         scf_tensors = scf_drv.compute(molecule, basis)
 
         # linear response
-        rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4),
-                        'damping': 0.5}
+        rsp_settings = {
+            'conv_thresh': 1.0e-5,
+            'frequencies': (0.0, 0.4),
+            'damping': 0.5
+        }
         lr_drv = ComplexResponse()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
@@ -144,10 +164,15 @@ class TestCphfPolgrad:
 
         # test complex analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
-        cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
-                                'is_complex': 'yes', 'damping': 0.5,
-                                'use_subspace_solver': 'no'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_settings = {
+            'conv_thresh': 2e-7,
+            'frequencies': (0.0, 0.4),
+            'is_complex': 'yes',
+            'damping': 0.5,
+            'use_subspace_solver': 'no'
+        }
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings,
+                                           method_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
 
@@ -156,16 +181,23 @@ class TestCphfPolgrad:
             cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here / 'data' / 'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
-            cphfpolgrad_reference = np.array(hf.get(label))
+            cphfpolgrad_reference = np.array(hf.get(label1))[12:]
+            cphfpolgrad_omega_reference = np.array(hf.get(label2))[12:]
             hf.close()
 
             # Here we ar comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
+            assert np.max(
+                np.abs(cphfpolgrad_coefficients) -
+                np.abs(cphfpolgrad_reference)) < 1.0e-6
 
-    def run_cphfpolgrad_ss_complex(self, molecule, basis, xcfun=None, label=None):
+    def run_cphfpolgrad_ss_complex(self,
+                                   molecule,
+                                   basis,
+                                   xcfun=None,
+                                   label=None):
         scf_drv = ScfRestrictedDriver()
         scf_dict = {}
         method_settings = {}
@@ -179,8 +211,11 @@ class TestCphfPolgrad:
         scf_tensors = scf_drv.compute(molecule, basis)
 
         # linear response
-        rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0, 0.4),
-                        'damping': 0.5}
+        rsp_settings = {
+            'conv_thresh': 1.0e-5,
+            'frequencies': (0.0, 0.4),
+            'damping': 0.5
+        }
         lr_drv = ComplexResponse()
         lr_drv.a_operator = "electric dipole"
         lr_drv.b_operator = "electric dipole"
@@ -190,10 +225,15 @@ class TestCphfPolgrad:
 
         # test complex analytical gradient
         cphfpolgrad_solver = PolOrbitalResponse()
-        cphfpolgrad_settings = {'conv_thresh':2e-7, 'frequencies': (0.0, 0.4),
-                                'is_complex': 'yes', 'damping': 0.5,
-                                'use_subspace_solver': 'yes'}
-        cphfpolgrad_solver.update_settings(cphfpolgrad_settings, method_settings)
+        cphfpolgrad_settings = {
+            'conv_thresh': 2e-7,
+            'frequencies': (0.0, 0.4),
+            'is_complex': 'yes',
+            'damping': 0.5,
+            'use_subspace_solver': 'yes'
+        }
+        cphfpolgrad_solver.update_settings(cphfpolgrad_settings,
+                                           method_settings)
         cphfpolgrad_solver.ostream.mute()
         cphfpolgrad_solver.compute(molecule, basis, scf_tensors, lr_results)
 
@@ -211,17 +251,21 @@ class TestCphfPolgrad:
             #cphfpolgrad_coefficients = cphfpolgrad_results['cphf_ov']
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
-            hf_file_name = str(here /'data'/'cphfpolgrad_coefficients.h5')
+            hf_file_name = str(here / 'data' / 'cphfpolgrad_coefficients.h5')
             hf = h5py.File(hf_file_name, 'r')
-            cphfpolgrad_reference = np.array(hf.get(label))
+            cphfpolgrad_reference = np.array(hf.get(label1))[12:]
+            cphfpolgrad_omega_reference = np.array(hf.get(label2))[12:]
             hf.close()
 
             cphfpolgrad_coefficients = np.array(cphfpolgrad_coefficients)
-            cphfpolgrad_coefficients = cphfpolgrad_coefficients.reshape(cphfpolgrad_reference.shape)
+            cphfpolgrad_coefficients = cphfpolgrad_coefficients.reshape(
+                cphfpolgrad_reference.shape)
 
             # Here we ar comparing the CPHF coefficients in MO basis, so
             # there might be sign differences; we compare absolute values instead.
-            assert np.max(np.abs(cphfpolgrad_coefficients) - np.abs(cphfpolgrad_reference)) < 1.0e-6
+            assert np.max(
+                np.abs(cphfpolgrad_coefficients) -
+                np.abs(cphfpolgrad_reference)) < 1.0e-6
 
     def test_cphfpolgrad_coefficients(self):
         h2o_xyz = """3
@@ -236,11 +280,15 @@ class TestCphfPolgrad:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         #self.run_cphfpolgrad_real(molecule, basis, None, "cphfpolgrad_coefficients_real")
-        self.run_cphfpolgrad_cg_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real")
-        self.run_cphfpolgrad_ss_real(molecule, basis, None, "cphfpolgrad_coefficients_red_real")
+        self.run_cphfpolgrad_cg_real(molecule, basis, None,
+                                     "cphfpolgrad_coefficients_red_real")
+        self.run_cphfpolgrad_ss_real(molecule, basis, None,
+                                     "cphfpolgrad_coefficients_red_real")
         #self.run_cphfpolgrad_complex(molecule, basis, None, "cphfpolgrad_coefficients_complex")
-        self.run_cphfpolgrad_cg_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex")
-        self.run_cphfpolgrad_ss_complex(molecule, basis, None, "cphfpolgrad_coefficients_red_complex")
+        self.run_cphfpolgrad_cg_complex(molecule, basis, None,
+                                        "cphfpolgrad_coefficients_red_complex")
+        self.run_cphfpolgrad_ss_complex(molecule, basis, None,
+                                        "cphfpolgrad_coefficients_red_complex")
 
     def test_cpkspolgrad_coefficients(self):
         h2o_xyz = """3
@@ -255,8 +303,14 @@ class TestCphfPolgrad:
         basis = MolecularBasis.read(molecule, basis_set_label)
 
         #self.run_cphfpolgrad_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_real")
-        self.run_cphfpolgrad_cg_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real")
-        self.run_cphfpolgrad_ss_real(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_real")
+        self.run_cphfpolgrad_cg_real(molecule, basis, "b3lyp",
+                                     "cpkspolgrad_coefficients_red_b3lyp_real")
+        self.run_cphfpolgrad_ss_real(molecule, basis, "b3lyp",
+                                     "cpkspolgrad_coefficients_red_b3lyp_real")
         #self.run_cphfpolgrad_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_b3lyp_complex")
-        self.run_cphfpolgrad_cg_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex")
-        self.run_cphfpolgrad_ss_complex(molecule, basis, "b3lyp", "cpkspolgrad_coefficients_red_b3lyp_complex")
+        self.run_cphfpolgrad_cg_complex(
+            molecule, basis, "b3lyp",
+            "cpkspolgrad_coefficients_red_b3lyp_complex")
+        self.run_cphfpolgrad_ss_complex(
+            molecule, basis, "b3lyp",
+            "cpkspolgrad_coefficients_red_b3lyp_complex")

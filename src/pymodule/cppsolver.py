@@ -1,33 +1,41 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import math
 import sys
+import h5py
 
 from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            hartree_in_inverse_nm, fine_structure_constant,
@@ -38,9 +46,8 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, create_hdf5,
-                         write_rsp_solution_with_multiple_keys)
+from .errorhandler import assert_msg_critical, safe_solve
+from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
 
 class ComplexResponse(LinearSolver):
@@ -84,7 +91,7 @@ class ComplexResponse(LinearSolver):
 
         self.cpp_flag = None
 
-        self.frequencies = (0,)
+        self.frequencies = (0, )
         self.damping = 1000.0 / hartree_in_wavenumber()
 
         self._input_keywords['response'].update({
@@ -309,6 +316,10 @@ class ComplexResponse(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -376,7 +387,8 @@ class ComplexResponse(LinearSolver):
                                                 basis, scf_tensors)
             if self.rank == mpi_master():
                 v_grad = {
-                    (op, w): v for op, v in zip(self.b_components, b_grad)
+                    (op, w): v
+                    for op, v in zip(self.b_components, b_grad)
                     for w in self.frequencies
                 }
 
@@ -488,8 +500,8 @@ class ComplexResponse(LinearSolver):
             s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             for op, w in op_freq_keys:
-                if (iteration == 0 or
-                        relative_residual_norm[(op, w)] > self.conv_thresh):
+                if (iteration == 0
+                        or relative_residual_norm[(op, w)] > self.conv_thresh):
 
                     grad_rg = dist_grad[(op, w)].get_column(0)
                     grad_ru = dist_grad[(op, w)].get_column(1)
@@ -561,7 +573,7 @@ class ComplexResponse(LinearSolver):
 
                         # solving matrix equation
 
-                        c = np.linalg.solve(mat, g)
+                        c = safe_solve(mat, g)
                     else:
                         c = None
                     c = self.comm.bcast(c, root=mpi_master())
@@ -772,15 +784,11 @@ class ComplexResponse(LinearSolver):
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
 
-                    # create h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
-                        final_h5_fname = str(
-                            Path(self.checkpoint_file).with_suffix(
-                                '.solutions.h5'))
-                        create_hdf5(final_h5_fname, molecule, basis,
-                                    dft_dict['dft_func_label'],
-                                    pe_dict['potfile_text'])
+                    # final h5 file for response solutions
+                    if self.filename is not None:
+                        final_h5_fname = f'{self.filename}.h5'
+                    else:
+                        final_h5_fname = None
 
                 for bop, w in solutions:
                     x = self.get_full_solution_vector(solutions[(bop, w)])
@@ -790,8 +798,8 @@ class ComplexResponse(LinearSolver):
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
 
                         # write to h5 file for response solutions
-                        if (self.save_solutions and
-                                self.checkpoint_file is not None):
+                        if (self.save_solutions
+                                and self.checkpoint_file is not None):
                             solution_keys = [
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
                                 for aop in self.a_components
@@ -801,8 +809,8 @@ class ComplexResponse(LinearSolver):
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
+                    if (self.save_solutions
+                            and self.checkpoint_file is not None):
                         checkpoint_text = 'Response solution vectors written to file: '
                         checkpoint_text += final_h5_fname
                         self.ostream.print_info(checkpoint_text)
@@ -819,6 +827,11 @@ class ComplexResponse(LinearSolver):
                     }
 
                     self._print_results(ret_dict)
+
+                    # write spectrum to h5 file
+                    if final_h5_fname is not None:
+                        self.write_cpp_rsp_results_to_hdf5(
+                            final_h5_fname, ret_dict)
 
                     return ret_dict
                 else:
@@ -1158,6 +1171,9 @@ class ComplexResponse(LinearSolver):
 
         ostream.print_blank()
 
+        # Note: flush is needed at the end of every print method
+        ostream.flush()
+
     def _print_ecd_results(self, rsp_results, ostream=None):
         """
         Prints ECD results to output stream.
@@ -1213,3 +1229,39 @@ class ComplexResponse(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+
+        # Note: flush is needed at the end of every print method
+        ostream.flush()
+
+    def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
+        """
+        Writes the results of a linear response calculation to HDF5 file.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param rsp_results:
+            The dictionary containing the linear response results.
+        """
+
+        if fname and isinstance(fname, str):
+
+            hf = h5py.File(fname, 'a')
+
+            # Write frequencies
+            xlabel = 'rsp/frequencies'
+            if xlabel in hf:
+                del hf[xlabel]
+            hf.create_dataset(xlabel, data=rsp_results['frequencies'])
+
+            spectrum = self.get_spectrum(rsp_results, 'au')
+            y_data = np.array(spectrum['y_data'])
+
+            if self.cpp_flag == 'absorption':
+                ylabel = 'rsp/sigma'
+            elif self.cpp_flag == 'ecd':
+                ylabel = 'rsp/delta-epsilon'
+            if ylabel in hf:
+                del hf[ylabel]
+            hf.create_dataset(ylabel, data=y_data)
+
+            hf.close()

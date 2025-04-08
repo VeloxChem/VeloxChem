@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from copy import deepcopy
@@ -28,7 +36,8 @@ import numpy as np
 import time
 import math
 
-from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver, NuclearPotentialGeom100Driver,
+from .veloxchemlib import (OverlapGeom100Driver, KineticEnergyGeom100Driver,
+                           NuclearPotentialGeom100Driver,
                            NuclearPotentialGeom010Driver, FockGeom1000Driver)
 from .veloxchemlib import XCFunctional, MolecularGrid, XCMolecularGradient
 from .veloxchemlib import T4CScreener
@@ -44,7 +53,8 @@ from .outputstream import OutputStream
 from .dispersionmodel import DispersionModel
 from .gradientdriver import GradientDriver
 from .errorhandler import assert_msg_critical
-from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check, dft_sanity_check)
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 
 
 class ScfGradientDriver(GradientDriver):
@@ -80,19 +90,6 @@ class ScfGradientDriver(GradientDriver):
 
         # D4 dispersion correction
         self.dispersion = scf_drv.dispersion
-
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' + profiler.get_available_memory())
-            self.ostream.flush()
 
     def compute(self, molecule, basis, scf_results=None):
         """
@@ -135,10 +132,14 @@ class ScfGradientDriver(GradientDriver):
                 self.compute_analytical_restricted(molecule, basis, scf_results)
 
             elif scf_type == 'unrestricted':
-                self.compute_analytical_unrestricted(molecule, basis, scf_results)
+                self.compute_analytical_unrestricted(molecule, basis,
+                                                     scf_results)
 
             else:
-                assert_msg_critical(False, 'ScfGradientDriver: Not implemented for restricted open-shell')
+                assert_msg_critical(
+                    False,
+                    'ScfGradientDriver: Not implemented for restricted open-shell'
+                )
 
         # print gradient
         self.print_geometry(molecule)
@@ -199,8 +200,6 @@ class ScfGradientDriver(GradientDriver):
 
         kin_grad_drv = KineticEnergyGeom100Driver()
 
-        self._print_debug_info('before kin_grad')
-
         for iatom in local_atoms:
             gmats = kin_grad_drv.compute(molecule, basis, iatom)
 
@@ -210,15 +209,11 @@ class ScfGradientDriver(GradientDriver):
 
             gmats = Matrices()
 
-        self._print_debug_info('after  kin_grad')
-
         grad_timing['Kinetic_energy_grad'] += time.time() - t0
 
         # nuclear potential contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before npot_grad')
 
         npot_grad_100_drv = NuclearPotentialGeom100Driver()
         npot_grad_010_drv = NuclearPotentialGeom010Driver()
@@ -232,13 +227,12 @@ class ScfGradientDriver(GradientDriver):
                 gmat_010 = gmats_010.matrix_to_numpy(label)
 
                 # TODO: move minus sign into function call (such as in oneints)
-                self.gradient[iatom, i] -= 2.0 * np.sum((gmat_100 + gmat_100.T) * D)
+                self.gradient[iatom, i] -= 2.0 * np.sum(
+                    (gmat_100 + gmat_100.T) * D)
                 self.gradient[iatom, i] -= 2.0 * np.sum(gmat_010 * D)
 
             gmats_100 = Matrices()
             gmats_010 = Matrices()
-
-        self._print_debug_info('after  npot_grad')
 
         grad_timing['Nuclear_potential_grad'] += time.time() - t0
 
@@ -257,13 +251,15 @@ class ScfGradientDriver(GradientDriver):
                 mm_charges.append(chg_p)
 
             for iatom in local_atoms:
-                gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom, mm_coords, mm_charges)
+                gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                                      mm_coords, mm_charges)
 
                 for i, label in enumerate(['X', 'Y', 'Z']):
                     gmat_100 = gmats_100.matrix_to_numpy(label)
 
                     # TODO: move minus sign into function call (such as in oneints)
-                    self.gradient[iatom, i] -= 2.0 * np.sum((gmat_100 + gmat_100.T) * D)
+                    self.gradient[iatom, i] -= 2.0 * np.sum(
+                        (gmat_100 + gmat_100.T) * D)
 
                 gmats_100 = Matrices()
 
@@ -272,8 +268,6 @@ class ScfGradientDriver(GradientDriver):
         # orbital contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before ovl_grad')
 
         ovl_grad_drv = OverlapGeom100Driver()
 
@@ -286,8 +280,6 @@ class ScfGradientDriver(GradientDriver):
                 self.gradient[iatom, i] -= 2.0 * np.sum((gmat + gmat.T) * W)
 
             gmats = Matrices()
-
-        self._print_debug_info('after  ovl_grad')
 
         grad_timing['Overlap_grad'] += time.time() - t0
 
@@ -321,15 +313,15 @@ class ScfGradientDriver(GradientDriver):
         # TODO: range-separated Fock
         need_omega = (use_dft and xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(False, 'ScfGradientDriver: Not implemented for' + ' range-separated functional')
+            assert_msg_critical(
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
 
         den_mat_for_fock = make_matrix(basis, mat_t.symmetric)
         den_mat_for_fock.set_values(D)
 
         den_mat_for_fock2 = make_matrix(basis, mat_t.general)
         den_mat_for_fock2.set_values(D)
-
-        self._print_debug_info('before fock_grad')
 
         fock_grad_drv = FockGeom1000Driver()
         fock_grad_drv._set_block_size_factor(self._block_size_factor)
@@ -344,20 +336,25 @@ class ScfGradientDriver(GradientDriver):
         thresh_int = int(-math.log10(self.eri_thresh))
 
         if self.scf_driver.ri_coulomb:
-            assert_msg_critical(basis.get_label().lower().startswith('def2-'),
-                                'ScfGradientDriver: Invalid basis set for RI-J')
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
 
-            self.ostream.print_info('Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
             self.ostream.print_blank()
             self.ostream.flush()
 
             if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(molecule, self.scf_driver.ri_auxiliary_basis)
+                basis_ri_j = MolecularBasis.read(
+                    molecule, self.scf_driver.ri_auxiliary_basis)
             else:
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            local_ri_gvec = np.array(self.scf_driver._ri_drv.compute_local_bq_vector(den_mat_for_fock))
+            local_ri_gvec = np.array(
+                self.scf_driver._ri_drv.compute_local_bq_vector(
+                    den_mat_for_fock))
             ri_gvec = np.zeros(local_ri_gvec.shape)
             self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
 
@@ -366,7 +363,9 @@ class ScfGradientDriver(GradientDriver):
             t0 = time.time()
 
             for iatom in local_atoms:
-                atomgrad = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule, ri_gvec, den_mat_for_fock,
+                atomgrad = ri_grad_drv.direct_compute(screener, basis,
+                                                      basis_ri_j, molecule,
+                                                      ri_gvec, den_mat_for_fock,
                                                       iatom, thresh_int)
 
                 # Note: RI gradient already contains factor of 2 for
@@ -388,8 +387,12 @@ class ScfGradientDriver(GradientDriver):
 
                 t0 = time.time()
 
-                atomgrad = fock_grad_drv.compute(basis, screener_atom, screener, den_mat_for_fock, den_mat_for_fock2,
-                                                 iatom, fock_type, exchange_scaling_factor, 0.0, thresh_int)
+                atomgrad = fock_grad_drv.compute(basis, screener_atom, screener,
+                                                 den_mat_for_fock,
+                                                 den_mat_for_fock2, iatom,
+                                                 fock_type,
+                                                 exchange_scaling_factor, 0.0,
+                                                 thresh_int)
 
                 grad_timing['Fock_grad'] += time.time() - t0
 
@@ -397,13 +400,9 @@ class ScfGradientDriver(GradientDriver):
 
                 self.gradient[iatom, :] += np.array(atomgrad) * factor
 
-        self._print_debug_info('after  fock_grad')
-
         # XC contribution to gradient
 
         t0 = time.time()
-
-        self._print_debug_info('before xc_grad')
 
         if use_dft:
             if self.rank == mpi_master():
@@ -413,13 +412,11 @@ class ScfGradientDriver(GradientDriver):
             xcfun_label = self.comm.bcast(xcfun_label, root=mpi_master())
 
             grad_drv = XCMolecularGradient()
-            self.gradient += grad_drv.integrate_vxc_gradient(molecule, basis, [D], self.scf_driver._mol_grid,
-                                                             xcfun_label)
+            self.gradient += grad_drv.integrate_vxc_gradient(
+                molecule, basis, [D], self.scf_driver._mol_grid, xcfun_label)
 
         else:
             xcfun_label = 'hf'
-
-        self._print_debug_info('after  xc_grad')
 
         grad_timing['XC_grad'] += time.time() - t0
 
@@ -431,12 +428,14 @@ class ScfGradientDriver(GradientDriver):
             from .embedding import PolarizableEmbeddingGrad
 
             # pass along emb object from scf, or make a new one? -> for ind dipoles.
-            self._embedding_drv = PolarizableEmbeddingGrad(molecule=molecule,
-                                                           ao_basis=basis,
-                                                           options=self.scf_driver.embedding,
-                                                           comm=self.comm)
+            self._embedding_drv = PolarizableEmbeddingGrad(
+                molecule=molecule,
+                ao_basis=basis,
+                options=self.scf_driver.embedding,
+                comm=self.comm)
 
-            pe_grad = self._embedding_drv.compute_pe_contributions(density_matrix=2.0 * D)
+            pe_grad = self._embedding_drv.compute_pe_contributions(
+                density_matrix=2.0 * D)
 
             if self.rank == mpi_master():
                 self.gradient += pe_grad
@@ -460,10 +459,10 @@ class ScfGradientDriver(GradientDriver):
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
             if self.scf_driver._cpcm:
-                self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(molecule, basis,
-                                                                                 self.scf_driver._cpcm_grid,
-                                                                                 self.scf_driver._cpcm_sw_func,
-                                                                                 self.scf_driver._cpcm_q, 2.0 * D)
+                self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
+                    molecule, basis, self.scf_driver._cpcm_grid,
+                    self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
+                    2.0 * D)
 
         # nuclei-point charges contribution to gradient
 
@@ -510,7 +509,8 @@ class ScfGradientDriver(GradientDriver):
                         sigma_r_6 = (sigma_ij / distance_ij)**6
                         sigma_r_12 = sigma_r_6**2
 
-                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij - sigma_r_6 / distance_ij)
+                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij
+                                                  - sigma_r_6 / distance_ij)
 
                         vdw_grad[a] += -g * n_ij
 
@@ -602,7 +602,8 @@ class ScfGradientDriver(GradientDriver):
                 gmat_010 = gmats_010.matrix_to_numpy(label)
 
                 # TODO: move minus sign into function call (such as in oneints)
-                self.gradient[iatom, i] -= np.sum((gmat_100 + gmat_100.T) * (Da + Db))
+                self.gradient[iatom, i] -= np.sum(
+                    (gmat_100 + gmat_100.T) * (Da + Db))
                 self.gradient[iatom, i] -= np.sum(gmat_010 * (Da + Db))
 
             gmats_100 = Matrices()
@@ -621,13 +622,15 @@ class ScfGradientDriver(GradientDriver):
                 mm_charges.append(chg_p)
 
             for iatom in local_atoms:
-                gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom, mm_coords, mm_charges)
+                gmats_100 = npot_grad_100_drv.compute(molecule, basis, iatom,
+                                                      mm_coords, mm_charges)
 
                 for i, label in enumerate(['X', 'Y', 'Z']):
                     gmat_100 = gmats_100.matrix_to_numpy(label)
 
                     # TODO: move minus sign into function call (such as in oneints)
-                    self.gradient[iatom, i] -= np.sum((gmat_100 + gmat_100.T) * (Da + Db))
+                    self.gradient[iatom, i] -= np.sum(
+                        (gmat_100 + gmat_100.T) * (Da + Db))
 
                 gmats_100 = Matrices()
 
@@ -675,7 +678,9 @@ class ScfGradientDriver(GradientDriver):
         # TODO: range-separated Fock
         need_omega = (use_dft and xcfun.is_range_separated())
         if need_omega:
-            assert_msg_critical(False, 'ScfGradientDriver: Not implemented for' + ' range-separated functional')
+            assert_msg_critical(
+                False, 'ScfGradientDriver: Not implemented for' +
+                ' range-separated functional')
 
         Da_for_fock = make_matrix(basis, mat_t.symmetric)
         Da_for_fock.set_values(Da)
@@ -704,31 +709,38 @@ class ScfGradientDriver(GradientDriver):
         thresh_int = int(-math.log10(self.eri_thresh))
 
         if self.scf_driver.ri_coulomb:
-            assert_msg_critical(basis.get_label().lower().startswith('def2-'),
-                                'ScfGradientDriver: Invalid basis set for RI-J')
+            assert_msg_critical(
+                basis.get_label().lower().startswith('def2-'),
+                'ScfGradientDriver: Invalid basis set for RI-J')
 
-            self.ostream.print_info('Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
             self.ostream.print_blank()
             self.ostream.flush()
 
             if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(molecule, self.scf_driver.ri_auxiliary_basis)
+                basis_ri_j = MolecularBasis.read(
+                    molecule, self.scf_driver.ri_auxiliary_basis)
             else:
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            local_ri_gvec = np.array(self.scf_driver._ri_drv.compute_local_bq_vector(Dab_for_fock))
+            local_ri_gvec = np.array(
+                self.scf_driver._ri_drv.compute_local_bq_vector(Dab_for_fock))
             ri_gvec = np.zeros(local_ri_gvec.shape)
             self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
 
             ri_grad_drv = RIFockGradDriver()
 
             for iatom in local_atoms:
-                atomgrad = ri_grad_drv.direct_compute(screener, basis, basis_ri_j, molecule, ri_gvec, Dab_for_fock,
+                atomgrad = ri_grad_drv.direct_compute(screener, basis,
+                                                      basis_ri_j, molecule,
+                                                      ri_gvec, Dab_for_fock,
                                                       iatom, thresh_int)
                 # Note: RI gradient already contains factor of 2 for
                 # closed-shell, so for unrestricted factor becomes 0.25
-                self.gradient[iatom, :] += 0.25 * np.array(atomgrad.coordinates())
+                self.gradient[iatom, :] += 0.25 * np.array(
+                    atomgrad.coordinates())
 
         else:
 
@@ -737,16 +749,22 @@ class ScfGradientDriver(GradientDriver):
                 screener_atom = T4CScreener()
                 screener_atom.partition_atom(basis, molecule, 'eri', iatom)
 
-                atomgrad_Jab = fock_grad_drv.compute(basis, screener_atom, screener, Dab_for_fock, Dab_for_fock_2,
-                                                     iatom, 'j', 0.0, 0.0, thresh_int)
+                atomgrad_Jab = fock_grad_drv.compute(basis, screener_atom,
+                                                     screener, Dab_for_fock,
+                                                     Dab_for_fock_2, iatom, 'j',
+                                                     0.0, 0.0, thresh_int)
 
                 self.gradient[iatom, :] += 0.5 * np.array(atomgrad_Jab)
 
                 if fock_type != 'j':
-                    atomgrad_Ka = fock_grad_drv.compute(basis, screener_atom, screener, Da_for_fock, Da_for_fock_2,
-                                                        iatom, 'kx', exchange_scaling_factor, 0.0, thresh_int)
-                    atomgrad_Kb = fock_grad_drv.compute(basis, screener_atom, screener, Db_for_fock, Db_for_fock_2,
-                                                        iatom, 'kx', exchange_scaling_factor, 0.0, thresh_int)
+                    atomgrad_Ka = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Da_for_fock,
+                        Da_for_fock_2, iatom, 'kx', exchange_scaling_factor,
+                        0.0, thresh_int)
+                    atomgrad_Kb = fock_grad_drv.compute(
+                        basis, screener_atom, screener, Db_for_fock,
+                        Db_for_fock_2, iatom, 'kx', exchange_scaling_factor,
+                        0.0, thresh_int)
 
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Ka)
                     self.gradient[iatom, :] -= 0.5 * np.array(atomgrad_Kb)
@@ -761,8 +779,9 @@ class ScfGradientDriver(GradientDriver):
             xcfun_label = self.comm.bcast(xcfun_label, root=mpi_master())
 
             grad_drv = XCMolecularGradient()
-            self.gradient += grad_drv.integrate_vxc_gradient(molecule, basis, [Da, Db], self.scf_driver._mol_grid,
-                                                             xcfun_label)
+            self.gradient += grad_drv.integrate_vxc_gradient(
+                molecule, basis, [Da, Db], self.scf_driver._mol_grid,
+                xcfun_label)
 
         else:
             xcfun_label = 'hf'
@@ -772,12 +791,14 @@ class ScfGradientDriver(GradientDriver):
             from .embedding import PolarizableEmbeddingGrad
 
             # pass along emb object from scf, or make a new one? -> for ind dipoles.
-            self._embedding_drv = PolarizableEmbeddingGrad(molecule=molecule,
-                                                           ao_basis=basis,
-                                                           options=self.scf_driver.embedding,
-                                                           comm=self.comm)
+            self._embedding_drv = PolarizableEmbeddingGrad(
+                molecule=molecule,
+                ao_basis=basis,
+                options=self.scf_driver.embedding,
+                comm=self.comm)
 
-            pe_grad = self._embedding_drv.compute_pe_contributions(density_matrix=Da + Db)
+            pe_grad = self._embedding_drv.compute_pe_contributions(
+                density_matrix=Da + Db)
 
             if self.rank == mpi_master():
                 self.gradient += pe_grad
@@ -797,10 +818,10 @@ class ScfGradientDriver(GradientDriver):
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
             if self.scf_driver._cpcm:
-                self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(molecule, basis,
-                                                                                 self.scf_driver._cpcm_grid,
-                                                                                 self.scf_driver._cpcm_sw_func,
-                                                                                 self.scf_driver._cpcm_q, Da + Db)
+                self.gradient += self.scf_driver.cpcm_drv.cpcm_grad_contribution(
+                    molecule, basis, self.scf_driver._cpcm_grid,
+                    self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
+                    Da + Db)
 
         # nuclei-point charges contribution to gradient
 
@@ -847,7 +868,8 @@ class ScfGradientDriver(GradientDriver):
                         sigma_r_6 = (sigma_ij / distance_ij)**6
                         sigma_r_12 = sigma_r_6**2
 
-                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij - sigma_r_6 / distance_ij)
+                        g = -24.0 * epsilon_ij * (2.0 * sigma_r_12 / distance_ij
+                                                  - sigma_r_6 / distance_ij)
 
                         vdw_grad[a] += -g * n_ij
 
@@ -885,7 +907,8 @@ class ScfGradientDriver(GradientDriver):
             # always try restarting scf for analytical gradient
             self.scf_driver.restart = True
         new_scf_results = self.scf_driver.compute(molecule, ao_basis)
-        assert_msg_critical(self.scf_driver.is_converged, 'ScfGradientDriver: SCF did not converge')
+        assert_msg_critical(self.scf_driver.is_converged,
+                            'ScfGradientDriver: SCF did not converge')
 
         # if not self._debug:
         #     self.ostream.unmute()

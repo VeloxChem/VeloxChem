@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path
@@ -91,13 +99,15 @@ class EvbDriver():
 
         self.t_label = int(time.time())
 
-    def build_and_run_default_water_EVB(self,
-                                        reactant: str | Molecule,
-                                        product: str | list[str] | Molecule
-                                        | list[Molecule],
-                                        barrier,
-                                        free_energy,
-                                        ordered_input=False,):
+    def build_and_run_default_water_EVB(
+        self,
+        reactant: str | Molecule,
+        product: str | list[str] | Molecule
+        | list[Molecule],
+        barrier,
+        free_energy,
+        ordered_input=False,
+    ):
         """Automatically perform an EVB calculation using a vacuum system as reference and a system solvated in water as target system.
 
         Args:
@@ -113,7 +123,7 @@ class EvbDriver():
         self.build_forcefields(reactant,
                                product,
                                ordered_input=ordered_input,
-                               optimise=True)
+                               optimize=True)
         self.ostream.print_blank()
         self.ostream.print_header("Building systems")
         self.ostream.flush()
@@ -145,7 +155,7 @@ class EvbDriver():
         reactant_multiplicity: int = 1,
         product_multiplicity: int | list[int] = 1,
         reparameterize: bool = True,
-        optimise: bool = False,
+        optimize: bool = False,
         ordered_input: bool = False,
         breaking_bonds: tuple[int, int] | list[tuple[int, int]] = None,
         save_output: bool = True,
@@ -163,7 +173,7 @@ class EvbDriver():
             reactant_multiplicity (int, optional): The multiplicity of the reactant. Defaults to 1.
             product_multiplicity (int | list[int], optional): The multiplicity of each provided product. List should have the same length as the amount of products provided. Defaults to 1.
             reparameterize (bool, optional): If unknown parameters in the forcefield should be reparameterized. Defaults to True.
-            optimise (bool, optional): If the provided structure should be optimised before the forcefield is generated. Defaults to False.
+            optimize (bool, optional): If the provided structure should be optimized before the forcefield is generated. Defaults to False.
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
             breaking_bonds (list[tuple[int, int]], optional): A list of tuples of atom-indices of breaking bonds. 
                 The atom indices are 0-indexed with respect to the reactant structure, and not all breaking bonds have to be provided. Defaults to None.
@@ -203,15 +213,15 @@ class EvbDriver():
                 product_multiplicity = [product.get_multiplicity()]
 
             rea_input = {
-                "molecule": copy.deepcopy(reactant),
-                "optimise": None,
+                "molecule": reactant,
+                "optimize": None,
                 "forcefield": None,
                 "hessian": None,
                 "charges": None
             }
             pro_input = [{
-                "molecule": copy.deepcopy(pro),
-                "optimise": None,
+                "molecule": pro,
+                "optimize": None,
                 "forcefield": None,
                 "hessian": None,
                 "charges": None
@@ -304,7 +314,7 @@ class EvbDriver():
         else:
             ffbuilder = EvbForceFieldBuilder()
             ffbuilder.reparameterize = reparameterize
-            ffbuilder.optimise = optimise
+            ffbuilder.optimize = optimize
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
@@ -325,20 +335,20 @@ class EvbDriver():
         self.ostream.flush()
 
     def _get_input_files(self, filename: str):
-        # Build a molecule from a (possibly optimised) geometry
-        optimise = True
+        # Build a molecule from a (possibly optimized) geometry
+        optimize = True
         cwd = Path().cwd()
 
         opt_path = cwd / self.input_folder / f"{filename}_xtb_opt.xyz"
         if opt_path.exists():
             self.ostream.print_info(
-                f"Loading optimised geometry from {opt_path}")
+                f"Loading optimized geometry from {opt_path}")
             molecule = Molecule.read_xyz_file(str(opt_path))
-            optimise = False
+            optimize = False
         else:
             struct_path = cwd / self.input_folder / f"{filename}.xyz"
             self.ostream.print_info(
-                f"Loading (possibly unoptimised) geometry from {struct_path}")
+                f"Loading (possibly unoptimized) geometry from {struct_path}")
             molecule = Molecule.read_xyz_file(str(struct_path))
 
         charges = None
@@ -386,7 +396,7 @@ class EvbDriver():
 
         return {
             "molecule": molecule,
-            "optimise": optimise,
+            "optimize": optimize,
             "forcefield": forcefield,
             "hessian": hessian,
             "charges": charges

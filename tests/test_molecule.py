@@ -532,7 +532,7 @@ class TestMolecule:
             assert abs(radius - vdw_data[elem_id]) < 1.0e-10
 
     @pytest.mark.skipif(not DispersionModel.is_available(),
-                        reason='dftd4 not available')
+                        reason='dftd4-python not available')
     def test_dispersion_model(self):
 
         ref_energies = {

@@ -1,29 +1,36 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
-from pathlib import Path
 import numpy as np
 import time as tm
 import math
@@ -36,9 +43,8 @@ from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check, pe_sanity_check)
-from .errorhandler import assert_msg_critical
-from .checkpoint import (check_rsp_hdf5, create_hdf5,
-                         write_rsp_solution_with_multiple_keys)
+from .errorhandler import assert_msg_critical, safe_solve
+from .checkpoint import (check_rsp_hdf5, write_rsp_solution_with_multiple_keys)
 
 
 class C6Driver(LinearSolver):
@@ -248,6 +254,10 @@ class C6Driver(LinearSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
+        # update checkpoint_file after scf_results_sanity_check
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_rsp.h5'
+
         # check dft setup
         dft_sanity_check(self, 'compute')
 
@@ -314,7 +324,8 @@ class C6Driver(LinearSolver):
         v_grad = None
         if self.rank == mpi_master():
             v_grad = {
-                (op, iw): v for op, v in zip(self.b_components, b_grad)
+                (op, iw): v
+                for op, v in zip(self.b_components, b_grad)
                 for iw in imagfreqs
             }
 
@@ -326,7 +337,8 @@ class C6Driver(LinearSolver):
         op_imagfreq_keys = self.comm.bcast(op_imagfreq_keys, root=mpi_master())
 
         precond = {
-            iw: self._get_precond(orb_ene, nocc, norb, iw) for iw in imagfreqs
+            iw: self._get_precond(orb_ene, nocc, norb, iw)
+            for iw in imagfreqs
         }
 
         # distribute the gradient and right-hand side:
@@ -409,8 +421,8 @@ class C6Driver(LinearSolver):
             s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             for op, iw in op_imagfreq_keys:
-                if (iteration == 0 or
-                        relative_residual_norm[(op, iw)] > self.conv_thresh):
+                if (iteration == 0
+                        or relative_residual_norm[(op, iw)] > self.conv_thresh):
 
                     grad_ru = dist_grad[(op, iw)].get_column(0)
                     grad_ig = dist_grad[(op, iw)].get_column(1)
@@ -443,7 +455,7 @@ class C6Driver(LinearSolver):
 
                         # solving matrix equation
 
-                        c = np.linalg.solve(mat, g)
+                        c = safe_solve(mat, g)
                     else:
                         c = None
                     c = self.comm.bcast(c, root=mpi_master())
@@ -614,13 +626,11 @@ class C6Driver(LinearSolver):
                 va = {op: v for op, v in zip(self.a_components, a_grad)}
                 rsp_funcs = {}
 
-                # create h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    final_h5_fname = str(
-                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
+                # final h5 file for response solutions
+                if self.filename is not None:
+                    final_h5_fname = f'{self.filename}.h5'
+                else:
+                    final_h5_fname = None
 
             for bop, iw in solutions:
                 x = self.get_full_solution_vector(solutions[(bop, iw)])
@@ -630,8 +640,8 @@ class C6Driver(LinearSolver):
                         rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
 
                     # write to h5 file for response solutions
-                    if (self.save_solutions and
-                            self.checkpoint_file is not None):
+                    if (self.save_solutions
+                            and self.checkpoint_file is not None):
                         solution_keys = [
                             '{:s}_{:s}_{:.8f}'.format(aop, bop, iw)
                             for aop in self.a_components

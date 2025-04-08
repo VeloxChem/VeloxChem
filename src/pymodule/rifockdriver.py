@@ -1,3 +1,35 @@
+#
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
+#
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  Copyright 2018-2025 VeloxChem developers
+#
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 from mpi4py import MPI
 import numpy as np
 
@@ -28,12 +60,8 @@ def _RIFockDriver_mpi_prepare_buffers(self, comm, molecule, basis, aux_basis):
     # select three-center integrals computation method
     
     natoms = molecule.number_of_atoms()
-    
-    if nodes > 1:
-        atoms = partition_atoms(natoms, rank, nodes)
-        self.prepare_buffers(molecule, basis, aux_basis, atoms)
-    else:
-        self.prepare_buffers(molecule, basis, aux_basis)
+    atoms = partition_atoms(natoms, rank, nodes)
+    self.prepare_buffers(molecule, basis, aux_basis, atoms)
         
 def _RIFockDriver_mpi_compute_bq_vector(self, comm, density):
     """
@@ -49,11 +77,6 @@ def _RIFockDriver_mpi_compute_bq_vector(self, comm, density):
     """
 
     # set up rank, node data
-    
-    nodes = comm.Get_size()
-    if nodes == 1:
-        return self.compute_bq_vector(density)
-    
     gv = np.array(self.compute_local_bq_vector(density))
     tv = np.zeros(gv.shape)
     comm.Allreduce([gv, MPI.DOUBLE], [tv, MPI.DOUBLE], op=MPI.SUM)
@@ -77,11 +100,6 @@ def _RIFockDriver_mpi_compute(self, comm, gamma, density, label):
     """
 
     # set up rank, node data
-    
-    nodes = comm.Get_size()
-    if nodes == 1:
-        return self.compute(density, gamma, label)
-
     fmat = self.local_compute(density, gamma, label)
     rfmat = Matrix.reduce(fmat, comm, mpi_master())
     return rfmat

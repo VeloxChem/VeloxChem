@@ -1,3 +1,35 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "RIFockGradDriver.hpp"
 
 #include <ranges>
@@ -15,6 +47,105 @@ CRIFockGradDriver::compute(const CMolecularBasis&     basis,
                            const int                  iatom) const -> TPoint<double>
 {
     return TPoint<double>(_comp_eri_grad(basis, aux_basis, molecule, gamma, density, iatom));
+}
+
+auto
+CRIFockGradDriver::compute(const CT4CScreener&        screener,
+                           const CMolecularBasis&     basis,
+                           const CMolecularBasis&     aux_basis,
+                           const CMolecule&           molecule,
+                           const std::vector<double>& gamma,
+                           const CMatrix&             density,
+                           const int                  iatom,
+                           const int                  ithreshold) const -> TPoint<double>
+{
+    return TPoint<double>(_comp_eri_grad(screener, basis, aux_basis, molecule, gamma, density, iatom, ithreshold));
+}
+
+auto
+CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
+                                  const CMolecularBasis&     basis,
+                                  const CMolecularBasis&     aux_basis,
+                                  const CMolecule&           molecule,
+                                  const std::vector<double>& gamma,
+                                  const CMatrix&             density,
+                                  const int                  iatom,
+                                  const int                  ithreshold) const -> TPoint<double>
+{
+    auto tg_xyz = std::array<double, 3>({0.0, 0.0, 0.0});
+    
+    const auto dvec = density.flat_values();
+            
+    const auto t3cb_drv = CThreeCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g1_xyz = t3cb_drv.compute(screener, basis, aux_basis, molecule, gamma, dvec, iatom, ithreshold);
+    
+    tg_xyz[0] += g1_xyz[0]; tg_xyz[1] += g1_xyz[1]; tg_xyz[2] += g1_xyz[2];
+    
+    const auto t3ck_drv = CThreeCenterElectronRepulsionGeom0X0Driver<1>();
+    
+    const auto g2_xyz = t3ck_drv.compute(basis, aux_basis, molecule, gamma, dvec, iatom);
+    
+    tg_xyz[0] += g2_xyz[0]; tg_xyz[1] += g2_xyz[1]; tg_xyz[2] += g2_xyz[2];
+    
+    const auto t2c_drv = CTwoCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g3_xyz = t2c_drv.compute(aux_basis, molecule, gamma, iatom);
+    
+    tg_xyz[0] -= g3_xyz[0]; tg_xyz[1] -= g3_xyz[1]; tg_xyz[2] -= g3_xyz[2];
+    
+    return TPoint<double>(tg_xyz);
+}
+
+auto
+CRIFockGradDriver::direct_compute(const CT4CScreener&        screener,
+                                  const CMolecularBasis&     basis,
+                                  const CMolecularBasis&     aux_basis,
+                                  const CMolecule&           molecule,
+                                  const std::vector<double>& bra_gamma,
+                                  const std::vector<double>& ket_gamma,
+                                  const CMatrix&             bra_density,
+                                  const CMatrix&             ket_density,
+                                  const int                  iatom,
+                                  const int                  ithreshold) const -> TPoint<double>
+{
+    auto tg_xyz = std::array<double, 3>({0.0, 0.0, 0.0});
+    
+    const auto bra_dvec = bra_density.flat_values();
+    
+    const auto ket_dvec = ket_density.flat_values();
+            
+    const auto t3cb_drv = CThreeCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g1_xyz = t3cb_drv.compute(screener, basis, aux_basis, molecule,
+                                         ket_gamma, bra_dvec, iatom, ithreshold);
+    
+    tg_xyz[0] += g1_xyz[0]; tg_xyz[1] += g1_xyz[1]; tg_xyz[2] += g1_xyz[2];
+    
+    const auto g2_xyz = t3cb_drv.compute(screener, basis, aux_basis, molecule,
+                                         bra_gamma, ket_dvec, iatom, ithreshold);
+    
+    tg_xyz[0] += g2_xyz[0]; tg_xyz[1] += g2_xyz[1]; tg_xyz[2] += g2_xyz[2];
+    
+    const auto t3ck_drv = CThreeCenterElectronRepulsionGeom0X0Driver<1>();
+    
+    const auto g3_xyz = t3ck_drv.compute(basis, aux_basis, molecule, ket_gamma, bra_dvec, iatom);
+    
+    tg_xyz[0] += g3_xyz[0]; tg_xyz[1] += g3_xyz[1]; tg_xyz[2] += g3_xyz[2];
+    
+    const auto g4_xyz = t3ck_drv.compute(basis, aux_basis, molecule, bra_gamma, ket_dvec, iatom);
+    
+    tg_xyz[0] += g4_xyz[0]; tg_xyz[1] += g4_xyz[1]; tg_xyz[2] += g4_xyz[2];
+    
+    tg_xyz[0] *= 0.25; tg_xyz[1] *= 0.25;  tg_xyz[2] *= 0.25; 
+    
+    const auto t2c_drv = CTwoCenterElectronRepulsionGeomX00Driver<1>();
+    
+    const auto g5_xyz = t2c_drv.compute(aux_basis, molecule, bra_gamma, ket_gamma, iatom);
+    
+    tg_xyz[0] -= g5_xyz[0]; tg_xyz[1] -= g5_xyz[1]; tg_xyz[2] -= g5_xyz[2];
+    
+    return TPoint<double>(tg_xyz);
 }
 
 auto

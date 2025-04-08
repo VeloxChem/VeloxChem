@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from pathlib import Path
 import numpy as np
@@ -96,8 +104,8 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
         The list containing SCF history.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+    valid_checkpoint = (fname and isinstance(fname, str)
+                        and Path(fname).is_file())
 
     if valid_checkpoint:
 
@@ -114,8 +122,7 @@ def write_scf_results_to_hdf5(fname, scf_results, scf_history):
                 hf.create_dataset(key, data=scf_results[key])
 
         # write SCF energy
-        hf.create_dataset('scf_type',
-                          data=np.bytes_([scf_results['scf_type']]))
+        hf.create_dataset('scf_type', data=np.bytes_([scf_results['scf_type']]))
         hf.create_dataset('scf_energy',
                           data=np.array([scf_results['scf_energy']]))
 
@@ -140,12 +147,12 @@ def write_rsp_solution(fname, key, vec):
         The solution vector.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
+    if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
-        hf.create_dataset(key, data=vec)
+        label = 'rsp/' + key
+        if label in hf:
+            del hf[label]
+        hf.create_dataset(label, data=vec)
         hf.close()
 
 
@@ -161,14 +168,47 @@ def write_rsp_solution_with_multiple_keys(fname, keys, vec):
         The solution vector.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
-
-    if valid_checkpoint:
+    if fname and isinstance(fname, str):
         hf = h5py.File(fname, 'a')
-        dset = hf.create_dataset(keys[0], data=vec)
+
+        label = 'rsp/' + keys[0]
+        if label in hf:
+            del hf[label]
+        dset = hf.create_dataset(label, data=vec)
+
         for key in keys[1:]:
-            hf[key] = dset
+            label = 'rsp/' + key
+            if label in hf:
+                del hf[label]
+            hf[label] = dset
+
+        hf.close()
+
+
+def write_lr_rsp_results_to_hdf5(fname, rsp_results):
+    """
+    Writes the results of a linear response calculation to HDF5 file.
+
+    :param fname:
+        Name of the HDF5 file.
+    :param rsp_results:
+        The dictionary containing the linear response results.
+    """
+
+    if fname and isinstance(fname, str):
+
+        hf = h5py.File(fname, 'a')
+
+        for key in rsp_results:
+            # Do not write the eigenvectors, file names and excitation details
+            if "vector" in key or "cube" in key or "file" in key or "details" in key:
+                continue
+
+            label = 'rsp/' + key
+            if label in hf:
+                del hf[label]
+            hf.create_dataset(label, data=rsp_results[key])
+
         hf.close()
 
 
@@ -221,6 +261,40 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     return True
 
 
+def write_detach_attach_to_hdf5(fname, state_label, dens_detach, dens_attach):
+    """
+    Writes the detachment and attachment density matrices for a specific
+    excited state to the checkpoint file.
+
+    :param fname:
+        The checkpoint file name.
+    :param state_label:
+        The excited state label.
+    :param dens_detach:
+        The detachment density matrix.
+    :param dens_attach:
+        The attachment density matrix.
+    """
+
+    if fname and isinstance(fname, str):
+
+        hf = h5py.File(fname, 'a')
+
+        # add detachment/attachment densities to the rsp group
+
+        detach_label = "rsp/detach_" + state_label
+        if detach_label in hf:
+            del hf[detach_label]
+        hf.create_dataset(detach_label, data=dens_detach)
+
+        attach_label = "rsp/attach_" + state_label
+        if attach_label in hf:
+            del hf[attach_label]
+        hf.create_dataset(attach_label, data=dens_attach)
+
+        hf.close()
+
+
 def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
     """
     Reads response vectors from checkpoint file. Nuclear charges and basis
@@ -249,11 +323,11 @@ def read_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict, ostream):
                                       pe_dict)
 
     if not valid_checkpoint:
-        return tuple([None] * len(labels))
+        return tuple([None for x in range(len(labels))])
 
     hf = h5py.File(fname, 'r')
 
-    arrays = [None] * len(labels)
+    arrays = [None for x in range(len(labels))]
 
     for i in range(len(labels)):
         if labels[i] in hf.keys():
@@ -293,8 +367,8 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
         True if the checkpoint file is valid, False otherwise.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+    valid_checkpoint = (fname and isinstance(fname, str)
+                        and Path(fname).is_file())
 
     if not valid_checkpoint:
         return False
@@ -346,9 +420,8 @@ def check_rsp_hdf5(fname, labels, molecule, basis, dft_dict, pe_dict):
 
     hf.close()
 
-    return (match_labels and match_nuclear_repulsion and
-            match_nuclear_charges and match_basis_set and match_dft_func and
-            match_potfile)
+    return (match_labels and match_nuclear_repulsion and match_nuclear_charges
+            and match_basis_set and match_dft_func and match_potfile)
 
 
 def write_distributed_focks(fname, dist_focks, key_freq_pairs, comm, ostream):
@@ -441,8 +514,8 @@ def check_distributed_focks(fname, key_freq_pairs):
         True if the checkpoint file is valid, False otherwise.
     """
 
-    valid_checkpoint = (fname and isinstance(fname, str) and
-                        Path(fname).is_file())
+    valid_checkpoint = (fname and isinstance(fname, str)
+                        and Path(fname).is_file())
 
     if not valid_checkpoint:
         return False
@@ -455,8 +528,8 @@ def check_distributed_focks(fname, key_freq_pairs):
         x.decode('utf-8') for x in np.array(hf.get('key_freq_pairs'))
     ]
 
-    valid_checkpoint = (str_key_freq_pairs == hf_key_freq_pairs and
-                        'distributed_focks' in hf.keys())
+    valid_checkpoint = (str_key_freq_pairs == hf_key_freq_pairs
+                        and 'distributed_focks' in hf.keys())
 
     hf.close()
 
