@@ -89,6 +89,7 @@ class EvbForceFieldBuilder():
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ):
+        assert len(product_input) == 1, "Only one product is supported at the moment"
 
         self.reactant = self.get_forcefield(
             reactant_input,
@@ -120,7 +121,7 @@ class EvbForceFieldBuilder():
         self.ostream.print_info("Creating combined product force field")
         self.ostream.flush()
         self.product = self._create_combined_forcefield(products)
-
+        self.product.molecule = product_input[0]['molecule']
         if not ordered_input:
             self.ostream.print_info(
                 "Matching reactant and product force fields")
@@ -128,7 +129,7 @@ class EvbForceFieldBuilder():
             self.product = self._match_reactant_and_product(
                 self.reactant, rea_elems, self.product, pro_elems,
                 breaking_bonds)
-        self.product.ostream.flush()
+            
         formed_bonds, broken_bonds = self._summarise_reaction(
             self.reactant, self.product)
 
@@ -179,7 +180,7 @@ class EvbForceFieldBuilder():
                     opt_results["final_geometry"])
 
             forcefield = MMForceFieldGenerator()
-
+            forcefield.eq_param= False
             #Load or calculate the charges
 
             if input["charges"] is not None:
@@ -304,8 +305,9 @@ class EvbForceFieldBuilder():
         total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
-        EvbForceFieldBuilder._apply_mapping_to_forcefield(
+        product_ff = EvbForceFieldBuilder._apply_mapping_to_forcefield(
             product_ff, total_mapping)
+        product_ff.molecule = EvbForceFieldBuilder._apply_mapping_to_molecule(product_ff.molecule, total_mapping)
         return product_ff
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
@@ -354,8 +356,6 @@ class EvbForceFieldBuilder():
             new_product_atoms.update({key: val})
 
         # Sort the atoms by index
-        forcefield.molecule = EvbForceFieldBuilder._apply_mapping_to_molecule(
-            forcefield.molecule, mapping)
         forcefield.atoms = dict(sorted(new_product_atoms.items()))
 
         forcefield.bonds = EvbForceFieldBuilder._apply_mapping_to_parameters(
@@ -370,9 +370,14 @@ class EvbForceFieldBuilder():
 
     @staticmethod
     def _apply_mapping_to_molecule(molecule,mapping):
-        pass
         new_molecule = Molecule()
         positions = molecule.get_coordinates_in_angstrom()
+        element_ids = molecule.get_element_ids()
+        sorted_ids = dict(sorted(mapping.items(), key=lambda item: item[1])).keys()
+        for id in sorted_ids:
+            new_molecule.add_atom(int(element_ids[id]), Point(positions[id]), 'angstrom')
+        return new_molecule
+        # int(elem), Point(coord), 'angstrom'
 
     #Remap the indices in a specific set of parameters
     @staticmethod
