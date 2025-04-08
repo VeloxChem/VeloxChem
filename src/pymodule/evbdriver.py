@@ -309,8 +309,19 @@ class EvbDriver():
             self.reactant = rea_input["forcefield"]
             self.product = self.load_forcefield_from_json(
                 str(combined_product_path))
-            self.product.molecule = EvbForceFieldBuilder.combine_molecule(
-                [pro['molecule'] for pro in pro_input])
+            combined_mapped_product_xyz_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
+
+            #todo is this robust to prevent loading for example mapped geometries but not the forcefield?
+            if combined_mapped_product_xyz_path.exists():
+                self.ostream.print_info(f"Loading mapped geometry from {combined_mapped_product_xyz_path}")
+                self.product.molecule = Molecule.read_xyz_file(
+                    str(combined_mapped_product_xyz_path))
+                self.ostream.flush()
+            else:
+                assert False, "This is currently not implemented"
+
+                self.product.molecule = EvbForceFieldBuilder.combine_molecule(
+                    [pro['molecule'] for pro in pro_input])
         else:
             ffbuilder = EvbForceFieldBuilder()
             ffbuilder.reparameterize = reparameterize
@@ -332,6 +343,10 @@ class EvbDriver():
         if save_output:
             self.save_forcefield(self.reactant, str(reactant_path))
             self.save_forcefield(self.product, str(combined_product_path))
+            combined_mapped_product_xyz_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
+            
+            self.ostream.print_info(f"Saving mapped geometry to {combined_mapped_product_xyz_path}")
+            self.product.molecule.write_xyz_file(str(combined_mapped_product_xyz_path))
         self.ostream.flush()
 
     def _get_input_files(self, filename: str):
@@ -449,6 +464,8 @@ class EvbDriver():
         }
         with open(path, "w", encoding="utf-8") as file:
             json.dump(ff_data, file, indent=4)
+
+        
 
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:

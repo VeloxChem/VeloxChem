@@ -1152,8 +1152,8 @@ class EvbSystemBuilder():
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
                 self._add_angle(integration_force,
-                                atom_ids, angle['equilibrium'],
-                                broken_equil * (1 - scale))
+                                atom_ids, broken_equil,
+                                angle['force_constant'] * (1 - scale))
 
         return harmonic_force, integration_force
 
@@ -1633,5 +1633,6 @@ class EvbSystemBuilder():
         # Calculate the angle using the dot product
         dot_product = np.dot(vector_u, vector_v)
         angle = np.arccos(dot_product)
+        angle = angle * 180 / np.pi  # Convert to degrees
 
         return angle
