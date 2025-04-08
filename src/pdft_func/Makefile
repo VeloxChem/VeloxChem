@@ -1,7 +1,7 @@
 
 # Makefile for internal Velox Chem library
 
-LOCAL_LIB := visualization.a
+LOCAL_LIB := pdft_func.a
 LOCAL_SCR := $(wildcard *.cpp)
 LOCAL_OBJ := $(subst .cpp,.o,$(LOCAL_SCR))
 LOCAL_DEP := $(subst .cpp,.d,$(LOCAL_SCR))

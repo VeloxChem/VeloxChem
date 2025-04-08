@@ -30,8 +30,8 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef ElectricFieldIntegralsGradient_hpp
-#define ElectricFieldIntegralsGradient_hpp
+#ifndef ElectricFieldPotentialGradient_hpp
+#define ElectricFieldPotentialGradient_hpp
 
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
@@ -39,8 +39,8 @@
 
 namespace onee {  // onee namespace
 
-auto computeElectricFieldIntegralsGradient(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const double* dipole_moments, const int ndipoles, const double* D, const int naos) -> CDenseMatrix;
+auto computeElectricFieldPotentialGradient(const CMolecule& molecule, const CMolecularBasis& basis, const double* dipole_coords, const double* dipole_moments, const int ndipoles, const double* D, const int naos) -> CDenseMatrix;
 
 }  // namespace onee
 
-#endif /* ElectricFieldIntegralsGradient_hpp */
+#endif /* ElectricFieldPotentialGradient_hpp */

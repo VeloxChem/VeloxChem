@@ -34,6 +34,7 @@
 #define TwoCenterElectronRepulsionGeomX00Driver_hpp
 
 #include <vector>
+#include <array>
 
 #include "GtoFunc.hpp"
 #include "Matrices.hpp"
@@ -46,6 +47,8 @@
 #include "T2CGeom10SumDistributor.hpp"
 #include "T2CGeom10SumTwoDistributor.hpp"
 #include "TwoCenterElectronRepulsionGeom100Func.hpp"
+
+#include <iostream>
 
 /// @brief Class  CTwoCenterElectronRepulsionGeomX00Driver provides methods for computing arbitrary order two-center
 /// electron repulsion integral derivatives with respect bra side.
@@ -91,7 +94,7 @@ class CTwoCenterElectronRepulsionGeomX00Driver
     /// @param basis The molecular basis.
     /// @param molecule The molecule.
     /// @param iatom The index of atom.
-    /// @return The nuclear potential matrix.
+    /// @return The electron repulsion matrix.
     auto compute(const CMolecularBasis             &basis,
                  const CMolecule                   &molecule,
                  const int                         iatom) const -> CMatrices;

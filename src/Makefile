@@ -8,7 +8,7 @@ VLX_BAS := ../basis
 VLX_TARGET := veloxchemlib.so
 VLX_MODULE := $(wildcard pymodule/*.py)
 
-LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD)
+LIB_LIST += -shared $(PYTHON_LD) $(OPENMP_LD) $(MATH_LD) $(LIBXC_LD)
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
@@ -73,6 +73,8 @@ debug: $(VLX_LIBS)
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
+	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 
 # Release
 release: $(VLX_LIBS)
@@ -84,6 +86,8 @@ release: $(VLX_LIBS)
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
+	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
+	$(CP) pymodule/mklconf.py.in $(CURDIR)/../build/python/veloxchem/mklconf.py
 
 # Clean up
 clean:
