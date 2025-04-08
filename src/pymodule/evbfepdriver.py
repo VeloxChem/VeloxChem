@@ -80,7 +80,7 @@ class EvbFepDriver():
         self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
-        self.save_frames: int = 100
+        self.save_frames: int = 1000
 
     def run_FEP(
         self,
@@ -390,6 +390,7 @@ class EvbFepDriver():
                     energies,
                     delimiter=",",
                     header=header,
+                    fmt="%.5e",
                 )
                 raise e
 

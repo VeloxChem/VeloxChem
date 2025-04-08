@@ -1401,16 +1401,16 @@ class EvbSystemBuilder():
         lj_force.addGlobalParameter("l", lam)
 
         if not bonded:
-            reactant_exceptions = self._create_exceptions_from_bonds(
-                self.reactant.atoms, self.reactant.bonds)
-            product_exceptions = self._create_exceptions_from_bonds(
-                self.product.atoms, self.product.bonds)
+            reactant_bonds = self.reactant.bonds
+            product_bonds = self.product.bonds
         else:
             bonds = list(set(self.reactant.bonds) | set(self.product.bonds))
-            reactant_exceptions = self._create_exceptions_from_bonds(
-                self.reactant.atoms, bonds)
-            product_exceptions = self._create_exceptions_from_bonds(
-                self.product.atoms, bonds)
+            reactant_bonds = bonds
+            product_bonds = bonds
+        reactant_exceptions = self._create_exceptions_from_bonds(
+            self.reactant.atoms, reactant_bonds)
+        product_exceptions = self._create_exceptions_from_bonds(
+            self.product.atoms, product_bonds)
 
         #Loop over all atoms, and check if their id's are part of any exceptions
         for i in self.reactant.atoms.keys():
