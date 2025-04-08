@@ -329,7 +329,7 @@ class RixsDriver:
             #self.ostream.print_info(
             #    'Incoming photon energy not set; calculating only for the first core resonance.')
             self.photon_energy = [core_eigvals[0]]
-        elif type(self.photon_energy) == float:
+        elif type(self.photon_energy) == float or type(self.photon_energy) == np.float64:
             self.photon_energy = [self.photon_energy]
 
         dipole_integrals = compute_electric_dipole_integrals(

@@ -878,13 +878,8 @@ class TdaEigenSolver(LinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-<<<<<<< HEAD
-    def _write_final_hdf5(self, molecule, basis, dft_func_label, potfile_text,
-                          eigvecs, orbital_details, eigvals):
-=======
     def _write_final_hdf5(self, final_h5_fname, molecule, basis, dft_func_label,
                           potfile_text, eigvecs):
->>>>>>> master
         """
         Writes final HDF5 that contains TDA solution vectors.
 
@@ -905,15 +900,6 @@ class TdaEigenSolver(LinearSolver):
         if (not self.save_solutions) or (final_h5_fname is None):
             return
 
-<<<<<<< HEAD
-        final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-
-        create_hdf5(final_h5_fname, molecule, basis, dft_func_label,
-                    potfile_text, orbital_details, eigvals)
-
-=======
->>>>>>> master
         for s in range(eigvecs.shape[1]):
             write_rsp_solution(final_h5_fname, 'S{:d}'.format(s + 1),
                                eigvecs[:, s])
