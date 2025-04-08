@@ -377,7 +377,7 @@ class EvbFepDriver():
                     energies[j, 0]
                     for k, fg in enumerate(EvbForceGroup):
                         fg_state = simulation.context.getState(
-                            energy=True,
+                            getEnergy=True,
                             groups=set([fg.value]),
                         )
                         energy = fg_state.getPotentialEnergy()
