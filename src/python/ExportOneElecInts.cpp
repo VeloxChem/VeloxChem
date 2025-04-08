@@ -1,26 +1,34 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ExportOneElecInts.hpp"
 
@@ -32,7 +40,7 @@
 #include "AngularMomentumIntegrals.hpp"
 #include "ElectricFieldFockGradient.hpp"
 #include "ElectricFieldIntegrals.hpp"
-#include "ElectricFieldIntegralsGradient.hpp"
+#include "ElectricFieldPotentialGradient.hpp"
 #include "ElectricFieldPotentialGradientAtMMSites.hpp"
 #include "ElectricFieldPotentialHessian.hpp"
 #include "ElectricFieldValues.hpp"
@@ -193,26 +201,26 @@ export_oneeints(py::module& m)
              "molecule"_a,
              "basis"_a,
              "dipole_coords"_a,
-             "D"_a);
+             "density"_a);
 
-    m.def("compute_electric_field_integrals_gradient",
+    m.def("compute_electric_field_potential_gradient",
             [](const CMolecule&           molecule,
                const CMolecularBasis&     basis,
                const py::array_t<double>& dipole_coords,
                const py::array_t<double>& dipole_moments,
                const py::array_t<double>& D) -> py::array_t<double> {
-                std::string errstyle("compute_electric_field_integrals_gradient: Expecting contiguous numpy arrays");
+                std::string errstyle("compute_electric_field_potential_gradient: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
                 errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
-                std::string errsize("compute_electric_field_integrals_gradient: Inconsistent dimension of dipole coordinates/moments");
+                std::string errsize("compute_electric_field_potential_gradient: Inconsistent dimension of dipole coordinates/moments");
                 errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
                 errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);
-                std::string errshape("compute_electric_field_integrals_gradient: Expecting square matrix D");
+                std::string errshape("compute_electric_field_potential_gradient: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto ndipoles = static_cast<int>(dipole_coords.shape(0));
                 auto naos = static_cast<int>(D.shape(0));
-                auto ef_grad = onee::computeElectricFieldIntegralsGradient(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles, D.data(), naos);
+                auto ef_grad = onee::computeElectricFieldPotentialGradient(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles, D.data(), naos);
                 return vlx_general::pointer_to_numpy(ef_grad.values(), {ef_grad.getNumberOfRows(), ef_grad.getNumberOfColumns()});
             },
             "Computes electric field integrals contribution to molecular gradient.",
@@ -220,7 +228,7 @@ export_oneeints(py::module& m)
              "basis"_a,
              "dipole_coords"_a,
              "dipole_moments"_a,
-             "D"_a);
+             "density"_a);
 
     m.def("compute_electric_field_fock_gradient",
             [](const CMolecule&           molecule,
@@ -299,7 +307,7 @@ export_oneeints(py::module& m)
              "basis"_a,
              "dipole_coords"_a,
              "dipole_moments"_a,
-             "D"_a);
+             "density"_a);
 
     m.def("compute_nuclear_potential_values",
             [](const CMolecule&           molecule,
@@ -320,7 +328,7 @@ export_oneeints(py::module& m)
              "molecule"_a,
              "basis"_a,
              "point_coords"_a,
-             "D"_a);
+             "density"_a);
 
     m.def("compute_quadrupole_integrals",
             [](const CMolecule&           molecule,

@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path
@@ -36,7 +44,7 @@ from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .inputparser import parse_input, print_keywords, get_random_string_parallel
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 
 
 class RespChargesDriver:
@@ -112,6 +120,7 @@ class RespChargesDriver:
 
         # grid information
         self.grid_type = 'mk'
+        self.custom_mk_radii = None
 
         # MK grid settings (density in Angstrom^-2)
         self.number_layers = 4
@@ -151,6 +160,8 @@ class RespChargesDriver:
                 'max_iter': ('int', 'maximum iterations in RESP fit'),
                 'threshold': ('float', 'convergence threshold of RESP fit'),
                 'equal_charges': ('str', 'constraints for equal charges'),
+                'custom_mk_radii':
+                    ('seq_fixed_str', 'custom MK radii for RESP charges'),
                 'xyz_file': ('str', 'xyz file containing the conformers'),
                 'net_charge': ('float', 'net charge of the molecule'),
                 'multiplicity': ('int', 'spin multiplicity of the molecule'),
@@ -437,7 +448,6 @@ class RespChargesDriver:
                     scf_drv = ScfUnrestrictedDriver(self.comm, self.ostream)
                 if self.filename is not None:
                     scf_drv.filename = self.filename
-                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
@@ -465,7 +475,6 @@ class RespChargesDriver:
                     scf_drv = ScfUnrestrictedDriver(self.comm, ostream)
                 if self.filename is not None:
                     scf_drv.filename = self.filename
-                    scf_drv.checkpoint_file = self.filename + '.scf.h5'
                 scf_drv.restart = self.restart
                 if (self.method_dict is None or
                         'xcfun' not in self.method_dict):
@@ -590,7 +599,7 @@ class RespChargesDriver:
         # generate and solve equation system (ESP fit)
         a, b = self.generate_equation_system(molecules, grids, esp, weights,
                                              None, constr)
-        q = np.linalg.solve(a, b)
+        q = safe_solve(a, b)
 
         n_atoms = molecules[0].number_of_atoms()
 
@@ -680,7 +689,7 @@ class RespChargesDriver:
                 a[i, n_points + 1 + j] = -1
                 j += 1
 
-        q = np.linalg.solve(a, b)
+        q = safe_solve(a, b)
 
         # print results
         for i in range(n_points):
@@ -767,7 +776,7 @@ class RespChargesDriver:
                                                             0.1**2)
             a_tot = a + np.diag(rstr)
 
-            q_new = np.linalg.solve(a_tot, b)
+            q_new = safe_solve(a_tot, b)
             dq_norm = np.linalg.norm(q_new - q_old)
 
             current_iteration = iteration
@@ -985,11 +994,47 @@ class RespChargesDriver:
         grid = []
         coords = molecule.get_coordinates_in_bohr()
 
+        mol_mk_radii = molecule.mk_radii_to_numpy()
+
+        if self.custom_mk_radii is not None:
+            assert_msg_critical(
+                len(self.custom_mk_radii) % 2 == 0,
+                'RespChargesDriver: expecting even number of entries for ' +
+                'user-defined MK radii')
+
+            keys = self.custom_mk_radii[0::2]
+            vals = self.custom_mk_radii[1::2]
+
+            self.ostream.print_blank()
+
+            for key, val in zip(keys, vals):
+                val_au = float(val) / bohr_in_angstrom()
+                try:
+                    idx = int(key) - 1
+                    assert_msg_critical(
+                        0 <= idx and idx < molecule.number_of_atoms(),
+                        'RespChargesDriver: invalid atom index for ' +
+                        'user-defined MK radii')
+                    mol_mk_radii[idx] = val_au
+                    self.ostream.print_info(
+                        f'Applying user-defined MK radius {val} for atom {key}')
+                except ValueError:
+                    elem_found = False
+                    for idx, label in enumerate(molecule.get_labels()):
+                        if label.upper() == key.upper():
+                            mol_mk_radii[idx] = val_au
+                            elem_found = True
+                    if elem_found:
+                        self.ostream.print_info(
+                            f'Applying user-defined MK radius {val} for atom {key}')
+
+            self.ostream.print_blank()
+
         for layer in range(self.number_layers):
 
             # MK radii with layer-dependent scaling factor
             scaling_factor = 1.4 + layer * 0.4 / np.sqrt(self.number_layers)
-            r = scaling_factor * molecule.mk_radii_to_numpy()
+            r = scaling_factor * mol_mk_radii
 
             for atom in range(molecule.number_of_atoms()):
                 # number of points fitting on the equator
@@ -1296,6 +1341,8 @@ class RespChargesDriver:
                     coords[0], coords[1], coords[2])
                 self.ostream.print_header(cur_str.ljust(str_width))
 
+        self.ostream.flush()
+
     def print_resp_stage_header(self, stage):
         """
         Prints header for a stage of the RESP fit.
@@ -1334,6 +1381,7 @@ class RespChargesDriver:
         cur_str = 'Convergence Threshold (a.u.) :  ' + str(self.threshold)
         self.ostream.print_header(cur_str.ljust(str_width))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_esp_header(self):
         """
@@ -1353,6 +1401,7 @@ class RespChargesDriver:
         cur_str = '{}   {}      {}'.format('No.', 'Atom', 'Charge (a.u.)')
         self.ostream.print_header(cur_str)
         self.ostream.print_header(31 * '-')
+        self.ostream.flush()
 
     def print_esp_fitting_points_header(self, n_conf):
         """
@@ -1375,6 +1424,7 @@ class RespChargesDriver:
         cur_str = '{} {}  {}'.format('No.', 'Constraints', 'Charge (a.u.)')
         self.ostream.print_header(cur_str)
         self.ostream.print_header(31 * '-')
+        self.ostream.flush()
 
     def print_resp_stage_results(self, stage, molecule, q, constr):
         """
@@ -1476,6 +1526,7 @@ class RespChargesDriver:
             self.ostream.print_header(title.ljust(str_width))
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def recommended_resp_parameters(self):
         """

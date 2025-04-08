@@ -1,5 +1,5 @@
 COMPND    sym_12_mc_11
-COMPND   1Created by VESTA
+COMPND   Created by MOF_builder
 HETATM    1 O1                  23.529  20.000   1.973  1.00  0.00           O
 HETATM    2 O2                  16.471  20.000   1.973  1.00  0.00           O
 HETATM    3 O3                  21.973  23.529   0.000  1.00  0.00           O
@@ -54,58 +54,3 @@ HETATM   51 O32                 20.000  18.027  -3.529  1.00  0.00           O
 HETATM   52 Zr6                 20.000  20.000  -2.482  1.00  0.00          Zr
 HETATM   53 H3                  21.863  21.863  -1.863  1.00  0.00           H
 HETATM   54 H4                  18.137  18.137  -1.863  1.00  0.00           H
-CONECT    1   24   17
-CONECT    2   25   18
-CONECT    3   26   19
-CONECT    4   27   20
-CONECT    5   28   20
-CONECT    6   29   19
-CONECT    7   30   21
-CONECT    8   31   21
-CONECT    9   30   19
-CONECT   10   31   20
-CONECT   11   26   17
-CONECT   12   29   18
-CONECT   13   28   18
-CONECT   14   27   17
-CONECT   15   24   21
-CONECT   16   25   21
-CONECT   17   36   35   38   23   11   14    1   37
-CONECT   18   39   22   41   33   12   13    2   40
-CONECT   19   41   33   38   23    3    6    9   42
-CONECT   20   39   22   36   35    4    5   10   43
-CONECT   21   22   33   35   23    7    8   15   16
-CONECT   22   18   20   21
-CONECT   23   21   17   19
-CONECT   24    1   15
-CONECT   25    2   16
-CONECT   26    3   11
-CONECT   27    4   14
-CONECT   28    5   13
-CONECT   29    6   12
-CONECT   30    9    7
-CONECT   31   10    8
-CONECT   32   33
-CONECT   33   32   18   21   19
-CONECT   34   35
-CONECT   35   34   20   21   17
-CONECT   36   52   20   17
-CONECT   37   44   17
-CONECT   38   53   52   17   19
-CONECT   39   54   52   18   20
-CONECT   40   45   18
-CONECT   41   52   18   19
-CONECT   42   46   19
-CONECT   43   47   20
-CONECT   44   37   48
-CONECT   45   40   49
-CONECT   46   42   50
-CONECT   47   43   51
-CONECT   48   44   52
-CONECT   49   45   52
-CONECT   50   46   52
-CONECT   51   47   52
-CONECT   52   36   38   41   39   48   49   51   50
-CONECT   53   38
-CONECT   54   39
-END

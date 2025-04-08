@@ -1,3 +1,35 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #ifndef RIFockDriver_hpp
 #define RIFockDriver_hpp
 
@@ -60,6 +92,16 @@ class CRIFockDriver
                          const CMolecularBasis &basis,
                          const CMolecularBasis &aux_basis) -> void;
     
+    /// @brief Computes three center electron repulsion integral buffers.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxilary molecular  basis.
+    /// @param atoms The vector of atoms to compute three-center electron repulsion integrals.
+    auto prepare_buffers(const CMolecule&        molecule,
+                         const CMolecularBasis&  basis,
+                         const CMolecularBasis&  aux_basis,
+                         const std::vector<int>& atoms) -> void;
+    
     /// @brief Computes Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.
@@ -67,10 +109,33 @@ class CRIFockDriver
     auto compute(const CMatrix     &density,
                  const std::string &label) const -> CMatrix;
     
+    /// @brief Computes Fock matrix for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param gvector The Gamma vector.
+    /// @param label The label of Fock matrix type.
+    /// @return The Fock matrix.
+    auto compute(const CMatrix     &density,
+                 const std::vector<double>& gvector,
+                 const std::string &label) const -> CMatrix;
+    
+    /// @brief Computes local Fock matrix for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @param gvector The Gamma vector.
+    /// @param label The label of Fock matrix type.
+    /// @return The Fock matrix.
+    auto local_compute(const CMatrix     &density,
+                       const std::vector<double>& gvector,
+                       const std::string &label) const -> CMatrix;
+    
     /// @brief Computes transformed Gamma vector with J metric for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @return The transformed Gamma vector.
     auto compute_bq_vector(const CMatrix &density) const -> std::vector<double>;
+    
+    /// @brief Computes local transformed Gamma vector with J metric for given density.
+    /// @param density The density matrix to construct Fock matrix.
+    /// @return The transformed Gamma vector.
+    auto compute_local_bq_vector(const CMatrix &density) const -> std::vector<double>;
     
     private:
     /// @brief Pointer to metric matrix for J fitting.
@@ -89,10 +154,20 @@ class CRIFockDriver
     /// @return The transformed Gamma vector.
     auto _trafo_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>;
     
+    /// @brief Transforms local Gamma vector  with J metric.
+    /// @param gvector The Gamma vector.
+    /// @return The transformed Gamma vector.
+    auto _trafo_local_gamma_vector(const std::vector<double>& gvector) const -> std::vector<double>;
+    
     /// @brief Computes J vector  for given transformed Gamma vector.
     /// @param gvector The transformed Gamma vector.
     /// @return The computed J vector.
     auto _comp_j_vector(const std::vector<double>& gvector) const -> std::vector<double>;
+    
+    /// @brief Computes local J vector  for given transformed Gamma vector.
+    /// @param gvector The transformed Gamma vector.
+    /// @return The computed J vector.
+    auto _comp_local_j_vector(const std::vector<double>& gvector) const -> std::vector<double>;
 };
 
 #endif /* RIFockDriver_hpp */

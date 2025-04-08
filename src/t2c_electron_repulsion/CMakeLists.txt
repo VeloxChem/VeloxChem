@@ -36,6 +36,13 @@ target_sources(vlxobjs
     TwoCenterElectronRepulsionPrimRecII.cpp
     TwoCenterElectronRepulsionPrimRecIP.cpp
     TwoCenterElectronRepulsionPrimRecIS.cpp
+    TwoCenterElectronRepulsionPrimRecKD.cpp
+    TwoCenterElectronRepulsionPrimRecKF.cpp
+    TwoCenterElectronRepulsionPrimRecKG.cpp
+    TwoCenterElectronRepulsionPrimRecKH.cpp
+    TwoCenterElectronRepulsionPrimRecKI.cpp
+    TwoCenterElectronRepulsionPrimRecKP.cpp
+    TwoCenterElectronRepulsionPrimRecKS.cpp
     TwoCenterElectronRepulsionPrimRecPD.cpp
     TwoCenterElectronRepulsionPrimRecPF.cpp
     TwoCenterElectronRepulsionPrimRecPG.cpp

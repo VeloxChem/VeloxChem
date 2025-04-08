@@ -1,3 +1,35 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "MolecularBasis.hpp"
 
 #include <algorithm>
@@ -471,28 +503,43 @@ CMolecularBasis::index_map(const int angular_momentum, const size_t npgtos) cons
 auto
 CMolecularBasis::index_map(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<size_t>
 {
+    const auto tot_orb_indices = index_map(angular_momentum, npgtos);
+    
+    const auto tot_atm_indices = atomic_indices(angular_momentum, npgtos);
+    
     std::vector<size_t> ao_indices;
 
-    ao_indices.push_back(number_of_basis_functions(angular_momentum));
-
-    auto offset = dimensions_of_basis(angular_momentum);
-
-    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
-        bool not_found = true;
-        std::ranges::for_each(atoms, [&](const int j) {
-            if (j == i)
+    ao_indices.push_back(tot_orb_indices[0]);
+    
+    for (const auto atom : atoms)
+    {
+        for (size_t i = 0; i < tot_atm_indices.size(); i++)
+        {
+            if (tot_atm_indices[i] == atom)
             {
-                std::ranges::for_each(_basis_sets[_indices[i]].basis_functions(angular_momentum), [&](const auto &bf) {
-                    if (bf.number_of_primitive_functions() == npgtos) ao_indices.push_back(offset);
-                    offset++;
-                });
-                not_found = false;
+                ao_indices.push_back(tot_orb_indices[i + 1]);
             }
-        });
-        if (not_found) offset += _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum);
-    });
-
+        }
+    }
+    
     return ao_indices;
+    
+//
+//    
+//    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
+//        bool not_found = true;
+//        std::ranges::for_each(atoms, [&](const int j) {
+//            if (j == i)
+//            {
+//                std::ranges::for_each(_basis_sets[_indices[i]].basis_functions(angular_momentum), [&](const auto &bf) {
+//                    if (bf.number_of_primitive_functions() == npgtos) ao_indices.push_back(offset);
+//                    offset++;
+//                });
+//                not_found = false;
+//            }
+//        });
+//        if (not_found) offset += _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum);
+//    });
 }
 
 auto

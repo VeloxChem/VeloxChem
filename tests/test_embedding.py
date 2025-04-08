@@ -41,15 +41,10 @@ class TestPolarizableEmbedding:
         else:
             return None, None
 
-    def run_scf_with_pe(self, name):
+    @staticmethod
+    def get_embedding_dict(options_file):
 
-        mol, bas = self.get_molecule_and_basis(name)
-
-        here = Path(__file__).parent
-        options_file = str(here / 'data' / f'{name}.json')
-
-        scf_drv = ScfRestrictedDriver()
-        scf_drv.embedding = {
+        return {
             'settings': {
                 'embedding_method': 'PE',
                 'induced_dipoles': {
@@ -63,6 +58,16 @@ class TestPolarizableEmbedding:
                 'json_file': options_file,
             },
         }
+
+    def run_scf_with_pe(self, name):
+
+        mol, bas = self.get_molecule_and_basis(name)
+
+        here = Path(__file__).parent
+        options_file = str(here / 'data' / f'{name}.json')
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.embedding = self.get_embedding_dict(options_file)
         scf_drv.conv_thresh = 1.0e-8
 
         scf_drv.ostream.mute()
@@ -77,20 +82,7 @@ class TestPolarizableEmbedding:
         options_file = str(here / 'data' / f'{name}.json')
 
         lrsolver = LinearResponseSolver()
-        lrsolver.embedding = {
-            'settings': {
-                'embedding_method': 'PE',
-                'induced_dipoles': {
-                    'solver': 'jacobi',
-                    'mic': False,
-                    'threshold': 1e-8,
-                    'max_iterations': 100,
-                },
-            },
-            'inputs': {
-                'json_file': options_file,
-            },
-        }
+        lrsolver.embedding = self.get_embedding_dict(options_file)
         lrsolver.frequencies = freqs
         lrsolver.conv_thresh = 1.0e-8
 

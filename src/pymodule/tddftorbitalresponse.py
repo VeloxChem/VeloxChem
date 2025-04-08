@@ -1,40 +1,47 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import time as tm
+import time
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import denmat
 from .veloxchemlib import XCIntegrator
 from .profiler import Profiler
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
 from .distributedarray import DistributedArray
-from .inputparser import (parse_input, parse_seq_fixed)
-from .visualizationdriver import VisualizationDriver
+from .dftutils import get_default_grid_level
+from .inputparser import parse_input
+
 
 class TddftOrbitalResponse(CphfSolver):
     """
@@ -54,6 +61,8 @@ class TddftOrbitalResponse(CphfSolver):
         """
 
         super().__init__(comm, ostream)
+
+        self.orbrsp_type = 'tddftgrad'
 
         self.tamm_dancoff = False
         self.state_deriv_index = None
@@ -204,7 +213,16 @@ class TddftOrbitalResponse(CphfSolver):
             'memory_tracing': self.memory_tracing,
         })
 
-        profiler.start_timer('RHS')
+        profiler.set_timing_key('RHS')
+
+        rhs_t0 = time.time()
+
+        self.ostream.print_info(
+            "Computing the right-hand side (RHS) of CPHF/CPKS equations...")
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        profiler.start_timer('Prep')
 
         # Workflow:
         # 1) Construct the necessary density matrices
@@ -341,12 +359,15 @@ class TddftOrbitalResponse(CphfSolver):
             # TODO: consider only bcast size of zero dm
             zero_dm_ao_list = self.comm.bcast(zero_dm_ao_list, root=mpi_master())
 
+        profiler.stop_timer('Prep')
 
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
         fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis,
                           eri_dict, dft_dict, pe_dict, profiler)
+
+        profiler.start_timer('Kxc')
 
         if self._dft:
             # Fock matrix for computing gxc
@@ -369,6 +390,10 @@ class TddftOrbitalResponse(CphfSolver):
 
             for idx in range(len(fock_gxc_ao)):
                 fock_gxc_ao[idx] = self.comm.reduce(fock_gxc_ao[idx], root=mpi_master())
+
+        profiler.stop_timer('Kxc')
+
+        profiler.start_timer('RHS_MO')
 
         dist_rhs_mo = []
 
@@ -426,8 +451,16 @@ class TddftOrbitalResponse(CphfSolver):
                 rhs_mo_i = None
             dist_rhs_mo.append(DistributedArray(rhs_mo_i, self.comm))
 
+        profiler.stop_timer('RHS_MO')
 
-        profiler.stop_timer('RHS')
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        self.ostream.print_info(
+            "RHS of CPHF/CPKS equations computed in " +
+            f"{time.time() - rhs_t0:.2f} sec.")
+        self.ostream.print_blank()
+        self.ostream.flush()
 
         if self.rank == mpi_master():
             return {
@@ -460,12 +493,39 @@ class TddftOrbitalResponse(CphfSolver):
             a numpy array containing the Lagrange multipliers in AO basis.
         """
 
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        profiler.set_timing_key('Omega')
+
+        omega_t0 = time.time()
+
+        self.ostream.print_info("Computing the omega Lagrange multipliers...")
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        profiler.start_timer('Prep')
+
+        # we don't want too much output about ERI/DFT/PE so this part is done
+        # with mute/unmute
+        self.ostream.mute()
+
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+
+        self.ostream.unmute()
+
+        profiler.stop_timer('Prep')
+
+        profiler.start_timer('lambda')
 
         if self.rank == mpi_master():
 
@@ -554,8 +614,12 @@ class TddftOrbitalResponse(CphfSolver):
             if self.rank == mpi_master():
                 lambda_ao_list.append(np.linalg.multi_dot([mo_occ, cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
 
+        profiler.stop_timer('lambda')
+
         fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                                         eri_dict, dft_dict, pe_dict)
+                                         eri_dict, dft_dict, pe_dict, profiler)
+
+        profiler.start_timer('Other')
 
         if self.rank == mpi_master():
             # Compute the contributions from the relaxed 1PDM
@@ -619,7 +683,7 @@ class TddftOrbitalResponse(CphfSolver):
                 ])
                 epsilon_dm_ao[s] += (epsilon_lambda_ao[s] 
                                      + epsilon_lambda_ao[s].T)
-                
+
         if self.rank == mpi_master():
 
             omega = - epsilon_dm_ao - omega_1pdm_2pdm_contribs
@@ -633,7 +697,60 @@ class TddftOrbitalResponse(CphfSolver):
                     omega[ifock] += factor * np.linalg.multi_dot([
                         D_occ, fock_gxc_ao_np, D_occ
                         ])
-
-            return omega
         else:
-            return None
+            omega = None
+
+        profiler.stop_timer('Other')
+
+        profiler.print_timing(self.ostream)
+        profiler.print_profiling_summary(self.ostream)
+
+        self.ostream.print_info(
+            "The omega Lagrange multipliers computed in " +
+            f"{time.time() - omega_t0:.2f} sec.")
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        return omega
+
+    def print_cphf_header(self, title):
+        """
+        Prints information on the solver setup
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header('{:s} Setup'.format(title))
+        self.ostream.print_header('=' * (len(title) + 8))
+        self.ostream.print_blank()
+
+        str_width = 70
+
+        # print general info
+        cur_str = 'Solver Type                     : '
+        if self.use_subspace_solver:
+            cur_str += 'Iterative Subspace Algorithm'
+        else:
+            cur_str += 'Conjugate Gradient'
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = 'Max. Number of Iterations       : ' + str(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(str_width))
+        cur_str = 'Convergence Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()

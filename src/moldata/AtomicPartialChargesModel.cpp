@@ -26,9 +26,9 @@
 #include <cmath>
 
 #include "Codata.hpp"
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
 #include "Molecule.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 
 namespace atmparchg {  // atmparchg namespace
 
@@ -168,7 +168,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vec
 
     // get partial charges
 
-    auto solutions = denblas::serialSolve(Amat, vec_rhs);
+    auto solutions = sdenblas::serialSolve(Amat, vec_rhs);
 
     auto solptr = solutions.data();
 

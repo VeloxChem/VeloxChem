@@ -58,20 +58,20 @@ class TestEvb:
 
         reactant_input = {
             "molecule": Molecule.from_xyz_string(ethanol_xyz),
-            "optimise": False,
+            "optimize": False,
             "forcefield": None,
             "hessian": None,
             "charges": None,
         }
         product_input = [{
             "molecule": Molecule.from_xyz_string(ethene_xyz),
-            "optimise": False,
+            "optimize": False,
             "forcefield": None,
             "hessian": None,
             "charges": None,
         }, {
             "molecule": Molecule.from_xyz_string(water_xyz),
-            "optimise": False,
+            "optimize": False,
             "forcefield": None,
             "hessian": None,
             "charges": None,

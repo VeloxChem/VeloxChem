@@ -1,29 +1,85 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #ifndef TwoCenterElectronRepulsionFunc_hpp
 #define TwoCenterElectronRepulsionFunc_hpp
 
 #include <array>
 
 #include "GtoBlock.hpp"
+#include "TwoCenterElectronRepulsionRecII.hpp"
+#include "TwoCenterElectronRepulsionRecIH.hpp"
+#include "TwoCenterElectronRepulsionRecID.hpp"
+#include "TwoCenterElectronRepulsionRecIF.hpp"
+#include "TwoCenterElectronRepulsionRecIG.hpp"
+#include "TwoCenterElectronRepulsionRecIP.hpp"
+#include "TwoCenterElectronRepulsionRecIS.hpp"
+#include "TwoCenterElectronRepulsionRecHI.hpp"
+#include "TwoCenterElectronRepulsionRecHH.hpp"
+#include "TwoCenterElectronRepulsionRecHD.hpp"
+#include "TwoCenterElectronRepulsionRecHF.hpp"
+#include "TwoCenterElectronRepulsionRecHG.hpp"
+#include "TwoCenterElectronRepulsionRecHP.hpp"
+#include "TwoCenterElectronRepulsionRecHS.hpp"
+#include "TwoCenterElectronRepulsionRecDI.hpp"
+#include "TwoCenterElectronRepulsionRecDH.hpp"
 #include "TwoCenterElectronRepulsionRecDD.hpp"
 #include "TwoCenterElectronRepulsionRecDF.hpp"
 #include "TwoCenterElectronRepulsionRecDG.hpp"
 #include "TwoCenterElectronRepulsionRecDP.hpp"
 #include "TwoCenterElectronRepulsionRecDS.hpp"
+#include "TwoCenterElectronRepulsionRecFI.hpp"
+#include "TwoCenterElectronRepulsionRecFH.hpp"
 #include "TwoCenterElectronRepulsionRecFD.hpp"
 #include "TwoCenterElectronRepulsionRecFF.hpp"
 #include "TwoCenterElectronRepulsionRecFG.hpp"
 #include "TwoCenterElectronRepulsionRecFP.hpp"
 #include "TwoCenterElectronRepulsionRecFS.hpp"
+#include "TwoCenterElectronRepulsionRecGI.hpp"
+#include "TwoCenterElectronRepulsionRecGH.hpp"
 #include "TwoCenterElectronRepulsionRecGD.hpp"
 #include "TwoCenterElectronRepulsionRecGF.hpp"
 #include "TwoCenterElectronRepulsionRecGG.hpp"
 #include "TwoCenterElectronRepulsionRecGP.hpp"
 #include "TwoCenterElectronRepulsionRecGS.hpp"
+#include "TwoCenterElectronRepulsionRecPI.hpp"
+#include "TwoCenterElectronRepulsionRecPH.hpp"
 #include "TwoCenterElectronRepulsionRecPD.hpp"
 #include "TwoCenterElectronRepulsionRecPF.hpp"
 #include "TwoCenterElectronRepulsionRecPG.hpp"
 #include "TwoCenterElectronRepulsionRecPP.hpp"
 #include "TwoCenterElectronRepulsionRecPS.hpp"
+#include "TwoCenterElectronRepulsionRecSI.hpp"
+#include "TwoCenterElectronRepulsionRecSH.hpp"
 #include "TwoCenterElectronRepulsionRecSD.hpp"
 #include "TwoCenterElectronRepulsionRecSF.hpp"
 #include "TwoCenterElectronRepulsionRecSG.hpp"
@@ -157,6 +213,20 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 0) && (ket_angmom == 5))
+    {
+        t2ceri::comp_electron_repulsion_sh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 0))
+    {
+        t2ceri::comp_electron_repulsion_hs(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 1) && (ket_angmom == 4))
     {
         t2ceri::comp_electron_repulsion_pg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
@@ -185,6 +255,34 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 0) && (ket_angmom == 6))
+    {
+        t2ceri::comp_electron_repulsion_si(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 0))
+    {
+        t2ceri::comp_electron_repulsion_is(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 1) && (ket_angmom == 5))
+    {
+        t2ceri::comp_electron_repulsion_ph(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 1))
+    {
+        t2ceri::comp_electron_repulsion_hp(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 2) && (ket_angmom == 4))
     {
         t2ceri::comp_electron_repulsion_dg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
@@ -206,6 +304,34 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 1) && (ket_angmom == 6))
+    {
+        t2ceri::comp_electron_repulsion_pi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 1))
+    {
+        t2ceri::comp_electron_repulsion_ip(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 2) && (ket_angmom == 5))
+    {
+        t2ceri::comp_electron_repulsion_dh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 2))
+    {
+        t2ceri::comp_electron_repulsion_hd(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 3) && (ket_angmom == 4))
     {
         t2ceri::comp_electron_repulsion_fg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
@@ -220,9 +346,107 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 2) && (ket_angmom == 6))
+    {
+        t2ceri::comp_electron_repulsion_di(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 2))
+    {
+        t2ceri::comp_electron_repulsion_id(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 5))
+    {
+        t2ceri::comp_electron_repulsion_fh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 3))
+    {
+        t2ceri::comp_electron_repulsion_hf(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 4) && (ket_angmom == 4))
     {
         t2ceri::comp_electron_repulsion_gg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 6))
+    {
+        t2ceri::comp_electron_repulsion_fi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 3))
+    {
+        t2ceri::comp_electron_repulsion_if(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 4) && (ket_angmom == 5))
+    {
+        t2ceri::comp_electron_repulsion_gh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 4))
+    {
+        t2ceri::comp_electron_repulsion_hg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 4) && (ket_angmom == 6))
+    {
+        t2ceri::comp_electron_repulsion_gi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 4))
+    {
+        t2ceri::comp_electron_repulsion_ig(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 5) && (ket_angmom == 5))
+    {
+        t2ceri::comp_electron_repulsion_hh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 5) && (ket_angmom == 6))
+    {
+        t2ceri::comp_electron_repulsion_hi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 5))
+    {
+        t2ceri::comp_electron_repulsion_ih(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 6) && (ket_angmom == 6))
+    {
+        t2ceri::comp_electron_repulsion_ii(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }
