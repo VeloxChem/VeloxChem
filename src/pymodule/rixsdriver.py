@@ -52,7 +52,7 @@ class RixsDriver:
     Instance variables:
         - photon_energy: Incoming photon energy; omega (a.u.)
         - theta: Angle (rad)
-        - gamma_n: Life-time broadening (a.u.)
+        - gamma: Life-time broadening (FWHM) (a.u.)
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -80,13 +80,13 @@ class RixsDriver:
         # method settings
         self.photon_energy = None
         self.theta = 0
-        self.gamma_n = .124/hartree_in_ev() # a.u.
+        self.gamma = .124/hartree_in_ev() # a.u.
 
         # input keywords
         self.input_keywords = {
             'rixs': {
                 'theta': ('float', 'angle between incident polarization vector and propagation vector of outgoing'),
-                'gamma': ('float', 'broadening term'),
+                'gamma': ('float', 'broadening term (FWHM)'),
                 #'nr_CO': ('int', 'number of involved core-orbitals'),
                 'photon_energy': ('float', 'incoming photon energy'),
             },
@@ -157,8 +157,8 @@ class RixsDriver:
         :return: 
             The scattering amplitude tensor; shape: (3,3)
         """
-
-        e_n = 1 / (omega - (core_eigenvalues + 1j * self.gamma_n))
+        gamma_hwhm = self.gamma / 2
+        e_n = 1 / (omega - (core_eigenvalues + 1j * gamma_hwhm))
         omega_product = (val_eigenvalues[:, np.newaxis] - core_eigenvalues) * core_eigenvalues
 
         if elastic:
