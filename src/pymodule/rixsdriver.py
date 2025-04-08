@@ -226,7 +226,7 @@ class RixsDriver:
         nvir = norb - nocc
 
         self.cvs = False
-        #self.sra = False
+        #self.rsa = False
         self.tda = tda
         
         num_vir_orbitals  = np.squeeze(rsp_tensors['num_vir'])
@@ -251,26 +251,46 @@ class RixsDriver:
 
         else:
             # What if too few states to include all valence orbitals?
-            self.ostream.print_info(
-                'Assuming subspace-restricted approximation.')
+            #self.ostream.print_info(
+            #    'Assuming subspace-restricted approximation.')
             # TODO: add assertion for splitting of response vector
             #assert_msg_critical(
             #   np.any(rsp_tensors['excitation_details'] core) is not None,
             #   '')
-            #self.sra = True
+
             num_core_orbitals = np.squeeze(rsp_tensors['num_core'])
             num_val_orbitals  = np.squeeze(rsp_tensors['num_val'])
 
             num_tot_states = len(rsp_tensors['eigenvalues'])
-            if num_core_orbitals == 0 or fulldiag_thresh is not None:
-                # full diagonalization
+            if fulldiag_thresh is not None:
+                # full matrix
+                if self.photon_energy is None:
+                    # assume first "non-zero" resonance, i.e., first with large osc. strength, if not given
+                    for k, entries in enumerate(rsp_tensors['excitation_details']):
+                        if entries[0].split()[0].startswith("core") and rsp_tensors['oscillator_strengths'][k] > 1e-3:
+                            self.photon_energy = [rsp_tensors['eigenvalues'][k]]
+                            break
+
                 mask = (np.abs(rsp_tensors['eigenvalues'] - self.photon_energy) < fulldiag_thresh)
-                # perhaps remove all states from final_states with eigenvalues LARGER than core/intermediate?
-                # otherwise we get negative emission energies
-                num_final_states = len(rsp_tensors['eigenvalues'][~mask])
-                num_intermediate_states = len(rsp_tensors['eigenvalues'][mask])
-                core_states = np.where(mask)[0]
+                try_core_states = np.where(mask)[0]
+
+                core_states, parsed = [], []
+                # if the one-particle excitations come in order of contributions
+                # the below can be simplified
+                for state in try_core_states:
+                    for entry in rsp_tensors['excitation_details'][state]:
+                        parts = entry.split()
+                        label = parts[0]
+                        value = float(parts[-1])
+                        parsed.append((label, value))
+                    label_max, _ = max(parsed, key=lambda x: x[1])
+                    if label_max.startswith("core"):
+                        core_states.append(state)
+                core_states = np.squeeze(core_states)
+
+                num_intermediate_states = len(core_states)
                 val_states  = np.where(~mask)[0]
+                num_final_states = len(val_states)
                 if final_cutoff is not None:
                     num_final_states = final_cutoff
                     val_states = val_states[:final_cutoff]
@@ -328,7 +348,11 @@ class RixsDriver:
             # assume first core resonance
             #self.ostream.print_info(
             #    'Incoming photon energy not set; calculating only for the first core resonance.')
-            self.photon_energy = [core_eigvals[0]]
+            for k, osc in enumerate(rsp_tensors['oscillator_strengths'][core_states]):
+                if osc > 1e-3:
+                    self.photon_energy = [rsp_tensors['eigenvalues'][core_states][k]]
+                    break
+
         elif type(self.photon_energy) == float or type(self.photon_energy) == np.float64:
             self.photon_energy = [self.photon_energy]
 
