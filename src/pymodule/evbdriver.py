@@ -99,13 +99,15 @@ class EvbDriver():
 
         self.t_label = int(time.time())
 
-    def build_and_run_default_water_EVB(self,
-                                        reactant: str | Molecule,
-                                        product: str | list[str] | Molecule
-                                        | list[Molecule],
-                                        barrier,
-                                        free_energy,
-                                        ordered_input=False,):
+    def build_and_run_default_water_EVB(
+        self,
+        reactant: str | Molecule,
+        product: str | list[str] | Molecule
+        | list[Molecule],
+        barrier,
+        free_energy,
+        ordered_input=False,
+    ):
         """Automatically perform an EVB calculation using a vacuum system as reference and a system solvated in water as target system.
 
         Args:
@@ -211,14 +213,14 @@ class EvbDriver():
                 product_multiplicity = [product.get_multiplicity()]
 
             rea_input = {
-                "molecule": copy.deepcopy(reactant),
+                "molecule": reactant,
                 "optimize": None,
                 "forcefield": None,
                 "hessian": None,
                 "charges": None
             }
             pro_input = [{
-                "molecule": copy.deepcopy(pro),
+                "molecule": pro,
                 "optimize": None,
                 "forcefield": None,
                 "hessian": None,
