@@ -144,8 +144,17 @@ class EvbReporter():
             self.FG_out = open(forcegroup_file, 'a' if append else 'w')
             if not append:
                 header = ""
+                integration_forcegroups = EvbForceGroup.integration_force_groups()
+                pes_forcegroups = EvbForceGroup.pes_force_groups()
                 for fg in EvbForceGroup:
-                    header += f"{fg.name}, "
+                    in_int = fg.value in integration_forcegroups
+                    in_pes = fg.value in pes_forcegroups
+                    fg_cat = 'b'
+                    if in_int and not in_pes:
+                        fg_cat = 'i'
+                    if not in_int and in_pes:
+                        fg_cat = 'p'
+                    header += f"{fg.name}({fg.value}-{fg_cat}), "
                 header = header[:-2] + '\n'
                 self.FG_out.write(header)
 
