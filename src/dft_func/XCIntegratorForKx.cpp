@@ -196,9 +196,9 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
                         
                         // compute G_gv matrix
                         
-                        //CDenseMatrix mat_ggv(npoints, aocount);
-                        
-                        //mat_ggv.zero();
+//                        CDenseMatrix mat_ggv(npoints, aocount);
+//                        
+//                        mat_ggv.zero();
                         
                         const auto npot_drv = CNuclearPotentialDriver();
                         

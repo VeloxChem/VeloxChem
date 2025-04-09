@@ -4,11 +4,13 @@
 #include <cstddef>
 #include <utility>
 #include <vector>
+#include <map>
 
 #include "Matrix.hpp"
 #include "Point.hpp"
 #include "SimdArray.hpp"
 #include "SubMatrix.hpp"
+#include "DenseMatrix.hpp"
 
 namespace t2cfunc {  // t2cfunc namespace
 
@@ -333,6 +335,34 @@ auto comp_boys_args(     CSubMatrix& buffer,
 /// @param index_prim The primary row index  of primitive integrals in buffer.
 /// @param ndims The dimensions of contracted rows.
 auto reduce(CSubMatrix& buffer, const size_t index_contr, const size_t index_prim, const size_t ndims) -> void;
+
+/// Distributes buffer of integrals into given matrix on grid.
+/// @param gmatrix The matrix for storage of contracted integrals on grid.
+/// @param buffer The integrals buffer on grid.
+/// @param offset The offset in integrals buffer.
+/// @param fmatrix The matrix used for contracttion of integrals on grid.
+/// @param weights The vector of weights. 
+/// @param ao_mask The mask of local indices.
+/// @param bra_indices The compressed contracted basis functions indexes on bra side.
+/// @param ket_indices The compressed contracted basis functions indexes on ket side.
+/// @param bra_angmom The angular momentum of integrals buffer on bra side.
+/// @param ket_angmom The angular momentum of integrals buffer on ket side.
+/// @param bra_igto The index of basis function on bra side.
+/// @param ket_igto The index of basis function on ket side.
+/// @param bra_eq_ket The flag for bra and ket basis function blocks being equal.
+auto distribute(      CDenseMatrix&             gmatrix,
+                const CSubMatrix&               buffer,
+                const size_t                    offset,
+                const CDenseMatrix&             fmatrix,
+                const std::vector<double>&      weights,
+                const std::map<size_t, size_t>& ao_mask,
+                const std::vector<size_t>&      bra_indices,
+                const std::vector<size_t>&      ket_indices,
+                const int                       bra_angmom,
+                const int                       ket_angmom,
+                const size_t                    bra_igto,
+                const size_t                    ket_igto,
+                const bool                      bra_eq_ket) -> void;
 
 }  // namespace t2cfunc
 

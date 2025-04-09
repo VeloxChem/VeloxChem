@@ -60,9 +60,14 @@ class TestSNLinkK:
             H  0.0000000000   0.7695699584   0.5948147012
             H  0.0000000000  -0.7695699584   0.5948147012
         """
+        mol_str = """
+            H  0.0000000000   0.0000000000  -0.0254395383
+            H  0.3000000000   0.1000000000   0.5948147012
+        """
 
         molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
-        basis = MolecularBasis.read(molecule, 'def2-svp')
+        #basis = MolecularBasis.read(molecule, 'def2-svp')
+        basis = MolecularBasis.read(molecule, 'sto-3g')
         
         self.run_sn_link_k(molecule, basis)
         

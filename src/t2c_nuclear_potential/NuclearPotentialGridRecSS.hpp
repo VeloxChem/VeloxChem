@@ -46,12 +46,6 @@ comp_on_grid_nuclear_potential_ss(CSubMatrix&                spher_buffer,
     
     const double fpi = mathconst::pi_value();
     
-    // zero buffers
-    
-    cart_buffer.zero(); 
-    
-    spher_buffer.zero();
-    
     // intialize GTOs data on bra side
 
     const auto bra_gto_exps = bra_gto_block.exponents();
@@ -98,6 +92,16 @@ comp_on_grid_nuclear_potential_ss(CSubMatrix&                spher_buffer,
 
     const auto b_z = b_xyz[2];
     
+    // compute overlap between A and B centers
+    
+    const auto ab_x = a_x - b_x;
+    
+    const auto ab_y = a_y - b_y;
+    
+    const auto ab_z = a_z - b_z;
+    
+    const double rab2 = ab_x * ab_x + ab_y * ab_y + ab_z * ab_z;
+    
     // setup Boys function data
 
     const CBoysFunc<0> bf_table;
@@ -134,16 +138,6 @@ comp_on_grid_nuclear_potential_ss(CSubMatrix&                spher_buffer,
             
             const auto p_z = finv * (a_exp * a_z + b_exp * b_z);
             
-            // compute overlap between A and B centers
-            
-            const auto ab_x = a_x - b_x;
-            
-            const auto ab_y = a_y - b_y;
-            
-            const auto ab_z = a_z - b_z;
-            
-            const double rab2 = ab_x * ab_x + ab_y * ab_y + ab_z * ab_z;
-
             // compute overlap integral
             
             finv *= fpi;

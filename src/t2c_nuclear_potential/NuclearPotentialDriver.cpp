@@ -140,6 +140,8 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
             
             const auto bra_mom = gto_blocks[i].angular_momentum();
             
+            const auto bra_indices = gto_blocks[i].orbital_indices();
+            
             // const auto nbra_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{bra_mom, });
             
             const auto nbra_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{bra_mom, });
@@ -148,7 +150,9 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
             {
                 const auto nket_gtos = gto_blocks[j].number_of_basis_functions();
                 
-                const auto ket_mom = gto_blocks[i].angular_momentum();
+                const auto ket_mom = gto_blocks[j].angular_momentum();
+                
+                const auto ket_indices = gto_blocks[j].orbital_indices();
                 
                 // const auto nket_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{ket_mom, });
                 
@@ -156,15 +160,13 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
                 
                 // allocate local buffers
                 
-                const size_t ncomps = 7;
-                
-                const std::array<size_t, 4> cdims{0, 0, ncomps, static_cast<size_t>(npoints)};
+                const std::array<size_t, 4> cdims{0, 0, _get_buffer_rows(bra_mom, ket_mom), static_cast<size_t>(npoints)};
                 
                 auto cbuffer = CSubMatrix(cdims);
                 
                 const std::array<size_t, 4> sdims{0, 0, static_cast<size_t>(nbra_spher_comps * nket_spher_comps), static_cast<size_t>(npoints)};
                 
-                auto sbuffer = CSubMatrix(cdims);
+                auto sbuffer = CSubMatrix(sdims);
                 
                 // loop over GTO pairs
                 
@@ -174,17 +176,28 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
                     
                     for (int l = lstart; l < nket_gtos; l++)
                     {
+                        sbuffer.zero();
+                        
+                        cbuffer.zero();
+                        
                         npotfunc::compute(sbuffer, cbuffer, gcoords_x, gcoords_y, gcoords_z, gweights, gto_blocks[i], gto_blocks[j], k, l);
+                        
+//                        std::cout << " *** Block *** (" << k << "," << l << ")" << std::endl;
+//                        
+//                        for (size_t m = 0; m < npoints; m++)
+//                        {
+//                            std::cout << " m = " << m << " val = " << cbuffer.at({6, m}) << std::endl; 
+//                        }
                         
                         // FIX ME: Add distributor here....
                         
                         if ((bra_mom + ket_mom) == 0)
                         {
-                            // distribute integrals in Cartesian buffer 
+                            t2cfunc::distribute(mat_g, cbuffer, 6, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, i == j);
                         }
                         else
                         {
-                            // distribute integrals in spherical buffer
+                            t2cfunc::distribute(mat_g, sbuffer, 0, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, i == j);
                         }
                     }
                 }
@@ -193,4 +206,13 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
     }
     
     return mat_g;
+}
+
+auto
+CNuclearPotentialDriver::_get_buffer_rows(const int bra_angmom,
+                                          const int ket_angmom) const -> size_t
+{
+    if ((bra_angmom == 0) && (ket_angmom == 0)) return 7;
+    
+    return 0;
 }

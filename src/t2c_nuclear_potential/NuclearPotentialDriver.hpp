@@ -102,6 +102,15 @@ class CNuclearPotentialDriver
                  const std::vector<double>&      gcoords_y,
                  const std::vector<double>&      gcoords_z,
                  const std::vector<double>&      gweights) const -> CDenseMatrix;
+    
+private:
+        
+    /// @brief Determines number of rows in Cartesian buffer for on grid recursions.
+    /// @param bra_angmom The angular momentum of integrals buffer on bra side.
+    /// @param ket_angmom The angular momentum of integrals buffer on ket side.
+    /// @return The number of rows in Cartesian buffer.
+    auto _get_buffer_rows(const int bra_angmom,
+                          const int ket_angmom) const -> size_t;
 };
 
 #endif /* NuclearPotentialDriver_hpp */
