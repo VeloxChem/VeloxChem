@@ -360,46 +360,8 @@ class EvbFepDriver():
             except Exception as e:
                 self.ostream.print_warning(
                     f"Error during simulation step {i}: {e}")
-                self.ostream.print_info(f"Saving last {len(states)} states")
                 self.ostream.flush()
-                cwd = Path.cwd()
-                path = cwd / self.run_folder
-
-                energies = np.zeros((len(states), len(EvbForceGroup) + 3))
-
-                for j, state in enumerate(states):
-                    step_num = i - len(states) + j
-                    with open(path / f"state_step_{step_num}.xml", "w") as f:
-                        f.write(mm.XmlSerializer.serialize(state))
-
-                    kin = state.getKineticEnergy()
-                    kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
-                    pot = state.getPotentialEnergy()
-                    pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
-
-                    energies[j, 0] = step_num
-                    energies[j, 1] = kin
-                    energies[j, 2] = pot
-
-                    simulation.context.setState(state)
-                    energies[j, 0]
-                    for k, fg in enumerate(EvbForceGroup):
-                        fg_state = simulation.context.getState(
-                            getEnergy=True,
-                            groups=set([fg.value]),
-                        )
-                        energy = fg_state.getPotentialEnergy()
-                        energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
-                        energies[j, k + 3] = energy
-                header = "step,kinetic,potential,"
-                header += ",".join([fg.name for fg in EvbForceGroup])
-                np.savetxt(
-                    path / f"crash_energies.csv",
-                    energies,
-                    delimiter=",",
-                    header=header,
-                    fmt="%.5e",
-                )
+                self._save_states(states)
                 raise e
 
             state = simulation.context.getState(
@@ -415,12 +377,59 @@ class EvbFepDriver():
             self.ostream.print_info(
                 f"Step {i}, kinetic energy: {kin:.5f} kJ/mol, potential energy: {pot:.5f} kJ/mol"
             )
-
+            if pot > 0:
+                self.ostream.print_warning(
+                    f"Potential energy is positive: {pot:.5f} kJ/mol. Saving states and crashing"
+                )
+                self._save_states(states)
+                raise RuntimeError(
+                    f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
+                )
             states.append(state)
             if len(states) > self.save_frames:
                 states.pop(0)
 
-        return states
+    def _save_states(self, states):
+        self.ostream.print_info(f"Saving last {len(states)} states")
+        self.ostream.flush()
+        cwd = Path.cwd()
+        path = cwd / self.run_folder
+
+        energies = np.zeros((len(states), len(EvbForceGroup) + 3))
+
+        for j, state in enumerate(states):
+            step_num = i - len(states) + j
+            with open(path / f"state_step_{step_num}.xml", "w") as f:
+                f.write(mm.XmlSerializer.serialize(state))
+
+            kin = state.getKineticEnergy()
+            kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
+            pot = state.getPotentialEnergy()
+            pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
+
+            energies[j, 0] = step_num
+            energies[j, 1] = kin
+            energies[j, 2] = pot
+
+            simulation.context.setState(state)
+            energies[j, 0]
+            for k, fg in enumerate(EvbForceGroup):
+                fg_state = simulation.context.getState(
+                    getEnergy=True,
+                    groups=set([fg.value]),
+                )
+                energy = fg_state.getPotentialEnergy()
+                energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
+                energies[j, k + 3] = energy
+        header = "step,kinetic,potential,"
+        header += ",".join([fg.name for fg in EvbForceGroup])
+        np.savetxt(
+            path / f"crash_energies.csv",
+            energies,
+            delimiter=",",
+            header=header,
+            fmt="%.5e",
+        )
 
 
 class Timer:
