@@ -408,6 +408,14 @@ class EvbFepDriver():
                 getForces=True,
                 getEnergy=True,
             )
+            kin = state.getKineticEnergy()
+            kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
+            pot = state.getPotentialEnergy()
+            pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
+            self.ostream.print_info(
+                f"Step {i}, kinetic energy: {kin:.5f} kJ/mol, potential energy: {pot:.5f} kJ/mol"
+            )
+
             states.append(state)
             if len(states) > self.save_frames:
                 states.pop(0)
