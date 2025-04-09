@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path
@@ -235,6 +243,7 @@ class ScfDriver:
         self.cpcm_epsilon = 78.39
         self.cpcm_grid_per_sphere = 194
         self.cpcm_x = 0
+        self.cpcm_custom_vdw_radii = None
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
@@ -271,6 +280,9 @@ class ScfDriver:
         self._debug = False
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
+
+        # may be used in rare cases when user wants to skip the writing of h5
+        self._skip_writing_h5 = False
 
         # input keywords
         self._input_keywords = {
@@ -318,6 +330,8 @@ class ScfDriver:
                 'cpcm_epsilon':
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
+                'cpcm_custom_vdw_radii':
+                    ('seq_fixed_str', 'custom vdw radii for C-PCM'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -554,6 +568,7 @@ class ScfDriver:
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
             self.cpcm_drv.x = self.cpcm_x
+            self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
         else:
             self.cpcm_drv = None
 
@@ -1247,6 +1262,9 @@ class ScfDriver:
             Name of the basis set.
         """
 
+        if self._skip_writing_h5:
+            return
+
         if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
@@ -1370,15 +1388,12 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
-        self._print_debug_info('before screener')
         if self.rank == mpi_master():
             screener = T4CScreener()
             screener.partition(ao_basis, molecule, 'eri')
         else:
             screener = None
-        self._print_debug_info('after  screener')
         screener = self.comm.bcast(screener, root=mpi_master())
-        self._print_debug_info('after  bcast screener')
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1928,20 +1943,6 @@ class ScfDriver:
 
         return npot_mat
 
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
     def _comp_2e_fock(self,
                       den_mat,
                       molecule,
@@ -2066,12 +2067,8 @@ class ScfDriver:
 
         fock_mat = None
 
-        self._print_debug_info('before Fock build')
-
         if self.scf_type == 'restricted':
             # restricted SCF
-            self._print_debug_info('before rest Fock build')
-
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
@@ -2095,18 +2092,14 @@ class ScfDriver:
                 fock_mat_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-            self._print_debug_info('after  rest Fock build')
-
             if fock_type == 'j':
                 # for pure functional
                 fock_mat_np *= 2.0
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before rest erf Fock build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  rest erf Fock build')
 
                 fock_mat_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2132,8 +2125,6 @@ class ScfDriver:
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_Jab is D_total
-                self._print_debug_info('before unrest Fock J build')
-
                 if self.ri_coulomb:
                     local_gvec = np.array(
                         self._ri_drv.compute_local_bq_vector(den_mat_for_Jab))
@@ -2150,35 +2141,27 @@ class ScfDriver:
                     J_ab_np = fock_mat.to_numpy()
                     fock_mat = Matrix()
 
-                self._print_debug_info('after  unrest Fock J build')
-
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
 
             else:
-                self._print_debug_info('before unrest Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_a_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_b_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock J build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock J build')
 
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2188,18 +2171,14 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before unrest erf Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Ka build')
 
                 fock_mat_a_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest erf Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Kb build')
 
                 fock_mat_b_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2216,8 +2195,6 @@ class ScfDriver:
                 fock_mat = [fock_mat_a_np, fock_mat_b_np]
             else:
                 fock_mat = None
-
-        self._print_debug_info('after  Fock build')
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
@@ -2710,6 +2687,10 @@ class ScfDriver:
             self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
@@ -2717,6 +2698,10 @@ class ScfDriver:
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.dispersion:
+            cur_str = 'Dispersion Correction           : D4'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._cpcm:
@@ -3028,6 +3013,9 @@ class ScfDriver:
         :param ao_basis:
             The AO basis set.
         """
+
+        if self._skip_writing_h5:
+            return
 
         if self.filename is None:
             return

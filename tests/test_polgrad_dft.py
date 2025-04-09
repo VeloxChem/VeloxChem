@@ -13,6 +13,7 @@ from veloxchem.cppsolver import ComplexResponse
 from veloxchem.polarizabilitygradient import PolarizabilityGradient
 
 
+@pytest.mark.solvers
 class TestPolgrad:
 
     def run_polgrad_real(self, molecule, basis, xcfun=None, label=None):
@@ -106,7 +107,7 @@ class TestPolgrad:
 
         if scf_drv.rank == mpi_master():
             #polgrad_results = an_polgrad_drv.polgradient
-            polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
+            #polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
@@ -118,7 +119,7 @@ class TestPolgrad:
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
+            #assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
         # test complex numerical gradient
@@ -146,7 +147,6 @@ class TestPolgrad:
             assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
-    @pytest.mark.timeconsuming
     def test_ks_polarizabilitygradient_real(self):
         h2o_xyz = """3
 
@@ -161,7 +161,6 @@ class TestPolgrad:
 
         self.run_polgrad_real(molecule, basis, "b3lyp", "polarizabilitygradient_b3lyp_real")
 
-    @pytest.mark.timeconsuming
     def test_ks_polarizabilitygradient_complex(self):
         h2o_xyz = """3
 

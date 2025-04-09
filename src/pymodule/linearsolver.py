@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from datetime import datetime
@@ -357,15 +365,12 @@ class LinearSolver:
             The dictionary of ERI information.
         """
 
-        self._print_mem_debug_info('before screener')
         if self.rank == mpi_master():
             screening = T4CScreener()
             screening.partition(basis, molecule, 'eri')
         else:
             screening = None
-        self._print_mem_debug_info('after  screener')
         screening = self.comm.bcast(screening, root=mpi_master())
-        self._print_mem_debug_info('after  bcast screener')
 
         if self.ri_coulomb:
             assert_msg_critical(basis.get_label().lower().startswith('def2-'),
@@ -627,20 +632,6 @@ class LinearSolver:
         else:
             self._dist_fock_ung.append(fock_ung, axis=1)
 
-    def _print_mem_debug_info(self, label):
-        """
-        Prints memory debug information.
-
-        :param label:
-            The label of memory debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Solves for the linear equations.
@@ -671,6 +662,15 @@ class LinearSolver:
                        dft_dict,
                        pe_dict,
                        profiler=None):
+
+        if self.use_subcomms and self.ri_coulomb:
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-J.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # TODO: enable RI-J with subcomms
 
         if self.use_subcomms:
             self._e2n_half_size_subcomms(vecs_ger, vecs_ung, molecule, basis,
@@ -939,13 +939,9 @@ class LinearSolver:
 
                 # form Fock matrices
 
-                self._print_mem_debug_info('before Fock build')
-
                 fock = self._comp_lr_fock(dks, molecule, basis, eri_dict,
                                           dft_dict, pe_dict, profiler,
                                           local_comm)
-
-                self._print_mem_debug_info('after  Fock build')
 
                 if is_local_master:
                     raw_fock_ger = []
@@ -1226,12 +1222,8 @@ class LinearSolver:
 
             # form Fock matrices
 
-            self._print_mem_debug_info('before Fock build')
-
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
                                       pe_dict, profiler)
-
-            self._print_mem_debug_info('after  Fock build')
 
             if self.rank == mpi_master():
                 raw_fock_ger = []
@@ -1444,11 +1436,9 @@ class LinearSolver:
                 den_mat_for_fock = make_matrix(basis, mat_t.general)
                 den_mat_for_fock.set_values(dens[idx])
 
-                self._print_mem_debug_info('before restgen Fock build')
                 fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                             fock_type, exchange_scaling_factor,
                                             0.0, thresh_int)
-                self._print_mem_debug_info('after  restgen Fock build')
 
                 fock_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -1459,11 +1449,9 @@ class LinearSolver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_mem_debug_info('before restgen erf Fock build')
                 fock_mat = fock_drv.compute(screening, den_mat_for_fock,
                                             'kx_rs', erf_k_coef, omega,
                                             thresh_int)
-                self._print_mem_debug_info('after  restgen erf Fock build')
 
                 fock_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -1662,6 +1650,10 @@ class LinearSolver:
         cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
             self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

@@ -1,29 +1,42 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-from scipy.optimize import minimize
+
+try:
+    from scipy.optimize import minimize
+except ImportError:
+    pass
+
 
 ###
 def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
@@ -42,6 +55,7 @@ def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
     unit_cell = np.asarray([[ax, ay, az], [bx, by, bz], [cx, cy, cz]]).T
     return unit_cell
 
+
 def fractional_to_cartesian(fractional_coords, T):
     T = T.astype(float)
     fractional_coords = fractional_coords.astype(float)
@@ -55,7 +69,19 @@ def cartesian_to_fractional(cartesian_coords, unit_cell_inv):
     """Convert Cartesian coordinates to fractional coordinates using the inverse transformation matrix."""
     return np.dot(unit_cell_inv, cartesian_coords.T).T
 
-######rotation optimization 2step######
+
+def expand_setrots(pname_set_dict, set_rotations, sorted_nodes):
+    set_rotations = set_rotations.reshape(len(pname_set_dict), 3, 3)
+    rotations = np.empty((len(sorted_nodes), 3, 3))
+    idx = 0
+    for name in pname_set_dict:
+        for k in pname_set_dict[name]["ind_ofsortednodes"]:
+            rotations[k] = set_rotations[idx]
+        idx += 1
+    return rotations
+
+
+######rotation optimization 1step######
 def locate_min_idx(a_array):
     # print(a_array,np.min(a_array))
     idx = np.argmin(a_array)
@@ -77,7 +103,7 @@ def reorthogonalize_matrix(matrix):
 
 
 def objective_function_pre(
-    params, G, static_atom_positions, sorted_nodes, sorted_edges
+    params, G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict
 ):
     """
     Objective function to minimize distances between paired node to paired node_com along edges.
@@ -92,7 +118,10 @@ def objective_function_pre(
         float: Total distance metric to minimize.
     """
     num_nodes = len(G.nodes())
-    rotation_matrices = params.reshape(num_nodes, 3, 3)
+    set_rotation_matrices = params.reshape(len(pname_set_dict), 3, 3)
+    rotation_matrices = expand_setrots(
+        pname_set_dict, set_rotation_matrices, sorted_nodes
+    )
     total_distance = 0.0
 
     for i, j in sorted_edges:
@@ -134,7 +163,7 @@ def objective_function_pre(
 
 
 def objective_function_after(
-    params, G, static_atom_positions, sorted_nodes, sorted_edges
+    params, G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict
 ):
     """
     Objective function to minimize distances between paired atoms along edges. just use minimum distance
@@ -149,7 +178,10 @@ def objective_function_after(
         float: Total distance metric to minimize.
     """
     num_nodes = len(G.nodes())
-    rotation_matrices = params.reshape(num_nodes, 3, 3)
+    set_rotation_matrices = params.reshape(len(pname_set_dict), 3, 3)
+    rotation_matrices = expand_setrots(
+        pname_set_dict, set_rotation_matrices, sorted_nodes
+    )
     total_distance = 0.0
 
     for i, j in sorted_edges:
@@ -177,28 +209,30 @@ def objective_function_after(
 
         if np.argmin(dist_matrix) > 1:
             total_distance += 1e4  # penalty for the distance difference
-        else:
-            total_distance += np.min(dist_matrix) ** 2
 
-        for idx_i in range(len(rotated_i_positions)):
-            # second min and min distance difference not max
-            if len(dist_matrix[idx_i, :]) > 1:
-                second_min_dist = np.partition(dist_matrix[idx_i, :], 1)[1]
-            else:
-                second_min_dist = np.partition(dist_matrix[idx_i, :], 0)[0]
-            diff = second_min_dist - np.min(dist_matrix[idx_i, :])
-            if diff < 3:
-                total_distance += 1e4
-        for idx_j in range(len(rotated_j_positions)):
-            # second min and min distance difference not max
-            if len(dist_matrix[:, idx_j]) > 1:
-                second_min_dist = np.partition(dist_matrix[:, idx_j], 1)[1]
-            else:
-                second_min_dist = np.partition(dist_matrix[:, idx_j], 0)[0]
-            diff = second_min_dist - np.min(dist_matrix[:, idx_j])
+        total_distance += np.min(dist_matrix) ** 2
 
-            if diff < 3:
-                total_distance += 1e4
+    # for idx_i in range(len(rotated_i_positions)):
+    #    # second min and min distance difference not max
+    #    if len(dist_matrix[idx_i, :]) > 1:
+    #        second_min_dist = np.partition(dist_matrix[idx_i, :], 1)[1]
+    #    else:
+    #        second_min_dist = np.partition(dist_matrix[idx_i, :], 0)[0]
+    #    diff = second_min_dist - np.min(dist_matrix[idx_i, :])
+    #    # if diff < 3:
+    #    total_distance += second_min_dist**2
+    # for idx_j in range(len(rotated_j_positions)):
+    #    # second min and min distance difference not max
+    #    if len(dist_matrix[:, idx_j]) > 1:
+    #        second_min_dist = np.partition(dist_matrix[:, idx_j], 1)[1]
+    #    else:
+    #        second_min_dist = np.partition(dist_matrix[:, idx_j], 0)[0]
+    #    # diff = second_min_dist - np.min(dist_matrix[:, idx_j])
+    #
+    #    # if diff < 3:
+    #    total_distance += second_min_dist**2
+
+    # exclusive pair penalty, node x SHOULD have exclusive pairing to all connected nodes, each connection get one pair
 
     return total_distance
 
@@ -209,7 +243,8 @@ def optimize_rotations_pre(
     sorted_nodes,
     sorted_edges,
     atom_positions,
-    initial_rotations,
+    initial_set_rotations,
+    pname_set_dict,
     opt_method,
     maxfun,
     maxiter,
@@ -227,18 +262,23 @@ def optimize_rotations_pre(
     Returns:
         list: Optimized rotation matrices for all nodes.
     """
+
+    assert_msg_critical(
+        "scipy" in sys.modules, "scipy is required for optimize_rotations_pre."
+    )
+
     print("optimize_rotations_step1")
     # initial_rotations = np.tile(np.eye(3), (num_nodes, 1)).flatten()
     # get a better initial guess, use random rotation matrix combination
     # initial_rotations  = np.array([reorthogonalize_matrix(np.random.rand(3,3)) for i in range(num_nodes)]).flatten()
     static_atom_positions = atom_positions.copy()
     # Precompute edge-specific pairings
-    # edge_pairings = find_edge_pairings(sorted_edges, atom_positions)
+    # edge_pairings = find_edge_pairings(sorted_edges, atom_positions).
 
     result = minimize(
         objective_function_pre,
-        initial_rotations,
-        args=(G, static_atom_positions, sorted_nodes, sorted_edges),
+        initial_set_rotations.flatten(),
+        args=(G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict),
         method=opt_method,
         options={
             "maxfun": maxfun,
@@ -246,6 +286,7 @@ def optimize_rotations_pre(
             "disp": disp,
             "eps": eps,
             "iprint": iprint,
+            "maxls": 50,
         },
     )
 
@@ -272,6 +313,7 @@ def optimize_rotations_after(
     sorted_edges,
     atom_positions,
     initial_rotations,
+    pname_set_dict,
     opt_method,
     maxfun,
     maxiter,
@@ -289,7 +331,15 @@ def optimize_rotations_after(
     Returns:
         list: Optimized rotation matrices for all nodes.
     """
-    print("optimize_rotations_step2")
+
+    assert_msg_critical(
+        "scipy" in sys.modules, "scipy is required for optimize_rotations_after."
+    )
+
+    print("optimize_rotations information:")
+    print("opt_method:", opt_method)
+    print("\n")
+
     # get a better initial guess, use random rotation matrix combination
     # initial_rotations  = np.array([reorthogonalize_matrix(np.random.rand(3,3)) for i in range(num_nodes)]).flatten()
     static_atom_positions = atom_positions.copy()
@@ -298,8 +348,8 @@ def optimize_rotations_after(
 
     result = minimize(
         objective_function_after,
-        initial_rotations,
-        args=(G, static_atom_positions, sorted_nodes, sorted_edges),
+        initial_rotations.flatten(),
+        args=(G, static_atom_positions, sorted_nodes, sorted_edges, pname_set_dict),
         method=opt_method,
         options={
             "maxfun": maxfun,
@@ -310,8 +360,9 @@ def optimize_rotations_after(
         },
     )
 
-    optimized_rotations = result.x.reshape(num_nodes, 3, 3)
+    optimized_rotations = result.x.reshape(-1, 3, 3)
     optimized_rotations = [reorthogonalize_matrix(R) for R in optimized_rotations]
+    optimized_rotations = np.array(optimized_rotations)
 
     ## # Print the optimized pairings after optimization
     ## print("Optimized Pairings (after optimization):")
@@ -416,6 +467,11 @@ def scale_objective_function(
 
 # Example usage
 def optimize_cell_parameters(cell_info, original_ccoords, updated_ccoords):
+
+    assert_msg_critical(
+        "scipy" in sys.modules, "scipy is required for optimize_cell_parameters."
+    )
+
     # Old cell parameters (example values)
     old_cell_params = cell_info  # [a, b, c, alpha, beta, gamma]
 

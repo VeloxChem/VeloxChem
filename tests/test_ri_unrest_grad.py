@@ -56,3 +56,15 @@ class TestScfUnrestrictedGradientDriverWithRI:
 
         self.run_scf_grad(mol_xyz, 'blyp', ref_scf_energy, ref_scf_grad,
                           tol_energy, tol_grad)
+
+        ref_scf_energy = -39.7896296654
+        tol_energy = 1.0e-4
+
+        ref_scf_grad = np.array([[0.03858304, -0.00838695, 0.0039605],
+                                 [-0.01362501, -0.00110359, -0.00216567],
+                                 [-0.01297109, 0.00410212, 0.00252107],
+                                 [-0.01199144, 0.00538578, -0.00432613]])
+        tol_grad = 5.0e-5
+
+        self.run_scf_grad(mol_xyz, 'm06-l', ref_scf_energy, ref_scf_grad,
+                          tol_energy, tol_grad)
