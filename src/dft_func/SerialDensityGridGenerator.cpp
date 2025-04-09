@@ -35,7 +35,6 @@
 #include <omp.h>
 
 #include <cstring>
-#include <iostream>
 
 #include "MathFunc.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
@@ -165,8 +164,6 @@ serialGenerateDensityGridForLDA(const CDenseMatrix&     gtoValues,
             for (int g = 0; g < npoints; g++)
             {
                 rhob[g] = rhoa[g];
-
-                //std::cout << "===rhob===" <<rhob[g]<<std::endl;
             }
         }
     }
