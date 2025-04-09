@@ -36,7 +36,6 @@
 
 #include <cstring>
 
-#include "DenseLinearAlgebra.hpp"
 #include "MathFunc.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
 
