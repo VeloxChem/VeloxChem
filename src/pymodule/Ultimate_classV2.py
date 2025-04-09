@@ -14,7 +14,7 @@ from rdkit.Chem import rdDetermineBonds
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 class MoleculeProcessor:
-    def __init__(self, folder_paths, output_folder='results', deprotonate=True):
+    def __init__(self, folder_paths, output_folder='Results4protonated_molecules', deprotonate=True):
         self.folder_paths = folder_paths
         self.output_folder = output_folder
         self.deprotonate = deprotonate
@@ -44,8 +44,16 @@ class MoleculeProcessor:
     def calculate_properties(self):
         for xyz_file in self.non_iodine_files:
             folder, filename = os.path.split(xyz_file)
+
+            h5_file_path = os.path.join(self.output_folder, f'{filename}.h5')
+            if os.path.exists(h5_file_path):
+                logging.info(f"Skipping {filename} as its h5 file already exists.")
+                continue
+
             try:
-                calc = vlx.MolecularPropertyCalculator(folder, xyz_filename=filename)
+                molecule = vlx.Molecule.read_xyz_file(xyz_file)
+                # calc = vlx.MolecularPropertyCalculator(folder, xyz_filename=filename)
+                calc = vlx.MPI1(molecule, deprotonated=False)
 
                 print('Starting calculations for', filename)
 
@@ -77,6 +85,13 @@ class MoleculeProcessor:
             return
 
         logging.info("Deprotonating molecules...")
+
+
+        existing_h5_files = {f[:12] for f in os.listdir(self.h5_deprotonated_dir) if f.endswith('.h5')}
+        self.non_iodine_files = [
+            file for file in self.non_iodine_files
+            if os.path.split(file)[1][:12] not in existing_h5_files
+        ]
 
         for file in self.non_iodine_files:
             folder, filename = os.path.split(file)
