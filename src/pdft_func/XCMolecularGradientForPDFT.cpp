@@ -719,8 +719,8 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
         // generate density and on-top pair density on the grid
 
-        pairdengridgen::generatePairDensityForGGA(
-            rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_active_mos, twoBodyDensityMatrix, timer);
+        pairdengridgen::serialGeneratePairDensityForGGA(
+            rho, rhograd, sigma, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_active_mos, twoBodyDensityMatrix);
 
         // generate density gradient grid
 

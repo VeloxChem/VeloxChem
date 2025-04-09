@@ -69,17 +69,16 @@ void serialGeneratePairDensityForLDA(double*               rho,
  @param timer the timer.
  */
 
-void generatePairDensityForGGA(double*               rho,
-                               double*               rhograd,
-                               double*               sigma,
-                               const CDenseMatrix&   gtoValues,
-                               const CDenseMatrix&   gtoValuesX,
-                               const CDenseMatrix&   gtoValuesY,
-                               const CDenseMatrix&   gtoValuesZ,
-                               const CDenseMatrix&   densityMatrix,
-                               const CDenseMatrix&   activeMOs,
-                               const CDenseMatrix&   twoBodyDensityMatrix,
-                               CMultiTimer&          timer);
+void serialGeneratePairDensityForGGA(double*               rho,
+                                     double*               rhograd,
+                                     double*               sigma,
+                                     const CDenseMatrix&   gtoValues,
+                                     const CDenseMatrix&   gtoValuesX,
+                                     const CDenseMatrix&   gtoValuesY,
+                                     const CDenseMatrix&   gtoValuesZ,
+                                     const CDenseMatrix&   densityMatrix,
+                                     const CDenseMatrix&   activeMOs,
+                                     const CDenseMatrix&   twoBodyDensityMatrix);
 
 }  // namespace pairdengridgen
 
