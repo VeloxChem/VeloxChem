@@ -237,7 +237,7 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
         // generate density and on-top pair density on the grid
 
-        pairdengridgen::generatePairDensityForLDA(rho, mat_chi, sub_dens_mat_a, sub_active_mos, twoBodyDensityMatrix, timer);
+        pairdengridgen::serialGeneratePairDensityForLDA(rho, mat_chi, sub_dens_mat_a, sub_active_mos, twoBodyDensityMatrix);
 
         // generate density gradient grid
 

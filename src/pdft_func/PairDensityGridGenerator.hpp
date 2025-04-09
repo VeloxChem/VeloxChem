@@ -46,14 +46,12 @@ namespace pairdengridgen {  // pairdengridgen namespace
  @param densityMatrix the total density matrix.
  @param activeMOs the MO coefficients.
  @param twoBodyDensityMatrix the MO two-body density matrix.
- @param timer the timer.
  */
-void generatePairDensityForLDA(double*               rho,
-                               const CDenseMatrix&   gtoValues,
-                               const CDenseMatrix&   densityMatrix,
-                               const CDenseMatrix&   activeMOs,
-                               const CDenseMatrix&   twoBodyDensityMatrix,
-                               CMultiTimer&          timer);
+void serialGeneratePairDensityForLDA(double*               rho,
+                                     const CDenseMatrix&   gtoValues,
+                                     const CDenseMatrix&   densityMatrix,
+                                     const CDenseMatrix&   activeMOs,
+                                     const CDenseMatrix&   twoBodyDensityMatrix);
 
 /**
  Generates density and on-top pair-density for GGA.

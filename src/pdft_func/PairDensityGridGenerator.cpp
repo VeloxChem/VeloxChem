@@ -38,53 +38,39 @@
 
 #include "DenseLinearAlgebra.hpp"
 #include "MathFunc.hpp"
+#include "SerialDenseLinearAlgebra.hpp"
 
 namespace pairdengridgen {  // pairdengridgen namespace
 
 void
-generatePairDensityForLDA(double*               rho,
-                          const CDenseMatrix&   gtoValues,
-                          const CDenseMatrix&   densityMatrix,
-                          const CDenseMatrix&   activeMOs,
-                          const CDenseMatrix&   twoBodyDensityMatrix,
-                          CMultiTimer&          timer)
+serialGeneratePairDensityForLDA(double*               rho,
+                                const CDenseMatrix&   gtoValues,
+                                const CDenseMatrix&   densityMatrix,
+                                const CDenseMatrix&   activeMOs,
+                                const CDenseMatrix&   twoBodyDensityMatrix)
 {
     auto npoints = gtoValues.getNumberOfColumns();
 
     // eq.(26), JCTC 2021, 17, 1512-1521
 
-    timer.start("Density grid matmul");
-
-    auto mat_F = denblas::multAB(densityMatrix, gtoValues);
+    auto mat_F = sdenblas::serialMultAB(densityMatrix, gtoValues);
 
     auto n_active = activeMOs.getNumberOfRows();
 
     CDenseMatrix MOs_on_grid;
+
     if (n_active > 0)
     {
-        MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+        MOs_on_grid = sdenblas::serialMultAB(activeMOs, gtoValues);
     }
 
-    timer.stop("Density grid matmul");
-
-    timer.start("Density mo pair");
-
     auto n_active2 = n_active * n_active;
-
-    auto nthreads = omp_get_max_threads();
 
     CDenseMatrix mo_pair(n_active2, npoints);
 
     auto mo_pair_val = mo_pair.values();
 
-    #pragma omp parallel
     {
-        auto thread_id = omp_get_thread_num();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
         for (int t = 0; t < n_active; t++)
         {
             auto MOt = MOs_on_grid.row(t);
@@ -96,8 +82,9 @@ generatePairDensityForLDA(double*               rho,
                 auto MOu = MOs_on_grid.row(u);
 
                 auto tu_offset = t_offset + u * npoints;
+
                 #pragma omp simd 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                for (int g = 0; g < npoints; g++)
                 {
                     mo_pair_val[tu_offset + g] += MOt[g] * MOu[g];
                 }
@@ -105,16 +92,7 @@ generatePairDensityForLDA(double*               rho,
         }
     }
 
-    timer.stop("Density mo pair");
-
-    timer.start("Density grid pi matmul");
-
-    auto mat_d = denblas::multAB(twoBodyDensityMatrix, mo_pair);
-
-    timer.stop("Density grid pi matmul");
-    // eq.(27), JCTC 2021, 17, 1512-1521
-
-    timer.start("Density grid rho");
+    auto mat_d = sdenblas::serialMultAB(twoBodyDensityMatrix, mo_pair);
 
     auto naos = gtoValues.getNumberOfRows();
 
@@ -124,16 +102,9 @@ generatePairDensityForLDA(double*               rho,
 
     auto chi_val = gtoValues.values();
 
-    #pragma omp parallel
     {
-        auto thread_id = omp_get_thread_num();
-
-        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
-
-        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
-
         #pragma omp simd 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int g = 0; g < npoints; g++)
         {
             rho[2 * g + 0] = 0.0;
             rho[2 * g + 1] = 0.0;
@@ -146,7 +117,7 @@ generatePairDensityForLDA(double*               rho,
             auto nu_offset = nu * npoints;
 
             #pragma omp simd 
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = 0; g < npoints; g++)
             {
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
             }
@@ -159,7 +130,7 @@ generatePairDensityForLDA(double*               rho,
             auto vw_offset = vw * npoints;
 
             #pragma omp simd 
-            for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int g = 0; g < npoints; g++)
             {
                 rho[2 * g + 1] += d_val[vw_offset + g] * mo_pair_val[vw_offset + g];
             }
@@ -167,7 +138,7 @@ generatePairDensityForLDA(double*               rho,
 
         // To prevent numerical issues, enforce that -0.5*rho^2 < pi < 0.5*rho^2
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int g = 0; g < npoints; g++)
         {
             auto bound = 0.5 * rho[2 * g + 0] * rho[2 * g + 0];
 
@@ -176,9 +147,6 @@ generatePairDensityForLDA(double*               rho,
             rho[2 * g + 1] = std::max(rho[2 * g + 1], -bound);
         }
     }
-
-
-    timer.stop("Density grid rho");
 }
 
 void
