@@ -28,6 +28,11 @@ class MoleculeProcessor:
 
         os.makedirs(self.output_folder, exist_ok=True)
         os.makedirs(self.h5_deprotonated_dir, exist_ok=True)
+        os.makedirs(self.deprotonated_dir, exist_ok=True)
+
+        print(f"Created output directory: {self.output_folder}")
+        print(f"Created H5 deprotonated directory: {self.h5_deprotonated_dir}")
+        print(f"Created deprotonated molecules directory: {self.deprotonated_dir}")
 
     def classify_molecules(self):
         for folder_path in self.folder_paths:
