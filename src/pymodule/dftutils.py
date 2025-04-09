@@ -145,3 +145,5 @@ def print_xc_reference(xcfun, ostream):
         valstr += 'J. Chem. Theory Comput. 2021, 17, 1512-1521'
         ostream.print_reference(valstr)
         ostream.print_blank()
+
+        ostream.flush()
