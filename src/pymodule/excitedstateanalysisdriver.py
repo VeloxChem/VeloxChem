@@ -622,6 +622,8 @@ class ExcitedStateAnalysisDriver:
 
         self.ostream.print_blank()
 
+        self.ostream.flush()
+
     def print_participation_ratios(self, descriptor_dict):
         """
         Prints participation ratios.
@@ -649,6 +651,8 @@ class ExcitedStateAnalysisDriver:
 
         self.ostream.print_blank()
 
+        self.ostream.flush()
+
     def print_charge_transfer_length(self, descriptor_dict):
         """
         Prints charge transfer length.
@@ -667,6 +671,8 @@ class ExcitedStateAnalysisDriver:
         self.ostream.print_header(valstr.ljust(92))
 
         self.ostream.print_blank()
+
+        self.ostream.flush()
 
     def print_results(self, descriptor_dict):
         """

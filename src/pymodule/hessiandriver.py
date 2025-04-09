@@ -245,6 +245,7 @@ class HessianDriver:
         """
 
         self.ostream.print_block(molecule.get_string())
+        self.ostream.flush()
 
     def print_hessian(self, molecule):
         """

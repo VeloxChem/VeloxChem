@@ -2,18 +2,21 @@
 VeloxChem
 =========
 
-.. image:: https://img.shields.io/conda/v/veloxchem/veloxchem.svg
+.. image:: https://img.shields.io/conda/v/veloxchem/veloxchem.svg?style=flat-square
         :alt: Install with Conda
         :target: https://anaconda.org/veloxchem/veloxchem
 
-.. image:: https://img.shields.io/github/actions/workflow/status/VeloxChem/VeloxChem/ci.yml
+.. image:: https://anaconda.org/veloxchem/veloxchem/badges/downloads.svg?style=flat-square
+        :alt: Conda downloads
+        :target: https://anaconda.org/veloxchem/veloxchem
+
+.. image:: https://img.shields.io/github/actions/workflow/status/VeloxChem/VeloxChem/ci.yml?style=flat-square
         :alt: GitHub action
         :target: https://github.com/VeloxChem/VeloxChem/actions
 
-.. image:: https://img.shields.io/badge/DOI-10.1002%2Fwcms.1457-informational
+.. image:: https://img.shields.io/badge/DOI-10.1002%2Fwcms.1457-informational?style=flat-square
         :alt: WIREs paper
         :target: https://onlinelibrary.wiley.com/doi/full/10.1002/wcms.1457
-
 
 VeloxChem: A Python‐driven density‐functional theory program for spectroscopy simulations in high‐performance computing environments.
 
@@ -25,7 +28,7 @@ https://veloxchem.org/
 License
 -------
 
-.. image:: https://img.shields.io/badge/License-BSD%203--Clause-orange.svg
+.. image:: https://img.shields.io/badge/License-BSD%203--Clause-orange.svg?style=flat-square
         :alt: License
         :target: https://opensource.org/licenses/BSD-3-Clause
 
@@ -42,11 +45,11 @@ the respective files. See `<LICENSE-THIRD-PARTY>`_ for details.
 Citation
 --------
 
-.. image:: https://img.shields.io/badge/WIREs-10.1002%2Fwcms.1457-informational
+.. image:: https://img.shields.io/badge/WIREs-10.1002%2Fwcms.1457-informational?style=flat-square
         :alt: WIREs paper
         :target: https://onlinelibrary.wiley.com/doi/full/10.1002/wcms.1457
 
-.. image:: https://img.shields.io/badge/JPCA-10.1021%2Facs.jpca.4c07510-informational
+.. image:: https://img.shields.io/badge/JPCA-10.1021%2Facs.jpca.4c07510-informational?style=flat-square
         :alt: JPCA paper
         :target: https://pubs.acs.org/doi/10.1021/acs.jpca.4c07510
 

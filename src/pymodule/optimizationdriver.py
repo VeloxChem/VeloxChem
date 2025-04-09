@@ -652,6 +652,7 @@ class OptimizationDriver:
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_scan_result(self, progress):
         """

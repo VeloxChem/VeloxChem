@@ -1168,6 +1168,9 @@ class ComplexResponse(LinearSolver):
 
         ostream.print_blank()
 
+        # Note: flush is needed at the end of every print method
+        ostream.flush()
+
     def _print_ecd_results(self, rsp_results, ostream=None):
         """
         Prints ECD results to output stream.
@@ -1223,6 +1226,9 @@ class ComplexResponse(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+
+        # Note: flush is needed at the end of every print method
+        ostream.flush()
 
     def write_cpp_rsp_results_to_hdf5(self, fname, rsp_results):
         """

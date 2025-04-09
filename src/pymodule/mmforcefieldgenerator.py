@@ -50,7 +50,7 @@ from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
 from .scfrestdriver import ScfRestrictedDriver
 from .optimizationdriver import OptimizationDriver
-from .inputparser import parse_input, get_random_string_parallel
+from .inputparser import parse_input
 from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
