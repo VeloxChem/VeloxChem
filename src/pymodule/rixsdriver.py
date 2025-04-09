@@ -348,9 +348,14 @@ class RixsDriver:
             # assume first core resonance
             #self.ostream.print_info(
             #    'Incoming photon energy not set; calculating only for the first core resonance.')
-            for k, osc in enumerate(rsp_tensors['oscillator_strengths'][core_states]):
+            if cvs_rsp_tensors is None:
+                osc_arr = rsp_tensors['oscillator_strengths']
+            else:
+                osc_arr = cvs_rsp_tensors['oscillator_strengths']
+
+            for k, osc in enumerate(osc_arr[core_states]):
                 if osc > 1e-3:
-                    self.photon_energy = [rsp_tensors['eigenvalues'][core_states][k]]
+                    self.photon_energy = [core_eigvals[k]]
                     break
 
         elif type(self.photon_energy) == float or type(self.photon_energy) == np.float64:
