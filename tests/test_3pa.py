@@ -64,6 +64,7 @@ class Test3PA:
                 assert abs(results_ThreePA['transition_moments'][key] -
                            ref_result[key].real) < 1.0e-4
 
+    @pytest.mark.timeconsuming
     def test_hf_3pa(self):
 
         ref_result = {
