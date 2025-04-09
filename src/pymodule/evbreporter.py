@@ -234,7 +234,7 @@ class EvbReporter():
                 fg_E.append(e)
                 if e> 1e9:
                     raise ValueError(
-                        f"Force group {fg.name}({fg.value}) energy is too large: {e}"
+                        f"Force group {fg.name}({fg.value}) energy is too large: {e}")
                 line += f"{e}, "
             line = line[:-2] + '\n'
 
