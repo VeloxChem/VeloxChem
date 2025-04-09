@@ -431,7 +431,7 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
                 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
                 
-                #pragma omp simd
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz)
                 for (int g = 0; g < npoints; g++)
                 {   
                     auto atom_g = atom_offset + g;
@@ -992,7 +992,7 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
-                #pragma omp simd
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz)
                 for (int g = 0; g < npoints; g++)
                 {
                     auto atom_g = atom_offset + g;
