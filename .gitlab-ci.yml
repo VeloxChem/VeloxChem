@@ -127,6 +127,8 @@ monkey:python_tests:
         -m "solvers" --durations=10
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO
         -m "not timeconsuming" --durations=10
+    - git clone https://github.com/VeloxChem/vlx-extra-tests.git
+    - python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests
 
 include:
   - '.gitlab/cron-deploy.yml'

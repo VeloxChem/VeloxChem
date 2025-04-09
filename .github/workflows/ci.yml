@@ -78,3 +78,5 @@ jobs:
             -m "solvers" --durations=10
           OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
             -m "not timeconsuming" --durations=10
+          git clone https://github.com/VeloxChem/vlx-extra-tests.git
+          OMP_NUM_THREADS=4 python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests
