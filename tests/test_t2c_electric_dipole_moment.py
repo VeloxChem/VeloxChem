@@ -30,7 +30,7 @@ class TestElectricDipoleMomentDriver:
 
         # load reference overlap data
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.qzvp.electric.dipole.momentum.npy')
+        npyfile = str(here / 'data' / 'co.qzvp.electric.dipole.moment.npy')
         ref_mat = np.load(npyfile)
 
         # dimension of molecular basis
