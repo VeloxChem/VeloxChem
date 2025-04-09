@@ -28515,7 +28515,7 @@ computeExchangeFockDDDP6(double*         mat_K,
 static inline constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
 static inline constexpr double   delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
-__device__ double 
+__device__ double __attribute__((noinline)) 
 computeExchangeFockDDDD0(const double* F8_t,
                          const double* PQ,
                          const double Lambda,
@@ -28727,7 +28727,7 @@ computeExchangeFockDDDD0(const double* F8_t,
                             );
 }
 
-__device__ double 
+__device__ double __attribute__((noinline)) 
 computeExchangeFockDDDD1(const double* F8_t,
                          const double* PQ,
                          const double Lambda,
@@ -28985,7 +28985,7 @@ computeExchangeFockDDDD1(const double* F8_t,
 
 }
 
- __device__ double                                    
+ __device__ double __attribute__((noinline))                                    
  computeExchangeFockDDDD2(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
@@ -29279,7 +29279,7 @@ computeExchangeFockDDDD1(const double* F8_t,
             );
 }
 
-__device__ double                                           
+__device__ double __attribute__((noinline))                                           
 computeExchangeFockDDDD3(const double* F8_t,                
                          const double* PQ,                  
                          const double Lambda,               
@@ -29633,7 +29633,7 @@ computeExchangeFockDDDD3(const double* F8_t,
                             );
 }
 
-__device__ double                                           
+__device__ double __attribute__((noinline))                                           
 computeExchangeFockDDDD4(const double* F8_t,                
                          const double* PQ,                  
                          const double Lambda,               
@@ -30123,7 +30123,7 @@ computeExchangeFockDDDD4(const double* F8_t,
                             );
 }
 
-__device__ double                                           
+__device__ double __attribute__((noinline))                                           
 computeExchangeFockDDDD5(const double* F8_t,                
                          const double* PQ,                  
                          const double Lambda,               
@@ -30284,7 +30284,7 @@ computeExchangeFockDDDD5(const double* F8_t,
                             );
 }
 
- __device__ double                                    
+ __device__ double __attribute__((noinline))                                    
  computeExchangeFockDDDD6(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
@@ -30442,7 +30442,7 @@ computeExchangeFockDDDD5(const double* F8_t,
 
 }
 
- __device__ double                                    
+ __device__ double __attribute__((noinline))                                    
  computeExchangeFockDDDD7(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
@@ -30555,7 +30555,7 @@ computeExchangeFockDDDD5(const double* F8_t,
                             );
 }
 
- __device__ double                                    
+ __device__ double __attribute__((noinline))                                    
  computeExchangeFockDDDD8(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
@@ -31112,7 +31112,7 @@ computeExchangeFockDDDD5(const double* F8_t,
                             );
 }
 
-__device__ double                                    
+__device__ double __attribute__((noinline))                                    
 computeExchangeFockDDDD9(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
@@ -31180,7 +31180,7 @@ computeExchangeFockDDDD9(const double* F8_t,
                             );
 }
 
-__device__ double                                    
+__device__ double __attribute__((noinline))                                    
 computeExchangeFockDDDD10(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
@@ -31296,7 +31296,7 @@ computeExchangeFockDDDD10(const double* F8_t,
                             );
 }
 
-__device__ double                                    
+__device__ double __attribute__((noinline))                                    
 computeExchangeFockDDDD11(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
@@ -31436,7 +31436,7 @@ computeExchangeFockDDDD11(const double* F8_t,
                             );
 }
 
-__device__ double                                    
+__device__ double __attribute__((noinline))                                    
 computeExchangeFockDDDD12(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
@@ -31818,7 +31818,7 @@ computeExchangeFockDDDD12(const double* F8_t,
                             );
 }
 
-__device__ double                                    
+__device__ double __attribute__((noinline))                                    
 computeExchangeFockDDDD13(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
@@ -31968,7 +31968,7 @@ computeExchangeFockDDDD13(const double* F8_t,
                             );
 }
 
-__device__ double                                    
+__device__ double __attribute__((noinline))
 computeExchangeFockDDDD14(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
