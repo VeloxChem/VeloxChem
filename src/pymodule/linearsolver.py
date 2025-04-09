@@ -152,6 +152,7 @@ class LinearSolver:
 
         # solvation model
         self.solvation_model = None
+        self.non_equilibrium_solv = False
 
         # point charges
         self.point_charges = None
@@ -160,6 +161,7 @@ class LinearSolver:
         self._cpcm = False
         self.cpcm_drv = None
         self.cpcm_epsilon = 78.39
+        self.cpcm_optical_epsilon = 1.777849
         self.cpcm_grid_per_sphere = 194
         self.cpcm_x = 0
         self.cpcm_custom_vdw_radii = None
@@ -245,6 +247,8 @@ class LinearSolver:
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
+                'non_equilibrium_solv': 
+                      ('bool', 'toggle use of non-equilibrium solvation for response'),
             },
             'method_settings': {
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
@@ -258,6 +262,8 @@ class LinearSolver:
                     ('int', 'number of grid points per sphere (C-PCM)'),
                 'cpcm_epsilon':
                     ('float', 'dielectric constant of solvent (C-PCM)'),
+                'cpcm_optical_epsilon':
+                    ('float', 'optical dielectric constant of solvent (C-PCM)'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
                 'cpcm_custom_vdw_radii':
                     ('seq_fixed_str', 'custom vdw radii for C-PCM'),
@@ -1544,8 +1550,12 @@ class LinearSolver:
                 Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
                                                         self._cpcm_grid,
                                                         dens[idx] * 2.0)
-                scale_f = -(self.cpcm_drv.epsilon - 1) / (
-                            self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                if self.non_equilibrium_solv:
+                    scale_f = -(self.cpcm_optical_epsilon - 1) / (
+                                self.cpcm_optical_epsilon + self.cpcm_drv.x)
+                else:
+                    scale_f = -(self.cpcm_drv.epsilon - 1) / (
+                                self.cpcm_drv.epsilon + self.cpcm_drv.x)
                 rhs = scale_f * (Cvec)
                 self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
@@ -1742,6 +1752,14 @@ class LinearSolver:
             cur_str = 'C-PCM Points per Atomic Sphere  : '
             cur_str += f'{self.cpcm_grid_per_sphere}'
             self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Non-Equilibrium solvation       : '
+            cur_str += f'{self.non_equilibrium_solv}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            if self.non_equilibrium_solv:
+                cur_str = 'C-PCM Optical Dielectric Constant: '
+                cur_str += f'{self.cpcm_optical_epsilon}'
+                self.ostream.print_header(cur_str.ljust(str_width))
+
 
         self.ostream.print_blank()
         self.ostream.flush()
