@@ -329,5 +329,3 @@ class MPC1:
         self.compute_esp()
         print('Successfully computed the ESP')
         return self.generate_data_matrix()
-    print('Successfully generated the data matrix')
-    
