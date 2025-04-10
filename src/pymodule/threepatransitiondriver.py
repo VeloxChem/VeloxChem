@@ -27,7 +27,6 @@ from pathlib import Path
 import numpy as np
 import time
 import sys
-from tabulate import tabulate
 
 
 from .oneeints import compute_electric_dipole_integrals

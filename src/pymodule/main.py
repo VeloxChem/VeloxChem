@@ -49,6 +49,8 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
+from .rspthreepa import ThreePA
+
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
@@ -61,6 +63,7 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
+
 
 
 def select_scf_driver(task, scf_type):
@@ -169,6 +172,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
+
+    elif prop_type == '3pa':
+        rsp_prop = ThreePA(rsp_dict, method_dict)
 
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
