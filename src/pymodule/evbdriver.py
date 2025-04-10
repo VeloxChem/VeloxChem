@@ -820,6 +820,7 @@ class EvbDriver():
         step_size=0.001,
         equil_step_size=0.001,
         initial_equil_step_size=0.001,
+        saved_frames_on_crash=None,
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
 
@@ -851,6 +852,8 @@ class EvbDriver():
             )
             sample_steps = 25000
 
+            
+
         for conf in self.system_confs:
             self.update_options_json(
                 {
@@ -868,6 +871,8 @@ class EvbDriver():
             self.ostream.flush()
             FEP = EvbFepDriver()
             FEP.debug = self.debug
+            if saved_frames_on_crash is not None:
+                FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
                 equilibration_steps=equil_steps,
                 total_sample_steps=sample_steps,

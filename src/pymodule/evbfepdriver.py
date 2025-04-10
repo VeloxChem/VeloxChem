@@ -88,7 +88,7 @@ class EvbFepDriver():
         self.report_velocities: bool = False
         self.report_forcegroups: bool = True
         self.debug: bool = False
-        self.save_frames: int = 2000
+        self.save_frames: int = 1000
 
     def run_FEP(
         self,
@@ -361,7 +361,7 @@ class EvbFepDriver():
                 self.ostream.print_warning(
                     f"Error during simulation step {i}: {e}")
                 self.ostream.flush()
-                self._save_states(states)
+                self._save_states(states,simulation)
                 raise e
 
             state = simulation.context.getState(
@@ -374,14 +374,17 @@ class EvbFepDriver():
             kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
             pot = state.getPotentialEnergy()
             pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
-            self.ostream.print_info(
-                f"Step {i}, kinetic energy: {kin:.5f} kJ/mol, potential energy: {pot:.5f} kJ/mol"
-            )
+
+            # self.ostream.print_info(
+            #     f"Step {i}, kinetic energy: {kin:.5f} kJ/mol, potential energy: {pot:.5f} kJ/mol"
+            # )
+
+            self.ostream.flush()
             if pot > 0:
                 self.ostream.print_warning(
                     f"Potential energy is positive: {pot:.5f} kJ/mol. Saving states and crashing"
                 )
-                self._save_states(states)
+                self._save_states(states,simulation)
                 raise RuntimeError(
                     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
                 )
@@ -389,7 +392,9 @@ class EvbFepDriver():
             if len(states) > self.save_frames:
                 states.pop(0)
 
-    def _save_states(self, states):
+        return states
+
+    def _save_states(self, states, simulation):
         self.ostream.print_info(f"Saving last {len(states)} states")
         self.ostream.flush()
         cwd = Path.cwd()
