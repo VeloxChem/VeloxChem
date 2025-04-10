@@ -169,7 +169,7 @@ class EvbFepDriver():
                     topology,
                     system,
                     equil_integrator,
-                    mm.Platform.getPlatform(platform),
+                    mm.Platform.getPlatformByName(platform),
                 )
             else:
                 equil_simulation = mmapp.Simulation(
@@ -180,9 +180,9 @@ class EvbFepDriver():
             equil_simulation.context.setPositions(positions)
 
             if i == 0:
-                platform = equil_simulation.context.getPlatform()
+                platformname = equil_simulation.context.getPlatform()
                 self.ostream.print_info(
-                    f"Running FEP on platform: {platform.getName()}")
+                    f"Running FEP on platform: {platformname.getName()}")
                 self.ostream.flush()
 
             if self.constrain_H:
@@ -272,7 +272,7 @@ class EvbFepDriver():
                     topology,
                     system,
                     run_integrator,
-                    mm.Platform.getPlatform(platform),
+                    mm.Platform.getPlatformByName(platform),
                 )
             else:
                 run_simulation = mmapp.Simulation(
