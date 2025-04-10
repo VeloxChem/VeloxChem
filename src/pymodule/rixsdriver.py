@@ -193,12 +193,21 @@ class RixsDriver:
         #           + ((3/4) * np.sin(self.theta) ** 2 - 1/2) * (np.sum(F * F.T.conj())
         #                                           + np.trace(np.abs(F)**2)))
         return sigma_f
+
+    def compute_from_h5(self, scf_tensors, 
+                rsp_tensors, cvs_rsp_tensors=None,
+                fulldiag_thresh=None, tda=False, 
+                final_cutoff=None):
+        # unpack h5
+        self.compute()
+        pass
     
     def compute(self, molecule, basis, scf_tensors, 
                 rsp_tensors, cvs_rsp_tensors=None,
-                fulldiag_thresh=None, tda=False, final_cutoff=None):
+                fulldiag_thresh=None, tda=False, 
+                final_cutoff=None):
         """
-        Computes the relevant RIXS properties
+        Computes RIXS properties.
         
         :param molecule:
             The molecule object
@@ -452,6 +461,23 @@ class RixsDriver:
                     'energy_losses': ene_losses}
 
         return return_dict
+    
+    @staticmethod
+    def read_from_h5(filename):
+        """ 
+        Reads the data from a checkpoint file and returns it as a dictionary.
+
+            :param filename: the name of the checkpoint file
+        """
+        res_dict = {}
+        h5f = h5py.File(filename, "r")
+        
+        for key in h5f.keys():
+            data = np.array(h5f.get(key))
+            res_dict[key] = data
+        h5f.close()
+        
+        return res_dict
     
     @staticmethod
     def get_full_solution_vector(solution):
