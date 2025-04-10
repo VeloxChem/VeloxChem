@@ -308,9 +308,6 @@ class MPC1:
         return data_matrix
 
     def run_all_calculations(self):
-        self.load_molecule()
-        print('Successfully loaded the molecule')
-        # self.run_scf()
         self.optimize_geometry()
         print('Successfully optimized the geometry')
         self.compute_electron_density()
