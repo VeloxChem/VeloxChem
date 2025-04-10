@@ -361,7 +361,7 @@ class EvbFepDriver():
                 self.ostream.print_warning(
                     f"Error during simulation step {i}: {e}")
                 self.ostream.flush()
-                self._save_states(states,simulation)
+                self._save_states(states, simulation, i)
                 raise e
 
             state = simulation.context.getState(
@@ -384,7 +384,7 @@ class EvbFepDriver():
                 self.ostream.print_warning(
                     f"Potential energy is positive: {pot:.5f} kJ/mol. Saving states and crashing"
                 )
-                self._save_states(states,simulation)
+                self._save_states(states, simulation, i)
                 raise RuntimeError(
                     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
                 )
@@ -394,7 +394,7 @@ class EvbFepDriver():
 
         return states
 
-    def _save_states(self, states, simulation):
+    def _save_states(self, states, simulation, step):
         self.ostream.print_info(f"Saving last {len(states)} states")
         self.ostream.flush()
         cwd = Path.cwd()
@@ -403,7 +403,7 @@ class EvbFepDriver():
         energies = np.zeros((len(states), len(EvbForceGroup) + 3))
 
         for j, state in enumerate(states):
-            step_num = i - len(states) + j
+            step_num = step - len(states) + j
             with open(path / f"state_step_{step_num}.xml", "w") as f:
                 f.write(mm.XmlSerializer.serialize(state))
 
