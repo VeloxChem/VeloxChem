@@ -378,8 +378,11 @@ class EvbFepDriver():
             # self.ostream.print_info(
             #     f"Step {i}, kinetic energy: {kin:.5f} kJ/mol, potential energy: {pot:.5f} kJ/mol"
             # )
-
             self.ostream.flush()
+
+            states.append(state)
+            if len(states) > self.save_frames:
+                states.pop(0)
             if pot > 0:
                 self.ostream.print_warning(
                     f"Potential energy is positive: {pot:.5f} kJ/mol. Saving states and crashing"
@@ -388,9 +391,6 @@ class EvbFepDriver():
                 raise RuntimeError(
                     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
                 )
-            states.append(state)
-            if len(states) > self.save_frames:
-                states.pop(0)
 
         return states
 
@@ -406,6 +406,13 @@ class EvbFepDriver():
             step_num = step - len(states) + j
             with open(path / f"state_step_{step_num}.xml", "w") as f:
                 f.write(mm.XmlSerializer.serialize(state))
+
+            minim_positions = state.getPositions()
+            mmapp.PDBFile.writeFile(
+                self.topology,
+                np.array(minim_positions.value_in_unit(mm.unit.angstrom)),
+                open(self.run_folder / f"state_step_{step_num}.pdb", "w"),
+            )
 
             kin = state.getKineticEnergy()
             kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
