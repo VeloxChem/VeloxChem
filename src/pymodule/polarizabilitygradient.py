@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import time as tm
 import math
@@ -49,7 +57,8 @@ from .inputparser import parse_input
 from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, polgrad_sanity_check)
+                           dft_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
+                           #polgrad_sanity_check)
 
 
 class PolarizabilityGradient:
@@ -221,8 +230,13 @@ class PolarizabilityGradient:
                 error_message += 'for analytical gradient'
                 raise ValueError(error_message)
             if self.rank == mpi_master():
-                polgrad_sanity_check(self, self.flag, lr_results)
+                polgrad_sanity_check_2(self, self.flag, lr_results)
+                # FIXME should this be moved to sanitychecks?
                 self._check_real_or_complex_input(lr_results)
+
+            # sanity check input frequencies
+            polgrad_sanity_check_1(self)
+
             # compute
             self.polgradient = self.compute_analytical(molecule, basis,
                                                        scf_tensors, lr_results)
@@ -305,11 +319,6 @@ class PolarizabilityGradient:
                         n_freqs, 2 * dof_red, nocc * nvir)
                 else:
                     all_cphf_red = all_cphf_red.reshape(n_freqs, dof_red, nocc * nvir)
-        else:
-            nocc = None
-            nvir = None
-
-        nocc, nvir = self.comm.bcast((nocc, nvir), root=mpi_master())
 
         # timings
         loop_start_time = tm.time()
@@ -1134,6 +1143,7 @@ class PolarizabilityGradient:
         """
 
         if self.rank == mpi_master():
+            # MO coefficients
             mo = scf_tensors['C_alpha']  # only alpha part
             nocc = molecule.number_of_alpha_electrons()
             mo_vir = mo[:, nocc:].copy()
@@ -1154,7 +1164,6 @@ class PolarizabilityGradient:
         dof_red, xy_pairs = self.comm.bcast((dof_red, xy_pairs), root=mpi_master())
 
         if self.is_complex:
-
             for idx, xy in enumerate(xy_pairs):
                 tmp_lambda_re = lambda_list[
                     2 * dof_red * fdx + idx].get_full_vector()
@@ -1201,6 +1210,7 @@ class PolarizabilityGradient:
             dof = len(self.vector_components)
             xy_pairs = [(x, y) for x in range(dof) for y in range(x, dof)]
             dof_red = len(xy_pairs)
+
             nao = basis.get_dimensions_of_basis()
 
             omega_ao = np.zeros((dof, dof, nao * nao), dtype=self.grad_dt)
@@ -1325,14 +1335,7 @@ class PolarizabilityGradient:
         # compute orbital response
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
-
-        #if self.rank == mpi_master():
-        #    valstr = f'** Time spent on orbital response for {len(self.frequencies)} '
-        #    valstr += f'frequencies: {(tm.time() - orbrsp_start_time):.6f} sec **'
-        #    self.ostream.print_header(valstr)
-        #    self.ostream.print_blank()
-        #    self.ostream.flush()
-
+       
         return orbrsp_drv.cphf_results
 
     def compute_polgrad_xc_contrib(self, molecule, ao_basis, gs_dm, rel_dm_ao,
@@ -1398,6 +1401,8 @@ class PolarizabilityGradient:
         else:
             xc_pol_gradient = None
 
+        # FIXME is this not a waste of communication?
+        # Maybe natm/xc_pol_gradient should both happen on all ranks
         xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         for m in range(dof):
@@ -1428,11 +1433,6 @@ class PolarizabilityGradient:
                     [gs_dm], xcfun_label, profiler)
 
                 xc_pol_gradient[m, n] += polgrad_xcgrad
-
-        #        if n != m:
-        #            xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
-
-        #xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
@@ -1468,6 +1468,8 @@ class PolarizabilityGradient:
         else:
             xc_pol_gradient = None
 
+        # FIXME is this not a waste of communication?
+        # Maybe natm/xc_pol_gradient should both happen on all ranks
         xc_pol_gradient = self.comm.bcast(xc_pol_gradient, root=mpi_master())
 
         # FIXME change "m,n" to "x,y" for consistency
@@ -1523,11 +1525,6 @@ class PolarizabilityGradient:
                     profiler)
 
                 xc_pol_gradient[m, n] += polgrad_xcgrad
-
-        #        if n != m:
-        #            xc_pol_gradient[n, m] = xc_pol_gradient[m, n]
-
-        #xc_pol_gradient = self.comm.reduce(xc_pol_gradient, root=mpi_master())
 
         return xc_pol_gradient
 
@@ -1980,7 +1977,6 @@ class PolarizabilityGradient:
         self.ostream.print_blank()
         self.ostream.print_info(info_on_threshold)
         self.ostream.print_blank()
-        self.ostream.flush()
 
         for i in range(natm):
             atom_info = f'** Atom #{i + 1}: {labels[i]} **'
@@ -2029,7 +2025,8 @@ class PolarizabilityGradient:
             self.ostream.print_block(gradient_block)
             self.ostream.print_blank()
             self.ostream.print_blank()
-            self.ostream.flush()
+
+        self.ostream.flush()
 
     def print_geometry(self, molecule):
         """
@@ -2040,6 +2037,7 @@ class PolarizabilityGradient:
         """
 
         self.ostream.print_block(molecule.get_string())
+        self.ostream.flush()
 
     def _check_real_or_complex_input(self, lr_results):
         """
