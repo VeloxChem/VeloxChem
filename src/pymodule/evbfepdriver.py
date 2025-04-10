@@ -101,6 +101,7 @@ class EvbFepDriver():
         initial_equil_step_size,
         Lambda,
         configuration,
+        platform,
     ):
 
         assert_msg_critical('openmm' in sys.modules,
@@ -145,6 +146,7 @@ class EvbFepDriver():
         )
         timer.start()
         positions = initial_positions
+
         for i, l in enumerate(self.Lambda):
             if l > 0:
                 estimated_time_remaining = timer.calculate_remaining(i)
@@ -162,11 +164,19 @@ class EvbFepDriver():
             )
             equil_integrator.setIntegrationForceGroups(
                 EvbForceGroup.integration_force_groups())
-            equil_simulation = mmapp.Simulation(
-                topology,
-                system,
-                equil_integrator,
-            )
+            if platform is not None:
+                equil_simulation = mmapp.Simulation(
+                    topology,
+                    system,
+                    equil_integrator,
+                    mm.Platform.getPlatform(platform),
+                )
+            else:
+                equil_simulation = mmapp.Simulation(
+                    topology,
+                    system,
+                    equil_integrator,
+                )
             equil_simulation.context.setPositions(positions)
 
             if i == 0:
@@ -256,11 +266,20 @@ class EvbFepDriver():
                 self.ostream.print_info(info)
                 for i in range(system.getNumConstraints()):
                     system.removeConstraint(0)
-            run_simulation = mmapp.Simulation(
-                topology,
-                system,
-                run_integrator,
-            )
+
+            if platform is not None:
+                run_simulation = mmapp.Simulation(
+                    topology,
+                    system,
+                    run_integrator,
+                    mm.Platform.getPlatform(platform),
+                )
+            else:
+                run_simulation = mmapp.Simulation(
+                    topology,
+                    system,
+                    run_integrator,
+                )
 
             run_simulation.reporters.append(traj_roporter)
             sz = step_size * mmunit.picoseconds

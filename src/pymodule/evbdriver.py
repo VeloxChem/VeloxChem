@@ -159,7 +159,6 @@ class EvbDriver():
 
         self.ostream.flush()
 
-
     def build_ff_from_molecules(
         self,
         reactant: Molecule,
@@ -184,12 +183,13 @@ class EvbDriver():
         reactant_charge = reactant.get_charge()
         product_charge = [pro.get_charge() for pro in product]
         assert reactant_charge == sum(
-            product_charge
-        ), "Total charge of reactant and products must match"
+            product_charge), "Total charge of reactant and products must match"
 
         if reactant_partial_charges is not None:
             partial_sum = sum(reactant_partial_charges)
-            assert abs(partial_sum -reactant_charge) < 0.001, f"Sum of partial charges of reactant {partial_sum} must match the total foral charge of the system {reactant_charge}"
+            assert abs(
+                partial_sum - reactant_charge
+            ) < 0.001, f"Sum of partial charges of reactant {partial_sum} must match the total foral charge of the system {reactant_charge}"
 
         if product_partial_charges is not None:
             if isinstance(product_partial_charges[0], float) or isinstance(
@@ -203,7 +203,7 @@ class EvbDriver():
                     product_partial_charges
                 ), "Amount of products and lists of partial charges must match"
         else:
-            product_partial_charges = [None]*len(product)
+            product_partial_charges = [None] * len(product)
 
         rea_input = {
             "molecule": reactant,
@@ -218,7 +218,7 @@ class EvbDriver():
             "forcefield": None,
             "hessian": None,
             "charges": charge
-        } for pro, charge in zip(product,product_partial_charges)]
+        } for pro, charge in zip(product, product_partial_charges)]
 
         ffbuilder = EvbForceFieldBuilder()
         ffbuilder.reparameterize = reparameterize
@@ -254,7 +254,7 @@ class EvbDriver():
         if not isinstance(product, list):
             product = [product]
 
-        assert len(product)==1, "Only one product is currently supported"
+        assert len(product) == 1, "Only one product is currently supported"
 
         reactant_name = reactant
         product_names = product
@@ -315,7 +315,9 @@ class EvbDriver():
 
             #todo is this robust to prevent loading for example mapped geometries but not the forcefield?
             if combined_mapped_product_xyz_path.exists():
-                self.ostream.print_info(f"Loading mapped geometry from {combined_mapped_product_xyz_path}")
+                self.ostream.print_info(
+                    f"Loading mapped geometry from {combined_mapped_product_xyz_path}"
+                )
                 self.product.molecule = Molecule.read_xyz_file(
                     str(combined_mapped_product_xyz_path))
                 self.ostream.flush()
@@ -339,7 +341,6 @@ class EvbDriver():
                 ordered_input,
                 breaking_bonds,
             )
-        
 
         if isinstance(breaking_bonds, tuple):
             breaking_bonds = [breaking_bonds]
@@ -351,11 +352,12 @@ class EvbDriver():
             cwd = Path().cwd()
 
             combined_mapped_product_xyz_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
-            
-            self.ostream.print_info(f"Saving mapped geometry to {combined_mapped_product_xyz_path}")
-            self.product.molecule.write_xyz_file(str(combined_mapped_product_xyz_path))
-        self.ostream.flush()
 
+            self.ostream.print_info(
+                f"Saving mapped geometry to {combined_mapped_product_xyz_path}")
+            self.product.molecule.write_xyz_file(
+                str(combined_mapped_product_xyz_path))
+        self.ostream.flush()
 
     def _get_input_files(self, filename: str):
         # Build a molecule from a (possibly optimized) geometry
@@ -472,8 +474,6 @@ class EvbDriver():
         }
         with open(path, "w", encoding="utf-8") as file:
             json.dump(ff_data, file, indent=4)
-
-        
 
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:
@@ -821,6 +821,7 @@ class EvbDriver():
         equil_step_size=0.001,
         initial_equil_step_size=0.001,
         saved_frames_on_crash=None,
+        platform=None,
     ):
         """Run the the FEP calculations for all configurations in self.system_confs.
 
@@ -852,8 +853,6 @@ class EvbDriver():
             )
             sample_steps = 25000
 
-            
-
         for conf in self.system_confs:
             self.update_options_json(
                 {
@@ -883,6 +882,7 @@ class EvbDriver():
                 initial_equil_step_size=initial_equil_step_size,
                 Lambda=self.Lambda,
                 configuration=conf,
+                platform=platform,
             )
 
     def update_options_json(self, dict, conf):
