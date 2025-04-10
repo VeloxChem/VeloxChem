@@ -23,7 +23,6 @@ class MoleculeProcessor:
         self.non_iodine_files = []
         self.failed_deprot = []
         self.failed_mapping = []
-        self.h5_protonated_dir = 'test_molecules_results'
         self.h5_deprotonated_dir = 'h5_deprotonated_molecules'
         self.deprotonated_dir = 'deprotonated_molecules'
 
@@ -65,8 +64,6 @@ class MoleculeProcessor:
 
                 data_matrix = calc.run_all_calculations()
 
-                print('Yippie! calculations done')
-
                 df = pd.DataFrame(data_matrix, columns=[
                     'Atom idx', 'Atom numbers', 'min_EA', 'max_EA', 'mean_EA', 'median_EA', 'min_IE',
                     'max_IE', 'mean_IE', 'median_IE', 'localized_charge', 'resp_charge', 'max_esp_values',
@@ -78,8 +75,6 @@ class MoleculeProcessor:
                         f.create_dataset(key, data=value)
                     xyz_coords = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
                     f.create_dataset('xyz coordinates', data=xyz_coords)
-
-                    print('Yippie! h5 file created')
 
             except Exception as e:
                 logging.error(f"Error processing {filename}: {e}")
@@ -166,7 +161,7 @@ class MoleculeProcessor:
                         shutil.copy2(os.path.join(self.h5_protonated_dir, prot_h5_file), h5_path)
                         with h5py.File(h5_path, 'a') as f:
                             for key, value in reordered.items():
-                                f.create_dataset(f"deprotonated_{key}", data=value)
+                                f.create_dataset(key, data=value)
                             f.create_dataset("xyz coordinates deprot", data=xyz)
                         logging.info(f"Added deprotonated data to {h5_path}")
                 except Exception as e:
