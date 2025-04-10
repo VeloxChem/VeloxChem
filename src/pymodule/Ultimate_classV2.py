@@ -6,12 +6,13 @@ import logging
 import numpy as np
 import pandas as pd
 import veloxchem as vlx
+import sys
 
 from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream = sys.stdout)
 
 class MoleculeProcessor:
     def __init__(self, folder_paths, output_folder='Results4protonated_molecules', deprotonate=True):
