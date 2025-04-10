@@ -43,7 +43,7 @@ from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
-from .threepatransitiondriver import ThreepaTransitionDriver
+from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
 from .quadraticresponsedriver import QuadraticResponseDriver
@@ -143,7 +143,7 @@ class ResponseProperty:
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['onlystatic'] == 'no' and
               self._rsp_dict['is_complex'] == 'yes'):
-            
+
             if self.tamm_dancoff:
                 self._rsp_driver = ComplexResponseTDA(self.comm, self.ostream)
             else:
@@ -213,7 +213,7 @@ class ResponseProperty:
         elif (self._rsp_dict['order'] == 'quadratic' and
               self._rsp_dict['residue'] == 'single' and
               self._rsp_dict['is_complex'] == 'yes'):
-            
+
             self._rsp_driver = TpaTransitionDriver(self.comm, self.ostream)
 
         # Cubic response driver
@@ -242,10 +242,10 @@ class ResponseProperty:
             })
 
         # 3PA (cubic response) driver
-        elif (self._rsp_dict['order'] == 'cubic' and self._rsp_dict['residue'] == 'single'):
-            
-            self._rsp_driver = ThreepaTransitionDriver(self.comm, self.ostream)
+        elif (self._rsp_dict['order'] == 'cubic' and
+              self._rsp_dict['residue'] == 'single'):
 
+            self._rsp_driver = ThreePATransitionDriver(self.comm, self.ostream)
 
         # Update driver settings
         self._rsp_driver.update_settings(self._rsp_dict, self._method_dict)
