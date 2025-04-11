@@ -105,13 +105,11 @@ class FirstOrderProperties:
             The total electron density.
         """
 
-        if molecule.get_charge() != 0:
-            coords = molecule.get_coordinates_in_bohr()
-            nuclear_charges = molecule.get_element_ids()
-            origin = np.sum(coords.T * nuclear_charges,
-                            axis=1) / np.sum(nuclear_charges)
-        else:
-            origin = np.zeros(3)
+        # choose center of nuclear charges as origin
+        coords = molecule.get_coordinates_in_bohr()
+        nuclear_charges = molecule.get_element_ids()
+        origin = np.sum(coords.T * nuclear_charges,
+                        axis=1) / np.sum(nuclear_charges)
 
         dipole_moment = None
         if self.rank == mpi_master():

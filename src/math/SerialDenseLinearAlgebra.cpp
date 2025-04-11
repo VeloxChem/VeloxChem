@@ -115,6 +115,44 @@ serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDens
 }
 
 auto
+serialMultAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
+{
+    // set up dimensions of matrix A
+
+    auto narow = matrixA.getNumberOfRows();
+    auto nacol = matrixA.getNumberOfColumns();
+
+    // set up dimensions of matrix B
+
+    auto nbrow = matrixB.getNumberOfRows();
+    auto nbcol = matrixB.getNumberOfColumns();
+
+    errors::assertMsgCritical(narow == nbrow, "sdenblas::serialMultAtB: Inconsistent sizes in matrix multiplication");
+
+    // allocate dense matrix
+
+    CDenseMatrix mat(nacol, nbcol);
+
+    if ((narow == 0) || (nbcol == 0)) return mat;
+
+    // compute matrix-matrix multiplication
+
+    auto A = matrixA.values();
+    auto B = matrixB.values();
+
+    mat.zero();
+    auto C = mat.values();
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematA(A, narow, nacol);
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematB(B, nbrow, nbcol);
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Unaligned> ematC(C, nacol, nbcol);
+
+    ematC.noalias() = ematA.transpose() * ematB;
+
+    return mat;
+}
+
+auto
 serialAddAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix
 {
     auto narow = matrixA.getNumberOfRows();
