@@ -1775,7 +1775,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             A dictionary containing the results of the response calculation.
         """
 
-        width = 94
+        width = 82
         freqs = rsp_results['photon_energies']
         T_tensors = rsp_results['transition_moments']
 
@@ -1784,19 +1784,15 @@ class ThreePATransitionDriver(NonlinearSolver):
         # Extract unique frequency values directly from stored tensor keys
         unique_freqs = sorted(set(w for _, w in T_tensors.keys()), reverse=True)
 
-        ij_pairs = [f'{x}{y}'
-                    for i, x in enumerate('xyz')
-                    for j, y in enumerate('xyz')
-                    if j >= i]
+        xyz_triples = [f'{x}{y}{z}'
+                       for i, x in enumerate('xyz')
+                       for j, y in enumerate('xyz')
+                       for k, z in enumerate('xyz')
+                       if (i <= j and j <= k)]
 
-        # Define table groups
-        table_groups = {
-            'Tx..': [f"x{i}{j}" for i, j in ij_pairs],
-            'Ty..': [f"y{i}{j}" for i, j in ij_pairs],
-            'Tz..': [f"z{i}{j}" for i, j in ij_pairs],
-        }
+        tensor_labels_groups = [xyz_triples[:5], xyz_triples[5:]]
 
-        for table_title, tensor_labels in table_groups.items():
+        for tensor_labels in tensor_labels_groups:
             self.ostream.print_blank()
 
             # Create header with proper spacing
@@ -1821,10 +1817,10 @@ class ThreePATransitionDriver(NonlinearSolver):
 
                 self.ostream.print_header(' '.join(row_values))  # Print row data
 
-            self.ostream.print_blank()
-
         tpa_strengths = rsp_results['3pa_strengths']
         tpa_cross_sections = rsp_results['cross_sections']
+
+        self.ostream.print_blank()
 
         title = '3PA Strength and Cross-Section (Linear Polarization)'
         self.ostream.print_header(title)
