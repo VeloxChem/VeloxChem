@@ -281,6 +281,7 @@ class RixsDriver:
                             break
 
                 mask = (np.abs(rsp_tensors['eigenvalues'] - self.photon_energy) < fulldiag_thresh)
+                """
                 try_core_states = np.where(mask)[0]
 
                 core_states = []
@@ -289,8 +290,10 @@ class RixsDriver:
                     label = entry[0]
                     if label.startswith("core"):
                         core_states.append(state)
-                        
+
                 core_states = np.squeeze(core_states)
+                """
+                core_states = np.where(mask)[0]
                 num_intermediate_states = len(core_states)
                 val_states  = np.where(~mask)[0]
                 num_final_states = len(val_states)
