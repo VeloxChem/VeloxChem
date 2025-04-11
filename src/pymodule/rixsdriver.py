@@ -283,20 +283,14 @@ class RixsDriver:
                 mask = (np.abs(rsp_tensors['eigenvalues'] - self.photon_energy) < fulldiag_thresh)
                 try_core_states = np.where(mask)[0]
 
-                core_states, parsed = [], []
-                # if the one-particle excitations come in order of contributions
-                # the below can be simplified
+                core_states = []
                 for state in try_core_states:
-                    for entry in rsp_tensors['excitation_details'][state]:
-                        parts = entry.split()
-                        label = parts[0]
-                        value = float(parts[-1])
-                        parsed.append((label, value))
-                    label_max, _ = max(parsed, key=lambda x: x[1])
-                    if label_max.startswith("core"):
+                    entry = rsp_tensors['excitation_details'][state][0].split()
+                    label = entry[0]
+                    if label.startswith("core"):
                         core_states.append(state)
+                        
                 core_states = np.squeeze(core_states)
-
                 num_intermediate_states = len(core_states)
                 val_states  = np.where(~mask)[0]
                 num_final_states = len(val_states)
