@@ -1929,3 +1929,4 @@ class TpaFullDriver(TpaDriver):
         self._print_spectrum(spectrum, width)
 
         self.ostream.print_blank()
+        self.ostream.flush()

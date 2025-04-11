@@ -1015,3 +1015,4 @@ class TpaDriver(NonlinearSolver):
             self.ostream.print_header(output.ljust(width))
 
         self.ostream.print_blank()
+        self.ostream.flush()
