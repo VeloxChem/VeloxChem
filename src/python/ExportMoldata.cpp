@@ -30,12 +30,12 @@
 
 #include <algorithm>
 
+#include "AtomicPartialChargesModel.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
-#include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 
 namespace vlx_moldata {  // vlx_moldata namespace
@@ -113,7 +113,7 @@ export_moldata(py::module& m)
             "Gets nuclear charges for molecule.")
         .def(
             "get_partial_charges",
-            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
+            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return atmparchg::getPartialCharges(self, net_charge); },
             "Gets partial charges for molecule.")
         .def("get_masses", &CMolecule::getMasses, "Gets a vector of atomic masses in molecule.")
         .def("get_labels", &CMolecule::getLabels, "Gets a vector of atomic labels in molecule.")

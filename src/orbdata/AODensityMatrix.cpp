@@ -24,7 +24,6 @@
 
 #include "AODensityMatrix.hpp"
 
-#include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 

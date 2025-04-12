@@ -33,7 +33,6 @@
 #include <string>
 #include <vector>
 
-#include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GpuConstants.hpp"

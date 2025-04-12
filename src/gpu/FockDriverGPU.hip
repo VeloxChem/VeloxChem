@@ -42,7 +42,6 @@
 
 #include "ScreeningData.hpp"
 #include "BoysFuncTable.hpp"
-#include "DenseLinearAlgebra.hpp"
 #include "FockDriverGPU.hpp"
 #include "ElectricDipoleIntegrals.hpp"
 #include "LinearMomentumIntegrals.hpp"
