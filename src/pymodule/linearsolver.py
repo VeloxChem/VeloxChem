@@ -39,7 +39,7 @@ import sys
 import os
 
 # TODO import VisualizationDriver
-from .veloxchemlib import GridDriver, MolecularGrid
+from .veloxchemlib import MolecularGrid
 from .veloxchemlib import AODensityMatrix, denmat
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import compute_fock_gpu
@@ -48,6 +48,7 @@ from .veloxchemlib import compute_linear_momentum_integrals_gpu
 from .veloxchemlib import compute_angular_momentum_integrals_gpu
 from .veloxchemlib import integrate_fxc_fock_gpu
 from .veloxchemlib import mpi_master, hartree_in_ev, rotatory_strength_in_cgs
+from .griddriver import GridDriver
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -1067,7 +1068,8 @@ class LinearSolver:
         if self._dft:
             t0 = tm.time()
 
-            molgrid.re_distribute_counts_and_displacements(local_comm)
+            molgrid.re_distribute_counts_and_displacements(
+                local_comm.Get_rank(), local_comm.Get_size())
 
             # TODO: enable meta-GGA
             # Note: skipping Fxc for antisymmetric density matrix

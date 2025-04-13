@@ -40,7 +40,6 @@ import sys
 import os
 
 from .veloxchemlib import AODensityMatrix, denmat
-from .veloxchemlib import GridDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import mpi_master, bohr_in_angstrom
@@ -51,6 +50,7 @@ from .veloxchemlib import (compute_fock_gpu, matmul_gpu, eigh_gpu,
                            compute_nuclear_potential_integrals_gpu,
                            compute_point_charges_integrals_gpu)
 from .profiler import Profiler
+from .griddriver import GridDriver
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
 from .sadguessdriver import SadGuessDriver

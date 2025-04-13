@@ -53,16 +53,6 @@ using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
 
-// constructors for CGridDriver
-
-static auto
-CGridDriver_create(py::object py_comm) -> std::shared_ptr<CGridDriver>
-{
-    if (py_comm.is_none()) return std::make_shared<CGridDriver>(MPI_COMM_WORLD);
-
-    return std::make_shared<CGridDriver>(*vlx_general::get_mpi_comm(py_comm));
-}
-
 // Exports classes/functions in src/dft to python
 
 void
@@ -104,8 +94,12 @@ export_dft(py::module& m)
 
     PyClass<CMolecularGrid>(m, "MolecularGrid")
         .def(py::init<>())
+        .def(py::init<const int64_t>())
         .def(py::init<const CDenseMatrix&>())
+        .def(py::init<const CDenseMatrix&, const int64_t>())
         .def(py::init<const CMolecularGrid&>())
+        .def("partition_grid_points", &CMolecularGrid::partitionGridPoints)
+        .def("distribute_counts_and_displacements", &CMolecularGrid::distributeCountsAndDisplacements)
         .def("number_of_points", &CMolecularGrid::getNumberOfGridPoints)
         .def(
             "x_to_numpy",
@@ -132,20 +126,34 @@ export_dft(py::module& m)
             },
             "Gets weights of grid as numpy array.")
         .def(
+            "grid_to_numpy",
+            [](const CMolecularGrid& self) -> py::array_t<double> {
+                auto points = self.getGridPoints();
+                return vlx_general::pointer_to_numpy(points.values(), {4, self.getNumberOfGridPoints()});
+            },
+            "Gets grid points as numpy array of shape (4,N).")
+        .def(
             "re_distribute_counts_and_displacements",
-            [](CMolecularGrid& self, py::object py_comm) -> void {
-                auto comm = vlx_general::get_mpi_comm(py_comm);
-                self.reDistributeCountsAndDisplacements(*comm);
+            [](CMolecularGrid& self, const int64_t rank, const int64_t nnodes) -> void {
+                self.reDistributeCountsAndDisplacements(rank, nnodes);
             },
             "Redo distributing MolecularGrid counts and displacements.",
-            "py_comm"_a)
+            "rank"_a,
+            "nnodes"_a)
         .def(py::self == py::self);
 
     // CGridDriver class
+    // Note: GridDriver is prefixed by an underscore and will be used in griddriver.py
 
-    PyClass<CGridDriver>(m, "GridDriver")
-        .def(py::init(&CGridDriver_create), "comm"_a = py::none())
-        .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a, "num_gpus_per_node"_a)
+    PyClass<CGridDriver>(m, "_GridDriver")
+        .def(py::init<>())
+        .def("_generate_local_grid",
+             &CGridDriver::generate_local_grid,
+             "Generates MPI-local molecular grid for molecule.",
+             "molecule"_a,
+             "rank"_a,
+             "nnodes"_a,
+             "num_gpus_per_node"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
 
     // XCComponent class

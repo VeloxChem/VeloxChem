@@ -33,8 +33,6 @@
 #ifndef GridDriver_hpp
 #define GridDriver_hpp
 
-#include <mpi.h>
-
 #include <cstdint>
 
 #include "MolecularGrid.hpp"
@@ -44,8 +42,6 @@
 /**
  Class CGridDriver generates grid points data for usage in numerical
  integration.
-
- @author Z. Rinkevicius
  */
 class CGridDriver
 {
@@ -58,11 +54,6 @@ class CGridDriver
      The threshold of weights screening.
      */
     double _thresholdOfWeight;
-
-    /**
-     The MPI communicator.
-     */
-    MPI_Comm _locComm;
 
     /**
      Determines number of radial grid points for specific chemical element.
@@ -79,32 +70,6 @@ class CGridDriver
      @return the number of angular points.
      */
     auto _getNumberOfAngularPoints(const int64_t idElemental) const -> int64_t;
-
-    /**
-     Prints start header with grid generation settings to output stream.
-
-     @param molecule the molecule.
-     @return the output string.
-     */
-    auto _startHeader(const CMolecule& molecule) const -> std::string;
-
-    /**
-     Prints finish header with grid generation settings to output stream.
-
-     @param molecularGrid the molecular grid object.
-     @return the output string.
-     */
-    auto _finishHeader(const CMolecularGrid& molecularGrid) const -> std::string;
-
-    /**
-     Creates molecular grid on master node by generating fraction of grid
-     points on each MPI process within domain of MPI communicator. Grid points
-     are generated using only CPUs.
-
-     @param molecule the molecule.
-     @return the molecular grid object.
-     */
-    auto _genGridPoints(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid;
 
     /**
      Gets size of grid points batch.
@@ -147,10 +112,8 @@ class CGridDriver
    public:
     /**
      Creates a grid driver object.
-
-     @param comm the MPI communicator.
      */
-    CGridDriver(MPI_Comm comm);
+    CGridDriver();
 
     /**
      Sets accuracy level for grid generation. Level: 1-8, where 1 is coarse
@@ -161,13 +124,17 @@ class CGridDriver
     auto setLevel(const int64_t gridLevel) -> void;
 
     /**
-     Generates molecular grid for molecule. Errors are printed to output stream.
-     Grid generation is distributed within domain of MPI communicator.
+     Generates molecular grid for molecule.
 
      @param molecule the molecule.
+     @param rank the MPI rank.
+     @param nnodes the number of MPI processes.
      @return the molecular grid object.
      */
-    auto generate(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid;
+    auto generate_local_grid(const CMolecule& molecule,
+                             const int64_t    rank,
+                             const int64_t    nnodes,
+                             const int64_t    numGpusPerNode) const -> CMolecularGrid;
 };
 
 #endif /* GridDriver_hpp */

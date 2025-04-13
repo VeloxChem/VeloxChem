@@ -33,8 +33,6 @@
 #ifndef MolecularGrid_hpp
 #define MolecularGrid_hpp
 
-#include <mpi.h>
-
 #include <array>
 #include <cstdint>
 #include <string>
@@ -44,11 +42,10 @@
 
 /**
  Class CMolecularGrid class generates molecular grid.
-
- @author Z. Rinkevicius
  */
 class CMolecularGrid
 {
+   private:
     /**
      The distribution status of molecular grid object.
      */
@@ -67,22 +64,16 @@ class CMolecularGrid
     /**
      The number of grid points in the partitioned grid boxes.
      */
+    std::vector<int64_t> _gridPointCounts;
+
     std::vector<int64_t> _gridPointCountsOriginal;
 
     /**
      The displacement of grid points in the partitioned grid boxes.
      */
-    std::vector<int64_t> _gridPointDisplacementsOriginal;
-
-    /**
-     The number of grid points in the partitioned grid boxes.
-     */
-    std::vector<int64_t> _gridPointCounts;
-
-    /**
-     The displacement of grid points in the partitioned grid boxes.
-     */
     std::vector<int64_t> _gridPointDisplacements;
+
+    std::vector<int64_t> _gridPointDisplacementsOriginal;
 
     /**
      The maximum number of grid points in a grid box.
@@ -96,11 +87,26 @@ class CMolecularGrid
     CMolecularGrid();
 
     /**
+     Creates an empty molecular grid object.
+
+     @param maxNumberOfGridPointsPerBox the maximum number of grid points per box.
+     */
+    CMolecularGrid(const int64_t maxNumberOfGridPointsPerBox);
+
+    /**
      Creates a molecular grid object.
 
      @param gridPoints the 2D memory block object with grid points data.
      */
     CMolecularGrid(const CDenseMatrix& gridPoints);
+
+    /**
+     Creates a molecular grid object.
+
+     @param gridPoints the 2D memory block object with grid points data.
+     @param maxNumberOfGridPointsPerBox the maximum number of grid points per box.
+     */
+    CMolecularGrid(const CDenseMatrix& gridPoints, const int64_t maxNumberOfGridPointsPerBox);
 
     /**
      Creates a molecular grid object by copying other molecular grid object.
@@ -218,17 +224,19 @@ class CMolecularGrid
      Distributes grid point counts and displacements within domain of MPI
      communacator and sets distribution flag to true.
 
-     @param comm the MPI communicator.
+     @param rank the MPI rank.
+     @param nnodes the number of MPI processes.
      */
-    auto distributeCountsAndDisplacements(MPI_Comm comm) -> void;
+    auto distributeCountsAndDisplacements(const int64_t rank, const int64_t nnodes) -> void;
 
     /**
      Redo distributing grid point counts and displacements within domain of MPI
      communacator and sets distribution flag to true.
 
-     @param comm the MPI communicator.
+     @param rank the MPI rank.
+     @param nnodes the number of MPI processes.
      */
-    auto reDistributeCountsAndDisplacements(MPI_Comm comm) -> void;
+    auto reDistributeCountsAndDisplacements(const int64_t rank, const int64_t nnodes) -> void;
 
     /**
      Checks whether the molecular grid has been partitioned.

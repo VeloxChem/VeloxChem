@@ -41,7 +41,6 @@
 
 #include "ErrorHandler.hpp"
 #include "GridPartitioner.hpp"
-#include "MpiFunc.hpp"
 
 CMolecularGrid::CMolecularGrid()
 
@@ -50,6 +49,16 @@ CMolecularGrid::CMolecularGrid()
     , _isPartitioned(false)
 
     , _maxNumberOfGridPointsPerBox(2048)
+{
+}
+
+CMolecularGrid::CMolecularGrid(const int64_t maxNumberOfGridPointsPerBox)
+
+    : _isDistributed(false)
+
+    , _isPartitioned(false)
+
+    , _maxNumberOfGridPointsPerBox(maxNumberOfGridPointsPerBox)
 {
 }
 
@@ -65,6 +74,18 @@ CMolecularGrid::CMolecularGrid(const CDenseMatrix& gridPoints)
 {
 }
 
+CMolecularGrid::CMolecularGrid(const CDenseMatrix& gridPoints, const int64_t maxNumberOfGridPointsPerBox)
+
+    : _isDistributed(false)
+
+    , _gridPoints(gridPoints)
+
+    , _isPartitioned(false)
+
+    , _maxNumberOfGridPointsPerBox(maxNumberOfGridPointsPerBox)
+{
+}
+
 CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
 
     : _isDistributed(source._isDistributed)
@@ -73,13 +94,13 @@ CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
 
     , _isPartitioned(source._isPartitioned)
 
-    , _gridPointCountsOriginal(source._gridPointCountsOriginal)
-
-    , _gridPointDisplacementsOriginal(source._gridPointDisplacementsOriginal)
-
     , _gridPointCounts(source._gridPointCounts)
 
+    , _gridPointCountsOriginal(source._gridPointCountsOriginal)
+
     , _gridPointDisplacements(source._gridPointDisplacements)
+
+    , _gridPointDisplacementsOriginal(source._gridPointDisplacementsOriginal)
 
     , _maxNumberOfGridPointsPerBox(source._maxNumberOfGridPointsPerBox)
 {
@@ -93,13 +114,13 @@ CMolecularGrid::CMolecularGrid(CMolecularGrid&& source) noexcept
 
     , _isPartitioned(std::move(source._isPartitioned))
 
-    , _gridPointCountsOriginal(std::move(source._gridPointCountsOriginal))
-
-    , _gridPointDisplacementsOriginal(std::move(source._gridPointDisplacementsOriginal))
-
     , _gridPointCounts(std::move(source._gridPointCounts))
 
+    , _gridPointCountsOriginal(std::move(source._gridPointCountsOriginal))
+
     , _gridPointDisplacements(std::move(source._gridPointDisplacements))
+
+    , _gridPointDisplacementsOriginal(std::move(source._gridPointDisplacementsOriginal))
 
     , _maxNumberOfGridPointsPerBox(std::move(source._maxNumberOfGridPointsPerBox))
 {
@@ -120,13 +141,13 @@ CMolecularGrid::operator=(const CMolecularGrid& source) -> CMolecularGrid&
 
     _isPartitioned = source._isPartitioned;
 
-    _gridPointCountsOriginal = source._gridPointCountsOriginal;
-
-    _gridPointDisplacementsOriginal = source._gridPointDisplacementsOriginal;
-
     _gridPointCounts = source._gridPointCounts;
 
+    _gridPointCountsOriginal = source._gridPointCountsOriginal;
+
     _gridPointDisplacements = source._gridPointDisplacements;
+
+    _gridPointDisplacementsOriginal = source._gridPointDisplacementsOriginal;
 
     _maxNumberOfGridPointsPerBox = source._maxNumberOfGridPointsPerBox;
 
@@ -144,13 +165,13 @@ CMolecularGrid::operator=(CMolecularGrid&& source) noexcept -> CMolecularGrid&
 
     _isPartitioned = std::move(source._isPartitioned);
 
-    _gridPointCountsOriginal = std::move(source._gridPointCountsOriginal);
-
-    _gridPointDisplacementsOriginal = std::move(source._gridPointDisplacementsOriginal);
-
     _gridPointCounts = std::move(source._gridPointCounts);
 
+    _gridPointCountsOriginal = std::move(source._gridPointCountsOriginal);
+
     _gridPointDisplacements = std::move(source._gridPointDisplacements);
+
+    _gridPointDisplacementsOriginal = std::move(source._gridPointDisplacementsOriginal);
 
     _maxNumberOfGridPointsPerBox = std::move(source._maxNumberOfGridPointsPerBox);
 
@@ -166,13 +187,13 @@ CMolecularGrid::operator==(const CMolecularGrid& other) const -> bool
 
     if (_isPartitioned != other._isPartitioned) return false;
 
-    if (_gridPointCountsOriginal != other._gridPointCountsOriginal) return false;
-
-    if (_gridPointDisplacementsOriginal != other._gridPointDisplacementsOriginal) return false;
-
     if (_gridPointCounts != other._gridPointCounts) return false;
 
+    if (_gridPointCountsOriginal != other._gridPointCountsOriginal) return false;
+
     if (_gridPointDisplacements != other._gridPointDisplacements) return false;
+
+    if (_gridPointDisplacementsOriginal != other._gridPointDisplacementsOriginal) return false;
 
     if (_maxNumberOfGridPointsPerBox != other._maxNumberOfGridPointsPerBox) return false;
 
@@ -312,13 +333,13 @@ CMolecularGrid::partitionGridPoints() -> std::string
 
         _gridPoints = partitioner.getAllGridPoints();
 
-        _gridPointCountsOriginal = partitioner.getGridPointCounts();
-
-        _gridPointDisplacementsOriginal = partitioner.getGridPointDisplacements();
-
         _gridPointCounts = partitioner.getGridPointCounts();
 
+        _gridPointCountsOriginal = partitioner.getGridPointCounts();
+
         _gridPointDisplacements = partitioner.getGridPointDisplacements();
+
+        _gridPointDisplacementsOriginal = partitioner.getGridPointDisplacements();
 
         return partitioner.getGridStatistics();
     }
@@ -327,7 +348,7 @@ CMolecularGrid::partitionGridPoints() -> std::string
 }
 
 auto
-CMolecularGrid::distributeCountsAndDisplacements(MPI_Comm comm) -> void
+CMolecularGrid::distributeCountsAndDisplacements(const int64_t rank, const int64_t nnodes) -> void
 {
     std::string errnotpartitioned("MolecularGrid.distributeCountsAndDisplacements: Cannot distribute unpartitioned molecular grid");
 
@@ -352,56 +373,57 @@ CMolecularGrid::distributeCountsAndDisplacements(MPI_Comm comm) -> void
 
         std::sort(count_index_pairs.begin(), count_index_pairs.end());
 
-        // re-arrange sorted indices for parallelization
+        // update original counts and displacements
 
-        std::vector<int64_t> newcounts;
+        std::vector<int64_t> orig_counts, orig_displs;
 
-        std::vector<int64_t> newdispls;
-
-        auto nodes = mpi::nodes(comm);
-
-        for (int64_t p = 0; p < nodes; p++)
+        for (int64_t box_id = 0; box_id < numboxes; box_id++)
         {
-            for (int64_t box_id = numboxes - 1 - p; box_id >= 0; box_id -= nodes)
-            {
-                auto index = count_index_pairs[box_id].second;
+            auto index = count_index_pairs[box_id].second;
 
-                newcounts.push_back(_gridPointCountsOriginal[index]);
-
-                newdispls.push_back(_gridPointDisplacementsOriginal[index]);
-            }
+            orig_counts.push_back(_gridPointCountsOriginal[index]);
+            orig_displs.push_back(_gridPointDisplacementsOriginal[index]);
         }
 
-        _gridPointCountsOriginal = newcounts;
+        _gridPointCountsOriginal = orig_counts;
+        _gridPointDisplacementsOriginal = orig_displs;
 
-        _gridPointDisplacementsOriginal = newdispls;
+        // update counts and displacements
 
-        // distribute counts and displacements
+        std::vector<int64_t> counts_p, displs_p;
 
-        _gridPointCounts = mpi::scatterStdVector(_gridPointCountsOriginal, comm);
+        for (int64_t box_id = numboxes - 1 - rank; box_id >= 0; box_id -= nnodes)
+        {
+            counts_p.push_back(_gridPointCountsOriginal[box_id]);
+            displs_p.push_back(_gridPointDisplacementsOriginal[box_id]);
+        }
 
-        _gridPointDisplacements = mpi::scatterStdVector(_gridPointDisplacementsOriginal, comm);
-
-        // broadcast all grid points, since counts and displacements are already distributed
-
-        _gridPoints = mpi::bcastDenseMatrix(_gridPoints, comm);
-
-        _gridPointCountsOriginal = mpi::bcastStdVectorInt(_gridPointCountsOriginal, comm);
-
-        _gridPointDisplacementsOriginal = mpi::bcastStdVectorInt(_gridPointDisplacementsOriginal, comm);
+        _gridPointCounts = counts_p;
+        _gridPointDisplacements = displs_p;
     }
 }
 
 auto
-CMolecularGrid::reDistributeCountsAndDisplacements(MPI_Comm comm) -> void
+CMolecularGrid::reDistributeCountsAndDisplacements(const int64_t rank, const int64_t nnodes) -> void
 {
     std::string errpartitioned("MolecularGrid.reDistributeCountsAndDisplacements: Molecular grid must be parttioned and distributed");
 
     errors::assertMsgCritical((_isPartitioned && _isDistributed), errpartitioned);
 
-    _gridPointCounts = mpi::scatterStdVector(_gridPointCountsOriginal, comm);
+    // recalculate counts and displacements
 
-    _gridPointDisplacements = mpi::scatterStdVector(_gridPointDisplacementsOriginal, comm);
+    auto numboxes = static_cast<int64_t>(_gridPointCountsOriginal.size());
+
+    std::vector<int64_t> counts_p, displs_p;
+
+    for (int64_t box_id = numboxes - 1 - rank; box_id >= 0; box_id -= nnodes)
+    {
+        counts_p.push_back(_gridPointCountsOriginal[box_id]);
+        displs_p.push_back(_gridPointDisplacementsOriginal[box_id]);
+    }
+
+    _gridPointCounts = counts_p;
+    _gridPointDisplacements = displs_p;
 }
 
 auto

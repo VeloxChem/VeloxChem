@@ -34,53 +34,30 @@
 
 #include <array>
 #include <cmath>
-#include <iostream>
 #include <sstream>
 
 #include "ChemicalElement.hpp"
-#include "GridPartitionFuncGPU.hpp"
 #include "LebedevLaikovQuadrature.hpp"
 #include "M4T2Quadrature.hpp"
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
-#include "MpiFunc.hpp"
+#include "GridPartitionFuncGPU.hpp"
 #include "StringFormat.hpp"
-#include "Timer.hpp"
 
-CGridDriver::CGridDriver(MPI_Comm comm)
+CGridDriver::CGridDriver()
 
     : _gridLevel(5)
 
     , _thresholdOfWeight(1.0e-15)
 {
-    _locComm = comm;
 }
 
 auto
 CGridDriver::setLevel(const int64_t gridLevel) -> void
 {
-    if (mpi::rank(_locComm) == mpi::master())
-    {
-        if ((gridLevel > 0) && (gridLevel < 9)) _gridLevel = gridLevel;
-    }
-
-    _gridLevel = mpi::bcastScalar(_gridLevel, _locComm);
-}
-
-auto
-CGridDriver::generate(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid
-{
-    CMolecularGrid molgrid;
-
-    molgrid = _genGridPoints(molecule, numGpusPerNode);
-
-    molgrid.partitionGridPoints();
-
-    molgrid.distributeCountsAndDisplacements(_locComm);
-
-    return molgrid;
+    if ((gridLevel > 0) && (gridLevel < 9)) _gridLevel = gridLevel;
 }
 
 auto
@@ -172,99 +149,11 @@ CGridDriver::_getNumberOfAngularPoints(const int64_t idElemental) const -> int64
 }
 
 auto
-CGridDriver::_startHeader(const CMolecule& molecule) const -> std::string
+CGridDriver::generate_local_grid(const CMolecule& molecule,
+                                 const int64_t    rank,
+                                 const int64_t    nnodes,
+                                 const int64_t    numGpusPerNode) const -> CMolecularGrid
 {
-    std::stringstream ss;
-
-    ss << "Numerical Grid For DFT Integration" << "\n";
-
-    ss << std::string(36, '=') << "\n\n";
-
-    std::string str("Grid Level          : ");
-
-    str.append(std::to_string(_gridLevel));
-
-    ss << fstr::format(str, 54, fmt_t::left) << "\n";
-
-    str.assign("Radial Quadrature   : M4T2");
-
-    ss << fstr::format(str, 54, fmt_t::left) << "\n";
-
-    str.assign("Angular Quadrature  : Lebedev-Laikov");
-
-    ss << fstr::format(str, 54, fmt_t::left) << "\n";
-
-    str.assign("Partitioning Scheme : SSF");
-
-    ss << fstr::format(str, 54, fmt_t::left) << "\n\n";
-
-    ss << "  Atom ";
-
-    ss << fstr::format(std::string("Angular Points"), 15, fmt_t::center);
-
-    ss << fstr::format(std::string("Radial Points"), 15, fmt_t::center);
-
-    ss << "\n\n";
-
-    auto molcomp = molecule.getElementalComposition();
-
-    int64_t npoints = 0;
-
-    for (auto i = molcomp.cbegin(); i != molcomp.cend(); ++i)
-    {
-        std::string label("  ");
-
-        CChemicalElement elem;
-
-        elem.setAtomType(*i);
-
-        label.append(elem.getName());
-
-        ss << fstr::format(label, 6, fmt_t::left);
-
-        auto apoints = _getNumberOfAngularPoints(*i);
-
-        auto rpoints = _getNumberOfRadialPoints(*i);
-
-        ss << fstr::format(std::to_string(apoints), 15, fmt_t::center);
-
-        ss << fstr::format(std::to_string(rpoints), 15, fmt_t::center);
-
-        ss << "\n";
-
-        npoints += apoints * rpoints * molecule.getNumberOfAtoms(*i);
-    }
-
-    ss << "\n";
-
-    str.assign("Full Grid       : ");
-
-    str.append(std::to_string(npoints));
-
-    ss << fstr::format(str, 54, fmt_t::left) << "\n";
-
-    return ss.str();
-}
-
-auto
-CGridDriver::_finishHeader(const CMolecularGrid& molecularGrid) const -> std::string
-{
-    std::stringstream ss;
-
-    std::string str("Pruned Grid     : ");
-
-    str.append(std::to_string(molecularGrid.getNumberOfGridPoints()));
-
-    ss << fstr::format(str, 54, fmt_t::left) << "\n";
-
-    return ss.str();
-}
-
-auto
-CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerNode) const -> CMolecularGrid
-{
-    // CTimer timer;
-
     // molecular data
 
     auto natoms = molecule.getNumberOfAtoms();
@@ -281,15 +170,11 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     auto molrm = mdist.data();
 
-    // determine dimensions of atoms batch for each MPI process
+    // determine dimensions of atoms batch for this MPI process
 
-    auto rank = mpi::rank(_locComm);
+    auto nodatm = mathfunc::batch_size(natoms, rank, nnodes);
 
-    auto nodes = mpi::nodes(_locComm);
-
-    auto nodatm = mathfunc::batch_size(natoms, rank, nodes);
-
-    auto nodoff = mathfunc::batch_offset(natoms, rank, nodes);
+    auto nodoff = mathfunc::batch_offset(natoms, rank, nnodes);
 
     // allocate raw grid
 
@@ -312,10 +197,6 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     std::vector<uint32_t> atom_ids_of_points(bpoints);
     std::vector<double>   atom_min_distances(bpoints);
-
-    // if (rank == mpi::master()) std::cout << "* Info * Generating grid points for atoms ..." << std::endl;
-    // timer.reset();
-    // timer.start();
 
     for (int64_t i = 0; i < nodatm; i++)
     {
@@ -340,18 +221,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
         std::fill(atom_min_distances.data() + gridoff, atom_min_distances.data() + gridoff + nrpoints * napoints, minrad);
     }
 
-    // timer.stop();
-    // if (rank == mpi::master()) std::cout << "    Grid points generated in     " << timer.getElapsedTime() << std::endl;
-    // timer.reset();
-    // timer.start();
-
     gpu::applyGridPartitionFunc(rawgrid, atom_ids_of_points, atom_min_distances, bpoints, molcoords, natoms, numGpusPerNode);
-
-    // timer.stop();
-    // if (rank == mpi::master()) std::cout << "    Grid weights determined in   " << timer.getElapsedTime() << std::endl;
-    // if (rank == mpi::master()) std::cout << "* Info * Screening grid points ";
-    // timer.reset();
-    // timer.start();
 
     // screen raw grid points & create prunned grid
 
@@ -361,18 +231,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule, const int64_t numGpusPerN
 
     delete rawgrid;
 
-    // timer.stop();
-    // if (rank == mpi::master()) std::cout << "       " << timer.getElapsedTime() << std::endl;
-    // if (rank == mpi::master()) std::cout << "* Info * Communicating grid points ";
-    // timer.reset();
-    // timer.start();
-
-    auto gathered_prngrid = mpi::gatherDenseMatricesByColumns(prngrid, _locComm);
-
-    // timer.stop();
-    // if (rank == mpi::master()) std::cout << "   " << timer.getElapsedTime() << std::endl;
-
-    return CMolecularGrid(gathered_prngrid);
+    return CMolecularGrid(prngrid);
 }
 
 auto
