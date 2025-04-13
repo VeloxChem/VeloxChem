@@ -690,13 +690,15 @@ class TdaEigenSolver(LinearSolver):
         """
 
         mx, my, mz = compute_electric_dipole_integrals_gpu(
-            molecule, basis, [0.0, 0.0, 0.0], screening)
+            molecule, basis, [0.0, 0.0, 0.0], screening,
+            self.rank, self.nodes)
 
         lx, ly, lz = compute_linear_momentum_integrals_gpu(
-            molecule, basis, screening)
+            molecule, basis, screening, self.rank, self.nodes)
 
         ax, ay, az = compute_angular_momentum_integrals_gpu(
-            molecule, basis, [0.0, 0.0, 0.0], screening)
+            molecule, basis, [0.0, 0.0, 0.0], screening,
+            self.rank, self.nodes)
 
         naos = mx.number_of_rows()
 

@@ -1094,7 +1094,8 @@ class ScfDriver:
             t0_point_charges = tm.time()
             V_es = compute_point_charges_integrals_gpu(molecule, ao_basis,
                                                        screener,
-                                                       self._point_charges)
+                                                       self._point_charges,
+                                                       self.rank, self.nodes)
             naos = V_es.number_of_rows()
             if self.rank == mpi_master():
                 self._V_es = np.zeros((naos, naos))
@@ -1450,10 +1451,10 @@ class ScfDriver:
         t0 = tm.time()
 
         ovl_mat, kin_mat = compute_overlap_and_kinetic_energy_integrals_gpu(
-            molecule, basis, screener)
+            molecule, basis, screener, self.rank, self.nodes)
 
         npot_mat = compute_nuclear_potential_integrals_gpu(
-            molecule, basis, screener)
+            molecule, basis, screener, self.rank, self.nodes)
 
         naos = ovl_mat.number_of_rows()
 
@@ -1572,7 +1573,8 @@ class ScfDriver:
                                                        2.0, full_k_coef, 0.0,
                                                        'symm', self.eri_thresh,
                                                        self.prelink_thresh,
-                                                       screener)
+                                                       screener, self.rank,
+                                                       self.nodes)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
@@ -1588,7 +1590,8 @@ class ScfDriver:
                                                       0.0, erf_k_coef, omega,
                                                       'symm', self.eri_thresh,
                                                       self.prelink_thresh,
-                                                      screener)
+                                                      screener, self.rank,
+                                                      self.nodes)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
@@ -1608,7 +1611,8 @@ class ScfDriver:
                     fock_mat = compute_fock_gpu(
                         molecule, basis, dmat, 2.0,
                         self.xcfun.get_frac_exact_exchange(), 0.0, 'symm',
-                        self.eri_thresh, self.prelink_thresh, screener)
+                        self.eri_thresh, self.prelink_thresh, screener,
+                        self.rank, self.nodes)
                     fock_mat_local = fock_mat.to_numpy()
 
                     coulomb_timing += np.array([
@@ -1625,7 +1629,8 @@ class ScfDriver:
                 # pure DFT
                 fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 0.0,
                                             0.0, 'symm', self.eri_thresh,
-                                            self.prelink_thresh, screener)
+                                            self.prelink_thresh, screener,
+                                            self.rank, self.nodes)
                 fock_mat_local = fock_mat.to_numpy()
 
                 coulomb_timing += np.array([
@@ -1640,7 +1645,8 @@ class ScfDriver:
             # Hartree-Fock
             fock_mat = compute_fock_gpu(molecule, basis, dmat, 2.0, 1.0, 0.0,
                                         'symm', self.eri_thresh,
-                                        self.prelink_thresh, screener)
+                                        self.prelink_thresh, screener,
+                                        self.rank, self.nodes)
             fock_mat_local = fock_mat.to_numpy()
 
             coulomb_timing += np.array(
@@ -1691,7 +1697,8 @@ class ScfDriver:
                 vxc_mat = integrate_vxc_fock_gpu(
                     molecule, basis, dmat, self._mol_grid,
                     self.xcfun.get_func_label(),
-                    screener.get_num_gpus_per_node())
+                    screener.get_num_gpus_per_node(),
+                    self.rank, self.nodes)
             else:
                 assert_msg_critical(
                     False, 'SCF driver: Unsupported XC functional type')

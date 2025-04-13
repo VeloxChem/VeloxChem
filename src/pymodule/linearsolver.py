@@ -966,7 +966,8 @@ class LinearSolver:
                                                 prefac_coulomb, full_k_coef,
                                                 0.0, flag_exchange,
                                                 self.eri_thresh,
-                                                self.prelink_thresh, local_screening)
+                                                self.prelink_thresh, local_screening,
+                                                self.rank, self.nodes)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
@@ -983,7 +984,8 @@ class LinearSolver:
                                                       flag_exchange,
                                                       self.eri_thresh,
                                                       self.prelink_thresh,
-                                                      local_screening)
+                                                      local_screening,
+                                                      self.rank, self.nodes)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
@@ -1001,7 +1003,7 @@ class LinearSolver:
                         molecule, basis, dens, prefac_coulomb,
                         self.xcfun.get_frac_exact_exchange(), 0.0,
                         flag_exchange, self.eri_thresh, self.prelink_thresh,
-                        local_screening)
+                        local_screening, self.rank, self.nodes)
 
                     coulomb_timing += np.array([
                         float(dt.split()[0])
@@ -1018,7 +1020,8 @@ class LinearSolver:
                 fock_mat = compute_fock_gpu(molecule, basis, dens,
                                             prefac_coulomb, 0.0, 0.0,
                                             flag_exchange, self.eri_thresh,
-                                            self.prelink_thresh, local_screening)
+                                            self.prelink_thresh, local_screening,
+                                            self.rank, self.nodes)
 
                 coulomb_timing += np.array([
                     float(dt.split()[0]) for dt in local_screening.get_coulomb_time()
@@ -1034,7 +1037,7 @@ class LinearSolver:
             fock_mat = compute_fock_gpu(molecule, basis, dens, prefac_coulomb,
                                         1.0, 0.0, flag_exchange,
                                         self.eri_thresh, self.prelink_thresh,
-                                        local_screening)
+                                        local_screening, self.rank, self.nodes)
 
             coulomb_timing += np.array(
                 [float(dt.split()[0]) for dt in local_screening.get_coulomb_time()])
@@ -1077,7 +1080,8 @@ class LinearSolver:
                 integrate_fxc_fock_gpu(fock_mat, molecule, basis, dens,
                                        gs_density, molgrid,
                                        self.xcfun.get_func_label(),
-                                       local_screening.get_num_gpus_per_node())
+                                       local_screening.get_num_gpus_per_node(),
+                                       self.rank, self.nodes)
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)
@@ -1443,7 +1447,8 @@ class LinearSolver:
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening,
+                self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 
@@ -1480,7 +1485,7 @@ class LinearSolver:
 
         elif operator in ['linear_momentum', 'linear momentum']:
             mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
-                molecule, basis, screening)
+                molecule, basis, screening, self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 
@@ -1517,7 +1522,8 @@ class LinearSolver:
 
         elif operator in ['angular_momentum', 'angular momentum']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening,
+                self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 
@@ -1554,7 +1560,8 @@ class LinearSolver:
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening,
+                self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 
@@ -1660,7 +1667,8 @@ class LinearSolver:
 
         if operator in ['dipole', 'electric dipole', 'electric_dipole']:
             mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening,
+                self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 
@@ -1697,7 +1705,7 @@ class LinearSolver:
 
         elif operator in ['linear_momentum', 'linear momentum']:
             mu_x, mu_y, mu_z = compute_linear_momentum_integrals_gpu(
-                molecule, basis, screening)
+                molecule, basis, screening, self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 
@@ -1734,7 +1742,8 @@ class LinearSolver:
 
         elif operator in ['angular_momentum', 'angular momentum']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening,
+                self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 
@@ -1771,7 +1780,8 @@ class LinearSolver:
 
         elif operator in ['magnetic_dipole', 'magnetic dipole']:
             mu_x, mu_y, mu_z = compute_angular_momentum_integrals_gpu(
-                molecule, basis, [0.0, 0.0, 0.0], screening)
+                molecule, basis, [0.0, 0.0, 0.0], screening,
+                self.rank, self.nodes)
 
             naos = mu_x.number_of_rows()
 

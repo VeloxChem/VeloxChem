@@ -52,7 +52,6 @@
 #include "GtoValuesLdaGPU.hpp"
 #include "MathFunc.hpp"
 #include "MatrixFunc.hpp"
-#include "MpiFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"
@@ -1078,15 +1077,13 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
                        const CAODensityMatrix& densityMatrix,
                        const CMolecularGrid&   molecularGrid,
                        const CXCFunctional&    xcFunctional,
-                       const int64_t           numGpusPerNode) -> CAOKohnShamMatrix
+                       const int64_t           numGpusPerNode,
+                       const int64_t           rank,
+                       const int64_t           nnodes) -> CAOKohnShamMatrix
 {
     CGpuDevices gpu_devices;
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
@@ -1449,15 +1446,13 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
                        const CAODensityMatrix& densityMatrix,
                        const CMolecularGrid&   molecularGrid,
                        const CXCFunctional&    xcFunctional,
-                       const int64_t           numGpusPerNode) -> CAOKohnShamMatrix
+                       const int64_t           numGpusPerNode,
+                       const int64_t           rank,
+                       const int64_t           nnodes) -> CAOKohnShamMatrix
 {
     CGpuDevices gpu_devices;
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
@@ -1870,7 +1865,9 @@ integrateVxcFock(const CMolecule&        molecule,
                  const CAODensityMatrix& densityMatrix,
                  const CMolecularGrid&   molecularGrid,
                  const std::string&      xcFuncLabel,
-                 const int64_t           numGpusPerNode) -> CAOKohnShamMatrix
+                 const int64_t           numGpusPerNode,
+                 const int64_t           rank,
+                 const int64_t           nnodes) -> CAOKohnShamMatrix
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -1880,9 +1877,9 @@ integrateVxcFock(const CMolecule&        molecule,
 
     errors::assertMsgCritical(densityMatrix.isClosedShell(), erropenshell);
 
-    if (xcfuntype == xcfun::lda) return gpu::integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    if (xcfuntype == xcfun::lda) return gpu::integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
 
-    if (xcfuntype == xcfun::gga) return gpu::integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    if (xcfuntype == xcfun::gga) return gpu::integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
 
     /*
     if (xcfuntype == xcfun::mgga) return gpu::integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, numGpusPerNode);
@@ -1903,15 +1900,13 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
                        const CAODensityMatrix& gsDensityMatrix,
                        const CMolecularGrid&   molecularGrid,
                        const CXCFunctional&    xcFunctional,
-                       const int64_t           numGpusPerNode) -> void
+                       const int64_t           numGpusPerNode,
+                       const int64_t           rank,
+                       const int64_t           nnodes) -> void
 {
     CGpuDevices gpu_devices;
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
@@ -2287,15 +2282,13 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
                        const CAODensityMatrix& gsDensityMatrix,
                        const CMolecularGrid&   molecularGrid,
                        const CXCFunctional&    xcFunctional,
-                       const int64_t           numGpusPerNode) -> void
+                       const int64_t           numGpusPerNode,
+                       const int64_t           rank,
+                       const int64_t           nnodes) -> void
 {
     CGpuDevices gpu_devices;
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;
@@ -2783,7 +2776,9 @@ integrateFxcFock(CDenseMatrix&           aoFockMatrix,
                  const CAODensityMatrix& gsDensityMatrix,
                  const CMolecularGrid&   molecularGrid,
                  const std::string&      xcFuncLabel,
-                 const int64_t           numGpusPerNode) -> void
+                 const int64_t           numGpusPerNode,
+                 const int64_t           rank,
+                 const int64_t           nnodes) -> void
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -2796,9 +2791,9 @@ integrateFxcFock(CDenseMatrix&           aoFockMatrix,
 
     errors::assertMsgCritical((rw_closed_shell && gs_closed_shell), erropenshell);
 
-    if (xcfuntype == xcfun::lda) integrateFxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    if (xcfuntype == xcfun::lda) integrateFxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
 
-    if (xcfuntype == xcfun::gga) integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);
+    if (xcfuntype == xcfun::gga) integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode, rank, nnodes);
 
     /*
     if (xcfuntype == xcfun::mgga) integrateFxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc, numGpusPerNode);

@@ -81,7 +81,11 @@ zeroData(double* d_data, const uint32_t n)
 }
 
 auto
-computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
+computeQMatrixOnGPU(const CMolecule& molecule,
+                    const CMolecularBasis& basis,
+                    const CScreeningData& screening,
+                    const int64_t rank,
+                    const int64_t nnodes) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -106,10 +110,6 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     }
 
     const auto all_prim_count = s_prim_count + p_prim_count * 3 + d_prim_count *6;
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
@@ -563,7 +563,11 @@ computeQMatrixOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 }
 
 auto
-computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
+computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
+                                             const CMolecularBasis& basis,
+                                             const CScreeningData& screening,
+                                             const int64_t rank,
+                                             const int64_t nnodes) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -571,10 +575,6 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
@@ -1125,7 +1125,11 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule, const CM
 }
 
 auto
-computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
+computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule,
+                                      const CMolecularBasis& basis,
+                                      const CScreeningData& screening,
+                                      const int64_t rank,
+                                      const int64_t nnodes) -> CDenseMatrix
 {
     const auto mol_charges = molecule.getCharges();
     const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
@@ -1141,11 +1145,17 @@ computeNuclearPotentialIntegralsOnGPU(const CMolecule& molecule, const CMolecula
         points_info[a + natoms * 3] = mol_charges[a];
     }
 
-    return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screening, points_info.data(), natoms);
+    return gpu::computePointChargesIntegralsOnGPU(molecule, basis, screening, points_info.data(), natoms, rank, nnodes);
 }
 
 auto
-computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening, const double* points_info_ptr, const int64_t npoints) -> CDenseMatrix
+computePointChargesIntegralsOnGPU(const CMolecule& molecule,
+                                  const CMolecularBasis& basis,
+                                  const CScreeningData& screening,
+                                  const double* points_info_ptr,
+                                  const int64_t npoints,
+                                  const int64_t rank,
+                                  const int64_t nnodes) -> CDenseMatrix
 {
     CGpuDevices gpu_devices;
 
@@ -1153,10 +1163,6 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
@@ -1713,7 +1719,12 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule, const CMolecularBas
 }
 
 auto
-computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const std::vector<double>& origin, const CScreeningData& screening) -> std::vector<CDenseMatrix>
+computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
+                                    const CMolecularBasis& basis,
+                                    const std::vector<double>& origin,
+                                    const CScreeningData& screening,
+                                    const int64_t rank,
+                                    const int64_t nnodes) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -1721,10 +1732,6 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
@@ -2338,7 +2345,11 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
 }
 
 auto
-computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
+computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
+                                    const CMolecularBasis& basis,
+                                    const CScreeningData& screening,
+                                    const int64_t rank,
+                                    const int64_t nnodes) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -2346,10 +2357,6 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
@@ -2945,7 +2952,12 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularB
 }
 
 auto
-computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const std::vector<double>& origin, const CScreeningData& screening) -> std::vector<CDenseMatrix>
+computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
+                                    const CMolecularBasis& basis,
+                                    const std::vector<double>& origin,
+                                    const CScreeningData& screening,
+                                    const int64_t rank,
+                                    const int64_t nnodes) -> std::vector<CDenseMatrix>
 {
     CGpuDevices gpu_devices;
 
@@ -2953,10 +2965,6 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule, const CMolecular
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();
@@ -3661,17 +3669,15 @@ computeFockOnGPU(const              CMolecule& molecule,
                  const std::string& flag_K,
                  const double       eri_threshold,
                  const double       prelink_threshold,
-                 CScreeningData&    screening) -> CDenseMatrix
+                 CScreeningData&    screening,
+                 const int64_t      rank,
+                 const int64_t      nnodes) -> CDenseMatrix
 {
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
     CGpuDevices gpu_devices;
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = screening.getNumGpusPerNode();

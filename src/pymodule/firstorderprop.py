@@ -69,6 +69,7 @@ class FirstOrderProperties:
 
         self.comm = comm
         self.rank = comm.Get_rank()
+        self.nodes = comm.Get_size()
 
         self.ostream = ostream
 
@@ -115,7 +116,8 @@ class FirstOrderProperties:
 
         # dipole integrals
         mu_x, mu_y, mu_z = compute_electric_dipole_integrals_gpu(
-            molecule, basis, origin, screening)
+            molecule, basis, origin, screening,
+            self.rank, self.nodes)
 
         naos = mu_x.number_of_rows()
 

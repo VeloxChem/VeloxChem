@@ -34,9 +34,9 @@
 
 #include <omp.h>
 
+#include <algorithm>
 #include <cmath>
 #include <string>
-#include <iostream>
 #include <sstream>
 
 #include "BoysFuncTable.hpp"
@@ -44,7 +44,6 @@
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
-#include "MpiFunc.hpp"
 #include "StringFormat.hpp"
 
 #define MATH_CONST_PI 3.14159265358979323846
