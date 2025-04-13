@@ -205,7 +205,7 @@ class RixsDriver:
     def compute(self, molecule, basis, scf_tensors, 
                 rsp_tensors, cvs_rsp_tensors=None,
                 fulldiag_thresh=None, tda=False, 
-                final_cutoff=None):
+                final_cutoff=None, core_cutoff=None):
         """
         Computes RIXS properties.
         
@@ -280,20 +280,36 @@ class RixsDriver:
                             self.photon_energy = [rsp_tensors['eigenvalues'][k]]
                             break
 
-                mask = (np.abs(rsp_tensors['eigenvalues'] - self.photon_energy) < fulldiag_thresh)
-                """
-                try_core_states = np.where(mask)[0]
+                #mask = (np.abs(rsp_tensors['eigenvalues'] - self.photon_energy) < fulldiag_thresh)
+                detuning = rsp_tensors['eigenvalues'] - self.photon_energy
+                mask = (detuning <= fulldiag_thresh) & (detuning >= 0)
+
+                init_core_states = np.where(mask)[0]
 
                 core_states = []
-                for state in try_core_states:
+                """
+                for state in init_core_states:
                     entry = rsp_tensors['excitation_details'][state][0].split()
                     label = entry[0]
                     if label.startswith("core"):
                         core_states.append(state)
-
-                core_states = np.squeeze(core_states)
                 """
-                core_states = np.where(mask)[0]
+                if core_cutoff:
+                    init_core_states = np.where(mask)[0]
+
+                    core_states = []
+                    for state in init_core_states:
+                        entry = rsp_tensors['excitation_details'][state][0].split()
+                        label = entry[0]
+                        if label.startswith("core"):
+                            core_states.append(state)
+
+                    #try:
+                    #    core_states = np.squeeze(core_states)[:core_cutoff]
+                    #except:
+                core_states = np.squeeze(core_states)
+                
+                #core_states = np.where(mask)[0]
                 num_intermediate_states = len(core_states)
                 val_states  = np.where(~mask)[0]
                 num_final_states = len(val_states)
@@ -455,7 +471,8 @@ class RixsDriver:
                     'elastic_emission': self.photon_energy,
                     'scattering_amplitudes': scattering_amplitudes,
                     'emission_energies': emission_enes,
-                    'energy_losses': ene_losses}
+                    'energy_losses': ene_losses,
+                    'excitation_energies': core_eigvals}
 
         return return_dict
     
