@@ -40,8 +40,6 @@
 /**
  Class COverlapDriver provides methods for computing two-center
  overlap integrals.
-
- @author Z. Rinkevicius
  */
 class COverlapDriver
 {

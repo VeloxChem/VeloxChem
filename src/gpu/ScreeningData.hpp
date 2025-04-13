@@ -44,8 +44,6 @@
 
 /**
  Class CScreeningData stores screening data for ERI evaluation on GPUs.
-
- @author X. Li
  */
 class CScreeningData
 {

@@ -41,8 +41,6 @@
 
 /**
  Class CBoysFunc implements computation of Boys function.
-
- @author Z. Rinkevicius
  */
 template <int64_t N>
 class CBoysFunc

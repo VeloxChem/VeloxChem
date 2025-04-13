@@ -40,8 +40,6 @@
 /**
  Class GpuDevices stores data about available GPU devices and provides these
  devices managment functions.
-
- @author Z. Rinkevicius
  */
 class CGpuDevices
 {

@@ -42,8 +42,6 @@
 /**
  Class CAOKohnShamMatrix stores set of AO Kohn-Sham matrices and provides set of methods
  for handling of AO Kohn-Sham matrices data.
-
- @author Z. Rinkevicius
  */
 class CAOKohnShamMatrix
 {

@@ -46,8 +46,6 @@
 /**
  Class CMatrix stores matrix data and provides set of methods
  for handling of matrix data.
-
- @author Z. Rinkevicius
  */
 class CMatrix
 {

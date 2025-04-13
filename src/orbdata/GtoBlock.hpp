@@ -45,8 +45,6 @@
 /**
  Class CGtoBlock stores data about contarcted GTOs block and provides set of methods
  for manipulating with contarcted  GTOs block.
-
- @author Z. Rinkevicius
  */
 class CGtoBlock
 {

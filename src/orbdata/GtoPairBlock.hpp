@@ -45,8 +45,6 @@
 /**
  Class CGtoPairBlock stores data about contarcted GTO pairs block and provides set of methods
  for manipulating with contarcted GTO pairs block.
-
- @author Z. Rinkevicius
  */
 class CGtoPairBlock
 {

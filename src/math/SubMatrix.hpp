@@ -44,8 +44,6 @@
 /**
  Class CSubMatrix stores submatrix data and provides set of methods
  for handling of submatrix data.
-
- @author Z. Rinkevicius
  */
 class CSubMatrix
 {

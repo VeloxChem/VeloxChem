@@ -54,8 +54,6 @@ enum class denmat
 /**
  Class CAODensityMatrix stores set of AO density matrices and provides
  set of methods for handling of AO density matrices data.
-
- @author Z. Rinkevicius
  */
 class CAODensityMatrix
 {

@@ -43,8 +43,6 @@
 /**
  Class CAtomBasis stores data about atomic basis set and provides set of methods
  for handling of atomic basis set data.
-
- @author Z. Rinkevicius
  */
 class CAtomBasis
 {

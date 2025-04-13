@@ -40,8 +40,6 @@
 /**
  Class CBasisFunction stores data about single contracted GTO and
  provides set of methods for handling of GTO data.
-
- @author Z. Rinkevicius
  */
 class CBasisFunction
 {

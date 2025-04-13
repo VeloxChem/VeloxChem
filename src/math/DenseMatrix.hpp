@@ -42,8 +42,6 @@
  Class CDenseMatrix stores dense matrix in coordinate format (zero-based
  indexing scheme) and provides set of methods for manipulating dense matrix
  data.
-
- @author Z. Rinkevicius
  */
 class CDenseMatrix
 {

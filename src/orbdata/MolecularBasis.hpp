@@ -43,8 +43,6 @@
 /**
 Class CMolecularBasis stores data about molecular basis set and provides set of
 methods for handling of molecular basis set data.
-
-@author Z. Rinkevicius
 */
 class CMolecularBasis
 {

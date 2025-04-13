@@ -39,8 +39,6 @@
 
 /**
  Class CXCComponent implements XC functional component.
-
- @author X. Li
  */
 class CXCComponent
 {

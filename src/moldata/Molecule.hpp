@@ -44,8 +44,6 @@
 /**
  Class CMolecule stores geometrical data  of molecule and provides set of methods
  for handling of this data.
-
- @author Z. Rinkevicius
  */
 class CMolecule
 {
