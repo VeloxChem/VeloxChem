@@ -65,7 +65,6 @@
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 #include "MatrixFunc.hpp"
-#include "MpiFunc.hpp"
 #include "MultiTimer.hpp"
 #include "OneElectronIntegrals.hpp"
 #include "StringFormat.hpp"
@@ -10120,10 +10119,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 auto
 computeDotProduct(const double* A, const double* B, const int64_t size) -> double
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::computeDotProduct: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+    // Note: Should only be called from MPI master rank
 
     hipSafe(hipSetDevice(0));
 
@@ -10154,10 +10150,7 @@ computeDotProduct(const double* A, const double* B, const int64_t size) -> doubl
 auto
 computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size) -> void
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::computeWeightedSum: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+    // Note: Should only be called from MPI master rank
 
     hipSafe(hipSetDevice(0));
 
@@ -10194,10 +10187,7 @@ auto
 computeErrorVector(double* errvec, const double* X, const double* F, const double* D, const double* S,
                    const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::computeErrorVector: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+    // Note: Should only be called from MPI master rank
 
     hipSafe(hipSetDevice(0));
 
@@ -10272,10 +10262,7 @@ auto
 transformMatrix(double* transformed_F, const double* X, const double* F,
                 const int64_t nmo_inp, const int64_t nao_inp, const std::string& trans_X) -> void
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::transformMatrix: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+    // Note: Should only be called from MPI master rank
 
     hipSafe(hipSetDevice(0));
 
@@ -10325,12 +10312,9 @@ auto
 computeMatrixMultiplication(double* C, const double* A, const double* B, const std::string& trans_A, const std::string& trans_B,
                             const int64_t m_inp, const int64_t k_inp, const int64_t n_inp) -> void
 {
-    // TODO allow computeMatrixMultiplication on non-master MPI rank
+    // Note: Should only be called from MPI master rank
 
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::computeMatrixMultiplication: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+    // TODO: allow computeMatrixMultiplication on non-master MPI rank
 
     // TODO: matmul on multiple GPUs
 
@@ -10377,12 +10361,9 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const s
 auto
 diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
 {
-    // TODO allow diagonalizeMatrix on non-master MPI rank
+    // Note: Should only be called from MPI master rank
 
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::diagonalizeMatrix: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+    // TODO: allow diagonalizeMatrix on non-master MPI rank
 
     hipSafe(hipSetDevice(0));
 
@@ -10436,12 +10417,9 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
 auto
 diagonalizeMatrixMultiGPU(double* A, double* W, const int64_t nrows_A, const int64_t num_gpus_per_node) -> void
 {
-    // TODO allow diagonalizeMatrix on non-master MPI rank
+    // Note: Should only be called from MPI master rank
 
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::diagonalizeMatrix: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+    // TODO: allow diagonalizeMatrix on non-master MPI rank
 
     magmaSafe(magma_init());
 

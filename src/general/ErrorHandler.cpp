@@ -32,14 +32,10 @@
 
 #include "ErrorHandler.hpp"
 
-#include <mpi.h>
-
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
-
-#include "MpiFunc.hpp"
 
 namespace errors {  // errors namespace
 
@@ -61,11 +57,6 @@ assertMsgCritical(const bool condition, const std::string& message) -> void
     if (!condition)
     {
         msg(message, "Critical Error");
-
-        if (mpi::initialized() && (mpi::nodes(MPI_COMM_WORLD) > 1))
-        {
-            MPI_Abort(MPI_COMM_WORLD, MPI_ERR_OTHER);
-        }
 
         std::abort();
     }
