@@ -46,7 +46,9 @@ auto applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
                             const int64_t                nGridPoints,
                             const TPoint3D*              atomCoordinates,
                             const int64_t                nAtoms,
-                            const int64_t                numGpusPerNode) -> void;
+                            const int64_t                numGpusPerNode,
+                            const int64_t                rank,
+                            const int64_t                nnodes) -> void;
 
 }  // namespace gpu
 

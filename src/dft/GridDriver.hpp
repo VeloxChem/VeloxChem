@@ -132,9 +132,9 @@ class CGridDriver
      @return the molecular grid object.
      */
     auto generate_local_grid(const CMolecule& molecule,
+                             const int64_t    numGpusPerNode,
                              const int64_t    rank,
-                             const int64_t    nnodes,
-                             const int64_t    numGpusPerNode) const -> CMolecularGrid;
+                             const int64_t    nnodes) const -> CMolecularGrid;
 };
 
 #endif /* GridDriver_hpp */

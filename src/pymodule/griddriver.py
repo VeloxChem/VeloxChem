@@ -96,7 +96,7 @@ class GridDriver:
         """
 
         local_grid = self._grid_drv._generate_local_grid(
-            molecule, self.rank, self.nodes, num_gpus_per_node)
+            molecule, num_gpus_per_node, self.rank, self.nodes)
 
         grid_np_arrays = self.comm.allgather(local_grid.grid_to_numpy())
         grid_np_arrays = [arr for arr in grid_np_arrays if arr.size > 0]

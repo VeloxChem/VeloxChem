@@ -151,9 +151,9 @@ export_dft(py::module& m)
              &CGridDriver::generate_local_grid,
              "Generates MPI-local molecular grid for molecule.",
              "molecule"_a,
+             "num_gpus_per_node"_a,
              "rank"_a,
-             "nnodes"_a,
-             "num_gpus_per_node"_a)
+             "nnodes"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
 
     // XCComponent class

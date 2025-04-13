@@ -41,7 +41,6 @@
 #include "GpuSafeChecks.hpp"
 #include "GpuDevices.hpp"
 #include "MathFunc.hpp"
-#include "MpiFunc.hpp"
 
 namespace gpu {  // gpu namespace
 
@@ -179,15 +178,13 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
                        const int64_t                nGridPoints,
                        const TPoint3D*              atomCoordinates,
                        const int64_t                nAtoms,
-                       const int64_t                numGpusPerNode) -> void
+                       const int64_t                numGpusPerNode,
+                       const int64_t                rank,
+                       const int64_t                nnodes) -> void
 {
     CGpuDevices gpu_devices;
 
     const auto total_num_gpus_per_compute_node = gpu_devices.getNumberOfDevices();
-
-    // TODO use communicator from arguments
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     auto nthreads = omp_get_max_threads();
     auto num_gpus_per_node = numGpusPerNode;

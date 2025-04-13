@@ -150,9 +150,9 @@ CGridDriver::_getNumberOfAngularPoints(const int64_t idElemental) const -> int64
 
 auto
 CGridDriver::generate_local_grid(const CMolecule& molecule,
+                                 const int64_t    numGpusPerNode,
                                  const int64_t    rank,
-                                 const int64_t    nnodes,
-                                 const int64_t    numGpusPerNode) const -> CMolecularGrid
+                                 const int64_t    nnodes) const -> CMolecularGrid
 {
     // molecular data
 
@@ -221,7 +221,7 @@ CGridDriver::generate_local_grid(const CMolecule& molecule,
         std::fill(atom_min_distances.data() + gridoff, atom_min_distances.data() + gridoff + nrpoints * napoints, minrad);
     }
 
-    gpu::applyGridPartitionFunc(rawgrid, atom_ids_of_points, atom_min_distances, bpoints, molcoords, natoms, numGpusPerNode);
+    gpu::applyGridPartitionFunc(rawgrid, atom_ids_of_points, atom_min_distances, bpoints, molcoords, natoms, numGpusPerNode, rank, nnodes);
 
     // screen raw grid points & create prunned grid
 
