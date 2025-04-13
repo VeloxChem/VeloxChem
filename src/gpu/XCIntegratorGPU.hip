@@ -1131,9 +1131,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -1413,7 +1413,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
 
-    }}
+    }
+    }
 
     auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
 
@@ -1500,9 +1501,9 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -1832,7 +1833,8 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
     mat_Vxc_omp[gpu_id].setExchangeCorrelationEnergy(xcene);
 
-    }}
+    }
+    }
 
     auto p_mat_Vxc = mat_Vxc_sum.getPointerToAlphaValues();
 
@@ -1949,9 +1951,9 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -2259,7 +2261,8 @@ integrateFxcFockForLDA(CDenseMatrix&           aoFockMatrix,
     hipSafe(hipFree(d_grid_z));
     hipSafe(hipFree(d_grid_w));
 
-    }}
+    }
+    }
 
     auto p_mat_Fxc = aoFockMatrix.values();
 
@@ -2331,9 +2334,9 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -2753,7 +2756,8 @@ integrateFxcFockForGGA(CDenseMatrix&           aoFockMatrix,
     hipSafe(hipFree(d_grid_z));
     hipSafe(hipFree(d_grid_w));
 
-    }}
+    }
+    }
 
     auto p_mat_Fxc = aoFockMatrix.values();
 

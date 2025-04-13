@@ -194,9 +194,9 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -309,7 +309,8 @@ applyGridPartitionFunc(CDenseMatrix*                rawGridPoints,
         gridw[i] *= partial_weights[i];
     }
 
-    }}
+    }
+    }
 }
 
 }  // namespace gpu

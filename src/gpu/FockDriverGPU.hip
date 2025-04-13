@@ -125,9 +125,9 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -540,7 +540,8 @@ computeQMatrixOnGPU(const CMolecule& molecule,
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
 
-    }}
+    }
+    }
 
     CDenseMatrix Q_matrix_sum(all_prim_count, all_prim_count);
 
@@ -592,9 +593,9 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -1095,7 +1096,8 @@ computeOverlapAndKineticEnergyIntegralsOnGPU(const CMolecule& molecule,
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
 
-    }}
+    }
+    }
 
     std::vector<CDenseMatrix> ST_matrices(2);
 
@@ -1178,9 +1180,9 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -1696,7 +1698,8 @@ computePointChargesIntegralsOnGPU(const CMolecule& molecule,
 
     hipSafe(hipFree(d_points_info));
 
-    }}
+    }
+    }
 
     CDenseMatrix V_matrix(naos, naos);
 
@@ -1751,9 +1754,9 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -2310,7 +2313,8 @@ computeElectricDipoleIntegralsOnGPU(const CMolecule& molecule,
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
 
-    }}
+    }
+    }
 
     std::vector<CDenseMatrix> edip_matrices(3);
 
@@ -2376,9 +2380,9 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -2917,7 +2921,8 @@ computeLinearMomentumIntegralsOnGPU(const CMolecule& molecule,
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
 
-    }}
+    }
+    }
 
     std::vector<CDenseMatrix> lmom_matrices(3);
 
@@ -2984,9 +2989,9 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -3543,7 +3548,8 @@ computeAngularMomentumIntegralsOnGPU(const CMolecule& molecule,
     hipSafe(hipFree(d_dd_first_inds_local));
     hipSafe(hipFree(d_dd_second_inds_local));
 
-    }}
+    }
+    }
 
     std::vector<CDenseMatrix> amom_matrices(3);
 
@@ -3923,9 +3929,9 @@ computeFockOnGPU(const              CMolecule& molecule,
     {
     auto thread_id = omp_get_thread_num();
 
-    if (thread_id % num_threads_per_gpu == 0)
+    if (thread_id < num_gpus_per_node)
     {
-    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_id = thread_id;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
@@ -10095,7 +10101,8 @@ computeFockOnGPU(const              CMolecule& molecule,
     // std::cout << "-----------------------\n";
     // std::cout << timer.getSummary() << std::endl;
 
-    }}
+    }
+    }
 
     CDenseMatrix mat_Fock_sum (naos, naos);
 
