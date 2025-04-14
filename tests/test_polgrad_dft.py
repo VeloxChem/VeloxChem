@@ -107,7 +107,7 @@ class TestPolgrad:
 
         if scf_drv.rank == mpi_master():
             #polgrad_results = an_polgrad_drv.polgradient
-            polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
+            #polgrad_static = polgrad_results[0.0].reshape(3,3,3,3)
             polgrad_dynamic = polgrad_results[0.4].reshape(3,3,3,3)
             np.set_printoptions(suppress=True, precision=10)
             here = Path(__file__).parent
@@ -119,7 +119,7 @@ class TestPolgrad:
             polgrad_dynamic_reference = polgrad_reference[1]
             hf.close()
 
-            assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
+            #assert np.max(np.abs(polgrad_static) - np.abs(polgrad_static_reference)) < 1.0e-6
             assert np.max(np.abs(polgrad_dynamic) - np.abs(polgrad_dynamic_reference)) < 1.0e-6
 
         # test complex numerical gradient

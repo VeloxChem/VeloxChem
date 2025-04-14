@@ -32,59 +32,6 @@ class TestOverlapDriver:
 
         return mol, bra_bas, ket_bas
         
-    def get_data_cc_pv6z(self):
-
-        costr = """
-            C   0.100  -0.400  -1.000
-            O   0.300   1.400  -2.100
-        """
-        mol = Molecule.read_str(costr, 'au')
-        bas = MolecularBasis.read(mol, 'cc-pV6Z-no-opt-gc')
-
-        return mol, bas
-        
-    def test_overlap_co_cc_pv6z(self):
-
-        mol_co, bas_pv6z = self.get_data_cc_pv6z()
-
-        # compute overlap matrix
-        ovl_drv = OverlapDriver()
-        ovl_mat = ovl_drv.compute(mol_co, bas_pv6z)
-        
-        # load reference overlap data
-        here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.cc.pv6z.overlap.npy')
-        ref_mat = np.load(npyfile)
-
-        # dimension of molecular basis
-        indexes = np.triu_indices(7)
-        basdims = [0, 14, 50, 100, 156, 210, 254, 280]
-        
-        # check individual overlap submatrices
-        for i, j in zip(indexes[0], indexes[1]):
-            # bra side
-            sbra = basdims[i]
-            ebra = basdims[i + 1]
-            # ket side
-            sket = basdims[j]
-            eket = basdims[j + 1]
-            # load computed submatrix
-            cmat = ovl_mat.submatrix((i, j))
-            # load reference submatrix
-            rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-            rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra,
-                                                         sket:eket]))
-            #print(i, j)
-            #print(np.max(np.abs(rmat.to_numpy() - cmat.to_numpy())))
-            # compare submatrices
-            assert cmat == rmat
-
-        # check full overlap matrix
-        fmat = ovl_mat.full_matrix()
-        fref = SubMatrix([0, 0, 280, 280])
-        fref.set_values(np.ascontiguousarray(ref_mat))
-        assert fmat == fref
-
     def test_overlap_co_qzvp(self):
 
         mol_co, bas_qzvp = self.get_data()

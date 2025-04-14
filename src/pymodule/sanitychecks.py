@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from pathlib import Path
 import json
@@ -167,13 +175,48 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
                             err_msg_scan)
 
 
-def polgrad_sanity_check(obj, method_flag, lr_results):
+def polorbrsp_sanity_check_1(obj):
     """
-    Checks settings for polarizability gradient and polarizability
-    orbital response against linear response results.
+    Checks frequencies in settings for polarizability orbital response.
 
     :param obj:
-        The object (polarizability gradient or orbital response driver).
+        The object (orbital response driver).
+    :param method_flag:
+        The flag indicating the method in which the sanity check is
+        called.
+    """
+    # check that there is no zero frequency for the complex case
+    # this can cause divergence with the subspace solver
+    if obj.is_complex:
+        try:
+            idx0 = obj.frequencies.index(0.0)
+            warn_msg = 'Zero (0.0) frequency in input frequencies for complex'
+            warn_msg += ' polarizability gradient/orbital response!\n\n'
+            if len(obj.frequencies) == 1:
+                warn_msg += 'No other frequencies requested;'
+                warn_msg += ' Will continue with zero frequency,'
+                warn_msg += ' CPHF solver might diverge.'
+            else:
+                # converting to a list because "pop()" does not exist for tuples
+                freq_list = list(obj.frequencies)
+                freq_list.pop(idx0)
+                obj.frequencies = freq_list
+                warn_msg += 'Zero (0.0) has been removed from the list of frequencies'
+                warn_msg += ' due to risk of divergent CPHF solver.\n'
+                warn_msg += 'Computations will be carried out for frequencies: '
+                warn_msg += str(obj.frequencies)
+            obj.ostream.print_warning(warn_msg)
+        except ValueError:
+            pass
+
+
+def polorbrsp_sanity_check_2(obj, method_flag, lr_results):
+    """
+    Checks settings for polarizability orbital response against
+    linear response results.
+
+    :param obj:
+        The object (orbital response driver).
     :param method_flag:
         The flag indicating the method in which the sanity check is
         called.
@@ -181,13 +224,95 @@ def polgrad_sanity_check(obj, method_flag, lr_results):
         A dictionary containing linear response results.
     """
 
-    response_results = lr_results.get('solutions', None)
-    for frequency in obj.frequencies:
-        if (obj.vector_components[0], frequency) not in response_results.keys():
-            error_msg = 'Frequency {:2.3f} in '.format(frequency)
-            error_msg += method_flag + ' not found in linear response results '
-            error_msg += 'for vector compontent ' + obj.vector_components[0]
-            raise ValueError(error_msg)
+    if obj.rank == mpi_master():
+        # check that frequencies agree with LR
+        response_results = lr_results.get('solutions', None)
+        for frequency in obj.frequencies:
+            if (obj.vector_components[0], frequency) not in response_results.keys():
+                error_msg = f'Frequency {frequency:2.3f} in '
+                error_msg += method_flag + ' not found in linear response results '
+                error_msg += 'for vector compontent ' + obj.vector_components[0]
+                raise ValueError(error_msg)
+
+
+def polgrad_sanity_check_1(obj):
+    """
+    Checks frequencies in settings for polarizability gradient.
+
+    :param obj:
+        The object (polarizability gradient driver).
+    :param method_flag:
+        The flag indicating the method in which the sanity check is
+        called.
+    """
+
+    polorbrsp_sanity_check_1(obj)
+
+
+def polgrad_sanity_check_2(obj, method_flag, lr_results):
+    """
+    Checks settings for polarizability gradient against
+    linear response results.
+
+    :param obj:
+        The object (polarizability gradient driver).
+    :param method_flag:
+        The flag indicating the method in which the sanity check is
+        called.
+    :param lr_results:
+        A dictionary containing linear response results.
+    """
+
+    polorbrsp_sanity_check_2(obj, method_flag, lr_results)
+
+
+#def polgrad_sanity_check(obj, method_flag, lr_results):
+#    """
+#    Checks settings for polarizability gradient and polarizability
+#    orbital response against linear response results.
+#
+#    :param obj:
+#        The object (polarizability gradient or orbital response driver).
+#    :param method_flag:
+#        The flag indicating the method in which the sanity check is
+#        called.
+#    :param lr_results:
+#        A dictionary containing linear response results.
+#    """
+#
+#    if obj.rank == mpi_master():
+#        # check that frequencies agree with LR
+#        response_results = lr_results.get('solutions', None)
+#        for frequency in obj.frequencies:
+#            if (obj.vector_components[0], frequency) not in response_results.keys():
+#                error_msg = f'Frequency {frequency:2.3f} in '
+#                error_msg += method_flag + ' not found in linear response results '
+#                error_msg += 'for vector compontent ' + obj.vector_components[0]
+#                raise ValueError(error_msg)
+#
+#    # check that there is no zero frequency for the complex case
+#    # this can cause divergence with the subspace solver
+#    if obj.is_complex:
+#        try:
+#            idx0 = obj.frequencies.index(0.0)
+#            warn_msg = 'Zero (0.0) frequency in input frequencies for complex'
+#            warn_msg += ' polarizability gradient/orbital response!\n\n'
+#            if len(obj.frequencies) == 1:
+#                warn_msg += 'No other frequencies requested;'
+#                warn_msg += ' Will continue with zero frequency,'
+#                warn_msg += ' CPHF solver might diverge.'
+#            else:
+#                # converting to a list because "pop()" does not exist for tuples
+#                freq_list = list(obj.frequencies)
+#                freq_list.pop(idx0)
+#                obj.frequencies = freq_list
+#                warn_msg += 'Zero (0.0) has been removed from the list of frequencies'
+#                warn_msg += ' due to risk of divergent CPHF solver.\n'
+#                warn_msg += 'Computations will be carried out for frequencies: '
+#                warn_msg += str(obj.frequencies)
+#            obj.ostream.print_warning(warn_msg)
+#        except ValueError:
+#            pass
 
 
 def raman_sanity_check(obj):
@@ -219,8 +344,8 @@ def raman_sanity_check(obj):
             idx0 = obj.frequencies.index(0.0)
             warn_msg = 'Zero frequency in input frequencies for resonance Raman!\n'
             if len(obj.frequencies) == 1:
-                warn_msg += 'No other frequencies requested.'
-                warn_msg += 'Will continue with normal Raman.'
+                warn_msg += 'No other frequencies has been requested, computations'
+                warn_msg += 'will continue with normal Raman.'
                 obj.do_raman = True
                 obj.do_resonance_raman = False
             else:
@@ -228,8 +353,9 @@ def raman_sanity_check(obj):
                 freq_list = list(obj.frequencies)
                 freq_list.pop(idx0)
                 obj.frequencies = freq_list
-                warn_msg += 'Zero has been removed from the list.\n'
-                warn_msg += 'Resonance Raman will be calculated for frequencies:\n'
+                warn_msg += 'Zero (0.0) has been removed from the list of frequencies'
+                warn_msg += ' due to risk of divergent CPHF solver.\n'
+                warn_msg += 'Resonance Raman will be calculated for frequencies: '
                 warn_msg += str(obj.frequencies)
             obj.ostream.print_warning(warn_msg)
         except ValueError:

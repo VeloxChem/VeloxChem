@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path
@@ -1767,90 +1775,90 @@ class ThreePATransitionDriver(NonlinearSolver):
             A dictionary containing the results of the response calculation.
         """
 
-        width = 140  # Adjusted width for proper formatting
+        width = 82
         freqs = rsp_results['photon_energies']
         T_tensors = rsp_results['transition_moments']
 
-        self.ostream.print_blank()
-        self.ostream.print_header('Three-Photon Absorption (3PA) Transition Moments (a.u.)'.center(width))
+        self.ostream.print_header('Three-Photon Absorption (3PA) Transition Moments (a.u.)')
         
         # Extract unique frequency values directly from stored tensor keys
         unique_freqs = sorted(set(w for _, w in T_tensors.keys()), reverse=True)
 
-        # Define table groups
-        table_groups = {
-            'Txxx, Txxy, ...': [f"x{i}{j}" for i in 'xyz' for j in 'xyz'],
-            'Tyxx, Tyxy, ...': [f"y{i}{j}" for i in 'xyz' for j in 'xyz'],
-            'Tzxx, Tzxy, ...': [f"z{i}{j}" for i in 'xyz' for j in 'xyz']
-        }
+        xyz_triples = [f'{x}{y}{z}'
+                       for i, x in enumerate('xyz')
+                       for j, y in enumerate('xyz')
+                       for k, z in enumerate('xyz')
+                       if (i <= j and j <= k)]
 
-        for table_title, tensor_labels in table_groups.items():
+        tensor_labels_groups = [xyz_triples[:5], xyz_triples[5:]]
+
+        for tensor_labels in tensor_labels_groups:
             self.ostream.print_blank()
-            self.ostream.print_header(f"  {table_title}  ".center(width, "-"))  # Properly centered title
 
             # Create header with proper spacing
-            header_format = '{:<10s} {:>12s} ' + ' '.join(['{:>12s}'] * len(tensor_labels))
-            header_str = header_format.format('Ex. State', 'Ex. Energy', *tensor_labels)
+            header_format = '{:<7s} {:>11s}    ' + ' '.join(
+                ['{:>11s}' for x in range(len(tensor_labels))])
+            header_str = header_format.format('State', 'Ex.Energy', *tensor_labels)
             self.ostream.print_header(header_str)
 
             # Print a separator line with correct spacing
             self.ostream.print_header('-' * len(header_str))
 
-            for w_ind, w in enumerate(unique_freqs):  # Iterate over stored frequencies
-                row_values = [f'{w_ind + 1:<10d}', f'{- 3 * w * hartree_in_ev():>12.6f} eV']
+            for w_ind, w in enumerate(unique_freqs):
+                row_values = [f'  {w_ind + 1:<5d}', f'{- 3 * w * hartree_in_ev():>11.5f} eV']
 
                 for label in tensor_labels:
-                    tensor_key = (label, w)  # Match stored key format
+                    tensor_key = (label, w)
 
                     if tensor_key in T_tensors:
-                        row_values.append(f'{T_tensors[tensor_key].real:12.5f}')  # Fixed width for values
+                        row_values.append(f'{T_tensors[tensor_key].real:11.4f}')
                     else:
-                        row_values.append(f'{"N/A":>12s}')  # Align missing values correctly
+                        row_values.append(f'{"N/A":>11s}')
 
                 self.ostream.print_header(' '.join(row_values))  # Print row data
 
-            self.ostream.print_blank()
-
         tpa_strengths = rsp_results['3pa_strengths']
         tpa_cross_sections = rsp_results['cross_sections']
+
+        self.ostream.print_blank()
 
         title = '3PA Strength and Cross-Section (Linear Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', '3PA strength    ',
+        title = '  {:<12s}{:>11s}{:>27s}{:>28s}'.format(
+            'State', 'Ex.Energy', '3PA strength    ',
             '3PA cross-section    ')
-        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
         for w_ind, w in enumerate(freqs):
-            exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(3 * w * hartree_in_ev())
+            exec_str = '{:<6d}'.format(w_ind + 1)
+            exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
             exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
-            self.ostream.print_header(exec_str.ljust(width))
-        self.ostream.print_blank()
+            self.ostream.print_header(exec_str)
         self.ostream.print_blank()
 
         title = '3PA Strength and Cross-Section (Circular Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
-            'Ex. State', 'Ex. Energy', '3PA strength    ',
+        title = '  {:<12s}{:>11s}{:>27s}{:>28s}'.format(
+            'State', 'Ex.Energy', '3PA strength    ',
             '3PA cross-section    ')
-        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
         for w_ind, w in enumerate(freqs):
-            exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(3 * w * hartree_in_ev())
+            exec_str = '{:<6d}'.format(w_ind + 1)
+            exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
             exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
-            self.ostream.print_header(exec_str.ljust(width))
+            self.ostream.print_header(exec_str)
         self.ostream.print_blank()
-        self.ostream.print_blank()
+
+        self.ostream.flush()
 
     @staticmethod
     def get_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
