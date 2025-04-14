@@ -12,24 +12,36 @@ from rdkit.Chem import rdFMCS
 from rdkit.Chem import rdDetermineBonds
 
 class MCS:
-    def __init__(self, Protonated_molecule, Deprotonated_molecule, deprotonated = False, protonated = True):
+    def __init__(self, Protonated_molecule, Deprotonated_molecule, deprotonated = False, protonated = False):
         self.molecule1 = Protonated_molecule
         self.molecule2 = Deprotonated_molecule
         self.deprotonated = deprotonated
         self.protonated = protonated
 
     def give_the_molecules_personality(self):
-        self.mol_1 = self.molecule1
-        rdDetermineBonds.DetermineBonds(self.mol_1, charge=0) # Determine bonds 
-        self.mol_1.SetProp('_Name', 'Molecule 1')
+        if self.deprotonated:
+            self.mol_1 = self.molecule1
+            rdDetermineBonds.DetermineBonds(self.mol_1, charge=0) # Determine bonds 
+            self.mol_1.SetProp('_Name', 'Molecule 1')
 
-        self.mol_2 = self.molecule2
-        rdDetermineBonds.DetermineBonds(self.mol_2, charge=-1)
-        self.mol_2.SetProp('_Name', 'Molecule 2')
+            self.mol_2 = self.molecule2
+            rdDetermineBonds.DetermineBonds(self.mol_2, charge=-1)
+            self.mol_2.SetProp('_Name', 'Molecule 2')
 
-        molecules = [self.mol_1, self.mol_2]
-        return molecules
+            molecules = [self.mol_1, self.mol_2]
+            return molecules
+        
+        if self.protonated:
+            self.mol_1 = self.molecule1
+            rdDetermineBonds.DetermineBonds(self.mol_1, charge=1) # Determine bonds 
+            self.mol_1.SetProp('_Name', 'Molecule 1')
 
+            self.mol_2 = self.molecule2
+            rdDetermineBonds.DetermineBonds(self.mol_2, charge=0)
+            self.mol_2.SetProp('_Name', 'Molecule 2')
+
+            molecules = [self.mol_1, self.mol_2]
+            return molecules
 
 
     def parameters(self):
