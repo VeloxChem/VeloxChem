@@ -12,9 +12,10 @@ from rdkit.Chem import rdFMCS
 from rdkit.Chem import rdDetermineBonds
 
 class MCS:
-    def __init__(self, Protonated_molecule, Deprotonated_molecule):
+    def __init__(self, Protonated_molecule, Deprotonated_molecule, deprotonated = False):
         self.molecule1 = Protonated_molecule
         self.molecule2 = Deprotonated_molecule
+        self.deprotonated = deprotonated
         
 
     def give_the_molecules_personality(self):
