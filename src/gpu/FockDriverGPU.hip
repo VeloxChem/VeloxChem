@@ -3678,6 +3678,12 @@ computeFockOnGPU(const              CMolecule& molecule,
                  const int64_t      rank,
                  const int64_t      nnodes) -> CDenseMatrix
 {
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Set device");
+
     // TODO sanity check for flag_K: SYMM or ANTISYMM
 
     CGpuDevices gpu_devices;
@@ -3692,7 +3698,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
-    CMultiTimer timer;
+    timer.stop("Set device");
 
     timer.start("Prep. blocks");
 
@@ -3839,11 +3845,11 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.stop("Prep. sortQD");
 
+    timer.start("Prep. Q_prime");
+
     CTimer prelink_timer;
 
     prelink_timer.start();
-
-    timer.start("Prep. Q_prime");
 
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
@@ -3890,15 +3896,19 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     timer.stop("Prep. Q_prime");
 
+    timer.start("Prep. preLinK 1");
+
     prelink_timer.stop();
 
     auto prelink_elapsed_time = prelink_timer.getElapsedTime();
 
     screening.setPreLinkTime(prelink_elapsed_time);
 
-    timer.start("Prep. preLinK");
-
     screening.form_pair_inds_for_K(s_prim_count, p_prim_count, d_prim_count, mat_full, prelink_threshold);
+
+    timer.stop("Prep. preLinK 1");
+
+    timer.start("Prep. preLinK 2");
 
     mat_full = CDenseMatrix();
 
@@ -3907,7 +3917,9 @@ computeFockOnGPU(const              CMolecule& molecule,
                                s_prim_aoinds, p_prim_aoinds, d_prim_aoinds,
                                cart_naos, cart_dens_ptr);
 
-    timer.stop("Prep. preLinK");
+    timer.stop("Prep. preLinK 2");
+
+    timer.start("Prep. Fockmat");
 
     std::string errnaos("gpu::computeFockGPU: Inconsistent number of AOs");
     errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
@@ -3921,9 +3933,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     screening.initTimers(num_gpus_per_node);
 
-    // std::cout << "\nTiming of prep. on rank " << rank << "\n";
-    // std::cout << "-------------------------\n";
-    // std::cout << timer.getSummary() << std::endl;
+    timer.stop("Prep. Fockmat");
+
+    std::vector<CMultiTimer> omptimers(nthreads);
 
 #pragma omp parallel
     {
@@ -3935,13 +3947,13 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
+    omptimers[thread_id].start("Set device");
+
     hipSafe(hipSetDevice(gpu_rank % total_num_gpus_per_compute_node));
 
-    CMultiTimer timer;
+    omptimers[thread_id].stop("Set device");
 
-    timer.start("Total timing");
-
-    timer.start("Boys func. prep.");
+    omptimers[thread_id].start("Boys func. prep.");
 
     // Boys function (tabulated for order 0-28)
 
@@ -3961,9 +3973,9 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
 
-    timer.stop("Boys func. prep.");
+    omptimers[thread_id].stop("Boys func. prep.");
 
-    timer.start("GTO block prep.");
+    omptimers[thread_id].start("GTO block prep.");
 
     // GTOs blocks and number of AOs
 
@@ -4037,11 +4049,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     hipSafe(hipMemcpy(d_d_prim_info, d_prim_info.data(), d_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_d_prim_aoinds, d_prim_aoinds.data(), d_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    timer.stop("GTO block prep.");
+    omptimers[thread_id].stop("GTO block prep.");
 
     // GTO block pairs
 
-    timer.start("Coulomb prep.");
+    omptimers[thread_id].start("Coulomb prep.");
 
     const auto ss_mat_Q_orig = screening.getQMatrixSS();
     const auto sp_mat_Q_orig = screening.getQMatrixSP();
@@ -4294,17 +4306,17 @@ computeFockOnGPU(const              CMolecule& molecule,
     hipSafe(hipMemcpy(d_pd_pair_data_local, pd_pair_data_local.data(), pd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_dd_pair_data_local, dd_pair_data_local.data(), dd_pair_data_local.size() * sizeof(double), hipMemcpyHostToDevice));
 
-    timer.stop("Coulomb prep.");
-
     mat_Fock_omp[gpu_id].zero();
 
     hipSafe(hipDeviceSynchronize());
 
+    omptimers[thread_id].stop("Coulomb prep.");
+
+    omptimers[thread_id].start("J computation");
+
     CTimer coulomb_timer;
 
     coulomb_timer.start();
-
-    timer.start("J computation");
 
     // compute J
 
@@ -4315,7 +4327,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     if (ss_prim_pair_count_local > 0)
     {
-        timer.start("  J block SS");
+        omptimers[thread_id].start("  J block SS");
 
         // zeroize J on device
 
@@ -4340,7 +4352,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         {
             hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-            timer.start("    J block SSSS");
+            //omptimers[thread_id].start("    J block SSSS");
 
             hipLaunchKernelGGL(gpu::computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0,
                                d_mat_J,
@@ -4363,7 +4375,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block SSSS");
+            omptimers[thread_id].stop("    J block SSSS");
         }
 
         // J: (SS|SP)
@@ -4538,14 +4550,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * prefac_coulomb;
         }
 
-        timer.stop("  J block SS");
+        omptimers[thread_id].stop("  J block SS");
     }
 
     // J: S-P block
 
     if (sp_prim_pair_count_local > 0)
     {
-        timer.start("  J block SP");
+        omptimers[thread_id].start("  J block SP");
 
         // zeroize J on device
 
@@ -4778,14 +4790,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  J block SP");
+        omptimers[thread_id].stop("  J block SP");
     }
 
     // J: P-P block
 
     if (pp_prim_pair_count_local > 0)
     {
-        timer.start("  J block PP");
+        omptimers[thread_id].start("  J block PP");
 
         // zeroize J on device
 
@@ -4963,7 +4975,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            timer.start("    J block PPDD");
+            //omptimers[thread_id].start("    J block PPDD");
 
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -4990,7 +5002,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block PPDD");
+            omptimers[thread_id].stop("    J block PPDD");
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -5024,14 +5036,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  J block PP");
+        omptimers[thread_id].stop("  J block PP");
     }
 
     // J: S-D block
 
     if (sd_prim_pair_count_local > 0)
     {
-        timer.start("  J block SD");
+        omptimers[thread_id].start("  J block SD");
 
         // zeroize J on device
 
@@ -5215,7 +5227,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            timer.start("    J block SDDD");
+            //omptimers[thread_id].start("    J block SDDD");
 
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5242,7 +5254,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block SDDD");
+            omptimers[thread_id].stop("    J block SDDD");
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, sd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -5268,14 +5280,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  J block SD");
+        omptimers[thread_id].stop("  J block SD");
     }
 
     // J: P-D block
 
     if (pd_prim_pair_count_local > 0)
     {
-        timer.start("  J block PD");
+        omptimers[thread_id].start("  J block PD");
 
         // zeroize J on device
 
@@ -5364,7 +5376,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            timer.start("    J block PDSD");
+            //omptimers[thread_id].start("    J block PDSD");
 
             hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5393,7 +5405,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block PDSD");
+            omptimers[thread_id].stop("    J block PDSD");
         }
 
         // J: (PD|PP)
@@ -5401,7 +5413,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            timer.start("    J block PDPP");
+            //omptimers[thread_id].start("    J block PDPP");
 
             hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5428,7 +5440,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block PDPP");
+            omptimers[thread_id].stop("    J block PDPP");
         }
 
         // J: (PD|PD)
@@ -5436,7 +5448,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            timer.start("    J block PDPD");
+            //omptimers[thread_id].start("    J block PDPD");
 
             hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5463,7 +5475,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block PDPD");
+            omptimers[thread_id].stop("    J block PDPD");
         }
 
         // J: (PD|DD)
@@ -5471,7 +5483,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            timer.start("    J block PDDD");
+            //omptimers[thread_id].start("    J block PDDD");
 
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5603,7 +5615,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block PDDD");
+            omptimers[thread_id].stop("    J block PDDD");
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, pd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -5636,14 +5648,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  J block PD");
+        omptimers[thread_id].stop("  J block PD");
     }
 
     // J: D-D block
 
     if (dd_prim_pair_count_local > 0)
     {
-        timer.start("  J block DD");
+        omptimers[thread_id].start("  J block DD");
 
         // zeroize J on device
 
@@ -5666,7 +5678,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (ss_prim_pair_count > 0)
         {
-            timer.start("    J block DDSS");
+            //omptimers[thread_id].start("    J block DDSS");
 
             hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5697,7 +5709,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block DDSS");
+            omptimers[thread_id].stop("    J block DDSS");
         }
 
         // J: (DD|SP)
@@ -5705,7 +5717,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sp_prim_pair_count > 0)
         {
-            timer.start("    J block DDSP");
+            //omptimers[thread_id].start("    J block DDSP");
 
             hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5738,7 +5750,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block DDSP");
+            omptimers[thread_id].stop("    J block DDSP");
         }
 
         // J: (DD|SD)
@@ -5746,7 +5758,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (sd_prim_pair_count > 0)
         {
-            timer.start("    J block DDSD");
+            //omptimers[thread_id].start("    J block DDSD");
 
             hipSafe(hipMemcpy(d_mat_D, sd_mat_D.data(), sd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5777,7 +5789,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block DDSD");
+            omptimers[thread_id].stop("    J block DDSD");
         }
 
         // J: (DD|PP)
@@ -5785,7 +5797,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pp_prim_pair_count > 0)
         {
-            timer.start("    J block DDPP");
+            //omptimers[thread_id].start("    J block DDPP");
 
             hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -5816,7 +5828,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block DDPP");
+            omptimers[thread_id].stop("    J block DDPP");
         }
 
         // J: (DD|PD)
@@ -5824,7 +5836,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (pd_prim_pair_count > 0)
         {
-            timer.start("    J block DDPD");
+            //omptimers[thread_id].start("    J block DDPD");
 
             hipSafe(hipMemcpy(d_mat_D, pd_mat_D.data(), pd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -6044,7 +6056,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block DDPD");
+            omptimers[thread_id].stop("    J block DDPD");
         }
 
         // J: (DD|DD)
@@ -6052,7 +6064,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         if (dd_prim_pair_count > 0)
         {
-            timer.start("    J block DDDD");
+            //omptimers[thread_id].start("    J block DDDD");
 
             hipSafe(hipMemcpy(d_mat_D, dd_mat_D.data(), dd_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -6518,7 +6530,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
             hipSafe(hipDeviceSynchronize());
 
-            timer.stop("    J block DDDD");
+            omptimers[thread_id].stop("    J block DDDD");
         }
 
         hipSafe(hipMemcpy(mat_J.data(), d_mat_J, dd_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
@@ -6552,12 +6564,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  J block DD");
+        omptimers[thread_id].stop("  J block DD");
     }
 
     }  // end of compute J
-
-    timer.stop("J computation");
 
     hipSafe(hipDeviceSynchronize());
 
@@ -6566,6 +6576,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto coulomb_elapsed_time = coulomb_timer.getElapsedTime();
 
     screening.setCoulombTime(gpu_id, coulomb_elapsed_time);
+
+    omptimers[thread_id].stop("J computation");
+
+    omptimers[thread_id].start("J finalize");
 
     hipSafe(hipFree(d_mat_D));
     hipSafe(hipFree(d_mat_J));
@@ -6624,7 +6638,9 @@ computeFockOnGPU(const              CMolecule& molecule,
     hipSafe(hipFree(d_pd_pair_data_local));
     hipSafe(hipFree(d_dd_pair_data_local));
 
-    timer.start("Exchange prep.");
+    omptimers[thread_id].stop("J finalize");
+
+    omptimers[thread_id].start("Exchange prep.");
 
     // K preparation
 
@@ -6894,15 +6910,15 @@ computeFockOnGPU(const              CMolecule& molecule,
     hipSafe(hipMemcpy(d_pair_data_K_dp, pair_data_K_dp.data(), pair_data_K_dp.size() * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pair_data_K_dd, pair_data_K_dd.data(), pair_data_K_dd.size() * sizeof(double), hipMemcpyHostToDevice));
 
-    timer.stop("Exchange prep.");
-
     hipSafe(hipDeviceSynchronize());
+
+    omptimers[thread_id].stop("Exchange prep.");
+
+    omptimers[thread_id].start("K computation");
 
     CTimer exchange_timer;
 
     exchange_timer.start();
-
-    timer.start("K computation");
 
     // compute K
 
@@ -6913,7 +6929,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
     if (pair_inds_count_for_K_ss > 0)
     {
-        timer.start("  K block SS");
+        omptimers[thread_id].start("  K block SS");
 
         // zeroize K on device
 
@@ -7240,14 +7256,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0) * frac_exact_exchange * symm_pref;
         }
 
-        timer.stop("  K block SS");
+        omptimers[thread_id].stop("  K block SS");
     }
 
     // K: S-P block
 
     if (pair_inds_count_for_K_sp > 0)
     {
-        timer.start("  K block SP");
+        omptimers[thread_id].start("  K block SP");
 
         // zeroize K on device
 
@@ -7610,14 +7626,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  K block SP");
+        omptimers[thread_id].stop("  K block SP");
     }
 
     // K: P-P block
 
     if (pair_inds_count_for_K_pp > 0)
     {
-        timer.start("  K block PP");
+        omptimers[thread_id].start("  K block PP");
 
         // zeroize K on device
 
@@ -7638,7 +7654,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PS|PS)
         //     *  *
 
-        timer.start("    K block PSPS");
+        //omptimers[thread_id].start("    K block PSPS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSPS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7666,12 +7682,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSPS");
+        omptimers[thread_id].stop("    K block PSPS");
 
         // K: (PS|PP)
         //     *  *
 
-        timer.start("    K block PSPP");
+        //omptimers[thread_id].start("    K block PSPP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSPP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7704,12 +7720,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSPP");
+        omptimers[thread_id].stop("    K block PSPP");
 
         // K: (PP|PS)
         //     *  *
 
-        timer.start("    K block PPPS");
+        //omptimers[thread_id].start("    K block PPPS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7742,12 +7758,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PPPS");
+        omptimers[thread_id].stop("    K block PPPS");
 
         // K: (PP|PP)
         //     *  *
 
-        timer.start("    K block PPPP");
+        //omptimers[thread_id].start("    K block PPPP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7772,12 +7788,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PPPP");
+        omptimers[thread_id].stop("    K block PPPP");
 
         // K: (PS|PD)
         //     *  *
 
-        timer.start("    K block PSPD");
+        //omptimers[thread_id].start("    K block PSPD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSPD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7813,12 +7829,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSPD");
+        omptimers[thread_id].stop("    K block PSPD");
 
         // K: (PD|PS)
         //     *  *
 
-        timer.start("    K block PDPS");
+        //omptimers[thread_id].start("    K block PDPS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7854,12 +7870,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PDPS");
+        omptimers[thread_id].stop("    K block PDPS");
 
         // K: (PP|PD)
         //     *  *
 
-        timer.start("    K block PPPD");
+        //omptimers[thread_id].start("    K block PPPD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPPD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7892,12 +7908,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PPPD");
+        omptimers[thread_id].stop("    K block PPPD");
 
         // K: (PD|PP)
         //     *  *
 
-        timer.start("    K block PDPP");
+        //omptimers[thread_id].start("    K block PDPP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7930,12 +7946,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PDPP");
+        omptimers[thread_id].stop("    K block PDPP");
 
         // K: (PD|PD)
         //     *  *
 
-        timer.start("    K block PDPD");
+        //omptimers[thread_id].start("    K block PDPD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDPD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -7963,7 +7979,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PDPD");
+        omptimers[thread_id].stop("    K block PDPD");
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -7998,14 +8014,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  K block PP");
+        omptimers[thread_id].stop("  K block PP");
     }
 
     // K: S-D block
 
     if (pair_inds_count_for_K_sd > 0)
     {
-        timer.start("  K block SD");
+        omptimers[thread_id].start("  K block SD");
 
         // zeroize K on device
 
@@ -8134,7 +8150,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (SP|DP)
         //     *  *
 
-        timer.start("    K block SPDP");
+        //omptimers[thread_id].start("    K block SPDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8170,12 +8186,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SPDP");
+        omptimers[thread_id].stop("    K block SPDP");
 
         // K: (SS|DD)
         //     *  *
 
-        timer.start("    K block SSDD");
+        //omptimers[thread_id].start("    K block SSDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSSDD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8208,12 +8224,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SSDD");
+        omptimers[thread_id].stop("    K block SSDD");
 
         // K: (SD|DS)
         //     *  *
 
-        timer.start("    K block SDDS");
+        //omptimers[thread_id].start("    K block SDDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8246,12 +8262,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SDDS");
+        omptimers[thread_id].stop("    K block SDDS");
 
         // K: (SP|DD)
         //     *  *
 
-        timer.start("    K block SPDD");
+        //omptimers[thread_id].start("    K block SPDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSPDD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8287,12 +8303,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SPDD");
+        omptimers[thread_id].stop("    K block SPDD");
 
         // K: (SD|DP)
         //     *  *
 
-        timer.start("    K block SDDP");
+        //omptimers[thread_id].start("    K block SDDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8328,12 +8344,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SDDP");
+        omptimers[thread_id].stop("    K block SDDP");
 
         // K: (SD|DD)
         //     *  *
 
-        timer.start("    K block SDDD");
+        //omptimers[thread_id].start("    K block SDDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockSDDD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8366,7 +8382,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block SDDD");
+        omptimers[thread_id].stop("    K block SDDD");
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sd * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -8394,14 +8410,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  K block SD");
+        omptimers[thread_id].stop("  K block SD");
     }
 
     // K: P-D block
 
     if (pair_inds_count_for_K_pd > 0)
     {
-        timer.start("  K block PD");
+        omptimers[thread_id].start("  K block PD");
 
         // zeroize K on device
 
@@ -8422,7 +8438,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (PS|DS)
         //     *  *
 
-        timer.start("    K block PSDS");
+        //omptimers[thread_id].start("    K block PSDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8458,12 +8474,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSDS");
+        omptimers[thread_id].stop("    K block PSDS");
 
         // K: (PS|DP)
         //     *  *
 
-        timer.start("    K block PSDP");
+        //omptimers[thread_id].start("    K block PSDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8499,12 +8515,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSDP");
+        omptimers[thread_id].stop("    K block PSDP");
 
         // K: (PP|DS)
         //     *  *
 
-        timer.start("    K block PPDS");
+        //omptimers[thread_id].start("    K block PPDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8540,12 +8556,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PPDS");
+        omptimers[thread_id].stop("    K block PPDS");
 
         // K: (PS|DD)
         //     *  *
 
-        timer.start("    K block PSDD");
+        //omptimers[thread_id].start("    K block PSDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPSDD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8581,12 +8597,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PSDD");
+        omptimers[thread_id].stop("    K block PSDD");
 
         // K: (PD|DS)
         //     *  *
 
-        timer.start("    K block PDDS");
+        //omptimers[thread_id].start("    K block PDDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8622,12 +8638,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PDDS");
+        omptimers[thread_id].stop("    K block PDDS");
 
         // K: (PP|DP)
         //     *  *
 
-        timer.start("    K block PPDP");
+        //omptimers[thread_id].start("    K block PPDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8660,12 +8676,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PPDP");
+        omptimers[thread_id].stop("    K block PPDP");
 
         // K: (PP|DD)
         //     *  *
 
-        timer.start("    K block PPDD");
+        //omptimers[thread_id].start("    K block PPDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPPDD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8698,12 +8714,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PPDD");
+        omptimers[thread_id].stop("    K block PPDD");
 
         // K: (PD|DP)
         //     *  *
 
-        timer.start("    K block PDDP");
+        //omptimers[thread_id].start("    K block PDDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8736,12 +8752,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PDDP");
+        omptimers[thread_id].stop("    K block PDDP");
 
         // K: (PD|DD)
         //     *  *
 
-        timer.start("    K block PDDD");
+        //omptimers[thread_id].start("    K block PDDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockPDDD0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -8948,7 +8964,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block PDDD");
+        omptimers[thread_id].stop("    K block PDDD");
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pd * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -8983,14 +8999,14 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  K block PD");
+        omptimers[thread_id].stop("  K block PD");
     }
 
     // K: D-D block
 
     if (pair_inds_count_for_K_dd > 0)
     {
-        timer.start("  K block DD");
+        omptimers[thread_id].start("  K block DD");
 
         // zeroize K on device
 
@@ -9114,7 +9130,7 @@ computeFockOnGPU(const              CMolecule& molecule,
         // K: (DS|DD)
         //     *  *
 
-        timer.start("    K block DSDD");
+        //omptimers[thread_id].start("    K block DSDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDSDD, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9147,12 +9163,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DSDD");
+        omptimers[thread_id].stop("    K block DSDD");
 
         // K: (DD|DS)
         //     *  *
 
-        timer.start("    K block DDDS");
+        //omptimers[thread_id].start("    K block DDDS");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDS, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9185,12 +9201,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DDDS");
+        omptimers[thread_id].stop("    K block DDDS");
 
         // K: (DP|DP)
         //     *  *
 
-        timer.start("    K block DPDP");
+        //omptimers[thread_id].start("    K block DPDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDP, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9218,12 +9234,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DPDP");
+        omptimers[thread_id].stop("    K block DPDP");
 
         // K: (DP|DD)
         //     *  *
 
-        timer.start("    K block DPDD");
+        //omptimers[thread_id].start("    K block DPDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDPDD0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9430,12 +9446,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DPDD");
+        omptimers[thread_id].stop("    K block DPDD");
 
         // K: (DD|DP)
         //     *  *
 
-        timer.start("    K block DDDP");
+        //omptimers[thread_id].start("    K block DDDP");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDP0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9642,12 +9658,12 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DDDP");
+        omptimers[thread_id].stop("    K block DDDP");
 
         // K: (DD|DD)
         //     *  *
 
-        timer.start("    K block DDDD");
+        //omptimers[thread_id].start("    K block DDDD");
 
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, num_blocks, threads_per_block, 0, 0,
                            d_mat_K,
@@ -9966,7 +9982,7 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         hipSafe(hipDeviceSynchronize());
 
-        timer.stop("    K block DDDD");
+        omptimers[thread_id].stop("    K block DDDD");
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_dd * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -10001,12 +10017,10 @@ computeFockOnGPU(const              CMolecule& molecule,
             }
         }
 
-        timer.stop("  K block DD");
+        omptimers[thread_id].stop("  K block DD");
     }
 
     }  // end of compute K
-
-    timer.stop("K computation");
 
     hipSafe(hipDeviceSynchronize());
 
@@ -10015,6 +10029,10 @@ computeFockOnGPU(const              CMolecule& molecule,
     auto exchange_elapsed_time = exchange_timer.getElapsedTime();
 
     screening.setExchangeTime(gpu_id, exchange_elapsed_time);
+
+    omptimers[thread_id].stop("K computation");
+
+    omptimers[thread_id].start("K finalize");
 
     hipSafe(hipFree(d_boys_func_table));
     hipSafe(hipFree(d_boys_func_ft));
@@ -10095,14 +10113,11 @@ computeFockOnGPU(const              CMolecule& molecule,
     hipSafe(hipFree(d_pair_data_K_dp));
     hipSafe(hipFree(d_pair_data_K_dd));
 
-    timer.stop("Total timing");
-
-    // std::cout << "\nTiming of ERIs on GPU " << gpu_rank << "\n";
-    // std::cout << "-----------------------\n";
-    // std::cout << timer.getSummary() << std::endl;
-
+    omptimers[thread_id].stop("K finalize");
     }
     }
+
+    timer.start("Accumulate Fockmat");
 
     CDenseMatrix mat_Fock_sum (naos, naos);
 
@@ -10119,6 +10134,21 @@ computeFockOnGPU(const              CMolecule& molecule,
             p_mat_F[ind] += p_mat_fock[ind];
         }
     }
+
+    timer.stop("Accumulate Fockmat");
+
+    timer.stop("Total timing");
+
+    // std::cout << "Timing of Fock build" << std::endl;
+    // std::cout << "--------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "GPU timing" << std::endl;
+    // std::cout << "----------" << std::endl;
+    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "GPU " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
 
     return mat_Fock_sum;
 }

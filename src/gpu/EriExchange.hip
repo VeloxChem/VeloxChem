@@ -2971,6 +2971,8 @@ computeExchangeFockPPPP(double*         mat_K,
         {
             const uint32_t l = n * TILE_DIM_X_K + threadIdx.x;
 
+            // TODO: merge to if's into one
+
             if ((ik < pair_inds_count_for_K_pp) && (j < count_i) && (l < count_k))
             {
                 const auto Q_kl = Q_K_pp[displ_k + l];
