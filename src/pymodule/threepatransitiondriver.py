@@ -503,6 +503,7 @@ class ThreePATransitionDriver(NonlinearSolver):
         a0 = bohr_in_angstrom() * 1.0e-8
         c = speed_of_light_in_vacuum_in_SI() * 100.0
         gamma = 0.1 / hartree_in_ev()
+        # TODO: double check au2gm for 3PA
         au2gm = (4.0 * np.pi**3 * alpha * a0**8) / (3.0 * c **2  * gamma) * 1.0e+50
 
         if self.rank == mpi_master():
@@ -530,6 +531,8 @@ class ThreePATransitionDriver(NonlinearSolver):
                 tpa_strengths['linear'][w] = D_linear
                 tpa_strengths['circular'][w] = D_circular
 
+                # TODO: double check 3PA cross-sections
+
                 tpa_cross_sections['linear'][w] = au2gm * w**3 * D_linear
                 tpa_cross_sections['circular'][w] = au2gm * w**3 * D_circular
 
@@ -547,7 +550,7 @@ class ThreePATransitionDriver(NonlinearSolver):
             ret_dict = {
                 'photon_energies': [-w for w in freqs],
                 'transition_moments': T_tensors,
-                'cross_sections': tpa_cross_sections,
+                #'cross_sections': tpa_cross_sections,
                 '3pa_strengths': tpa_strengths,
                 'ground_state_dipole_moments':scf_prop.get_property('dipole moment')
             }
@@ -1818,129 +1821,47 @@ class ThreePATransitionDriver(NonlinearSolver):
                 self.ostream.print_header(' '.join(row_values))  # Print row data
 
         tpa_strengths = rsp_results['3pa_strengths']
-        tpa_cross_sections = rsp_results['cross_sections']
+        #tpa_cross_sections = rsp_results['cross_sections']
 
         self.ostream.print_blank()
+        self.ostream.print_blank()
 
-        title = '3PA Strength and Cross-Section (Linear Polarization)'
+        #title = '3PA Strength and Cross-Section (Linear Polarization)'
+        title = '3PA Strength (Linear Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<12s}{:>11s}{:>27s}{:>28s}'.format(
-            'State', 'Ex.Energy', '3PA strength    ',
-            '3PA cross-section    ')
+        title = '{:<12s}{:>11s}{:>27s}'.format(
+            'State', 'Ex.Energy', '3PA strength    ')
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
         for w_ind, w in enumerate(freqs):
-            exec_str = '{:<6d}'.format(w_ind + 1)
+            exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
+            #exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
             self.ostream.print_header(exec_str)
+
+        self.ostream.print_blank()
         self.ostream.print_blank()
 
-        title = '3PA Strength and Cross-Section (Circular Polarization)'
+        #title = '3PA Strength and Cross-Section (Circular Polarization)'
+        title = '3PA Strength (Circular Polarization)'
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
-        title = '  {:<12s}{:>11s}{:>27s}{:>28s}'.format(
-            'State', 'Ex.Energy', '3PA strength    ',
-            '3PA cross-section    ')
+        title = '{:<12s}{:>11s}{:>27s}'.format(
+            'State', 'Ex.Energy', '3PA strength    ')
         self.ostream.print_header(title)
         self.ostream.print_header('-' * width)
 
         for w_ind, w in enumerate(freqs):
-            exec_str = '{:<6d}'.format(w_ind + 1)
+            exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
+            #exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
             self.ostream.print_header(exec_str)
         self.ostream.print_blank()
 
         self.ostream.flush()
-
-    @staticmethod
-    def get_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
-        """
-        Gets two-photon absorption spectrum.
-
-        :param rsp_results:
-            A dictonary containing the result of TPA transition calculation.
-        :param x_data:
-            The list or array of x values.
-        :param x_unit:
-            The unit of x values.
-        :param b_value:
-            The value of the broadening parameter.
-        :param b_unit:
-            The unit of the broadening parameter.
-
-        :return:
-            A dictionary containing photon energies and TPA cross-sections.
-        """
-
-        assert_msg_critical(
-            x_unit.lower() in ['au', 'ev', 'nm'],
-            'TpaTransitionDriver.get_spectrum: x_data should be au, ev or nm')
-
-        assert_msg_critical(
-            b_unit.lower() in ['au', 'ev'],
-            'TpaTransitionDriver.get_spectrum: broadening parameter should be au or ev'
-        )
-
-        au2ev = hartree_in_ev()
-        auxnm = 1.0 / hartree_in_inverse_nm()
-
-        # conversion factor for TPA cross-sections in GM
-        # * a0 in cm
-        # * c in cm/s
-        # * broadening parameter not included in au2gm
-        alpha = fine_structure_constant()
-        a0_in_cm = bohr_in_angstrom() * 1.0e-8
-        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
-        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
-
-        tpa_ene_au = []
-        tpa_str = []
-
-        for w, s in rsp_results['tpa_strengths']['linear'].items():
-            tpa_ene_au.append(-w)
-            tpa_str.append(s)
-
-        spectrum = {}
-
-        if x_unit.lower() == 'au':
-            spectrum['x_label'] = 'Photon energy [a.u.]'
-        elif x_unit.lower() == 'ev':
-            spectrum['x_label'] = 'Photon energy [eV]'
-        elif x_unit.lower() == 'nm':
-            spectrum['x_label'] = 'Wavelength [nm]'
-
-        spectrum['y_label'] = 'TPA cross-section [GM]'
-
-        if x_unit.lower() == 'au':
-            x_data_au = list(x_data)
-        elif x_unit.lower() == 'ev':
-            x_data_au = [x / au2ev for x in x_data]
-        elif x_unit.lower() == 'nm':
-            x_data_au = [auxnm / x for x in x_data]
-
-        if b_unit.lower() == 'au':
-            b_au = b_value
-        elif b_unit.lower() == 'ev':
-            b_au = b_value / au2ev
-
-        y_data = []
-
-        for x_au in x_data_au:
-            y = 0.0
-            for e, s in zip(tpa_ene_au, tpa_str):
-                b_factor = b_au / ((e * 2 - x_au * 2)**2 + b_au**2)
-                y += au2gm * b_factor * (s * x_au**2)
-            y_data.append(y)
-
-        spectrum['x_data'] = list(x_data)
-        spectrum['y_data'] = y_data
-
-        return spectrum
