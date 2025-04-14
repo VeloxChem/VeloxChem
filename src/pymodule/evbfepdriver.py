@@ -194,7 +194,7 @@ class EvbFepDriver():
             self.ostream.flush()
             equil_simulation.minimizeEnergy()
             minim_positions = equil_simulation.context.getState(
-                getPositions=True).getPositions()
+                getPositions=True, enforcePeriodicBox=True).getPositions()
             mmapp.PDBFile.writeFile(
                 topology,
                 np.array(minim_positions.value_in_unit(mm.unit.angstrom)),

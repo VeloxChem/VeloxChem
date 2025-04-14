@@ -94,10 +94,6 @@ class EvbForceFieldBuilder():
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] | None = None,
     ):
-        # assert len(
-        #     reactant_input) == 1, "Only one reactant is supported at the moment"
-        # assert len(
-        #     product_input) == 1, "Only one product is supported at the moment"
 
         reactants: list[MMForceFieldGenerator] = []
         for input in reactant_input:
