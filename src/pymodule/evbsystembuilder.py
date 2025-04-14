@@ -167,11 +167,6 @@ class EvbSystemBuilder():
         self.temperature: float = 300
         self.Lambda: list[float]
 
-        self.soft_core_coulomb_pes = True
-        self.soft_core_coulomb_int = True
-        self.soft_core_lj_pes = True
-        self.soft_core_lj_int = True
-
         self.sc_alpha_lj: float = 0.7
         self.sc_alpha_q: float = 0.3
         self.sc_sigma_q: float = 1.0
@@ -184,7 +179,14 @@ class EvbSystemBuilder():
         self.coul14_scale: float = 0.833
         self.lj14_scale: float = 0.5
         self.minimal_nb_cutoff: float = 1  # nm, minimal cutoff for the nonbonded force
-        self.bonded_integration: bool = False  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
+
+        self.soft_core_coulomb_pes = False
+        self.soft_core_lj_pes = False
+
+        self.soft_core_coulomb_int = True
+        self.soft_core_lj_int = True
+
+        self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
 
         self.verbose = False
         # self.write_xml = True

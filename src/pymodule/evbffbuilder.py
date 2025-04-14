@@ -103,10 +103,7 @@ class EvbForceFieldBuilder():
         self.ostream.print_info("Creating combined reactant force field")
         self.ostream.flush()
         reamol = molecule = self._combine_molecule(
-            [rea['molecule'] for rea in reactant_input],
-            reactants,
-            self.optimize_ff,
-        )
+            [rea['molecule'] for rea in reactant_input])
         self.reactant = self._combine_forcefield(reactants)
         self.reactant.molecule = reamol
 
@@ -118,11 +115,7 @@ class EvbForceFieldBuilder():
 
         self.ostream.print_info("Creating combined product force field")
         self.ostream.flush()
-        promol = self._combine_molecule(
-            [pro['molecule'] for pro in product_input],
-            products,
-            self.optimize_ff,
-        )
+        promol = self._combine_molecule([pro['molecule'] for pro in product_input],)
         self.product = self._combine_forcefield(products)
         self.product.molecule = promol
 
@@ -137,13 +130,14 @@ class EvbForceFieldBuilder():
         formed_bonds, broken_bonds = self._summarise_reaction(
             self.reactant, self.product)
 
+        if self.optimize_ff:
+            self.reactant.molecule = self._optimize_molecule(self.reactant.molecule.get_element_ids(), self.reactant,formed_bonds)
+            self.product.molecule = self._optimize_molecule(self.product.molecule.get_element_ids(), self.product,broken_bonds)
+
         return self.reactant, self.product, formed_bonds, broken_bonds
 
     @staticmethod
-    def _combine_molecule(molecules,
-                          forcefields,
-                          optimise_mm=True,
-                          name='MOL',):
+    def _combine_molecule(molecules):
         
         combined_molecule = molecules[0]
         # pos = []
@@ -158,49 +152,51 @@ class EvbForceFieldBuilder():
                 coord[0] += shift
                 # pos.append(coord)
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
-
-        # merged_forcefield.molecule = combined_molecule
-
-        if optimise_mm:
-
-            # ffs = []
-            ffnames = []
-            for i, ff in enumerate(forcefields):
-                ffname = f'{name}_{i}'
-                ffnames.append(f'{ffname}.xml')
-                ff.write_openmm_files(ffname,ffname)
-                pdb = mmapp.PDBFile(f'{ffname}.pdb')
-                if i == 0:
-                    modeller = mmapp.Modeller(pdb.topology,pdb.positions)
-                else:
-                    modeller.add(pdb.topology, pdb.positions)
-
-            top = modeller.getTopology()
-            pos = modeller.getPositions()
-
-            ff = mmapp.ForceField(*ffnames)
-
-            mmsys = ff.createSystem(
-                top,
-                nonbondedMethod=mmapp.CutoffNonPeriodic,
-                nonbondedCutoff=1.0 * mmunit.nanometers,
-            )
-            integrator = mm.VerletIntegrator(0.001)
-            sim = mmapp.Simulation(top, mmsys, integrator)
-            sim.context.setPositions(pos)
-            sim.minimizeEnergy()
-
-            state = sim.context.getState(getPositions=True)
-            pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
-
-            elements = combined_molecule.get_element_ids()
-            new_molecule = Molecule()
-            for i in range(len(elements)):
-                point = Point(pos[i])
-                new_molecule.add_atom(int(elements[i]), point, 'angstrom')
-
-            combined_molecule = new_molecule
         return combined_molecule
+
+    def _optimize_molecule(self, elemental_ids, forcefield, changing_bonds, name='MOL'):
+        # for i, ff in enumerate(forcefields):
+        for bond in changing_bonds:
+            s1 = forcefield.atoms[bond[0]]['sigma']
+            s2 = forcefield.atoms[bond[1]]['sigma']
+            s = (s1 + s2) / 2
+            forcefield.bonds.update({bond: {'equilibrium': s, 'force_constant': 250000}})
+            self.ostream.print_info(f"Adding bond {bond} with r {s} for equilibration")
+
+        self.ostream.flush()
+        forcefield.write_openmm_files(name,name)
+
+        for bond in changing_bonds:
+            forcefield.bonds.pop(bond)
+
+        pdb = mmapp.PDBFile(f'{name}.pdb')
+        modeller = mmapp.Modeller(pdb.topology,pdb.positions)
+            
+        top = modeller.getTopology()
+        pos = modeller.getPositions()
+
+        ff = mmapp.ForceField(f'{name}.xml')
+
+        mmsys = ff.createSystem(
+            top,
+            nonbondedMethod=mmapp.CutoffNonPeriodic,
+            nonbondedCutoff=1.0 * mmunit.nanometers,
+        )
+        integrator = mm.VerletIntegrator(0.001)
+        sim = mmapp.Simulation(top, mmsys, integrator)
+        sim.context.setPositions(pos)
+        sim.minimizeEnergy()
+
+        state = sim.context.getState(getPositions=True)
+        pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
+
+        
+        new_molecule = Molecule()
+        for i,elem in enumerate(elemental_ids):
+            point = Point(pos[i])
+            new_molecule.add_atom(int(elem), point, 'angstrom')
+
+        return new_molecule
 
     def get_forcefield(
         self,
@@ -363,6 +359,7 @@ class EvbForceFieldBuilder():
         return product_ff
 
         # Merge a list of forcefield generators into a single forcefield generator while taking care of the atom indices
+
     @staticmethod
     def _combine_forcefield(
             forcefields: list[MMForceFieldGenerator]) -> MMForceFieldGenerator:

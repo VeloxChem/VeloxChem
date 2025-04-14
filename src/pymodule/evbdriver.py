@@ -656,6 +656,16 @@ class EvbDriver():
                 "ion_count": 0,
                 "no_reactant": True,
             }
+        elif name == "ts_guesser":
+            conf = {
+                "name": "vacuum",
+                "temperature": self.temperature,
+                "bonded_integration": True,
+                "soft_core_coulomb_pes": True,
+                "soft_core_lj_pes": True,
+                "soft_core_coulomb_int": False,
+                "soft_core_lj_int": False,
+            }
         elif SolvationBuilder()._solvent_properties(name) is not None:
             conf = {
                 "name": name,

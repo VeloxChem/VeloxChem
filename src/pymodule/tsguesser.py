@@ -84,9 +84,8 @@ class TransitionStateGuesser():
 
     def find_TS(self, evb, scf=True):
         #todo ideally find a way to efficiently deal with the input to the EVB object
-
-        config = evb.default_system_configurations("vacuum")
-        config['temperature'] = self.mm_temperature
+        evb.temperature = self.mm_temperature
+        config = evb.default_system_configurations("ts_guesser")
 
         evb.build_systems([config], self.lambda_vec, save_output=False)
         self.ostream.print_blank()
