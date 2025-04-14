@@ -7,9 +7,10 @@ from scipy import optimize
 
 
 class MPC1:
-    def __init__(self, molecule, deprotonated=False):
+    def __init__(self, molecule, deprotonated=False, protonated=False):
         self.molecule = molecule
-        self.deprotonated = deprotonated 
+        self.deprotonated = deprotonated
+	self.protonated = protonated
         self.basis = None
         self.scf_results = None
         self.density_matrix = None
@@ -25,6 +26,8 @@ class MPC1:
     def run_scf(self, functional='BLYP', solvation_model='CPCM'):
         if self.deprotonated == True:
             self.molecule.set_charge(-1)
+	if self.protonated == True:
+		self.molecule.set_charge(+1)
         self.basis = vlx.MolecularBasis.read(self.molecule, "def2-SVP")
         self.scf_drv = vlx.ScfRestrictedDriver()
         self.scf_drv.xcfun = functional
