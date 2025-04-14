@@ -193,11 +193,11 @@ CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
                         
                         if ((bra_mom + ket_mom) == 0)
                         {
-                            t2cfunc::distribute(mat_g, cbuffer, 6, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, i == j);
+                            t2cfunc::distribute(mat_g, cbuffer, 6, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, (i == j) && (k == l));
                         }
                         else
                         {
-                            t2cfunc::distribute(mat_g, sbuffer, 0, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, i == j);
+                            t2cfunc::distribute(mat_g, sbuffer, 0, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, (i == j) && (k == l));
                         }
                     }
                 }
