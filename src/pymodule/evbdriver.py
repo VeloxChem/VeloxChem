@@ -204,8 +204,8 @@ class EvbDriver():
     def _process_molecule_input(molecules, partial_charges):
         if isinstance(molecules, Molecule):
             molecules = [molecules]
-        if isinstance(partial_charges, float) or isinstance(
-                partial_charges, int):
+        if isinstance(partial_charges[0], float) or isinstance(
+                partial_charges[0], int):
             partial_charges = [partial_charges]
         elif partial_charges is None:
             partial_charges = [None] * len(molecules)

@@ -131,7 +131,7 @@ class EvbForceFieldBuilder():
                 "Matching reactant and product force fields")
             self.ostream.flush()
             self.product = self._match_reactant_and_product(
-                self.reactant, promol.get_element_ids(), self.product, reamol.get_element_ids(),
+                self.reactant, reamol.get_element_ids(), self.product, promol.get_element_ids(),
                 breaking_bonds)
 
         formed_bonds, broken_bonds = self._summarise_reaction(
@@ -354,6 +354,7 @@ class EvbForceFieldBuilder():
         total_mapping = rm.match_reaction_graphs(rea_graph, pro_graph)
         total_mapping = {v: k for k, v in total_mapping.items()}
         self.ostream.print_info(f"Mapping: {total_mapping}")
+        self.ostream.flush()
         product_ff = EvbForceFieldBuilder._apply_mapping_to_forcefield(
             product_ff, total_mapping)
 

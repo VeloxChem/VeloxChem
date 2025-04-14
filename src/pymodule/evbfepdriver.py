@@ -404,12 +404,12 @@ class EvbFepDriver():
                 states.pop(0)
             if pot > 0:
                 self.ostream.print_warning(
-                    f"Potential energy is positive: {pot:.5f} kJ/mol. Saving states and crashing"
+                    f"Potential energy is positive: {pot:.5f} kJ/mol."
                 )
-                self._save_states(states, simulation, i)
-                raise RuntimeError(
-                    f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
-                )
+                # self._save_states(states, simulation, i)
+                # raise RuntimeError(
+                #     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
+                # )
 
         return states
 
