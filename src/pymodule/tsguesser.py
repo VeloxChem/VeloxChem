@@ -82,12 +82,12 @@ class TransitionStateGuesser():
         self.mm_step_size = 0.001 * mmunit.picoseconds
         self.save_mm_traj = False
 
-    def find_TS(self, evb, scf=True):
+    def find_TS(self, evb, scf=True, constraints=None):
         #todo ideally find a way to efficiently deal with the input to the EVB object
         evb.temperature = self.mm_temperature
         config = evb.default_system_configurations("ts_guesser")
 
-        evb.build_systems([config], self.lambda_vec, save_output=False)
+        evb.build_systems([config], self.lambda_vec, save_output=False, constraints=constraints)
         self.ostream.print_blank()
         self.ostream.print_header("Starting MM scan")
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
