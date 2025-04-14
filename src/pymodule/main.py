@@ -57,6 +57,8 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
+from .rspthreepatransition import ThreePATransition
+
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
@@ -177,6 +179,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
+
+    elif prop_type == '3pa transition':
+        rsp_prop = ThreePATransition(rsp_dict, method_dict)
 
     elif prop_type == 'tpa':
         rsp_prop = TPA(rsp_dict, method_dict)
@@ -557,7 +562,8 @@ def main():
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
-        polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm, task.ostream)
+        polgrad_drv = PolarizabilityGradient(scf_drv, task.mpi_comm,
+                                             task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
         polgrad_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
                             rsp_prop._rsp_property)

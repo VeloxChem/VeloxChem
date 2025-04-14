@@ -984,6 +984,7 @@ class NonlinearSolver:
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_fock_time(self, time):
         """

@@ -2636,6 +2636,7 @@ class LinearSolver:
             valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r[0], r[1], r[2])
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_absorption(self, title, results):
         """
@@ -2660,6 +2661,7 @@ class LinearSolver:
             valstr += '    Osc.Str. {:9.4f}'.format(f)
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_ecd(self, title, results):
         """
@@ -2683,6 +2685,7 @@ class LinearSolver:
             valstr += f'{R:11.4f} [10**(-40) cgs]'
             self.ostream.print_header(valstr.ljust(92))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_excitation_details(self, title, results):
         """

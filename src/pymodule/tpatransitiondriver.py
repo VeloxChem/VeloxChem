@@ -1078,6 +1078,8 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_blank()
         self.ostream.print_blank()
 
+        self.ostream.flush()
+
     @staticmethod
     def get_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
         """
