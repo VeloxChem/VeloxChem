@@ -140,7 +140,7 @@ class MoleculeProcessor2:
 
                 try:
                     mol = vlx.Molecule.read_xyz_file(deprot_path)
-                    calc = vlx.MolecularPropertyCalculator(mol, deprotonated=True)
+                    calc = vlx.MPC1(mol, deprotonated=True)
                     data_matrix = calc.run_all_calculations()
                     xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
                     df = pd.DataFrame(data_matrix, columns=[
