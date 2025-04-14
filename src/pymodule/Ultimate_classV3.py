@@ -9,16 +9,11 @@ import veloxchem as vlx
 
 from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
-# from veloxchem import Molecule
-# from Atom_mapping import MCS
-# from Class import MolecularPropertyCalculator
-# from Deprotonation import OxygenDeprotonation
-# from Protonation import NitrogenProtonation
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
-class MoleculeProcessor:
-    def __init__(self, folder_paths, output_folder='results', deprotonate=False, protonate = False):
+class MoleculeProcessor2:
+    def __init__(self, folder_paths, output_folder='results', deprotonate = False, protonate = False):
         self.folder_paths = folder_paths
         self.output_folder = output_folder
         self.deprotonate = deprotonate
@@ -68,7 +63,7 @@ class MoleculeProcessor:
             try:
                 molecule = vlx.Molecule.read_xyz_file(xyz_file)
             
-                calc = vlx.MPC1(molecule, xyz_filename=filename)
+                calc = vlx.MPC1(molecule)
 
                 print('Starting calculations for', filename)
 
@@ -106,7 +101,7 @@ class MoleculeProcessor:
             mol = Chem.MolFromXYZFile(file)
             try:
                 rdDetermineBonds.DetermineBonds(mol, 0)
-                deprot = OxygenDeprotonation(mol, filename, output_folder=self.deprotonated_dir)
+                deprot = vlx.OxygenDeprotonation(mol, filename, output_folder=self.deprotonated_dir)
                 deprot.Deprotonate()
             except Exception as e:
                 logging.error(f"Failed to deprotonate {filename}: {e}")
@@ -135,7 +130,7 @@ class MoleculeProcessor:
                     continue
 
                 try:
-                    mapping = MCS(neutral_mol, deprot_mol).get_atom_mapping()
+                    mapping = vlx.MCS(neutral_mol, deprot_mol).get_atom_mapping()
                     if mapping is None:
                         raise ValueError("Atom mapping failed.")
                 except Exception as e:
@@ -144,8 +139,8 @@ class MoleculeProcessor:
                     continue
 
                 try:
-                    mol = Molecule.read_xyz_file(deprot_path)
-                    calc = MolecularPropertyCalculator(mol, deprotonated=True)
+                    mol = vlx.Molecule.read_xyz_file(deprot_path)
+                    calc = vlx.MolecularPropertyCalculator(mol, deprotonated=True)
                     data_matrix = calc.run_all_calculations()
                     xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
                     df = pd.DataFrame(data_matrix, columns=[
@@ -165,7 +160,7 @@ class MoleculeProcessor:
                     neutral_h5_file = next((f for f in os.listdir(self.output_folder) if f.startswith(prefix) and f.endswith('.h5')), None)
                     if neutral_h5_file:
                         h5_path = os.path.join(self.h5_deprotonated_dir, neutral_h5_file)
-                        shutil.copy2(os.path.join(self.h5_protonated_dir, neutral_h5_file), h5_path)
+                        shutil.copy2(os.path.join(self.output_folder, neutral_h5_file), h5_path)
                         with h5py.File(h5_path, 'a') as f:
                             for key, value in reordered.items():
                                 f.create_dataset(f"deprotonated_{key}", data=value)
@@ -185,7 +180,7 @@ class MoleculeProcessor:
             mol = Chem.MolFromXYZFile(file)
             try:
                 rdDetermineBonds.DetermineBonds(mol, 0)
-                prot_drv = NitrogenProtonation(mol, filename, output_folder=self.protonated_dir)
+                prot_drv = vlx.NitrogenProtonation(mol, filename, output_folder=self.protonated_dir)
                 prot_drv.Protonate()
             except Exception as e:
                 logging.error(f"Failed to protonate {filename}: {e}")
@@ -215,7 +210,7 @@ class MoleculeProcessor:
                     continue
 
                 try:
-                    mapping = MCS(prot_mol, neutral_mol).get_atom_mapping()
+                    mapping = vlx.MCS(prot_mol, neutral_mol).get_atom_mapping()
                     if mapping is None:
                         raise ValueError("Atom mapping failed.")
                 except Exception as e:
@@ -224,8 +219,8 @@ class MoleculeProcessor:
                     continue
 
                 try:
-                    mol = Molecule.read_xyz_file(prot_path)
-                    calc = MolecularPropertyCalculator(mol, protonated=True)
+                    mol = vlx.Molecule.read_xyz_file(prot_path)
+                    calc = vlx.MPC1(mol, protonated=True)
                     data_matrix = calc.run_all_calculations()
                     xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
                     df = pd.DataFrame(data_matrix, columns=[
