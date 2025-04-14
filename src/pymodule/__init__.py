@@ -193,7 +193,7 @@ from .Ultimate_classV2 import MoleculeProcessor # I imported this <-------------
 from .Atom_mapping import MCS # I imported this <----------------------------------
 from .testclassmol import MPC1 # I imported this <----------------------------------
 from .Protonation import NitrogenProtonation # I imported this <----------------------------------
-from Ultimate_classV3 import MoleculeProcessor2 # I imported this <----------------------------------
+from .Ultimate_classV3 import MoleculeProcessor2 # I imported this <----------------------------------
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver
