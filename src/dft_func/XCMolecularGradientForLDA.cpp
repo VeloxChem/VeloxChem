@@ -54,6 +54,7 @@
 #include "SerialDenseLinearAlgebra.hpp"
 #include "SerialDensityGridGenerator.hpp"
 #include "XCFunctional.hpp"
+#include "XCMolecularGradientForLDA.hpp"
 
 namespace xcgradlda {  // xcgradlda namespace
 
