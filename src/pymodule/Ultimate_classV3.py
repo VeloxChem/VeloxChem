@@ -130,7 +130,7 @@ class MoleculeProcessor2:
                     continue
 
                 try:
-                    mapping = vlx.MCS(neutral_mol, deprot_mol).get_atom_mapping()
+                    mapping = vlx.MCS(neutral_mol, deprot_mol, deprotonated = True).get_atom_mapping()
                     if mapping is None:
                         raise ValueError("Atom mapping failed.")
                 except Exception as e:
@@ -163,7 +163,7 @@ class MoleculeProcessor2:
                         shutil.copy2(os.path.join(self.output_folder, neutral_h5_file), h5_path)
                         with h5py.File(h5_path, 'a') as f:
                             for key, value in reordered.items():
-                                f.create_dataset(f"deprotonated_{key}", data=value)
+                                f.create_dataset(key, data=value)
                             f.create_dataset("xyz coordinates deprot", data=xyz)
                         logging.info(f"Added deprotonated data to {h5_path}")
                 except Exception as e:
@@ -210,7 +210,7 @@ class MoleculeProcessor2:
                     continue
 
                 try:
-                    mapping = vlx.MCS(prot_mol, neutral_mol).get_atom_mapping()
+                    mapping = vlx.MCS(prot_mol, neutral_mol, protonated = True).get_atom_mapping()
                     if mapping is None:
                         raise ValueError("Atom mapping failed.")
                 except Exception as e:
@@ -243,7 +243,7 @@ class MoleculeProcessor2:
                         shutil.copy2(os.path.join(self.output_folder, neutral_h5_file), h5_path)
                         with h5py.File(h5_path, 'a') as f:
                             for key, value in reordered.items():
-                                f.create_dataset(f"deprotonated_{key}", data=value)
+                                f.create_dataset(key, data=value)
                             f.create_dataset("xyz coordinates deprot", data=xyz)
                         logging.info(f"Added deprotonated data to {h5_path}")
                 except Exception as e:
