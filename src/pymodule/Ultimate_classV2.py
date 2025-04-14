@@ -58,7 +58,7 @@ class MoleculeProcessor:
             try:
                 molecule = vlx.Molecule.read_xyz_file(xyz_file)
                 # calc = vlx.MolecularPropertyCalculator(folder, xyz_filename=filename)
-                calc = vlx.MPI1(molecule, deprotonated=False)
+                calc = vlx.MPC1(molecule, deprotonated=False)
 
                 print('Starting calculations for', filename)
 
