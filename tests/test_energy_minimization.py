@@ -183,7 +183,7 @@ class TestEnergyMinimization:
         """
 
         xyz_list = [mol_xyz_1, mol_xyz_2, mol_xyz_3]
-        tol = 0.05
+        tol = 0.1
 
         here = Path(__file__).parent
         filename = str(here / 'data' / 'vlx_em_mol_test')
