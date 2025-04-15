@@ -373,6 +373,7 @@ class EvbFepDriver():
 
     def _safe_step(self, simulation, steps):
         states = []
+        potwarning = False
         for i in range(steps):
             try:
                 simulation.step(1)
@@ -402,10 +403,13 @@ class EvbFepDriver():
             states.append(state)
             if len(states) > self.save_frames:
                 states.pop(0)
-            if pot > 0:
+
+            if pot > 0 and not potwarning:
+                
                 self.ostream.print_warning(
                     f"Potential energy is positive: {pot:.5f} kJ/mol."
                 )
+                potwarning = True
                 # self._save_states(states, simulation, i)
                 # raise RuntimeError(
                 #     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"

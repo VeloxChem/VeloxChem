@@ -131,8 +131,16 @@ class EvbForceFieldBuilder():
             self.reactant, self.product)
 
         if self.optimize_ff:
-            self.reactant.molecule = self._optimize_molecule(self.reactant.molecule.get_element_ids(), self.reactant,formed_bonds)
-            self.product.molecule = self._optimize_molecule(self.product.molecule.get_element_ids(), self.product,broken_bonds)
+            self.reactant.molecule = self._optimize_molecule(
+                self.reactant.molecule.get_element_ids(),
+                self.reactant,
+                formed_bonds,note='reactant',
+            )
+            self.product.molecule = self._optimize_molecule(
+                self.product.molecule.get_element_ids(),
+                self.product, 
+                broken_bonds,note='product',
+            )
 
         return self.reactant, self.product, formed_bonds, broken_bonds
 
@@ -154,14 +162,24 @@ class EvbForceFieldBuilder():
                 combined_molecule.add_atom(int(elem), Point(coord), 'angstrom')
         return combined_molecule
 
-    def _optimize_molecule(self, elemental_ids, forcefield, changing_bonds, name='MOL'):
+    def _optimize_molecule(self, elemental_ids, forcefield, changing_bonds, name='MOL',note=None):
         # for i, ff in enumerate(forcefields):
+        atoms = []
         for bond in changing_bonds:
             s1 = forcefield.atoms[bond[0]]['sigma']
             s2 = forcefield.atoms[bond[1]]['sigma']
+            if bond[0] not in atoms:
+                atoms.append(bond[0])
+            if bond[1] not in atoms:
+                atoms.append(bond[1])
+            # if s1 < 0.3:
+            #     s1 = 0.3
+            # if s2 < 0.3:
+            #     s2 = 0.3
             s = (s1 + s2) / 2
-            forcefield.bonds.update({bond: {'equilibrium': s, 'force_constant': 250000}})
-            self.ostream.print_info(f"Adding bond {bond} with r {s} for equilibration")
+            # s*=0.8
+            forcefield.bonds.update({bond: {'equilibrium': s, 'force_constant': 2500000}})
+            self.ostream.print_info(f"Adding bond {bond} with r {s} for equilibration {note}, s1={s1}, s2={s2}")
 
         self.ostream.flush()
         forcefield.write_openmm_files(name,name)
@@ -182,10 +200,32 @@ class EvbForceFieldBuilder():
             nonbondedMethod=mmapp.CutoffNonPeriodic,
             nonbondedCutoff=1.0 * mmunit.nanometers,
         )
+        
+        nbforce = [force for force in mmsys.getForces() if isinstance(force,mm.NonbondedForce)][0]
+        existing_exceptions = {}
+        for i in range(nbforce.getNumExceptions()):
+            params = nbforce.getExceptionParameters(i)
+            if params[0] in atoms or params[1] in atoms:
+                sorted_tuple = (params[0], params[1])
+                existing_exceptions.update({sorted_tuple:i})
+
+        for i in range(mmsys.getNumParticles()):
+            for j in atoms:
+                if i != j:
+                    if (i,j) in existing_exceptions.keys():
+                        nbforce.setExceptionParameters(existing_exceptions[(i,j)],i,j,0,1,0)
+                    elif (j,i) in existing_exceptions.keys():
+                        nbforce.setExceptionParameters(existing_exceptions[(j,i)],i,j,0,1,0)
+                    else:
+                        nbforce.addException(i, j,0,1,0)
+        with open(f'{name}_sys.xml', 'w') as f:
+            f.write(mm.XmlSerializer.serialize(mmsys))
         integrator = mm.VerletIntegrator(0.001)
         sim = mmapp.Simulation(top, mmsys, integrator)
         sim.context.setPositions(pos)
         sim.minimizeEnergy()
+        # sim.step(1000)
+        # sim.minimizeEnergy()
 
         state = sim.context.getState(getPositions=True)
         pos = state.getPositions(asNumpy=True).value_in_unit(mmunit.angstrom)
@@ -381,8 +421,8 @@ class EvbForceFieldBuilder():
             EvbForceFieldBuilder._apply_mapping_to_forcefield(
                 ff, mapping)
             atom_count += len(ff.atoms)
-            # for atom in ff.atoms.values():
-            #     atom['name'] = f"{atom['name']}_{i}"
+            for atom in ff.atoms.values():
+                atom['name'] = f"{atom['name']}{i}"
             forcefield.atoms.update(ff.atoms)
             forcefield.bonds.update(ff.bonds)
             forcefield.angles.update(ff.angles)
