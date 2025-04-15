@@ -1,4 +1,5 @@
 import numpy as np
+import time as tm
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import XCIntegrator
@@ -42,7 +43,10 @@ class TestSNLinkK:
 
         # compute Fock matrix
         fock_drv = FockDriver()
+        start = tm.time()
         fock_mat = fock_drv._compute_fock_omp(t4c_drv, dmat, "kx", 0.68, 0.0, 12)
+        end = tm.time()
+        print("Analytical exchange matrix: ", end - start, " sec.")
         
         #print("*** SEMINUMERICAL FOCK ***")
         #print(kx_mat.alpha_to_numpy())
@@ -60,15 +64,10 @@ class TestSNLinkK:
             H  0.0000000000   0.7695699584   0.5948147012
             H  0.0000000000  -0.7695699584   0.5948147012
         """
-        mol_str = """
-            H  0.0000000000   0.0000000000  -0.0254395383
-            H  0.3000000000   0.1000000000   0.5948147012
-        """
-
+       
         molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
-        #basis = MolecularBasis.read(molecule, 'def2-svp')
-        basis = MolecularBasis.read(molecule, 'sto-3g')
-        
+        basis = MolecularBasis.read(molecule, 'def2-svp')
+    
         self.run_sn_link_k(molecule, basis)
         
         assert False

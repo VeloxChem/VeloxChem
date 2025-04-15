@@ -214,5 +214,35 @@ CNuclearPotentialDriver::_get_buffer_rows(const int bra_angmom,
 {
     if ((bra_angmom == 0) && (ket_angmom == 0)) return 7;
     
+    if ((bra_angmom == 0) && (ket_angmom == 1)) return 14;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 0)) return 14;
+    
+    if ((bra_angmom == 0) && (ket_angmom == 2)) return 28;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 0)) return 28;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 1)) return 34;
+    
+    if ((bra_angmom == 0) && (ket_angmom == 3)) return 53;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 0)) return 53;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 2)) return 69;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 1)) return 81;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 3)) return 124;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 1)) return 170;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 2)) return 170;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 3)) return 301;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 2)) return 373;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 3)) return 669;
+    
     return 0;
 }

@@ -5,6 +5,21 @@
 
 #include "SubMatrix.hpp"
 #include "NuclearPotentialGridRecSS.hpp"
+#include "NuclearPotentialGridRecSP.hpp"
+#include "NuclearPotentialGridRecPS.hpp"
+#include "NuclearPotentialGridRecSD.hpp"
+#include "NuclearPotentialGridRecDS.hpp"
+#include "NuclearPotentialGridRecPP.hpp"
+#include "NuclearPotentialGridRecSF.hpp"
+#include "NuclearPotentialGridRecFS.hpp"
+#include "NuclearPotentialGridRecPD.hpp"
+#include "NuclearPotentialGridRecDP.hpp"
+#include "NuclearPotentialGridRecPF.hpp"
+#include "NuclearPotentialGridRecFP.hpp"
+#include "NuclearPotentialGridRecDD.hpp"
+#include "NuclearPotentialGridRecDF.hpp"
+#include "NuclearPotentialGridRecFD.hpp"
+#include "NuclearPotentialGridRecFF.hpp"
 
 namespace npotfunc {
 
@@ -38,6 +53,111 @@ compute(CSubMatrix&                spher_buffer,
     if ((bra_angmom == 0) && (ket_angmom == 0))
     {
         npotrec::comp_on_grid_nuclear_potential_ss(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 0) && (ket_angmom == 1))
+    {
+        npotrec::comp_on_grid_nuclear_potential_sp(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 1) && (ket_angmom == 0))
+    {
+        npotrec::comp_on_grid_nuclear_potential_ps(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 0) && (ket_angmom == 2))
+    {
+        npotrec::comp_on_grid_nuclear_potential_sd(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 2) && (ket_angmom == 0))
+    {
+        npotrec::comp_on_grid_nuclear_potential_ds(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 1) && (ket_angmom == 1))
+    {
+        npotrec::comp_on_grid_nuclear_potential_pp(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 0) && (ket_angmom == 3))
+    {
+        npotrec::comp_on_grid_nuclear_potential_sf(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 0))
+    {
+        npotrec::comp_on_grid_nuclear_potential_fs(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 1) && (ket_angmom == 2))
+    {
+        npotrec::comp_on_grid_nuclear_potential_pd(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 2) && (ket_angmom == 1))
+    {
+        npotrec::comp_on_grid_nuclear_potential_dp(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 1) && (ket_angmom == 3))
+    {
+        npotrec::comp_on_grid_nuclear_potential_pf(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 1))
+    {
+        npotrec::comp_on_grid_nuclear_potential_fp(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 2) && (ket_angmom == 2))
+    {
+        npotrec::comp_on_grid_nuclear_potential_dd(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 2) && (ket_angmom == 3))
+    {
+        npotrec::comp_on_grid_nuclear_potential_df(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 2))
+    {
+        npotrec::comp_on_grid_nuclear_potential_fd(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 3))
+    {
+        npotrec::comp_on_grid_nuclear_potential_ff(spher_buffer, cart_buffer, gcoords_x, gcoords_y, gcoords_z, gweights, bra_gto_block, ket_gto_block, bra_igto, ket_igto);
 
         return;
     }
