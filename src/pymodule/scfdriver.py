@@ -82,6 +82,13 @@ class ScfDriver:
     Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
     accelerators.
 
+    # vlxtag: RHF, Energy
+    # vlxtag: RKS, Energy
+    # vlxtag: UHF, Energy
+    # vlxtag: UKS, Energy
+    # vlxtag: ROHF, Energy
+    # vlxtag: ROKS, Energy
+
     :param comm:
         The MPI communicator.
     :param ostream:

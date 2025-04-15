@@ -47,6 +47,8 @@ class PEForceFieldGenerator:
     """
     Implements the PE force field generator.
 
+    # vlxtag: RHF, PEForceFieldGenerator
+
     :param comm:
         The MPI communicator.
     :param ostream:

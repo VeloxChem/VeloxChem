@@ -54,6 +54,8 @@ class TpaDriver(NonlinearSolver):
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
 
+    # vlxtag: RHF, TPA, CR
+
     :param comm:
         The MPI communicator.
     :param ostream:

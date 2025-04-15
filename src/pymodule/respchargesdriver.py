@@ -51,6 +51,10 @@ class RespChargesDriver:
     """
     Implements ESP and RESP charges.
 
+    # vlxtag: RHF, RESP_charges
+    # vlxtag: RHF, ESP_charges
+    # vlxtag: RHF, ESP_on_points
+
     :param comm:
         The MPI communicator.
     :param ostream:

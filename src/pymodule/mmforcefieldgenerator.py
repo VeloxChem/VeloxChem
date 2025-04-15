@@ -64,6 +64,8 @@ class MMForceFieldGenerator:
     """
     Parameterizes general Amber force field and creates Gromacs topologies.
 
+    # vlxtag: RKS, MM_Force_Field_Generation
+
     :param comm:
         The MPI communicator.
     :param ostream:

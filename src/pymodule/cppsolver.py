@@ -54,6 +54,11 @@ class ComplexResponse(LinearSolver):
     """
     Implements the complex linear response solver.
 
+    # vlxtag: RHF, Absorption, CPP
+    # vlxtag: RKS, Absorption, CPP
+    # vlxtag: RHF, ECD, CPP
+    # vlxtag: RKS, ECD, CPP
+
     :param comm:
         The MPI communicator.
     :param ostream:

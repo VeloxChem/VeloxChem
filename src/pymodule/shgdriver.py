@@ -56,6 +56,9 @@ class ShgDriver(NonlinearSolver):
     """
     Implements a quadratic response driver for SHG calculations
 
+    # vlxtag: RHF, SHG, QR
+    # vlxtag: RKS, SHG, QR
+
     :param comm:
         The MPI communicator.
     :param ostream:
