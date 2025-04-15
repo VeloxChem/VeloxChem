@@ -374,7 +374,7 @@ class LinearSolver:
 
         if self.ri_coulomb:
             assert_msg_critical(basis.get_label().lower().startswith('def2-'),
-                                'SCF Driver: Invalid basis set for RI-J')
+                                'LinearSolver: Invalid basis set for RI-J')
 
             self.ostream.print_info(
                 'Using the resolution of the identity (RI) approximation.')

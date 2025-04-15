@@ -34,12 +34,16 @@ from mpi4py import MPI
 import numpy as np
 import time as tm
 import math
+import sys
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import RIFockDriver, SubMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
+from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
 from .fockdriver import FockDriver
@@ -51,6 +55,11 @@ from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
 
 
 class NonlinearSolver:
@@ -98,6 +107,11 @@ class NonlinearSolver:
         # ERI settings
         self.eri_thresh = 1.0e-15
         self.batch_size = None
+
+        # RI-J
+        self.ri_coulomb = False
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_drv = None
 
         # dft
         self._dft = False
@@ -166,6 +180,8 @@ class NonlinearSolver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             },
@@ -299,6 +315,69 @@ class NonlinearSolver:
         else:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
+
+        if self.ri_coulomb:
+            assert_msg_critical(basis.get_label().lower().startswith('def2-'),
+                                'NonlinearSolver: Invalid basis set for RI-J')
+
+            self.ostream.print_info(
+                'Using the resolution of the identity (RI) approximation.')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            if self.rank == mpi_master():
+                basis_ri_j = MolecularBasis.read(molecule,
+                                                 self.ri_auxiliary_basis)
+            else:
+                basis_ri_j = None
+            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
+
+            self.ostream.print_info('Dimension of RI auxiliary basis set ' +
+                                    f'({self.ri_auxiliary_basis.upper()}): ' +
+                                    f'{basis_ri_j.get_dimensions_of_basis()}')
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            ri_prep_t0 = tm.time()
+
+            t2c_drv = TwoCenterElectronRepulsionDriver()
+            mat_j = t2c_drv.compute(molecule, basis_ri_j)
+            mat_j_np = mat_j.to_numpy()
+
+            self.ostream.print_info('Two-center integrals for RI done in ' +
+                                    f'{tm.time() - ri_prep_t0:.2f} sec.')
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            if 'scipy' in sys.modules:
+                lu, piv = lu_factor(mat_j_np)
+                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
+            else:
+                inv_mat_j_np = np.linalg.inv(mat_j_np)
+
+            self.ostream.print_info(
+                f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+
+            ri_prep_t0 = tm.time()
+
+            inv_mat_j = SubMatrix(
+                [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
+            inv_mat_j.set_values(inv_mat_j_np)
+
+            self._ri_drv = RIFockDriver(inv_mat_j)
+
+            local_atoms = molecule.partition_atoms(self.comm)
+            self._ri_drv.prepare_buffers(molecule, basis, basis_ri_j,
+                                         local_atoms)
+
+            self.ostream.print_info(
+                f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
+            )
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         return {
             'screening': screening,
@@ -828,14 +907,37 @@ class NonlinearSolver:
             fock_arrays = []
 
             for idx in range(len(dts_for_fock)):
-                den_mat = make_matrix(ao_basis, mat_t.general)
-                den_mat.set_values(dts_for_fock[idx])
+                if self.ri_coulomb:
+                    assert_msg_critical(
+                        fock_type == 'j',
+                        'NonlinearSolver: RI is only applicable to pure DFT functional'
+                    )
 
-                fock_mat = fock_drv.compute(screening, den_mat, fock_type,
-                                            fock_k_factor, 0.0, thresh_int)
+                if self.ri_coulomb and fock_type == 'j':
+                    # symmetrize density for RI-J
+                    den_mat_for_ri_j = make_matrix(ao_basis, mat_t.symmetric)
+                    den_mat_for_ri_j.set_values(
+                        0.5 * (dts_for_fock[idx] + dts_for_fock[idx].T))
 
-                fock_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
+                    local_gvec = np.array(
+                        self._ri_drv.compute_local_bq_vector(den_mat_for_ri_j))
+                    gvec = np.zeros(local_gvec.shape)
+                    self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
+
+                    fock_mat = self._ri_drv.local_compute(
+                        den_mat_for_ri_j, gvec, 'j')
+                    fock_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
+
+                else:
+                    den_mat = make_matrix(ao_basis, mat_t.general)
+                    den_mat.set_values(dts_for_fock[idx])
+
+                    fock_mat = fock_drv.compute(screening, den_mat, fock_type,
+                                                fock_k_factor, 0.0, thresh_int)
+
+                    fock_np = fock_mat.to_numpy()
+                    fock_mat = Matrix()
 
                 if fock_type == 'j':
                     # for pure functional
@@ -1026,6 +1128,10 @@ class NonlinearSolver:
         cur_str = 'Damping Parameter               : {:.6e}'.format(
             self.damping)
         self.ostream.print_header(cur_str.ljust(width))
+
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
