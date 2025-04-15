@@ -136,7 +136,7 @@ class SolvationFepDriver:
         self.temperature = 298.15 * unit.kelvin
         self.pressure = 1 * unit.atmospheres
         self.timestep = 2.0 * unit.femtoseconds 
-        self.num_equil_steps = 10000 #10 ps
+        self.num_equil_steps = 5000 #10 ps
         self.num_steps = 500000 # 1 ns
         self.number_of_snapshots = 1000
         self.cutoff = 1.0 * unit.nanometers
@@ -774,6 +774,7 @@ class SolvationFepDriver:
             for l in range(n_states):
                 u_kln_reduced[k, l, :int(N_k[k])] = u_kln[k, l, subsample_indices[k]]
 
+        # TODO: change this, subsampling is not recommended. 
         if any(n <= self.number_of_snapshots // 4 for n in N_k):
             self.ostream.print_warning("MBAR may not converge due to insufficient sampling. Consider increasing the number of steps per lambda.")
             self.ostream.flush()
