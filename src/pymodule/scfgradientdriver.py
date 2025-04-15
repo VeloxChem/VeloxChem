@@ -352,11 +352,7 @@ class ScfGradientDriver(GradientDriver):
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            local_ri_gvec = np.array(
-                self.scf_driver._ri_drv.compute_local_bq_vector(
-                    den_mat_for_fock))
-            ri_gvec = np.zeros(local_ri_gvec.shape)
-            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
+            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(den_mat_for_fock)
 
             ri_grad_drv = RIFockGradDriver()
 
@@ -725,10 +721,7 @@ class ScfGradientDriver(GradientDriver):
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            local_ri_gvec = np.array(
-                self.scf_driver._ri_drv.compute_local_bq_vector(Dab_for_fock))
-            ri_gvec = np.zeros(local_ri_gvec.shape)
-            self.comm.Allreduce(local_ri_gvec, ri_gvec, op=MPI.SUM)
+            ri_gvec = self.scf_driver._ri_drv.compute_bq_vector(Dab_for_fock)
 
             ri_grad_drv = RIFockGradDriver()
 

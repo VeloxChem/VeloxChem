@@ -30,7 +30,6 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from mpi4py import MPI
 from pathlib import Path
 from datetime import datetime
 from collections import deque
@@ -42,8 +41,6 @@ import re
 
 from .oneeints import compute_nuclear_potential_integrals
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import TwoCenterElectronRepulsionDriver
-from .veloxchemlib import RIFockDriver, SubMatrix
 from .veloxchemlib import OverlapDriver, KineticEnergyDriver
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import XCIntegrator
@@ -54,6 +51,7 @@ from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
 from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
+from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .profiler import Profiler
 from .griddriver import GridDriver
@@ -70,11 +68,6 @@ from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical, safe_solve
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
-
-try:
-    from scipy.linalg import lu_factor, lu_solve
-except ImportError:
-    pass
 
 
 class ScfDriver:
@@ -1405,68 +1398,11 @@ class ScfDriver:
         profiler.check_memory_usage('Initial guess')
 
         if self.ri_coulomb:
-            assert_msg_critical(
-                ao_basis.get_label().lower().startswith('def2-'),
-                'SCF Driver: Invalid basis set for RI-J')
-
-            self.ostream.print_info(
-                'Using the resolution of the identity (RI) approximation.')
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-            if self.rank == mpi_master():
-                basis_ri_j = MolecularBasis.read(molecule,
-                                                 self.ri_auxiliary_basis)
-            else:
-                basis_ri_j = None
-            basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
-
-            self.ostream.print_info('Dimension of RI auxiliary basis set ' +
-                                    f'({self.ri_auxiliary_basis.upper()}): ' +
-                                    f'{basis_ri_j.get_dimensions_of_basis()}')
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-            ri_prep_t0 = tm.time()
-
-            t2c_drv = TwoCenterElectronRepulsionDriver()
-            mat_j = t2c_drv.compute(molecule, basis_ri_j)
-            mat_j_np = mat_j.to_numpy()
-
-            self.ostream.print_info('Two-center integrals for RI done in ' +
-                                    f'{tm.time() - ri_prep_t0:.2f} sec.')
-            self.ostream.print_blank()
-
-            ri_prep_t0 = tm.time()
-
-            if 'scipy' in sys.modules:
-                lu, piv = lu_factor(mat_j_np)
-                inv_mat_j_np = lu_solve((lu, piv), np.eye(mat_j_np.shape[0]))
-            else:
-                inv_mat_j_np = np.linalg.inv(mat_j_np)
-
-            self.ostream.print_info(
-                f'Matrix inversion for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
-            )
-            self.ostream.print_blank()
-
-            ri_prep_t0 = tm.time()
-
-            inv_mat_j = SubMatrix(
-                [0, 0, inv_mat_j_np.shape[0], inv_mat_j_np.shape[1]])
-            inv_mat_j.set_values(inv_mat_j_np)
-
-            self._ri_drv = RIFockDriver(inv_mat_j)
-
-            local_atoms = molecule.partition_atoms(self.comm)
-            self._ri_drv.prepare_buffers(molecule, ao_basis, basis_ri_j,
-                                         local_atoms)
-
-            self.ostream.print_info(
-                f'Buffer preparation for RI done in {tm.time() - ri_prep_t0:.2f} sec.'
-            )
-            self.ostream.print_blank()
-            self.ostream.flush()
+            self._ri_drv = RIFockDriver(self.comm, self.ostream)
+            self._ri_drv.prepare_buffers(molecule,
+                                         ao_basis,
+                                         self.ri_auxiliary_basis,
+                                         verbose=True)
 
         e_grad = None
 
@@ -2082,22 +2018,13 @@ class ScfDriver:
                     'SCF driver: RI is only applicable to pure DFT functional')
 
             if self.ri_coulomb and fock_type == 'j':
-                local_gvec = np.array(
-                    self._ri_drv.compute_local_bq_vector(den_mat_for_fock))
-                gvec = np.zeros(local_gvec.shape)
-                self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
-
-                fock_mat = self._ri_drv.local_compute(den_mat_for_fock, gvec,
-                                                      'j')
-                fock_mat_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
-
+                fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
             else:
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock,
                                             fock_type, exchange_scaling_factor,
                                             0.0, thresh_int)
-                fock_mat_np = fock_mat.to_numpy()
-                fock_mat = Matrix()
+            fock_mat_np = fock_mat.to_numpy()
+            fock_mat = Matrix()
 
             if fock_type == 'j':
                 # for pure functional
@@ -2133,20 +2060,12 @@ class ScfDriver:
                 # for pure functional
                 # den_mat_for_Jab is D_total
                 if self.ri_coulomb:
-                    local_gvec = np.array(
-                        self._ri_drv.compute_local_bq_vector(den_mat_for_Jab))
-                    gvec = np.zeros(local_gvec.shape)
-                    self.comm.Allreduce(local_gvec, gvec, op=MPI.SUM)
-
-                    fock_mat = self._ri_drv.local_compute(
-                        den_mat_for_Jab, gvec, 'j')
-                    J_ab_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
+                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
                 else:
                     fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                                 0.0, 0.0, thresh_int)
-                    J_ab_np = fock_mat.to_numpy()
-                    fock_mat = Matrix()
+                J_ab_np = fock_mat.to_numpy()
+                fock_mat = Matrix()
 
                 fock_mat_a_np = J_ab_np
                 fock_mat_b_np = J_ab_np.copy()
