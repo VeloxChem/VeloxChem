@@ -173,6 +173,7 @@ class ScfGradientDriver(GradientDriver):
             'XC_grad': 0.0,
             'PE_grad': 0.0,
             'CPCM_grad': 0.0,
+            'D4_grad': 0.0,
             'Classical': 0.0,
         }
 
