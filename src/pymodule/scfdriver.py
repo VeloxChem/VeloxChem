@@ -272,6 +272,7 @@ class ScfDriver:
         self._debug = False
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
+        self._semi_num_ldstaging = 128
 
         # input keywords
         self._input_keywords = {
@@ -603,10 +604,10 @@ class ScfDriver:
         # generate integration grid for seminumerical exchange
         if self.semi_num_exchange:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(3)
+            grid_drv.set_level(4)
 
             grid_t0 = tm.time()
-            self._semi_num_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
+            self._semi_num_grid = grid_drv.generate(molecule, self._semi_num_ldstaging)
             n_grid_points = self._semi_num_grid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid for seminumerical exchange with {0:d} points generated in {1:.2f} sec.'.
