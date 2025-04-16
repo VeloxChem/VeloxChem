@@ -40,6 +40,7 @@ from .veloxchemlib import cpcm_form_matrix_A, cpcm_comp_grad_Aij
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import compute_nuclear_potential_erf_values
+from .veloxchemlib import compute_nuclear_potential_erf_gradient_on_charges
 from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
@@ -767,19 +768,19 @@ class CpcmDriver:
             grid_a    = grid_coords[indices_a]
             zeta_a    = zeta[indices_a]
             
-            geom100_mats, geom010_mats, geom001_mats = [], [], []
+            geom100_mats, geom001_mats = [], []
 
             t1 = time.time()
             C_timings[0] += t1 - t0
             t0 = time.time()
 
             if q_subset.size == 0:
-                # for fully buried atoms, DM shape 0 and 1 in case of orthogonalization
-                geom010_mats = np.zeros((1, 1, DM.shape[0], DM.shape[1]))
+                grad_C_nuc[a] = np.zeros(3)
             else:
-                for i, charge in enumerate(q_subset):
-                    grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i]], [zeta_a[i]])
-                    geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
+                calc_grad = compute_nuclear_potential_erf_gradient_on_charges(
+                    molecule, basis, np.copy(grid_a), np.copy(q_subset), DM,
+                    np.copy(zeta_a))
+                grad_C_nuc[a] = np.sum(calc_grad, axis=0)
 
             t1 = time.time()
             C_timings[1] += t1 - t0
@@ -801,7 +802,6 @@ class CpcmDriver:
             t0 = time.time()
 
             geom100_mats = np.array(geom100_mats)
-            geom010_mats = np.array(geom010_mats)
             geom001_mats = np.array(geom001_mats)
             geom100_mats += geom001_mats
 
@@ -809,27 +809,18 @@ class CpcmDriver:
             C_timings[4] += t1 - t0
             t0 = time.time()
 
-            partial_nuc = np.squeeze(np.matmul(
-                geom010_mats.reshape(geom010_mats.shape[0], geom010_mats.shape[1], -1), DM.reshape(-1, 1)), -1)
+            grad_C_cav[a] = np.matmul(DM.reshape(-1), geom100_mats.reshape(geom100_mats.shape[0], -1).T)
 
             t1 = time.time()
             C_timings[5] += t1 - t0
             t0 = time.time()
             
-            grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
-            grad_C_cav[a] = np.matmul(DM.reshape(-1), geom100_mats.reshape(geom100_mats.shape[0], -1).T)
-
-            t1 = time.time()
-            C_timings[6] += t1 - t0
-            t0 = time.time()
-
         self.ostream.print_info(f'Grad C step 0: {C_timings[0]:.2f} sec')
         self.ostream.print_info(f'Grad C step 1: {C_timings[1]:.2f} sec')
         self.ostream.print_info(f'Grad C step 2: {C_timings[2]:.2f} sec')
         self.ostream.print_info(f'Grad C step 3: {C_timings[3]:.2f} sec')
         self.ostream.print_info(f'Grad C step 4: {C_timings[4]:.2f} sec')
         self.ostream.print_info(f'Grad C step 5: {C_timings[5]:.2f} sec')
-        self.ostream.print_info(f'Grad C step 6: {C_timings[6]:.2f} sec')
         self.ostream.print_blank()
         self.ostream.flush()
             
