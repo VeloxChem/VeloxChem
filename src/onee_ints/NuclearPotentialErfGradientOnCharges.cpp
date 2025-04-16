@@ -61,7 +61,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
                                             const int npoints,
                                             const double* D,
                                             const int naos,
-                                            const double* omega) -> CDenseMatrix
+                                            const double* omega,
+                                            const int* atom_indices) -> CDenseMatrix
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
@@ -71,11 +72,13 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
     auto nthreads = omp_get_max_threads();
 
+    auto natoms = molecule.number_of_atoms();
+
     std::vector<CDenseMatrix> V_grad_omp(nthreads);
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
-        V_grad_omp[thread_id] = CDenseMatrix(npoints, 3);
+        V_grad_omp[thread_id] = CDenseMatrix(natoms, 3);
 
         V_grad_omp[thread_id].zero();
     }
@@ -441,6 +444,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -501,7 +506,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -559,6 +564,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -634,7 +641,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -694,6 +701,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -794,7 +803,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -856,6 +865,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -995,7 +1006,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -1055,6 +1066,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -1156,7 +1169,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -1218,6 +1231,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -1358,7 +1373,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -1422,6 +1437,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -1632,7 +1649,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -1696,6 +1713,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -1906,7 +1925,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -1972,6 +1991,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -2311,7 +2332,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -2379,6 +2400,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
         for (int c = 0; c < npoints; c++)
         {
+            const auto atomidx_c = atom_indices[c];
+
             const auto x_c = points_info[c + npoints * 0];
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
@@ -2977,7 +3000,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
-                        V_grad_omp[thread_id].row(c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
                     }
                 }
             }
@@ -2986,13 +3009,13 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
     // auto-generated code ends here
 
-    CDenseMatrix V_grad(npoints, 3);
+    CDenseMatrix V_grad(natoms, 3);
 
     V_grad.zero();
 
     for (int thread_id = 0; thread_id < nthreads; thread_id++)
     {
-        for (int a = 0; a < npoints; a++)
+        for (int a = 0; a < natoms; a++)
         {
             for (int d = 0; d < 3; d++)
             {

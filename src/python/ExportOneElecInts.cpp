@@ -366,24 +366,27 @@ export_oneeints(py::module& m)
                const py::array_t<double>& point_coords,
                const py::array_t<double>& point_charges,
                const py::array_t<double>& D,
-               const py::array_t<double>& omega) -> py::array_t<double> {
+               const py::array_t<double>& omega,
+               const py::array_t<int>&    atom_indices) -> py::array_t<double> {
                 std::string errstyle("compute_nuclear_potential_erf_gradient_on_charges: Expecting contiguous numpy arrays");
                 auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
                 auto        c_style_2 = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
                 auto        c_style_3 = py::detail::check_flags(D.ptr(), py::array::c_style);
                 auto        c_style_4 = py::detail::check_flags(omega.ptr(), py::array::c_style);
-                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+                auto        c_style_5 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4 && c_style_5), errstyle);
                 std::string errsize("compute_electric_point_erf_gradient_on_charges: Inconsistent sizes");
                 errors::assertMsgCritical(omega.shape(0) == point_coords.shape(0), errsize);
                 errors::assertMsgCritical(point_charges.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_charges.shape(0) == atom_indices.shape(0), errsize);
                 errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
                 std::string errshape("compute_electric_point_erf_gradient_on_charges: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(D.shape(0));
                 auto grad = onee::computeNuclearPotentialErfGradientOnCharges(
-                    molecule, basis, point_coords.data(), point_charges.data(), npoints, D.data(), naos, omega.data());
-                return vlx_general::pointer_to_numpy(grad.values(), {npoints, 3});
+                    molecule, basis, point_coords.data(), point_charges.data(), npoints, D.data(), naos, omega.data(), atom_indices.data());
+                return vlx_general::pointer_to_numpy(grad.values(), {grad.getNumberOfRows(), grad.getNumberOfColumns()});
             },
             "Computes nuclear potential gradient on charges.",
              "molecule"_a,
@@ -391,7 +394,8 @@ export_oneeints(py::module& m)
              "point_coords"_a,
              "point_charges"_a,
              "density"_a,
-             "omega"_a);
+             "omega"_a,
+             "atom_indices"_a);
 
     m.def("compute_quadrupole_integrals",
             [](const CMolecule&           molecule,

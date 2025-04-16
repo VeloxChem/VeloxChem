@@ -46,7 +46,8 @@ auto computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
                                                  const int npoints,
                                                  const double* D,
                                                  const int naos,
-                                                 const double* omega) -> CDenseMatrix;
+                                                 const double* omega,
+                                                 const int* atom_indices) -> CDenseMatrix;
 
 }  // namespace onee
 

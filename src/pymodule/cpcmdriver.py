@@ -758,6 +758,15 @@ class CpcmDriver:
 
         C_timings = [0.0 for ind in range(10)]
 
+        t0 = time.time()
+
+        grad_C_nuc = compute_nuclear_potential_erf_gradient_on_charges(
+            molecule, basis, np.copy(grid_coords), q, DM, np.copy(zeta),
+            np.copy(atom_indices))
+
+        t1 = time.time()
+        C_timings[0] = t1 - t0
+
         # Compute both the nuclear and cavity contributions
         for a in range(natoms):
             t0 = time.time()
@@ -769,18 +778,6 @@ class CpcmDriver:
             zeta_a    = zeta[indices_a]
             
             geom100_mats, geom001_mats = [], []
-
-            t1 = time.time()
-            C_timings[0] += t1 - t0
-            t0 = time.time()
-
-            if q_subset.size == 0:
-                grad_C_nuc[a] = np.zeros(3)
-            else:
-                calc_grad = compute_nuclear_potential_erf_gradient_on_charges(
-                    molecule, basis, np.copy(grid_a), np.copy(q_subset), DM,
-                    np.copy(zeta_a))
-                grad_C_nuc[a] = np.sum(calc_grad, axis=0)
 
             t1 = time.time()
             C_timings[1] += t1 - t0
