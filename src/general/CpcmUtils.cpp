@@ -96,15 +96,17 @@ form_matrix_A(const double* ptr_grid_data,
 }
 
 auto
-comp_grad_Aij(const double* ptr_dr_rij,
-              const double* ptr_dA_dr,
-              const int*    ptr_delta_ij,
+comp_grad_Aij(const double* ptr_grid_coords,
+              const double* ptr_zeta,
+              const int*    ptr_atom_indices,
               const double* ptr_q,
               const int     row_start,
               const int     row_end,
               const int     npoints,
               const int     natoms) -> std::vector<double>
 {
+    const double two_sqrt_invpi = 2.0 / std::sqrt(mathconst::pi_value());
+
     auto nthreads = omp_get_max_threads();
 
     std::vector<double> omp_grad_Aij(nthreads * natoms * 3, 0.0);
@@ -116,25 +118,57 @@ comp_grad_Aij(const double* ptr_dr_rij,
     {
         const auto thread_id = omp_get_thread_num();
 
+        const auto x_i = ptr_grid_coords[i * 3 + 0];
+        const auto y_i = ptr_grid_coords[i * 3 + 1];
+        const auto z_i = ptr_grid_coords[i * 3 + 2];
+
+        const auto zeta_i = ptr_zeta[i];
+        const auto zeta_i2 = zeta_i * zeta_i;
+
+        const auto atomidx_i = ptr_atom_indices[i];
+
         for (int j = 0; j < npoints; j++)
         {
+            // Note: skip i == j since delta_ij will be zero
+            if (i == j) continue;
+
+            const auto x_j = ptr_grid_coords[j * 3 + 0];
+            const auto y_j = ptr_grid_coords[j * 3 + 1];
+            const auto z_j = ptr_grid_coords[j * 3 + 2];
+
+            const auto zeta_j = ptr_zeta[j];
+            const auto zeta_j2 = zeta_j * zeta_j;
+
+            const auto atomidx_j = ptr_atom_indices[j];
+
+            const auto r_ij_2 = ((x_i - x_j) * (x_i - x_j) +
+                                 (y_i - y_j) * (y_i - y_j) +
+                                 (z_i - z_j) * (z_i - z_j));
+
+            const auto r_ij = std::sqrt(r_ij_2);
+
+            const double uvec_ij[3] = {(x_i - x_j) / r_ij,
+                                       (y_i - y_j) / r_ij,
+                                       (z_i - z_j) / r_ij};
+
+            const auto zeta_ij = (zeta_i * zeta_j) / std::sqrt(zeta_i2 + zeta_j2);
+            const auto erf_term = std::erf(zeta_ij * r_ij);
+            const auto exp_term = std::exp(-zeta_ij * zeta_ij * r_ij_2);
+
+            const auto dA_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_ij * r_ij * exp_term) / r_ij_2;
+
             for (int a = 0; a < natoms; a++)
             {
+                const auto delta_ij = static_cast<double>(static_cast<int>(atomidx_i == a) -
+                                                          static_cast<int>(atomidx_j == a));
+
                 for (int c = 0; c < 3; c++)
                 {
                     // np.einsum('ij,aij,ijc,i,j->ac', dA_dr, delta_ij, dr_rij, q, q)
 
                     ptr_omp_grad_Aij[thread_id * natoms * 3 + a * 3 + c] +=
 
-                        ptr_q[i] *
-
-                        static_cast<double>(ptr_delta_ij[a * npoints * npoints + i * npoints + j]) *
-
-                        ptr_dA_dr[i * npoints + j] *
-
-                        ptr_dr_rij[i * npoints * 3 + j * 3 + c] *
-
-                        ptr_q[j];
+                        ptr_q[i] * delta_ij *dA_dr * uvec_ij[c] * ptr_q[j];
                 }
             }
         }

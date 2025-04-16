@@ -242,34 +242,33 @@ export_general(py::module &m) -> void
           "sw_func"_a);
 
     m.def("cpcm_comp_grad_Aij",
-          [](const py::array_t<double>& dr_rij,
-             const py::array_t<double>& dA_dr,
-             const py::array_t<int>&    delta_ij,
-             const py::array_t<double>& q) -> py::array_t<double> {
+          [](const py::array_t<double>& grid_coords,
+             const py::array_t<double>& zeta,
+             const py::array_t<int>&    atom_indices,
+             const py::array_t<double>& q,
+             const int                  natoms) -> py::array_t<double> {
               std::string errstyle("cpcm_comp_grad_Aij: Expecting contiguous numpy arrays");
-              auto        c_style_1 = py::detail::check_flags(dr_rij.ptr(), py::array::c_style);
-              auto        c_style_2 = py::detail::check_flags(dA_dr.ptr(), py::array::c_style);
-              auto        c_style_3 = py::detail::check_flags(delta_ij.ptr(), py::array::c_style);
+              auto        c_style_1 = py::detail::check_flags(grid_coords.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(zeta.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
               auto        c_style_4 = py::detail::check_flags(q.ptr(), py::array::c_style);
               errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
               std::string errsize("cpcm_comp_grad_Aij: Inconsistent sizes");
-              errors::assertMsgCritical(dr_rij.shape(0) == dr_rij.shape(1), errsize);
-              errors::assertMsgCritical(dr_rij.shape(2) == 3, errsize);
-              errors::assertMsgCritical(dr_rij.shape(0) == dA_dr.shape(0), errsize);
-              errors::assertMsgCritical(dr_rij.shape(0) == dA_dr.shape(1), errsize);
-              errors::assertMsgCritical(dr_rij.shape(0) == delta_ij.shape(1), errsize);
-              errors::assertMsgCritical(dr_rij.shape(0) == delta_ij.shape(2), errsize);
-              errors::assertMsgCritical(dr_rij.shape(0) == q.shape(0), errsize);
-              const auto npoints = static_cast<int>(dr_rij.shape(0));
-              const auto natoms = static_cast<int>(delta_ij.shape(0));
-              auto grad_Amat = cpcm::comp_grad_Aij(dr_rij.data(), dA_dr.data(), delta_ij.data(), q.data(), 0, npoints, npoints, natoms);
+              errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
+              const auto npoints = static_cast<int>(grid_coords.shape(0));
+              auto grad_Amat = cpcm::comp_grad_Aij(grid_coords.data(), zeta.data(), atom_indices.data(), q.data(),
+                                                   0, npoints, npoints, natoms);
               return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
           },
           "Compute C-PCM gradient for Aij.",
-          "dr_rij"_a,
-          "dA_dr"_a,
-          "delta_ij"_a,
-          "q"_a);
+          "grid_coords"_a,
+          "zeta"_a,
+          "atom_indices"_a,
+          "q"_a,
+          "natoms"_a);
 
     // TPoint class
     PyClass<TPoint<double>>(m, "Point")

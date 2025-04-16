@@ -42,8 +42,6 @@ from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import compute_nuclear_potential_erf_values
 from .veloxchemlib import compute_nuclear_potential_erf_gradient
 from .veloxchemlib import NuclearPotentialErfDriver
-from .veloxchemlib import NuclearPotentialErfGeom010Driver
-from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
@@ -488,64 +486,15 @@ class CpcmDriver:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
 
-        t0 = time.time()
+        natoms = molecule.number_of_atoms()
+        scale_f = -(eps - 1.0) / (eps + x)
 
-        # Defnine constants
-        two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
-        natoms         = molecule.number_of_atoms()
-        scale_f        = -(eps - 1) / (eps + x)
-        grid_coords    = grid[:, :3]
-        zeta           = grid[:, 4]
-        zeta_2         = zeta**2
-        atom_indices   = grid[:, 5]
-        n_dim          = 3 # x,y,z
-        
-        # M = Nr. of grid pts.
-        M = grid_coords.shape[0]
-        grad = np.zeros((M, M, natoms, 3))
+        grid_coords = np.copy(grid[:, :3])
+        zeta = np.copy(grid[:, 4])
+        atom_indices = np.copy(grid[:, 5].astype(int))
 
-        t1 = time.time()
-
-        delta_r = grid_coords[:, np.newaxis, :] - grid_coords[np.newaxis, :, :]
-        r_ij_2  = np.sum(delta_r**2, axis=-1)
-        # Diagonal terms are not used anyway so fill these elements
-        # to avoid divison by zero errors
-        np.fill_diagonal(r_ij_2, 1.0)
-        r_ij   = np.sqrt(r_ij_2)
-        dr_rij = delta_r / r_ij[:, :, np.newaxis]
-
-        t2 = time.time()
-
-        # Construct the explicit terms appearing in the gradient
-        zeta_ij  = (zeta[:, np.newaxis] * zeta[np.newaxis, :]) / np.sqrt(zeta_2[:, np.newaxis] + zeta_2[np.newaxis, :])
-        erf_term = self.erf_array(zeta_ij * r_ij)
-        exp_term = np.exp(-zeta_ij**2 * r_ij_2)
-
-        dA_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_ij * r_ij * exp_term) / r_ij_2
-
-        t3 = time.time()
-        
-        # Definitions to keep track of which atom each piint belongs to
-        I_vals      = np.arange(natoms)[:, np.newaxis, np.newaxis]
-        atom_idx_m  = atom_indices[np.newaxis, :, np.newaxis]
-        atom_idx_n  = atom_indices[np.newaxis, np.newaxis, :]
-        delta_ij    = ((I_vals == atom_idx_m).astype(int)
-                     - (I_vals == atom_idx_n).astype(int))
-
-        t4 = time.time()
-
-        grad_Aij = cpcm_comp_grad_Aij(dr_rij, dA_dr, delta_ij, q)
+        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, natoms)
         grad_Aij *= (-0.5 / scale_f)
-
-        t5 = time.time()
-
-        self.ostream.print_info(f'Grad Aij step 1: {t1 - t0:.2f} sec')
-        self.ostream.print_info(f'Grad Aij step 2: {t2 - t1:.2f} sec')
-        self.ostream.print_info(f'Grad Aij step 3: {t3 - t2:.2f} sec')
-        self.ostream.print_info(f'Grad Aij step 4: {t4 - t3:.2f} sec')
-        self.ostream.print_info(f'Grad Aij step 5: {t5 - t4:.2f} sec')
-        self.ostream.print_blank()
-        self.ostream.flush()
 
         return grad_Aij
 
