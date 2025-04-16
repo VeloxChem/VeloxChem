@@ -47,7 +47,7 @@
 #include "ExportGeneral.hpp"
 #include "ErrorHandler.hpp"
 #include "LinearMomentumIntegrals.hpp"
-#include "NuclearPotentialValues.hpp"
+#include "NuclearPotentialErfValues.hpp"
 #include "QuadrupoleIntegrals.hpp"
 #include "OldOneElecIntsDrivers.hpp"
 
@@ -315,13 +315,14 @@ export_oneeints(py::module& m)
                const py::array_t<double>& point_coords,
                const py::array_t<double>& D) -> py::array_t<double> {
                 std::string errstyle("compute_nuclear_potential_values: Expecting contiguous numpy arrays");
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
-                errors::assertMsgCritical(c_style, errstyle);
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
                 std::string errshape("compute_electric_point_values: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(D.shape(0));
-                auto npot_vals = onee::computeNuclearPotentialValues(molecule, basis, point_coords.data(), npoints, D.data(), naos);
+                auto npot_vals = onee::computeNuclearPotentialErfValues(molecule, basis, point_coords.data(), npoints, D.data(), naos, nullptr);
                 return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
             },
             "Computes nuclear potential values.",
@@ -329,6 +330,33 @@ export_oneeints(py::module& m)
              "basis"_a,
              "point_coords"_a,
              "density"_a);
+
+    m.def("compute_nuclear_potential_erf_values",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& point_coords,
+               const py::array_t<double>& D,
+               const py::array_t<double>& omega) -> py::array_t<double> {
+                std::string errstyle("compute_nuclear_potential_erf_values: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(omega.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+                std::string errsize("compute_electric_point_erf_values: Inconsistent size of omega");
+                errors::assertMsgCritical(omega.shape(0) == point_coords.shape(0), errsize);
+                std::string errshape("compute_electric_point_erf_values: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto npot_vals = onee::computeNuclearPotentialErfValues(molecule, basis, point_coords.data(), npoints, D.data(), naos, omega.data());
+                return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
+            },
+            "Computes nuclear potential values.",
+             "molecule"_a,
+             "basis"_a,
+             "point_coords"_a,
+             "density"_a,
+             "omega"_a);
 
     m.def("compute_quadrupole_integrals",
             [](const CMolecule&           molecule,

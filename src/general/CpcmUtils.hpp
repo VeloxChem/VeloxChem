@@ -30,17 +30,28 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef NuclearPotentialValues_hpp
-#define NuclearPotentialValues_hpp
+#ifndef CpcmUtils_hpp
+#define CpcmUtils_hpp
 
-#include "DenseMatrix.hpp"
-#include "MolecularBasis.hpp"
-#include "Molecule.hpp"
+#include <vector>
 
-namespace onee {  // onee namespace
+namespace cpcm {  // cpcm namespace
 
-auto computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& basis, const double* point_coords, const int npoints, const double* D, const int naos) -> std::vector<double>;
+/**
+ Form matrix A for C-PCM
 
-}  // namespace onee
+ @param ptr_grid_data the pointer to the C-PCM grid data.
+ @param row_start the starting row of matrix A to be calculated.
+ @param row_end the end row of matrix A to be calculated.
+ @param ncols the number of columns of matrix A.
+ @param ptr_sw_func the pointer to the switching function.
+ */
+auto form_matrix_A(const double* ptr_grid_data,
+                   const int     row_start,
+                   const int     row_end,
+                   const int     ncols,
+                   const double* ptr_sw_func) -> std::vector<double>;
 
-#endif /* NuclearPotentialValues_hpp */
+}  // namespace cpcm
+
+#endif /* CpcmUtils_hpp */

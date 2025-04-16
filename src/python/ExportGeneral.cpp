@@ -40,6 +40,8 @@
 #include "AtomicRadii.hpp"
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
+#include "CpcmUtils.hpp"
+#include "ErrorHandler.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "SphericalMomentum.hpp"
@@ -220,6 +222,24 @@ export_general(py::module &m) -> void
     m.def("spherical_momentum_d_factors", spher_mom::transformation_factors<2>, "Gets transformation factors for D type spherical momentum.");
     m.def("spherical_momentum_f_factors", spher_mom::transformation_factors<3>, "Gets transformation factors for F type spherical momentum.");
     m.def("spherical_momentum_g_factors", spher_mom::transformation_factors<4>, "Gets transformation factors for G type spherical momentum.");
+
+    // exposing functions from CpcmUtils.hpp
+    m.def("cpcm_form_matrix_A",
+          [](const py::array_t<double>& grid_data, const py::array_t<double>& sw_func) -> py::array_t<double> {
+              std::string errstyle("cpcm_form_matrix_A: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_data.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(sw_func.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+              std::string errsize("cpcm_form_matrix_A: Inconsistent sizes");
+              errors::assertMsgCritical(grid_data.shape(0) == sw_func.shape(0), errsize);
+              const auto npoints = static_cast<int>(grid_data.shape(0));
+              const auto ncols = static_cast<int>(grid_data.shape(1));
+              auto Amat = cpcm::form_matrix_A(grid_data.data(), 0, npoints, ncols, sw_func.data());
+              return vlx_general::pointer_to_numpy(Amat.data(), {npoints, npoints});
+          },
+          "Form C-PCM matrix A.",
+          "grid_data"_a,
+          "sw_func"_a);
 
     // TPoint class
     PyClass<TPoint<double>>(m, "Point")

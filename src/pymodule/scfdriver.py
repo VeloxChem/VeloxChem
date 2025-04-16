@@ -652,14 +652,24 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
+            cpcm_t0 = tm.time()
+
             (self._cpcm_grid,
              self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
+
             self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
                 self._cpcm_grid, self._cpcm_sw_func)
-            self._cpcm_Bmat = self.cpcm_drv.form_matrix_B(
+
+            cpcm_Bmat = self.cpcm_drv.form_matrix_B(
                 self._cpcm_grid, molecule)
-            self._cpcm_Bzvec = np.dot(self._cpcm_Bmat,
-                                      molecule.get_element_ids())
+
+            self._cpcm_Bzvec = np.dot(cpcm_Bmat, molecule.get_element_ids())
+
+            self.ostream.print_info(
+                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated ' +
+                f'in {tm.time() - cpcm_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         # set up polarizable embedding
         if self._pe:
@@ -1432,6 +1442,9 @@ class ScfDriver:
 
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
+            profiler.stop_timer('ErrVec')
+            profiler.start_timer('CPCM')
+
             if self._cpcm:
                 if self.scf_type == 'restricted':
                     Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
@@ -1464,6 +1477,9 @@ class ScfDriver:
                     fock_mat[0] += Fock_sol
                     if self.scf_type != 'restricted':
                         fock_mat[1] += Fock_sol
+
+            profiler.stop_timer('CPCM')
+            profiler.start_timer('ErrVec')
 
             if (self.rank == mpi_master() and i > 0 and
                     self.level_shifting > 0.0):

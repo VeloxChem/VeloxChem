@@ -35,8 +35,10 @@ import numpy as np
 import math
 import sys
 
+from .veloxchemlib import cpcm_form_matrix_A
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
+from .veloxchemlib import compute_nuclear_potential_erf_values
 from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
@@ -217,7 +219,7 @@ class CpcmDriver:
 
         assert_msg_critical(
             self.grid_per_sphere in valid_grid_numbers,
-            'CpcmDriver.generate_grid: Invalid grid_per_sphere')
+            'CpcmDriver.generate_cpcm_grid: Invalid grid_per_sphere')
 
         unit_grid = gen_lebedev_grid(self.grid_per_sphere)
         unit_grid_coords = unit_grid[:, :3]
@@ -333,28 +335,7 @@ class CpcmDriver:
             the grid (unweighted by the charges).
         """
 
-        Amat = np.zeros((grid.shape[0], grid.shape[0]))
-
-        sqrt_2_invpi = np.sqrt(2.0 / np.pi)
-
-        for i in range(grid.shape[0]):
-            xi, yi, zi, wi, zeta_i, atom_idx = grid[i]
-            Amat[i, i] = zeta_i * sqrt_2_invpi / sw_func[i]
-            zeta_i2 = zeta_i**2
-
-            for j in range(i + 1, grid.shape[0]):
-                xj, yj, zj, wj, zeta_j, atom_idx = grid[j]
-
-                zeta_j2 = zeta_j**2
-                zeta_ij = zeta_i * zeta_j / np.sqrt(zeta_i2 + zeta_j2)
-
-                r_ij = np.sqrt((xi - xj)**2 + (yi - yj)**2 + (zi - zj)**2)
-
-                Aij = math.erf(zeta_ij * r_ij) / r_ij
-                Amat[i, j] = Aij
-                Amat[j, i] = Aij
-
-        return Amat
+        return cpcm_form_matrix_A(grid, sw_func)
 
     def form_matrix_B(self, grid, molecule):
         """
@@ -413,14 +394,8 @@ class CpcmDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        local_esp = np.zeros(end - start)
-        nerf_drv = NuclearPotentialErfDriver()
-        
-        for i in range(start, end):
-            epi_matrix = 1.0 * nerf_drv.compute(molecule, basis, [1.0], [grid[i,:3]], grid[i,4]).full_matrix().to_numpy()
-
-            if local_comm.Get_rank() == mpi_master():
-                local_esp[i - start] -= np.sum(epi_matrix * D)
+        local_esp = compute_nuclear_potential_erf_values(
+            molecule, basis, np.copy(grid[start:end, :3]), D, np.copy(grid[start:end, 4]))
 
         if local_comm.Get_rank() == mpi_master():
             local_esp = cross_comm.gather(local_esp, root=mpi_master())
