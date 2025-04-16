@@ -142,7 +142,6 @@ class ScfHessianDriver(HessianDriver):
 
         self.cphf_dict = dict(cphf_dict)
 
-    #todo add optional parameter for atom pairs
     def compute(self, molecule, ao_basis):
         """
         Computes the analytical or numerical nuclear Hessian.
@@ -181,7 +180,8 @@ class ScfHessianDriver(HessianDriver):
         if self.numerical:
             self.compute_numerical(molecule, ao_basis)
         else:
-            self.compute_analytical(molecule, ao_basis, profiler, self.atom_pairs)
+            self.compute_analytical(molecule, ao_basis, profiler,
+                                    self.atom_pairs)
 
         if self.rank == mpi_master():
             # print Hessian
@@ -406,16 +406,25 @@ class ScfHessianDriver(HessianDriver):
         # RHS contracted with CPHF coefficients (ov)
         hessian_cphf_coeff_rhs = np.zeros((natm, 3, natm, 3))
 
-        for i in range(natm):
+        atom_pair_atoms = []
+        if atom_pairs is not None:
+            for i, j in atom_pairs:
+                atom_pair_atoms.append(i)
+                atom_pair_atoms.append(j)
+
+            atoms = atom_pair_atoms
+        else:
+            atoms = range(natm)
+
+        for i in atoms:
             for x in range(3):
                 dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
 
-                for j in range(i, natm):
+                for j in atoms:
                     for y in range(3):
                         hess_ijxy = 4.0 * (np.dot(
                             dist_cphf_ov_ix_data,
                             dist_cphf_rhs[j * 3 + y].data))
-
                         hessian_cphf_coeff_rhs[i, x, j, y] += hess_ijxy
                         if i != j:
                             hessian_cphf_coeff_rhs[j, y, i, x] += hess_ijxy
@@ -508,16 +517,10 @@ class ScfHessianDriver(HessianDriver):
         # TODO: use alternative way to partition atoms
         # todo only do atoms in atom pairs
         if atom_pairs is not None:
-            atoms = []
-            for i, j in atom_pairs:
-                if not i in atoms:
-                    atoms.append(i)
-                if not j in atoms:
-                    atoms.append(j)
+            atoms = atom_pair_atoms
         else:
             atoms = list(range(natm))
         local_atoms = atoms[self.rank::self.nodes]
-
 
         for i in local_atoms:
 
@@ -604,7 +607,11 @@ class ScfHessianDriver(HessianDriver):
         if atom_pairs is None:
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
         else:
-            local_atom_pairs = atom_pairs[self.rank::self.nodes]
+            all_atom_pairs_subset = []
+            for pair in all_atom_pairs:
+                if pair[0] in atom_pair_atoms and pair[1] in atom_pair_atoms:
+                    all_atom_pairs_subset.append(pair)
+            local_atom_pairs = all_atom_pairs_subset[self.rank::self.nodes]
 
         for i, j in local_atom_pairs:
 
@@ -736,73 +743,85 @@ class ScfHessianDriver(HessianDriver):
             nuclear_charges = molecule.get_element_ids()
 
             for i in range(self.rank, natm, self.nodes):
-                q_i = nuclear_charges[i]
-                xyz_i = qm_coords[i]
+                if atom_pairs is None or i in atom_pair_atoms:
+                    q_i = nuclear_charges[i]
+                    xyz_i = qm_coords[i]
 
-                for j in range(len(mm_charges)):
-                    q_j = mm_charges[j]
-                    xyz_j = mm_coords[j]
+                    for j in range(len(mm_charges)):
+                        q_j = mm_charges[j]
+                        xyz_j = mm_coords[j]
 
-                    vec_ij = xyz_j - xyz_i
-                    rij = np.linalg.norm(vec_ij)
+                        vec_ij = xyz_j - xyz_i
+                        rij = np.linalg.norm(vec_ij)
 
-                    hess_ii = q_i * q_j * (3.0 * np.outer(vec_ij, vec_ij) /
-                                           rij**5 - np.eye(3) / rij**3)
+                        hess_ii = q_i * q_j * (3.0 * np.outer(vec_ij, vec_ij) /
+                                               rij**5 - np.eye(3) / rij**3)
 
-                    hessian_point_charges[i, i, :, :] += hess_ii
+                        hessian_point_charges[i, i, :, :] += hess_ii
 
             if self.scf_driver.qm_vdw_params is not None:
 
                 for i in range(self.rank, natm, self.nodes):
-                    xyz_i = qm_coords[i]
-                    sigma_i = self.scf_driver.qm_vdw_params[i, 0]
-                    epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
+                    if atom_pairs is None or i in atom_pair_atoms:
 
-                    for j in range(len(mm_charges)):
-                        xyz_j = self.scf_driver.point_charges[:3, j]
-                        sigma_j = self.scf_driver.point_charges[4, j]
-                        epsilon_j = self.scf_driver.point_charges[5, j]
+                        xyz_i = qm_coords[i]
+                        sigma_i = self.scf_driver.qm_vdw_params[i, 0]
+                        epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
 
-                        vec_ij = xyz_j - xyz_i
+                        for j in range(len(mm_charges)):
+                            xyz_j = self.scf_driver.point_charges[:3, j]
+                            sigma_j = self.scf_driver.point_charges[4, j]
+                            epsilon_j = self.scf_driver.point_charges[5, j]
 
-                        # convert vector to nm
-                        vec_ij *= bohr_in_angstrom() * 0.1
+                            vec_ij = xyz_j - xyz_i
 
-                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
-                        sigma_ij = 0.5 * (sigma_i + sigma_j)
+                            # convert vector to nm
+                            vec_ij *= bohr_in_angstrom() * 0.1
 
-                        if epsilon_ij == 0.0:
-                            continue
+                            epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                            sigma_ij = 0.5 * (sigma_i + sigma_j)
 
-                        rij = np.linalg.norm(vec_ij)
-                        inv_r2 = 1.0 / rij**2
-                        inv_r4 = inv_r2**2
+                            if epsilon_ij == 0.0:
+                                continue
 
-                        sigma_r_6 = (sigma_ij / rij)**6
-                        sigma_r_12 = sigma_r_6**2
+                            rij = np.linalg.norm(vec_ij)
+                            inv_r2 = 1.0 / rij**2
+                            inv_r4 = inv_r2**2
 
-                        coef_rr = (28.0 * sigma_r_12 - 8.0 * sigma_r_6) * inv_r4
-                        coef_I = (2.0 * sigma_r_12 - sigma_r_6) * inv_r2
+                            sigma_r_6 = (sigma_ij / rij)**6
+                            sigma_r_12 = sigma_r_6**2
 
-                        hess_ii = 24.0 * epsilon_ij * (
-                            coef_rr * np.outer(vec_ij, vec_ij) -
-                            coef_I * np.eye(3))
+                            coef_rr = (28.0 * sigma_r_12 -
+                                       8.0 * sigma_r_6) * inv_r4
+                            coef_I = (2.0 * sigma_r_12 - sigma_r_6) * inv_r2
 
-                        # convert hessian to atomic unit
-                        hess_ii /= (hartree_in_kjpermol() *
-                                    (10.0 / bohr_in_angstrom())**2)
+                            hess_ii = 24.0 * epsilon_ij * (
+                                coef_rr * np.outer(vec_ij, vec_ij) -
+                                coef_I * np.eye(3))
 
-                        hessian_point_charges[i, i, :, :] += hess_ii
+                            # convert hessian to atomic unit
+                            hess_ii /= (hartree_in_kjpermol() *
+                                        (10.0 / bohr_in_angstrom())**2)
+
+                            hessian_point_charges[i, i, :, :] += hess_ii
 
             hessian_point_charges = self.comm.reduce(hessian_point_charges,
                                                      root=mpi_master())
 
         if self.rank == mpi_master():
 
-            # Nuclear-nuclear repulsion contribution
             hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
-            # Sum up the terms and reshape for final Hessian
+            # Doing this post-hoc is much easier to implement, and the cost of the nuclear nuclear contribution is neglible
+            if atom_pairs is not None:
+                for i in range(natm):
+                    for j in range(natm):
+                        if i not in atom_pair_atoms or j not in atom_pair_atoms:
+                            hessian_nuclear_nuclear[i, j, :, :] = 0.0
+
+            print('hessian_nuclear_nuclear:')
+            print(hessian_nuclear_nuclear)
+
             self.hessian = (
                 hessian_first_order_derivatives +
                 hessian_2nd_order_derivatives.transpose(0, 2, 1, 3) +

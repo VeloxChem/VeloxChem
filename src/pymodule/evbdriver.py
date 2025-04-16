@@ -241,7 +241,7 @@ class EvbDriver():
         product: str | list[str],
         reactant_charge: int | list[int] = 0,
         product_charge: int | list[int] = 0,
-        reactant_multiplicity: int |list[int]= 1,
+        reactant_multiplicity: int | list[int] = 1,
         product_multiplicity: int | list[int] = 1,
         reparameterize: bool = True,
         optimize: bool = False,
@@ -276,11 +276,12 @@ class EvbDriver():
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
-        if (combined_rea_input['forcefield'] is not None and 
-            combined_rea_input['molecule'] is not None and 
-            combined_pro_input['forcefield'] is not None and 
-            mapped_product_path.exists()):
-            mapped_product_molecule = Molecule.read_xyz_file(str(mapped_product_path))
+        if (combined_rea_input['forcefield'] is not None
+                and combined_rea_input['molecule'] is not None
+                and combined_pro_input['forcefield'] is not None
+                and mapped_product_path.exists()):
+            mapped_product_molecule = Molecule.read_xyz_file(
+                str(mapped_product_path))
             combined_pro_input['forcefield'].molecule = mapped_product_molecule
             combined_pro_input['molecule'] = mapped_product_molecule
             self.ostream.print_info(
@@ -330,7 +331,6 @@ class EvbDriver():
                 self.reactant.molecule.write_xyz_file(str(reactant_mol_path))
                 self.product.molecule.write_xyz_file(str(mapped_product_path))
 
-
     def _process_file_input(self, filenames, charge, multiplicity):
         if isinstance(filenames, str):
             filenames = [filenames]
@@ -338,17 +338,18 @@ class EvbDriver():
         # by default, give all molecules 0 charge and 1 multiplicity
         if isinstance(charge, int):
             if charge == 0:
-                charge = [charge]*len(filenames)
+                charge = [charge] * len(filenames)
             else:
                 charge = [charge]
 
         if isinstance(multiplicity, int):
             if multiplicity == 1:
-                multiplicity = [multiplicity]*len(filenames)
+                multiplicity = [multiplicity] * len(filenames)
             else:
                 multiplicity = [multiplicity]
 
-        assert len(filenames) == len(charge), "Number of reactants and charges must match"
+        assert len(filenames) == len(
+            charge), "Number of reactants and charges must match"
         assert len(filenames) == len(
             multiplicity), "Number of reactants and multiplicities must match"
 
@@ -365,9 +366,8 @@ class EvbDriver():
                 assert abs(
                     sum(partial_charge) - charge
                 ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total foral charge of the system {charge} for input {i+1}"
-        
+
         return input
-        
 
     def _get_input_files(self, filename: str):
         # Build a molecule from a (possibly optimized) geometry
@@ -387,7 +387,9 @@ class EvbDriver():
             molecule = Molecule.read_xyz_file(str(struct_path))
         else:
             molecule = None
-            self.ostream.print_info(f"Could not load {'/'.join(opt_path.parts[-2:])} and {'/'.join(struct_path.parts[-1])}")
+            self.ostream.print_info(
+                f"Could not load {'/'.join(opt_path.parts[-2:])} and {'/'.join(struct_path.parts[-1])}"
+            )
         self.ostream.flush()
 
         charges = None
@@ -437,8 +439,7 @@ class EvbDriver():
             hessian = np.loadtxt(hessian_path)
         else:
             self.ostream.print_info(
-                f"Could not find hessian file at {hessian_path}"
-            )
+                f"Could not find hessian file at {hessian_path}")
         self.ostream.flush()
 
         return {

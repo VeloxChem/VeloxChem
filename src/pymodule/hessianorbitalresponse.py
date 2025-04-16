@@ -111,9 +111,6 @@ class HessianOrbitalResponse(CphfSolver):
             The RHS of the CPHF equations.
         """
 
-        if atom_pairs is not None:
-            pass
-
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -159,7 +156,18 @@ class HessianOrbitalResponse(CphfSolver):
         # partition atoms for parallellisation
         # TODO: use partition_atoms in e.g. scfgradientdriver
 
-        local_atoms = partition_atoms(natm, self.rank, self.nodes)
+        if atom_pairs is None:
+            local_atoms = partition_atoms(natm, self.rank, self.nodes)
+        else:
+            if self.rank == mpi_master():
+                local_atoms = []
+                for i, j in atom_pairs:
+                    if i not in local_atoms:
+                        local_atoms.append(i)
+                    if j not in local_atoms:
+                        local_atoms.append(j)
+            else:
+                local_atoms = []
 
         atom_idx_rank = [(iatom, self.rank) for iatom in local_atoms]
         gathered_atom_idx_rank = self.comm.gather(atom_idx_rank)
@@ -490,6 +498,17 @@ class HessianOrbitalResponse(CphfSolver):
                 dist_cphf_rhs.append(dist_cphf_rhs_ix)
 
             profiler.add_timing_info('distRHS', tm.time() - uij_t0)
+
+        # fill up the missing values in dist_cphf_rhs with zeros so later indexing does not fail
+        if atom_pairs is not None:
+            for i in range(natm):
+                if i not in local_atoms:
+                    zer = np.zeros(len(dist_cphf_rhs[0].data))
+                    for j in range(3):
+                        empty_dist_arr = DistributedArray(zer,
+                                                          self.comm,
+                                                          distribute=False)
+                        dist_cphf_rhs.insert(i * 3 + j, empty_dist_arr)
 
         hessian_eri_overlap = self.comm.reduce(hessian_eri_overlap,
                                                root=mpi_master())
