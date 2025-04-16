@@ -270,6 +270,47 @@ export_general(py::module &m) -> void
           "q"_a,
           "natoms"_a);
 
+    m.def("cpcm_comp_grad_Aii",
+          [](const py::array_t<double>& grid_coords,
+             const py::array_t<double>& zeta,
+             const py::array_t<double>& sw_f,
+             const py::array_t<int>&    atom_indices,
+             const py::array_t<double>& q,
+             const py::array_t<double>& atom_coords,
+             const py::array_t<double>& atom_radii) -> py::array_t<double> {
+              std::string errstyle("cpcm_comp_grad_Aii: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_coords.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(zeta.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(sw_f.ptr(), py::array::c_style);
+              auto        c_style_4 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+              auto        c_style_5 = py::detail::check_flags(q.ptr(), py::array::c_style);
+              auto        c_style_6 = py::detail::check_flags(atom_coords.ptr(), py::array::c_style);
+              auto        c_style_7 = py::detail::check_flags(atom_radii.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+              errors::assertMsgCritical((c_style_5 && c_style_6 && c_style_7), errstyle);
+              std::string errsize("cpcm_comp_grad_Aii: Inconsistent sizes");
+              errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == sw_f.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
+              errors::assertMsgCritical(atom_coords.shape(0) == atom_radii.shape(0), errsize);
+              errors::assertMsgCritical(atom_coords.shape(1) == 3, errsize);
+              const auto npoints = static_cast<int>(grid_coords.shape(0));
+              const auto natoms = static_cast<int>(atom_coords.shape(0));
+              auto grad_Amat = cpcm::comp_grad_Aii(grid_coords.data(), zeta.data(), sw_f.data(), atom_indices.data(), q.data(),
+                                                   atom_coords.data(), atom_radii.data(), 0, npoints, npoints, natoms);
+              return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
+          },
+          "Compute C-PCM gradient for Aii.",
+          "grid_coords"_a,
+          "zeta"_a,
+          "sw_f"_a,
+          "atom_indices"_a,
+          "q"_a,
+          "atom_coords"_a,
+          "atom_radii"_a);
+
     // TPoint class
     PyClass<TPoint<double>>(m, "Point")
         .def(py::init<>())

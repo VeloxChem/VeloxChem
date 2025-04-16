@@ -61,6 +61,18 @@ auto comp_grad_Aij(const double* ptr_grid_coords,
                    const int     npoints,
                    const int     natoms) -> std::vector<double>;
 
+auto comp_grad_Aii(const double* ptr_grid_coords,
+                   const double* ptr_zeta,
+                   const double* ptr_sw_f,
+                   const int*    ptr_atom_indices,
+                   const double* ptr_q,
+                   const double* ptr_atom_coords,
+                   const double* ptr_atom_radii,
+                   const int     row_start,
+                   const int     row_end,
+                   const int     npoints,
+                   const int     natoms) -> std::vector<double>;
+
 }  // namespace cpcm
 
 #endif /* CpcmUtils_hpp */

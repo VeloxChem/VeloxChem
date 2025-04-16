@@ -168,7 +168,7 @@ comp_grad_Aij(const double* ptr_grid_coords,
 
                     ptr_omp_grad_Aij[thread_id * natoms * 3 + a * 3 + c] +=
 
-                        ptr_q[i] * delta_ij *dA_dr * uvec_ij[c] * ptr_q[j];
+                        ptr_q[i] * delta_ij * dA_dr * uvec_ij[c] * ptr_q[j];
                 }
             }
         }
@@ -188,6 +188,106 @@ comp_grad_Aij(const double* ptr_grid_coords,
     }
 
     return grad_Aij;
+}
+
+auto
+comp_grad_Aii(const double* ptr_grid_coords,
+              const double* ptr_zeta,
+              const double* ptr_sw_f,
+              const int*    ptr_atom_indices,
+              const double* ptr_q,
+              const double* ptr_atom_coords,
+              const double* ptr_atom_radii,
+              const int     row_start,
+              const int     row_end,
+              const int     npoints,
+              const int     natoms) -> std::vector<double>
+{
+    const double sqrt_2_inv_pi = std::sqrt(2.0 / mathconst::pi_value());
+
+    const double sqrt_invpi = 1.0 / std::sqrt(mathconst::pi_value());
+
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<double> omp_grad_Aii(nthreads * natoms * 3, 0.0);
+
+    auto ptr_omp_grad_Aii = omp_grad_Aii.data();
+
+    #pragma omp parallel for schedule(static)
+    for (int i = row_start; i < row_end; i++)
+    {
+        const auto thread_id = omp_get_thread_num();
+
+        const auto x_i = ptr_grid_coords[i * 3 + 0];
+        const auto y_i = ptr_grid_coords[i * 3 + 1];
+        const auto z_i = ptr_grid_coords[i * 3 + 2];
+
+        const auto zeta_i = ptr_zeta[i];
+        const auto zeta_i2 = zeta_i * zeta_i;
+
+        const auto sw_f_i = ptr_sw_f[i];
+        const auto q_i = ptr_q[i];
+
+        const auto atomidx_i = ptr_atom_indices[i];
+
+        const auto factor_i = sqrt_2_inv_pi * (zeta_i / sw_f_i) * (q_i * q_i);
+
+        for (int b = 0; b < natoms; b++)
+        {
+            const auto x_b = ptr_atom_coords[b * 3 + 0];
+            const auto y_b = ptr_atom_coords[b * 3 + 1];
+            const auto z_b = ptr_atom_coords[b * 3 + 2];
+
+            const auto R_b = ptr_atom_radii[b];
+
+            const auto r_ib_2 = ((x_i - x_b) * (x_i - x_b) +
+                                 (y_i - y_b) * (y_i - y_b) +
+                                 (z_i - z_b) * (z_i - z_b));
+
+            const auto r_ib = std::sqrt(r_ib_2);
+
+            const double uvec_ib[3] = {(x_i - x_b) / r_ib,
+                                       (y_i - y_b) / r_ib,
+                                       (z_i - z_b) / r_ib};
+
+            const auto term_m = zeta_i * (R_b - r_ib);
+            const auto term_p = zeta_i * (R_b + r_ib);
+            const auto fib = 1.0 - 0.5 * (std::erf(term_m) + std::erf(term_p));
+
+            const auto ratio_fib = (sqrt_invpi * zeta_i / fib) * (
+                -std::exp(-term_m * term_m) + std::exp(-term_p * term_p));
+
+            for (int a = 0; a < natoms; a++)
+            {
+                const auto delta = static_cast<double>(static_cast<int>(a == atomidx_i) -
+                                                       static_cast<int>(a == b));
+
+                for (int c = 0; c < 3; c++)
+                {
+                    // np.einsum('aib,ib,ibc,i->ac', delta, ratio_fib, dr_iJ, factor_i)
+
+                    ptr_omp_grad_Aii[thread_id * natoms * 3 + a * 3 + c] +=
+
+                        delta * ratio_fib * uvec_ib[c] * factor_i;
+                }
+            }
+        }
+    }
+
+    std::vector<double> grad_Aii(natoms * 3, 0.0);
+
+    for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        for (int a = 0; a < natoms; a++)
+        {
+            for (int c = 0; c < 3; c++)
+            {
+                grad_Aii[a * 3 + c] += omp_grad_Aii[thread_id * natoms * 3 + a * 3 + c];
+            }
+        }
+    }
+
+    return grad_Aii;
 }
 
 }  // namespace cpcm

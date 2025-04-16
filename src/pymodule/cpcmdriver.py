@@ -37,6 +37,7 @@ import time
 import sys
 
 from .veloxchemlib import cpcm_form_matrix_A, cpcm_comp_grad_Aij
+from .veloxchemlib import cpcm_comp_grad_Aii
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import compute_nuclear_potential_erf_values
@@ -521,101 +522,22 @@ class CpcmDriver:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
 
-        t0 = time.time()
-
-        # Basic constants
-        sqrt_2_inv_pi = np.sqrt(2.0 / np.pi)
         scale_f       = -(eps - 1) / (eps + x)
-        natoms        = molecule.number_of_atoms()
+
+        grid_coords = np.copy(grid[:, :3])
+        zeta_i      = np.copy(grid[:, 4])
+        atom_idx    = np.copy(grid[:, 5])
+
         atom_coords   = molecule.get_coordinates_in_bohr()
         atom_radii    = self.get_cpcm_vdw_radii(molecule) * 1.2
-        
-        # Grid info
-        M           = grid.shape[0]
-        grid_coords = grid[:, :3]
-        zeta_i      = grid[:, 4]
-        atom_idx    = grid[:, 5]
-        n_dim       = 3 # x,y,z
-        F_i         = sw_f
 
-        # Initialise grad. object
-        grad = np.zeros((M, M, natoms, 3))
-
-        t1 = time.time()
-
-        # Basic geometrical vectors
-        r_iJ      = grid_coords[:, np.newaxis, :] - atom_coords[np.newaxis, :, :]
-        r_iJ_norm = np.linalg.norm(r_iJ, axis=2)
-        dr_iJ     = r_iJ / r_iJ_norm[:, :, np.newaxis]
-        RJ        = atom_radii[np.newaxis, :]
-
-        t2 = time.time()
-
-        # Definitions to keep track of which atom each grid point belongs to
-        a_vals = np.arange(natoms)[:, np.newaxis, np.newaxis]
-        _i_idx = atom_idx[np.newaxis, :, np.newaxis]
-        J_vals = np.arange(natoms)[np.newaxis, np.newaxis, :]
-        delta  = ((a_vals == _i_idx).astype(int)
-                - (a_vals == J_vals).astype(int))
-
-        t3 = time.time()
-
-        # Compute fiJ
-        term_m = zeta_i[:, np.newaxis] * (RJ - r_iJ_norm)
-        term_p = zeta_i[:, np.newaxis] * (RJ + r_iJ_norm)
-        fiJ    = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
-
-        t4 = time.time()
-
-        # Derivative of fiJ: dfiJ_driJ
-        z2 = zeta_i[:, np.newaxis]**2
-        dfiJ_driJ = (zeta_i[:, np.newaxis] / np.sqrt(np.pi)) * (
-            -np.exp(-z2 * (RJ - r_iJ_norm)**2) + np.exp(-z2 * (RJ + r_iJ_norm)**2))
-        ratio_fiJ = dfiJ_driJ / fiJ
-
-        t5 = time.time()
-
-        # Primitive switching func. derivative contribution
-        f_i = delta[:, :, :, np.newaxis] * ratio_fiJ[np.newaxis, :, :, np.newaxis] * dr_iJ[np.newaxis, :, :, :]
-        summed_fi = np.sum(f_i, axis=2)
-
-        t6 = time.time()
-
-        # Switching func. contribution
-        grad_Fi = -F_i[np.newaxis, :, np.newaxis] * summed_fi
-
-        factor_i = -zeta_i[np.newaxis, :] * sqrt_2_inv_pi / (F_i[np.newaxis, :]**2)
-
-        final_contribution = grad_Fi * factor_i[:, :, np.newaxis]
-
-        t7 = time.time()
-
-        idx = np.arange(M)
-        for a in range(natoms):
-            contrib_a = final_contribution[a, :, :]
-            # Set the diagonal
-            grad[idx, idx, a, :] = contrib_a
-
-        t8 = time.time()
-
-        # Perform contractions
-        partial_contract = np.matmul(q, grad.reshape(M, M * natoms * n_dim)).reshape(M, natoms * n_dim)
-        grad_Aii         = np.matmul(partial_contract.T, q).reshape(natoms, n_dim)
-        grad_Aii        *= (-0.5 / scale_f)
-
-        t9 = time.time()
-
-        self.ostream.print_info(f'Grad Aii step 1: {t1 - t0:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 2: {t2 - t1:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 3: {t3 - t2:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 4: {t4 - t3:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 5: {t5 - t4:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 6: {t6 - t5:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 7: {t7 - t6:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 8: {t8 - t7:.2f} sec')
-        self.ostream.print_info(f'Grad Aii step 9: {t9 - t8:.2f} sec')
-        self.ostream.print_blank()
-        self.ostream.flush()
+        # a, b: atoms
+        # i: grid points
+        # c: Cartesian components
+        # np.einsum('aib,ib,ibc,i->ac', delta, ratio_fiJ, dr_iJ, factor_i * q**2)
+        grad_Aii = cpcm_comp_grad_Aii(grid_coords, zeta_i, sw_f, atom_idx, q,
+                                      atom_coords, atom_radii)
+        grad_Aii *= (-0.5 / scale_f)
 
         return grad_Aii
 
