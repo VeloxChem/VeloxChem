@@ -56,6 +56,15 @@ auto serialMultAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> C
 auto serialMultABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
+ Computes matrix multiplication: A^T * B.
+
+ @param matrixA the matrix A.
+ @param matrixB the matrix B
+ @return the matrix A^T * B.
+ */
+auto serialMultAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
+
+/**
  Computes matrix addition: A + B.
 
  @param matrixA the matrix A.

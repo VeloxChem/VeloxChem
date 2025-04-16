@@ -189,6 +189,7 @@ from .excitedstateanalysisdriver import ExcitedStateAnalysisDriver
 from .evbdriver import EvbDriver
 from .evbffbuilder import EvbForceFieldBuilder
 from .evbsystembuilder import EvbSystemBuilder
+from .evbsystembuilder import EvbForceGroup
 from .evbfepdriver import EvbFepDriver
 from .evbdataprocessing import EvbDataProcessing
 from .evbreporter import EvbReporter
@@ -198,6 +199,7 @@ from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 from .mofbuilder import MofBuilder
 from .conformergenerator import ConformerGenerator
+from .tsguesser import TransitionStateGuesser
 
 # for backward compatibility only
 from .peforcefieldgenerator import PEForceFieldGenerator as LoPropDriver

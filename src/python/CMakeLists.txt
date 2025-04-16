@@ -1,8 +1,6 @@
 # find mpi4py
 include(${PROJECT_SOURCE_DIR}/cmake/custom/FindPythonModule.cmake)
 
-find_python_module(mpi4py REQUIRED)
-
 # create Python module with pybind11
 # * use pybind11 header files with -isystem
 # * explicitly disable LTO, even for release builds

@@ -30,10 +30,13 @@
 #  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+from pathlib import Path
 from io import StringIO
 from contextlib import redirect_stdout
 import numpy as np
+import json
 
+from .veloxchemlib import bohr_in_angstrom
 from .oneeints import (compute_nuclear_potential_integrals,
                        compute_nuclear_potential_gradient_bfs,
                        compute_electrostatic_potential_hessian,
@@ -45,6 +48,7 @@ from .oneeints import (compute_nuclear_potential_integrals,
                        compute_electric_field_potential_gradient_for_mm,
                        compute_electric_field_potential_hessian)
 from .errorhandler import assert_msg_critical
+from .sanitychecks import write_pe_jsonfile
 
 try:
     from pyframe.embedding import (read_input, electrostatic_interactions,
@@ -55,6 +59,71 @@ try:
     from pyframe.simulation_box import SimulationBox
 except ImportError:
     raise ImportError('Unable to import PyFraME. Please install PyFraME.')
+
+
+def show_embedding(molecule,
+                   potfile=None,
+                   embedding=None,
+                   width=600,
+                   height=500,
+                   mm_opacity=0.8):
+
+    # Note: this method can involve writting to file so it should only be used
+    # on single MPI rank.
+
+    assert_msg_critical(
+        not ((embedding is None) and (potfile is None)),
+        'show_embedding: expecting embedding or potfile')
+
+    assert_msg_critical(
+        not ((embedding is not None) and (potfile is not None)),
+        'show_embedding: expecting either embedding or potfile, not both')
+
+    if embedding is not None:
+        json_potfile = embedding['inputs']['json_file']
+
+    elif potfile is not None:
+        if Path(potfile).suffix == '.json':
+            json_potfile = potfile
+        else:
+            json_potfile = write_pe_jsonfile(molecule, potfile)
+
+    with open(json_potfile, 'r') as fh:
+        emb_dict = json.load(fh)
+
+    mm_atoms = []
+    for subsys in emb_dict['classical_subsystems']:
+        for frag in subsys['classical_fragments']:
+            for atom in frag['atoms']:
+                mm_atoms.append([atom['element']] + [str(x * bohr_in_angstrom()) for x in atom['coordinate']])
+    mm_atoms_xyz = f'{len(mm_atoms)}\n\n'
+    for a in mm_atoms:
+        mm_atoms_xyz += ' '.join(a) + '\n'
+
+    try:
+        import py3Dmol
+        viewer = py3Dmol.view(width=width, height=height)
+        viewer.setViewStyle({"style": "outline", "width": 0.02})
+
+        viewer.addModel(molecule.get_xyz_string())
+        viewer.setStyle({'model': 0}, {"stick": {}, "sphere": {"scale": 0.25}})
+
+        viewer.addModel(mm_atoms_xyz)
+        viewer.setStyle(
+            {
+                'model': 1,
+            },
+            {
+                "stick": {"radius": 0.1, "opacity": mm_opacity},
+                "sphere": {"scale": 0.08, "opacity": mm_opacity},
+            },
+        )
+
+        viewer.zoomTo()
+        viewer.show()
+
+    except ImportError:
+        raise ImportError('Unable to import py3Dmol')
 
 
 class EmbeddingIntegralDriver:

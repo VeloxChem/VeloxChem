@@ -1,5 +1,5 @@
-recursive-include src *.py *.cpp *.hpp *.tab
+recursive-include src *.py *.cpp *.hpp
 graft basis
-graft config
-include requirements.txt AUTHORS.rst HISTORY.rst
+graft database
+include AUTHORS.rst HISTORY.rst
 global-include Makefile
