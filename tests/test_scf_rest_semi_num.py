@@ -20,7 +20,7 @@ class TestScfRestrictedSemiNumDriver:
         H   -0.5650842  11.3134964  -1.2949455
         H    0.9282185  11.0652990  -1.3134026
         """
-        basis_label = 'def2-svp'
+        basis_label = 'def2-tzvpd'
 
         mol = Molecule.read_xyz_string(xyz_string)
 

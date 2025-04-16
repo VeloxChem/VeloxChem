@@ -220,6 +220,7 @@ class ScfDriver:
         self._dft = False
         self._mol_grid = None
         self.semi_num_exchange = False
+        self._semi_num_grid = None
 
         # polarizable embedding
         self.potfile = None
@@ -595,6 +596,20 @@ class ScfDriver:
             n_grid_points = self._mol_grid.number_of_points()
             self.ostream.print_info(
                 'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+            
+        # generate integration grid for seminumerical exchange
+        if self.semi_num_exchange:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(3)
+
+            grid_t0 = tm.time()
+            self._semi_num_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
+            n_grid_points = self._semi_num_grid.number_of_points()
+            self.ostream.print_info(
+                'Molecular grid for seminumerical exchange with {0:d} points generated in {1:.2f} sec.'.
                 format(n_grid_points,
                        tm.time() - grid_t0))
             self.ostream.print_blank()
@@ -2220,7 +2235,7 @@ class ScfDriver:
             
         if self.semi_num_exchange:
             kx_drv = XCIntegrator()
-            vkx_mat = kx_drv.integrate_kx_fock(molecule, basis, den_mat, self._mol_grid, exchange_scaling_factor)
+            vkx_mat = kx_drv.integrate_kx_fock(molecule, basis, den_mat, self._semi_num_grid, exchange_scaling_factor)
         else:
             vkx_mat = None
                                         
