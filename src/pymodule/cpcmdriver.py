@@ -744,84 +744,15 @@ class CpcmDriver:
         :return:
         The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
-        geom100_drv = NuclearPotentialErfGeom100Driver()
-        geom010_drv = NuclearPotentialErfGeom010Driver()
         
-        # Define constants
-        natoms       = molecule.number_of_atoms()
-        grad_C_nuc   = np.zeros((natoms, 3))
-        grad_C_cav   = np.zeros((natoms, 3))
-        grid_coords  = grid[:, :3]
-        zeta         = grid[:, 4]
-        atom_indices = grid[:, 5].astype(int)
-        labels       = ['X', 'Y', 'Z']
+        grid_coords  = np.copy(grid[:, :3])
+        zeta         = np.copy(grid[:, 4])
+        atom_indices = np.copy(grid[:, 5].astype(int))
 
-        C_timings = [0.0 for ind in range(10)]
+        # TODO: parallelize over MPI ranks
 
-        t0 = time.time()
-
-        grad_C_nuc = compute_nuclear_potential_erf_gradient_on_charges(
-            molecule, basis, np.copy(grid_coords), q, DM, np.copy(zeta),
-            np.copy(atom_indices))
-
-        t1 = time.time()
-        C_timings[0] = t1 - t0
-
-        # Compute both the nuclear and cavity contributions
-        for a in range(natoms):
-            t0 = time.time()
-
-            # Indices where the grid belongs to atom a
-            indices_a = (atom_indices == a)
-            q_subset  = q[indices_a]
-            grid_a    = grid_coords[indices_a]
-            zeta_a    = zeta[indices_a]
-            
-            geom100_mats, geom001_mats = [], []
-
-            t1 = time.time()
-            C_timings[1] += t1 - t0
-            t0 = time.time()
-
-            grad_100 = geom100_drv.compute(molecule, basis, a, grid_coords, q, zeta)
-            
-            t1 = time.time()
-            C_timings[2] += t1 - t0
-            t0 = time.time()
-
-            for label in labels:
-                mat_100 = -1.0 * grad_100.matrix(label).full_matrix().to_numpy()
-                geom100_mats.append(mat_100)
-                geom001_mats.append(mat_100.T)
-
-            t1 = time.time()
-            C_timings[3] += t1 - t0
-            t0 = time.time()
-
-            geom100_mats = np.array(geom100_mats)
-            geom001_mats = np.array(geom001_mats)
-            geom100_mats += geom001_mats
-
-            t1 = time.time()
-            C_timings[4] += t1 - t0
-            t0 = time.time()
-
-            grad_C_cav[a] = np.matmul(DM.reshape(-1), geom100_mats.reshape(geom100_mats.shape[0], -1).T)
-
-            t1 = time.time()
-            C_timings[5] += t1 - t0
-            t0 = time.time()
-            
-        self.ostream.print_info(f'Grad C step 0: {C_timings[0]:.2f} sec')
-        self.ostream.print_info(f'Grad C step 1: {C_timings[1]:.2f} sec')
-        self.ostream.print_info(f'Grad C step 2: {C_timings[2]:.2f} sec')
-        self.ostream.print_info(f'Grad C step 3: {C_timings[3]:.2f} sec')
-        self.ostream.print_info(f'Grad C step 4: {C_timings[4]:.2f} sec')
-        self.ostream.print_info(f'Grad C step 5: {C_timings[5]:.2f} sec')
-        self.ostream.print_blank()
-        self.ostream.flush()
-            
-        return grad_C_nuc + grad_C_cav
+        return compute_nuclear_potential_erf_gradient_on_charges(
+            molecule, basis, grid_coords, q, DM, zeta, atom_indices)
 
     def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D):
         """

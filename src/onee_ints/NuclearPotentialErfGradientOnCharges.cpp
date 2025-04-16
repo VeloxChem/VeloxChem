@@ -70,9 +70,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
             std::string("computeNuclearPotentialErfGradientOnCharges: Inconsistent number of AOs"));
 
-    auto nthreads = omp_get_max_threads();
-
     auto natoms = molecule.number_of_atoms();
+
+    auto nthreads = omp_get_max_threads();
 
     std::vector<CDenseMatrix> V_grad_omp(nthreads);
 
@@ -109,6 +109,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
     int f_prim_count = 0;
 
     int ncgtos_d = 0;
+    int naos_cart = 0;
 
     for (const auto& gto_block : gto_blocks)
     {
@@ -120,20 +121,28 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         if (gto_ang == 0)
         {
             s_prim_count += npgtos * ncgtos;
+
+            naos_cart += ncgtos;
         }
         else if (gto_ang == 1)
         {
             p_prim_count += npgtos * ncgtos;
+
+            naos_cart += ncgtos * 3;
         }
         else if (gto_ang == 2)
         {
             d_prim_count += npgtos * ncgtos;
 
             ncgtos_d += ncgtos;
+
+            naos_cart += ncgtos * 6;
         }
         else if (gto_ang == 3)
         {
             f_prim_count += npgtos * ncgtos;
+
+            naos_cart += ncgtos * 10;
         }
         else
         {
@@ -178,6 +187,27 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
             for (const auto& [cart_ind, sph_ind_coef] : f_map)
             {
                 cart_sph_f[cart_ind] = sph_ind_coef;
+            }
+        }
+    }
+
+    // Cartesian AO to atom mapping
+
+    std::vector<int> cart_ao_to_atom_ids(naos_cart);
+
+    for (int iatom = 0; iatom < natoms; iatom++)
+    {
+        std::vector<int> atomidx({iatom});
+
+        const auto atom_gto_blocks = gtofunc::make_gto_blocks(basis, molecule, atomidx);
+
+        for (const auto& atom_gto_block : atom_gto_blocks)
+        {
+            const auto gto_ao_inds = atom_gto_block.getAtomicOrbitalsIndexesForCartesian(ncgtos_d);
+
+            for (const auto aoidx : gto_ao_inds)
+            {
+                cart_ao_to_atom_ids[aoidx] = iatom;
             }
         }
     }
@@ -422,8 +452,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = s_prim_aoinds[j];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -477,6 +507,30 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F1_t[0] * (
+
+                        2.0 * a_i * (
+                            PA_m
+                        )
+
+                    )
+
+                    + F1_t[1] * (
+
+                        (-2.0) * a_i * (
+                            PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -490,6 +544,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
                     )
 
                 );
+
+                double grad_j = -grad_c - grad_i;
 
                 {
                     auto i_cgto_sph = i_cgto;
@@ -506,7 +562,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -541,8 +599,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -599,6 +657,47 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F2_t[0] * (
+
+                        1.0 / (a_i + a_j) * a_i * (
+                            delta[b0][m]
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_m * PB_0
+                        )
+
+                    )
+
+                    + F2_t[1] * (
+
+                        (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b0][m]
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_m * PC[b0]
+                            + PB_0 * PC[m]
+                        )
+
+                    )
+
+                    + F2_t[2] * (
+
+                        2.0 * a_i * (
+                            PC[b0] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -625,6 +724,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 {
                     auto i_cgto_sph = i_cgto;
                     double i_coef_sph = 1.0;
@@ -641,7 +742,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -677,8 +780,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -738,6 +841,68 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F3_t[0] * (
+
+                        1.0 / (a_i + a_j) * a_i * (
+                            delta[b0][b1] * (PA_m)
+                            + delta[b1][m] * (PB_0)
+                            + delta[b0][m] * (PB_1)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_m * PB_0 * PB_1
+                        )
+
+                    )
+
+                    + F3_t[1] * (
+
+                        (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b0][b1] * (PA_m + PC[m])
+                            + delta[b1][m] * (PB_0 + PC[b0])
+                            + delta[b0][m] * (PB_1 + PC[b1])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_m * PB_0 * PC[b1]
+                            + PA_m * PB_1 * PC[b0]
+                            + PB_0 * PB_1 * PC[m]
+                        )
+
+                    )
+
+                    + F3_t[2] * (
+
+                        1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][m] * (PC[b0])
+                            + delta[b0][m] * (PC[b1])
+                            + delta[b0][b1] * (PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_m * PC[b0] * PC[b1]
+                            + PB_0 * PC[b1] * PC[m]
+                            + PB_1 * PC[b0] * PC[m]
+                        )
+
+                    )
+
+                    + F3_t[3] * (
+
+                        (-2.0) * a_i * (
+                            PC[b0] * PC[b1] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -787,6 +952,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 {
                     auto i_cgto_sph = i_cgto;
                     double i_coef_sph = 1.0;
@@ -803,7 +970,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -840,8 +1009,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -904,6 +1073,113 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F4_t[0] * (
+
+                        0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2])
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_m * PB_0)
+                            + delta[b0][b2] * (PA_m * PB_1)
+                            + delta[b0][b1] * (PA_m * PB_2)
+                            + delta[b2][m] * (PB_0 * PB_1)
+                            + delta[b1][m] * (PB_0 * PB_2)
+                            + delta[b0][m] * (PB_1 * PB_2)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_m * PB_0 * PB_1 * PB_2
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-1.0) / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2])
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_m * PB_0 + PA_m * PC[b0] + PB_0 * PC[m])
+                            + delta[b0][b2] * (PA_m * PB_1 + PA_m * PC[b1] + PB_1 * PC[m])
+                            + delta[b0][b1] * (PA_m * PB_2 + PA_m * PC[b2] + PB_2 * PC[m])
+                            + delta[b2][m] * (PB_0 * PB_1 + PB_0 * PC[b1] + PB_1 * PC[b0])
+                            + delta[b1][m] * (PB_0 * PB_2 + PB_0 * PC[b2] + PB_2 * PC[b0])
+                            + delta[b0][m] * (PB_1 * PB_2 + PB_1 * PC[b2] + PB_2 * PC[b1])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_m * PB_0 * PB_1 * PC[b2]
+                            + PA_m * PB_0 * PB_2 * PC[b1]
+                            + PA_m * PB_1 * PB_2 * PC[b0]
+                            + PB_0 * PB_1 * PB_2 * PC[m]
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2])
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_m * PC[b0] + PB_0 * PC[m] + PC[b0] * PC[m])
+                            + delta[b0][b2] * (PA_m * PC[b1] + PB_1 * PC[m] + PC[b1] * PC[m])
+                            + delta[b0][b1] * (PA_m * PC[b2] + PB_2 * PC[m] + PC[b2] * PC[m])
+                            + delta[b2][m] * (PB_0 * PC[b1] + PB_1 * PC[b0] + PC[b0] * PC[b1])
+                            + delta[b1][m] * (PB_0 * PC[b2] + PB_2 * PC[b0] + PC[b0] * PC[b2])
+                            + delta[b0][m] * (PB_1 * PC[b2] + PB_2 * PC[b1] + PC[b1] * PC[b2])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_m * PB_0 * PC[b1] * PC[b2]
+                            + PA_m * PB_1 * PC[b0] * PC[b2]
+                            + PA_m * PB_2 * PC[b0] * PC[b1]
+                            + PB_0 * PB_1 * PC[b2] * PC[m]
+                            + PB_0 * PB_2 * PC[b1] * PC[m]
+                            + PB_1 * PB_2 * PC[b0] * PC[m]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PC[b0] * PC[b1])
+                            + delta[b1][m] * (PC[b0] * PC[b2])
+                            + delta[b1][b2] * (PC[b0] * PC[m])
+                            + delta[b0][m] * (PC[b1] * PC[b2])
+                            + delta[b0][b2] * (PC[b1] * PC[m])
+                            + delta[b0][b1] * (PC[b2] * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_m * PC[b0] * PC[b1] * PC[b2]
+                            + PB_0 * PC[b1] * PC[b2] * PC[m]
+                            + PB_1 * PC[b0] * PC[b2] * PC[m]
+                            + PB_2 * PC[b0] * PC[b1] * PC[m]
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        2.0 * a_i * (
+                            PC[b0] * PC[b1] * PC[b2] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -990,6 +1266,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 {
                     auto i_cgto_sph = i_cgto;
                     double i_coef_sph = 1.0;
@@ -1006,7 +1284,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -1042,8 +1322,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
         const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -1103,6 +1383,76 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F3_t[0] * (
+
+                        (-1.0) * (
+                            delta[a0][m] * (PB_0)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b0][m] * (PA_0)
+                            + delta[a0][b0] * (PA_m)
+                            + delta[a0][m] * (PB_0)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_m * PB_0
+                        )
+
+                    )
+
+                    + F3_t[1] * (
+
+                        (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b0][m] * (PA_0 + PC[a0])
+                            + delta[a0][b0] * (PA_m + PC[m])
+                            + delta[a0][m] * (PB_0 + PC[b0])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_m * PC[b0]
+                            + PA_0 * PB_0 * PC[m]
+                            + PA_m * PB_0 * PC[a0]
+                        )
+
+                        + (
+                            delta[a0][m] * (PC[b0])
+                        )
+
+                    )
+
+                    + F3_t[2] * (
+
+                        1.0 / (a_i + a_j) * a_i * (
+                            delta[b0][m] * (PC[a0])
+                            + delta[a0][m] * (PC[b0])
+                            + delta[a0][b0] * (PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PC[b0] * PC[m]
+                            + PA_m * PC[a0] * PC[b0]
+                            + PB_0 * PC[a0] * PC[m]
+                        )
+
+                    )
+
+                    + F3_t[3] * (
+
+                        (-2.0) * a_i * (
+                            PC[a0] * PC[b0] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -1152,6 +1502,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
                 {
                     auto i_cgto_sph = i_cgto_sph_ind_coef.first;
@@ -1169,7 +1521,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -1206,8 +1560,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
         const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -1270,6 +1624,133 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F4_t[0] * (
+
+                        (-0.5) / (a_i + a_j) * (
+                            delta[a0][m] * delta[b0][b1]
+                        )
+
+                        + (-1.0) * (
+                            delta[a0][m] * (PB_0 * PB_1)
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1])
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b0][b1] * (PA_0 * PA_m)
+                            + delta[b1][m] * (PA_0 * PB_0)
+                            + delta[b0][m] * (PA_0 * PB_1)
+                            + delta[a0][b1] * (PA_m * PB_0)
+                            + delta[a0][b0] * (PA_m * PB_1)
+                            + delta[a0][m] * (PB_0 * PB_1)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_m * PB_0 * PB_1
+                        )
+
+                    )
+
+                    + F4_t[1] * (
+
+                        (-1.0) / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1])
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b0][b1] * (PA_0 * PA_m + PA_0 * PC[m] + PA_m * PC[a0])
+                            + delta[b1][m] * (PA_0 * PB_0 + PA_0 * PC[b0] + PB_0 * PC[a0])
+                            + delta[b0][m] * (PA_0 * PB_1 + PA_0 * PC[b1] + PB_1 * PC[a0])
+                            + delta[a0][b1] * (PA_m * PB_0 + PA_m * PC[b0] + PB_0 * PC[m])
+                            + delta[a0][b0] * (PA_m * PB_1 + PA_m * PC[b1] + PB_1 * PC[m])
+                            + delta[a0][m] * (PB_0 * PB_1 + PB_0 * PC[b1] + PB_1 * PC[b0])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_m * PB_0 * PC[b1]
+                            + PA_0 * PA_m * PB_1 * PC[b0]
+                            + PA_0 * PB_0 * PB_1 * PC[m]
+                            + PA_m * PB_0 * PB_1 * PC[a0]
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a0][m] * delta[b0][b1]
+                        )
+
+                        + (
+                            delta[a0][m] * (PB_0 * PC[b1] + PB_1 * PC[b0])
+                        )
+
+                    )
+
+                    + F4_t[2] * (
+
+                        (-1.0) * (
+                            delta[a0][m] * (PC[b0] * PC[b1])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1])
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][m] * (PA_0 * PC[b0] + PB_0 * PC[a0] + PC[a0] * PC[b0])
+                            + delta[b0][m] * (PA_0 * PC[b1] + PB_1 * PC[a0] + PC[a0] * PC[b1])
+                            + delta[b0][b1] * (PA_0 * PC[m] + PA_m * PC[a0] + PC[a0] * PC[m])
+                            + delta[a0][b1] * (PA_m * PC[b0] + PB_0 * PC[m] + PC[b0] * PC[m])
+                            + delta[a0][b0] * (PA_m * PC[b1] + PB_1 * PC[m] + PC[b1] * PC[m])
+                            + delta[a0][m] * (PB_0 * PC[b1] + PB_1 * PC[b0] + PC[b0] * PC[b1])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_m * PC[b0] * PC[b1]
+                            + PA_0 * PB_0 * PC[b1] * PC[m]
+                            + PA_0 * PB_1 * PC[b0] * PC[m]
+                            + PA_m * PB_0 * PC[a0] * PC[b1]
+                            + PA_m * PB_1 * PC[a0] * PC[b0]
+                            + PB_0 * PB_1 * PC[a0] * PC[m]
+                        )
+
+                    )
+
+                    + F4_t[3] * (
+
+                        (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b1][m] * (PC[a0] * PC[b0])
+                            + delta[b0][m] * (PC[a0] * PC[b1])
+                            + delta[b0][b1] * (PC[a0] * PC[m])
+                            + delta[a0][m] * (PC[b0] * PC[b1])
+                            + delta[a0][b1] * (PC[b0] * PC[m])
+                            + delta[a0][b0] * (PC[b1] * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PC[b0] * PC[b1] * PC[m]
+                            + PA_m * PC[a0] * PC[b0] * PC[b1]
+                            + PB_0 * PC[a0] * PC[b1] * PC[m]
+                            + PB_1 * PC[a0] * PC[b0] * PC[m]
+                        )
+
+                    )
+
+                    + F4_t[4] * (
+
+                        2.0 * a_i * (
+                            PC[a0] * PC[b0] * PC[b1] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -1356,6 +1837,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
                 {
                     auto i_cgto_sph = i_cgto_sph_ind_coef.first;
@@ -1373,7 +1856,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -1411,8 +1896,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -1478,6 +1963,219 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F5_t[0] * (
+
+                        (-0.5) / (a_i + a_j) * (
+                            delta[a0][m] * delta[b1][b2] * (PB_0)
+                            + delta[a0][m] * delta[b0][b2] * (PB_1)
+                            + delta[a0][m] * delta[b0][b1] * (PB_2)
+                        )
+
+                        + (-1.0) * (
+                            delta[a0][m] * (PB_0 * PB_1 * PB_2)
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0)
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_m)
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PB_0)
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PB_1)
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PB_2)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_m * PB_0)
+                            + delta[b0][b2] * (PA_0 * PA_m * PB_1)
+                            + delta[b0][b1] * (PA_0 * PA_m * PB_2)
+                            + delta[b2][m] * (PA_0 * PB_0 * PB_1)
+                            + delta[b1][m] * (PA_0 * PB_0 * PB_2)
+                            + delta[b0][m] * (PA_0 * PB_1 * PB_2)
+                            + delta[a0][b2] * (PA_m * PB_0 * PB_1)
+                            + delta[a0][b1] * (PA_m * PB_0 * PB_2)
+                            + delta[a0][b0] * (PA_m * PB_1 * PB_2)
+                            + delta[a0][m] * (PB_0 * PB_1 * PB_2)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_m * PB_0 * PB_1 * PB_2
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * (-2.0) + PC[a0] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_m * (-2.0) + PC[m] * (-1.0))
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PB_0 * (-2.0) + PC[b0] * (-1.0))
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PB_1 * (-2.0) + PC[b1] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PB_2 * (-2.0) + PC[b2] * (-1.0))
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_m * PB_0 + PA_0 * PA_m * PC[b0] + PA_0 * PB_0 * PC[m] + PA_m * PB_0 * PC[a0])
+                            + delta[b0][b2] * (PA_0 * PA_m * PB_1 + PA_0 * PA_m * PC[b1] + PA_0 * PB_1 * PC[m] + PA_m * PB_1 * PC[a0])
+                            + delta[b0][b1] * (PA_0 * PA_m * PB_2 + PA_0 * PA_m * PC[b2] + PA_0 * PB_2 * PC[m] + PA_m * PB_2 * PC[a0])
+                            + delta[b2][m] * (PA_0 * PB_0 * PB_1 + PA_0 * PB_0 * PC[b1] + PA_0 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a0])
+                            + delta[b1][m] * (PA_0 * PB_0 * PB_2 + PA_0 * PB_0 * PC[b2] + PA_0 * PB_2 * PC[b0] + PB_0 * PB_2 * PC[a0])
+                            + delta[b0][m] * (PA_0 * PB_1 * PB_2 + PA_0 * PB_1 * PC[b2] + PA_0 * PB_2 * PC[b1] + PB_1 * PB_2 * PC[a0])
+                            + delta[a0][b2] * (PA_m * PB_0 * PB_1 + PA_m * PB_0 * PC[b1] + PA_m * PB_1 * PC[b0] + PB_0 * PB_1 * PC[m])
+                            + delta[a0][b1] * (PA_m * PB_0 * PB_2 + PA_m * PB_0 * PC[b2] + PA_m * PB_2 * PC[b0] + PB_0 * PB_2 * PC[m])
+                            + delta[a0][b0] * (PA_m * PB_1 * PB_2 + PA_m * PB_1 * PC[b2] + PA_m * PB_2 * PC[b1] + PB_1 * PB_2 * PC[m])
+                            + delta[a0][m] * (PB_0 * PB_1 * PB_2 + PB_0 * PB_1 * PC[b2] + PB_0 * PB_2 * PC[b1] + PB_1 * PB_2 * PC[b0])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_m * PB_0 * PB_1 * PC[b2]
+                            + PA_0 * PA_m * PB_0 * PB_2 * PC[b1]
+                            + PA_0 * PA_m * PB_1 * PB_2 * PC[b0]
+                            + PA_0 * PB_0 * PB_1 * PB_2 * PC[m]
+                            + PA_m * PB_0 * PB_1 * PB_2 * PC[a0]
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a0][m] * delta[b1][b2] * (PB_0 + PC[b0])
+                            + delta[a0][m] * delta[b0][b2] * (PB_1 + PC[b1])
+                            + delta[a0][m] * delta[b0][b1] * (PB_2 + PC[b2])
+                        )
+
+                        + (
+                            delta[a0][m] * (PB_0 * PB_1 * PC[b2] + PB_0 * PB_2 * PC[b1] + PB_1 * PB_2 * PC[b0])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        (-0.5) / (a_i + a_j) * (
+                            delta[a0][m] * delta[b1][b2] * (PC[b0])
+                            + delta[a0][m] * delta[b0][b2] * (PC[b1])
+                            + delta[a0][m] * delta[b0][b1] * (PC[b2])
+                        )
+
+                        + (-1.0) * (
+                            delta[a0][m] * (PB_0 * PC[b1] * PC[b2] + PB_1 * PC[b0] * PC[b2] + PB_2 * PC[b0] * PC[b1])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 + PC[a0] * 2.0)
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_m + PC[m] * 2.0)
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PB_0 + PC[b0] * 2.0)
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PB_1 + PC[b1] * 2.0)
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PB_2 + PC[b2] * 2.0)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_m * PC[b0] + PA_0 * PB_0 * PC[m] + PA_0 * PC[b0] * PC[m] + PA_m * PB_0 * PC[a0] + PA_m * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[m])
+                            + delta[b0][b2] * (PA_0 * PA_m * PC[b1] + PA_0 * PB_1 * PC[m] + PA_0 * PC[b1] * PC[m] + PA_m * PB_1 * PC[a0] + PA_m * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[m])
+                            + delta[b0][b1] * (PA_0 * PA_m * PC[b2] + PA_0 * PB_2 * PC[m] + PA_0 * PC[b2] * PC[m] + PA_m * PB_2 * PC[a0] + PA_m * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[m])
+                            + delta[b2][m] * (PA_0 * PB_0 * PC[b1] + PA_0 * PB_1 * PC[b0] + PA_0 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0])
+                            + delta[b1][m] * (PA_0 * PB_0 * PC[b2] + PA_0 * PB_2 * PC[b0] + PA_0 * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] + PB_0 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b0])
+                            + delta[b0][m] * (PA_0 * PB_1 * PC[b2] + PA_0 * PB_2 * PC[b1] + PA_0 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] + PB_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b1])
+                            + delta[a0][b2] * (PA_m * PB_0 * PC[b1] + PA_m * PB_1 * PC[b0] + PA_m * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[m] + PB_0 * PC[b1] * PC[m] + PB_1 * PC[b0] * PC[m])
+                            + delta[a0][b1] * (PA_m * PB_0 * PC[b2] + PA_m * PB_2 * PC[b0] + PA_m * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[m] + PB_0 * PC[b2] * PC[m] + PB_2 * PC[b0] * PC[m])
+                            + delta[a0][b0] * (PA_m * PB_1 * PC[b2] + PA_m * PB_2 * PC[b1] + PA_m * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[m] + PB_1 * PC[b2] * PC[m] + PB_2 * PC[b1] * PC[m])
+                            + delta[a0][m] * (PB_0 * PB_1 * PC[b2] + PB_0 * PB_2 * PC[b1] + PB_0 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[b0] + PB_1 * PC[b0] * PC[b2] + PB_2 * PC[b0] * PC[b1])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_m * PB_0 * PC[b1] * PC[b2]
+                            + PA_0 * PA_m * PB_1 * PC[b0] * PC[b2]
+                            + PA_0 * PA_m * PB_2 * PC[b0] * PC[b1]
+                            + PA_0 * PB_0 * PB_1 * PC[b2] * PC[m]
+                            + PA_0 * PB_0 * PB_2 * PC[b1] * PC[m]
+                            + PA_0 * PB_1 * PB_2 * PC[b0] * PC[m]
+                            + PA_m * PB_0 * PB_1 * PC[a0] * PC[b2]
+                            + PA_m * PB_0 * PB_2 * PC[a0] * PC[b1]
+                            + PA_m * PB_1 * PB_2 * PC[a0] * PC[b0]
+                            + PB_0 * PB_1 * PB_2 * PC[a0] * PC[m]
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-0.5) / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PC[a0])
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PC[b0])
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PC[b1])
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PC[b2])
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PC[m])
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PA_0 * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0] + PC[a0] * PC[b0] * PC[b1])
+                            + delta[b1][m] * (PA_0 * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b0] + PC[a0] * PC[b0] * PC[b2])
+                            + delta[b1][b2] * (PA_0 * PC[b0] * PC[m] + PA_m * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[m] + PC[a0] * PC[b0] * PC[m])
+                            + delta[b0][m] * (PA_0 * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b1] + PC[a0] * PC[b1] * PC[b2])
+                            + delta[b0][b2] * (PA_0 * PC[b1] * PC[m] + PA_m * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[m] + PC[a0] * PC[b1] * PC[m])
+                            + delta[b0][b1] * (PA_0 * PC[b2] * PC[m] + PA_m * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[m] + PC[a0] * PC[b2] * PC[m])
+                            + delta[a0][b2] * (PA_m * PC[b0] * PC[b1] + PB_0 * PC[b1] * PC[m] + PB_1 * PC[b0] * PC[m] + PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][b1] * (PA_m * PC[b0] * PC[b2] + PB_0 * PC[b2] * PC[m] + PB_2 * PC[b0] * PC[m] + PC[b0] * PC[b2] * PC[m])
+                            + delta[a0][b0] * (PA_m * PC[b1] * PC[b2] + PB_1 * PC[b2] * PC[m] + PB_2 * PC[b1] * PC[m] + PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][m] * (PB_0 * PC[b1] * PC[b2] + PB_1 * PC[b0] * PC[b2] + PB_2 * PC[b0] * PC[b1] + PC[b0] * PC[b1] * PC[b2])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_m * PC[b0] * PC[b1] * PC[b2]
+                            + PA_0 * PB_0 * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PB_1 * PC[b0] * PC[b2] * PC[m]
+                            + PA_0 * PB_2 * PC[b0] * PC[b1] * PC[m]
+                            + PA_m * PB_0 * PC[a0] * PC[b1] * PC[b2]
+                            + PA_m * PB_1 * PC[a0] * PC[b0] * PC[b2]
+                            + PA_m * PB_2 * PC[a0] * PC[b0] * PC[b1]
+                            + PB_0 * PB_1 * PC[a0] * PC[b2] * PC[m]
+                            + PB_0 * PB_2 * PC[a0] * PC[b1] * PC[m]
+                            + PB_1 * PB_2 * PC[a0] * PC[b0] * PC[m]
+                        )
+
+                        + (
+                            delta[a0][m] * (PC[b0] * PC[b1] * PC[b2])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        1.0 / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PC[a0] * PC[b0] * PC[b1])
+                            + delta[b1][m] * (PC[a0] * PC[b0] * PC[b2])
+                            + delta[b1][b2] * (PC[a0] * PC[b0] * PC[m])
+                            + delta[b0][m] * (PC[a0] * PC[b1] * PC[b2])
+                            + delta[b0][b2] * (PC[a0] * PC[b1] * PC[m])
+                            + delta[b0][b1] * (PC[a0] * PC[b2] * PC[m])
+                            + delta[a0][m] * (PC[b0] * PC[b1] * PC[b2])
+                            + delta[a0][b2] * (PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][b1] * (PC[b0] * PC[b2] * PC[m])
+                            + delta[a0][b0] * (PC[b1] * PC[b2] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_m * PC[a0] * PC[b0] * PC[b1] * PC[b2]
+                            + PB_0 * PC[a0] * PC[b1] * PC[b2] * PC[m]
+                            + PB_1 * PC[a0] * PC[b0] * PC[b2] * PC[m]
+                            + PB_2 * PC[a0] * PC[b0] * PC[b1] * PC[m]
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-2.0) * a_i * (
+                            PC[a0] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -1632,6 +2330,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
                 {
                     auto i_cgto_sph = i_cgto_sph_ind_coef.first;
@@ -1649,7 +2349,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -1687,8 +2389,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
         const auto j_cgto = d_prim_aoinds[(j / 6) + d_prim_count * (j % 6)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -1754,6 +2456,226 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F5_t[0] * (
+
+                        (-0.5) / (a_i + a_j) * (
+                            delta[a1][m] * delta[b0][b1] * (PA_0)
+                            + delta[a0][m] * delta[b0][b1] * (PA_1)
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0)
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1)
+                        )
+
+                        + (-1.0) * (
+                            delta[a1][m] * (PA_0 * PB_0 * PB_1)
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1)
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0)
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_m)
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0)
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b0][b1] * (PA_0 * PA_1 * PA_m)
+                            + delta[b1][m] * (PA_0 * PA_1 * PB_0)
+                            + delta[b0][m] * (PA_0 * PA_1 * PB_1)
+                            + delta[a1][b1] * (PA_0 * PA_m * PB_0)
+                            + delta[a1][b0] * (PA_0 * PA_m * PB_1)
+                            + delta[a1][m] * (PA_0 * PB_0 * PB_1)
+                            + delta[a0][b1] * (PA_1 * PA_m * PB_0)
+                            + delta[a0][b0] * (PA_1 * PA_m * PB_1)
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1)
+                            + delta[a0][a1] * (PA_m * PB_0 * PB_1)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PA_m * PB_0 * PB_1
+                        )
+
+                    )
+
+                    + F5_t[1] * (
+
+                        0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * (-2.0) + PC[a0] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * (-2.0) + PC[a1] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_m * (-2.0) + PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * (-2.0) + PC[b0] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * (-2.0) + PC[b1] * (-1.0))
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b0][b1] * (PA_0 * PA_1 * PA_m + PA_0 * PA_1 * PC[m] + PA_0 * PA_m * PC[a1] + PA_1 * PA_m * PC[a0])
+                            + delta[b1][m] * (PA_0 * PA_1 * PB_0 + PA_0 * PA_1 * PC[b0] + PA_0 * PB_0 * PC[a1] + PA_1 * PB_0 * PC[a0])
+                            + delta[b0][m] * (PA_0 * PA_1 * PB_1 + PA_0 * PA_1 * PC[b1] + PA_0 * PB_1 * PC[a1] + PA_1 * PB_1 * PC[a0])
+                            + delta[a1][b1] * (PA_0 * PA_m * PB_0 + PA_0 * PA_m * PC[b0] + PA_0 * PB_0 * PC[m] + PA_m * PB_0 * PC[a0])
+                            + delta[a1][b0] * (PA_0 * PA_m * PB_1 + PA_0 * PA_m * PC[b1] + PA_0 * PB_1 * PC[m] + PA_m * PB_1 * PC[a0])
+                            + delta[a1][m] * (PA_0 * PB_0 * PB_1 + PA_0 * PB_0 * PC[b1] + PA_0 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a0])
+                            + delta[a0][b1] * (PA_1 * PA_m * PB_0 + PA_1 * PA_m * PC[b0] + PA_1 * PB_0 * PC[m] + PA_m * PB_0 * PC[a1])
+                            + delta[a0][b0] * (PA_1 * PA_m * PB_1 + PA_1 * PA_m * PC[b1] + PA_1 * PB_1 * PC[m] + PA_m * PB_1 * PC[a1])
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1 + PA_1 * PB_0 * PC[b1] + PA_1 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a1])
+                            + delta[a0][a1] * (PA_m * PB_0 * PB_1 + PA_m * PB_0 * PC[b1] + PA_m * PB_1 * PC[b0] + PB_0 * PB_1 * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_1 * PA_m * PB_0 * PC[b1]
+                            + PA_0 * PA_1 * PA_m * PB_1 * PC[b0]
+                            + PA_0 * PA_1 * PB_0 * PB_1 * PC[m]
+                            + PA_0 * PA_m * PB_0 * PB_1 * PC[a1]
+                            + PA_1 * PA_m * PB_0 * PB_1 * PC[a0]
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a1][m] * delta[b0][b1] * (PA_0 + PC[a0])
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 + PC[a1])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 + PC[b0])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 + PC[b1])
+                        )
+
+                        + (
+                            delta[a1][m] * (PA_0 * PB_0 * PC[b1] + PA_0 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a0])
+                            + delta[a0][m] * (PA_1 * PB_0 * PC[b1] + PA_1 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a1])
+                        )
+
+                    )
+
+                    + F5_t[2] * (
+
+                        (-0.5) / (a_i + a_j) * (
+                            delta[a1][m] * delta[b0][b1] * (PC[a0])
+                            + delta[a0][m] * delta[b0][b1] * (PC[a1])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PC[b0])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PC[b1])
+                        )
+
+                        + (-1.0) * (
+                            delta[a1][m] * (PA_0 * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0])
+                            + delta[a0][m] * (PA_1 * PC[b0] * PC[b1] + PB_0 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[b0])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 + PC[a0] * 2.0)
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 + PC[a1] * 2.0)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_m + PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 + PC[b0] * 2.0)
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 + PC[b1] * 2.0)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][m] * (PA_0 * PA_1 * PC[b0] + PA_0 * PB_0 * PC[a1] + PA_0 * PC[a1] * PC[b0] + PA_1 * PB_0 * PC[a0] + PA_1 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a1])
+                            + delta[b0][m] * (PA_0 * PA_1 * PC[b1] + PA_0 * PB_1 * PC[a1] + PA_0 * PC[a1] * PC[b1] + PA_1 * PB_1 * PC[a0] + PA_1 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a1])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PC[m] + PA_0 * PA_m * PC[a1] + PA_0 * PC[a1] * PC[m] + PA_1 * PA_m * PC[a0] + PA_1 * PC[a0] * PC[m] + PA_m * PC[a0] * PC[a1])
+                            + delta[a1][b1] * (PA_0 * PA_m * PC[b0] + PA_0 * PB_0 * PC[m] + PA_0 * PC[b0] * PC[m] + PA_m * PB_0 * PC[a0] + PA_m * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PA_m * PC[b1] + PA_0 * PB_1 * PC[m] + PA_0 * PC[b1] * PC[m] + PA_m * PB_1 * PC[a0] + PA_m * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[m])
+                            + delta[a1][m] * (PA_0 * PB_0 * PC[b1] + PA_0 * PB_1 * PC[b0] + PA_0 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0])
+                            + delta[a0][b1] * (PA_1 * PA_m * PC[b0] + PA_1 * PB_0 * PC[m] + PA_1 * PC[b0] * PC[m] + PA_m * PB_0 * PC[a1] + PA_m * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PA_m * PC[b1] + PA_1 * PB_1 * PC[m] + PA_1 * PC[b1] * PC[m] + PA_m * PB_1 * PC[a1] + PA_m * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[m])
+                            + delta[a0][m] * (PA_1 * PB_0 * PC[b1] + PA_1 * PB_1 * PC[b0] + PA_1 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a1] + PB_0 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[b0])
+                            + delta[a0][a1] * (PA_m * PB_0 * PC[b1] + PA_m * PB_1 * PC[b0] + PA_m * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[m] + PB_0 * PC[b1] * PC[m] + PB_1 * PC[b0] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PA_m * PC[b0] * PC[b1]
+                            + PA_0 * PA_1 * PB_0 * PC[b1] * PC[m]
+                            + PA_0 * PA_1 * PB_1 * PC[b0] * PC[m]
+                            + PA_0 * PA_m * PB_0 * PC[a1] * PC[b1]
+                            + PA_0 * PA_m * PB_1 * PC[a1] * PC[b0]
+                            + PA_0 * PB_0 * PB_1 * PC[a1] * PC[m]
+                            + PA_1 * PA_m * PB_0 * PC[a0] * PC[b1]
+                            + PA_1 * PA_m * PB_1 * PC[a0] * PC[b0]
+                            + PA_1 * PB_0 * PB_1 * PC[a0] * PC[m]
+                            + PA_m * PB_0 * PB_1 * PC[a0] * PC[a1]
+                        )
+
+                    )
+
+                    + F5_t[3] * (
+
+                        (-0.5) / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PC[a0])
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PC[a1])
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PC[b0])
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PC[b1])
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PC[m])
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b1][m] * (PA_0 * PC[a1] * PC[b0] + PA_1 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b0])
+                            + delta[b0][m] * (PA_0 * PC[a1] * PC[b1] + PA_1 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b1])
+                            + delta[b0][b1] * (PA_0 * PC[a1] * PC[m] + PA_1 * PC[a0] * PC[m] + PA_m * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[m])
+                            + delta[a1][m] * (PA_0 * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0] + PC[a0] * PC[b0] * PC[b1])
+                            + delta[a1][b1] * (PA_0 * PC[b0] * PC[m] + PA_m * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[m] + PC[a0] * PC[b0] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PC[b1] * PC[m] + PA_m * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[m] + PC[a0] * PC[b1] * PC[m])
+                            + delta[a0][m] * (PA_1 * PC[b0] * PC[b1] + PB_0 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[b0] + PC[a1] * PC[b0] * PC[b1])
+                            + delta[a0][b1] * (PA_1 * PC[b0] * PC[m] + PA_m * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[m] + PC[a1] * PC[b0] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PC[b1] * PC[m] + PA_m * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[m] + PC[a1] * PC[b1] * PC[m])
+                            + delta[a0][a1] * (PA_m * PC[b0] * PC[b1] + PB_0 * PC[b1] * PC[m] + PB_1 * PC[b0] * PC[m] + PC[b0] * PC[b1] * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_1 * PC[b0] * PC[b1] * PC[m]
+                            + PA_0 * PA_m * PC[a1] * PC[b0] * PC[b1]
+                            + PA_0 * PB_0 * PC[a1] * PC[b1] * PC[m]
+                            + PA_0 * PB_1 * PC[a1] * PC[b0] * PC[m]
+                            + PA_1 * PA_m * PC[a0] * PC[b0] * PC[b1]
+                            + PA_1 * PB_0 * PC[a0] * PC[b1] * PC[m]
+                            + PA_1 * PB_1 * PC[a0] * PC[b0] * PC[m]
+                            + PA_m * PB_0 * PC[a0] * PC[a1] * PC[b1]
+                            + PA_m * PB_1 * PC[a0] * PC[a1] * PC[b0]
+                            + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[m]
+                        )
+
+                        + (
+                            delta[a1][m] * (PC[a0] * PC[b0] * PC[b1])
+                            + delta[a0][m] * (PC[a1] * PC[b0] * PC[b1])
+                        )
+
+                    )
+
+                    + F5_t[4] * (
+
+                        1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][m] * (PC[a0] * PC[a1] * PC[b0])
+                            + delta[b0][m] * (PC[a0] * PC[a1] * PC[b1])
+                            + delta[b0][b1] * (PC[a0] * PC[a1] * PC[m])
+                            + delta[a1][m] * (PC[a0] * PC[b0] * PC[b1])
+                            + delta[a1][b1] * (PC[a0] * PC[b0] * PC[m])
+                            + delta[a1][b0] * (PC[a0] * PC[b1] * PC[m])
+                            + delta[a0][m] * (PC[a1] * PC[b0] * PC[b1])
+                            + delta[a0][b1] * (PC[a1] * PC[b0] * PC[m])
+                            + delta[a0][b0] * (PC[a1] * PC[b1] * PC[m])
+                            + delta[a0][a1] * (PC[b0] * PC[b1] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PC[a1] * PC[b0] * PC[b1] * PC[m]
+                            + PA_1 * PC[a0] * PC[b0] * PC[b1] * PC[m]
+                            + PA_m * PC[a0] * PC[a1] * PC[b0] * PC[b1]
+                            + PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[m]
+                            + PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[m]
+                        )
+
+                    )
+
+                    + F5_t[5] * (
+
+                        (-2.0) * a_i * (
+                            PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -1908,6 +2830,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
                 {
                     auto i_cgto_sph = i_cgto_sph_ind_coef.first;
@@ -1925,7 +2849,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -1964,8 +2890,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = d_prim_aoinds[(i / 6) + d_prim_count * (i % 6)];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -2034,6 +2960,426 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F6_t[0] * (
+
+                        (-0.25) / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            (delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
+                        )
+
+                        + (-0.5) / (a_i + a_j) * (
+                            delta[a1][m] * delta[b1][b2] * (PA_0 * PB_0)
+                            + delta[a1][m] * delta[b0][b2] * (PA_0 * PB_1)
+                            + delta[a1][m] * delta[b0][b1] * (PA_0 * PB_2)
+                            + delta[a0][m] * delta[b1][b2] * (PA_1 * PB_0)
+                            + delta[a0][m] * delta[b0][b2] * (PA_1 * PB_1)
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 * PB_2)
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PB_0 * PB_1)
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * PB_2)
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * PB_2)
+                        )
+
+                        + (-1.0) * (
+                            delta[a1][m] * (PA_0 * PB_0 * PB_1 * PB_2)
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1 * PB_2)
+                        )
+
+                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PA_1)
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PA_m)
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PB_0)
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PB_1)
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PB_2)
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PA_m)
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PB_0)
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PB_1)
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PB_2)
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_m * PB_0)
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_m * PB_1)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_m * PB_2)
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PB_0 * PB_1)
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * PB_2)
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * PB_2)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_1 * PA_m * PB_0)
+                            + delta[b0][b2] * (PA_0 * PA_1 * PA_m * PB_1)
+                            + delta[b0][b1] * (PA_0 * PA_1 * PA_m * PB_2)
+                            + delta[b2][m] * (PA_0 * PA_1 * PB_0 * PB_1)
+                            + delta[b1][m] * (PA_0 * PA_1 * PB_0 * PB_2)
+                            + delta[b0][m] * (PA_0 * PA_1 * PB_1 * PB_2)
+                            + delta[a1][b2] * (PA_0 * PA_m * PB_0 * PB_1)
+                            + delta[a1][b1] * (PA_0 * PA_m * PB_0 * PB_2)
+                            + delta[a1][b0] * (PA_0 * PA_m * PB_1 * PB_2)
+                            + delta[a1][m] * (PA_0 * PB_0 * PB_1 * PB_2)
+                            + delta[a0][b2] * (PA_1 * PA_m * PB_0 * PB_1)
+                            + delta[a0][b1] * (PA_1 * PA_m * PB_0 * PB_2)
+                            + delta[a0][b0] * (PA_1 * PA_m * PB_1 * PB_2)
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1 * PB_2)
+                            + delta[a0][a1] * (PA_m * PB_0 * PB_1 * PB_2)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PA_m * PB_0 * PB_1 * PB_2
+                        )
+
+                    )
+
+                    + F6_t[1] * (
+
+                        (-0.75) / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PA_1 * (-2.0) + PA_0 * PC[a1] * (-1.0) + PA_1 * PC[a0] * (-1.0))
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PA_m * (-2.0) + PA_0 * PC[m] * (-1.0) + PA_m * PC[a0] * (-1.0))
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PB_0 * (-2.0) + PA_0 * PC[b0] * (-1.0) + PB_0 * PC[a0] * (-1.0))
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PB_1 * (-2.0) + PA_0 * PC[b1] * (-1.0) + PB_1 * PC[a0] * (-1.0))
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PB_2 * (-2.0) + PA_0 * PC[b2] * (-1.0) + PB_2 * PC[a0] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PA_m * (-2.0) + PA_1 * PC[m] * (-1.0) + PA_m * PC[a1] * (-1.0))
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PB_0 * (-2.0) + PA_1 * PC[b0] * (-1.0) + PB_0 * PC[a1] * (-1.0))
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PB_1 * (-2.0) + PA_1 * PC[b1] * (-1.0) + PB_1 * PC[a1] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PB_2 * (-2.0) + PA_1 * PC[b2] * (-1.0) + PB_2 * PC[a1] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_m * PB_0 * (-2.0) + PA_m * PC[b0] * (-1.0) + PB_0 * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_m * PB_1 * (-2.0) + PA_m * PC[b1] * (-1.0) + PB_1 * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_m * PB_2 * (-2.0) + PA_m * PC[b2] * (-1.0) + PB_2 * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PB_0 * PB_1 * (-2.0) + PB_0 * PC[b1] * (-1.0) + PB_1 * PC[b0] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * PB_2 * (-2.0) + PB_0 * PC[b2] * (-1.0) + PB_2 * PC[b0] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * PB_2 * (-2.0) + PB_1 * PC[b2] * (-1.0) + PB_2 * PC[b1] * (-1.0))
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_1 * PA_m * PB_0 + PA_0 * PA_1 * PA_m * PC[b0] + PA_0 * PA_1 * PB_0 * PC[m] + PA_0 * PA_m * PB_0 * PC[a1] + PA_1 * PA_m * PB_0 * PC[a0])
+                            + delta[b0][b2] * (PA_0 * PA_1 * PA_m * PB_1 + PA_0 * PA_1 * PA_m * PC[b1] + PA_0 * PA_1 * PB_1 * PC[m] + PA_0 * PA_m * PB_1 * PC[a1] + PA_1 * PA_m * PB_1 * PC[a0])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PA_m * PB_2 + PA_0 * PA_1 * PA_m * PC[b2] + PA_0 * PA_1 * PB_2 * PC[m] + PA_0 * PA_m * PB_2 * PC[a1] + PA_1 * PA_m * PB_2 * PC[a0])
+                            + delta[b2][m] * (PA_0 * PA_1 * PB_0 * PB_1 + PA_0 * PA_1 * PB_0 * PC[b1] + PA_0 * PA_1 * PB_1 * PC[b0] + PA_0 * PB_0 * PB_1 * PC[a1] + PA_1 * PB_0 * PB_1 * PC[a0])
+                            + delta[b1][m] * (PA_0 * PA_1 * PB_0 * PB_2 + PA_0 * PA_1 * PB_0 * PC[b2] + PA_0 * PA_1 * PB_2 * PC[b0] + PA_0 * PB_0 * PB_2 * PC[a1] + PA_1 * PB_0 * PB_2 * PC[a0])
+                            + delta[b0][m] * (PA_0 * PA_1 * PB_1 * PB_2 + PA_0 * PA_1 * PB_1 * PC[b2] + PA_0 * PA_1 * PB_2 * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a1] + PA_1 * PB_1 * PB_2 * PC[a0])
+                            + delta[a1][b2] * (PA_0 * PA_m * PB_0 * PB_1 + PA_0 * PA_m * PB_0 * PC[b1] + PA_0 * PA_m * PB_1 * PC[b0] + PA_0 * PB_0 * PB_1 * PC[m] + PA_m * PB_0 * PB_1 * PC[a0])
+                            + delta[a1][b1] * (PA_0 * PA_m * PB_0 * PB_2 + PA_0 * PA_m * PB_0 * PC[b2] + PA_0 * PA_m * PB_2 * PC[b0] + PA_0 * PB_0 * PB_2 * PC[m] + PA_m * PB_0 * PB_2 * PC[a0])
+                            + delta[a1][b0] * (PA_0 * PA_m * PB_1 * PB_2 + PA_0 * PA_m * PB_1 * PC[b2] + PA_0 * PA_m * PB_2 * PC[b1] + PA_0 * PB_1 * PB_2 * PC[m] + PA_m * PB_1 * PB_2 * PC[a0])
+                            + delta[a1][m] * (PA_0 * PB_0 * PB_1 * PB_2 + PA_0 * PB_0 * PB_1 * PC[b2] + PA_0 * PB_0 * PB_2 * PC[b1] + PA_0 * PB_1 * PB_2 * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a0])
+                            + delta[a0][b2] * (PA_1 * PA_m * PB_0 * PB_1 + PA_1 * PA_m * PB_0 * PC[b1] + PA_1 * PA_m * PB_1 * PC[b0] + PA_1 * PB_0 * PB_1 * PC[m] + PA_m * PB_0 * PB_1 * PC[a1])
+                            + delta[a0][b1] * (PA_1 * PA_m * PB_0 * PB_2 + PA_1 * PA_m * PB_0 * PC[b2] + PA_1 * PA_m * PB_2 * PC[b0] + PA_1 * PB_0 * PB_2 * PC[m] + PA_m * PB_0 * PB_2 * PC[a1])
+                            + delta[a0][b0] * (PA_1 * PA_m * PB_1 * PB_2 + PA_1 * PA_m * PB_1 * PC[b2] + PA_1 * PA_m * PB_2 * PC[b1] + PA_1 * PB_1 * PB_2 * PC[m] + PA_m * PB_1 * PB_2 * PC[a1])
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1 * PB_2 + PA_1 * PB_0 * PB_1 * PC[b2] + PA_1 * PB_0 * PB_2 * PC[b1] + PA_1 * PB_1 * PB_2 * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a1])
+                            + delta[a0][a1] * (PA_m * PB_0 * PB_1 * PB_2 + PA_m * PB_0 * PB_1 * PC[b2] + PA_m * PB_0 * PB_2 * PC[b1] + PA_m * PB_1 * PB_2 * PC[b0] + PB_0 * PB_1 * PB_2 * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_1 * PA_m * PB_0 * PB_1 * PC[b2]
+                            + PA_0 * PA_1 * PA_m * PB_0 * PB_2 * PC[b1]
+                            + PA_0 * PA_1 * PA_m * PB_1 * PB_2 * PC[b0]
+                            + PA_0 * PA_1 * PB_0 * PB_1 * PB_2 * PC[m]
+                            + PA_0 * PA_m * PB_0 * PB_1 * PB_2 * PC[a1]
+                            + PA_1 * PA_m * PB_0 * PB_1 * PB_2 * PC[a0]
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            (delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a1][m] * delta[b1][b2] * (PA_0 * PB_0 + PA_0 * PC[b0] + PB_0 * PC[a0])
+                            + delta[a1][m] * delta[b0][b2] * (PA_0 * PB_1 + PA_0 * PC[b1] + PB_1 * PC[a0])
+                            + delta[a1][m] * delta[b0][b1] * (PA_0 * PB_2 + PA_0 * PC[b2] + PB_2 * PC[a0])
+                            + delta[a0][m] * delta[b1][b2] * (PA_1 * PB_0 + PA_1 * PC[b0] + PB_0 * PC[a1])
+                            + delta[a0][m] * delta[b0][b2] * (PA_1 * PB_1 + PA_1 * PC[b1] + PB_1 * PC[a1])
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 * PB_2 + PA_1 * PC[b2] + PB_2 * PC[a1])
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PB_0 * PB_1 + PB_0 * PC[b1] + PB_1 * PC[b0])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * PB_2 + PB_0 * PC[b2] + PB_2 * PC[b0])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * PB_2 + PB_1 * PC[b2] + PB_2 * PC[b1])
+                        )
+
+                        + (
+                            delta[a1][m] * (PA_0 * PB_0 * PB_1 * PC[b2] + PA_0 * PB_0 * PB_2 * PC[b1] + PA_0 * PB_1 * PB_2 * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a0])
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1 * PC[b2] + PA_1 * PB_0 * PB_2 * PC[b1] + PA_1 * PB_1 * PB_2 * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a1])
+                        )
+
+                    )
+
+                    + F6_t[2] * (
+
+                        (-0.25) / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            (delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
+                        )
+
+                        + (-0.5) / (a_i + a_j) * (
+                            delta[a1][m] * delta[b1][b2] * (PA_0 * PC[b0] + PB_0 * PC[a0] + PC[a0] * PC[b0])
+                            + delta[a1][m] * delta[b0][b2] * (PA_0 * PC[b1] + PB_1 * PC[a0] + PC[a0] * PC[b1])
+                            + delta[a1][m] * delta[b0][b1] * (PA_0 * PC[b2] + PB_2 * PC[a0] + PC[a0] * PC[b2])
+                            + delta[a0][m] * delta[b1][b2] * (PA_1 * PC[b0] + PB_0 * PC[a1] + PC[a1] * PC[b0])
+                            + delta[a0][m] * delta[b0][b2] * (PA_1 * PC[b1] + PB_1 * PC[a1] + PC[a1] * PC[b1])
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 * PC[b2] + PB_2 * PC[a1] + PC[a1] * PC[b2])
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PB_0 * PC[b1] + PB_1 * PC[b0] + PC[b0] * PC[b1])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * PC[b2] + PB_2 * PC[b0] + PC[b0] * PC[b2])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * PC[b2] + PB_2 * PC[b1] + PC[b1] * PC[b2])
+                        )
+
+                        + (-1.0) * (
+                            delta[a1][m] * (PA_0 * PB_0 * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[b0])
+                            + delta[a0][m] * (PA_1 * PB_0 * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a1] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[b1] + PB_1 * PB_2 * PC[a1] * PC[b0])
+                        )
+
+                        + 0.75 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PA_1 + PA_0 * PC[a1] * 2.0 + PA_1 * PC[a0] * 2.0 + PC[a0] * PC[a1])
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PA_m + PA_0 * PC[m] * 2.0 + PA_m * PC[a0] * 2.0 + PC[a0] * PC[m])
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PB_0 + PA_0 * PC[b0] * 2.0 + PB_0 * PC[a0] * 2.0 + PC[a0] * PC[b0])
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PB_1 + PA_0 * PC[b1] * 2.0 + PB_1 * PC[a0] * 2.0 + PC[a0] * PC[b1])
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PB_2 + PA_0 * PC[b2] * 2.0 + PB_2 * PC[a0] * 2.0 + PC[a0] * PC[b2])
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PA_m + PA_1 * PC[m] * 2.0 + PA_m * PC[a1] * 2.0 + PC[a1] * PC[m])
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PB_0 + PA_1 * PC[b0] * 2.0 + PB_0 * PC[a1] * 2.0 + PC[a1] * PC[b0])
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PB_1 + PA_1 * PC[b1] * 2.0 + PB_1 * PC[a1] * 2.0 + PC[a1] * PC[b1])
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PB_2 + PA_1 * PC[b2] * 2.0 + PB_2 * PC[a1] * 2.0 + PC[a1] * PC[b2])
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_m * PB_0 + PA_m * PC[b0] * 2.0 + PB_0 * PC[m] * 2.0 + PC[b0] * PC[m])
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_m * PB_1 + PA_m * PC[b1] * 2.0 + PB_1 * PC[m] * 2.0 + PC[b1] * PC[m])
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_m * PB_2 + PA_m * PC[b2] * 2.0 + PB_2 * PC[m] * 2.0 + PC[b2] * PC[m])
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PB_0 * PB_1 + PB_0 * PC[b1] * 2.0 + PB_1 * PC[b0] * 2.0 + PC[b0] * PC[b1])
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * PB_2 + PB_0 * PC[b2] * 2.0 + PB_2 * PC[b0] * 2.0 + PC[b0] * PC[b2])
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * PB_2 + PB_1 * PC[b2] * 2.0 + PB_2 * PC[b1] * 2.0 + PC[b1] * PC[b2])
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_1 * PA_m * PC[b0] + PA_0 * PA_1 * PB_0 * PC[m] + PA_0 * PA_1 * PC[b0] * PC[m] + PA_0 * PA_m * PB_0 * PC[a1] + PA_0 * PA_m * PC[a1] * PC[b0] + PA_0 * PB_0 * PC[a1] * PC[m] + PA_1 * PA_m * PB_0 * PC[a0] + PA_1 * PA_m * PC[a0] * PC[b0] + PA_1 * PB_0 * PC[a0] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a1])
+                            + delta[b0][b2] * (PA_0 * PA_1 * PA_m * PC[b1] + PA_0 * PA_1 * PB_1 * PC[m] + PA_0 * PA_1 * PC[b1] * PC[m] + PA_0 * PA_m * PB_1 * PC[a1] + PA_0 * PA_m * PC[a1] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[m] + PA_1 * PA_m * PB_1 * PC[a0] + PA_1 * PA_m * PC[a0] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[m] + PA_m * PB_1 * PC[a0] * PC[a1])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PA_m * PC[b2] + PA_0 * PA_1 * PB_2 * PC[m] + PA_0 * PA_1 * PC[b2] * PC[m] + PA_0 * PA_m * PB_2 * PC[a1] + PA_0 * PA_m * PC[a1] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[m] + PA_1 * PA_m * PB_2 * PC[a0] + PA_1 * PA_m * PC[a0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[m] + PA_m * PB_2 * PC[a0] * PC[a1])
+                            + delta[b2][m] * (PA_0 * PA_1 * PB_0 * PC[b1] + PA_0 * PA_1 * PB_1 * PC[b0] + PA_0 * PA_1 * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PC[a1] + PA_0 * PB_0 * PC[a1] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[b0] + PA_1 * PB_0 * PB_1 * PC[a0] + PA_1 * PB_0 * PC[a0] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[b0] + PB_0 * PB_1 * PC[a0] * PC[a1])
+                            + delta[b1][m] * (PA_0 * PA_1 * PB_0 * PC[b2] + PA_0 * PA_1 * PB_2 * PC[b0] + PA_0 * PA_1 * PC[b0] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a1] + PA_0 * PB_0 * PC[a1] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[b0] + PA_1 * PB_0 * PB_2 * PC[a0] + PA_1 * PB_0 * PC[a0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[b0] + PB_0 * PB_2 * PC[a0] * PC[a1])
+                            + delta[b0][m] * (PA_0 * PA_1 * PB_1 * PC[b2] + PA_0 * PA_1 * PB_2 * PC[b1] + PA_0 * PA_1 * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[a1] + PA_0 * PB_1 * PC[a1] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a0] + PA_1 * PB_1 * PC[a0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a1])
+                            + delta[a1][b2] * (PA_0 * PA_m * PB_0 * PC[b1] + PA_0 * PA_m * PB_1 * PC[b0] + PA_0 * PA_m * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PC[m] + PA_0 * PB_0 * PC[b1] * PC[m] + PA_0 * PB_1 * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PC[a0] + PA_m * PB_0 * PC[a0] * PC[b1] + PA_m * PB_1 * PC[a0] * PC[b0] + PB_0 * PB_1 * PC[a0] * PC[m])
+                            + delta[a1][b1] * (PA_0 * PA_m * PB_0 * PC[b2] + PA_0 * PA_m * PB_2 * PC[b0] + PA_0 * PA_m * PC[b0] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[m] + PA_0 * PB_0 * PC[b2] * PC[m] + PA_0 * PB_2 * PC[b0] * PC[m] + PA_m * PB_0 * PB_2 * PC[a0] + PA_m * PB_0 * PC[a0] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[b0] + PB_0 * PB_2 * PC[a0] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PA_m * PB_1 * PC[b2] + PA_0 * PA_m * PB_2 * PC[b1] + PA_0 * PA_m * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[m] + PA_0 * PB_1 * PC[b2] * PC[m] + PA_0 * PB_2 * PC[b1] * PC[m] + PA_m * PB_1 * PB_2 * PC[a0] + PA_m * PB_1 * PC[a0] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[m])
+                            + delta[a1][m] * (PA_0 * PB_0 * PB_1 * PC[b2] + PA_0 * PB_0 * PB_2 * PC[b1] + PA_0 * PB_0 * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[b0] + PA_0 * PB_1 * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a0] + PB_0 * PB_1 * PC[a0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[b0])
+                            + delta[a0][b2] * (PA_1 * PA_m * PB_0 * PC[b1] + PA_1 * PA_m * PB_1 * PC[b0] + PA_1 * PA_m * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PC[m] + PA_1 * PB_0 * PC[b1] * PC[m] + PA_1 * PB_1 * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PC[a1] + PA_m * PB_0 * PC[a1] * PC[b1] + PA_m * PB_1 * PC[a1] * PC[b0] + PB_0 * PB_1 * PC[a1] * PC[m])
+                            + delta[a0][b1] * (PA_1 * PA_m * PB_0 * PC[b2] + PA_1 * PA_m * PB_2 * PC[b0] + PA_1 * PA_m * PC[b0] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[m] + PA_1 * PB_0 * PC[b2] * PC[m] + PA_1 * PB_2 * PC[b0] * PC[m] + PA_m * PB_0 * PB_2 * PC[a1] + PA_m * PB_0 * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[b0] + PB_0 * PB_2 * PC[a1] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PA_m * PB_1 * PC[b2] + PA_1 * PA_m * PB_2 * PC[b1] + PA_1 * PA_m * PC[b1] * PC[b2] + PA_1 * PB_1 * PB_2 * PC[m] + PA_1 * PB_1 * PC[b2] * PC[m] + PA_1 * PB_2 * PC[b1] * PC[m] + PA_m * PB_1 * PB_2 * PC[a1] + PA_m * PB_1 * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[b1] + PB_1 * PB_2 * PC[a1] * PC[m])
+                            + delta[a0][m] * (PA_1 * PB_0 * PB_1 * PC[b2] + PA_1 * PB_0 * PB_2 * PC[b1] + PA_1 * PB_0 * PC[b1] * PC[b2] + PA_1 * PB_1 * PB_2 * PC[b0] + PA_1 * PB_1 * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a1] + PB_0 * PB_1 * PC[a1] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[b1] + PB_1 * PB_2 * PC[a1] * PC[b0])
+                            + delta[a0][a1] * (PA_m * PB_0 * PB_1 * PC[b2] + PA_m * PB_0 * PB_2 * PC[b1] + PA_m * PB_0 * PC[b1] * PC[b2] + PA_m * PB_1 * PB_2 * PC[b0] + PA_m * PB_1 * PC[b0] * PC[b2] + PA_m * PB_2 * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[m] + PB_0 * PB_1 * PC[b2] * PC[m] + PB_0 * PB_2 * PC[b1] * PC[m] + PB_1 * PB_2 * PC[b0] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PA_m * PB_0 * PC[b1] * PC[b2]
+                            + PA_0 * PA_1 * PA_m * PB_1 * PC[b0] * PC[b2]
+                            + PA_0 * PA_1 * PA_m * PB_2 * PC[b0] * PC[b1]
+                            + PA_0 * PA_1 * PB_0 * PB_1 * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PB_0 * PB_2 * PC[b1] * PC[m]
+                            + PA_0 * PA_1 * PB_1 * PB_2 * PC[b0] * PC[m]
+                            + PA_0 * PA_m * PB_0 * PB_1 * PC[a1] * PC[b2]
+                            + PA_0 * PA_m * PB_0 * PB_2 * PC[a1] * PC[b1]
+                            + PA_0 * PA_m * PB_1 * PB_2 * PC[a1] * PC[b0]
+                            + PA_0 * PB_0 * PB_1 * PB_2 * PC[a1] * PC[m]
+                            + PA_1 * PA_m * PB_0 * PB_1 * PC[a0] * PC[b2]
+                            + PA_1 * PA_m * PB_0 * PB_2 * PC[a0] * PC[b1]
+                            + PA_1 * PA_m * PB_1 * PB_2 * PC[a0] * PC[b0]
+                            + PA_1 * PB_0 * PB_1 * PB_2 * PC[a0] * PC[m]
+                            + PA_m * PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1]
+                        )
+
+                    )
+
+                    + F6_t[3] * (
+
+                        (-0.25) / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PC[a1] * (-1.0) + PA_1 * PC[a0] * (-1.0) + PC[a0] * PC[a1] * (-2.0))
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PC[b0] * (-1.0) + PB_0 * PC[a0] * (-1.0) + PC[a0] * PC[b0] * (-2.0))
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PC[b1] * (-1.0) + PB_1 * PC[a0] * (-1.0) + PC[a0] * PC[b1] * (-2.0))
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PC[b2] * (-1.0) + PB_2 * PC[a0] * (-1.0) + PC[a0] * PC[b2] * (-2.0))
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PC[m] * (-1.0) + PA_m * PC[a0] * (-1.0) + PC[a0] * PC[m] * (-2.0))
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PC[b0] * (-1.0) + PB_0 * PC[a1] * (-1.0) + PC[a1] * PC[b0] * (-2.0))
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PC[b1] * (-1.0) + PB_1 * PC[a1] * (-1.0) + PC[a1] * PC[b1] * (-2.0))
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PC[b2] * (-1.0) + PB_2 * PC[a1] * (-1.0) + PC[a1] * PC[b2] * (-2.0))
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PC[m] * (-1.0) + PA_m * PC[a1] * (-1.0) + PC[a1] * PC[m] * (-2.0))
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_m * PC[b0] * (-1.0) + PB_0 * PC[m] * (-1.0) + PC[b0] * PC[m] * (-2.0))
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_m * PC[b1] * (-1.0) + PB_1 * PC[m] * (-1.0) + PC[b1] * PC[m] * (-2.0))
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_m * PC[b2] * (-1.0) + PB_2 * PC[m] * (-1.0) + PC[b2] * PC[m] * (-2.0))
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PB_0 * PC[b1] * (-1.0) + PB_1 * PC[b0] * (-1.0) + PC[b0] * PC[b1] * (-2.0))
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PB_0 * PC[b2] * (-1.0) + PB_2 * PC[b0] * (-1.0) + PC[b0] * PC[b2] * (-2.0))
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PB_1 * PC[b2] * (-1.0) + PB_2 * PC[b1] * (-1.0) + PC[b1] * PC[b2] * (-2.0))
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PA_0 * PA_1 * PC[b0] * PC[b1] + PA_0 * PB_0 * PC[a1] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[b0] + PA_0 * PC[a1] * PC[b0] * PC[b1] + PA_1 * PB_0 * PC[a0] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[b0] + PA_1 * PC[a0] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[a1] + PB_0 * PC[a0] * PC[a1] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[b0])
+                            + delta[b1][m] * (PA_0 * PA_1 * PC[b0] * PC[b2] + PA_0 * PB_0 * PC[a1] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[b0] + PA_0 * PC[a1] * PC[b0] * PC[b2] + PA_1 * PB_0 * PC[a0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[b0] + PA_1 * PC[a0] * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a1] + PB_0 * PC[a0] * PC[a1] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[b0])
+                            + delta[b1][b2] * (PA_0 * PA_1 * PC[b0] * PC[m] + PA_0 * PA_m * PC[a1] * PC[b0] + PA_0 * PB_0 * PC[a1] * PC[m] + PA_0 * PC[a1] * PC[b0] * PC[m] + PA_1 * PA_m * PC[a0] * PC[b0] + PA_1 * PB_0 * PC[a0] * PC[m] + PA_1 * PC[a0] * PC[b0] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a1] + PA_m * PC[a0] * PC[a1] * PC[b0] + PB_0 * PC[a0] * PC[a1] * PC[m])
+                            + delta[b0][m] * (PA_0 * PA_1 * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a1] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[b1] + PA_0 * PC[a1] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[b1] + PA_1 * PC[a0] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[a1] + PB_1 * PC[a0] * PC[a1] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[b1])
+                            + delta[b0][b2] * (PA_0 * PA_1 * PC[b1] * PC[m] + PA_0 * PA_m * PC[a1] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[m] + PA_0 * PC[a1] * PC[b1] * PC[m] + PA_1 * PA_m * PC[a0] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[m] + PA_1 * PC[a0] * PC[b1] * PC[m] + PA_m * PB_1 * PC[a0] * PC[a1] + PA_m * PC[a0] * PC[a1] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[m])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PC[b2] * PC[m] + PA_0 * PA_m * PC[a1] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[m] + PA_0 * PC[a1] * PC[b2] * PC[m] + PA_1 * PA_m * PC[a0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[m] + PA_1 * PC[a0] * PC[b2] * PC[m] + PA_m * PB_2 * PC[a0] * PC[a1] + PA_m * PC[a0] * PC[a1] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[m])
+                            + delta[a1][b2] * (PA_0 * PA_m * PC[b0] * PC[b1] + PA_0 * PB_0 * PC[b1] * PC[m] + PA_0 * PB_1 * PC[b0] * PC[m] + PA_0 * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PC[a0] * PC[b1] + PA_m * PB_1 * PC[a0] * PC[b0] + PA_m * PC[a0] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[m] + PB_0 * PC[a0] * PC[b1] * PC[m] + PB_1 * PC[a0] * PC[b0] * PC[m])
+                            + delta[a1][b1] * (PA_0 * PA_m * PC[b0] * PC[b2] + PA_0 * PB_0 * PC[b2] * PC[m] + PA_0 * PB_2 * PC[b0] * PC[m] + PA_0 * PC[b0] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a0] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[b0] + PA_m * PC[a0] * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[m] + PB_0 * PC[a0] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[b0] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PA_m * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[b2] * PC[m] + PA_0 * PB_2 * PC[b1] * PC[m] + PA_0 * PC[b1] * PC[b2] * PC[m] + PA_m * PB_1 * PC[a0] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[b1] + PA_m * PC[a0] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[m] + PB_1 * PC[a0] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[b1] * PC[m])
+                            + delta[a1][m] * (PA_0 * PB_0 * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[b0] * PC[b1] + PA_0 * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[b1] + PB_0 * PC[a0] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[b0] + PB_1 * PC[a0] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[b0] * PC[b1])
+                            + delta[a0][b2] * (PA_1 * PA_m * PC[b0] * PC[b1] + PA_1 * PB_0 * PC[b1] * PC[m] + PA_1 * PB_1 * PC[b0] * PC[m] + PA_1 * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PC[a1] * PC[b1] + PA_m * PB_1 * PC[a1] * PC[b0] + PA_m * PC[a1] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a1] * PC[m] + PB_0 * PC[a1] * PC[b1] * PC[m] + PB_1 * PC[a1] * PC[b0] * PC[m])
+                            + delta[a0][b1] * (PA_1 * PA_m * PC[b0] * PC[b2] + PA_1 * PB_0 * PC[b2] * PC[m] + PA_1 * PB_2 * PC[b0] * PC[m] + PA_1 * PC[b0] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[b0] + PA_m * PC[a1] * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[m] + PB_0 * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[b0] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PA_m * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[b2] * PC[m] + PA_1 * PB_2 * PC[b1] * PC[m] + PA_1 * PC[b1] * PC[b2] * PC[m] + PA_m * PB_1 * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[b1] + PA_m * PC[a1] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a1] * PC[m] + PB_1 * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[b1] * PC[m])
+                            + delta[a0][m] * (PA_1 * PB_0 * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[b0] * PC[b1] + PA_1 * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a1] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[b1] + PB_0 * PC[a1] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a1] * PC[b0] + PB_1 * PC[a1] * PC[b0] * PC[b2] + PB_2 * PC[a1] * PC[b0] * PC[b1])
+                            + delta[a0][a1] * (PA_m * PB_0 * PC[b1] * PC[b2] + PA_m * PB_1 * PC[b0] * PC[b2] + PA_m * PB_2 * PC[b0] * PC[b1] + PA_m * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[b2] * PC[m] + PB_0 * PB_2 * PC[b1] * PC[m] + PB_0 * PC[b1] * PC[b2] * PC[m] + PB_1 * PB_2 * PC[b0] * PC[m] + PB_1 * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[b0] * PC[b1] * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_1 * PA_m * PC[b0] * PC[b1] * PC[b2]
+                            + PA_0 * PA_1 * PB_0 * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PB_1 * PC[b0] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PB_2 * PC[b0] * PC[b1] * PC[m]
+                            + PA_0 * PA_m * PB_0 * PC[a1] * PC[b1] * PC[b2]
+                            + PA_0 * PA_m * PB_1 * PC[a1] * PC[b0] * PC[b2]
+                            + PA_0 * PA_m * PB_2 * PC[a1] * PC[b0] * PC[b1]
+                            + PA_0 * PB_0 * PB_1 * PC[a1] * PC[b2] * PC[m]
+                            + PA_0 * PB_0 * PB_2 * PC[a1] * PC[b1] * PC[m]
+                            + PA_0 * PB_1 * PB_2 * PC[a1] * PC[b0] * PC[m]
+                            + PA_1 * PA_m * PB_0 * PC[a0] * PC[b1] * PC[b2]
+                            + PA_1 * PA_m * PB_1 * PC[a0] * PC[b0] * PC[b2]
+                            + PA_1 * PA_m * PB_2 * PC[a0] * PC[b0] * PC[b1]
+                            + PA_1 * PB_0 * PB_1 * PC[a0] * PC[b2] * PC[m]
+                            + PA_1 * PB_0 * PB_2 * PC[a0] * PC[b1] * PC[m]
+                            + PA_1 * PB_1 * PB_2 * PC[a0] * PC[b0] * PC[m]
+                            + PA_m * PB_0 * PB_1 * PC[a0] * PC[a1] * PC[b2]
+                            + PA_m * PB_0 * PB_2 * PC[a0] * PC[a1] * PC[b1]
+                            + PA_m * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[b0]
+                            + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[m]
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a1][m] * delta[b1][b2] * (PC[a0] * PC[b0])
+                            + delta[a1][m] * delta[b0][b2] * (PC[a0] * PC[b1])
+                            + delta[a1][m] * delta[b0][b1] * (PC[a0] * PC[b2])
+                            + delta[a0][m] * delta[b1][b2] * (PC[a1] * PC[b0])
+                            + delta[a0][m] * delta[b0][b2] * (PC[a1] * PC[b1])
+                            + delta[a0][m] * delta[b0][b1] * (PC[a1] * PC[b2])
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PC[b0] * PC[b1])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PC[b0] * PC[b2])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PC[b1] * PC[b2])
+                        )
+
+                        + (
+                            delta[a1][m] * (PA_0 * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a0] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[b0] * PC[b1])
+                            + delta[a0][m] * (PA_1 * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a1] * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[b0] * PC[b2] + PB_2 * PC[a1] * PC[b0] * PC[b1])
+                        )
+
+                    )
+
+                    + F6_t[4] * (
+
+                        (-1.0) * (
+                            delta[a1][m] * (PC[a0] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a0][m] * (PC[a1] * PC[b0] * PC[b1] * PC[b2])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PC[a0] * PC[a1])
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PC[a0] * PC[b0])
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PC[a0] * PC[b1])
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PC[a0] * PC[b2])
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PC[a0] * PC[m])
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PC[a1] * PC[b0])
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PC[a1] * PC[b1])
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PC[a1] * PC[b2])
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PC[a1] * PC[m])
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PC[b0] * PC[b1])
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PC[b0] * PC[b2])
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PC[b0] * PC[m])
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PC[b1] * PC[b2])
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PC[b1] * PC[m])
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PC[b2] * PC[m])
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PA_0 * PC[a1] * PC[b0] * PC[b1] + PA_1 * PC[a0] * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[a1] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[b0] + PC[a0] * PC[a1] * PC[b0] * PC[b1])
+                            + delta[b1][m] * (PA_0 * PC[a1] * PC[b0] * PC[b2] + PA_1 * PC[a0] * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[a1] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[b0] + PC[a0] * PC[a1] * PC[b0] * PC[b2])
+                            + delta[b1][b2] * (PA_0 * PC[a1] * PC[b0] * PC[m] + PA_1 * PC[a0] * PC[b0] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[b0] + PB_0 * PC[a0] * PC[a1] * PC[m] + PC[a0] * PC[a1] * PC[b0] * PC[m])
+                            + delta[b0][m] * (PA_0 * PC[a1] * PC[b1] * PC[b2] + PA_1 * PC[a0] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a1] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[b1] + PC[a0] * PC[a1] * PC[b1] * PC[b2])
+                            + delta[b0][b2] * (PA_0 * PC[a1] * PC[b1] * PC[m] + PA_1 * PC[a0] * PC[b1] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[m] + PC[a0] * PC[a1] * PC[b1] * PC[m])
+                            + delta[b0][b1] * (PA_0 * PC[a1] * PC[b2] * PC[m] + PA_1 * PC[a0] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[m] + PC[a0] * PC[a1] * PC[b2] * PC[m])
+                            + delta[a1][m] * (PA_0 * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a0] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[b0] * PC[b1] + PC[a0] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a1][b2] * (PA_0 * PC[b0] * PC[b1] * PC[m] + PA_m * PC[a0] * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[b1] * PC[m] + PB_1 * PC[a0] * PC[b0] * PC[m] + PC[a0] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a1][b1] * (PA_0 * PC[b0] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[b0] * PC[m] + PC[a0] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[b1] * PC[m] + PC[a0] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][m] * (PA_1 * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a1] * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[b0] * PC[b2] + PB_2 * PC[a1] * PC[b0] * PC[b1] + PC[a1] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a0][b2] * (PA_1 * PC[b0] * PC[b1] * PC[m] + PA_m * PC[a1] * PC[b0] * PC[b1] + PB_0 * PC[a1] * PC[b1] * PC[m] + PB_1 * PC[a1] * PC[b0] * PC[m] + PC[a1] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][b1] * (PA_1 * PC[b0] * PC[b2] * PC[m] + PA_m * PC[a1] * PC[b0] * PC[b2] + PB_0 * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[b0] * PC[m] + PC[a1] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a1] * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[b1] * PC[m] + PC[a1] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][a1] * (PA_m * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[b1] * PC[b2] * PC[m] + PB_1 * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[b0] * PC[b1] * PC[m] + PC[b0] * PC[b1] * PC[b2] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_m * PC[a1] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_0 * PB_0 * PC[a1] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PB_1 * PC[a1] * PC[b0] * PC[b2] * PC[m]
+                            + PA_0 * PB_2 * PC[a1] * PC[b0] * PC[b1] * PC[m]
+                            + PA_1 * PA_m * PC[a0] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_1 * PB_0 * PC[a0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_1 * PB_1 * PC[a0] * PC[b0] * PC[b2] * PC[m]
+                            + PA_1 * PB_2 * PC[a0] * PC[b0] * PC[b1] * PC[m]
+                            + PA_m * PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[b2]
+                            + PA_m * PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[b2]
+                            + PA_m * PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1]
+                            + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[b2] * PC[m]
+                            + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[b1] * PC[m]
+                            + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[m]
+                        )
+
+                    )
+
+                    + F6_t[5] * (
+
+                        (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PC[a0] * PC[a1] * PC[b0] * PC[b1])
+                            + delta[b1][m] * (PC[a0] * PC[a1] * PC[b0] * PC[b2])
+                            + delta[b1][b2] * (PC[a0] * PC[a1] * PC[b0] * PC[m])
+                            + delta[b0][m] * (PC[a0] * PC[a1] * PC[b1] * PC[b2])
+                            + delta[b0][b2] * (PC[a0] * PC[a1] * PC[b1] * PC[m])
+                            + delta[b0][b1] * (PC[a0] * PC[a1] * PC[b2] * PC[m])
+                            + delta[a1][m] * (PC[a0] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a1][b2] * (PC[a0] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a1][b1] * (PC[a0] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a1][b0] * (PC[a0] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][m] * (PC[a1] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a0][b2] * (PC[a1] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][b1] * (PC[a1] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a0][b0] * (PC[a1] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][a1] * (PC[b0] * PC[b1] * PC[b2] * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PC[a1] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_1 * PC[a0] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_m * PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[b2]
+                            + PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[b2] * PC[m]
+                            + PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[b2] * PC[m]
+                            + PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[m]
+                        )
+
+                    )
+
+                    + F6_t[6] * (
+
+                        2.0 * a_i * (
+                            PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -2315,6 +3661,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
                 {
                     auto i_cgto_sph = i_cgto_sph_ind_coef.first;
@@ -2332,7 +3680,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = (Dij + Dji);
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
@@ -2372,8 +3722,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         const auto i_cgto = f_prim_aoinds[(i / 10) + f_prim_count * (i % 10)];
         const auto j_cgto = f_prim_aoinds[(j / 10) + f_prim_count * (j % 10)];
 
-        // const auto i_atom = cart_ao_to_atom_ids[i_cgto];
-        // const auto j_atom = cart_ao_to_atom_ids[j_cgto];
+        const auto i_atom = cart_ao_to_atom_ids[i_cgto];
+        const auto j_atom = cart_ao_to_atom_ids[j_cgto];
 
         const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
@@ -2445,6 +3795,826 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
             for (int m = 0; m < 3; m++)
             {
+                const auto PA_m = (a_j / (a_i + a_j)) * rij[m];
+
+                // Note: minus sign from electron charge
+
+                double grad_i = (-1.0) * q_c * V_ij_00 * (
+
+                    F7_t[0] * (
+
+                        (-0.25) / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            (delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PA_0)
+                            + (delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PA_1)
+                            + (delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PA_2)
+                            + (delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PB_0)
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PB_1)
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PB_2)
+                        )
+
+                        + (-0.5) / (a_i + a_j) * (
+                            delta[a2][m] * delta[b1][b2] * (PA_0 * PA_1 * PB_0)
+                            + delta[a2][m] * delta[b0][b2] * (PA_0 * PA_1 * PB_1)
+                            + delta[a2][m] * delta[b0][b1] * (PA_0 * PA_1 * PB_2)
+                            + delta[a1][m] * delta[b1][b2] * (PA_0 * PA_2 * PB_0)
+                            + delta[a1][m] * delta[b0][b2] * (PA_0 * PA_2 * PB_1)
+                            + delta[a1][m] * delta[b0][b1] * (PA_0 * PA_2 * PB_2)
+                            + (delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PB_0 * PB_1)
+                            + (delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PB_0 * PB_2)
+                            + (delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PB_1 * PB_2)
+                            + delta[a0][m] * delta[b1][b2] * (PA_1 * PA_2 * PB_0)
+                            + delta[a0][m] * delta[b0][b2] * (PA_1 * PA_2 * PB_1)
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 * PA_2 * PB_2)
+                            + (delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PB_0 * PB_1)
+                            + (delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PB_0 * PB_2)
+                            + (delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PB_1 * PB_2)
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PB_0 * PB_1)
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PB_0 * PB_2)
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PB_1 * PB_2)
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PB_1 * PB_2)
+                        )
+
+                        + (-1.0) * (
+                            delta[a2][m] * (PA_0 * PA_1 * PB_0 * PB_1 * PB_2)
+                            + delta[a1][m] * (PA_0 * PA_2 * PB_0 * PB_1 * PB_2)
+                            + delta[a0][m] * (PA_1 * PA_2 * PB_0 * PB_1 * PB_2)
+                        )
+
+                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][a2] * delta[b0][b1] * delta[b2][m] + delta[a1][a2] * delta[b0][b2] * delta[b1][m] + delta[a1][a2] * delta[b0][m] * delta[b1][b2] + delta[a1][b0] * delta[a2][b1] * delta[b2][m] + delta[a1][b0] * delta[a2][b2] * delta[b1][m] + delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][b0] * delta[b2][m] + delta[a1][b1] * delta[a2][b2] * delta[b0][m] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][b0] * delta[b1][m] + delta[a1][b2] * delta[a2][b1] * delta[b0][m] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PA_0)
+                            + (delta[a0][a2] * delta[b0][b1] * delta[b2][m] + delta[a0][a2] * delta[b0][b2] * delta[b1][m] + delta[a0][a2] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a2][b1] * delta[b2][m] + delta[a0][b0] * delta[a2][b2] * delta[b1][m] + delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][b0] * delta[b2][m] + delta[a0][b1] * delta[a2][b2] * delta[b0][m] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][b0] * delta[b1][m] + delta[a0][b2] * delta[a2][b1] * delta[b0][m] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PA_1)
+                            + (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PA_2)
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][b2] + delta[a0][a1] * delta[a2][b1] * delta[b0][b2] + delta[a0][a1] * delta[a2][b2] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b0][b2] + delta[a0][a2] * delta[a1][b2] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[a2][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][b2] + delta[a0][b1] * delta[a1][b0] * delta[a2][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][b0] + delta[a0][b2] * delta[a1][a2] * delta[b0][b1] + delta[a0][b2] * delta[a1][b0] * delta[a2][b1] + delta[a0][b2] * delta[a1][b1] * delta[a2][b0]) * (PA_m)
+                            + (delta[a0][a1] * delta[a2][b1] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b1][m] + delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b1][m] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][a2] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PB_0)
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][b0] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][a2] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b0][m] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PB_1)
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][m] + delta[a0][a1] * delta[a2][b1] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][m] + delta[a0][a2] * delta[a1][b1] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][m] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][m] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PB_2)
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PA_1 * PA_2)
+                            + (delta[a2][b0] * delta[b1][b2] + delta[a2][b1] * delta[b0][b2] + delta[a2][b2] * delta[b0][b1]) * (PA_0 * PA_1 * PA_m)
+                            + (delta[a2][b1] * delta[b2][m] + delta[a2][b2] * delta[b1][m] + delta[a2][m] * delta[b1][b2]) * (PA_0 * PA_1 * PB_0)
+                            + (delta[a2][b0] * delta[b2][m] + delta[a2][b2] * delta[b0][m] + delta[a2][m] * delta[b0][b2]) * (PA_0 * PA_1 * PB_1)
+                            + (delta[a2][b0] * delta[b1][m] + delta[a2][b1] * delta[b0][m] + delta[a2][m] * delta[b0][b1]) * (PA_0 * PA_1 * PB_2)
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PA_2 * PA_m)
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PA_2 * PB_0)
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PA_2 * PB_1)
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PA_2 * PB_2)
+                            + (delta[a1][a2] * delta[b1][b2] + delta[a1][b1] * delta[a2][b2] + delta[a1][b2] * delta[a2][b1]) * (PA_0 * PA_m * PB_0)
+                            + (delta[a1][a2] * delta[b0][b2] + delta[a1][b0] * delta[a2][b2] + delta[a1][b2] * delta[a2][b0]) * (PA_0 * PA_m * PB_1)
+                            + (delta[a1][a2] * delta[b0][b1] + delta[a1][b0] * delta[a2][b1] + delta[a1][b1] * delta[a2][b0]) * (PA_0 * PA_m * PB_2)
+                            + (delta[a1][a2] * delta[b2][m] + delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PB_0 * PB_1)
+                            + (delta[a1][a2] * delta[b1][m] + delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PB_0 * PB_2)
+                            + (delta[a1][a2] * delta[b0][m] + delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PB_1 * PB_2)
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PA_2 * PA_m)
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PA_2 * PB_0)
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PA_2 * PB_1)
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PA_2 * PB_2)
+                            + (delta[a0][a2] * delta[b1][b2] + delta[a0][b1] * delta[a2][b2] + delta[a0][b2] * delta[a2][b1]) * (PA_1 * PA_m * PB_0)
+                            + (delta[a0][a2] * delta[b0][b2] + delta[a0][b0] * delta[a2][b2] + delta[a0][b2] * delta[a2][b0]) * (PA_1 * PA_m * PB_1)
+                            + (delta[a0][a2] * delta[b0][b1] + delta[a0][b0] * delta[a2][b1] + delta[a0][b1] * delta[a2][b0]) * (PA_1 * PA_m * PB_2)
+                            + (delta[a0][a2] * delta[b2][m] + delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PB_0 * PB_1)
+                            + (delta[a0][a2] * delta[b1][m] + delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PB_0 * PB_2)
+                            + (delta[a0][a2] * delta[b0][m] + delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PB_1 * PB_2)
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_2 * PA_m * PB_0)
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_2 * PA_m * PB_1)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_2 * PA_m * PB_2)
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PB_0 * PB_1)
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PB_0 * PB_2)
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PB_1 * PB_2)
+                            + (delta[a0][a1] * delta[a2][b2] + delta[a0][a2] * delta[a1][b2] + delta[a0][b2] * delta[a1][a2]) * (PA_m * PB_0 * PB_1)
+                            + (delta[a0][a1] * delta[a2][b1] + delta[a0][a2] * delta[a1][b1] + delta[a0][b1] * delta[a1][a2]) * (PA_m * PB_0 * PB_2)
+                            + (delta[a0][a1] * delta[a2][b0] + delta[a0][a2] * delta[a1][b0] + delta[a0][b0] * delta[a1][a2]) * (PA_m * PB_1 * PB_2)
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PB_1 * PB_2)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_1 * PA_2 * PA_m * PB_0)
+                            + delta[b0][b2] * (PA_0 * PA_1 * PA_2 * PA_m * PB_1)
+                            + delta[b0][b1] * (PA_0 * PA_1 * PA_2 * PA_m * PB_2)
+                            + delta[b2][m] * (PA_0 * PA_1 * PA_2 * PB_0 * PB_1)
+                            + delta[b1][m] * (PA_0 * PA_1 * PA_2 * PB_0 * PB_2)
+                            + delta[b0][m] * (PA_0 * PA_1 * PA_2 * PB_1 * PB_2)
+                            + delta[a2][b2] * (PA_0 * PA_1 * PA_m * PB_0 * PB_1)
+                            + delta[a2][b1] * (PA_0 * PA_1 * PA_m * PB_0 * PB_2)
+                            + delta[a2][b0] * (PA_0 * PA_1 * PA_m * PB_1 * PB_2)
+                            + delta[a2][m] * (PA_0 * PA_1 * PB_0 * PB_1 * PB_2)
+                            + delta[a1][b2] * (PA_0 * PA_2 * PA_m * PB_0 * PB_1)
+                            + delta[a1][b1] * (PA_0 * PA_2 * PA_m * PB_0 * PB_2)
+                            + delta[a1][b0] * (PA_0 * PA_2 * PA_m * PB_1 * PB_2)
+                            + delta[a1][m] * (PA_0 * PA_2 * PB_0 * PB_1 * PB_2)
+                            + delta[a1][a2] * (PA_0 * PA_m * PB_0 * PB_1 * PB_2)
+                            + delta[a0][b2] * (PA_1 * PA_2 * PA_m * PB_0 * PB_1)
+                            + delta[a0][b1] * (PA_1 * PA_2 * PA_m * PB_0 * PB_2)
+                            + delta[a0][b0] * (PA_1 * PA_2 * PA_m * PB_1 * PB_2)
+                            + delta[a0][m] * (PA_1 * PA_2 * PB_0 * PB_1 * PB_2)
+                            + delta[a0][a2] * (PA_1 * PA_m * PB_0 * PB_1 * PB_2)
+                            + delta[a0][a1] * (PA_2 * PA_m * PB_0 * PB_1 * PB_2)
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PA_2 * PA_m * PB_0 * PB_1 * PB_2
+                        )
+
+                    )
+
+                    + F7_t[1] * (
+
+                        0.25 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][a2] * delta[b0][b1] * delta[b2][m] + delta[a1][a2] * delta[b0][b2] * delta[b1][m] + delta[a1][a2] * delta[b0][m] * delta[b1][b2] + delta[a1][b0] * delta[a2][b1] * delta[b2][m] + delta[a1][b0] * delta[a2][b2] * delta[b1][m] + delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][b0] * delta[b2][m] + delta[a1][b1] * delta[a2][b2] * delta[b0][m] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][b0] * delta[b1][m] + delta[a1][b2] * delta[a2][b1] * delta[b0][m] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PA_0 * (-3.0) + PC[a0] * (-1.0))
+                            + (delta[a0][a2] * delta[b0][b1] * delta[b2][m] + delta[a0][a2] * delta[b0][b2] * delta[b1][m] + delta[a0][a2] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a2][b1] * delta[b2][m] + delta[a0][b0] * delta[a2][b2] * delta[b1][m] + delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][b0] * delta[b2][m] + delta[a0][b1] * delta[a2][b2] * delta[b0][m] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][b0] * delta[b1][m] + delta[a0][b2] * delta[a2][b1] * delta[b0][m] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PA_1 * (-3.0) + PC[a1] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PA_2 * (-3.0) + PC[a2] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][b2] + delta[a0][a1] * delta[a2][b1] * delta[b0][b2] + delta[a0][a1] * delta[a2][b2] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b0][b2] + delta[a0][a2] * delta[a1][b2] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[a2][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][b2] + delta[a0][b1] * delta[a1][b0] * delta[a2][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][b0] + delta[a0][b2] * delta[a1][a2] * delta[b0][b1] + delta[a0][b2] * delta[a1][b0] * delta[a2][b1] + delta[a0][b2] * delta[a1][b1] * delta[a2][b0]) * (PA_m * (-3.0) + PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b1] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b1][m] + delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b1][m] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][a2] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PB_0 * (-3.0) + PC[b0] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][b0] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][a2] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b0][m] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PB_1 * (-3.0) + PC[b1] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][m] + delta[a0][a1] * delta[a2][b1] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][m] + delta[a0][a2] * delta[a1][b1] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][m] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][m] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PB_2 * (-3.0) + PC[b2] * (-1.0))
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PA_1 * PA_2 * (-2.0) + PA_0 * PA_1 * PC[a2] * (-1.0) + PA_0 * PA_2 * PC[a1] * (-1.0) + PA_1 * PA_2 * PC[a0] * (-1.0))
+                            + (delta[a2][b0] * delta[b1][b2] + delta[a2][b1] * delta[b0][b2] + delta[a2][b2] * delta[b0][b1]) * (PA_0 * PA_1 * PA_m * (-2.0) + PA_0 * PA_1 * PC[m] * (-1.0) + PA_0 * PA_m * PC[a1] * (-1.0) + PA_1 * PA_m * PC[a0] * (-1.0))
+                            + (delta[a2][b1] * delta[b2][m] + delta[a2][b2] * delta[b1][m] + delta[a2][m] * delta[b1][b2]) * (PA_0 * PA_1 * PB_0 * (-2.0) + PA_0 * PA_1 * PC[b0] * (-1.0) + PA_0 * PB_0 * PC[a1] * (-1.0) + PA_1 * PB_0 * PC[a0] * (-1.0))
+                            + (delta[a2][b0] * delta[b2][m] + delta[a2][b2] * delta[b0][m] + delta[a2][m] * delta[b0][b2]) * (PA_0 * PA_1 * PB_1 * (-2.0) + PA_0 * PA_1 * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[a1] * (-1.0) + PA_1 * PB_1 * PC[a0] * (-1.0))
+                            + (delta[a2][b0] * delta[b1][m] + delta[a2][b1] * delta[b0][m] + delta[a2][m] * delta[b0][b1]) * (PA_0 * PA_1 * PB_2 * (-2.0) + PA_0 * PA_1 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[a1] * (-1.0) + PA_1 * PB_2 * PC[a0] * (-1.0))
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PA_2 * PA_m * (-2.0) + PA_0 * PA_2 * PC[m] * (-1.0) + PA_0 * PA_m * PC[a2] * (-1.0) + PA_2 * PA_m * PC[a0] * (-1.0))
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PA_2 * PB_0 * (-2.0) + PA_0 * PA_2 * PC[b0] * (-1.0) + PA_0 * PB_0 * PC[a2] * (-1.0) + PA_2 * PB_0 * PC[a0] * (-1.0))
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PA_2 * PB_1 * (-2.0) + PA_0 * PA_2 * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[a2] * (-1.0) + PA_2 * PB_1 * PC[a0] * (-1.0))
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PA_2 * PB_2 * (-2.0) + PA_0 * PA_2 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[a2] * (-1.0) + PA_2 * PB_2 * PC[a0] * (-1.0))
+                            + (delta[a1][a2] * delta[b1][b2] + delta[a1][b1] * delta[a2][b2] + delta[a1][b2] * delta[a2][b1]) * (PA_0 * PA_m * PB_0 * (-2.0) + PA_0 * PA_m * PC[b0] * (-1.0) + PA_0 * PB_0 * PC[m] * (-1.0) + PA_m * PB_0 * PC[a0] * (-1.0))
+                            + (delta[a1][a2] * delta[b0][b2] + delta[a1][b0] * delta[a2][b2] + delta[a1][b2] * delta[a2][b0]) * (PA_0 * PA_m * PB_1 * (-2.0) + PA_0 * PA_m * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[m] * (-1.0) + PA_m * PB_1 * PC[a0] * (-1.0))
+                            + (delta[a1][a2] * delta[b0][b1] + delta[a1][b0] * delta[a2][b1] + delta[a1][b1] * delta[a2][b0]) * (PA_0 * PA_m * PB_2 * (-2.0) + PA_0 * PA_m * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[m] * (-1.0) + PA_m * PB_2 * PC[a0] * (-1.0))
+                            + (delta[a1][a2] * delta[b2][m] + delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PB_0 * PB_1 * (-2.0) + PA_0 * PB_0 * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[b0] * (-1.0) + PB_0 * PB_1 * PC[a0] * (-1.0))
+                            + (delta[a1][a2] * delta[b1][m] + delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PB_0 * PB_2 * (-2.0) + PA_0 * PB_0 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[b0] * (-1.0) + PB_0 * PB_2 * PC[a0] * (-1.0))
+                            + (delta[a1][a2] * delta[b0][m] + delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PB_1 * PB_2 * (-2.0) + PA_0 * PB_1 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[b1] * (-1.0) + PB_1 * PB_2 * PC[a0] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PA_2 * PA_m * (-2.0) + PA_1 * PA_2 * PC[m] * (-1.0) + PA_1 * PA_m * PC[a2] * (-1.0) + PA_2 * PA_m * PC[a1] * (-1.0))
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PA_2 * PB_0 * (-2.0) + PA_1 * PA_2 * PC[b0] * (-1.0) + PA_1 * PB_0 * PC[a2] * (-1.0) + PA_2 * PB_0 * PC[a1] * (-1.0))
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PA_2 * PB_1 * (-2.0) + PA_1 * PA_2 * PC[b1] * (-1.0) + PA_1 * PB_1 * PC[a2] * (-1.0) + PA_2 * PB_1 * PC[a1] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PA_2 * PB_2 * (-2.0) + PA_1 * PA_2 * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[a2] * (-1.0) + PA_2 * PB_2 * PC[a1] * (-1.0))
+                            + (delta[a0][a2] * delta[b1][b2] + delta[a0][b1] * delta[a2][b2] + delta[a0][b2] * delta[a2][b1]) * (PA_1 * PA_m * PB_0 * (-2.0) + PA_1 * PA_m * PC[b0] * (-1.0) + PA_1 * PB_0 * PC[m] * (-1.0) + PA_m * PB_0 * PC[a1] * (-1.0))
+                            + (delta[a0][a2] * delta[b0][b2] + delta[a0][b0] * delta[a2][b2] + delta[a0][b2] * delta[a2][b0]) * (PA_1 * PA_m * PB_1 * (-2.0) + PA_1 * PA_m * PC[b1] * (-1.0) + PA_1 * PB_1 * PC[m] * (-1.0) + PA_m * PB_1 * PC[a1] * (-1.0))
+                            + (delta[a0][a2] * delta[b0][b1] + delta[a0][b0] * delta[a2][b1] + delta[a0][b1] * delta[a2][b0]) * (PA_1 * PA_m * PB_2 * (-2.0) + PA_1 * PA_m * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[m] * (-1.0) + PA_m * PB_2 * PC[a1] * (-1.0))
+                            + (delta[a0][a2] * delta[b2][m] + delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PB_0 * PB_1 * (-2.0) + PA_1 * PB_0 * PC[b1] * (-1.0) + PA_1 * PB_1 * PC[b0] * (-1.0) + PB_0 * PB_1 * PC[a1] * (-1.0))
+                            + (delta[a0][a2] * delta[b1][m] + delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PB_0 * PB_2 * (-2.0) + PA_1 * PB_0 * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[b0] * (-1.0) + PB_0 * PB_2 * PC[a1] * (-1.0))
+                            + (delta[a0][a2] * delta[b0][m] + delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PB_1 * PB_2 * (-2.0) + PA_1 * PB_1 * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[b1] * (-1.0) + PB_1 * PB_2 * PC[a1] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_2 * PA_m * PB_0 * (-2.0) + PA_2 * PA_m * PC[b0] * (-1.0) + PA_2 * PB_0 * PC[m] * (-1.0) + PA_m * PB_0 * PC[a2] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_2 * PA_m * PB_1 * (-2.0) + PA_2 * PA_m * PC[b1] * (-1.0) + PA_2 * PB_1 * PC[m] * (-1.0) + PA_m * PB_1 * PC[a2] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_2 * PA_m * PB_2 * (-2.0) + PA_2 * PA_m * PC[b2] * (-1.0) + PA_2 * PB_2 * PC[m] * (-1.0) + PA_m * PB_2 * PC[a2] * (-1.0))
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PB_0 * PB_1 * (-2.0) + PA_2 * PB_0 * PC[b1] * (-1.0) + PA_2 * PB_1 * PC[b0] * (-1.0) + PB_0 * PB_1 * PC[a2] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PB_0 * PB_2 * (-2.0) + PA_2 * PB_0 * PC[b2] * (-1.0) + PA_2 * PB_2 * PC[b0] * (-1.0) + PB_0 * PB_2 * PC[a2] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PB_1 * PB_2 * (-2.0) + PA_2 * PB_1 * PC[b2] * (-1.0) + PA_2 * PB_2 * PC[b1] * (-1.0) + PB_1 * PB_2 * PC[a2] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b2] + delta[a0][a2] * delta[a1][b2] + delta[a0][b2] * delta[a1][a2]) * (PA_m * PB_0 * PB_1 * (-2.0) + PA_m * PB_0 * PC[b1] * (-1.0) + PA_m * PB_1 * PC[b0] * (-1.0) + PB_0 * PB_1 * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b1] + delta[a0][a2] * delta[a1][b1] + delta[a0][b1] * delta[a1][a2]) * (PA_m * PB_0 * PB_2 * (-2.0) + PA_m * PB_0 * PC[b2] * (-1.0) + PA_m * PB_2 * PC[b0] * (-1.0) + PB_0 * PB_2 * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b0] + delta[a0][a2] * delta[a1][b0] + delta[a0][b0] * delta[a1][a2]) * (PA_m * PB_1 * PB_2 * (-2.0) + PA_m * PB_1 * PC[b2] * (-1.0) + PA_m * PB_2 * PC[b1] * (-1.0) + PB_1 * PB_2 * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PB_1 * PB_2 * (-2.0) + PB_0 * PB_1 * PC[b2] * (-1.0) + PB_0 * PB_2 * PC[b1] * (-1.0) + PB_1 * PB_2 * PC[b0] * (-1.0))
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_1 * PA_2 * PA_m * PB_0 + PA_0 * PA_1 * PA_2 * PA_m * PC[b0] + PA_0 * PA_1 * PA_2 * PB_0 * PC[m] + PA_0 * PA_1 * PA_m * PB_0 * PC[a2] + PA_0 * PA_2 * PA_m * PB_0 * PC[a1] + PA_1 * PA_2 * PA_m * PB_0 * PC[a0])
+                            + delta[b0][b2] * (PA_0 * PA_1 * PA_2 * PA_m * PB_1 + PA_0 * PA_1 * PA_2 * PA_m * PC[b1] + PA_0 * PA_1 * PA_2 * PB_1 * PC[m] + PA_0 * PA_1 * PA_m * PB_1 * PC[a2] + PA_0 * PA_2 * PA_m * PB_1 * PC[a1] + PA_1 * PA_2 * PA_m * PB_1 * PC[a0])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PA_2 * PA_m * PB_2 + PA_0 * PA_1 * PA_2 * PA_m * PC[b2] + PA_0 * PA_1 * PA_2 * PB_2 * PC[m] + PA_0 * PA_1 * PA_m * PB_2 * PC[a2] + PA_0 * PA_2 * PA_m * PB_2 * PC[a1] + PA_1 * PA_2 * PA_m * PB_2 * PC[a0])
+                            + delta[b2][m] * (PA_0 * PA_1 * PA_2 * PB_0 * PB_1 + PA_0 * PA_1 * PA_2 * PB_0 * PC[b1] + PA_0 * PA_1 * PA_2 * PB_1 * PC[b0] + PA_0 * PA_1 * PB_0 * PB_1 * PC[a2] + PA_0 * PA_2 * PB_0 * PB_1 * PC[a1] + PA_1 * PA_2 * PB_0 * PB_1 * PC[a0])
+                            + delta[b1][m] * (PA_0 * PA_1 * PA_2 * PB_0 * PB_2 + PA_0 * PA_1 * PA_2 * PB_0 * PC[b2] + PA_0 * PA_1 * PA_2 * PB_2 * PC[b0] + PA_0 * PA_1 * PB_0 * PB_2 * PC[a2] + PA_0 * PA_2 * PB_0 * PB_2 * PC[a1] + PA_1 * PA_2 * PB_0 * PB_2 * PC[a0])
+                            + delta[b0][m] * (PA_0 * PA_1 * PA_2 * PB_1 * PB_2 + PA_0 * PA_1 * PA_2 * PB_1 * PC[b2] + PA_0 * PA_1 * PA_2 * PB_2 * PC[b1] + PA_0 * PA_1 * PB_1 * PB_2 * PC[a2] + PA_0 * PA_2 * PB_1 * PB_2 * PC[a1] + PA_1 * PA_2 * PB_1 * PB_2 * PC[a0])
+                            + delta[a2][b2] * (PA_0 * PA_1 * PA_m * PB_0 * PB_1 + PA_0 * PA_1 * PA_m * PB_0 * PC[b1] + PA_0 * PA_1 * PA_m * PB_1 * PC[b0] + PA_0 * PA_1 * PB_0 * PB_1 * PC[m] + PA_0 * PA_m * PB_0 * PB_1 * PC[a1] + PA_1 * PA_m * PB_0 * PB_1 * PC[a0])
+                            + delta[a2][b1] * (PA_0 * PA_1 * PA_m * PB_0 * PB_2 + PA_0 * PA_1 * PA_m * PB_0 * PC[b2] + PA_0 * PA_1 * PA_m * PB_2 * PC[b0] + PA_0 * PA_1 * PB_0 * PB_2 * PC[m] + PA_0 * PA_m * PB_0 * PB_2 * PC[a1] + PA_1 * PA_m * PB_0 * PB_2 * PC[a0])
+                            + delta[a2][b0] * (PA_0 * PA_1 * PA_m * PB_1 * PB_2 + PA_0 * PA_1 * PA_m * PB_1 * PC[b2] + PA_0 * PA_1 * PA_m * PB_2 * PC[b1] + PA_0 * PA_1 * PB_1 * PB_2 * PC[m] + PA_0 * PA_m * PB_1 * PB_2 * PC[a1] + PA_1 * PA_m * PB_1 * PB_2 * PC[a0])
+                            + delta[a2][m] * (PA_0 * PA_1 * PB_0 * PB_1 * PB_2 + PA_0 * PA_1 * PB_0 * PB_1 * PC[b2] + PA_0 * PA_1 * PB_0 * PB_2 * PC[b1] + PA_0 * PA_1 * PB_1 * PB_2 * PC[b0] + PA_0 * PB_0 * PB_1 * PB_2 * PC[a1] + PA_1 * PB_0 * PB_1 * PB_2 * PC[a0])
+                            + delta[a1][b2] * (PA_0 * PA_2 * PA_m * PB_0 * PB_1 + PA_0 * PA_2 * PA_m * PB_0 * PC[b1] + PA_0 * PA_2 * PA_m * PB_1 * PC[b0] + PA_0 * PA_2 * PB_0 * PB_1 * PC[m] + PA_0 * PA_m * PB_0 * PB_1 * PC[a2] + PA_2 * PA_m * PB_0 * PB_1 * PC[a0])
+                            + delta[a1][b1] * (PA_0 * PA_2 * PA_m * PB_0 * PB_2 + PA_0 * PA_2 * PA_m * PB_0 * PC[b2] + PA_0 * PA_2 * PA_m * PB_2 * PC[b0] + PA_0 * PA_2 * PB_0 * PB_2 * PC[m] + PA_0 * PA_m * PB_0 * PB_2 * PC[a2] + PA_2 * PA_m * PB_0 * PB_2 * PC[a0])
+                            + delta[a1][b0] * (PA_0 * PA_2 * PA_m * PB_1 * PB_2 + PA_0 * PA_2 * PA_m * PB_1 * PC[b2] + PA_0 * PA_2 * PA_m * PB_2 * PC[b1] + PA_0 * PA_2 * PB_1 * PB_2 * PC[m] + PA_0 * PA_m * PB_1 * PB_2 * PC[a2] + PA_2 * PA_m * PB_1 * PB_2 * PC[a0])
+                            + delta[a1][m] * (PA_0 * PA_2 * PB_0 * PB_1 * PB_2 + PA_0 * PA_2 * PB_0 * PB_1 * PC[b2] + PA_0 * PA_2 * PB_0 * PB_2 * PC[b1] + PA_0 * PA_2 * PB_1 * PB_2 * PC[b0] + PA_0 * PB_0 * PB_1 * PB_2 * PC[a2] + PA_2 * PB_0 * PB_1 * PB_2 * PC[a0])
+                            + delta[a1][a2] * (PA_0 * PA_m * PB_0 * PB_1 * PB_2 + PA_0 * PA_m * PB_0 * PB_1 * PC[b2] + PA_0 * PA_m * PB_0 * PB_2 * PC[b1] + PA_0 * PA_m * PB_1 * PB_2 * PC[b0] + PA_0 * PB_0 * PB_1 * PB_2 * PC[m] + PA_m * PB_0 * PB_1 * PB_2 * PC[a0])
+                            + delta[a0][b2] * (PA_1 * PA_2 * PA_m * PB_0 * PB_1 + PA_1 * PA_2 * PA_m * PB_0 * PC[b1] + PA_1 * PA_2 * PA_m * PB_1 * PC[b0] + PA_1 * PA_2 * PB_0 * PB_1 * PC[m] + PA_1 * PA_m * PB_0 * PB_1 * PC[a2] + PA_2 * PA_m * PB_0 * PB_1 * PC[a1])
+                            + delta[a0][b1] * (PA_1 * PA_2 * PA_m * PB_0 * PB_2 + PA_1 * PA_2 * PA_m * PB_0 * PC[b2] + PA_1 * PA_2 * PA_m * PB_2 * PC[b0] + PA_1 * PA_2 * PB_0 * PB_2 * PC[m] + PA_1 * PA_m * PB_0 * PB_2 * PC[a2] + PA_2 * PA_m * PB_0 * PB_2 * PC[a1])
+                            + delta[a0][b0] * (PA_1 * PA_2 * PA_m * PB_1 * PB_2 + PA_1 * PA_2 * PA_m * PB_1 * PC[b2] + PA_1 * PA_2 * PA_m * PB_2 * PC[b1] + PA_1 * PA_2 * PB_1 * PB_2 * PC[m] + PA_1 * PA_m * PB_1 * PB_2 * PC[a2] + PA_2 * PA_m * PB_1 * PB_2 * PC[a1])
+                            + delta[a0][m] * (PA_1 * PA_2 * PB_0 * PB_1 * PB_2 + PA_1 * PA_2 * PB_0 * PB_1 * PC[b2] + PA_1 * PA_2 * PB_0 * PB_2 * PC[b1] + PA_1 * PA_2 * PB_1 * PB_2 * PC[b0] + PA_1 * PB_0 * PB_1 * PB_2 * PC[a2] + PA_2 * PB_0 * PB_1 * PB_2 * PC[a1])
+                            + delta[a0][a2] * (PA_1 * PA_m * PB_0 * PB_1 * PB_2 + PA_1 * PA_m * PB_0 * PB_1 * PC[b2] + PA_1 * PA_m * PB_0 * PB_2 * PC[b1] + PA_1 * PA_m * PB_1 * PB_2 * PC[b0] + PA_1 * PB_0 * PB_1 * PB_2 * PC[m] + PA_m * PB_0 * PB_1 * PB_2 * PC[a1])
+                            + delta[a0][a1] * (PA_2 * PA_m * PB_0 * PB_1 * PB_2 + PA_2 * PA_m * PB_0 * PB_1 * PC[b2] + PA_2 * PA_m * PB_0 * PB_2 * PC[b1] + PA_2 * PA_m * PB_1 * PB_2 * PC[b0] + PA_2 * PB_0 * PB_1 * PB_2 * PC[m] + PA_m * PB_0 * PB_1 * PB_2 * PC[a2])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_1 * PA_2 * PA_m * PB_0 * PB_1 * PC[b2]
+                            + PA_0 * PA_1 * PA_2 * PA_m * PB_0 * PB_2 * PC[b1]
+                            + PA_0 * PA_1 * PA_2 * PA_m * PB_1 * PB_2 * PC[b0]
+                            + PA_0 * PA_1 * PA_2 * PB_0 * PB_1 * PB_2 * PC[m]
+                            + PA_0 * PA_1 * PA_m * PB_0 * PB_1 * PB_2 * PC[a2]
+                            + PA_0 * PA_2 * PA_m * PB_0 * PB_1 * PB_2 * PC[a1]
+                            + PA_1 * PA_2 * PA_m * PB_0 * PB_1 * PB_2 * PC[a0]
+                        )
+
+                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            (delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PA_0 * 2.0 + PC[a0])
+                            + (delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PA_1 * 2.0 + PC[a1])
+                            + (delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PA_2 * 2.0 + PC[a2])
+                            + (delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PB_0 * 2.0 + PC[b0])
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PB_1 * 2.0 + PC[b1])
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PB_2 * 2.0 + PC[b2])
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a2][m] * delta[b1][b2] * (PA_0 * PA_1 * PB_0 + PA_0 * PA_1 * PC[b0] + PA_0 * PB_0 * PC[a1] + PA_1 * PB_0 * PC[a0])
+                            + delta[a2][m] * delta[b0][b2] * (PA_0 * PA_1 * PB_1 + PA_0 * PA_1 * PC[b1] + PA_0 * PB_1 * PC[a1] + PA_1 * PB_1 * PC[a0])
+                            + delta[a2][m] * delta[b0][b1] * (PA_0 * PA_1 * PB_2 + PA_0 * PA_1 * PC[b2] + PA_0 * PB_2 * PC[a1] + PA_1 * PB_2 * PC[a0])
+                            + delta[a1][m] * delta[b1][b2] * (PA_0 * PA_2 * PB_0 + PA_0 * PA_2 * PC[b0] + PA_0 * PB_0 * PC[a2] + PA_2 * PB_0 * PC[a0])
+                            + delta[a1][m] * delta[b0][b2] * (PA_0 * PA_2 * PB_1 + PA_0 * PA_2 * PC[b1] + PA_0 * PB_1 * PC[a2] + PA_2 * PB_1 * PC[a0])
+                            + delta[a1][m] * delta[b0][b1] * (PA_0 * PA_2 * PB_2 + PA_0 * PA_2 * PC[b2] + PA_0 * PB_2 * PC[a2] + PA_2 * PB_2 * PC[a0])
+                            + (delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PB_0 * PB_1 + PA_0 * PB_0 * PC[b1] + PA_0 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a0])
+                            + (delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PB_0 * PB_2 + PA_0 * PB_0 * PC[b2] + PA_0 * PB_2 * PC[b0] + PB_0 * PB_2 * PC[a0])
+                            + (delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PB_1 * PB_2 + PA_0 * PB_1 * PC[b2] + PA_0 * PB_2 * PC[b1] + PB_1 * PB_2 * PC[a0])
+                            + delta[a0][m] * delta[b1][b2] * (PA_1 * PA_2 * PB_0 + PA_1 * PA_2 * PC[b0] + PA_1 * PB_0 * PC[a2] + PA_2 * PB_0 * PC[a1])
+                            + delta[a0][m] * delta[b0][b2] * (PA_1 * PA_2 * PB_1 + PA_1 * PA_2 * PC[b1] + PA_1 * PB_1 * PC[a2] + PA_2 * PB_1 * PC[a1])
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 * PA_2 * PB_2 + PA_1 * PA_2 * PC[b2] + PA_1 * PB_2 * PC[a2] + PA_2 * PB_2 * PC[a1])
+                            + (delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PB_0 * PB_1 + PA_1 * PB_0 * PC[b1] + PA_1 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a1])
+                            + (delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PB_0 * PB_2 + PA_1 * PB_0 * PC[b2] + PA_1 * PB_2 * PC[b0] + PB_0 * PB_2 * PC[a1])
+                            + (delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PB_1 * PB_2 + PA_1 * PB_1 * PC[b2] + PA_1 * PB_2 * PC[b1] + PB_1 * PB_2 * PC[a1])
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PB_0 * PB_1 + PA_2 * PB_0 * PC[b1] + PA_2 * PB_1 * PC[b0] + PB_0 * PB_1 * PC[a2])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PB_0 * PB_2 + PA_2 * PB_0 * PC[b2] + PA_2 * PB_2 * PC[b0] + PB_0 * PB_2 * PC[a2])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PB_1 * PB_2 + PA_2 * PB_1 * PC[b2] + PA_2 * PB_2 * PC[b1] + PB_1 * PB_2 * PC[a2])
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PB_1 * PB_2 + PB_0 * PB_1 * PC[b2] + PB_0 * PB_2 * PC[b1] + PB_1 * PB_2 * PC[b0])
+                        )
+
+                        + (
+                            delta[a2][m] * (PA_0 * PA_1 * PB_0 * PB_1 * PC[b2] + PA_0 * PA_1 * PB_0 * PB_2 * PC[b1] + PA_0 * PA_1 * PB_1 * PB_2 * PC[b0] + PA_0 * PB_0 * PB_1 * PB_2 * PC[a1] + PA_1 * PB_0 * PB_1 * PB_2 * PC[a0])
+                            + delta[a1][m] * (PA_0 * PA_2 * PB_0 * PB_1 * PC[b2] + PA_0 * PA_2 * PB_0 * PB_2 * PC[b1] + PA_0 * PA_2 * PB_1 * PB_2 * PC[b0] + PA_0 * PB_0 * PB_1 * PB_2 * PC[a2] + PA_2 * PB_0 * PB_1 * PB_2 * PC[a0])
+                            + delta[a0][m] * (PA_1 * PA_2 * PB_0 * PB_1 * PC[b2] + PA_1 * PA_2 * PB_0 * PB_2 * PC[b1] + PA_1 * PA_2 * PB_1 * PB_2 * PC[b0] + PA_1 * PB_0 * PB_1 * PB_2 * PC[a2] + PA_2 * PB_0 * PB_1 * PB_2 * PC[a1])
+                        )
+
+                    )
+
+                    + F7_t[2] * (
+
+                        0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            (delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PA_0 * (-1.0) + PC[a0] * (-2.0))
+                            + (delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PA_1 * (-1.0) + PC[a1] * (-2.0))
+                            + (delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PA_2 * (-1.0) + PC[a2] * (-2.0))
+                            + (delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PB_0 * (-1.0) + PC[b0] * (-2.0))
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PB_1 * (-1.0) + PC[b1] * (-2.0))
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PB_2 * (-1.0) + PC[b2] * (-2.0))
+                        )
+
+                        + (-0.5) / (a_i + a_j) * (
+                            delta[a2][m] * delta[b1][b2] * (PA_0 * PA_1 * PC[b0] + PA_0 * PB_0 * PC[a1] + PA_0 * PC[a1] * PC[b0] + PA_1 * PB_0 * PC[a0] + PA_1 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a1])
+                            + delta[a2][m] * delta[b0][b2] * (PA_0 * PA_1 * PC[b1] + PA_0 * PB_1 * PC[a1] + PA_0 * PC[a1] * PC[b1] + PA_1 * PB_1 * PC[a0] + PA_1 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a1])
+                            + delta[a2][m] * delta[b0][b1] * (PA_0 * PA_1 * PC[b2] + PA_0 * PB_2 * PC[a1] + PA_0 * PC[a1] * PC[b2] + PA_1 * PB_2 * PC[a0] + PA_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a1])
+                            + delta[a1][m] * delta[b1][b2] * (PA_0 * PA_2 * PC[b0] + PA_0 * PB_0 * PC[a2] + PA_0 * PC[a2] * PC[b0] + PA_2 * PB_0 * PC[a0] + PA_2 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a2])
+                            + delta[a1][m] * delta[b0][b2] * (PA_0 * PA_2 * PC[b1] + PA_0 * PB_1 * PC[a2] + PA_0 * PC[a2] * PC[b1] + PA_2 * PB_1 * PC[a0] + PA_2 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a2])
+                            + delta[a1][m] * delta[b0][b1] * (PA_0 * PA_2 * PC[b2] + PA_0 * PB_2 * PC[a2] + PA_0 * PC[a2] * PC[b2] + PA_2 * PB_2 * PC[a0] + PA_2 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a2])
+                            + (delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PB_0 * PC[b1] + PA_0 * PB_1 * PC[b0] + PA_0 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0])
+                            + (delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PB_0 * PC[b2] + PA_0 * PB_2 * PC[b0] + PA_0 * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] + PB_0 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b0])
+                            + (delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PB_1 * PC[b2] + PA_0 * PB_2 * PC[b1] + PA_0 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] + PB_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b1])
+                            + delta[a0][m] * delta[b1][b2] * (PA_1 * PA_2 * PC[b0] + PA_1 * PB_0 * PC[a2] + PA_1 * PC[a2] * PC[b0] + PA_2 * PB_0 * PC[a1] + PA_2 * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[a2])
+                            + delta[a0][m] * delta[b0][b2] * (PA_1 * PA_2 * PC[b1] + PA_1 * PB_1 * PC[a2] + PA_1 * PC[a2] * PC[b1] + PA_2 * PB_1 * PC[a1] + PA_2 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[a2])
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 * PA_2 * PC[b2] + PA_1 * PB_2 * PC[a2] + PA_1 * PC[a2] * PC[b2] + PA_2 * PB_2 * PC[a1] + PA_2 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[a2])
+                            + (delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PB_0 * PC[b1] + PA_1 * PB_1 * PC[b0] + PA_1 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a1] + PB_0 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[b0])
+                            + (delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PB_0 * PC[b2] + PA_1 * PB_2 * PC[b0] + PA_1 * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a1] + PB_0 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b0])
+                            + (delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PB_1 * PC[b2] + PA_1 * PB_2 * PC[b1] + PA_1 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a1] + PB_1 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b1])
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PB_0 * PC[b1] + PA_2 * PB_1 * PC[b0] + PA_2 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a2] + PB_0 * PC[a2] * PC[b1] + PB_1 * PC[a2] * PC[b0])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PB_0 * PC[b2] + PA_2 * PB_2 * PC[b0] + PA_2 * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a2] + PB_0 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b0])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PB_1 * PC[b2] + PA_2 * PB_2 * PC[b1] + PA_2 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a2] + PB_1 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b1])
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PB_1 * PC[b2] + PB_0 * PB_2 * PC[b1] + PB_0 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[b0] + PB_1 * PC[b0] * PC[b2] + PB_2 * PC[b0] * PC[b1])
+                        )
+
+                        + (-1.0) * (
+                            delta[a2][m] * (PA_0 * PA_1 * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_1 * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a1] * PC[b0] + PA_1 * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a0] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1])
+                            + delta[a1][m] * (PA_0 * PA_2 * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_2 * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a2] * PC[b0] + PA_2 * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_2 * PB_1 * PB_2 * PC[a0] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a2])
+                            + delta[a0][m] * (PA_1 * PA_2 * PB_0 * PC[b1] * PC[b2] + PA_1 * PA_2 * PB_1 * PC[b0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a2] * PC[b0] + PA_2 * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_2 * PB_1 * PB_2 * PC[a1] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a1] * PC[a2])
+                        )
+
+                        + 0.75 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][a2] * delta[b0][b1] * delta[b2][m] + delta[a1][a2] * delta[b0][b2] * delta[b1][m] + delta[a1][a2] * delta[b0][m] * delta[b1][b2] + delta[a1][b0] * delta[a2][b1] * delta[b2][m] + delta[a1][b0] * delta[a2][b2] * delta[b1][m] + delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][b0] * delta[b2][m] + delta[a1][b1] * delta[a2][b2] * delta[b0][m] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][b0] * delta[b1][m] + delta[a1][b2] * delta[a2][b1] * delta[b0][m] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PA_0 + PC[a0])
+                            + (delta[a0][a2] * delta[b0][b1] * delta[b2][m] + delta[a0][a2] * delta[b0][b2] * delta[b1][m] + delta[a0][a2] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a2][b1] * delta[b2][m] + delta[a0][b0] * delta[a2][b2] * delta[b1][m] + delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][b0] * delta[b2][m] + delta[a0][b1] * delta[a2][b2] * delta[b0][m] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][b0] * delta[b1][m] + delta[a0][b2] * delta[a2][b1] * delta[b0][m] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PA_1 + PC[a1])
+                            + (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PA_2 + PC[a2])
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][b2] + delta[a0][a1] * delta[a2][b1] * delta[b0][b2] + delta[a0][a1] * delta[a2][b2] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b0][b2] + delta[a0][a2] * delta[a1][b2] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[a2][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][b2] + delta[a0][b1] * delta[a1][b0] * delta[a2][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][b0] + delta[a0][b2] * delta[a1][a2] * delta[b0][b1] + delta[a0][b2] * delta[a1][b0] * delta[a2][b1] + delta[a0][b2] * delta[a1][b1] * delta[a2][b0]) * (PA_m + PC[m])
+                            + (delta[a0][a1] * delta[a2][b1] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b1][m] + delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b1][m] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][a2] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PB_0 + PC[b0])
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][b0] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][a2] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b0][m] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PB_1 + PC[b1])
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][m] + delta[a0][a1] * delta[a2][b1] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][m] + delta[a0][a2] * delta[a1][b1] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][m] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][m] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PB_2 + PC[b2])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PA_1 * PA_2 + PA_0 * PA_1 * PC[a2] * 2.0 + PA_0 * PA_2 * PC[a1] * 2.0 + PA_0 * PC[a1] * PC[a2] + PA_1 * PA_2 * PC[a0] * 2.0 + PA_1 * PC[a0] * PC[a2] + PA_2 * PC[a0] * PC[a1])
+                            + (delta[a2][b0] * delta[b1][b2] + delta[a2][b1] * delta[b0][b2] + delta[a2][b2] * delta[b0][b1]) * (PA_0 * PA_1 * PA_m + PA_0 * PA_1 * PC[m] * 2.0 + PA_0 * PA_m * PC[a1] * 2.0 + PA_0 * PC[a1] * PC[m] + PA_1 * PA_m * PC[a0] * 2.0 + PA_1 * PC[a0] * PC[m] + PA_m * PC[a0] * PC[a1])
+                            + (delta[a2][b1] * delta[b2][m] + delta[a2][b2] * delta[b1][m] + delta[a2][m] * delta[b1][b2]) * (PA_0 * PA_1 * PB_0 + PA_0 * PA_1 * PC[b0] * 2.0 + PA_0 * PB_0 * PC[a1] * 2.0 + PA_0 * PC[a1] * PC[b0] + PA_1 * PB_0 * PC[a0] * 2.0 + PA_1 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a1])
+                            + (delta[a2][b0] * delta[b2][m] + delta[a2][b2] * delta[b0][m] + delta[a2][m] * delta[b0][b2]) * (PA_0 * PA_1 * PB_1 + PA_0 * PA_1 * PC[b1] * 2.0 + PA_0 * PB_1 * PC[a1] * 2.0 + PA_0 * PC[a1] * PC[b1] + PA_1 * PB_1 * PC[a0] * 2.0 + PA_1 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a1])
+                            + (delta[a2][b0] * delta[b1][m] + delta[a2][b1] * delta[b0][m] + delta[a2][m] * delta[b0][b1]) * (PA_0 * PA_1 * PB_2 + PA_0 * PA_1 * PC[b2] * 2.0 + PA_0 * PB_2 * PC[a1] * 2.0 + PA_0 * PC[a1] * PC[b2] + PA_1 * PB_2 * PC[a0] * 2.0 + PA_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a1])
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PA_2 * PA_m + PA_0 * PA_2 * PC[m] * 2.0 + PA_0 * PA_m * PC[a2] * 2.0 + PA_0 * PC[a2] * PC[m] + PA_2 * PA_m * PC[a0] * 2.0 + PA_2 * PC[a0] * PC[m] + PA_m * PC[a0] * PC[a2])
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PA_2 * PB_0 + PA_0 * PA_2 * PC[b0] * 2.0 + PA_0 * PB_0 * PC[a2] * 2.0 + PA_0 * PC[a2] * PC[b0] + PA_2 * PB_0 * PC[a0] * 2.0 + PA_2 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a2])
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PA_2 * PB_1 + PA_0 * PA_2 * PC[b1] * 2.0 + PA_0 * PB_1 * PC[a2] * 2.0 + PA_0 * PC[a2] * PC[b1] + PA_2 * PB_1 * PC[a0] * 2.0 + PA_2 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a2])
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PA_2 * PB_2 + PA_0 * PA_2 * PC[b2] * 2.0 + PA_0 * PB_2 * PC[a2] * 2.0 + PA_0 * PC[a2] * PC[b2] + PA_2 * PB_2 * PC[a0] * 2.0 + PA_2 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a2])
+                            + (delta[a1][a2] * delta[b1][b2] + delta[a1][b1] * delta[a2][b2] + delta[a1][b2] * delta[a2][b1]) * (PA_0 * PA_m * PB_0 + PA_0 * PA_m * PC[b0] * 2.0 + PA_0 * PB_0 * PC[m] * 2.0 + PA_0 * PC[b0] * PC[m] + PA_m * PB_0 * PC[a0] * 2.0 + PA_m * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[m])
+                            + (delta[a1][a2] * delta[b0][b2] + delta[a1][b0] * delta[a2][b2] + delta[a1][b2] * delta[a2][b0]) * (PA_0 * PA_m * PB_1 + PA_0 * PA_m * PC[b1] * 2.0 + PA_0 * PB_1 * PC[m] * 2.0 + PA_0 * PC[b1] * PC[m] + PA_m * PB_1 * PC[a0] * 2.0 + PA_m * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[m])
+                            + (delta[a1][a2] * delta[b0][b1] + delta[a1][b0] * delta[a2][b1] + delta[a1][b1] * delta[a2][b0]) * (PA_0 * PA_m * PB_2 + PA_0 * PA_m * PC[b2] * 2.0 + PA_0 * PB_2 * PC[m] * 2.0 + PA_0 * PC[b2] * PC[m] + PA_m * PB_2 * PC[a0] * 2.0 + PA_m * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[m])
+                            + (delta[a1][a2] * delta[b2][m] + delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PB_0 * PB_1 + PA_0 * PB_0 * PC[b1] * 2.0 + PA_0 * PB_1 * PC[b0] * 2.0 + PA_0 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * 2.0 + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0])
+                            + (delta[a1][a2] * delta[b1][m] + delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PB_0 * PB_2 + PA_0 * PB_0 * PC[b2] * 2.0 + PA_0 * PB_2 * PC[b0] * 2.0 + PA_0 * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] * 2.0 + PB_0 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b0])
+                            + (delta[a1][a2] * delta[b0][m] + delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PB_1 * PB_2 + PA_0 * PB_1 * PC[b2] * 2.0 + PA_0 * PB_2 * PC[b1] * 2.0 + PA_0 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * 2.0 + PB_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b1])
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PA_2 * PA_m + PA_1 * PA_2 * PC[m] * 2.0 + PA_1 * PA_m * PC[a2] * 2.0 + PA_1 * PC[a2] * PC[m] + PA_2 * PA_m * PC[a1] * 2.0 + PA_2 * PC[a1] * PC[m] + PA_m * PC[a1] * PC[a2])
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PA_2 * PB_0 + PA_1 * PA_2 * PC[b0] * 2.0 + PA_1 * PB_0 * PC[a2] * 2.0 + PA_1 * PC[a2] * PC[b0] + PA_2 * PB_0 * PC[a1] * 2.0 + PA_2 * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[a2])
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PA_2 * PB_1 + PA_1 * PA_2 * PC[b1] * 2.0 + PA_1 * PB_1 * PC[a2] * 2.0 + PA_1 * PC[a2] * PC[b1] + PA_2 * PB_1 * PC[a1] * 2.0 + PA_2 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[a2])
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PA_2 * PB_2 + PA_1 * PA_2 * PC[b2] * 2.0 + PA_1 * PB_2 * PC[a2] * 2.0 + PA_1 * PC[a2] * PC[b2] + PA_2 * PB_2 * PC[a1] * 2.0 + PA_2 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[a2])
+                            + (delta[a0][a2] * delta[b1][b2] + delta[a0][b1] * delta[a2][b2] + delta[a0][b2] * delta[a2][b1]) * (PA_1 * PA_m * PB_0 + PA_1 * PA_m * PC[b0] * 2.0 + PA_1 * PB_0 * PC[m] * 2.0 + PA_1 * PC[b0] * PC[m] + PA_m * PB_0 * PC[a1] * 2.0 + PA_m * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[m])
+                            + (delta[a0][a2] * delta[b0][b2] + delta[a0][b0] * delta[a2][b2] + delta[a0][b2] * delta[a2][b0]) * (PA_1 * PA_m * PB_1 + PA_1 * PA_m * PC[b1] * 2.0 + PA_1 * PB_1 * PC[m] * 2.0 + PA_1 * PC[b1] * PC[m] + PA_m * PB_1 * PC[a1] * 2.0 + PA_m * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[m])
+                            + (delta[a0][a2] * delta[b0][b1] + delta[a0][b0] * delta[a2][b1] + delta[a0][b1] * delta[a2][b0]) * (PA_1 * PA_m * PB_2 + PA_1 * PA_m * PC[b2] * 2.0 + PA_1 * PB_2 * PC[m] * 2.0 + PA_1 * PC[b2] * PC[m] + PA_m * PB_2 * PC[a1] * 2.0 + PA_m * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[m])
+                            + (delta[a0][a2] * delta[b2][m] + delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PB_0 * PB_1 + PA_1 * PB_0 * PC[b1] * 2.0 + PA_1 * PB_1 * PC[b0] * 2.0 + PA_1 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a1] * 2.0 + PB_0 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[b0])
+                            + (delta[a0][a2] * delta[b1][m] + delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PB_0 * PB_2 + PA_1 * PB_0 * PC[b2] * 2.0 + PA_1 * PB_2 * PC[b0] * 2.0 + PA_1 * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a1] * 2.0 + PB_0 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b0])
+                            + (delta[a0][a2] * delta[b0][m] + delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PB_1 * PB_2 + PA_1 * PB_1 * PC[b2] * 2.0 + PA_1 * PB_2 * PC[b1] * 2.0 + PA_1 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a1] * 2.0 + PB_1 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b1])
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_2 * PA_m * PB_0 + PA_2 * PA_m * PC[b0] * 2.0 + PA_2 * PB_0 * PC[m] * 2.0 + PA_2 * PC[b0] * PC[m] + PA_m * PB_0 * PC[a2] * 2.0 + PA_m * PC[a2] * PC[b0] + PB_0 * PC[a2] * PC[m])
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_2 * PA_m * PB_1 + PA_2 * PA_m * PC[b1] * 2.0 + PA_2 * PB_1 * PC[m] * 2.0 + PA_2 * PC[b1] * PC[m] + PA_m * PB_1 * PC[a2] * 2.0 + PA_m * PC[a2] * PC[b1] + PB_1 * PC[a2] * PC[m])
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_2 * PA_m * PB_2 + PA_2 * PA_m * PC[b2] * 2.0 + PA_2 * PB_2 * PC[m] * 2.0 + PA_2 * PC[b2] * PC[m] + PA_m * PB_2 * PC[a2] * 2.0 + PA_m * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[m])
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PB_0 * PB_1 + PA_2 * PB_0 * PC[b1] * 2.0 + PA_2 * PB_1 * PC[b0] * 2.0 + PA_2 * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a2] * 2.0 + PB_0 * PC[a2] * PC[b1] + PB_1 * PC[a2] * PC[b0])
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PB_0 * PB_2 + PA_2 * PB_0 * PC[b2] * 2.0 + PA_2 * PB_2 * PC[b0] * 2.0 + PA_2 * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a2] * 2.0 + PB_0 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b0])
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PB_1 * PB_2 + PA_2 * PB_1 * PC[b2] * 2.0 + PA_2 * PB_2 * PC[b1] * 2.0 + PA_2 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a2] * 2.0 + PB_1 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b1])
+                            + (delta[a0][a1] * delta[a2][b2] + delta[a0][a2] * delta[a1][b2] + delta[a0][b2] * delta[a1][a2]) * (PA_m * PB_0 * PB_1 + PA_m * PB_0 * PC[b1] * 2.0 + PA_m * PB_1 * PC[b0] * 2.0 + PA_m * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[m] * 2.0 + PB_0 * PC[b1] * PC[m] + PB_1 * PC[b0] * PC[m])
+                            + (delta[a0][a1] * delta[a2][b1] + delta[a0][a2] * delta[a1][b1] + delta[a0][b1] * delta[a1][a2]) * (PA_m * PB_0 * PB_2 + PA_m * PB_0 * PC[b2] * 2.0 + PA_m * PB_2 * PC[b0] * 2.0 + PA_m * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[m] * 2.0 + PB_0 * PC[b2] * PC[m] + PB_2 * PC[b0] * PC[m])
+                            + (delta[a0][a1] * delta[a2][b0] + delta[a0][a2] * delta[a1][b0] + delta[a0][b0] * delta[a1][a2]) * (PA_m * PB_1 * PB_2 + PA_m * PB_1 * PC[b2] * 2.0 + PA_m * PB_2 * PC[b1] * 2.0 + PA_m * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[m] * 2.0 + PB_1 * PC[b2] * PC[m] + PB_2 * PC[b1] * PC[m])
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PB_1 * PB_2 + PB_0 * PB_1 * PC[b2] * 2.0 + PB_0 * PB_2 * PC[b1] * 2.0 + PB_0 * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[b0] * 2.0 + PB_1 * PC[b0] * PC[b2] + PB_2 * PC[b0] * PC[b1])
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b1][b2] * (PA_0 * PA_1 * PA_2 * PA_m * PC[b0] + PA_0 * PA_1 * PA_2 * PB_0 * PC[m] + PA_0 * PA_1 * PA_2 * PC[b0] * PC[m] + PA_0 * PA_1 * PA_m * PB_0 * PC[a2] + PA_0 * PA_1 * PA_m * PC[a2] * PC[b0] + PA_0 * PA_1 * PB_0 * PC[a2] * PC[m] + PA_0 * PA_2 * PA_m * PB_0 * PC[a1] + PA_0 * PA_2 * PA_m * PC[a1] * PC[b0] + PA_0 * PA_2 * PB_0 * PC[a1] * PC[m] + PA_0 * PA_m * PB_0 * PC[a1] * PC[a2] + PA_1 * PA_2 * PA_m * PB_0 * PC[a0] + PA_1 * PA_2 * PA_m * PC[a0] * PC[b0] + PA_1 * PA_2 * PB_0 * PC[a0] * PC[m] + PA_1 * PA_m * PB_0 * PC[a0] * PC[a2] + PA_2 * PA_m * PB_0 * PC[a0] * PC[a1])
+                            + delta[b0][b2] * (PA_0 * PA_1 * PA_2 * PA_m * PC[b1] + PA_0 * PA_1 * PA_2 * PB_1 * PC[m] + PA_0 * PA_1 * PA_2 * PC[b1] * PC[m] + PA_0 * PA_1 * PA_m * PB_1 * PC[a2] + PA_0 * PA_1 * PA_m * PC[a2] * PC[b1] + PA_0 * PA_1 * PB_1 * PC[a2] * PC[m] + PA_0 * PA_2 * PA_m * PB_1 * PC[a1] + PA_0 * PA_2 * PA_m * PC[a1] * PC[b1] + PA_0 * PA_2 * PB_1 * PC[a1] * PC[m] + PA_0 * PA_m * PB_1 * PC[a1] * PC[a2] + PA_1 * PA_2 * PA_m * PB_1 * PC[a0] + PA_1 * PA_2 * PA_m * PC[a0] * PC[b1] + PA_1 * PA_2 * PB_1 * PC[a0] * PC[m] + PA_1 * PA_m * PB_1 * PC[a0] * PC[a2] + PA_2 * PA_m * PB_1 * PC[a0] * PC[a1])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PA_2 * PA_m * PC[b2] + PA_0 * PA_1 * PA_2 * PB_2 * PC[m] + PA_0 * PA_1 * PA_2 * PC[b2] * PC[m] + PA_0 * PA_1 * PA_m * PB_2 * PC[a2] + PA_0 * PA_1 * PA_m * PC[a2] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[a2] * PC[m] + PA_0 * PA_2 * PA_m * PB_2 * PC[a1] + PA_0 * PA_2 * PA_m * PC[a1] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[a1] * PC[m] + PA_0 * PA_m * PB_2 * PC[a1] * PC[a2] + PA_1 * PA_2 * PA_m * PB_2 * PC[a0] + PA_1 * PA_2 * PA_m * PC[a0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[a0] * PC[m] + PA_1 * PA_m * PB_2 * PC[a0] * PC[a2] + PA_2 * PA_m * PB_2 * PC[a0] * PC[a1])
+                            + delta[b2][m] * (PA_0 * PA_1 * PA_2 * PB_0 * PC[b1] + PA_0 * PA_1 * PA_2 * PB_1 * PC[b0] + PA_0 * PA_1 * PA_2 * PC[b0] * PC[b1] + PA_0 * PA_1 * PB_0 * PB_1 * PC[a2] + PA_0 * PA_1 * PB_0 * PC[a2] * PC[b1] + PA_0 * PA_1 * PB_1 * PC[a2] * PC[b0] + PA_0 * PA_2 * PB_0 * PB_1 * PC[a1] + PA_0 * PA_2 * PB_0 * PC[a1] * PC[b1] + PA_0 * PA_2 * PB_1 * PC[a1] * PC[b0] + PA_0 * PB_0 * PB_1 * PC[a1] * PC[a2] + PA_1 * PA_2 * PB_0 * PB_1 * PC[a0] + PA_1 * PA_2 * PB_0 * PC[a0] * PC[b1] + PA_1 * PA_2 * PB_1 * PC[a0] * PC[b0] + PA_1 * PB_0 * PB_1 * PC[a0] * PC[a2] + PA_2 * PB_0 * PB_1 * PC[a0] * PC[a1])
+                            + delta[b1][m] * (PA_0 * PA_1 * PA_2 * PB_0 * PC[b2] + PA_0 * PA_1 * PA_2 * PB_2 * PC[b0] + PA_0 * PA_1 * PA_2 * PC[b0] * PC[b2] + PA_0 * PA_1 * PB_0 * PB_2 * PC[a2] + PA_0 * PA_1 * PB_0 * PC[a2] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[a2] * PC[b0] + PA_0 * PA_2 * PB_0 * PB_2 * PC[a1] + PA_0 * PA_2 * PB_0 * PC[a1] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[a1] * PC[b0] + PA_0 * PB_0 * PB_2 * PC[a1] * PC[a2] + PA_1 * PA_2 * PB_0 * PB_2 * PC[a0] + PA_1 * PA_2 * PB_0 * PC[a0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[a0] * PC[b0] + PA_1 * PB_0 * PB_2 * PC[a0] * PC[a2] + PA_2 * PB_0 * PB_2 * PC[a0] * PC[a1])
+                            + delta[b0][m] * (PA_0 * PA_1 * PA_2 * PB_1 * PC[b2] + PA_0 * PA_1 * PA_2 * PB_2 * PC[b1] + PA_0 * PA_1 * PA_2 * PC[b1] * PC[b2] + PA_0 * PA_1 * PB_1 * PB_2 * PC[a2] + PA_0 * PA_1 * PB_1 * PC[a2] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[a2] * PC[b1] + PA_0 * PA_2 * PB_1 * PB_2 * PC[a1] + PA_0 * PA_2 * PB_1 * PC[a1] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[a1] * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a1] * PC[a2] + PA_1 * PA_2 * PB_1 * PB_2 * PC[a0] + PA_1 * PA_2 * PB_1 * PC[a0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[a0] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a0] * PC[a2] + PA_2 * PB_1 * PB_2 * PC[a0] * PC[a1])
+                            + delta[a2][b2] * (PA_0 * PA_1 * PA_m * PB_0 * PC[b1] + PA_0 * PA_1 * PA_m * PB_1 * PC[b0] + PA_0 * PA_1 * PA_m * PC[b0] * PC[b1] + PA_0 * PA_1 * PB_0 * PB_1 * PC[m] + PA_0 * PA_1 * PB_0 * PC[b1] * PC[m] + PA_0 * PA_1 * PB_1 * PC[b0] * PC[m] + PA_0 * PA_m * PB_0 * PB_1 * PC[a1] + PA_0 * PA_m * PB_0 * PC[a1] * PC[b1] + PA_0 * PA_m * PB_1 * PC[a1] * PC[b0] + PA_0 * PB_0 * PB_1 * PC[a1] * PC[m] + PA_1 * PA_m * PB_0 * PB_1 * PC[a0] + PA_1 * PA_m * PB_0 * PC[a0] * PC[b1] + PA_1 * PA_m * PB_1 * PC[a0] * PC[b0] + PA_1 * PB_0 * PB_1 * PC[a0] * PC[m] + PA_m * PB_0 * PB_1 * PC[a0] * PC[a1])
+                            + delta[a2][b1] * (PA_0 * PA_1 * PA_m * PB_0 * PC[b2] + PA_0 * PA_1 * PA_m * PB_2 * PC[b0] + PA_0 * PA_1 * PA_m * PC[b0] * PC[b2] + PA_0 * PA_1 * PB_0 * PB_2 * PC[m] + PA_0 * PA_1 * PB_0 * PC[b2] * PC[m] + PA_0 * PA_1 * PB_2 * PC[b0] * PC[m] + PA_0 * PA_m * PB_0 * PB_2 * PC[a1] + PA_0 * PA_m * PB_0 * PC[a1] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a1] * PC[b0] + PA_0 * PB_0 * PB_2 * PC[a1] * PC[m] + PA_1 * PA_m * PB_0 * PB_2 * PC[a0] + PA_1 * PA_m * PB_0 * PC[a0] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a0] * PC[b0] + PA_1 * PB_0 * PB_2 * PC[a0] * PC[m] + PA_m * PB_0 * PB_2 * PC[a0] * PC[a1])
+                            + delta[a2][b0] * (PA_0 * PA_1 * PA_m * PB_1 * PC[b2] + PA_0 * PA_1 * PA_m * PB_2 * PC[b1] + PA_0 * PA_1 * PA_m * PC[b1] * PC[b2] + PA_0 * PA_1 * PB_1 * PB_2 * PC[m] + PA_0 * PA_1 * PB_1 * PC[b2] * PC[m] + PA_0 * PA_1 * PB_2 * PC[b1] * PC[m] + PA_0 * PA_m * PB_1 * PB_2 * PC[a1] + PA_0 * PA_m * PB_1 * PC[a1] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a1] * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a1] * PC[m] + PA_1 * PA_m * PB_1 * PB_2 * PC[a0] + PA_1 * PA_m * PB_1 * PC[a0] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a0] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a0] * PC[m] + PA_m * PB_1 * PB_2 * PC[a0] * PC[a1])
+                            + delta[a2][m] * (PA_0 * PA_1 * PB_0 * PB_1 * PC[b2] + PA_0 * PA_1 * PB_0 * PB_2 * PC[b1] + PA_0 * PA_1 * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_1 * PB_1 * PB_2 * PC[b0] + PA_0 * PA_1 * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PB_2 * PC[a1] + PA_0 * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a1] * PC[b0] + PA_1 * PB_0 * PB_1 * PB_2 * PC[a0] + PA_1 * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a0] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1])
+                            + delta[a1][b2] * (PA_0 * PA_2 * PA_m * PB_0 * PC[b1] + PA_0 * PA_2 * PA_m * PB_1 * PC[b0] + PA_0 * PA_2 * PA_m * PC[b0] * PC[b1] + PA_0 * PA_2 * PB_0 * PB_1 * PC[m] + PA_0 * PA_2 * PB_0 * PC[b1] * PC[m] + PA_0 * PA_2 * PB_1 * PC[b0] * PC[m] + PA_0 * PA_m * PB_0 * PB_1 * PC[a2] + PA_0 * PA_m * PB_0 * PC[a2] * PC[b1] + PA_0 * PA_m * PB_1 * PC[a2] * PC[b0] + PA_0 * PB_0 * PB_1 * PC[a2] * PC[m] + PA_2 * PA_m * PB_0 * PB_1 * PC[a0] + PA_2 * PA_m * PB_0 * PC[a0] * PC[b1] + PA_2 * PA_m * PB_1 * PC[a0] * PC[b0] + PA_2 * PB_0 * PB_1 * PC[a0] * PC[m] + PA_m * PB_0 * PB_1 * PC[a0] * PC[a2])
+                            + delta[a1][b1] * (PA_0 * PA_2 * PA_m * PB_0 * PC[b2] + PA_0 * PA_2 * PA_m * PB_2 * PC[b0] + PA_0 * PA_2 * PA_m * PC[b0] * PC[b2] + PA_0 * PA_2 * PB_0 * PB_2 * PC[m] + PA_0 * PA_2 * PB_0 * PC[b2] * PC[m] + PA_0 * PA_2 * PB_2 * PC[b0] * PC[m] + PA_0 * PA_m * PB_0 * PB_2 * PC[a2] + PA_0 * PA_m * PB_0 * PC[a2] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a2] * PC[b0] + PA_0 * PB_0 * PB_2 * PC[a2] * PC[m] + PA_2 * PA_m * PB_0 * PB_2 * PC[a0] + PA_2 * PA_m * PB_0 * PC[a0] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a0] * PC[b0] + PA_2 * PB_0 * PB_2 * PC[a0] * PC[m] + PA_m * PB_0 * PB_2 * PC[a0] * PC[a2])
+                            + delta[a1][b0] * (PA_0 * PA_2 * PA_m * PB_1 * PC[b2] + PA_0 * PA_2 * PA_m * PB_2 * PC[b1] + PA_0 * PA_2 * PA_m * PC[b1] * PC[b2] + PA_0 * PA_2 * PB_1 * PB_2 * PC[m] + PA_0 * PA_2 * PB_1 * PC[b2] * PC[m] + PA_0 * PA_2 * PB_2 * PC[b1] * PC[m] + PA_0 * PA_m * PB_1 * PB_2 * PC[a2] + PA_0 * PA_m * PB_1 * PC[a2] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a2] * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a2] * PC[m] + PA_2 * PA_m * PB_1 * PB_2 * PC[a0] + PA_2 * PA_m * PB_1 * PC[a0] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a0] * PC[b1] + PA_2 * PB_1 * PB_2 * PC[a0] * PC[m] + PA_m * PB_1 * PB_2 * PC[a0] * PC[a2])
+                            + delta[a1][m] * (PA_0 * PA_2 * PB_0 * PB_1 * PC[b2] + PA_0 * PA_2 * PB_0 * PB_2 * PC[b1] + PA_0 * PA_2 * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_2 * PB_1 * PB_2 * PC[b0] + PA_0 * PA_2 * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PB_2 * PC[a2] + PA_0 * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_0 * PB_1 * PB_2 * PC[a2] * PC[b0] + PA_2 * PB_0 * PB_1 * PB_2 * PC[a0] + PA_2 * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_2 * PB_1 * PB_2 * PC[a0] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a2])
+                            + delta[a1][a2] * (PA_0 * PA_m * PB_0 * PB_1 * PC[b2] + PA_0 * PA_m * PB_0 * PB_2 * PC[b1] + PA_0 * PA_m * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_m * PB_1 * PB_2 * PC[b0] + PA_0 * PA_m * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_m * PB_2 * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PB_2 * PC[m] + PA_0 * PB_0 * PB_1 * PC[b2] * PC[m] + PA_0 * PB_0 * PB_2 * PC[b1] * PC[m] + PA_0 * PB_1 * PB_2 * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PB_2 * PC[a0] + PA_m * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_m * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_m * PB_1 * PB_2 * PC[a0] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[m])
+                            + delta[a0][b2] * (PA_1 * PA_2 * PA_m * PB_0 * PC[b1] + PA_1 * PA_2 * PA_m * PB_1 * PC[b0] + PA_1 * PA_2 * PA_m * PC[b0] * PC[b1] + PA_1 * PA_2 * PB_0 * PB_1 * PC[m] + PA_1 * PA_2 * PB_0 * PC[b1] * PC[m] + PA_1 * PA_2 * PB_1 * PC[b0] * PC[m] + PA_1 * PA_m * PB_0 * PB_1 * PC[a2] + PA_1 * PA_m * PB_0 * PC[a2] * PC[b1] + PA_1 * PA_m * PB_1 * PC[a2] * PC[b0] + PA_1 * PB_0 * PB_1 * PC[a2] * PC[m] + PA_2 * PA_m * PB_0 * PB_1 * PC[a1] + PA_2 * PA_m * PB_0 * PC[a1] * PC[b1] + PA_2 * PA_m * PB_1 * PC[a1] * PC[b0] + PA_2 * PB_0 * PB_1 * PC[a1] * PC[m] + PA_m * PB_0 * PB_1 * PC[a1] * PC[a2])
+                            + delta[a0][b1] * (PA_1 * PA_2 * PA_m * PB_0 * PC[b2] + PA_1 * PA_2 * PA_m * PB_2 * PC[b0] + PA_1 * PA_2 * PA_m * PC[b0] * PC[b2] + PA_1 * PA_2 * PB_0 * PB_2 * PC[m] + PA_1 * PA_2 * PB_0 * PC[b2] * PC[m] + PA_1 * PA_2 * PB_2 * PC[b0] * PC[m] + PA_1 * PA_m * PB_0 * PB_2 * PC[a2] + PA_1 * PA_m * PB_0 * PC[a2] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a2] * PC[b0] + PA_1 * PB_0 * PB_2 * PC[a2] * PC[m] + PA_2 * PA_m * PB_0 * PB_2 * PC[a1] + PA_2 * PA_m * PB_0 * PC[a1] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a1] * PC[b0] + PA_2 * PB_0 * PB_2 * PC[a1] * PC[m] + PA_m * PB_0 * PB_2 * PC[a1] * PC[a2])
+                            + delta[a0][b0] * (PA_1 * PA_2 * PA_m * PB_1 * PC[b2] + PA_1 * PA_2 * PA_m * PB_2 * PC[b1] + PA_1 * PA_2 * PA_m * PC[b1] * PC[b2] + PA_1 * PA_2 * PB_1 * PB_2 * PC[m] + PA_1 * PA_2 * PB_1 * PC[b2] * PC[m] + PA_1 * PA_2 * PB_2 * PC[b1] * PC[m] + PA_1 * PA_m * PB_1 * PB_2 * PC[a2] + PA_1 * PA_m * PB_1 * PC[a2] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a2] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a2] * PC[m] + PA_2 * PA_m * PB_1 * PB_2 * PC[a1] + PA_2 * PA_m * PB_1 * PC[a1] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a1] * PC[b1] + PA_2 * PB_1 * PB_2 * PC[a1] * PC[m] + PA_m * PB_1 * PB_2 * PC[a1] * PC[a2])
+                            + delta[a0][m] * (PA_1 * PA_2 * PB_0 * PB_1 * PC[b2] + PA_1 * PA_2 * PB_0 * PB_2 * PC[b1] + PA_1 * PA_2 * PB_0 * PC[b1] * PC[b2] + PA_1 * PA_2 * PB_1 * PB_2 * PC[b0] + PA_1 * PA_2 * PB_1 * PC[b0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PB_2 * PC[a2] + PA_1 * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_1 * PB_1 * PB_2 * PC[a2] * PC[b0] + PA_2 * PB_0 * PB_1 * PB_2 * PC[a1] + PA_2 * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_2 * PB_1 * PB_2 * PC[a1] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a1] * PC[a2])
+                            + delta[a0][a2] * (PA_1 * PA_m * PB_0 * PB_1 * PC[b2] + PA_1 * PA_m * PB_0 * PB_2 * PC[b1] + PA_1 * PA_m * PB_0 * PC[b1] * PC[b2] + PA_1 * PA_m * PB_1 * PB_2 * PC[b0] + PA_1 * PA_m * PB_1 * PC[b0] * PC[b2] + PA_1 * PA_m * PB_2 * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PB_2 * PC[m] + PA_1 * PB_0 * PB_1 * PC[b2] * PC[m] + PA_1 * PB_0 * PB_2 * PC[b1] * PC[m] + PA_1 * PB_1 * PB_2 * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PB_2 * PC[a1] + PA_m * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_m * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_m * PB_1 * PB_2 * PC[a1] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a1] * PC[m])
+                            + delta[a0][a1] * (PA_2 * PA_m * PB_0 * PB_1 * PC[b2] + PA_2 * PA_m * PB_0 * PB_2 * PC[b1] + PA_2 * PA_m * PB_0 * PC[b1] * PC[b2] + PA_2 * PA_m * PB_1 * PB_2 * PC[b0] + PA_2 * PA_m * PB_1 * PC[b0] * PC[b2] + PA_2 * PA_m * PB_2 * PC[b0] * PC[b1] + PA_2 * PB_0 * PB_1 * PB_2 * PC[m] + PA_2 * PB_0 * PB_1 * PC[b2] * PC[m] + PA_2 * PB_0 * PB_2 * PC[b1] * PC[m] + PA_2 * PB_1 * PB_2 * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PB_2 * PC[a2] + PA_m * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_m * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_m * PB_1 * PB_2 * PC[a2] * PC[b0] + PB_0 * PB_1 * PB_2 * PC[a2] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PA_2 * PA_m * PB_0 * PC[b1] * PC[b2]
+                            + PA_0 * PA_1 * PA_2 * PA_m * PB_1 * PC[b0] * PC[b2]
+                            + PA_0 * PA_1 * PA_2 * PA_m * PB_2 * PC[b0] * PC[b1]
+                            + PA_0 * PA_1 * PA_2 * PB_0 * PB_1 * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PA_2 * PB_0 * PB_2 * PC[b1] * PC[m]
+                            + PA_0 * PA_1 * PA_2 * PB_1 * PB_2 * PC[b0] * PC[m]
+                            + PA_0 * PA_1 * PA_m * PB_0 * PB_1 * PC[a2] * PC[b2]
+                            + PA_0 * PA_1 * PA_m * PB_0 * PB_2 * PC[a2] * PC[b1]
+                            + PA_0 * PA_1 * PA_m * PB_1 * PB_2 * PC[a2] * PC[b0]
+                            + PA_0 * PA_1 * PB_0 * PB_1 * PB_2 * PC[a2] * PC[m]
+                            + PA_0 * PA_2 * PA_m * PB_0 * PB_1 * PC[a1] * PC[b2]
+                            + PA_0 * PA_2 * PA_m * PB_0 * PB_2 * PC[a1] * PC[b1]
+                            + PA_0 * PA_2 * PA_m * PB_1 * PB_2 * PC[a1] * PC[b0]
+                            + PA_0 * PA_2 * PB_0 * PB_1 * PB_2 * PC[a1] * PC[m]
+                            + PA_0 * PA_m * PB_0 * PB_1 * PB_2 * PC[a1] * PC[a2]
+                            + PA_1 * PA_2 * PA_m * PB_0 * PB_1 * PC[a0] * PC[b2]
+                            + PA_1 * PA_2 * PA_m * PB_0 * PB_2 * PC[a0] * PC[b1]
+                            + PA_1 * PA_2 * PA_m * PB_1 * PB_2 * PC[a0] * PC[b0]
+                            + PA_1 * PA_2 * PB_0 * PB_1 * PB_2 * PC[a0] * PC[m]
+                            + PA_1 * PA_m * PB_0 * PB_1 * PB_2 * PC[a0] * PC[a2]
+                            + PA_2 * PA_m * PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1]
+                        )
+
+                    )
+
+                    + F7_t[3] * (
+
+                        0.25 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][a2] * delta[b0][b1] * delta[b2][m] + delta[a1][a2] * delta[b0][b2] * delta[b1][m] + delta[a1][a2] * delta[b0][m] * delta[b1][b2] + delta[a1][b0] * delta[a2][b1] * delta[b2][m] + delta[a1][b0] * delta[a2][b2] * delta[b1][m] + delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][b0] * delta[b2][m] + delta[a1][b1] * delta[a2][b2] * delta[b0][m] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][b0] * delta[b1][m] + delta[a1][b2] * delta[a2][b1] * delta[b0][m] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PA_0 * (-1.0) + PC[a0] * (-3.0))
+                            + (delta[a0][a2] * delta[b0][b1] * delta[b2][m] + delta[a0][a2] * delta[b0][b2] * delta[b1][m] + delta[a0][a2] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a2][b1] * delta[b2][m] + delta[a0][b0] * delta[a2][b2] * delta[b1][m] + delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][b0] * delta[b2][m] + delta[a0][b1] * delta[a2][b2] * delta[b0][m] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][b0] * delta[b1][m] + delta[a0][b2] * delta[a2][b1] * delta[b0][m] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PA_1 * (-1.0) + PC[a1] * (-3.0))
+                            + (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PA_2 * (-1.0) + PC[a2] * (-3.0))
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][b2] + delta[a0][a1] * delta[a2][b1] * delta[b0][b2] + delta[a0][a1] * delta[a2][b2] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b0][b2] + delta[a0][a2] * delta[a1][b2] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[a2][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][b2] + delta[a0][b1] * delta[a1][b0] * delta[a2][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][b0] + delta[a0][b2] * delta[a1][a2] * delta[b0][b1] + delta[a0][b2] * delta[a1][b0] * delta[a2][b1] + delta[a0][b2] * delta[a1][b1] * delta[a2][b0]) * (PA_m * (-1.0) + PC[m] * (-3.0))
+                            + (delta[a0][a1] * delta[a2][b1] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b1][m] + delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b1][m] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][a2] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PB_0 * (-1.0) + PC[b0] * (-3.0))
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][b0] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][a2] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b0][m] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PB_1 * (-1.0) + PC[b1] * (-3.0))
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][m] + delta[a0][a1] * delta[a2][b1] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][m] + delta[a0][a2] * delta[a1][b1] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][m] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][m] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PB_2 * (-1.0) + PC[b2] * (-3.0))
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PA_1 * PC[a2] * (-1.0) + PA_0 * PA_2 * PC[a1] * (-1.0) + PA_0 * PC[a1] * PC[a2] * (-2.0) + PA_1 * PA_2 * PC[a0] * (-1.0) + PA_1 * PC[a0] * PC[a2] * (-2.0) + PA_2 * PC[a0] * PC[a1] * (-2.0) + PC[a0] * PC[a1] * PC[a2] * (-1.0))
+                            + (delta[a2][b1] * delta[b2][m] + delta[a2][b2] * delta[b1][m] + delta[a2][m] * delta[b1][b2]) * (PA_0 * PA_1 * PC[b0] * (-1.0) + PA_0 * PB_0 * PC[a1] * (-1.0) + PA_0 * PC[a1] * PC[b0] * (-2.0) + PA_1 * PB_0 * PC[a0] * (-1.0) + PA_1 * PC[a0] * PC[b0] * (-2.0) + PB_0 * PC[a0] * PC[a1] * (-2.0) + PC[a0] * PC[a1] * PC[b0] * (-1.0))
+                            + (delta[a2][b0] * delta[b2][m] + delta[a2][b2] * delta[b0][m] + delta[a2][m] * delta[b0][b2]) * (PA_0 * PA_1 * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[a1] * (-1.0) + PA_0 * PC[a1] * PC[b1] * (-2.0) + PA_1 * PB_1 * PC[a0] * (-1.0) + PA_1 * PC[a0] * PC[b1] * (-2.0) + PB_1 * PC[a0] * PC[a1] * (-2.0) + PC[a0] * PC[a1] * PC[b1] * (-1.0))
+                            + (delta[a2][b0] * delta[b1][m] + delta[a2][b1] * delta[b0][m] + delta[a2][m] * delta[b0][b1]) * (PA_0 * PA_1 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[a1] * (-1.0) + PA_0 * PC[a1] * PC[b2] * (-2.0) + PA_1 * PB_2 * PC[a0] * (-1.0) + PA_1 * PC[a0] * PC[b2] * (-2.0) + PB_2 * PC[a0] * PC[a1] * (-2.0) + PC[a0] * PC[a1] * PC[b2] * (-1.0))
+                            + (delta[a2][b0] * delta[b1][b2] + delta[a2][b1] * delta[b0][b2] + delta[a2][b2] * delta[b0][b1]) * (PA_0 * PA_1 * PC[m] * (-1.0) + PA_0 * PA_m * PC[a1] * (-1.0) + PA_0 * PC[a1] * PC[m] * (-2.0) + PA_1 * PA_m * PC[a0] * (-1.0) + PA_1 * PC[a0] * PC[m] * (-2.0) + PA_m * PC[a0] * PC[a1] * (-2.0) + PC[a0] * PC[a1] * PC[m] * (-1.0))
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PA_2 * PC[b0] * (-1.0) + PA_0 * PB_0 * PC[a2] * (-1.0) + PA_0 * PC[a2] * PC[b0] * (-2.0) + PA_2 * PB_0 * PC[a0] * (-1.0) + PA_2 * PC[a0] * PC[b0] * (-2.0) + PB_0 * PC[a0] * PC[a2] * (-2.0) + PC[a0] * PC[a2] * PC[b0] * (-1.0))
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PA_2 * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[a2] * (-1.0) + PA_0 * PC[a2] * PC[b1] * (-2.0) + PA_2 * PB_1 * PC[a0] * (-1.0) + PA_2 * PC[a0] * PC[b1] * (-2.0) + PB_1 * PC[a0] * PC[a2] * (-2.0) + PC[a0] * PC[a2] * PC[b1] * (-1.0))
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PA_2 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[a2] * (-1.0) + PA_0 * PC[a2] * PC[b2] * (-2.0) + PA_2 * PB_2 * PC[a0] * (-1.0) + PA_2 * PC[a0] * PC[b2] * (-2.0) + PB_2 * PC[a0] * PC[a2] * (-2.0) + PC[a0] * PC[a2] * PC[b2] * (-1.0))
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PA_2 * PC[m] * (-1.0) + PA_0 * PA_m * PC[a2] * (-1.0) + PA_0 * PC[a2] * PC[m] * (-2.0) + PA_2 * PA_m * PC[a0] * (-1.0) + PA_2 * PC[a0] * PC[m] * (-2.0) + PA_m * PC[a0] * PC[a2] * (-2.0) + PC[a0] * PC[a2] * PC[m] * (-1.0))
+                            + (delta[a1][a2] * delta[b1][b2] + delta[a1][b1] * delta[a2][b2] + delta[a1][b2] * delta[a2][b1]) * (PA_0 * PA_m * PC[b0] * (-1.0) + PA_0 * PB_0 * PC[m] * (-1.0) + PA_0 * PC[b0] * PC[m] * (-2.0) + PA_m * PB_0 * PC[a0] * (-1.0) + PA_m * PC[a0] * PC[b0] * (-2.0) + PB_0 * PC[a0] * PC[m] * (-2.0) + PC[a0] * PC[b0] * PC[m] * (-1.0))
+                            + (delta[a1][a2] * delta[b0][b2] + delta[a1][b0] * delta[a2][b2] + delta[a1][b2] * delta[a2][b0]) * (PA_0 * PA_m * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[m] * (-1.0) + PA_0 * PC[b1] * PC[m] * (-2.0) + PA_m * PB_1 * PC[a0] * (-1.0) + PA_m * PC[a0] * PC[b1] * (-2.0) + PB_1 * PC[a0] * PC[m] * (-2.0) + PC[a0] * PC[b1] * PC[m] * (-1.0))
+                            + (delta[a1][a2] * delta[b0][b1] + delta[a1][b0] * delta[a2][b1] + delta[a1][b1] * delta[a2][b0]) * (PA_0 * PA_m * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[m] * (-1.0) + PA_0 * PC[b2] * PC[m] * (-2.0) + PA_m * PB_2 * PC[a0] * (-1.0) + PA_m * PC[a0] * PC[b2] * (-2.0) + PB_2 * PC[a0] * PC[m] * (-2.0) + PC[a0] * PC[b2] * PC[m] * (-1.0))
+                            + (delta[a1][a2] * delta[b2][m] + delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PB_0 * PC[b1] * (-1.0) + PA_0 * PB_1 * PC[b0] * (-1.0) + PA_0 * PC[b0] * PC[b1] * (-2.0) + PB_0 * PB_1 * PC[a0] * (-1.0) + PB_0 * PC[a0] * PC[b1] * (-2.0) + PB_1 * PC[a0] * PC[b0] * (-2.0) + PC[a0] * PC[b0] * PC[b1] * (-1.0))
+                            + (delta[a1][a2] * delta[b1][m] + delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PB_0 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[b0] * (-1.0) + PA_0 * PC[b0] * PC[b2] * (-2.0) + PB_0 * PB_2 * PC[a0] * (-1.0) + PB_0 * PC[a0] * PC[b2] * (-2.0) + PB_2 * PC[a0] * PC[b0] * (-2.0) + PC[a0] * PC[b0] * PC[b2] * (-1.0))
+                            + (delta[a1][a2] * delta[b0][m] + delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PB_1 * PC[b2] * (-1.0) + PA_0 * PB_2 * PC[b1] * (-1.0) + PA_0 * PC[b1] * PC[b2] * (-2.0) + PB_1 * PB_2 * PC[a0] * (-1.0) + PB_1 * PC[a0] * PC[b2] * (-2.0) + PB_2 * PC[a0] * PC[b1] * (-2.0) + PC[a0] * PC[b1] * PC[b2] * (-1.0))
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PA_2 * PC[b0] * (-1.0) + PA_1 * PB_0 * PC[a2] * (-1.0) + PA_1 * PC[a2] * PC[b0] * (-2.0) + PA_2 * PB_0 * PC[a1] * (-1.0) + PA_2 * PC[a1] * PC[b0] * (-2.0) + PB_0 * PC[a1] * PC[a2] * (-2.0) + PC[a1] * PC[a2] * PC[b0] * (-1.0))
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PA_2 * PC[b1] * (-1.0) + PA_1 * PB_1 * PC[a2] * (-1.0) + PA_1 * PC[a2] * PC[b1] * (-2.0) + PA_2 * PB_1 * PC[a1] * (-1.0) + PA_2 * PC[a1] * PC[b1] * (-2.0) + PB_1 * PC[a1] * PC[a2] * (-2.0) + PC[a1] * PC[a2] * PC[b1] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PA_2 * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[a2] * (-1.0) + PA_1 * PC[a2] * PC[b2] * (-2.0) + PA_2 * PB_2 * PC[a1] * (-1.0) + PA_2 * PC[a1] * PC[b2] * (-2.0) + PB_2 * PC[a1] * PC[a2] * (-2.0) + PC[a1] * PC[a2] * PC[b2] * (-1.0))
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PA_2 * PC[m] * (-1.0) + PA_1 * PA_m * PC[a2] * (-1.0) + PA_1 * PC[a2] * PC[m] * (-2.0) + PA_2 * PA_m * PC[a1] * (-1.0) + PA_2 * PC[a1] * PC[m] * (-2.0) + PA_m * PC[a1] * PC[a2] * (-2.0) + PC[a1] * PC[a2] * PC[m] * (-1.0))
+                            + (delta[a0][a2] * delta[b1][b2] + delta[a0][b1] * delta[a2][b2] + delta[a0][b2] * delta[a2][b1]) * (PA_1 * PA_m * PC[b0] * (-1.0) + PA_1 * PB_0 * PC[m] * (-1.0) + PA_1 * PC[b0] * PC[m] * (-2.0) + PA_m * PB_0 * PC[a1] * (-1.0) + PA_m * PC[a1] * PC[b0] * (-2.0) + PB_0 * PC[a1] * PC[m] * (-2.0) + PC[a1] * PC[b0] * PC[m] * (-1.0))
+                            + (delta[a0][a2] * delta[b0][b2] + delta[a0][b0] * delta[a2][b2] + delta[a0][b2] * delta[a2][b0]) * (PA_1 * PA_m * PC[b1] * (-1.0) + PA_1 * PB_1 * PC[m] * (-1.0) + PA_1 * PC[b1] * PC[m] * (-2.0) + PA_m * PB_1 * PC[a1] * (-1.0) + PA_m * PC[a1] * PC[b1] * (-2.0) + PB_1 * PC[a1] * PC[m] * (-2.0) + PC[a1] * PC[b1] * PC[m] * (-1.0))
+                            + (delta[a0][a2] * delta[b0][b1] + delta[a0][b0] * delta[a2][b1] + delta[a0][b1] * delta[a2][b0]) * (PA_1 * PA_m * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[m] * (-1.0) + PA_1 * PC[b2] * PC[m] * (-2.0) + PA_m * PB_2 * PC[a1] * (-1.0) + PA_m * PC[a1] * PC[b2] * (-2.0) + PB_2 * PC[a1] * PC[m] * (-2.0) + PC[a1] * PC[b2] * PC[m] * (-1.0))
+                            + (delta[a0][a2] * delta[b2][m] + delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PB_0 * PC[b1] * (-1.0) + PA_1 * PB_1 * PC[b0] * (-1.0) + PA_1 * PC[b0] * PC[b1] * (-2.0) + PB_0 * PB_1 * PC[a1] * (-1.0) + PB_0 * PC[a1] * PC[b1] * (-2.0) + PB_1 * PC[a1] * PC[b0] * (-2.0) + PC[a1] * PC[b0] * PC[b1] * (-1.0))
+                            + (delta[a0][a2] * delta[b1][m] + delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PB_0 * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[b0] * (-1.0) + PA_1 * PC[b0] * PC[b2] * (-2.0) + PB_0 * PB_2 * PC[a1] * (-1.0) + PB_0 * PC[a1] * PC[b2] * (-2.0) + PB_2 * PC[a1] * PC[b0] * (-2.0) + PC[a1] * PC[b0] * PC[b2] * (-1.0))
+                            + (delta[a0][a2] * delta[b0][m] + delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PB_1 * PC[b2] * (-1.0) + PA_1 * PB_2 * PC[b1] * (-1.0) + PA_1 * PC[b1] * PC[b2] * (-2.0) + PB_1 * PB_2 * PC[a1] * (-1.0) + PB_1 * PC[a1] * PC[b2] * (-2.0) + PB_2 * PC[a1] * PC[b1] * (-2.0) + PC[a1] * PC[b1] * PC[b2] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_2 * PA_m * PC[b0] * (-1.0) + PA_2 * PB_0 * PC[m] * (-1.0) + PA_2 * PC[b0] * PC[m] * (-2.0) + PA_m * PB_0 * PC[a2] * (-1.0) + PA_m * PC[a2] * PC[b0] * (-2.0) + PB_0 * PC[a2] * PC[m] * (-2.0) + PC[a2] * PC[b0] * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_2 * PA_m * PC[b1] * (-1.0) + PA_2 * PB_1 * PC[m] * (-1.0) + PA_2 * PC[b1] * PC[m] * (-2.0) + PA_m * PB_1 * PC[a2] * (-1.0) + PA_m * PC[a2] * PC[b1] * (-2.0) + PB_1 * PC[a2] * PC[m] * (-2.0) + PC[a2] * PC[b1] * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_2 * PA_m * PC[b2] * (-1.0) + PA_2 * PB_2 * PC[m] * (-1.0) + PA_2 * PC[b2] * PC[m] * (-2.0) + PA_m * PB_2 * PC[a2] * (-1.0) + PA_m * PC[a2] * PC[b2] * (-2.0) + PB_2 * PC[a2] * PC[m] * (-2.0) + PC[a2] * PC[b2] * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PB_0 * PC[b1] * (-1.0) + PA_2 * PB_1 * PC[b0] * (-1.0) + PA_2 * PC[b0] * PC[b1] * (-2.0) + PB_0 * PB_1 * PC[a2] * (-1.0) + PB_0 * PC[a2] * PC[b1] * (-2.0) + PB_1 * PC[a2] * PC[b0] * (-2.0) + PC[a2] * PC[b0] * PC[b1] * (-1.0))
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PB_0 * PC[b2] * (-1.0) + PA_2 * PB_2 * PC[b0] * (-1.0) + PA_2 * PC[b0] * PC[b2] * (-2.0) + PB_0 * PB_2 * PC[a2] * (-1.0) + PB_0 * PC[a2] * PC[b2] * (-2.0) + PB_2 * PC[a2] * PC[b0] * (-2.0) + PC[a2] * PC[b0] * PC[b2] * (-1.0))
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PB_1 * PC[b2] * (-1.0) + PA_2 * PB_2 * PC[b1] * (-1.0) + PA_2 * PC[b1] * PC[b2] * (-2.0) + PB_1 * PB_2 * PC[a2] * (-1.0) + PB_1 * PC[a2] * PC[b2] * (-2.0) + PB_2 * PC[a2] * PC[b1] * (-2.0) + PC[a2] * PC[b1] * PC[b2] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b2] + delta[a0][a2] * delta[a1][b2] + delta[a0][b2] * delta[a1][a2]) * (PA_m * PB_0 * PC[b1] * (-1.0) + PA_m * PB_1 * PC[b0] * (-1.0) + PA_m * PC[b0] * PC[b1] * (-2.0) + PB_0 * PB_1 * PC[m] * (-1.0) + PB_0 * PC[b1] * PC[m] * (-2.0) + PB_1 * PC[b0] * PC[m] * (-2.0) + PC[b0] * PC[b1] * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b1] + delta[a0][a2] * delta[a1][b1] + delta[a0][b1] * delta[a1][a2]) * (PA_m * PB_0 * PC[b2] * (-1.0) + PA_m * PB_2 * PC[b0] * (-1.0) + PA_m * PC[b0] * PC[b2] * (-2.0) + PB_0 * PB_2 * PC[m] * (-1.0) + PB_0 * PC[b2] * PC[m] * (-2.0) + PB_2 * PC[b0] * PC[m] * (-2.0) + PC[b0] * PC[b2] * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][b0] + delta[a0][a2] * delta[a1][b0] + delta[a0][b0] * delta[a1][a2]) * (PA_m * PB_1 * PC[b2] * (-1.0) + PA_m * PB_2 * PC[b1] * (-1.0) + PA_m * PC[b1] * PC[b2] * (-2.0) + PB_1 * PB_2 * PC[m] * (-1.0) + PB_1 * PC[b2] * PC[m] * (-2.0) + PB_2 * PC[b1] * PC[m] * (-2.0) + PC[b1] * PC[b2] * PC[m] * (-1.0))
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PB_1 * PC[b2] * (-1.0) + PB_0 * PB_2 * PC[b1] * (-1.0) + PB_0 * PC[b1] * PC[b2] * (-2.0) + PB_1 * PB_2 * PC[b0] * (-1.0) + PB_1 * PC[b0] * PC[b2] * (-2.0) + PB_2 * PC[b0] * PC[b1] * (-2.0) + PC[b0] * PC[b1] * PC[b2] * (-1.0))
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PA_0 * PA_1 * PA_2 * PC[b0] * PC[b1] + PA_0 * PA_1 * PB_0 * PC[a2] * PC[b1] + PA_0 * PA_1 * PB_1 * PC[a2] * PC[b0] + PA_0 * PA_1 * PC[a2] * PC[b0] * PC[b1] + PA_0 * PA_2 * PB_0 * PC[a1] * PC[b1] + PA_0 * PA_2 * PB_1 * PC[a1] * PC[b0] + PA_0 * PA_2 * PC[a1] * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PC[a1] * PC[a2] + PA_0 * PB_0 * PC[a1] * PC[a2] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[a2] * PC[b0] + PA_1 * PA_2 * PB_0 * PC[a0] * PC[b1] + PA_1 * PA_2 * PB_1 * PC[a0] * PC[b0] + PA_1 * PA_2 * PC[a0] * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PC[a0] * PC[a2] + PA_1 * PB_0 * PC[a0] * PC[a2] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[a2] * PC[b0] + PA_2 * PB_0 * PB_1 * PC[a0] * PC[a1] + PA_2 * PB_0 * PC[a0] * PC[a1] * PC[b1] + PA_2 * PB_1 * PC[a0] * PC[a1] * PC[b0] + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[a2])
+                            + delta[b1][m] * (PA_0 * PA_1 * PA_2 * PC[b0] * PC[b2] + PA_0 * PA_1 * PB_0 * PC[a2] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[a2] * PC[b0] + PA_0 * PA_1 * PC[a2] * PC[b0] * PC[b2] + PA_0 * PA_2 * PB_0 * PC[a1] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[a1] * PC[b0] + PA_0 * PA_2 * PC[a1] * PC[b0] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a1] * PC[a2] + PA_0 * PB_0 * PC[a1] * PC[a2] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[a2] * PC[b0] + PA_1 * PA_2 * PB_0 * PC[a0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[a0] * PC[b0] + PA_1 * PA_2 * PC[a0] * PC[b0] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a0] * PC[a2] + PA_1 * PB_0 * PC[a0] * PC[a2] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[a2] * PC[b0] + PA_2 * PB_0 * PB_2 * PC[a0] * PC[a1] + PA_2 * PB_0 * PC[a0] * PC[a1] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[a1] * PC[b0] + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[a2])
+                            + delta[b1][b2] * (PA_0 * PA_1 * PA_2 * PC[b0] * PC[m] + PA_0 * PA_1 * PA_m * PC[a2] * PC[b0] + PA_0 * PA_1 * PB_0 * PC[a2] * PC[m] + PA_0 * PA_1 * PC[a2] * PC[b0] * PC[m] + PA_0 * PA_2 * PA_m * PC[a1] * PC[b0] + PA_0 * PA_2 * PB_0 * PC[a1] * PC[m] + PA_0 * PA_2 * PC[a1] * PC[b0] * PC[m] + PA_0 * PA_m * PB_0 * PC[a1] * PC[a2] + PA_0 * PA_m * PC[a1] * PC[a2] * PC[b0] + PA_0 * PB_0 * PC[a1] * PC[a2] * PC[m] + PA_1 * PA_2 * PA_m * PC[a0] * PC[b0] + PA_1 * PA_2 * PB_0 * PC[a0] * PC[m] + PA_1 * PA_2 * PC[a0] * PC[b0] * PC[m] + PA_1 * PA_m * PB_0 * PC[a0] * PC[a2] + PA_1 * PA_m * PC[a0] * PC[a2] * PC[b0] + PA_1 * PB_0 * PC[a0] * PC[a2] * PC[m] + PA_2 * PA_m * PB_0 * PC[a0] * PC[a1] + PA_2 * PA_m * PC[a0] * PC[a1] * PC[b0] + PA_2 * PB_0 * PC[a0] * PC[a1] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a1] * PC[a2])
+                            + delta[b0][m] * (PA_0 * PA_1 * PA_2 * PC[b1] * PC[b2] + PA_0 * PA_1 * PB_1 * PC[a2] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[a2] * PC[b1] + PA_0 * PA_1 * PC[a2] * PC[b1] * PC[b2] + PA_0 * PA_2 * PB_1 * PC[a1] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[a1] * PC[b1] + PA_0 * PA_2 * PC[a1] * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[a1] * PC[a2] + PA_0 * PB_1 * PC[a1] * PC[a2] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[a2] * PC[b1] + PA_1 * PA_2 * PB_1 * PC[a0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[a0] * PC[b1] + PA_1 * PA_2 * PC[a0] * PC[b1] * PC[b2] + PA_1 * PB_1 * PB_2 * PC[a0] * PC[a2] + PA_1 * PB_1 * PC[a0] * PC[a2] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[a2] * PC[b1] + PA_2 * PB_1 * PB_2 * PC[a0] * PC[a1] + PA_2 * PB_1 * PC[a0] * PC[a1] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[a1] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[a2])
+                            + delta[b0][b2] * (PA_0 * PA_1 * PA_2 * PC[b1] * PC[m] + PA_0 * PA_1 * PA_m * PC[a2] * PC[b1] + PA_0 * PA_1 * PB_1 * PC[a2] * PC[m] + PA_0 * PA_1 * PC[a2] * PC[b1] * PC[m] + PA_0 * PA_2 * PA_m * PC[a1] * PC[b1] + PA_0 * PA_2 * PB_1 * PC[a1] * PC[m] + PA_0 * PA_2 * PC[a1] * PC[b1] * PC[m] + PA_0 * PA_m * PB_1 * PC[a1] * PC[a2] + PA_0 * PA_m * PC[a1] * PC[a2] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[a2] * PC[m] + PA_1 * PA_2 * PA_m * PC[a0] * PC[b1] + PA_1 * PA_2 * PB_1 * PC[a0] * PC[m] + PA_1 * PA_2 * PC[a0] * PC[b1] * PC[m] + PA_1 * PA_m * PB_1 * PC[a0] * PC[a2] + PA_1 * PA_m * PC[a0] * PC[a2] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[a2] * PC[m] + PA_2 * PA_m * PB_1 * PC[a0] * PC[a1] + PA_2 * PA_m * PC[a0] * PC[a1] * PC[b1] + PA_2 * PB_1 * PC[a0] * PC[a1] * PC[m] + PA_m * PB_1 * PC[a0] * PC[a1] * PC[a2])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PA_2 * PC[b2] * PC[m] + PA_0 * PA_1 * PA_m * PC[a2] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[a2] * PC[m] + PA_0 * PA_1 * PC[a2] * PC[b2] * PC[m] + PA_0 * PA_2 * PA_m * PC[a1] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[a1] * PC[m] + PA_0 * PA_2 * PC[a1] * PC[b2] * PC[m] + PA_0 * PA_m * PB_2 * PC[a1] * PC[a2] + PA_0 * PA_m * PC[a1] * PC[a2] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[a2] * PC[m] + PA_1 * PA_2 * PA_m * PC[a0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[a0] * PC[m] + PA_1 * PA_2 * PC[a0] * PC[b2] * PC[m] + PA_1 * PA_m * PB_2 * PC[a0] * PC[a2] + PA_1 * PA_m * PC[a0] * PC[a2] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[a2] * PC[m] + PA_2 * PA_m * PB_2 * PC[a0] * PC[a1] + PA_2 * PA_m * PC[a0] * PC[a1] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[a1] * PC[m] + PA_m * PB_2 * PC[a0] * PC[a1] * PC[a2])
+                            + delta[a2][b2] * (PA_0 * PA_1 * PA_m * PC[b0] * PC[b1] + PA_0 * PA_1 * PB_0 * PC[b1] * PC[m] + PA_0 * PA_1 * PB_1 * PC[b0] * PC[m] + PA_0 * PA_1 * PC[b0] * PC[b1] * PC[m] + PA_0 * PA_m * PB_0 * PC[a1] * PC[b1] + PA_0 * PA_m * PB_1 * PC[a1] * PC[b0] + PA_0 * PA_m * PC[a1] * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PC[a1] * PC[m] + PA_0 * PB_0 * PC[a1] * PC[b1] * PC[m] + PA_0 * PB_1 * PC[a1] * PC[b0] * PC[m] + PA_1 * PA_m * PB_0 * PC[a0] * PC[b1] + PA_1 * PA_m * PB_1 * PC[a0] * PC[b0] + PA_1 * PA_m * PC[a0] * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PC[a0] * PC[m] + PA_1 * PB_0 * PC[a0] * PC[b1] * PC[m] + PA_1 * PB_1 * PC[a0] * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PC[a0] * PC[a1] + PA_m * PB_0 * PC[a0] * PC[a1] * PC[b1] + PA_m * PB_1 * PC[a0] * PC[a1] * PC[b0] + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[m])
+                            + delta[a2][b1] * (PA_0 * PA_1 * PA_m * PC[b0] * PC[b2] + PA_0 * PA_1 * PB_0 * PC[b2] * PC[m] + PA_0 * PA_1 * PB_2 * PC[b0] * PC[m] + PA_0 * PA_1 * PC[b0] * PC[b2] * PC[m] + PA_0 * PA_m * PB_0 * PC[a1] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a1] * PC[b0] + PA_0 * PA_m * PC[a1] * PC[b0] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a1] * PC[m] + PA_0 * PB_0 * PC[a1] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a1] * PC[b0] * PC[m] + PA_1 * PA_m * PB_0 * PC[a0] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a0] * PC[b0] + PA_1 * PA_m * PC[a0] * PC[b0] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a0] * PC[m] + PA_1 * PB_0 * PC[a0] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a0] * PC[b0] * PC[m] + PA_m * PB_0 * PB_2 * PC[a0] * PC[a1] + PA_m * PB_0 * PC[a0] * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a1] * PC[b0] + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[m])
+                            + delta[a2][b0] * (PA_0 * PA_1 * PA_m * PC[b1] * PC[b2] + PA_0 * PA_1 * PB_1 * PC[b2] * PC[m] + PA_0 * PA_1 * PB_2 * PC[b1] * PC[m] + PA_0 * PA_1 * PC[b1] * PC[b2] * PC[m] + PA_0 * PA_m * PB_1 * PC[a1] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a1] * PC[b1] + PA_0 * PA_m * PC[a1] * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[a1] * PC[m] + PA_0 * PB_1 * PC[a1] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a1] * PC[b1] * PC[m] + PA_1 * PA_m * PB_1 * PC[a0] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a0] * PC[b1] + PA_1 * PA_m * PC[a0] * PC[b1] * PC[b2] + PA_1 * PB_1 * PB_2 * PC[a0] * PC[m] + PA_1 * PB_1 * PC[a0] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a0] * PC[b1] * PC[m] + PA_m * PB_1 * PB_2 * PC[a0] * PC[a1] + PA_m * PB_1 * PC[a0] * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a1] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[m])
+                            + delta[a2][m] * (PA_0 * PA_1 * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_1 * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_1 * PB_2 * PC[b0] * PC[b1] + PA_0 * PA_1 * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_0 * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[a1] * PC[b0] + PA_0 * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_1 * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_1 * PB_1 * PB_2 * PC[a0] * PC[b0] + PA_1 * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1] + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[b0])
+                            + delta[a1][b2] * (PA_0 * PA_2 * PA_m * PC[b0] * PC[b1] + PA_0 * PA_2 * PB_0 * PC[b1] * PC[m] + PA_0 * PA_2 * PB_1 * PC[b0] * PC[m] + PA_0 * PA_2 * PC[b0] * PC[b1] * PC[m] + PA_0 * PA_m * PB_0 * PC[a2] * PC[b1] + PA_0 * PA_m * PB_1 * PC[a2] * PC[b0] + PA_0 * PA_m * PC[a2] * PC[b0] * PC[b1] + PA_0 * PB_0 * PB_1 * PC[a2] * PC[m] + PA_0 * PB_0 * PC[a2] * PC[b1] * PC[m] + PA_0 * PB_1 * PC[a2] * PC[b0] * PC[m] + PA_2 * PA_m * PB_0 * PC[a0] * PC[b1] + PA_2 * PA_m * PB_1 * PC[a0] * PC[b0] + PA_2 * PA_m * PC[a0] * PC[b0] * PC[b1] + PA_2 * PB_0 * PB_1 * PC[a0] * PC[m] + PA_2 * PB_0 * PC[a0] * PC[b1] * PC[m] + PA_2 * PB_1 * PC[a0] * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PC[a0] * PC[a2] + PA_m * PB_0 * PC[a0] * PC[a2] * PC[b1] + PA_m * PB_1 * PC[a0] * PC[a2] * PC[b0] + PB_0 * PB_1 * PC[a0] * PC[a2] * PC[m])
+                            + delta[a1][b1] * (PA_0 * PA_2 * PA_m * PC[b0] * PC[b2] + PA_0 * PA_2 * PB_0 * PC[b2] * PC[m] + PA_0 * PA_2 * PB_2 * PC[b0] * PC[m] + PA_0 * PA_2 * PC[b0] * PC[b2] * PC[m] + PA_0 * PA_m * PB_0 * PC[a2] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a2] * PC[b0] + PA_0 * PA_m * PC[a2] * PC[b0] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a2] * PC[m] + PA_0 * PB_0 * PC[a2] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a2] * PC[b0] * PC[m] + PA_2 * PA_m * PB_0 * PC[a0] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a0] * PC[b0] + PA_2 * PA_m * PC[a0] * PC[b0] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a0] * PC[m] + PA_2 * PB_0 * PC[a0] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a0] * PC[b0] * PC[m] + PA_m * PB_0 * PB_2 * PC[a0] * PC[a2] + PA_m * PB_0 * PC[a0] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a2] * PC[b0] + PB_0 * PB_2 * PC[a0] * PC[a2] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PA_2 * PA_m * PC[b1] * PC[b2] + PA_0 * PA_2 * PB_1 * PC[b2] * PC[m] + PA_0 * PA_2 * PB_2 * PC[b1] * PC[m] + PA_0 * PA_2 * PC[b1] * PC[b2] * PC[m] + PA_0 * PA_m * PB_1 * PC[a2] * PC[b2] + PA_0 * PA_m * PB_2 * PC[a2] * PC[b1] + PA_0 * PA_m * PC[a2] * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[a2] * PC[m] + PA_0 * PB_1 * PC[a2] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a2] * PC[b1] * PC[m] + PA_2 * PA_m * PB_1 * PC[a0] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a0] * PC[b1] + PA_2 * PA_m * PC[a0] * PC[b1] * PC[b2] + PA_2 * PB_1 * PB_2 * PC[a0] * PC[m] + PA_2 * PB_1 * PC[a0] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a0] * PC[b1] * PC[m] + PA_m * PB_1 * PB_2 * PC[a0] * PC[a2] + PA_m * PB_1 * PC[a0] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a2] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a2] * PC[m])
+                            + delta[a1][m] * (PA_0 * PA_2 * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_2 * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_2 * PB_2 * PC[b0] * PC[b1] + PA_0 * PA_2 * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_0 * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_0 * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_0 * PB_1 * PB_2 * PC[a2] * PC[b0] + PA_0 * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[a2] * PC[b0] * PC[b1] + PA_2 * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_2 * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_2 * PB_1 * PB_2 * PC[a0] * PC[b0] + PA_2 * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a2] + PB_0 * PB_1 * PC[a0] * PC[a2] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a2] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a2] * PC[b0])
+                            + delta[a1][a2] * (PA_0 * PA_m * PB_0 * PC[b1] * PC[b2] + PA_0 * PA_m * PB_1 * PC[b0] * PC[b2] + PA_0 * PA_m * PB_2 * PC[b0] * PC[b1] + PA_0 * PA_m * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PB_1 * PC[b2] * PC[m] + PA_0 * PB_0 * PB_2 * PC[b1] * PC[m] + PA_0 * PB_0 * PC[b1] * PC[b2] * PC[m] + PA_0 * PB_1 * PB_2 * PC[b0] * PC[m] + PA_0 * PB_1 * PC[b0] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PB_1 * PC[a0] * PC[b2] + PA_m * PB_0 * PB_2 * PC[a0] * PC[b1] + PA_m * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_m * PB_1 * PB_2 * PC[a0] * PC[b0] + PA_m * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a0] * PC[m] + PB_0 * PB_1 * PC[a0] * PC[b2] * PC[m] + PB_0 * PB_2 * PC[a0] * PC[b1] * PC[m] + PB_1 * PB_2 * PC[a0] * PC[b0] * PC[m])
+                            + delta[a0][b2] * (PA_1 * PA_2 * PA_m * PC[b0] * PC[b1] + PA_1 * PA_2 * PB_0 * PC[b1] * PC[m] + PA_1 * PA_2 * PB_1 * PC[b0] * PC[m] + PA_1 * PA_2 * PC[b0] * PC[b1] * PC[m] + PA_1 * PA_m * PB_0 * PC[a2] * PC[b1] + PA_1 * PA_m * PB_1 * PC[a2] * PC[b0] + PA_1 * PA_m * PC[a2] * PC[b0] * PC[b1] + PA_1 * PB_0 * PB_1 * PC[a2] * PC[m] + PA_1 * PB_0 * PC[a2] * PC[b1] * PC[m] + PA_1 * PB_1 * PC[a2] * PC[b0] * PC[m] + PA_2 * PA_m * PB_0 * PC[a1] * PC[b1] + PA_2 * PA_m * PB_1 * PC[a1] * PC[b0] + PA_2 * PA_m * PC[a1] * PC[b0] * PC[b1] + PA_2 * PB_0 * PB_1 * PC[a1] * PC[m] + PA_2 * PB_0 * PC[a1] * PC[b1] * PC[m] + PA_2 * PB_1 * PC[a1] * PC[b0] * PC[m] + PA_m * PB_0 * PB_1 * PC[a1] * PC[a2] + PA_m * PB_0 * PC[a1] * PC[a2] * PC[b1] + PA_m * PB_1 * PC[a1] * PC[a2] * PC[b0] + PB_0 * PB_1 * PC[a1] * PC[a2] * PC[m])
+                            + delta[a0][b1] * (PA_1 * PA_2 * PA_m * PC[b0] * PC[b2] + PA_1 * PA_2 * PB_0 * PC[b2] * PC[m] + PA_1 * PA_2 * PB_2 * PC[b0] * PC[m] + PA_1 * PA_2 * PC[b0] * PC[b2] * PC[m] + PA_1 * PA_m * PB_0 * PC[a2] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a2] * PC[b0] + PA_1 * PA_m * PC[a2] * PC[b0] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a2] * PC[m] + PA_1 * PB_0 * PC[a2] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a2] * PC[b0] * PC[m] + PA_2 * PA_m * PB_0 * PC[a1] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a1] * PC[b0] + PA_2 * PA_m * PC[a1] * PC[b0] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a1] * PC[m] + PA_2 * PB_0 * PC[a1] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a1] * PC[b0] * PC[m] + PA_m * PB_0 * PB_2 * PC[a1] * PC[a2] + PA_m * PB_0 * PC[a1] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[a2] * PC[b0] + PB_0 * PB_2 * PC[a1] * PC[a2] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PA_2 * PA_m * PC[b1] * PC[b2] + PA_1 * PA_2 * PB_1 * PC[b2] * PC[m] + PA_1 * PA_2 * PB_2 * PC[b1] * PC[m] + PA_1 * PA_2 * PC[b1] * PC[b2] * PC[m] + PA_1 * PA_m * PB_1 * PC[a2] * PC[b2] + PA_1 * PA_m * PB_2 * PC[a2] * PC[b1] + PA_1 * PA_m * PC[a2] * PC[b1] * PC[b2] + PA_1 * PB_1 * PB_2 * PC[a2] * PC[m] + PA_1 * PB_1 * PC[a2] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a2] * PC[b1] * PC[m] + PA_2 * PA_m * PB_1 * PC[a1] * PC[b2] + PA_2 * PA_m * PB_2 * PC[a1] * PC[b1] + PA_2 * PA_m * PC[a1] * PC[b1] * PC[b2] + PA_2 * PB_1 * PB_2 * PC[a1] * PC[m] + PA_2 * PB_1 * PC[a1] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a1] * PC[b1] * PC[m] + PA_m * PB_1 * PB_2 * PC[a1] * PC[a2] + PA_m * PB_1 * PC[a1] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[a2] * PC[b1] + PB_1 * PB_2 * PC[a1] * PC[a2] * PC[m])
+                            + delta[a0][m] * (PA_1 * PA_2 * PB_0 * PC[b1] * PC[b2] + PA_1 * PA_2 * PB_1 * PC[b0] * PC[b2] + PA_1 * PA_2 * PB_2 * PC[b0] * PC[b1] + PA_1 * PA_2 * PC[b0] * PC[b1] * PC[b2] + PA_1 * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_1 * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_1 * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_1 * PB_1 * PB_2 * PC[a2] * PC[b0] + PA_1 * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[a2] * PC[b0] * PC[b1] + PA_2 * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_2 * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_2 * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_2 * PB_1 * PB_2 * PC[a1] * PC[b0] + PA_2 * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_2 * PB_2 * PC[a1] * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a1] * PC[a2] + PB_0 * PB_1 * PC[a1] * PC[a2] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[a2] * PC[b1] + PB_1 * PB_2 * PC[a1] * PC[a2] * PC[b0])
+                            + delta[a0][a2] * (PA_1 * PA_m * PB_0 * PC[b1] * PC[b2] + PA_1 * PA_m * PB_1 * PC[b0] * PC[b2] + PA_1 * PA_m * PB_2 * PC[b0] * PC[b1] + PA_1 * PA_m * PC[b0] * PC[b1] * PC[b2] + PA_1 * PB_0 * PB_1 * PC[b2] * PC[m] + PA_1 * PB_0 * PB_2 * PC[b1] * PC[m] + PA_1 * PB_0 * PC[b1] * PC[b2] * PC[m] + PA_1 * PB_1 * PB_2 * PC[b0] * PC[m] + PA_1 * PB_1 * PC[b0] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PB_1 * PC[a1] * PC[b2] + PA_m * PB_0 * PB_2 * PC[a1] * PC[b1] + PA_m * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_m * PB_1 * PB_2 * PC[a1] * PC[b0] + PA_m * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a1] * PC[m] + PB_0 * PB_1 * PC[a1] * PC[b2] * PC[m] + PB_0 * PB_2 * PC[a1] * PC[b1] * PC[m] + PB_1 * PB_2 * PC[a1] * PC[b0] * PC[m])
+                            + delta[a0][a1] * (PA_2 * PA_m * PB_0 * PC[b1] * PC[b2] + PA_2 * PA_m * PB_1 * PC[b0] * PC[b2] + PA_2 * PA_m * PB_2 * PC[b0] * PC[b1] + PA_2 * PA_m * PC[b0] * PC[b1] * PC[b2] + PA_2 * PB_0 * PB_1 * PC[b2] * PC[m] + PA_2 * PB_0 * PB_2 * PC[b1] * PC[m] + PA_2 * PB_0 * PC[b1] * PC[b2] * PC[m] + PA_2 * PB_1 * PB_2 * PC[b0] * PC[m] + PA_2 * PB_1 * PC[b0] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PB_1 * PC[a2] * PC[b2] + PA_m * PB_0 * PB_2 * PC[a2] * PC[b1] + PA_m * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_m * PB_1 * PB_2 * PC[a2] * PC[b0] + PA_m * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_m * PB_2 * PC[a2] * PC[b0] * PC[b1] + PB_0 * PB_1 * PB_2 * PC[a2] * PC[m] + PB_0 * PB_1 * PC[a2] * PC[b2] * PC[m] + PB_0 * PB_2 * PC[a2] * PC[b1] * PC[m] + PB_1 * PB_2 * PC[a2] * PC[b0] * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_1 * PA_2 * PA_m * PC[b0] * PC[b1] * PC[b2]
+                            + PA_0 * PA_1 * PA_2 * PB_0 * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PA_2 * PB_1 * PC[b0] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PA_2 * PB_2 * PC[b0] * PC[b1] * PC[m]
+                            + PA_0 * PA_1 * PA_m * PB_0 * PC[a2] * PC[b1] * PC[b2]
+                            + PA_0 * PA_1 * PA_m * PB_1 * PC[a2] * PC[b0] * PC[b2]
+                            + PA_0 * PA_1 * PA_m * PB_2 * PC[a2] * PC[b0] * PC[b1]
+                            + PA_0 * PA_1 * PB_0 * PB_1 * PC[a2] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PB_0 * PB_2 * PC[a2] * PC[b1] * PC[m]
+                            + PA_0 * PA_1 * PB_1 * PB_2 * PC[a2] * PC[b0] * PC[m]
+                            + PA_0 * PA_2 * PA_m * PB_0 * PC[a1] * PC[b1] * PC[b2]
+                            + PA_0 * PA_2 * PA_m * PB_1 * PC[a1] * PC[b0] * PC[b2]
+                            + PA_0 * PA_2 * PA_m * PB_2 * PC[a1] * PC[b0] * PC[b1]
+                            + PA_0 * PA_2 * PB_0 * PB_1 * PC[a1] * PC[b2] * PC[m]
+                            + PA_0 * PA_2 * PB_0 * PB_2 * PC[a1] * PC[b1] * PC[m]
+                            + PA_0 * PA_2 * PB_1 * PB_2 * PC[a1] * PC[b0] * PC[m]
+                            + PA_0 * PA_m * PB_0 * PB_1 * PC[a1] * PC[a2] * PC[b2]
+                            + PA_0 * PA_m * PB_0 * PB_2 * PC[a1] * PC[a2] * PC[b1]
+                            + PA_0 * PA_m * PB_1 * PB_2 * PC[a1] * PC[a2] * PC[b0]
+                            + PA_0 * PB_0 * PB_1 * PB_2 * PC[a1] * PC[a2] * PC[m]
+                            + PA_1 * PA_2 * PA_m * PB_0 * PC[a0] * PC[b1] * PC[b2]
+                            + PA_1 * PA_2 * PA_m * PB_1 * PC[a0] * PC[b0] * PC[b2]
+                            + PA_1 * PA_2 * PA_m * PB_2 * PC[a0] * PC[b0] * PC[b1]
+                            + PA_1 * PA_2 * PB_0 * PB_1 * PC[a0] * PC[b2] * PC[m]
+                            + PA_1 * PA_2 * PB_0 * PB_2 * PC[a0] * PC[b1] * PC[m]
+                            + PA_1 * PA_2 * PB_1 * PB_2 * PC[a0] * PC[b0] * PC[m]
+                            + PA_1 * PA_m * PB_0 * PB_1 * PC[a0] * PC[a2] * PC[b2]
+                            + PA_1 * PA_m * PB_0 * PB_2 * PC[a0] * PC[a2] * PC[b1]
+                            + PA_1 * PA_m * PB_1 * PB_2 * PC[a0] * PC[a2] * PC[b0]
+                            + PA_1 * PB_0 * PB_1 * PB_2 * PC[a0] * PC[a2] * PC[m]
+                            + PA_2 * PA_m * PB_0 * PB_1 * PC[a0] * PC[a1] * PC[b2]
+                            + PA_2 * PA_m * PB_0 * PB_2 * PC[a0] * PC[a1] * PC[b1]
+                            + PA_2 * PA_m * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[b0]
+                            + PA_2 * PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[m]
+                            + PA_m * PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[a2]
+                        )
+
+                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) ) * (
+                            (delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PC[a0])
+                            + (delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PC[a1])
+                            + (delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PC[a2])
+                            + (delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PC[b0])
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PC[b1])
+                            + (delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PC[b2])
+                        )
+
+                        + 0.5 / (a_i + a_j) * (
+                            delta[a2][m] * delta[b1][b2] * (PA_0 * PC[a1] * PC[b0] + PA_1 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b0])
+                            + delta[a2][m] * delta[b0][b2] * (PA_0 * PC[a1] * PC[b1] + PA_1 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b1])
+                            + delta[a2][m] * delta[b0][b1] * (PA_0 * PC[a1] * PC[b2] + PA_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b2])
+                            + delta[a1][m] * delta[b1][b2] * (PA_0 * PC[a2] * PC[b0] + PA_2 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a2] + PC[a0] * PC[a2] * PC[b0])
+                            + delta[a1][m] * delta[b0][b2] * (PA_0 * PC[a2] * PC[b1] + PA_2 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a2] + PC[a0] * PC[a2] * PC[b1])
+                            + delta[a1][m] * delta[b0][b1] * (PA_0 * PC[a2] * PC[b2] + PA_2 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a2] + PC[a0] * PC[a2] * PC[b2])
+                            + (delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0] + PC[a0] * PC[b0] * PC[b1])
+                            + (delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b0] + PC[a0] * PC[b0] * PC[b2])
+                            + (delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b1] + PC[a0] * PC[b1] * PC[b2])
+                            + delta[a0][m] * delta[b1][b2] * (PA_1 * PC[a2] * PC[b0] + PA_2 * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[a2] + PC[a1] * PC[a2] * PC[b0])
+                            + delta[a0][m] * delta[b0][b2] * (PA_1 * PC[a2] * PC[b1] + PA_2 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[a2] + PC[a1] * PC[a2] * PC[b1])
+                            + delta[a0][m] * delta[b0][b1] * (PA_1 * PC[a2] * PC[b2] + PA_2 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[a2] + PC[a1] * PC[a2] * PC[b2])
+                            + (delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PC[b0] * PC[b1] + PB_0 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[b0] + PC[a1] * PC[b0] * PC[b1])
+                            + (delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PC[b0] * PC[b2] + PB_0 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b0] + PC[a1] * PC[b0] * PC[b2])
+                            + (delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b1] + PC[a1] * PC[b1] * PC[b2])
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PC[b0] * PC[b1] + PB_0 * PC[a2] * PC[b1] + PB_1 * PC[a2] * PC[b0] + PC[a2] * PC[b0] * PC[b1])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PC[b0] * PC[b2] + PB_0 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b0] + PC[a2] * PC[b0] * PC[b2])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PC[b1] * PC[b2] + PB_1 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b1] + PC[a2] * PC[b1] * PC[b2])
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PC[b1] * PC[b2] + PB_1 * PC[b0] * PC[b2] + PB_2 * PC[b0] * PC[b1] + PC[b0] * PC[b1] * PC[b2])
+                        )
+
+                        + (
+                            delta[a2][m] * (PA_0 * PA_1 * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[b0] * PC[b1] + PA_1 * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[b0])
+                            + delta[a1][m] * (PA_0 * PA_2 * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[a2] * PC[b0] * PC[b1] + PA_2 * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_2 * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[a2] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a2] * PC[b1] + PB_1 * PB_2 * PC[a0] * PC[a2] * PC[b0])
+                            + delta[a0][m] * (PA_1 * PA_2 * PC[b0] * PC[b1] * PC[b2] + PA_1 * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[a2] * PC[b0] * PC[b1] + PA_2 * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_2 * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_2 * PB_2 * PC[a1] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a1] * PC[a2] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[a2] * PC[b1] + PB_1 * PB_2 * PC[a1] * PC[a2] * PC[b0])
+                        )
+
+                    )
+
+                    + F7_t[4] * (
+
+                        (-0.5) / (a_i + a_j) * (
+                            delta[a2][m] * delta[b1][b2] * (PC[a0] * PC[a1] * PC[b0])
+                            + delta[a2][m] * delta[b0][b2] * (PC[a0] * PC[a1] * PC[b1])
+                            + delta[a2][m] * delta[b0][b1] * (PC[a0] * PC[a1] * PC[b2])
+                            + delta[a1][m] * delta[b1][b2] * (PC[a0] * PC[a2] * PC[b0])
+                            + delta[a1][m] * delta[b0][b2] * (PC[a0] * PC[a2] * PC[b1])
+                            + delta[a1][m] * delta[b0][b1] * (PC[a0] * PC[a2] * PC[b2])
+                            + (delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PC[a0] * PC[b0] * PC[b1])
+                            + (delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PC[a0] * PC[b0] * PC[b2])
+                            + (delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PC[a0] * PC[b1] * PC[b2])
+                            + delta[a0][m] * delta[b1][b2] * (PC[a1] * PC[a2] * PC[b0])
+                            + delta[a0][m] * delta[b0][b2] * (PC[a1] * PC[a2] * PC[b1])
+                            + delta[a0][m] * delta[b0][b1] * (PC[a1] * PC[a2] * PC[b2])
+                            + (delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PC[a1] * PC[b0] * PC[b1])
+                            + (delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PC[a1] * PC[b0] * PC[b2])
+                            + (delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PC[a1] * PC[b1] * PC[b2])
+                            + (delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PC[a2] * PC[b0] * PC[b1])
+                            + (delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PC[a2] * PC[b0] * PC[b2])
+                            + (delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PC[a2] * PC[b1] * PC[b2])
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PC[b0] * PC[b1] * PC[b2])
+                        )
+
+                        + (-1.0) * (
+                            delta[a2][m] * (PA_0 * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PA_1 * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1])
+                            + delta[a1][m] * (PA_0 * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PA_2 * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a0] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a2] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[b1])
+                            + delta[a0][m] * (PA_1 * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PA_2 * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a1] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[a2] * PC[b0] * PC[b2] + PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[b1])
+                        )
+
+                        + 0.25 / ( (a_i + a_j) * (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[a1][a2] * delta[b0][b1] * delta[b2][m] + delta[a1][a2] * delta[b0][b2] * delta[b1][m] + delta[a1][a2] * delta[b0][m] * delta[b1][b2] + delta[a1][b0] * delta[a2][b1] * delta[b2][m] + delta[a1][b0] * delta[a2][b2] * delta[b1][m] + delta[a1][b0] * delta[a2][m] * delta[b1][b2] + delta[a1][b1] * delta[a2][b0] * delta[b2][m] + delta[a1][b1] * delta[a2][b2] * delta[b0][m] + delta[a1][b1] * delta[a2][m] * delta[b0][b2] + delta[a1][b2] * delta[a2][b0] * delta[b1][m] + delta[a1][b2] * delta[a2][b1] * delta[b0][m] + delta[a1][b2] * delta[a2][m] * delta[b0][b1] + delta[a1][m] * delta[a2][b0] * delta[b1][b2] + delta[a1][m] * delta[a2][b1] * delta[b0][b2] + delta[a1][m] * delta[a2][b2] * delta[b0][b1]) * (PC[a0])
+                            + (delta[a0][a2] * delta[b0][b1] * delta[b2][m] + delta[a0][a2] * delta[b0][b2] * delta[b1][m] + delta[a0][a2] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a2][b1] * delta[b2][m] + delta[a0][b0] * delta[a2][b2] * delta[b1][m] + delta[a0][b0] * delta[a2][m] * delta[b1][b2] + delta[a0][b1] * delta[a2][b0] * delta[b2][m] + delta[a0][b1] * delta[a2][b2] * delta[b0][m] + delta[a0][b1] * delta[a2][m] * delta[b0][b2] + delta[a0][b2] * delta[a2][b0] * delta[b1][m] + delta[a0][b2] * delta[a2][b1] * delta[b0][m] + delta[a0][b2] * delta[a2][m] * delta[b0][b1] + delta[a0][m] * delta[a2][b0] * delta[b1][b2] + delta[a0][m] * delta[a2][b1] * delta[b0][b2] + delta[a0][m] * delta[a2][b2] * delta[b0][b1]) * (PC[a1])
+                            + (delta[a0][a1] * delta[b0][b1] * delta[b2][m] + delta[a0][a1] * delta[b0][b2] * delta[b1][m] + delta[a0][a1] * delta[b0][m] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[b1][m] + delta[a0][b0] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][b0] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[b0][m] + delta[a0][b1] * delta[a1][m] * delta[b0][b2] + delta[a0][b2] * delta[a1][b0] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[b0][m] + delta[a0][b2] * delta[a1][m] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[b0][b2] + delta[a0][m] * delta[a1][b2] * delta[b0][b1]) * (PC[a2])
+                            + (delta[a0][a1] * delta[a2][b1] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b1][m] + delta[a0][a1] * delta[a2][m] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b1][m] + delta[a0][a2] * delta[a1][m] * delta[b1][b2] + delta[a0][b1] * delta[a1][a2] * delta[b2][m] + delta[a0][b1] * delta[a1][b2] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b1][m] + delta[a0][b2] * delta[a1][b1] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b1] + delta[a0][m] * delta[a1][a2] * delta[b1][b2] + delta[a0][m] * delta[a1][b1] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b1]) * (PC[b0])
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b2][m] + delta[a0][a1] * delta[a2][b2] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b2] + delta[a0][a2] * delta[a1][b0] * delta[b2][m] + delta[a0][a2] * delta[a1][b2] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b2] + delta[a0][b0] * delta[a1][a2] * delta[b2][m] + delta[a0][b0] * delta[a1][b2] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b2] + delta[a0][b2] * delta[a1][a2] * delta[b0][m] + delta[a0][b2] * delta[a1][b0] * delta[a2][m] + delta[a0][b2] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b2] + delta[a0][m] * delta[a1][b0] * delta[a2][b2] + delta[a0][m] * delta[a1][b2] * delta[a2][b0]) * (PC[b1])
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][m] + delta[a0][a1] * delta[a2][b1] * delta[b0][m] + delta[a0][a1] * delta[a2][m] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][m] + delta[a0][a2] * delta[a1][b1] * delta[b0][m] + delta[a0][a2] * delta[a1][m] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][m] + delta[a0][b0] * delta[a1][b1] * delta[a2][m] + delta[a0][b0] * delta[a1][m] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][m] + delta[a0][b1] * delta[a1][b0] * delta[a2][m] + delta[a0][b1] * delta[a1][m] * delta[a2][b0] + delta[a0][m] * delta[a1][a2] * delta[b0][b1] + delta[a0][m] * delta[a1][b0] * delta[a2][b1] + delta[a0][m] * delta[a1][b1] * delta[a2][b0]) * (PC[b2])
+                            + (delta[a0][a1] * delta[a2][b0] * delta[b1][b2] + delta[a0][a1] * delta[a2][b1] * delta[b0][b2] + delta[a0][a1] * delta[a2][b2] * delta[b0][b1] + delta[a0][a2] * delta[a1][b0] * delta[b1][b2] + delta[a0][a2] * delta[a1][b1] * delta[b0][b2] + delta[a0][a2] * delta[a1][b2] * delta[b0][b1] + delta[a0][b0] * delta[a1][a2] * delta[b1][b2] + delta[a0][b0] * delta[a1][b1] * delta[a2][b2] + delta[a0][b0] * delta[a1][b2] * delta[a2][b1] + delta[a0][b1] * delta[a1][a2] * delta[b0][b2] + delta[a0][b1] * delta[a1][b0] * delta[a2][b2] + delta[a0][b1] * delta[a1][b2] * delta[a2][b0] + delta[a0][b2] * delta[a1][a2] * delta[b0][b1] + delta[a0][b2] * delta[a1][b0] * delta[a2][b1] + delta[a0][b2] * delta[a1][b1] * delta[a2][b0]) * (PC[m])
+                        )
+
+                        + 0.5 / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PA_0 * PC[a1] * PC[a2] + PA_1 * PC[a0] * PC[a2] + PA_2 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[a2] * 2.0)
+                            + (delta[a2][b1] * delta[b2][m] + delta[a2][b2] * delta[b1][m] + delta[a2][m] * delta[b1][b2]) * (PA_0 * PC[a1] * PC[b0] + PA_1 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b0] * 2.0)
+                            + (delta[a2][b0] * delta[b2][m] + delta[a2][b2] * delta[b0][m] + delta[a2][m] * delta[b0][b2]) * (PA_0 * PC[a1] * PC[b1] + PA_1 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b1] * 2.0)
+                            + (delta[a2][b0] * delta[b1][m] + delta[a2][b1] * delta[b0][m] + delta[a2][m] * delta[b0][b1]) * (PA_0 * PC[a1] * PC[b2] + PA_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[b2] * 2.0)
+                            + (delta[a2][b0] * delta[b1][b2] + delta[a2][b1] * delta[b0][b2] + delta[a2][b2] * delta[b0][b1]) * (PA_0 * PC[a1] * PC[m] + PA_1 * PC[a0] * PC[m] + PA_m * PC[a0] * PC[a1] + PC[a0] * PC[a1] * PC[m] * 2.0)
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PA_0 * PC[a2] * PC[b0] + PA_2 * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[a2] + PC[a0] * PC[a2] * PC[b0] * 2.0)
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PA_0 * PC[a2] * PC[b1] + PA_2 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[a2] + PC[a0] * PC[a2] * PC[b1] * 2.0)
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PA_0 * PC[a2] * PC[b2] + PA_2 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[a2] + PC[a0] * PC[a2] * PC[b2] * 2.0)
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PA_0 * PC[a2] * PC[m] + PA_2 * PC[a0] * PC[m] + PA_m * PC[a0] * PC[a2] + PC[a0] * PC[a2] * PC[m] * 2.0)
+                            + (delta[a1][a2] * delta[b2][m] + delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PA_0 * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[b0] + PC[a0] * PC[b0] * PC[b1] * 2.0)
+                            + (delta[a1][a2] * delta[b1][m] + delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PA_0 * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b0] + PC[a0] * PC[b0] * PC[b2] * 2.0)
+                            + (delta[a1][a2] * delta[b1][b2] + delta[a1][b1] * delta[a2][b2] + delta[a1][b2] * delta[a2][b1]) * (PA_0 * PC[b0] * PC[m] + PA_m * PC[a0] * PC[b0] + PB_0 * PC[a0] * PC[m] + PC[a0] * PC[b0] * PC[m] * 2.0)
+                            + (delta[a1][a2] * delta[b0][m] + delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PA_0 * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[b1] + PC[a0] * PC[b1] * PC[b2] * 2.0)
+                            + (delta[a1][a2] * delta[b0][b2] + delta[a1][b0] * delta[a2][b2] + delta[a1][b2] * delta[a2][b0]) * (PA_0 * PC[b1] * PC[m] + PA_m * PC[a0] * PC[b1] + PB_1 * PC[a0] * PC[m] + PC[a0] * PC[b1] * PC[m] * 2.0)
+                            + (delta[a1][a2] * delta[b0][b1] + delta[a1][b0] * delta[a2][b1] + delta[a1][b1] * delta[a2][b0]) * (PA_0 * PC[b2] * PC[m] + PA_m * PC[a0] * PC[b2] + PB_2 * PC[a0] * PC[m] + PC[a0] * PC[b2] * PC[m] * 2.0)
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PA_1 * PC[a2] * PC[b0] + PA_2 * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[a2] + PC[a1] * PC[a2] * PC[b0] * 2.0)
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PA_1 * PC[a2] * PC[b1] + PA_2 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[a2] + PC[a1] * PC[a2] * PC[b1] * 2.0)
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PA_1 * PC[a2] * PC[b2] + PA_2 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[a2] + PC[a1] * PC[a2] * PC[b2] * 2.0)
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PA_1 * PC[a2] * PC[m] + PA_2 * PC[a1] * PC[m] + PA_m * PC[a1] * PC[a2] + PC[a1] * PC[a2] * PC[m] * 2.0)
+                            + (delta[a0][a2] * delta[b2][m] + delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PA_1 * PC[b0] * PC[b1] + PB_0 * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[b0] + PC[a1] * PC[b0] * PC[b1] * 2.0)
+                            + (delta[a0][a2] * delta[b1][m] + delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PA_1 * PC[b0] * PC[b2] + PB_0 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b0] + PC[a1] * PC[b0] * PC[b2] * 2.0)
+                            + (delta[a0][a2] * delta[b1][b2] + delta[a0][b1] * delta[a2][b2] + delta[a0][b2] * delta[a2][b1]) * (PA_1 * PC[b0] * PC[m] + PA_m * PC[a1] * PC[b0] + PB_0 * PC[a1] * PC[m] + PC[a1] * PC[b0] * PC[m] * 2.0)
+                            + (delta[a0][a2] * delta[b0][m] + delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PA_1 * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[b1] + PC[a1] * PC[b1] * PC[b2] * 2.0)
+                            + (delta[a0][a2] * delta[b0][b2] + delta[a0][b0] * delta[a2][b2] + delta[a0][b2] * delta[a2][b0]) * (PA_1 * PC[b1] * PC[m] + PA_m * PC[a1] * PC[b1] + PB_1 * PC[a1] * PC[m] + PC[a1] * PC[b1] * PC[m] * 2.0)
+                            + (delta[a0][a2] * delta[b0][b1] + delta[a0][b0] * delta[a2][b1] + delta[a0][b1] * delta[a2][b0]) * (PA_1 * PC[b2] * PC[m] + PA_m * PC[a1] * PC[b2] + PB_2 * PC[a1] * PC[m] + PC[a1] * PC[b2] * PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PA_2 * PC[b0] * PC[b1] + PB_0 * PC[a2] * PC[b1] + PB_1 * PC[a2] * PC[b0] + PC[a2] * PC[b0] * PC[b1] * 2.0)
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PA_2 * PC[b0] * PC[b2] + PB_0 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b0] + PC[a2] * PC[b0] * PC[b2] * 2.0)
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PA_2 * PC[b0] * PC[m] + PA_m * PC[a2] * PC[b0] + PB_0 * PC[a2] * PC[m] + PC[a2] * PC[b0] * PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PA_2 * PC[b1] * PC[b2] + PB_1 * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[b1] + PC[a2] * PC[b1] * PC[b2] * 2.0)
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PA_2 * PC[b1] * PC[m] + PA_m * PC[a2] * PC[b1] + PB_1 * PC[a2] * PC[m] + PC[a2] * PC[b1] * PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PA_2 * PC[b2] * PC[m] + PA_m * PC[a2] * PC[b2] + PB_2 * PC[a2] * PC[m] + PC[a2] * PC[b2] * PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[a2][b2] + delta[a0][a2] * delta[a1][b2] + delta[a0][b2] * delta[a1][a2]) * (PA_m * PC[b0] * PC[b1] + PB_0 * PC[b1] * PC[m] + PB_1 * PC[b0] * PC[m] + PC[b0] * PC[b1] * PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[a2][b1] + delta[a0][a2] * delta[a1][b1] + delta[a0][b1] * delta[a1][a2]) * (PA_m * PC[b0] * PC[b2] + PB_0 * PC[b2] * PC[m] + PB_2 * PC[b0] * PC[m] + PC[b0] * PC[b2] * PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[a2][b0] + delta[a0][a2] * delta[a1][b0] + delta[a0][b0] * delta[a1][a2]) * (PA_m * PC[b1] * PC[b2] + PB_1 * PC[b2] * PC[m] + PB_2 * PC[b1] * PC[m] + PC[b1] * PC[b2] * PC[m] * 2.0)
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PB_0 * PC[b1] * PC[b2] + PB_1 * PC[b0] * PC[b2] + PB_2 * PC[b0] * PC[b1] + PC[b0] * PC[b1] * PC[b2] * 2.0)
+                        )
+
+                        + 1.0 / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PA_0 * PA_1 * PC[a2] * PC[b0] * PC[b1] + PA_0 * PA_2 * PC[a1] * PC[b0] * PC[b1] + PA_0 * PB_0 * PC[a1] * PC[a2] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[a2] * PC[b0] + PA_0 * PC[a1] * PC[a2] * PC[b0] * PC[b1] + PA_1 * PA_2 * PC[a0] * PC[b0] * PC[b1] + PA_1 * PB_0 * PC[a0] * PC[a2] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[a2] * PC[b0] + PA_1 * PC[a0] * PC[a2] * PC[b0] * PC[b1] + PA_2 * PB_0 * PC[a0] * PC[a1] * PC[b1] + PA_2 * PB_1 * PC[a0] * PC[a1] * PC[b0] + PA_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[a2] + PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b0])
+                            + delta[b1][m] * (PA_0 * PA_1 * PC[a2] * PC[b0] * PC[b2] + PA_0 * PA_2 * PC[a1] * PC[b0] * PC[b2] + PA_0 * PB_0 * PC[a1] * PC[a2] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[a2] * PC[b0] + PA_0 * PC[a1] * PC[a2] * PC[b0] * PC[b2] + PA_1 * PA_2 * PC[a0] * PC[b0] * PC[b2] + PA_1 * PB_0 * PC[a0] * PC[a2] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[a2] * PC[b0] + PA_1 * PC[a0] * PC[a2] * PC[b0] * PC[b2] + PA_2 * PB_0 * PC[a0] * PC[a1] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[a1] * PC[b0] + PA_2 * PC[a0] * PC[a1] * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[a2] + PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b0])
+                            + delta[b1][b2] * (PA_0 * PA_1 * PC[a2] * PC[b0] * PC[m] + PA_0 * PA_2 * PC[a1] * PC[b0] * PC[m] + PA_0 * PA_m * PC[a1] * PC[a2] * PC[b0] + PA_0 * PB_0 * PC[a1] * PC[a2] * PC[m] + PA_0 * PC[a1] * PC[a2] * PC[b0] * PC[m] + PA_1 * PA_2 * PC[a0] * PC[b0] * PC[m] + PA_1 * PA_m * PC[a0] * PC[a2] * PC[b0] + PA_1 * PB_0 * PC[a0] * PC[a2] * PC[m] + PA_1 * PC[a0] * PC[a2] * PC[b0] * PC[m] + PA_2 * PA_m * PC[a0] * PC[a1] * PC[b0] + PA_2 * PB_0 * PC[a0] * PC[a1] * PC[m] + PA_2 * PC[a0] * PC[a1] * PC[b0] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a1] * PC[a2] + PA_m * PC[a0] * PC[a1] * PC[a2] * PC[b0] + PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[m])
+                            + delta[b0][m] * (PA_0 * PA_1 * PC[a2] * PC[b1] * PC[b2] + PA_0 * PA_2 * PC[a1] * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a1] * PC[a2] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[a2] * PC[b1] + PA_0 * PC[a1] * PC[a2] * PC[b1] * PC[b2] + PA_1 * PA_2 * PC[a0] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a0] * PC[a2] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[a2] * PC[b1] + PA_1 * PC[a0] * PC[a2] * PC[b1] * PC[b2] + PA_2 * PB_1 * PC[a0] * PC[a1] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[a1] * PC[b1] + PA_2 * PC[a0] * PC[a1] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[a2] + PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b1])
+                            + delta[b0][b2] * (PA_0 * PA_1 * PC[a2] * PC[b1] * PC[m] + PA_0 * PA_2 * PC[a1] * PC[b1] * PC[m] + PA_0 * PA_m * PC[a1] * PC[a2] * PC[b1] + PA_0 * PB_1 * PC[a1] * PC[a2] * PC[m] + PA_0 * PC[a1] * PC[a2] * PC[b1] * PC[m] + PA_1 * PA_2 * PC[a0] * PC[b1] * PC[m] + PA_1 * PA_m * PC[a0] * PC[a2] * PC[b1] + PA_1 * PB_1 * PC[a0] * PC[a2] * PC[m] + PA_1 * PC[a0] * PC[a2] * PC[b1] * PC[m] + PA_2 * PA_m * PC[a0] * PC[a1] * PC[b1] + PA_2 * PB_1 * PC[a0] * PC[a1] * PC[m] + PA_2 * PC[a0] * PC[a1] * PC[b1] * PC[m] + PA_m * PB_1 * PC[a0] * PC[a1] * PC[a2] + PA_m * PC[a0] * PC[a1] * PC[a2] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[m])
+                            + delta[b0][b1] * (PA_0 * PA_1 * PC[a2] * PC[b2] * PC[m] + PA_0 * PA_2 * PC[a1] * PC[b2] * PC[m] + PA_0 * PA_m * PC[a1] * PC[a2] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[a2] * PC[m] + PA_0 * PC[a1] * PC[a2] * PC[b2] * PC[m] + PA_1 * PA_2 * PC[a0] * PC[b2] * PC[m] + PA_1 * PA_m * PC[a0] * PC[a2] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[a2] * PC[m] + PA_1 * PC[a0] * PC[a2] * PC[b2] * PC[m] + PA_2 * PA_m * PC[a0] * PC[a1] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[a1] * PC[m] + PA_2 * PC[a0] * PC[a1] * PC[b2] * PC[m] + PA_m * PB_2 * PC[a0] * PC[a1] * PC[a2] + PA_m * PC[a0] * PC[a1] * PC[a2] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[m])
+                            + delta[a2][m] * (PA_0 * PA_1 * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[a1] * PC[b0] * PC[b1] + PA_0 * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PA_1 * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[a0] * PC[b0] * PC[b1] + PA_1 * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[b1] + PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[b0] + PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1])
+                            + delta[a2][b2] * (PA_0 * PA_1 * PC[b0] * PC[b1] * PC[m] + PA_0 * PA_m * PC[a1] * PC[b0] * PC[b1] + PA_0 * PB_0 * PC[a1] * PC[b1] * PC[m] + PA_0 * PB_1 * PC[a1] * PC[b0] * PC[m] + PA_0 * PC[a1] * PC[b0] * PC[b1] * PC[m] + PA_1 * PA_m * PC[a0] * PC[b0] * PC[b1] + PA_1 * PB_0 * PC[a0] * PC[b1] * PC[m] + PA_1 * PB_1 * PC[a0] * PC[b0] * PC[m] + PA_1 * PC[a0] * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a1] * PC[b1] + PA_m * PB_1 * PC[a0] * PC[a1] * PC[b0] + PA_m * PC[a0] * PC[a1] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[m] + PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[m] + PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[m])
+                            + delta[a2][b1] * (PA_0 * PA_1 * PC[b0] * PC[b2] * PC[m] + PA_0 * PA_m * PC[a1] * PC[b0] * PC[b2] + PA_0 * PB_0 * PC[a1] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a1] * PC[b0] * PC[m] + PA_0 * PC[a1] * PC[b0] * PC[b2] * PC[m] + PA_1 * PA_m * PC[a0] * PC[b0] * PC[b2] + PA_1 * PB_0 * PC[a0] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a0] * PC[b0] * PC[m] + PA_1 * PC[a0] * PC[b0] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a1] * PC[b0] + PA_m * PC[a0] * PC[a1] * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[m] + PB_0 * PC[a0] * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[m])
+                            + delta[a2][b0] * (PA_0 * PA_1 * PC[b1] * PC[b2] * PC[m] + PA_0 * PA_m * PC[a1] * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a1] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a1] * PC[b1] * PC[m] + PA_0 * PC[a1] * PC[b1] * PC[b2] * PC[m] + PA_1 * PA_m * PC[a0] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a0] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a0] * PC[b1] * PC[m] + PA_1 * PC[a0] * PC[b1] * PC[b2] * PC[m] + PA_m * PB_1 * PC[a0] * PC[a1] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a1] * PC[b1] + PA_m * PC[a0] * PC[a1] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[m] + PB_1 * PC[a0] * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a1] * PC[b1] * PC[m])
+                            + delta[a1][m] * (PA_0 * PA_2 * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_0 * PB_2 * PC[a2] * PC[b0] * PC[b1] + PA_0 * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PA_2 * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_2 * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_2 * PB_2 * PC[a0] * PC[b0] * PC[b1] + PA_2 * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a0] * PC[a2] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a2] * PC[b1] + PB_0 * PC[a0] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[a2] * PC[b0] + PB_1 * PC[a0] * PC[a2] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[b1])
+                            + delta[a1][b2] * (PA_0 * PA_2 * PC[b0] * PC[b1] * PC[m] + PA_0 * PA_m * PC[a2] * PC[b0] * PC[b1] + PA_0 * PB_0 * PC[a2] * PC[b1] * PC[m] + PA_0 * PB_1 * PC[a2] * PC[b0] * PC[m] + PA_0 * PC[a2] * PC[b0] * PC[b1] * PC[m] + PA_2 * PA_m * PC[a0] * PC[b0] * PC[b1] + PA_2 * PB_0 * PC[a0] * PC[b1] * PC[m] + PA_2 * PB_1 * PC[a0] * PC[b0] * PC[m] + PA_2 * PC[a0] * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a2] * PC[b1] + PA_m * PB_1 * PC[a0] * PC[a2] * PC[b0] + PA_m * PC[a0] * PC[a2] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a0] * PC[a2] * PC[m] + PB_0 * PC[a0] * PC[a2] * PC[b1] * PC[m] + PB_1 * PC[a0] * PC[a2] * PC[b0] * PC[m])
+                            + delta[a1][b1] * (PA_0 * PA_2 * PC[b0] * PC[b2] * PC[m] + PA_0 * PA_m * PC[a2] * PC[b0] * PC[b2] + PA_0 * PB_0 * PC[a2] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a2] * PC[b0] * PC[m] + PA_0 * PC[a2] * PC[b0] * PC[b2] * PC[m] + PA_2 * PA_m * PC[a0] * PC[b0] * PC[b2] + PA_2 * PB_0 * PC[a0] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a0] * PC[b0] * PC[m] + PA_2 * PC[a0] * PC[b0] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a0] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a2] * PC[b0] + PA_m * PC[a0] * PC[a2] * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a0] * PC[a2] * PC[m] + PB_0 * PC[a0] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PA_2 * PC[b1] * PC[b2] * PC[m] + PA_0 * PA_m * PC[a2] * PC[b1] * PC[b2] + PA_0 * PB_1 * PC[a2] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[a2] * PC[b1] * PC[m] + PA_0 * PC[a2] * PC[b1] * PC[b2] * PC[m] + PA_2 * PA_m * PC[a0] * PC[b1] * PC[b2] + PA_2 * PB_1 * PC[a0] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a0] * PC[b1] * PC[m] + PA_2 * PC[a0] * PC[b1] * PC[b2] * PC[m] + PA_m * PB_1 * PC[a0] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[a2] * PC[b1] + PA_m * PC[a0] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a0] * PC[a2] * PC[m] + PB_1 * PC[a0] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a2] * PC[b1] * PC[m])
+                            + delta[a1][a2] * (PA_0 * PA_m * PC[b0] * PC[b1] * PC[b2] + PA_0 * PB_0 * PC[b1] * PC[b2] * PC[m] + PA_0 * PB_1 * PC[b0] * PC[b2] * PC[m] + PA_0 * PB_2 * PC[b0] * PC[b1] * PC[m] + PA_0 * PC[b0] * PC[b1] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a0] * PC[b1] * PC[b2] + PA_m * PB_1 * PC[a0] * PC[b0] * PC[b2] + PA_m * PB_2 * PC[a0] * PC[b0] * PC[b1] + PA_m * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a0] * PC[b2] * PC[m] + PB_0 * PB_2 * PC[a0] * PC[b1] * PC[m] + PB_0 * PC[a0] * PC[b1] * PC[b2] * PC[m] + PB_1 * PB_2 * PC[a0] * PC[b0] * PC[m] + PB_1 * PC[a0] * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][m] * (PA_1 * PA_2 * PC[b0] * PC[b1] * PC[b2] + PA_1 * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_1 * PB_2 * PC[a2] * PC[b0] * PC[b1] + PA_1 * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PA_2 * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_2 * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_2 * PB_2 * PC[a1] * PC[b0] * PC[b1] + PA_2 * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a1] * PC[a2] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[a2] * PC[b1] + PB_0 * PC[a1] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a1] * PC[a2] * PC[b0] + PB_1 * PC[a1] * PC[a2] * PC[b0] * PC[b2] + PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[b1])
+                            + delta[a0][b2] * (PA_1 * PA_2 * PC[b0] * PC[b1] * PC[m] + PA_1 * PA_m * PC[a2] * PC[b0] * PC[b1] + PA_1 * PB_0 * PC[a2] * PC[b1] * PC[m] + PA_1 * PB_1 * PC[a2] * PC[b0] * PC[m] + PA_1 * PC[a2] * PC[b0] * PC[b1] * PC[m] + PA_2 * PA_m * PC[a1] * PC[b0] * PC[b1] + PA_2 * PB_0 * PC[a1] * PC[b1] * PC[m] + PA_2 * PB_1 * PC[a1] * PC[b0] * PC[m] + PA_2 * PC[a1] * PC[b0] * PC[b1] * PC[m] + PA_m * PB_0 * PC[a1] * PC[a2] * PC[b1] + PA_m * PB_1 * PC[a1] * PC[a2] * PC[b0] + PA_m * PC[a1] * PC[a2] * PC[b0] * PC[b1] + PB_0 * PB_1 * PC[a1] * PC[a2] * PC[m] + PB_0 * PC[a1] * PC[a2] * PC[b1] * PC[m] + PB_1 * PC[a1] * PC[a2] * PC[b0] * PC[m])
+                            + delta[a0][b1] * (PA_1 * PA_2 * PC[b0] * PC[b2] * PC[m] + PA_1 * PA_m * PC[a2] * PC[b0] * PC[b2] + PA_1 * PB_0 * PC[a2] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a2] * PC[b0] * PC[m] + PA_1 * PC[a2] * PC[b0] * PC[b2] * PC[m] + PA_2 * PA_m * PC[a1] * PC[b0] * PC[b2] + PA_2 * PB_0 * PC[a1] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a1] * PC[b0] * PC[m] + PA_2 * PC[a1] * PC[b0] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a1] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[a2] * PC[b0] + PA_m * PC[a1] * PC[a2] * PC[b0] * PC[b2] + PB_0 * PB_2 * PC[a1] * PC[a2] * PC[m] + PB_0 * PC[a1] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PA_2 * PC[b1] * PC[b2] * PC[m] + PA_1 * PA_m * PC[a2] * PC[b1] * PC[b2] + PA_1 * PB_1 * PC[a2] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[a2] * PC[b1] * PC[m] + PA_1 * PC[a2] * PC[b1] * PC[b2] * PC[m] + PA_2 * PA_m * PC[a1] * PC[b1] * PC[b2] + PA_2 * PB_1 * PC[a1] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[a1] * PC[b1] * PC[m] + PA_2 * PC[a1] * PC[b1] * PC[b2] * PC[m] + PA_m * PB_1 * PC[a1] * PC[a2] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[a2] * PC[b1] + PA_m * PC[a1] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PB_2 * PC[a1] * PC[a2] * PC[m] + PB_1 * PC[a1] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[a2] * PC[b1] * PC[m])
+                            + delta[a0][a2] * (PA_1 * PA_m * PC[b0] * PC[b1] * PC[b2] + PA_1 * PB_0 * PC[b1] * PC[b2] * PC[m] + PA_1 * PB_1 * PC[b0] * PC[b2] * PC[m] + PA_1 * PB_2 * PC[b0] * PC[b1] * PC[m] + PA_1 * PC[b0] * PC[b1] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a1] * PC[b1] * PC[b2] + PA_m * PB_1 * PC[a1] * PC[b0] * PC[b2] + PA_m * PB_2 * PC[a1] * PC[b0] * PC[b1] + PA_m * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a1] * PC[b2] * PC[m] + PB_0 * PB_2 * PC[a1] * PC[b1] * PC[m] + PB_0 * PC[a1] * PC[b1] * PC[b2] * PC[m] + PB_1 * PB_2 * PC[a1] * PC[b0] * PC[m] + PB_1 * PC[a1] * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][a1] * (PA_2 * PA_m * PC[b0] * PC[b1] * PC[b2] + PA_2 * PB_0 * PC[b1] * PC[b2] * PC[m] + PA_2 * PB_1 * PC[b0] * PC[b2] * PC[m] + PA_2 * PB_2 * PC[b0] * PC[b1] * PC[m] + PA_2 * PC[b0] * PC[b1] * PC[b2] * PC[m] + PA_m * PB_0 * PC[a2] * PC[b1] * PC[b2] + PA_m * PB_1 * PC[a2] * PC[b0] * PC[b2] + PA_m * PB_2 * PC[a2] * PC[b0] * PC[b1] + PA_m * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PB_1 * PC[a2] * PC[b2] * PC[m] + PB_0 * PB_2 * PC[a2] * PC[b1] * PC[m] + PB_0 * PC[a2] * PC[b1] * PC[b2] * PC[m] + PB_1 * PB_2 * PC[a2] * PC[b0] * PC[m] + PB_1 * PC[a2] * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[a2] * PC[b0] * PC[b1] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PA_1 * PA_2 * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PA_m * PC[a2] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_0 * PA_1 * PB_0 * PC[a2] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PB_1 * PC[a2] * PC[b0] * PC[b2] * PC[m]
+                            + PA_0 * PA_1 * PB_2 * PC[a2] * PC[b0] * PC[b1] * PC[m]
+                            + PA_0 * PA_2 * PA_m * PC[a1] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_0 * PA_2 * PB_0 * PC[a1] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_2 * PB_1 * PC[a1] * PC[b0] * PC[b2] * PC[m]
+                            + PA_0 * PA_2 * PB_2 * PC[a1] * PC[b0] * PC[b1] * PC[m]
+                            + PA_0 * PA_m * PB_0 * PC[a1] * PC[a2] * PC[b1] * PC[b2]
+                            + PA_0 * PA_m * PB_1 * PC[a1] * PC[a2] * PC[b0] * PC[b2]
+                            + PA_0 * PA_m * PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[b1]
+                            + PA_0 * PB_0 * PB_1 * PC[a1] * PC[a2] * PC[b2] * PC[m]
+                            + PA_0 * PB_0 * PB_2 * PC[a1] * PC[a2] * PC[b1] * PC[m]
+                            + PA_0 * PB_1 * PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[m]
+                            + PA_1 * PA_2 * PA_m * PC[a0] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_1 * PA_2 * PB_0 * PC[a0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_1 * PA_2 * PB_1 * PC[a0] * PC[b0] * PC[b2] * PC[m]
+                            + PA_1 * PA_2 * PB_2 * PC[a0] * PC[b0] * PC[b1] * PC[m]
+                            + PA_1 * PA_m * PB_0 * PC[a0] * PC[a2] * PC[b1] * PC[b2]
+                            + PA_1 * PA_m * PB_1 * PC[a0] * PC[a2] * PC[b0] * PC[b2]
+                            + PA_1 * PA_m * PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[b1]
+                            + PA_1 * PB_0 * PB_1 * PC[a0] * PC[a2] * PC[b2] * PC[m]
+                            + PA_1 * PB_0 * PB_2 * PC[a0] * PC[a2] * PC[b1] * PC[m]
+                            + PA_1 * PB_1 * PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[m]
+                            + PA_2 * PA_m * PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[b2]
+                            + PA_2 * PA_m * PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[b2]
+                            + PA_2 * PA_m * PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1]
+                            + PA_2 * PB_0 * PB_1 * PC[a0] * PC[a1] * PC[b2] * PC[m]
+                            + PA_2 * PB_0 * PB_2 * PC[a0] * PC[a1] * PC[b1] * PC[m]
+                            + PA_2 * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[m]
+                            + PA_m * PB_0 * PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b2]
+                            + PA_m * PB_0 * PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b1]
+                            + PA_m * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b0]
+                            + PB_0 * PB_1 * PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[m]
+                        )
+
+                    )
+
+                    + F7_t[5] * (
+
+                        (-0.5) / ( (a_i + a_j) * (a_i + a_j) ) * a_i * (
+                            (delta[b0][b1] * delta[b2][m] + delta[b0][b2] * delta[b1][m] + delta[b0][m] * delta[b1][b2]) * (PC[a0] * PC[a1] * PC[a2])
+                            + (delta[a2][b1] * delta[b2][m] + delta[a2][b2] * delta[b1][m] + delta[a2][m] * delta[b1][b2]) * (PC[a0] * PC[a1] * PC[b0])
+                            + (delta[a2][b0] * delta[b2][m] + delta[a2][b2] * delta[b0][m] + delta[a2][m] * delta[b0][b2]) * (PC[a0] * PC[a1] * PC[b1])
+                            + (delta[a2][b0] * delta[b1][m] + delta[a2][b1] * delta[b0][m] + delta[a2][m] * delta[b0][b1]) * (PC[a0] * PC[a1] * PC[b2])
+                            + (delta[a2][b0] * delta[b1][b2] + delta[a2][b1] * delta[b0][b2] + delta[a2][b2] * delta[b0][b1]) * (PC[a0] * PC[a1] * PC[m])
+                            + (delta[a1][b1] * delta[b2][m] + delta[a1][b2] * delta[b1][m] + delta[a1][m] * delta[b1][b2]) * (PC[a0] * PC[a2] * PC[b0])
+                            + (delta[a1][b0] * delta[b2][m] + delta[a1][b2] * delta[b0][m] + delta[a1][m] * delta[b0][b2]) * (PC[a0] * PC[a2] * PC[b1])
+                            + (delta[a1][b0] * delta[b1][m] + delta[a1][b1] * delta[b0][m] + delta[a1][m] * delta[b0][b1]) * (PC[a0] * PC[a2] * PC[b2])
+                            + (delta[a1][b0] * delta[b1][b2] + delta[a1][b1] * delta[b0][b2] + delta[a1][b2] * delta[b0][b1]) * (PC[a0] * PC[a2] * PC[m])
+                            + (delta[a1][a2] * delta[b2][m] + delta[a1][b2] * delta[a2][m] + delta[a1][m] * delta[a2][b2]) * (PC[a0] * PC[b0] * PC[b1])
+                            + (delta[a1][a2] * delta[b1][m] + delta[a1][b1] * delta[a2][m] + delta[a1][m] * delta[a2][b1]) * (PC[a0] * PC[b0] * PC[b2])
+                            + (delta[a1][a2] * delta[b1][b2] + delta[a1][b1] * delta[a2][b2] + delta[a1][b2] * delta[a2][b1]) * (PC[a0] * PC[b0] * PC[m])
+                            + (delta[a1][a2] * delta[b0][m] + delta[a1][b0] * delta[a2][m] + delta[a1][m] * delta[a2][b0]) * (PC[a0] * PC[b1] * PC[b2])
+                            + (delta[a1][a2] * delta[b0][b2] + delta[a1][b0] * delta[a2][b2] + delta[a1][b2] * delta[a2][b0]) * (PC[a0] * PC[b1] * PC[m])
+                            + (delta[a1][a2] * delta[b0][b1] + delta[a1][b0] * delta[a2][b1] + delta[a1][b1] * delta[a2][b0]) * (PC[a0] * PC[b2] * PC[m])
+                            + (delta[a0][b1] * delta[b2][m] + delta[a0][b2] * delta[b1][m] + delta[a0][m] * delta[b1][b2]) * (PC[a1] * PC[a2] * PC[b0])
+                            + (delta[a0][b0] * delta[b2][m] + delta[a0][b2] * delta[b0][m] + delta[a0][m] * delta[b0][b2]) * (PC[a1] * PC[a2] * PC[b1])
+                            + (delta[a0][b0] * delta[b1][m] + delta[a0][b1] * delta[b0][m] + delta[a0][m] * delta[b0][b1]) * (PC[a1] * PC[a2] * PC[b2])
+                            + (delta[a0][b0] * delta[b1][b2] + delta[a0][b1] * delta[b0][b2] + delta[a0][b2] * delta[b0][b1]) * (PC[a1] * PC[a2] * PC[m])
+                            + (delta[a0][a2] * delta[b2][m] + delta[a0][b2] * delta[a2][m] + delta[a0][m] * delta[a2][b2]) * (PC[a1] * PC[b0] * PC[b1])
+                            + (delta[a0][a2] * delta[b1][m] + delta[a0][b1] * delta[a2][m] + delta[a0][m] * delta[a2][b1]) * (PC[a1] * PC[b0] * PC[b2])
+                            + (delta[a0][a2] * delta[b1][b2] + delta[a0][b1] * delta[a2][b2] + delta[a0][b2] * delta[a2][b1]) * (PC[a1] * PC[b0] * PC[m])
+                            + (delta[a0][a2] * delta[b0][m] + delta[a0][b0] * delta[a2][m] + delta[a0][m] * delta[a2][b0]) * (PC[a1] * PC[b1] * PC[b2])
+                            + (delta[a0][a2] * delta[b0][b2] + delta[a0][b0] * delta[a2][b2] + delta[a0][b2] * delta[a2][b0]) * (PC[a1] * PC[b1] * PC[m])
+                            + (delta[a0][a2] * delta[b0][b1] + delta[a0][b0] * delta[a2][b1] + delta[a0][b1] * delta[a2][b0]) * (PC[a1] * PC[b2] * PC[m])
+                            + (delta[a0][a1] * delta[b2][m] + delta[a0][b2] * delta[a1][m] + delta[a0][m] * delta[a1][b2]) * (PC[a2] * PC[b0] * PC[b1])
+                            + (delta[a0][a1] * delta[b1][m] + delta[a0][b1] * delta[a1][m] + delta[a0][m] * delta[a1][b1]) * (PC[a2] * PC[b0] * PC[b2])
+                            + (delta[a0][a1] * delta[b1][b2] + delta[a0][b1] * delta[a1][b2] + delta[a0][b2] * delta[a1][b1]) * (PC[a2] * PC[b0] * PC[m])
+                            + (delta[a0][a1] * delta[b0][m] + delta[a0][b0] * delta[a1][m] + delta[a0][m] * delta[a1][b0]) * (PC[a2] * PC[b1] * PC[b2])
+                            + (delta[a0][a1] * delta[b0][b2] + delta[a0][b0] * delta[a1][b2] + delta[a0][b2] * delta[a1][b0]) * (PC[a2] * PC[b1] * PC[m])
+                            + (delta[a0][a1] * delta[b0][b1] + delta[a0][b0] * delta[a1][b1] + delta[a0][b1] * delta[a1][b0]) * (PC[a2] * PC[b2] * PC[m])
+                            + (delta[a0][a1] * delta[a2][m] + delta[a0][a2] * delta[a1][m] + delta[a0][m] * delta[a1][a2]) * (PC[b0] * PC[b1] * PC[b2])
+                            + (delta[a0][a1] * delta[a2][b2] + delta[a0][a2] * delta[a1][b2] + delta[a0][b2] * delta[a1][a2]) * (PC[b0] * PC[b1] * PC[m])
+                            + (delta[a0][a1] * delta[a2][b1] + delta[a0][a2] * delta[a1][b1] + delta[a0][b1] * delta[a1][a2]) * (PC[b0] * PC[b2] * PC[m])
+                            + (delta[a0][a1] * delta[a2][b0] + delta[a0][a2] * delta[a1][b0] + delta[a0][b0] * delta[a1][a2]) * (PC[b1] * PC[b2] * PC[m])
+                        )
+
+                        + (-1.0) / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PA_0 * PC[a1] * PC[a2] * PC[b0] * PC[b1] + PA_1 * PC[a0] * PC[a2] * PC[b0] * PC[b1] + PA_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b0] + PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b1])
+                            + delta[b1][m] * (PA_0 * PC[a1] * PC[a2] * PC[b0] * PC[b2] + PA_1 * PC[a0] * PC[a2] * PC[b0] * PC[b2] + PA_2 * PC[a0] * PC[a1] * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b0] + PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b2])
+                            + delta[b1][b2] * (PA_0 * PC[a1] * PC[a2] * PC[b0] * PC[m] + PA_1 * PC[a0] * PC[a2] * PC[b0] * PC[m] + PA_2 * PC[a0] * PC[a1] * PC[b0] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[a2] * PC[b0] + PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[m] + PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[m])
+                            + delta[b0][m] * (PA_0 * PC[a1] * PC[a2] * PC[b1] * PC[b2] + PA_1 * PC[a0] * PC[a2] * PC[b1] * PC[b2] + PA_2 * PC[a0] * PC[a1] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b1] + PC[a0] * PC[a1] * PC[a2] * PC[b1] * PC[b2])
+                            + delta[b0][b2] * (PA_0 * PC[a1] * PC[a2] * PC[b1] * PC[m] + PA_1 * PC[a0] * PC[a2] * PC[b1] * PC[m] + PA_2 * PC[a0] * PC[a1] * PC[b1] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[a2] * PC[b1] + PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[m] + PC[a0] * PC[a1] * PC[a2] * PC[b1] * PC[m])
+                            + delta[b0][b1] * (PA_0 * PC[a1] * PC[a2] * PC[b2] * PC[m] + PA_1 * PC[a0] * PC[a2] * PC[b2] * PC[m] + PA_2 * PC[a0] * PC[a1] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[a2] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[m] + PC[a0] * PC[a1] * PC[a2] * PC[b2] * PC[m])
+                            + delta[a2][m] * (PA_0 * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PA_1 * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1] + PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a2][b2] * (PA_0 * PC[a1] * PC[b0] * PC[b1] * PC[m] + PA_1 * PC[a0] * PC[b0] * PC[b1] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[m] + PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[m] + PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a2][b1] * (PA_0 * PC[a1] * PC[b0] * PC[b2] * PC[m] + PA_1 * PC[a0] * PC[b0] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[m] + PC[a0] * PC[a1] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a2][b0] * (PA_0 * PC[a1] * PC[b1] * PC[b2] * PC[m] + PA_1 * PC[a0] * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[a1] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a1] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a1] * PC[b1] * PC[m] + PC[a0] * PC[a1] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a1][m] * (PA_0 * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PA_2 * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a0] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a2] * PC[b0] * PC[b2] + PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[b1] + PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a1][b2] * (PA_0 * PC[a2] * PC[b0] * PC[b1] * PC[m] + PA_2 * PC[a0] * PC[b0] * PC[b1] * PC[m] + PA_m * PC[a0] * PC[a2] * PC[b0] * PC[b1] + PB_0 * PC[a0] * PC[a2] * PC[b1] * PC[m] + PB_1 * PC[a0] * PC[a2] * PC[b0] * PC[m] + PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a1][b1] * (PA_0 * PC[a2] * PC[b0] * PC[b2] * PC[m] + PA_2 * PC[a0] * PC[b0] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[a2] * PC[b0] * PC[b2] + PB_0 * PC[a0] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[m] + PC[a0] * PC[a2] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a1][b0] * (PA_0 * PC[a2] * PC[b1] * PC[b2] * PC[m] + PA_2 * PC[a0] * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PC[a0] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[a2] * PC[b1] * PC[m] + PC[a0] * PC[a2] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a1][a2] * (PA_0 * PC[b0] * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a0] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a0] * PC[b1] * PC[b2] * PC[m] + PB_1 * PC[a0] * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[a0] * PC[b0] * PC[b1] * PC[m] + PC[a0] * PC[b0] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][m] * (PA_1 * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PA_2 * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a1] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[a2] * PC[b0] * PC[b2] + PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[b1] + PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a0][b2] * (PA_1 * PC[a2] * PC[b0] * PC[b1] * PC[m] + PA_2 * PC[a1] * PC[b0] * PC[b1] * PC[m] + PA_m * PC[a1] * PC[a2] * PC[b0] * PC[b1] + PB_0 * PC[a1] * PC[a2] * PC[b1] * PC[m] + PB_1 * PC[a1] * PC[a2] * PC[b0] * PC[m] + PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][b1] * (PA_1 * PC[a2] * PC[b0] * PC[b2] * PC[m] + PA_2 * PC[a1] * PC[b0] * PC[b2] * PC[m] + PA_m * PC[a1] * PC[a2] * PC[b0] * PC[b2] + PB_0 * PC[a1] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[m] + PC[a1] * PC[a2] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a0][b0] * (PA_1 * PC[a2] * PC[b1] * PC[b2] * PC[m] + PA_2 * PC[a1] * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a1] * PC[a2] * PC[b1] * PC[b2] + PB_1 * PC[a1] * PC[a2] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[a2] * PC[b1] * PC[m] + PC[a1] * PC[a2] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][a2] * (PA_1 * PC[b0] * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a1] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a1] * PC[b1] * PC[b2] * PC[m] + PB_1 * PC[a1] * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[a1] * PC[b0] * PC[b1] * PC[m] + PC[a1] * PC[b0] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][a1] * (PA_2 * PC[b0] * PC[b1] * PC[b2] * PC[m] + PA_m * PC[a2] * PC[b0] * PC[b1] * PC[b2] + PB_0 * PC[a2] * PC[b1] * PC[b2] * PC[m] + PB_1 * PC[a2] * PC[b0] * PC[b2] * PC[m] + PB_2 * PC[a2] * PC[b0] * PC[b1] * PC[m] + PC[a2] * PC[b0] * PC[b1] * PC[b2] * PC[m])
+                        )
+
+                        + (-2.0) * a_i * (
+                            PA_0 * PA_1 * PC[a2] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_2 * PC[a1] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PA_m * PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_0 * PB_0 * PC[a1] * PC[a2] * PC[b1] * PC[b2] * PC[m]
+                            + PA_0 * PB_1 * PC[a1] * PC[a2] * PC[b0] * PC[b2] * PC[m]
+                            + PA_0 * PB_2 * PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[m]
+                            + PA_1 * PA_2 * PC[a0] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_1 * PA_m * PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_1 * PB_0 * PC[a0] * PC[a2] * PC[b1] * PC[b2] * PC[m]
+                            + PA_1 * PB_1 * PC[a0] * PC[a2] * PC[b0] * PC[b2] * PC[m]
+                            + PA_1 * PB_2 * PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[m]
+                            + PA_2 * PA_m * PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[b2]
+                            + PA_2 * PB_0 * PC[a0] * PC[a1] * PC[b1] * PC[b2] * PC[m]
+                            + PA_2 * PB_1 * PC[a0] * PC[a1] * PC[b0] * PC[b2] * PC[m]
+                            + PA_2 * PB_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[m]
+                            + PA_m * PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[b1] * PC[b2]
+                            + PA_m * PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b2]
+                            + PA_m * PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b1]
+                            + PB_0 * PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b2] * PC[m]
+                            + PB_0 * PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b1] * PC[m]
+                            + PB_1 * PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[m]
+                        )
+
+                        + (
+                            delta[a2][m] * (PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a1][m] * (PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a0][m] * (PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[b2])
+                        )
+
+                    )
+
+                    + F7_t[6] * (
+
+                        1.0 / (a_i + a_j) * a_i * (
+                            delta[b2][m] * (PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b1])
+                            + delta[b1][m] * (PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b2])
+                            + delta[b1][b2] * (PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[m])
+                            + delta[b0][m] * (PC[a0] * PC[a1] * PC[a2] * PC[b1] * PC[b2])
+                            + delta[b0][b2] * (PC[a0] * PC[a1] * PC[a2] * PC[b1] * PC[m])
+                            + delta[b0][b1] * (PC[a0] * PC[a1] * PC[a2] * PC[b2] * PC[m])
+                            + delta[a2][m] * (PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a2][b2] * (PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a2][b1] * (PC[a0] * PC[a1] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a2][b0] * (PC[a0] * PC[a1] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a1][m] * (PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a1][b2] * (PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a1][b1] * (PC[a0] * PC[a2] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a1][b0] * (PC[a0] * PC[a2] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a1][a2] * (PC[a0] * PC[b0] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][m] * (PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[b2])
+                            + delta[a0][b2] * (PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[m])
+                            + delta[a0][b1] * (PC[a1] * PC[a2] * PC[b0] * PC[b2] * PC[m])
+                            + delta[a0][b0] * (PC[a1] * PC[a2] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][a2] * (PC[a1] * PC[b0] * PC[b1] * PC[b2] * PC[m])
+                            + delta[a0][a1] * (PC[a2] * PC[b0] * PC[b1] * PC[b2] * PC[m])
+                        )
+
+                        + 2.0 * a_i * (
+                            PA_0 * PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_1 * PC[a0] * PC[a2] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_2 * PC[a0] * PC[a1] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                            + PA_m * PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[b2]
+                            + PB_0 * PC[a0] * PC[a1] * PC[a2] * PC[b1] * PC[b2] * PC[m]
+                            + PB_1 * PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b2] * PC[m]
+                            + PB_2 * PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[m]
+                        )
+
+                    )
+
+                    + F7_t[7] * (
+
+                        (-2.0) * a_i * (
+                            PC[a0] * PC[a1] * PC[a2] * PC[b0] * PC[b1] * PC[b2] * PC[m]
+                        )
+
+                    )
+
+                );
+
                 // Note: minus sign from force (electric field) -> gradient conversion
 
                 double grad_c = (-1.0) * q_c * V_ij_00 * (
@@ -2983,6 +5153,8 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                 );
 
+                double grad_j = -grad_c - grad_i;
+
                 for (const auto& i_cgto_sph_ind_coef : cart_sph_f[i_cgto])
                 {
                     auto i_cgto_sph = i_cgto_sph_ind_coef.first;
@@ -3000,7 +5172,9 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
 
                         double D_sym = ((i == j) ? Dij : (Dij + Dji));
 
+                        V_grad_omp[thread_id].row(i_atom)[m] += grad_i * coef_sph * D_sym;
                         V_grad_omp[thread_id].row(atomidx_c)[m] += grad_c * coef_sph * D_sym;
+                        V_grad_omp[thread_id].row(j_atom)[m] += grad_j * coef_sph * D_sym;
                     }
                 }
             }
