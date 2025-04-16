@@ -29,8 +29,8 @@ class TestScfRestrictedSemiNumDriver:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
-        #scf_drv.ri_coulomb = True
-        #scf_drv.semi_num_exchange = True
+        scf_drv.ri_coulomb = True
+        scf_drv.semi_num_exchange = True
         scf_results = scf_drv.compute(mol, bas, min_bas)
         
         assert False

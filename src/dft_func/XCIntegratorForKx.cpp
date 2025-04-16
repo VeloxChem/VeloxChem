@@ -227,9 +227,9 @@ integrateKxFockForClosedShell(const CMolecule&                  molecule,
 
     timer.stop("Total timing");
    
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
+//    std::cout << "Timing of new integrator" << std::endl;
+//    std::cout << "------------------------" << std::endl;
+//    std::cout << timer.getSummary() << std::endl;
     
     return mat_kx;
 }
