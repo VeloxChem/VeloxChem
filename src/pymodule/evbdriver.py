@@ -257,33 +257,32 @@ class EvbDriver():
             combined_reactant_name = '_'.join(reactant)
         else:
             combined_reactant_name = reactant
-        combined_rea_input = self._process_file_input(
-            combined_reactant_name,
-            0,1,
-        )[0]
+        combined_rea_input = self._get_input_files(combined_reactant_name)
+        # self._process_file_input(
+        #     combined_reactant_name,
+        #     reactant_charge,
+        #     reactant_multiplicity,
+        # )[0]
 
         if isinstance(product, list):
             combined_product_name = '_'.join(product)
         else:
             combined_product_name = product
-        combined_pro_input = self._process_file_input(
-            combined_product_name,
-            0,1,
-        )[0]
+        combined_pro_input = self._get_input_files(combined_product_name)
+        # combined_pro_input = self._process_file_input(
+        #     combined_product_name,
+        #     product_charge,product_multiplicity,
+        # )[0]
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
-        if mapped_product_path.exists():
-            mapped_product_molecule = Molecule.read_xyz_file(str(mapped_product_path))
-            combined_pro_input['forcefield'].molecule = mapped_product_molecule
-            combined_pro_input['molecule'] = mapped_product_molecule
-        else:
-            combined_pro_input['molecule'] = None
-
         if (combined_rea_input['forcefield'] is not None and 
             combined_rea_input['molecule'] is not None and 
             combined_pro_input['forcefield'] is not None and 
-            combined_pro_input['molecule'] is not None):
+            mapped_product_path.exists()):
+            mapped_product_molecule = Molecule.read_xyz_file(str(mapped_product_path))
+            combined_pro_input['forcefield'].molecule = mapped_product_molecule
+            combined_pro_input['molecule'] = mapped_product_molecule
             self.ostream.print_info(
                 f"Found both reactant and product forcefield data. Not generating new forcefields"
             )
