@@ -95,4 +95,65 @@ form_matrix_A(const double* ptr_grid_data,
     return Amat;
 }
 
+auto
+comp_grad_Aij(const double* ptr_dr_rij,
+              const double* ptr_dA_dr,
+              const int*    ptr_delta_ij,
+              const double* ptr_q,
+              const int     row_start,
+              const int     row_end,
+              const int     npoints,
+              const int     natoms) -> std::vector<double>
+{
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<double> omp_grad_Aij(nthreads * natoms * 3, 0.0);
+
+    auto ptr_omp_grad_Aij = omp_grad_Aij.data();
+
+    #pragma omp parallel for schedule(static)
+    for (int i = row_start; i < row_end; i++)
+    {
+        const auto thread_id = omp_get_thread_num();
+
+        for (int j = 0; j < npoints; j++)
+        {
+            for (int a = 0; a < natoms; a++)
+            {
+                for (int c = 0; c < 3; c++)
+                {
+                    // np.einsum('ij,aij,ijc,i,j->ac', dA_dr, delta_ij, dr_rij, q, q)
+
+                    ptr_omp_grad_Aij[thread_id * natoms * 3 + a * 3 + c] +=
+
+                        ptr_q[i] *
+
+                        static_cast<double>(ptr_delta_ij[a * npoints * npoints + i * npoints + j]) *
+
+                        ptr_dA_dr[i * npoints + j] *
+
+                        ptr_dr_rij[i * npoints * 3 + j * 3 + c] *
+
+                        ptr_q[j];
+                }
+            }
+        }
+    }
+
+    std::vector<double> grad_Aij(natoms * 3, 0.0);
+
+    for (int thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        for (int a = 0; a < natoms; a++)
+        {
+            for (int c = 0; c < 3; c++)
+            {
+                grad_Aij[a * 3 + c] += omp_grad_Aij[thread_id * natoms * 3 + a * 3 + c];
+            }
+        }
+    }
+
+    return grad_Aij;
+}
+
 }  // namespace cpcm

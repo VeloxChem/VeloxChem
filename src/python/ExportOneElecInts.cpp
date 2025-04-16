@@ -322,7 +322,7 @@ export_oneeints(py::module& m)
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(D.shape(0));
-                auto npot_vals = onee::computeNuclearPotentialErfValues(molecule, basis, point_coords.data(), npoints, D.data(), naos, nullptr);
+                auto npot_vals = onee::computeNuclearPotentialErfValues(molecule, basis, point_coords.data(), npoints, D.data(), naos);
                 return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
             },
             "Computes nuclear potential values.",

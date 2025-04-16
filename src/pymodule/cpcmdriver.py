@@ -33,9 +33,10 @@
 from mpi4py import MPI
 import numpy as np
 import math
+import time
 import sys
 
-from .veloxchemlib import cpcm_form_matrix_A
+from .veloxchemlib import cpcm_form_matrix_A, cpcm_comp_grad_Aij
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import compute_nuclear_potential_erf_values
@@ -485,6 +486,9 @@ class CpcmDriver:
         :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
+
+        t0 = time.time()
+
         # Defnine constants
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
         natoms         = molecule.number_of_atoms()
@@ -499,6 +503,8 @@ class CpcmDriver:
         M = grid_coords.shape[0]
         grad = np.zeros((M, M, natoms, 3))
 
+        t1 = time.time()
+
         delta_r = grid_coords[:, np.newaxis, :] - grid_coords[np.newaxis, :, :]
         r_ij_2  = np.sum(delta_r**2, axis=-1)
         # Diagonal terms are not used anyway so fill these elements
@@ -507,29 +513,39 @@ class CpcmDriver:
         r_ij   = np.sqrt(r_ij_2)
         dr_rij = delta_r / r_ij[:, :, np.newaxis]
 
+        t2 = time.time()
+
         # Construct the explicit terms appearing in the gradient
         zeta_ij  = (zeta[:, np.newaxis] * zeta[np.newaxis, :]) / np.sqrt(zeta_2[:, np.newaxis] + zeta_2[np.newaxis, :])
         erf_term = self.erf_array(zeta_ij * r_ij)
         exp_term = np.exp(-zeta_ij**2 * r_ij_2)
 
         dA_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_ij * r_ij * exp_term) / r_ij_2
+
+        t3 = time.time()
         
         # Definitions to keep track of which atom each piint belongs to
-        I_vals      = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
+        I_vals      = np.arange(natoms)[:, np.newaxis, np.newaxis]
         atom_idx_m  = atom_indices[np.newaxis, :, np.newaxis]
         atom_idx_n  = atom_indices[np.newaxis, np.newaxis, :]
         delta_ij    = ((I_vals == atom_idx_m).astype(int)
                      - (I_vals == atom_idx_n).astype(int))
 
-        # Construct the (n-1) gradient terms by broadcasting
-        grad[:, :, :-1, :] = dA_dr[:, :, np.newaxis, np.newaxis] * delta_ij.transpose(1, 2, 0)[:, :, :, np.newaxis] * dr_rij[:, :, np.newaxis, :]
-        # Translational invariance
-        grad[:, :, -1, :] = -np.sum(grad[:, :, :-1, :], axis=2)
+        t4 = time.time()
 
-        # Perform contractions
-        partial_contract = np.matmul(q, grad.reshape(M, M * natoms * n_dim)).reshape(M, natoms * n_dim)
-        grad_Aij = np.matmul(partial_contract.T, q).reshape(natoms, n_dim)
+        grad_Aij = cpcm_comp_grad_Aij(dr_rij, dA_dr, delta_ij, q)
         grad_Aij *= (-0.5 / scale_f)
+
+        t5 = time.time()
+
+        self.ostream.print_info(f'Grad Aij step 1: {t1 - t0:.2f} sec')
+        self.ostream.print_info(f'Grad Aij step 2: {t2 - t1:.2f} sec')
+        self.ostream.print_info(f'Grad Aij step 3: {t3 - t2:.2f} sec')
+        self.ostream.print_info(f'Grad Aij step 4: {t4 - t3:.2f} sec')
+        self.ostream.print_info(f'Grad Aij step 5: {t5 - t4:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         return grad_Aij
 
     def grad_Aii(self, molecule, grid, sw_f, q, eps, x):
@@ -554,6 +570,9 @@ class CpcmDriver:
         :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
+
+        t0 = time.time()
+
         # Basic constants
         sqrt_2_inv_pi = np.sqrt(2.0 / np.pi)
         scale_f       = -(eps - 1) / (eps + x)
@@ -572,23 +591,31 @@ class CpcmDriver:
         # Initialise grad. object
         grad = np.zeros((M, M, natoms, 3))
 
+        t1 = time.time()
+
         # Basic geometrical vectors
         r_iJ      = grid_coords[:, np.newaxis, :] - atom_coords[np.newaxis, :, :]
         r_iJ_norm = np.linalg.norm(r_iJ, axis=2)
         dr_iJ     = r_iJ / r_iJ_norm[:, :, np.newaxis]
         RJ        = atom_radii[np.newaxis, :]
 
+        t2 = time.time()
+
         # Definitions to keep track of which atom each grid point belongs to
-        a_vals = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
+        a_vals = np.arange(natoms)[:, np.newaxis, np.newaxis]
         _i_idx = atom_idx[np.newaxis, :, np.newaxis]
         J_vals = np.arange(natoms)[np.newaxis, np.newaxis, :]
         delta  = ((a_vals == _i_idx).astype(int)
                 - (a_vals == J_vals).astype(int))
 
+        t3 = time.time()
+
         # Compute fiJ
         term_m = zeta_i[:, np.newaxis] * (RJ - r_iJ_norm)
         term_p = zeta_i[:, np.newaxis] * (RJ + r_iJ_norm)
         fiJ    = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
+
+        t4 = time.time()
 
         # Derivative of fiJ: dfiJ_driJ
         z2 = zeta_i[:, np.newaxis]**2
@@ -596,9 +623,13 @@ class CpcmDriver:
             -np.exp(-z2 * (RJ - r_iJ_norm)**2) + np.exp(-z2 * (RJ + r_iJ_norm)**2))
         ratio_fiJ = dfiJ_driJ / fiJ
 
+        t5 = time.time()
+
         # Primitive switching func. derivative contribution
         f_i = delta[:, :, :, np.newaxis] * ratio_fiJ[np.newaxis, :, :, np.newaxis] * dr_iJ[np.newaxis, :, :, :]
         summed_fi = np.sum(f_i, axis=2)
+
+        t6 = time.time()
 
         # Switching func. contribution
         grad_Fi = -F_i[np.newaxis, :, np.newaxis] * summed_fi
@@ -607,19 +638,35 @@ class CpcmDriver:
 
         final_contribution = grad_Fi * factor_i[:, :, np.newaxis]
 
+        t7 = time.time()
+
         idx = np.arange(M)
-        for a in range(natoms - 1):
+        for a in range(natoms):
             contrib_a = final_contribution[a, :, :]
             # Set the diagonal
             grad[idx, idx, a, :] = contrib_a
 
-        # Translational invariance
-        grad[:, :, -1, :] = -np.sum(grad[:, :, :-1, :], axis=2)
+        t8 = time.time()
 
         # Perform contractions
         partial_contract = np.matmul(q, grad.reshape(M, M * natoms * n_dim)).reshape(M, natoms * n_dim)
         grad_Aii         = np.matmul(partial_contract.T, q).reshape(natoms, n_dim)
         grad_Aii        *= (-0.5 / scale_f)
+
+        t9 = time.time()
+
+        self.ostream.print_info(f'Grad Aii step 1: {t1 - t0:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 2: {t2 - t1:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 3: {t3 - t2:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 4: {t4 - t3:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 5: {t5 - t4:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 6: {t6 - t5:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 7: {t7 - t6:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 8: {t8 - t7:.2f} sec')
+        self.ostream.print_info(f'Grad Aii step 9: {t9 - t8:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         return grad_Aii
 
     def grad_B(self, molecule, grid, q):
@@ -662,20 +709,16 @@ class CpcmDriver:
         dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
 
         # Set up for broadcasting
-        I_vals       = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
+        I_vals       = np.arange(natoms)[:, np.newaxis, np.newaxis]
         A_vals       = np.arange(natoms)[np.newaxis, np.newaxis, :]
         atom_idx_exp = atom_idx[np.newaxis, :, np.newaxis]
         factor       = ((I_vals == atom_idx_exp).astype(int)
                     - (I_vals == A_vals).astype(int))
         
-        # Calculate for the n-1 first atoms
-        dB_mat_n_minus_1 = dB_dr[np.newaxis, :, :, np.newaxis] * factor[:, :, :, np.newaxis] * dr_iA[np.newaxis, :, :, :]
-        # Reordeer to (M, nAtoms, nAtoms-1, 3)
-        dB_mat_n_minus_1 = np.transpose(dB_mat_n_minus_1, (1, 2, 0, 3))
-        
-        # Translational invariance
-        dB_mat[:, :, :-1, :] = dB_mat_n_minus_1
-        dB_mat[:, :, -1, :]  = -np.sum(dB_mat[:, :, :-1, :], axis=2)
+        # Calculate for n atoms
+        dB_mat = dB_dr[np.newaxis, :, :, np.newaxis] * factor[:, :, :, np.newaxis] * dr_iA[np.newaxis, :, :, :]
+        # Reordeer to (M, nAtoms, nAtoms, 3)
+        dB_mat = np.transpose(dB_mat, (1, 2, 0, 3))
         
         # Contract
         partial_contract = np.matmul(q, dB_mat.reshape(M, natoms * natoms * n_dim)).reshape(natoms, natoms * n_dim)
@@ -712,8 +755,12 @@ class CpcmDriver:
         atom_indices = grid[:, 5].astype(int)
         labels       = ['X', 'Y', 'Z']
 
+        C_timings = [0.0 for ind in range(10)]
+
         # Compute both the nuclear and cavity contributions
-        for a in range(natoms - 1):
+        for a in range(natoms):
+            t0 = time.time()
+
             # Indices where the grid belongs to atom a
             indices_a = (atom_indices == a)
             q_subset  = q[indices_a]
@@ -721,6 +768,10 @@ class CpcmDriver:
             zeta_a    = zeta[indices_a]
             
             geom100_mats, geom010_mats, geom001_mats = [], [], []
+
+            t1 = time.time()
+            C_timings[0] += t1 - t0
+            t0 = time.time()
 
             if q_subset.size == 0:
                 # for fully buried atoms, DM shape 0 and 1 in case of orthogonalization
@@ -730,35 +781,84 @@ class CpcmDriver:
                     grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i]], [zeta_a[i]])
                     geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
 
+            t1 = time.time()
+            C_timings[1] += t1 - t0
+            t0 = time.time()
+
             grad_100 = geom100_drv.compute(molecule, basis, a, grid_coords, q, zeta)
             
+            t1 = time.time()
+            C_timings[2] += t1 - t0
+            t0 = time.time()
+
             for label in labels:
                 mat_100 = -1.0 * grad_100.matrix(label).full_matrix().to_numpy()
                 geom100_mats.append(mat_100)
                 geom001_mats.append(mat_100.T)
+
+            t1 = time.time()
+            C_timings[3] += t1 - t0
+            t0 = time.time()
 
             geom100_mats = np.array(geom100_mats)
             geom010_mats = np.array(geom010_mats)
             geom001_mats = np.array(geom001_mats)
             geom100_mats += geom001_mats
 
+            t1 = time.time()
+            C_timings[4] += t1 - t0
+            t0 = time.time()
+
             partial_nuc = np.squeeze(np.matmul(
                 geom010_mats.reshape(geom010_mats.shape[0], geom010_mats.shape[1], -1), DM.reshape(-1, 1)), -1)
+
+            t1 = time.time()
+            C_timings[5] += t1 - t0
+            t0 = time.time()
             
             grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
             grad_C_cav[a] = np.matmul(DM.reshape(-1), geom100_mats.reshape(geom100_mats.shape[0], -1).T)
-            
 
-        # Translational invariance
-        grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
-        grad_C_nuc[-1] = -np.sum(grad_C_nuc[:-1], axis=0)
+            t1 = time.time()
+            C_timings[6] += t1 - t0
+            t0 = time.time()
+
+        self.ostream.print_info(f'Grad C step 0: {C_timings[0]:.2f} sec')
+        self.ostream.print_info(f'Grad C step 1: {C_timings[1]:.2f} sec')
+        self.ostream.print_info(f'Grad C step 2: {C_timings[2]:.2f} sec')
+        self.ostream.print_info(f'Grad C step 3: {C_timings[3]:.2f} sec')
+        self.ostream.print_info(f'Grad C step 4: {C_timings[4]:.2f} sec')
+        self.ostream.print_info(f'Grad C step 5: {C_timings[5]:.2f} sec')
+        self.ostream.print_info(f'Grad C step 6: {C_timings[6]:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+            
         return grad_C_nuc + grad_C_cav
 
     def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D):
         """
         Collects the CPCM gradient contribution.
         """
+
+        t0 = time.time()
+
         gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x) + self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
+
+        t1 = time.time()
+
         gradB = self.grad_B(molecule, grid, q)
+
+        t2 = time.time()
+
         gradC = self.grad_C(molecule, basis, grid, q, D)
+
+        t3 = time.time()
+
+        self.ostream.print_info(f'Time spent in CPCM gradient: {t3 - t0:.2f} sec')
+        self.ostream.print_info(f'    Grad A took {t1 - t0:.2f} sec')
+        self.ostream.print_info(f'    Grad B took {t2 - t1:.2f} sec')
+        self.ostream.print_info(f'    Grad C took {t3 - t2:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         return gradA + gradB + gradC

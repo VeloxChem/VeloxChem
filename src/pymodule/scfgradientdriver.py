@@ -172,6 +172,7 @@ class ScfGradientDriver(GradientDriver):
             'Fock_grad': 0.0,
             'XC_grad': 0.0,
             'PE_grad': 0.0,
+            'CPCM_grad': 0.0,
             'Classical': 0.0,
         }
 
@@ -263,7 +264,7 @@ class ScfGradientDriver(GradientDriver):
 
                 gmats_100 = Matrices()
 
-        grad_timing['Point_charges_grad'] += time.time() - t0
+            grad_timing['Point_charges_grad'] += time.time() - t0
 
         # orbital contribution to gradient
 
@@ -411,10 +412,10 @@ class ScfGradientDriver(GradientDriver):
             self.gradient += grad_drv.integrate_vxc_gradient(
                 molecule, basis, [D], self.scf_driver._mol_grid, xcfun_label)
 
+            grad_timing['XC_grad'] += time.time() - t0
+
         else:
             xcfun_label = 'hf'
-
-        grad_timing['XC_grad'] += time.time() - t0
 
         # Embedding contribution to the gradient
 
@@ -436,7 +437,7 @@ class ScfGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 self.gradient += pe_grad
 
-        grad_timing['PE_grad'] += time.time() - t0
+            grad_timing['PE_grad'] += time.time() - t0
 
         # nuclear contribution to gradient
         # and D4 dispersion correction if requested
@@ -447,10 +448,18 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
+            grad_timing['Classical'] += time.time() - t0
+
+            t0 = time.time()
+
             if self.dispersion:
                 disp = DispersionModel()
                 disp.compute(molecule, xcfun_label)
                 self.gradient += disp.get_gradient()
+
+                grad_timing['D4_grad'] += time.time() - t0
+
+            t0 = time.time()
 
             # CPCM contribution to gradient
             # TODO: parallelize over MPI
@@ -460,7 +469,11 @@ class ScfGradientDriver(GradientDriver):
                     self.scf_driver._cpcm_sw_func, self.scf_driver._cpcm_q,
                     2.0 * D)
 
+                grad_timing['CPCM_grad'] += time.time() - t0
+
         # nuclei-point charges contribution to gradient
+
+        t0 = time.time()
 
         if self.scf_driver.point_charges is not None:
             coords = molecule.get_coordinates_in_bohr()
@@ -524,7 +537,8 @@ class ScfGradientDriver(GradientDriver):
         if self.timing and self.rank == mpi_master():
             self.ostream.print_info('Gradient timing decomposition')
             for key, val in grad_timing.items():
-                self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
+                if val > 0.0:
+                    self.ostream.print_info(f'    {key:<25}:  {val:.2f} sec')
             self.ostream.print_blank()
 
     def compute_analytical_unrestricted(self, molecule, basis, scf_results):

@@ -52,6 +52,15 @@ auto form_matrix_A(const double* ptr_grid_data,
                    const int     ncols,
                    const double* ptr_sw_func) -> std::vector<double>;
 
+auto comp_grad_Aij(const double* ptr_dr_rij,
+                   const double* ptr_dA_dr,
+                   const int*    ptr_delta_ij,
+                   const double* ptr_q,
+                   const int     row_start,
+                   const int     row_end,
+                   const int     npoints,
+                   const int     natoms) -> std::vector<double>;
+
 }  // namespace cpcm
 
 #endif /* CpcmUtils_hpp */
