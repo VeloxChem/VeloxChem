@@ -40,7 +40,7 @@ from .veloxchemlib import cpcm_form_matrix_A, cpcm_comp_grad_Aij
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import compute_nuclear_potential_erf_values
-from .veloxchemlib import compute_nuclear_potential_erf_gradient_on_charges
+from .veloxchemlib import compute_nuclear_potential_erf_gradient
 from .veloxchemlib import NuclearPotentialErfDriver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
@@ -751,7 +751,7 @@ class CpcmDriver:
 
         # TODO: parallelize over MPI ranks
 
-        return compute_nuclear_potential_erf_gradient_on_charges(
+        return compute_nuclear_potential_erf_gradient(
             molecule, basis, grid_coords, q, DM, zeta, atom_indices)
 
     def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D):

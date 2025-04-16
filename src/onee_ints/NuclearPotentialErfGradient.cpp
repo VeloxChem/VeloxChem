@@ -30,7 +30,7 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "NuclearPotentialErfGradientOnCharges.hpp"
+#include "NuclearPotentialErfGradient.hpp"
 
 #include <omp.h>
 
@@ -54,21 +54,21 @@
 namespace onee {  // onee namespace
 
 auto
-computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
-                                            const CMolecularBasis& basis,
-                                            const double* point_coords,
-                                            const double* point_charges,
-                                            const int npoints,
-                                            const double* D,
-                                            const int naos,
-                                            const double* omega,
-                                            const int* atom_indices) -> CDenseMatrix
+computeNuclearPotentialErfGradient(const CMolecule& molecule,
+                                   const CMolecularBasis& basis,
+                                   const double* point_coords,
+                                   const double* point_charges,
+                                   const int npoints,
+                                   const double* D,
+                                   const int naos,
+                                   const double* omega,
+                                   const int* atom_indices) -> CDenseMatrix
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computeNuclearPotentialErfGradientOnCharges: Inconsistent number of AOs"));
+            std::string("computeNuclearPotentialErfGradient: Inconsistent number of AOs"));
 
     auto natoms = molecule.number_of_atoms();
 
@@ -146,7 +146,7 @@ computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
         }
         else
         {
-            std::string errangmom("computeNuclearPotentialErfGradientOnCharges: Only implemented up to f-orbitals");
+            std::string errangmom("computeNuclearPotentialErfGradient: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }

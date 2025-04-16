@@ -30,8 +30,8 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef NuclearPotentialErfGradientOnCharges_hpp
-#define NuclearPotentialErfGradientOnCharges_hpp
+#ifndef NuclearPotentialErfGradient_hpp
+#define NuclearPotentialErfGradient_hpp
 
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
@@ -39,16 +39,16 @@
 
 namespace onee {  // onee namespace
 
-auto computeNuclearPotentialErfGradientOnCharges(const CMolecule& molecule,
-                                                 const CMolecularBasis& basis,
-                                                 const double* point_coords,
-                                                 const double* point_charges,
-                                                 const int npoints,
-                                                 const double* D,
-                                                 const int naos,
-                                                 const double* omega,
-                                                 const int* atom_indices) -> CDenseMatrix;
+auto computeNuclearPotentialErfGradient(const CMolecule& molecule,
+                                        const CMolecularBasis& basis,
+                                        const double* point_coords,
+                                        const double* point_charges,
+                                        const int npoints,
+                                        const double* D,
+                                        const int naos,
+                                        const double* omega,
+                                        const int* atom_indices) -> CDenseMatrix;
 
 }  // namespace onee
 
-#endif /* NuclearPotentialErfGradientOnCharges_hpp */
+#endif /* NuclearPotentialErfGradient_hpp */
