@@ -37,24 +37,24 @@
 #include <cmath>
 #include <cstring>
 
+#include "DenseMatrix.hpp"
 #include "MathFunc.hpp"
 
 namespace cpcm {  // cpcm namespace
 
 auto
-form_matrix_A(const double* ptr_grid_data,
+form_matrix_A(const int     npoints,
+              const double* ptr_grid_data,
               const int     row_start,
               const int     row_end,
               const int     ncols,
-              const double* ptr_sw_func) -> std::vector<double>
+              const double* ptr_sw_func) -> CDenseMatrix
 {
-    const auto npoints = row_end - row_start;
-
-    std::vector<double> Amat(npoints * npoints);
-
-    const auto ptr_A = Amat.data();
-
     const double sqrt_2_invpi = std::sqrt(2.0 / mathconst::pi_value());
+
+    CDenseMatrix Amat(row_end - row_start, npoints);
+
+    Amat.zero();
 
     #pragma omp parallel for schedule(static)
     for (int i = row_start; i < row_end; i++)
@@ -71,7 +71,7 @@ form_matrix_A(const double* ptr_grid_data,
         {
             if (j == i)
             {
-                ptr_A[i * npoints + i] = zeta_i * sqrt_2_invpi / ptr_sw_func[i];
+                Amat.row(i - row_start)[j] = zeta_i * sqrt_2_invpi / ptr_sw_func[i];
             }
             else
             {
@@ -87,7 +87,7 @@ form_matrix_A(const double* ptr_grid_data,
 
                 const double r_ij = std::sqrt((xi - xj)*(xi - xj) + (yi - yj)*(yi - yj) + (zi - zj)*(zi - zj));
 
-                ptr_A[i * npoints + j] = std::erf(zeta_ij * r_ij) / r_ij;
+                Amat.row(i - row_start)[j] = std::erf(zeta_ij * r_ij) / r_ij;
             }
         }
     }

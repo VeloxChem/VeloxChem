@@ -657,11 +657,17 @@ class ScfDriver:
             (self._cpcm_grid,
              self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
 
-            self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
-                self._cpcm_grid, self._cpcm_sw_func)
+            self._cpcm_local_Amat, cpcm_local_precond = (
+                self.cpcm_drv.form_local_matrix_A(
+                    self._cpcm_grid, self._cpcm_sw_func))
+
+            self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
+            self._cpcm_precond = np.hstack(self._cpcm_precond)
 
             self._cpcm_Bzvec = self.cpcm_drv.form_vector_Bz(
                 self._cpcm_grid, molecule)
+
+            self._cpcm_q = None
 
             self.ostream.print_info(
                 f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
@@ -1457,10 +1463,15 @@ class ScfDriver:
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (self._cpcm_Bzvec + Cvec)
+                else:
+                    rhs = None
+                rhs = self.comm.bcast(rhs, root=mpi_master())
 
-                    self._cpcm_q = self.cpcm_drv.cg_solve(
-                        self._cpcm_Amat, 1.0 / np.diag(self._cpcm_Amat), rhs)
+                self._cpcm_q = self.cpcm_drv.cg_solve_parallel(
+                    self._cpcm_local_Amat, self._cpcm_precond, rhs,
+                    self._cpcm_q)
 
+                if self.rank == mpi_master():
                     e_sol = self.cpcm_drv.compute_solv_energy(
                         self._cpcm_Bzvec, Cvec, self._cpcm_q)
                     e_el += e_sol

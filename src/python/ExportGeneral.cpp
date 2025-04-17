@@ -225,7 +225,10 @@ export_general(py::module &m) -> void
 
     // exposing functions from CpcmUtils.hpp
     m.def("cpcm_form_matrix_A",
-          [](const py::array_t<double>& grid_data, const py::array_t<double>& sw_func) -> py::array_t<double> {
+          [](const py::array_t<double>& grid_data,
+             const py::array_t<double>& sw_func,
+             const int                  grid_index_start,
+             const int                  grid_index_end) -> py::array_t<double> {
               std::string errstyle("cpcm_form_matrix_A: Expecting contiguous numpy arrays");
               auto        c_style_1 = py::detail::check_flags(grid_data.ptr(), py::array::c_style);
               auto        c_style_2 = py::detail::check_flags(sw_func.ptr(), py::array::c_style);
@@ -234,12 +237,17 @@ export_general(py::module &m) -> void
               errors::assertMsgCritical(grid_data.shape(0) == sw_func.shape(0), errsize);
               const auto npoints = static_cast<int>(grid_data.shape(0));
               const auto ncols = static_cast<int>(grid_data.shape(1));
-              auto Amat = cpcm::form_matrix_A(grid_data.data(), 0, npoints, ncols, sw_func.data());
-              return vlx_general::pointer_to_numpy(Amat.data(), {npoints, npoints});
+              std::string errindex("cpcm_form_matrix_A: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto Amat = cpcm::form_matrix_A(npoints, grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data());
+              return vlx_general::pointer_to_numpy(Amat.values(), {Amat.getNumberOfRows(), Amat.getNumberOfColumns()});
           },
           "Form C-PCM matrix A.",
           "grid_data"_a,
-          "sw_func"_a);
+          "sw_func"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a);
 
     m.def("cpcm_comp_grad_Aij",
           [](const py::array_t<double>& grid_coords,

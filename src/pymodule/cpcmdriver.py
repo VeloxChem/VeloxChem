@@ -320,7 +320,7 @@ class CpcmDriver:
             2030: 4.90744499142,
         }
 
-    def form_matrix_A(self, grid, sw_func):
+    def form_local_matrix_A(self, grid, sw_func):
         """
         Forms the cavity-cavity interaction matrix.
 
@@ -329,13 +329,23 @@ class CpcmDriver:
             the Gaussian exponents, and indices for which atom they belong to.
         :param sw_func:
             The switching function.
-        
+
         :return:
             The (cavity) electrostatic potential at each grid point due to
             the grid (unweighted by the charges).
         """
 
-        return cpcm_form_matrix_A(grid, sw_func)
+        npoints = grid.shape[0]
+
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        local_Amat = cpcm_form_matrix_A(grid, sw_func, start, end)
+        local_precond = 1.0 / np.diag(local_Amat[:, start:end])
+
+        return local_Amat, local_precond
 
     def form_vector_Bz(self, grid, molecule):
         """
@@ -637,7 +647,7 @@ class CpcmDriver:
 
         return gradA + gradB + gradC
 
-    def cg_solve(self, Amat, inv_Adiag, rhs):
+    def cg_solve_parallel(self, local_Amat, precond, rhs, x0=None):
         """
         Solves the C-PCM equations using conjugate gradient.
         """
@@ -653,7 +663,10 @@ class CpcmDriver:
             Matrix-vector product
             """
 
-            return np.dot(Amat, v)
+            local_v = np.dot(local_Amat, v)
+
+            ret = self.comm.allgather(local_v)
+            return np.hstack(ret)
 
         def precond_matvec(v):
             """
@@ -661,13 +674,16 @@ class CpcmDriver:
             inverse of the diagonal
             """
 
-            return inv_Adiag * v
+            return precond * v
 
-        LinOp = linalg.LinearOperator(Amat.shape, matvec=matvec)
-        PrecondOp = linalg.LinearOperator(Amat.shape, matvec=precond_matvec)
+        n = local_Amat.shape[1]
+
+        LinOp = linalg.LinearOperator((n, n), matvec=matvec)
+        PrecondOp = linalg.LinearOperator((n, n), matvec=precond_matvec)
 
         b = rhs
-        x0 = np.zeros(rhs.shape)
+        if x0 is None:
+            x0 = np.zeros(rhs.shape)
 
         try:
             cg_solution, cg_conv = linalg.cg(A=LinOp,

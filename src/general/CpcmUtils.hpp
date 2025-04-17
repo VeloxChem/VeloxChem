@@ -35,6 +35,8 @@
 
 #include <vector>
 
+#include "DenseMatrix.hpp"
+
 namespace cpcm {  // cpcm namespace
 
 /**
@@ -46,11 +48,12 @@ namespace cpcm {  // cpcm namespace
  @param ncols the number of columns of matrix A.
  @param ptr_sw_func the pointer to the switching function.
  */
-auto form_matrix_A(const double* ptr_grid_data,
+auto form_matrix_A(const int     npoints,
+                   const double* ptr_grid_data,
                    const int     row_start,
                    const int     row_end,
                    const int     ncols,
-                   const double* ptr_sw_func) -> std::vector<double>;
+                   const double* ptr_sw_func) -> CDenseMatrix;
 
 auto comp_grad_Aij(const double* ptr_grid_coords,
                    const double* ptr_zeta,
