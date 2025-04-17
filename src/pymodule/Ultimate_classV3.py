@@ -73,9 +73,9 @@ class MoleculeProcessor2:
 
                 df = pd.DataFrame(data_matrix, columns=[
                     'Atom idx', 'Atom numbers', 'min_EA', 'max_EA', 'mean_EA', 'median_EA', 'min_IE',
-                    'max_IE', 'mean_IE', 'median_IE', 'localized_charge', 'resp_charge', 'max_esp_values',
-                    'min_esp_values', 'local_polarizability X', 'local_polarizability Y',
-                    'local_polarizability Z', 'Total energy'
+                    'max_IE', 'mean_IE', 'median_IE', 'min_AE', 'max_AE', 'mean_AE', 'median_AE',
+                    'localized_charge', 'resp_charge', 'max_esp_values', 'min_esp_values',
+                    'local_polarizability X', 'local_polarizability Y', 'local_polarizability Z', 'Total energy'
                 ])
                 with h5py.File(os.path.join(self.output_folder, f'{filename}.h5'), 'w') as f:
                     for key, value in df.items():
@@ -93,7 +93,7 @@ class MoleculeProcessor2:
     def deprotonate_and_process(self):
         if not self.deprotonate:
             return
-
+        self.deprot_info = [] # This is just a list to later see if a molecule containing nitrogen was deprotonated
         logging.info("Deprotonating molecules...")
 
         for file in self.non_iodine_files:
@@ -102,7 +102,11 @@ class MoleculeProcessor2:
             try:
                 rdDetermineBonds.DetermineBonds(mol, 0)
                 deprot = vlx.OxygenDeprotonation(mol, filename, output_folder=self.deprotonated_dir)
-                deprot.Deprotonate()
+                succes = deprot.Deprotonate() # Succes will be True if the molecule had a deprotonatable hydrogen (OH)
+
+                if succes: 
+                    self.deprot_info.append(deprot)
+
             except Exception as e:
                 logging.error(f"Failed to deprotonate {filename}: {e}")
                 self.failed_deprot.append(filename)
@@ -145,10 +149,10 @@ class MoleculeProcessor2:
                     xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
                     df = pd.DataFrame(data_matrix, columns=[
                         'Atom idx', 'Atom numbers', 'deprot_min_EA', 'deprot_max_EA', 'deprot_mean_EA', 'deprot_median_EA',
-                        'deprot_min_IE', 'deprot_max_IE', 'deprot_mean_IE', 'deprot_median_IE', 'deprot_localized_charge',
-                        'deprot_resp_charge', 'deprot_max_esp_values', 'deprot_min_esp_values',
-                        'deprot_local_polarizability X', 'deprot_local_polarizability Y',
-                        'deprot_local_polarizability Z', 'deprot_Total energy'
+                        'deprot_min_IE', 'deprot_max_IE', 'deprot_mean_IE', 'deprot_median_IE', 'deprot_min_AE', 'deprot_max_AE',
+                        'deprot_mean_AE', 'deprot_median_AE', 'deprot_localized_charge', 'deprot_resp_charge',
+                        'deprot_max_esp_values', 'deprot_min_esp_values', 'deprot_local_polarizability X',
+                        'deprot_local_polarizability Y', 'deprot_local_polarizability Z', 'deprot_Total energy'
                     ])
 
                     df = df.iloc[:, 2:]
@@ -209,14 +213,16 @@ class MoleculeProcessor2:
                     logging.warning(f"Could not load molecules: {prot_file} or {prot_file}")
                     continue
 
-                try:
-                    mapping = vlx.MCS(prot_mol, neutral_mol, protonated = True).get_atom_mapping()
-                    if mapping is None:
-                        raise ValueError("Atom mapping failed.")
-                except Exception as e:
-                    logging.error(f"Mapping failed for {prot_file}: {e}")
-                    self.failed_mapping.append(prot_file)
-                    continue
+                # No need to do any atom mapping since the newly added atom is always the last one
+
+                # try:
+                #     mapping = vlx.MCS(prot_mol, neutral_mol, protonated = True).get_atom_mapping()
+                #     if mapping is None:
+                #         raise ValueError("Atom mapping failed.")
+                # except Exception as e:
+                #     logging.error(f"Mapping failed for {prot_file}: {e}")
+                #     self.failed_mapping.append(prot_file)
+                #     continue
 
                 try:
                     mol = vlx.Molecule.read_xyz_file(prot_path)
@@ -225,27 +231,44 @@ class MoleculeProcessor2:
                     xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
                     df = pd.DataFrame(data_matrix, columns=[
                         'Atom idx', 'Atom numbers', 'prot_min_EA', 'prot_max_EA', 'prot_mean_EA', 'prot_median_EA',
-                        'prot_min_IE', 'prot_max_IE', 'prot_mean_IE', 'prot_median_IE', 'prot_localized_charge',
-                        'prot_resp_charge', 'prot_max_esp_values', 'prot_min_esp_values',
+                        'prot_min_IE', 'prot_max_IE', 'prot_mean_IE', 'prot_median_IE',
+                        'prot_min_AE', 'prot_max_AE', 'prot_mean_AE', 'prot_median_AE',
+                        'prot_localized_charge', 'prot_resp_charge', 'prot_max_esp_values', 'prot_min_esp_values',
                         'prot_local_polarizability X', 'prot_local_polarizability Y',
-                        'prot_local_polarizability Z', 'Total energy'
+                        'prot_local_polarizability Z', 'prot_Total energy'
                     ])
 
-                    df = df.iloc[:, 2:]
-                    idx_map = {d: p for p, d in mapping}
-                    reordered = df.iloc[list(idx_map.keys())]
-                    reordered.index = [idx_map[i] for i in idx_map]
-                    reordered = reordered.sort_index()
+                    # df = df.iloc[:, 2:]
+                    # idx_map = {d: p for p, d in mapping}
+                    # reordered = df.iloc[list(idx_map.keys())]
+                    # reordered.index = [idx_map[i] for i in idx_map]
+                    # reordered = reordered.sort_index()
 
-                    neutral_h5_file = next((f for f in os.listdir(self.h5_protonated_dir) if f.startswith(prefix) and f.endswith('.h5')), None)
-                    if neutral_h5_file:
-                        h5_path = os.path.join(self.h5_protonated_dir, neutral_h5_file)
-                        shutil.copy2(os.path.join(self.output_folder, neutral_h5_file), h5_path)
-                        with h5py.File(h5_path, 'a') as f:
-                            for key, value in reordered.items():
-                                f.create_dataset(key, data=value)
-                            f.create_dataset("xyz coordinates deprot", data=xyz)
-                        logging.info(f"Added deprotonated data to {h5_path}")
+                    if self.deprot_info is None:
+                        # Look in h5 folder for the neutral molecule for a match and add the data
+                        neutral_h5_file = next((f for f in os.listdir(self.h5_protonated_dir) if f.startswith(prefix) and f.endswith('.h5')), None)
+                        if neutral_h5_file:
+                            h5_path = os.path.join(self.h5_protonated_dir, neutral_h5_file)
+                            shutil.copy2(os.path.join(self.output_folder, neutral_h5_file), h5_path)
+                            with h5py.File(h5_path, 'a') as f:
+                                # for key, value in reordered.items():
+                                for key, value in df.items():
+                                    f.create_dataset(key, data=value)
+                                f.create_dataset("xyz coordinates deprot", data=xyz)
+                            logging.info(f"Added deprotonated data to {h5_path}")
+
+                    else:
+                        # Look in deprotonated folder for the neutral molecule for a match and add the data
+                        neutral_h5_file = next((f for f in os.listdir(self.h5_deprotonated_dir) if f.startswith(prefix) and f.endswith('.h5')), None)
+                        if neutral_h5_file:
+                            h5_path = os.path.join(self.h5_protonated_dir, neutral_h5_file)
+                            shutil.copy2(os.path.join(self.h5_deprotonated_dir, neutral_h5_file), h5_path)
+                            with h5py.File(h5_path, 'a') as f:
+                                # for key, value in reordered.items():
+                                for key, value in df.items():
+                                    f.create_dataset(key, data=value)
+                                f.create_dataset("xyz coordinates deprot", data=xyz)
+                            logging.info(f"Added deprotonated data to {h5_path}")
                 except Exception as e:
                     logging.error(f"Failed to process deprotonated {neutral_file}: {e}")
 

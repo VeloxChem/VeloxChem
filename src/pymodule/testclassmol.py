@@ -143,8 +143,12 @@ class MPC1:
         energy_unocc = self.scf_results['E_alpha'][len(occ_mo_val):]
         # den_val = self.compute_electron_density() # Electron density values at surface points
               
-
+        # Electron affinity (EA) and ionization energy (IE) values
         EA, IE = [], []
+
+        # Electron attachment energy (AE)
+        AE = []
+
         for idx, point in enumerate(self.surface_points):
 
             ea_point_val, ie_point_val = 0, 0 # Initialize EA and IE values for this point
@@ -167,16 +171,29 @@ class MPC1:
             EA.append(ea_point_val)
             IE.append(ie_point_val)
 
+            number_of_virtual_orbitals_with_negative_energy = sum(1 for energy in energy_unocc if energy < 0)
+            negative_energies_virtual_orbitals = unocc_mo_val[:number_of_virtual_orbitals_with_negative_energy]
+
+            for j in range(len(negative_energies_virtual_orbitals)):
+                # Calculate the square of the negative energy of the virtual orbitals (density values)
+                negative_energies_virtual_orbitals_squared = negative_energies_virtual_orbitals[j][idx]**2
+                ae_point_val += negative_energies_virtual_orbitals_squared * energy_unocc[j] # Sum over all unoccupied MOs
+
+            ae_point_val /= sum(occ_mo_val[j][idx]**2 for j in range(len(occ_mo_val)))
+
+            AE.append(ae_point_val)
         
         self.ea_values = EA
         self.ie_values = IE
+        self.ae_values = AE
     
-        data_bank = [{'atom': int(self.atom_indices[idx]), 'IE': IE[idx], 'EA': EA[idx]} for idx in range(len(IE))]
+        data_bank = [{'atom': int(self.atom_indices[idx]), 'IE': IE[idx], 'EA': EA[idx], 'AE': AE[idx]} for idx in range(len(IE))]
         # print(f"Data bank: {data_bank}")
 
-	    # Organize data into a dictionary where keys are atoms and values are lists of (EA, index) tuples
+        # Organize data into a dictionary where keys are atoms and values are lists of (EA, IE, AE, index) tuples
         self.EA_data = defaultdict(lambda: {"EA": [], "indices": []})
         self.IE_data = defaultdict(lambda: {"IE": [], "indices": []})
+        self.AE_data = defaultdict(lambda: {"AE": [], "indices": []})
 
         for idx, entry in enumerate(data_bank):
             atom = entry["atom"]
@@ -184,6 +201,8 @@ class MPC1:
             self.EA_data[atom]["indices"].append(idx)  # Store the index of the point
             self.IE_data[atom]["IE"].append(entry["IE"])
             self.IE_data[atom]["indices"].append(idx)  # Store the index of the point
+            self.AE_data[atom]["AE"].append(entry["AE"])
+            self.AE_data[atom]["indices"].append(idx)  # Store the index of the point
         
     def _local_property_EA(self):
         self.EA_results = {}
@@ -234,13 +253,38 @@ class MPC1:
                 self.min_IE_points.append(min_IE_index)  # Store min IE point index
 
         return self.IE_results, self.min_IE_points
+    
+    def _local_property_AE(self):
+        self.AE_results = {}
+        self.min_AE_points = []
 
-    def _get_max_min_EA_IE(self):
-        # EA_data and IE_data should be structured as dictionaries where the atom index maps to a list of EA/IE values
+        for atom, values in self.AE_data.items():
+            # Assuming 'values' contains 'AE' (list of AE values) and 'indices' (corresponding surface point indices)
+            if values["AE"]:
+                min_AE_value = min(values["AE"])
+                min_AE_index = values["indices"][values["AE"].index(min_AE_value)]
+                max_AE_value = max(values["AE"])
+                mean_AE_value = np.mean(values["AE"])
+                median_AE_value = np.median(values["AE"])
+
+                self.AE_results[atom] = {
+                    "min_AE": min_AE_value,
+                    "max_AE": max_AE_value,
+                    "mean_AE": mean_AE_value,
+                    "median_AE": median_AE_value,
+                    "min_AE_index": min_AE_index
+                }
+
+                self.min_AE_points.append(min_AE_index)
+        return self.AE_results, self.min_AE_points
+
+    def _get_max_min_EA_IE_AE(self):
+        # EA_data, IE_data, and AE_data should be structured as dictionaries where the atom index maps to a list of EA/IE/AE values
         self.result_EA, self.min_EA_points = self._local_property_EA()
         self.result_IE, self.min_IE_points = self._local_property_IE()
+        self.result_AE, self.min_AE_points = self._local_property_AE()
 
-        return self.result_EA, self.result_IE, self.min_EA_points, self.min_IE_points
+        return self.result_EA, self.result_IE, self.result_AE, self.min_EA_points, self.min_IE_points, self.min_AE_points
 
 
     def _compute_resp_loprop(self):
@@ -288,7 +332,7 @@ class MPC1:
     
     def generate_data_matrix(self):
         num_atoms = len(self.resp_charges)
-        data_matrix = np.zeros((num_atoms, 18))
+        data_matrix = np.zeros((num_atoms, 22))
 
         for i, atom_idx in enumerate(range(num_atoms)):
             data_matrix[i, 0] = atom_idx + 1
@@ -301,12 +345,16 @@ class MPC1:
             data_matrix[i, 7] = self.result_IE[atom_idx]['max_IE']
             data_matrix[i, 8] = self.result_IE[atom_idx]['mean_IE']
             data_matrix[i, 9] = self.result_IE[atom_idx]['median_IE']
-            data_matrix[i, 10] = self.loprop_charges['localized_charges'][i]
-            data_matrix[i, 11] = self.resp_charges[i]
-            data_matrix[i, 12] = self.max_esp_values.get(atom_idx, np.nan)
-            data_matrix[i, 13] = self.min_esp_values.get(atom_idx, np.nan)
-            data_matrix[i, 14:17] = self.local_polarizabilities[i]  # Principal polarizability vector
-            data_matrix[i,17] = self.scf_results['scf_energy'] # SCF energy
+            data_matrix[i, 10] = self.result_AE[atom_idx]['min_AE']
+            data_matrix[i, 11] = self.result_AE[atom_idx]['max_AE'] 
+            data_matrix[i, 12] = self.result_AE[atom_idx]['mean_AE'] 
+            data_matrix[i, 13] = self.result_AE[atom_idx]['median_AE']
+            data_matrix[i, 14] = self.loprop_charges['localized_charges'][i]
+            data_matrix[i, 15] = self.resp_charges[i]
+            data_matrix[i, 16] = self.max_esp_values.get(atom_idx, np.nan)
+            data_matrix[i, 17] = self.min_esp_values.get(atom_idx, np.nan)
+            data_matrix[i, 18:21] = self.local_polarizabilities[i]  # Principal polarizability vector
+            data_matrix[i, 21] = self.scf_results['scf_energy']  # SCF energy
 
         return data_matrix
 
@@ -325,7 +373,7 @@ class MPC1:
         print('Successfully computed the local property EA')
         self._local_property_IE()
         print('Successfully computed the local property IE')
-        self._get_max_min_EA_IE()
+        self._get_max_min_EA_IE_AE()
         print('Successfully computed the max and min EA and IE')
         self._compute_resp_loprop()
         print('Successfully computed the RESP and LoProp charges')
