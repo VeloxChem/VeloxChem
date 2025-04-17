@@ -237,7 +237,13 @@ class CpcmDriver:
 
         cpcm_grid_raw = np.zeros((0, 6))
 
-        for i in range(molecule.number_of_atoms()):
+        natoms = molecule.number_of_atoms()
+        ave, rem = divmod(natoms, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        atom_start = sum(counts[:self.rank])
+        atom_end = sum(counts[:self.rank + 1])
+
+        for i in range(atom_start, atom_end):
             # scale and shift unit grid
             atom_grid_coords = unit_grid_coords * atom_radii[i] + atom_coords[i]
             grid_zeta = zeta / (atom_radii[i] * np.sqrt(unit_grid_weights))
@@ -246,7 +252,14 @@ class CpcmDriver:
                 (atom_grid_coords, unit_grid_weights, grid_zeta, atom_idx))
             cpcm_grid_raw = np.vstack((cpcm_grid_raw, atom_grid))
 
+        gathered_cpcm_grid_raw = self.comm.allgather(cpcm_grid_raw)
+        cpcm_grid_raw = np.vstack(gathered_cpcm_grid_raw)
+
         sw_func_raw = self.get_switching_function(atom_coords, atom_radii, cpcm_grid_raw)
+
+        gathered_sw_func_raw = self.comm.allgather(sw_func_raw)
+        sw_func_raw = np.hstack(gathered_sw_func_raw)
+
         sw_mask = (sw_func_raw > 1.0e-8)
 
         cpcm_grid = cpcm_grid_raw[sw_mask, :]
@@ -274,20 +287,25 @@ class CpcmDriver:
             'CpcmDriver.get_switching_function: Inconsistent atom_coords ' +
             'and atom_radii')
 
-        assert_msg_critical(
-            grid.shape[0] == self.grid_per_sphere * atom_coords.shape[0],
-            'CpcmDriver.get_switching_function: Should only be used on ' +
-            'raw CPCM grid')
+        npoints = grid.shape[0]
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-        sw_func = np.zeros(grid.shape[0])
+        sw_func = np.zeros(end - start)
 
-        for g in range(grid.shape[0]):
+        for g in range(start, end):
             gx, gy, gz = grid[g, :3]
             zeta_g = grid[g, 4]
 
-            sw_func[g] = 1.0
+            sw_func[g - start] = 1.0
+
+            # TODO: use grid atom_idx saved in grid
+            # TODO: save grid atom_idx in another array
             atom_idx = g // self.grid_per_sphere
 
+            # TODO: consider moving to C++
             for i in range(atom_coords.shape[0]):
                 if i == atom_idx:
                     continue
@@ -298,7 +316,7 @@ class CpcmDriver:
                 f_ag = 1.0 - 0.5 * (math.erf(zeta_g * (a_radius - r_ag)) +
                                     math.erf(zeta_g * (a_radius + r_ag)))
 
-                sw_func[g] *= f_ag
+                sw_func[g - start] *= f_ag
 
         return sw_func
     
