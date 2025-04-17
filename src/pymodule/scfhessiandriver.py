@@ -818,9 +818,9 @@ class ScfHessianDriver(HessianDriver):
                     for j in range(natm):
                         if i not in atom_pair_atoms or j not in atom_pair_atoms:
                             hessian_nuclear_nuclear[i, j, :, :] = 0.0
+                            hessian_dft_xc[3 * i:3 * i + 3,
+                                           3 * j:3 * j + 3] = 0.0
 
-            print('hessian_nuclear_nuclear:')
-            print(hessian_nuclear_nuclear)
 
             self.hessian = (
                 hessian_first_order_derivatives +

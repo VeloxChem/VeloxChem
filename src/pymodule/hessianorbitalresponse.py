@@ -269,39 +269,59 @@ class HessianOrbitalResponse(CphfSolver):
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
-            naos = basis.get_dimensions_of_basis()
+            if atom_pairs is None:
+                naos = basis.get_dimensions_of_basis()
 
-            batch_size = get_batch_size(None, natm * 3, naos, self.comm)
-            batch_size = batch_size // 3
+                batch_size = get_batch_size(None, natm * 3, naos, self.comm)
+                batch_size = batch_size // 3
 
-            num_batches = natm // batch_size
-            if natm % batch_size != 0:
-                num_batches += 1
+                num_batches = natm // batch_size
+                if natm % batch_size != 0:
+                    num_batches += 1
 
-            for batch_ind in range(num_batches):
+                for batch_ind in range(num_batches):
 
-                batch_start = batch_ind * batch_size
-                batch_end = min(batch_start + batch_size, natm)
+                    batch_start = batch_ind * batch_size
+                    batch_end = min(batch_start + batch_size, natm)
 
-                atom_list = list(range(batch_start, batch_end))
+                    atom_list = list(range(batch_start, batch_end))
 
-                vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
-                    molecule, basis, gs_density, mol_grid,
-                    self.xcfun.get_func_label(), atom_list)
+                    vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
+                        molecule, basis, gs_density, mol_grid,
+                        self.xcfun.get_func_label(), atom_list)
 
-                for vecind, (iatom, root_rank) in enumerate(
-                        all_atom_idx_rank[batch_start:batch_end]):
+                    for vecind, (iatom, root_rank) in enumerate(
+                            all_atom_idx_rank[batch_start:batch_end]):
+                        # print(iatom)
+                        for x in range(3):
+                            vxc_deriv_ix = self.comm.reduce(
+                                vxc_deriv_batch[vecind * 3 + x])
 
-                    for x in range(3):
-                        vxc_deriv_ix = self.comm.reduce(
-                            vxc_deriv_batch[vecind * 3 + x])
+                            dist_vxc_deriv_ix = DistributedArray(
+                                vxc_deriv_ix, self.comm)
 
-                        dist_vxc_deriv_ix = DistributedArray(
-                            vxc_deriv_ix, self.comm)
+                            key_ix = (iatom, x)
+                            dist_fock_deriv_ao[
+                                key_ix].data += dist_vxc_deriv_ix.data
+            else:
+                if self.rank == mpi_master():
+                    vxc_deriv_batch = xc_mol_hess.integrate_vxc_fock_gradient(
+                        molecule, basis, gs_density, mol_grid,
+                        self.xcfun.get_func_label(), local_atoms)
 
-                        key_ix = (iatom, x)
-                        dist_fock_deriv_ao[
-                            key_ix].data += dist_vxc_deriv_ix.data
+                    for vecind, (iatom, root_rank) in enumerate(all_atom_idx_rank):
+                        # print(iatom)
+                        for x in range(3):
+                            vxc_deriv_ix = self.comm.reduce(
+                                vxc_deriv_batch[vecind * 3 + x])
+
+                            dist_vxc_deriv_ix = DistributedArray(
+                                vxc_deriv_ix, self.comm)
+
+                            key_ix = (iatom, x)
+                            dist_fock_deriv_ao[
+                                key_ix].data += dist_vxc_deriv_ix.data
+                        
 
         profiler.stop_timer('dXC')
 
