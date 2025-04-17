@@ -507,7 +507,13 @@ class CpcmDriver:
         zeta = np.copy(grid[:, 4])
         atom_indices = np.copy(grid[:, 5].astype(int))
 
-        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, natoms)
+        npoints = grid_coords.shape[0]
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, start, end, natoms)
         grad_Aij *= (-0.5 / scale_f)
 
         return grad_Aij
@@ -544,12 +550,18 @@ class CpcmDriver:
         atom_coords   = molecule.get_coordinates_in_bohr()
         atom_radii    = self.get_cpcm_vdw_radii(molecule) * 1.2
 
+        npoints = grid_coords.shape[0]
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
         # a, b: atoms
         # i: grid points
         # c: Cartesian components
         # np.einsum('aib,ib,ibc,i->ac', delta, ratio_fiJ, dr_iJ, factor_i * q**2)
         grad_Aii = cpcm_comp_grad_Aii(grid_coords, zeta_i, sw_f, atom_idx, q,
-                                      atom_coords, atom_radii)
+                                      start, end, atom_coords, atom_radii)
         grad_Aii *= (-0.5 / scale_f)
 
         return grad_Aii
@@ -584,7 +596,7 @@ class CpcmDriver:
 
         # np.einsum('ia,bia,iac,i,a->bc', dB_dr, factor, dr_iA, q, Z)
 
-        for a in range(natoms):
+        for a in list(range(natoms))[self.rank::self.nodes]:
 
             r_iA   = grid_coords - atom_coords[a]
             r_iA_2 = np.sum(r_iA**2, axis=1)
@@ -623,14 +635,19 @@ class CpcmDriver:
         The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         
-        grid_coords  = np.copy(grid[:, :3])
-        zeta         = np.copy(grid[:, 4])
-        atom_indices = np.copy(grid[:, 5].astype(int))
+        npoints = grid.shape[0]
 
-        # TODO: parallelize over MPI ranks
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
+
+        grid_coords  = np.copy(grid[start:end, :3])
+        zeta         = np.copy(grid[start:end, 4])
+        atom_indices = np.copy(grid[start:end, 5].astype(int))
 
         return compute_nuclear_potential_erf_gradient(
-            molecule, basis, grid_coords, q, DM, zeta, atom_indices)
+            molecule, basis, grid_coords, q[start:end], DM, zeta, atom_indices)
 
     def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D):
         """

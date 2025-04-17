@@ -254,6 +254,8 @@ export_general(py::module &m) -> void
              const py::array_t<double>& zeta,
              const py::array_t<int>&    atom_indices,
              const py::array_t<double>& q,
+             const int                  grid_index_start,
+             const int                  grid_index_end,
              const int                  natoms) -> py::array_t<double> {
               std::string errstyle("cpcm_comp_grad_Aij: Expecting contiguous numpy arrays");
               auto        c_style_1 = py::detail::check_flags(grid_coords.ptr(), py::array::c_style);
@@ -267,8 +269,11 @@ export_general(py::module &m) -> void
               errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
               errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
               const auto npoints = static_cast<int>(grid_coords.shape(0));
+              std::string errindex("cpcm_comp_grad_Aij: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
               auto grad_Amat = cpcm::comp_grad_Aij(grid_coords.data(), zeta.data(), atom_indices.data(), q.data(),
-                                                   0, npoints, npoints, natoms);
+                                                   grid_index_start, grid_index_end, npoints, natoms);
               return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
           },
           "Compute C-PCM gradient for Aij.",
@@ -276,6 +281,8 @@ export_general(py::module &m) -> void
           "zeta"_a,
           "atom_indices"_a,
           "q"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a,
           "natoms"_a);
 
     m.def("cpcm_comp_grad_Aii",
@@ -284,6 +291,8 @@ export_general(py::module &m) -> void
              const py::array_t<double>& sw_f,
              const py::array_t<int>&    atom_indices,
              const py::array_t<double>& q,
+             const int                  grid_index_start,
+             const int                  grid_index_end,
              const py::array_t<double>& atom_coords,
              const py::array_t<double>& atom_radii) -> py::array_t<double> {
               std::string errstyle("cpcm_comp_grad_Aii: Expecting contiguous numpy arrays");
@@ -306,8 +315,11 @@ export_general(py::module &m) -> void
               errors::assertMsgCritical(atom_coords.shape(1) == 3, errsize);
               const auto npoints = static_cast<int>(grid_coords.shape(0));
               const auto natoms = static_cast<int>(atom_coords.shape(0));
+              std::string errindex("cpcm_comp_grad_Aii: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
               auto grad_Amat = cpcm::comp_grad_Aii(grid_coords.data(), zeta.data(), sw_f.data(), atom_indices.data(), q.data(),
-                                                   atom_coords.data(), atom_radii.data(), 0, npoints, npoints, natoms);
+                                                   atom_coords.data(), atom_radii.data(), grid_index_start, grid_index_end, npoints, natoms);
               return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
           },
           "Compute C-PCM gradient for Aii.",
@@ -316,6 +328,8 @@ export_general(py::module &m) -> void
           "sw_f"_a,
           "atom_indices"_a,
           "q"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a,
           "atom_coords"_a,
           "atom_radii"_a);
 
