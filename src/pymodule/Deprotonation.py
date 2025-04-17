@@ -99,7 +99,11 @@ class OxygenDeprotonation:
         # self.load_molecule()
         self.remove_hydroxyl_hydrogen()
 
-        # saved_files = []
+        if not self.deprotonated_molecules:
+            print("\n No hydroxyl hydrogens found in the molecule.\n")
+            print("Deprotonation failed.\n")
+            
+            return False # Return False if no deprotonated molecules were found
 
         for i, file_name in enumerate(self.deprotonated_molecules):
             # filapath = os.path.join(self.folder_path, f"/Users/simonisaksson/Examensarbete/veloxchem/Atom mapping/deprotonated_molecules/ deprotonated_{molecule}.xyz")
@@ -110,5 +114,7 @@ class OxygenDeprotonation:
         print('All Molecules with OH-groups have been deprotonated, molecules without this group is not saved as an xyz file.')
         print('Remember to set the charge to -1 for the molecule when loaded with VeloxChem')
         # return saved_files
+
+        return True # Return True if the deprotonation was successful (needed for other class)
         
         
