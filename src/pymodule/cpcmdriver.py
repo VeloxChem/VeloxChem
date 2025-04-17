@@ -33,7 +33,6 @@
 from mpi4py import MPI
 import numpy as np
 import math
-import time
 import sys
 
 from .veloxchemlib import cpcm_form_matrix_A, cpcm_comp_grad_Aij
@@ -560,45 +559,39 @@ class CpcmDriver:
         :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
+
         atom_coords = molecule.get_coordinates_in_bohr()
         natoms      = molecule.number_of_atoms()
-        grid_coords = grid[:, :3]
-        zeta_i      = grid[:, 4]
-        atom_idx    = grid[:, 5]
-        n_dim       = 3 # x,y,z
 
-        # Define constants
-        # M = Nr. of grid points
-        M              = grid_coords.shape[0]
+        grid_coords = np.copy(grid[:, :3])
+        zeta_i      = np.copy(grid[:, 4])
+        atom_idx    = np.copy(grid[:, 5]).astype(int)
+
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
-        dB_mat         = np.zeros((M, natoms, natoms, n_dim))
 
-        # distances and direction vects.
-        r_iA   = grid_coords[:, np.newaxis, :] - atom_coords[np.newaxis, :, :]
-        r_iA_2 = np.sum(r_iA**2, axis=2)
-        d_iA   = np.sqrt(r_iA_2)
-        dr_iA  = r_iA / d_iA[:, :, np.newaxis]
+        elem_ids = molecule.get_element_ids()
+        gradB_vec = np.zeros((natoms, 3))
 
-        zeta_r   = zeta_i[:, np.newaxis] * d_iA
-        erf_term = self.erf_array(zeta_r)
-        exp_term = np.exp(-1.0 * (zeta_i[:, np.newaxis]**2) * r_iA_2)
-        dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
+        # np.einsum('ia,bia,iac,i,a->bc', dB_dr, factor, dr_iA, q, Z)
 
-        # Set up for broadcasting
-        I_vals       = np.arange(natoms)[:, np.newaxis, np.newaxis]
-        A_vals       = np.arange(natoms)[np.newaxis, np.newaxis, :]
-        atom_idx_exp = atom_idx[np.newaxis, :, np.newaxis]
-        factor       = ((I_vals == atom_idx_exp).astype(int)
-                    - (I_vals == A_vals).astype(int))
-        
-        # Calculate for n atoms
-        dB_mat = dB_dr[np.newaxis, :, :, np.newaxis] * factor[:, :, :, np.newaxis] * dr_iA[np.newaxis, :, :, :]
-        # Reordeer to (M, nAtoms, nAtoms, 3)
-        dB_mat = np.transpose(dB_mat, (1, 2, 0, 3))
-        
-        # Contract
-        partial_contract = np.matmul(q, dB_mat.reshape(M, natoms * natoms * n_dim)).reshape(natoms, natoms * n_dim)
-        gradB_vec = np.matmul(partial_contract.T, molecule.get_element_ids()).reshape(natoms, n_dim)
+        for a in range(natoms):
+
+            r_iA   = grid_coords - atom_coords[a]
+            r_iA_2 = np.sum(r_iA**2, axis=1)
+            d_iA   = np.sqrt(r_iA_2)
+
+            dr_iA  = r_iA / d_iA.reshape(-1, 1)
+
+            zeta_r   = zeta_i * d_iA
+            erf_term = self.erf_array(zeta_r)
+            exp_term = np.exp(-1.0 * (zeta_i**2) * r_iA_2)
+            dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
+
+            for b in range(natoms):
+
+                factor = (atom_idx == b).astype(int) - int(a == b)
+
+                gradB_vec[b] += np.dot(dB_dr * factor * q, dr_iA) * elem_ids[a]
 
         return gradB_vec
     
@@ -634,25 +627,12 @@ class CpcmDriver:
         Collects the CPCM gradient contribution.
         """
 
-        t0 = time.time()
+        gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x)
 
-        gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x) + self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
-
-        t1 = time.time()
+        gradA += self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
 
         gradB = self.grad_B(molecule, grid, q)
 
-        t2 = time.time()
-
         gradC = self.grad_C(molecule, basis, grid, q, D)
-
-        t3 = time.time()
-
-        self.ostream.print_info(f'Time spent in CPCM gradient: {t3 - t0:.2f} sec')
-        self.ostream.print_info(f'    Grad A took {t1 - t0:.2f} sec')
-        self.ostream.print_info(f'    Grad B took {t2 - t1:.2f} sec')
-        self.ostream.print_info(f'    Grad C took {t3 - t2:.2f} sec')
-        self.ostream.print_blank()
-        self.ostream.flush()
 
         return gradA + gradB + gradC
