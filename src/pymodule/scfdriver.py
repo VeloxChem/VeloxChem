@@ -1457,7 +1457,9 @@ class ScfDriver:
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                    self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
+
+                    self._cpcm_q = self.cpcm_drv.cg_solve(
+                        self._cpcm_Amat, 1.0 / np.diag(self._cpcm_Amat), rhs)
 
                     e_sol = self.cpcm_drv.compute_solv_energy(
                         self._cpcm_Bzvec, Cvec, self._cpcm_q)

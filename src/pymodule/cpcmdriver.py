@@ -636,3 +636,60 @@ class CpcmDriver:
         gradC = self.grad_C(molecule, basis, grid, q, D)
 
         return gradA + gradB + gradC
+
+    def cg_solve(self, Amat, inv_Adiag, rhs):
+        """
+        Solves the C-PCM equations using conjugate gradient.
+        """
+
+        try:
+            from scipy.sparse import linalg
+        except ImportError:
+            raise ImportError('Unable to import scipy. Please install scipy ' +
+                              'via pip or conda.')
+
+        def matvec(v):
+            """
+            Matrix-vector product
+            """
+
+            return np.dot(Amat, v)
+
+        def precond_matvec(v):
+            """
+            Matrix-vector product for preconditioner using the
+            inverse of the diagonal
+            """
+
+            return inv_Adiag * v
+
+        LinOp = linalg.LinearOperator(Amat.shape, matvec=matvec)
+        PrecondOp = linalg.LinearOperator(Amat.shape, matvec=precond_matvec)
+
+        b = rhs
+        x0 = np.zeros(rhs.shape)
+
+        try:
+            cg_solution, cg_conv = linalg.cg(A=LinOp,
+                                             b=b,
+                                             x0=x0,
+                                             M=PrecondOp,
+                                             rtol=1.0e-6,
+                                             atol=0)
+        except TypeError:
+            # workaround for scipy < 1.11
+            cg_solution, cg_conv = linalg.cg(A=LinOp,
+                                             b=b,
+                                             x0=x0,
+                                             M=PrecondOp,
+                                             tol=(1.0e-6 * np.linalg.norm(b)),
+                                             atol=0)
+
+
+        assert_msg_critical(cg_conv == 0,
+                            'C-PCM: conjugate gradient solver did not converge')
+
+        if cg_conv == 0:
+            return cg_solution
+        else:
+            return None
