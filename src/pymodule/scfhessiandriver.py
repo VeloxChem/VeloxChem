@@ -432,6 +432,8 @@ class ScfHessianDriver(HessianDriver):
         hessian_cphf_coeff_rhs = self.comm.reduce(hessian_cphf_coeff_rhs,
                                                   root=mpi_master())
 
+        # print('first integral derivatives:\n', hessian_first_integral_derivatives)
+        # print('eri overlap:\n', hessian_eri_overlap)
         if self.rank == mpi_master():
             hessian_first_order_derivatives = (
                 hessian_cphf_coeff_rhs + hessian_first_integral_derivatives +
@@ -602,7 +604,6 @@ class ScfHessianDriver(HessianDriver):
         # do only upper triangular matrix
 
         # TODO: use alternative way to partition atom pairs
-        # todo only do this with the given atom pairs
         all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
         if atom_pairs is None:
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
@@ -735,6 +736,7 @@ class ScfHessianDriver(HessianDriver):
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
         # nuclei-point charges contribution
+        #todo atompairs, this needs to be verified
         if self.scf_driver.point_charges is not None:
 
             hessian_point_charges = np.zeros((natm, natm, 3, 3))
@@ -820,7 +822,6 @@ class ScfHessianDriver(HessianDriver):
                             hessian_nuclear_nuclear[i, j, :, :] = 0.0
                             hessian_dft_xc[3 * i:3 * i + 3,
                                            3 * j:3 * j + 3] = 0.0
-
 
             self.hessian = (
                 hessian_first_order_derivatives +

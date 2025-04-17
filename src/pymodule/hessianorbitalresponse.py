@@ -266,6 +266,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         profiler.start_timer('dXC')
 
+
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
