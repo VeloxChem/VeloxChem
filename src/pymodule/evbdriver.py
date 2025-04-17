@@ -241,7 +241,7 @@ class EvbDriver():
         product: str | list[str],
         reactant_charge: int | list[int] = 0,
         product_charge: int | list[int] = 0,
-        reactant_multiplicity: int |list[int]= 1,
+        reactant_multiplicity: int | list[int] = 1,
         product_multiplicity: int | list[int] = 1,
         reparameterize: bool = True,
         optimize: bool = False,
@@ -276,11 +276,12 @@ class EvbDriver():
 
         cwd = Path().cwd()
         mapped_product_path = cwd / self.input_folder / f"{combined_product_name}_mapped.xyz"
-        if (combined_rea_input['forcefield'] is not None and 
-            combined_rea_input['molecule'] is not None and 
-            combined_pro_input['forcefield'] is not None and 
-            mapped_product_path.exists()):
-            mapped_product_molecule = Molecule.read_xyz_file(str(mapped_product_path))
+        if (combined_rea_input['forcefield'] is not None
+                and combined_rea_input['molecule'] is not None
+                and combined_pro_input['forcefield'] is not None
+                and mapped_product_path.exists()):
+            mapped_product_molecule = Molecule.read_xyz_file(
+                str(mapped_product_path))
             combined_pro_input['forcefield'].molecule = mapped_product_molecule
             combined_pro_input['molecule'] = mapped_product_molecule
             self.ostream.print_info(
@@ -310,6 +311,7 @@ class EvbDriver():
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
 
+
             self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
@@ -330,7 +332,6 @@ class EvbDriver():
                 self.reactant.molecule.write_xyz_file(str(reactant_mol_path))
                 self.product.molecule.write_xyz_file(str(mapped_product_path))
 
-
     def _process_file_input(self, filenames, charge, multiplicity):
         if isinstance(filenames, str):
             filenames = [filenames]
@@ -338,17 +339,18 @@ class EvbDriver():
         # by default, give all molecules 0 charge and 1 multiplicity
         if isinstance(charge, int):
             if charge == 0:
-                charge = [charge]*len(filenames)
+                charge = [charge] * len(filenames)
             else:
                 charge = [charge]
 
         if isinstance(multiplicity, int):
             if multiplicity == 1:
-                multiplicity = [multiplicity]*len(filenames)
+                multiplicity = [multiplicity] * len(filenames)
             else:
                 multiplicity = [multiplicity]
 
-        assert len(filenames) == len(charge), "Number of reactants and charges must match"
+        assert len(filenames) == len(
+            charge), "Number of reactants and charges must match"
         assert len(filenames) == len(
             multiplicity), "Number of reactants and multiplicities must match"
 
@@ -365,9 +367,11 @@ class EvbDriver():
                 assert abs(
                     sum(partial_charge) - charge
                 ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total foral charge of the system {charge} for input {i+1}"
-        
+
+        for inp,filename in zip(input,filenames):
+            assert inp['molecule'] is not None or inp['forcefield'] is not None, f"Could not load {filename} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
+
         return input
-        
 
     def _get_input_files(self, filename: str):
         # Build a molecule from a (possibly optimized) geometry
@@ -387,7 +391,9 @@ class EvbDriver():
             molecule = Molecule.read_xyz_file(str(struct_path))
         else:
             molecule = None
-            self.ostream.print_info(f"Could not load {'/'.join(opt_path.parts[-2:])} and {'/'.join(struct_path.parts[-1])}")
+            self.ostream.print_info(
+                f"Could not load {'/'.join(opt_path.parts[-2:])} and {'/'.join(struct_path.parts[-2:])}"
+            )
         self.ostream.flush()
 
         charges = None
@@ -408,7 +414,7 @@ class EvbDriver():
             )
         else:
             self.ostream.print_info(
-                f"Could not load {charge_path.parts[-1]} file. Continuing without charges"
+                f"Could not load {'/'.join(charge_path.parts[-2:])} file. Continuing without charges"
             )
         self.ostream.flush()
 
@@ -437,8 +443,7 @@ class EvbDriver():
             hessian = np.loadtxt(hessian_path)
         else:
             self.ostream.print_info(
-                f"Could not find hessian file at {hessian_path}"
-            )
+                f"Could not find hessian file at {hessian_path}")
         self.ostream.flush()
 
         return {
@@ -845,10 +850,12 @@ class EvbDriver():
 
     def run_FEP(
         self,
-        equil_steps=10000,
+        equil_NVT_steps=5000,
+        equil_NPT_steps=5000,
         sample_steps=100000,
         write_step=1000,
-        initial_equil_steps=10000,
+        initial_equil_NVT_steps=10000,
+        initial_equil_NPT_steps=10000,
         step_size=0.001,
         equil_step_size=0.001,
         initial_equil_step_size=0.001,
@@ -871,10 +878,12 @@ class EvbDriver():
                 "Debugging enabled, using low number of steps. Do not use for production"
             )
             self.ostream.flush()
-            equil_steps = 100
+            equil_NVT_steps = 0
+            equil_NPT_steps = 100
             sample_steps = 200
             write_step = 5
-            initial_equil_steps = 100
+            initial_equil_NVT_steps = 0
+            initial_equil_NPT_steps = 100
             step_size = 0.001
             equil_step_size = 0.001
             initial_equil_step_size = 0.001
@@ -888,10 +897,12 @@ class EvbDriver():
         for conf in self.system_confs:
             self.update_options_json(
                 {
-                    "equil_steps": equil_steps,
+                    "equil_steps_NVT": equil_NVT_steps,
+                    "equil_steps_NPT": equil_NPT_steps,
                     "sample_steps": sample_steps,
                     "write_step": write_step,
-                    "initial_equil_steps": initial_equil_steps,
+                    "initial_equil_NVT_steps": initial_equil_NVT_steps,
+                    "initial_equil_NPT_steps": initial_equil_NPT_steps,
                     "step_size": step_size,
                     "equil_step_size": equil_step_size,
                     "initial_equil_step_size": initial_equil_step_size,
@@ -905,13 +916,14 @@ class EvbDriver():
             if saved_frames_on_crash is not None:
                 FEP.save_frames = saved_frames_on_crash
             FEP.run_FEP(
-                equilibration_steps=equil_steps,
+                equil_NVT_steps=equil_NVT_steps,
+                equil_NPT_steps=equil_NPT_steps,
                 total_sample_steps=sample_steps,
                 write_step=write_step,
-                lambda_0_equilibration_steps=initial_equil_steps,
+                initial_equil_NVT_steps=initial_equil_NVT_steps,
+                initial_equil_NPT_steps=initial_equil_NPT_steps,
                 step_size=step_size,
                 equil_step_size=equil_step_size,
-                initial_equil_step_size=initial_equil_step_size,
                 Lambda=self.Lambda,
                 configuration=conf,
                 platform=platform,

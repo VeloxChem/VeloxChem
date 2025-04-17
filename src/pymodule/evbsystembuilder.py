@@ -112,11 +112,17 @@ class EvbForceGroup(Enum):
             cls.SOLVENT.value,
             cls.CARBON.value,
             cls.INTEGRATION.value,
-            cls.DEBUG1INT.value,
-            cls.DEBUG2INT.value,
-            cls.DEBUG1.value,
-            cls.DEBUG2.value,
+            # cls.DEBUG1INT.value,
+            # cls.DEBUG2INT.value,
+            # cls.DEBUG1.value,
+            # cls.DEBUG2.value,
         ])
+
+    @classmethod
+    def NVT_integration_force_groups(cls):
+        int_fg = cls.integration_force_groups()
+        int_fg.remove(cls.BAROSTAT.value)
+        return int_fg
 
     @classmethod
     def pes_force_groups(cls):
@@ -133,10 +139,10 @@ class EvbForceGroup(Enum):
             cls.SOLVENT.value,
             cls.CARBON.value,
             cls.PES.value,
-            cls.DEBUG1PES.value,
-            cls.DEBUG2PES.value,
-            cls.DEBUG1.value,
-            cls.DEBUG2.value,
+            # cls.DEBUG1PES.value,
+            # cls.DEBUG2PES.value,
+            # cls.DEBUG1.value,
+            # cls.DEBUG2.value,
         ])
 
 
@@ -180,11 +186,11 @@ class EvbSystemBuilder():
         self.lj14_scale: float = 0.5
         self.minimal_nb_cutoff: float = 1  # nm, minimal cutoff for the nonbonded force
 
-        self.soft_core_coulomb_pes = False
-        self.soft_core_lj_pes = False
+        self.soft_core_coulomb_pes = True
+        self.soft_core_lj_pes = True
 
-        self.soft_core_coulomb_int = True
-        self.soft_core_lj_int = True
+        self.soft_core_coulomb_int = False
+        self.soft_core_lj_int = False
 
         self.bonded_integration: bool = True  # If the integration potential should use bonded (harmonic/morse) forces for forming/breaking bonds, instead of replacing them with nonbonded potentials
 
