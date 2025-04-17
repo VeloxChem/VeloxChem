@@ -660,14 +660,12 @@ class ScfDriver:
             self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
                 self._cpcm_grid, self._cpcm_sw_func)
 
-            cpcm_Bmat = self.cpcm_drv.form_matrix_B(
+            self._cpcm_Bzvec = self.cpcm_drv.form_vector_Bz(
                 self._cpcm_grid, molecule)
 
-            self._cpcm_Bzvec = np.dot(cpcm_Bmat, molecule.get_element_ids())
-
             self.ostream.print_info(
-                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated ' +
-                f'in {tm.time() - cpcm_t0:.2f} sec.')
+                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
+                + f'in {tm.time() - cpcm_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
 

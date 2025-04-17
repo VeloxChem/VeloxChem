@@ -338,9 +338,9 @@ class CpcmDriver:
 
         return cpcm_form_matrix_A(grid, sw_func)
 
-    def form_matrix_B(self, grid, molecule):
+    def form_vector_Bz(self, grid, molecule):
         """
-        Forms the nuclear-cavity interaction matrix.
+        Forms the nuclear-cavity interaction vector.
 
         :param molecule:
             The molecule.
@@ -352,18 +352,22 @@ class CpcmDriver:
             The (nuclear) electrostatic potential at each grid point due to
             each nucleus (not weighted by nuclear charge).
         """
-        Bmat = np.zeros((grid.shape[0], molecule.number_of_atoms()))
-        natoms = molecule.number_of_atoms()
+
+        Bzvec = np.zeros(grid.shape[0])
+
         atom_coords = molecule.get_coordinates_in_bohr()
+        elem_ids = molecule.get_element_ids()
 
-        for i in range(grid.shape[0]):
-            xi, yi, zi, wi, zeta_i, atom_idx = grid[i]
-            for a in range(natoms):
-                xa, ya, za = atom_coords[a]
-                r_ia = np.sqrt((xi - xa)**2 + (yi - ya)**2 + (zi - za)**2)
-                Bmat[i, a] = math.erf(zeta_i * r_ia) / r_ia
+        grid_coords = np.copy(grid[:, :3])
+        grid_zeta = np.copy(grid[:, 4])
 
-        return Bmat
+        for a in range(molecule.number_of_atoms()):
+
+            r_ia = np.sqrt(np.sum((grid_coords - atom_coords[a])**2, axis=1))
+
+            Bzvec += elem_ids[a] * self.erf_array(grid_zeta * r_ia) / r_ia
+
+        return Bzvec
 
     def form_vector_C(self, molecule, basis, grid, D):
         """
