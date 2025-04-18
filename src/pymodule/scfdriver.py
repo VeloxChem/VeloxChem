@@ -66,7 +66,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
-from .errorhandler import assert_msg_critical, safe_solve
+from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_results_to_hdf5
 
 
@@ -241,7 +241,7 @@ class ScfDriver:
         self._cpcm = False
         self.cpcm_drv = None
         self.cpcm_epsilon = 78.39
-        self.cpcm_grid_per_sphere = 194
+        self.cpcm_grid_per_sphere = (194, 110)
         self.cpcm_x = 0
         self.cpcm_custom_vdw_radii = None
 
@@ -326,7 +326,7 @@ class ScfDriver:
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
-                    ('int', 'number of grid points per sphere (C-PCM)'),
+                    ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
                 'cpcm_epsilon':
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
@@ -654,14 +654,8 @@ class ScfDriver:
 
             cpcm_grid_t0 = tm.time()
 
-            cpcm_t0 = tm.time()
-
             (self._cpcm_grid,
              self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
-
-            self.ostream.print_info(
-                f'  Time spent in C-PCM Grid gen: {tm.time() - cpcm_t0:.2f} sec')
-            cpcm_t0 = tm.time()
 
             cpcm_local_precond = self.cpcm_drv.form_local_precond(
                 self._cpcm_grid, self._cpcm_sw_func)
@@ -669,17 +663,8 @@ class ScfDriver:
             self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
             self._cpcm_precond = np.hstack(self._cpcm_precond)
 
-            self.ostream.print_info(
-                f'  Time spent in C-PCM precon:   {tm.time() - cpcm_t0:.2f} sec')
-            cpcm_t0 = tm.time()
-
             self._cpcm_Bzvec = self.cpcm_drv.form_vector_Bz(
                 self._cpcm_grid, molecule)
-
-            self.ostream.print_info(
-                f'  Time spent in C-PCM vec Bz:   {tm.time() - cpcm_t0:.2f} sec')
-            self.ostream.print_blank()
-            self.ostream.flush()
 
             self._cpcm_q = None
 
@@ -1464,8 +1449,6 @@ class ScfDriver:
             profiler.start_timer('CPCM')
 
             if self._cpcm:
-                cpcm_t0 = tm.time()
-
                 if self.scf_type == 'restricted':
                     Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
                                                        self._cpcm_grid,
@@ -1475,10 +1458,6 @@ class ScfDriver:
                                                        self._cpcm_grid,
                                                        den_mat[0] + den_mat[1])
 
-                self.ostream.print_info(
-                    f'  Time spent in C-PCM Cvec: {tm.time() - cpcm_t0:.2f} sec')
-                cpcm_t0 = tm.time()
-
                 if self.rank == mpi_master():
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
@@ -1487,17 +1466,9 @@ class ScfDriver:
                     rhs = None
                 rhs = self.comm.bcast(rhs, root=mpi_master())
 
-                self.ostream.print_info(
-                    f'  Time spent in C-PCM rhs: {tm.time() - cpcm_t0:.2f} sec')
-                cpcm_t0 = tm.time()
-
                 self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
-                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond, rhs,
-                    self._cpcm_q)
-
-                self.ostream.print_info(
-                    f'  Time spent in C-PCM cg_solve: {tm.time() - cpcm_t0:.2f} sec')
-                cpcm_t0 = tm.time()
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
+                    rhs, self._cpcm_q)
 
                 if self.rank == mpi_master():
                     e_sol = self.cpcm_drv.compute_solv_energy(
@@ -1507,17 +1478,8 @@ class ScfDriver:
                 else:
                     self.cpcm_epol = None
 
-                self.ostream.print_info(
-                    f'  Time spent in C-PCM energy: {tm.time() - cpcm_t0:.2f} sec')
-                cpcm_t0 = tm.time()
-
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
                     molecule, ao_basis, self._cpcm_grid, self._cpcm_q)
-
-                self.ostream.print_info(
-                    f'  Time spent in C-PCM Fock: {tm.time() - cpcm_t0:.2f} sec')
-                self.ostream.print_blank()
-                self.ostream.flush()
 
                 if self.rank == mpi_master():
                     fock_mat[0] += Fock_sol
@@ -2699,8 +2661,11 @@ class ScfDriver:
             cur_str = 'C-PCM Dielectric Constant       : '
             cur_str += f'{self.cpcm_drv.epsilon}'
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'C-PCM Points per Atomic Sphere  : '
-            cur_str += f'{self.cpcm_drv.grid_per_sphere}'
+            cur_str = 'C-PCM Points per Hydrogen Sphere: '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere[1]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per non-H Sphere   : '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere[0]}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.electric_field is not None:

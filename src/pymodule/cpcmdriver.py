@@ -94,7 +94,7 @@ class CpcmDriver:
         # model settings
         # standard value for dielectric const. is for that of water
         self.epsilon         = 78.39 
-        self.grid_per_sphere = 194
+        self.grid_per_sphere = (194, 110)
         self.x               = 0
 
         self.custom_vdw_radii = None
@@ -102,7 +102,8 @@ class CpcmDriver:
         # input keywords
         self.input_keywords = {
             'cpcm': {
-                'grid_per_sphere': ('int', 'number of Lebedev grid points'),
+                'grid_per_sphere':
+                    ('seq_fixed_int', 'number of Lebedev grid points'),
                 'epsilon': ('float', 'dielectric constant of solvent'),
                 'x': ('float', 'parameter for scaling function'),
             },
@@ -219,22 +220,31 @@ class CpcmDriver:
         valid_grid_numbers = [50, 110, 194, 302, 434, 590, 770, 974, 2030]
 
         assert_msg_critical(
-            self.grid_per_sphere in valid_grid_numbers,
+            (len(self.grid_per_sphere) == 2) and
+                (self.grid_per_sphere[0] in valid_grid_numbers) and
+                (self.grid_per_sphere[1] in valid_grid_numbers),
             'CpcmDriver.generate_cpcm_grid: Invalid grid_per_sphere')
 
-        unit_grid = gen_lebedev_grid(self.grid_per_sphere)
+        unit_grid = gen_lebedev_grid(self.grid_per_sphere[0])
         unit_grid_coords = unit_grid[:, :3]
         unit_grid_weights = unit_grid[:, 3:]
+
+        unit_hydrogen_grid = gen_lebedev_grid(self.grid_per_sphere[1])
+        unit_hydrogen_grid_coords = unit_hydrogen_grid[:, :3]
+        unit_hydrogen_grid_weights = unit_hydrogen_grid[:, 3:]
 
         # standard normalization of lebedev weights -- unit sphere surface; 1 -> 4pi
         # Ref.: B. A. Gregersen and D. M. York, J. Chem. Phys. 122, 194110 (2005)
         unit_grid_weights *= 4 * np.pi
+        unit_hydrogen_grid_weights *= 4 * np.pi
 
-        zeta = self.get_zeta_dict()[self.grid_per_sphere]
+        zeta = self.get_zeta_dict()[self.grid_per_sphere[0]]
+        hydrogen_zeta = self.get_zeta_dict()[self.grid_per_sphere[1]]
 
         # increase radii by 20%
         atom_radii = self.get_cpcm_vdw_radii(molecule) * 1.2
         atom_coords = molecule.get_coordinates_in_bohr()
+        identifiers = molecule.get_identifiers()
 
         cpcm_grid_raw = np.zeros((0, 6))
 
@@ -245,12 +255,20 @@ class CpcmDriver:
         atom_end = sum(counts[:self.rank + 1])
 
         for i in range(atom_start, atom_end):
-            # scale and shift unit grid
-            atom_grid_coords = unit_grid_coords * atom_radii[i] + atom_coords[i]
-            grid_zeta = zeta / (atom_radii[i] * np.sqrt(unit_grid_weights))
-            atom_idx = np.full_like(grid_zeta, i)
-            atom_grid = np.hstack(
-                (atom_grid_coords, unit_grid_weights, grid_zeta, atom_idx))
+            if identifiers[i] == 1:
+                # scale and shift unit grid of hydrogen atom
+                atom_grid_coords = unit_hydrogen_grid_coords * atom_radii[i] + atom_coords[i]
+                grid_zeta = hydrogen_zeta / (atom_radii[i] * np.sqrt(unit_hydrogen_grid_weights))
+                atom_idx = np.full_like(grid_zeta, i)
+                atom_grid = np.hstack(
+                    (atom_grid_coords, unit_hydrogen_grid_weights, grid_zeta, atom_idx))
+            else:
+                # scale and shift unit grid of non-hydrogen atom
+                atom_grid_coords = unit_grid_coords * atom_radii[i] + atom_coords[i]
+                grid_zeta = zeta / (atom_radii[i] * np.sqrt(unit_grid_weights))
+                atom_idx = np.full_like(grid_zeta, i)
+                atom_grid = np.hstack(
+                    (atom_grid_coords, unit_grid_weights, grid_zeta, atom_idx))
             cpcm_grid_raw = np.vstack((cpcm_grid_raw, atom_grid))
 
         gathered_cpcm_grid_raw = self.comm.allgather(cpcm_grid_raw)
@@ -302,9 +320,8 @@ class CpcmDriver:
 
             sw_func[g - start] = 1.0
 
-            # TODO: use grid atom_idx saved in grid
             # TODO: save grid atom_idx in another array
-            atom_idx = g // self.grid_per_sphere
+            atom_idx = int(grid[g, 5])
 
             # TODO: consider moving to C++
             for i in range(atom_coords.shape[0]):
@@ -665,32 +682,13 @@ class CpcmDriver:
         Collects the CPCM gradient contribution.
         """
 
-        cpcm_t0 = time.time()
-
         gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x)
-
-        self.ostream.print_info(
-            f'  Time spent in C-PCM grad_Aij: {time.time() - cpcm_t0:.2f} sec')
-        cpcm_t0 = time.time()
 
         gradA += self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
 
-        self.ostream.print_info(
-            f'  Time spent in C-PCM grad_Aii: {time.time() - cpcm_t0:.2f} sec')
-        cpcm_t0 = time.time()
-
         gradB = self.grad_B(molecule, grid, q)
 
-        self.ostream.print_info(
-            f'  Time spent in C-PCM grad_B:   {time.time() - cpcm_t0:.2f} sec')
-        cpcm_t0 = time.time()
-
         gradC = self.grad_C(molecule, basis, grid, q, D)
-
-        self.ostream.print_info(
-            f'  Time spent in C-PCM grad_C:   {time.time() - cpcm_t0:.2f} sec')
-        self.ostream.print_blank()
-        self.ostream.flush()
 
         return gradA + gradB + gradC
 
