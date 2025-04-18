@@ -43,6 +43,7 @@ from .c6driver import C6Driver
 from .tdaeigensolver import TdaEigenSolver
 from .shgdriver import ShgDriver
 from .tpatransitiondriver import TpaTransitionDriver
+from .doubleresbeta import DoubleResBetaDriver
 from .threepatransitiondriver import ThreePATransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
@@ -215,6 +216,14 @@ class ResponseProperty:
               self._rsp_dict['is_complex'] == 'yes'):
 
             self._rsp_driver = TpaTransitionDriver(self.comm, self.ostream)
+
+        # Double res transition (quadratic response) driver
+        elif (self._rsp_dict['order'] == 'quadratic' and
+              self._rsp_dict['residue'] == 'double' and
+              self._rsp_dict['is_complex'] == 'yes'):
+
+            self._rsp_driver = DoubleResBetaDriver(self.comm, self.ostream)
+
 
         # Cubic response driver
         elif (self.prop_type == 'custom' and

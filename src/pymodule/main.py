@@ -57,8 +57,8 @@ from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpatransition import TpaTransition
+from .doublerestrans import DoubleResTransition
 from .rspthreepatransition import ThreePATransition
-
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
 from .polarizabilitygradient import PolarizabilityGradient
@@ -179,6 +179,9 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
 
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
+
+    elif prop_type == 'transition dipole moment':
+        rsp_prop = DoubleResTransition(rsp_dict, method_dict)
 
     elif prop_type == '3pa transition':
         rsp_prop = ThreePATransition(rsp_dict, method_dict)
