@@ -56,16 +56,10 @@ local_matrix_A_diagonals(const double* ptr_grid_data,
 
     auto ptr_Adiag = Adiag.data();
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static, PAD_SIZE)
     for (int i = row_start; i < row_end; i++)
     {
-        const double xi = ptr_grid_data[i * ncols + 0];
-        const double yi = ptr_grid_data[i * ncols + 1];
-        const double zi = ptr_grid_data[i * ncols + 2];
-        const double wi = ptr_grid_data[i * ncols + 3];
-
         const double zeta_i = ptr_grid_data[i * ncols + 4];
-        const double zeta_i2 = zeta_i * zeta_i;
 
         ptr_Adiag[i - row_start] = zeta_i * sqrt_2_invpi / ptr_sw_func[i];
     }
