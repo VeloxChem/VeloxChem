@@ -652,26 +652,40 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
+            cpcm_grid_t0 = tm.time()
+
             cpcm_t0 = tm.time()
 
             (self._cpcm_grid,
              self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
 
-            self._cpcm_local_Amat, cpcm_local_precond = (
-                self.cpcm_drv.form_local_matrix_A(
-                    self._cpcm_grid, self._cpcm_sw_func))
+            self.ostream.print_info(
+                f'  Time spent in C-PCM Grid gen: {tm.time() - cpcm_t0:.2f} sec')
+            cpcm_t0 = tm.time()
+
+            cpcm_local_precond = self.cpcm_drv.form_local_precond(
+                self._cpcm_grid, self._cpcm_sw_func)
 
             self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
             self._cpcm_precond = np.hstack(self._cpcm_precond)
 
+            self.ostream.print_info(
+                f'  Time spent in C-PCM precon:   {tm.time() - cpcm_t0:.2f} sec')
+            cpcm_t0 = tm.time()
+
             self._cpcm_Bzvec = self.cpcm_drv.form_vector_Bz(
                 self._cpcm_grid, molecule)
+
+            self.ostream.print_info(
+                f'  Time spent in C-PCM vec Bz:   {tm.time() - cpcm_t0:.2f} sec')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
             self._cpcm_q = None
 
             self.ostream.print_info(
                 f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
-                + f'in {tm.time() - cpcm_t0:.2f} sec.')
+                + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1450,6 +1464,8 @@ class ScfDriver:
             profiler.start_timer('CPCM')
 
             if self._cpcm:
+                cpcm_t0 = tm.time()
+
                 if self.scf_type == 'restricted':
                     Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
                                                        self._cpcm_grid,
@@ -1459,6 +1475,10 @@ class ScfDriver:
                                                        self._cpcm_grid,
                                                        den_mat[0] + den_mat[1])
 
+                self.ostream.print_info(
+                    f'  Time spent in C-PCM Cvec: {tm.time() - cpcm_t0:.2f} sec')
+                cpcm_t0 = tm.time()
+
                 if self.rank == mpi_master():
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
@@ -1467,9 +1487,17 @@ class ScfDriver:
                     rhs = None
                 rhs = self.comm.bcast(rhs, root=mpi_master())
 
-                self._cpcm_q = self.cpcm_drv.cg_solve_parallel(
-                    self._cpcm_local_Amat, self._cpcm_precond, rhs,
+                self.ostream.print_info(
+                    f'  Time spent in C-PCM rhs: {tm.time() - cpcm_t0:.2f} sec')
+                cpcm_t0 = tm.time()
+
+                self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond, rhs,
                     self._cpcm_q)
+
+                self.ostream.print_info(
+                    f'  Time spent in C-PCM cg_solve: {tm.time() - cpcm_t0:.2f} sec')
+                cpcm_t0 = tm.time()
 
                 if self.rank == mpi_master():
                     e_sol = self.cpcm_drv.compute_solv_energy(
@@ -1477,12 +1505,19 @@ class ScfDriver:
                     e_el += e_sol
                     self.cpcm_epol = e_sol
                 else:
-                    self._cpcm_q = None
                     self.cpcm_epol = None
-                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+
+                self.ostream.print_info(
+                    f'  Time spent in C-PCM energy: {tm.time() - cpcm_t0:.2f} sec')
+                cpcm_t0 = tm.time()
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
                     molecule, ao_basis, self._cpcm_grid, self._cpcm_q)
+
+                self.ostream.print_info(
+                    f'  Time spent in C-PCM Fock: {tm.time() - cpcm_t0:.2f} sec')
+                self.ostream.print_blank()
+                self.ostream.flush()
 
                 if self.rank == mpi_master():
                     fock_mat[0] += Fock_sol

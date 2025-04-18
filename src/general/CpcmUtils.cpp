@@ -37,26 +37,58 @@
 #include <cmath>
 #include <cstring>
 
-#include "DenseMatrix.hpp"
 #include "MathFunc.hpp"
+
+#define PAD_SIZE 8
 
 namespace cpcm {  // cpcm namespace
 
 auto
-form_matrix_A(const int     npoints,
-              const double* ptr_grid_data,
-              const int     row_start,
-              const int     row_end,
-              const int     ncols,
-              const double* ptr_sw_func) -> CDenseMatrix
+local_matrix_A_diagonals(const double* ptr_grid_data,
+                         const int     row_start,
+                         const int     row_end,
+                         const int     ncols,
+                         const double* ptr_sw_func) -> std::vector<double> 
 {
     const double sqrt_2_invpi = std::sqrt(2.0 / mathconst::pi_value());
 
-    CDenseMatrix Amat(row_end - row_start, npoints);
+    std::vector<double> Adiag(row_end - row_start, 0.0);
 
-    Amat.zero();
+    auto ptr_Adiag = Adiag.data();
 
     #pragma omp parallel for schedule(static)
+    for (int i = row_start; i < row_end; i++)
+    {
+        const double xi = ptr_grid_data[i * ncols + 0];
+        const double yi = ptr_grid_data[i * ncols + 1];
+        const double zi = ptr_grid_data[i * ncols + 2];
+        const double wi = ptr_grid_data[i * ncols + 3];
+
+        const double zeta_i = ptr_grid_data[i * ncols + 4];
+        const double zeta_i2 = zeta_i * zeta_i;
+
+        ptr_Adiag[i - row_start] = zeta_i * sqrt_2_invpi / ptr_sw_func[i];
+    }
+
+    return Adiag;
+}
+
+auto
+local_matrix_A_dot_vector(const int     npoints,
+                          const double* ptr_grid_data,
+                          const int     row_start,
+                          const int     row_end,
+                          const int     ncols,
+                          const double* ptr_sw_func,
+                          const double* ptr_vector) -> std::vector<double>
+{
+    const double sqrt_2_invpi = std::sqrt(2.0 / mathconst::pi_value());
+
+    std::vector<double> product(row_end - row_start, 0.0);
+
+    auto ptr_product = product.data();
+
+    #pragma omp parallel for schedule(static, PAD_SIZE)
     for (int i = row_start; i < row_end; i++)
     {
         const double xi = ptr_grid_data[i * ncols + 0];
@@ -71,7 +103,9 @@ form_matrix_A(const int     npoints,
         {
             if (j == i)
             {
-                Amat.row(i - row_start)[j] = zeta_i * sqrt_2_invpi / ptr_sw_func[i];
+                const auto Aij = zeta_i * sqrt_2_invpi / ptr_sw_func[i];
+
+                ptr_product[i - row_start] += Aij * ptr_vector[j];
             }
             else
             {
@@ -87,12 +121,14 @@ form_matrix_A(const int     npoints,
 
                 const double r_ij = std::sqrt((xi - xj)*(xi - xj) + (yi - yj)*(yi - yj) + (zi - zj)*(zi - zj));
 
-                Amat.row(i - row_start)[j] = std::erf(zeta_ij * r_ij) / r_ij;
+                const auto Aij = std::erf(zeta_ij * r_ij) / r_ij;
+
+                ptr_product[i - row_start] += Aij * ptr_vector[j];
             }
         }
     }
 
-    return Amat;
+    return product;
 }
 
 auto

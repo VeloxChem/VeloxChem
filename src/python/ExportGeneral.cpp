@@ -224,7 +224,7 @@ export_general(py::module &m) -> void
     m.def("spherical_momentum_g_factors", spher_mom::transformation_factors<4>, "Gets transformation factors for G type spherical momentum.");
 
     // exposing functions from CpcmUtils.hpp
-    m.def("cpcm_form_matrix_A",
+    m.def("cpcm_local_matrix_A_diagonals",
           [](const py::array_t<double>& grid_data,
              const py::array_t<double>& sw_func,
              const int                  grid_index_start,
@@ -240,12 +240,41 @@ export_general(py::module &m) -> void
               std::string errindex("cpcm_form_matrix_A: Invalid indices");
               errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
               errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
-              auto Amat = cpcm::form_matrix_A(npoints, grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data());
-              return vlx_general::pointer_to_numpy(Amat.values(), {Amat.getNumberOfRows(), Amat.getNumberOfColumns()});
+              auto Adiag = cpcm::local_matrix_A_diagonals(grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data());
+              return vlx_general::pointer_to_numpy(Adiag.data(), {static_cast<int>(Adiag.size())});
           },
-          "Form C-PCM matrix A.",
+          "Form local diagonals of C-PCM matrix A.",
           "grid_data"_a,
           "sw_func"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a);
+
+    m.def("cpcm_local_matrix_A_dot_vector",
+          [](const py::array_t<double>& grid_data,
+             const py::array_t<double>& sw_func,
+             const py::array_t<double>& vector,
+             const int                  grid_index_start,
+             const int                  grid_index_end) -> py::array_t<double> {
+              std::string errstyle("cpcm_local_matrix_A_dot_vector: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_data.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(sw_func.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(vector.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+              std::string errsize("cpcm_local_matrix_A_dot_vector: Inconsistent sizes");
+              errors::assertMsgCritical(grid_data.shape(0) == sw_func.shape(0), errsize);
+              errors::assertMsgCritical(grid_data.shape(0) == vector.shape(0), errsize);
+              const auto npoints = static_cast<int>(grid_data.shape(0));
+              const auto ncols = static_cast<int>(grid_data.shape(1));
+              std::string errindex("cpcm_local_matrix_A_dot_vector: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto prod = cpcm::local_matrix_A_dot_vector(npoints, grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data(), vector.data());
+              return vlx_general::pointer_to_numpy(prod.data(), {static_cast<int>(prod.size())});
+          },
+          "Form local product of C-PCM matrix A and a vector.",
+          "grid_data"_a,
+          "sw_func"_a,
+          "vector"_a,
           "grid_index_start"_a,
           "grid_index_end"_a);
 

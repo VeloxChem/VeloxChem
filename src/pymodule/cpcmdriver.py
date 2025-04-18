@@ -33,16 +33,17 @@
 from mpi4py import MPI
 import numpy as np
 import math
+import time
 import sys
 
-from .veloxchemlib import cpcm_form_matrix_A, cpcm_comp_grad_Aij
-from .veloxchemlib import cpcm_comp_grad_Aii
+from .veloxchemlib import cpcm_local_matrix_A_diagonals
+from .veloxchemlib import cpcm_local_matrix_A_dot_vector
+from .veloxchemlib import cpcm_comp_grad_Aii, cpcm_comp_grad_Aij
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
 from .veloxchemlib import compute_nuclear_potential_erf_values
 from .veloxchemlib import compute_nuclear_potential_erf_gradient
 from .veloxchemlib import NuclearPotentialErfDriver
-from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
@@ -338,7 +339,7 @@ class CpcmDriver:
             2030: 4.90744499142,
         }
 
-    def form_local_matrix_A(self, grid, sw_func):
+    def form_local_precond(self, grid, sw_func):
         """
         Forms the cavity-cavity interaction matrix.
 
@@ -353,17 +354,15 @@ class CpcmDriver:
             the grid (unweighted by the charges).
         """
 
-        npoints = grid.shape[0]
-
-        ave, rem = divmod(npoints, self.nodes)
+        ave, rem = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        local_Amat = cpcm_form_matrix_A(grid, sw_func, start, end)
-        local_precond = 1.0 / np.diag(local_Amat[:, start:end])
+        local_Adiag = cpcm_local_matrix_A_diagonals(grid, sw_func, start, end)
+        local_precond = 1.0 / local_Adiag
 
-        return local_Amat, local_precond
+        return local_precond
 
     def form_vector_Bz(self, grid, molecule):
         """
@@ -413,45 +412,39 @@ class CpcmDriver:
         :return:
             The total (electronic) electrostatic potential at each grid point.
         """
-        esp = np.zeros(grid.shape[0])
-        # electrostatic potential integrals
-        node_grps = [p for p in range(self.nodes)]
-        subcomm = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomm.local_comm
-        cross_comm = subcomm.cross_comm
 
         ave, res = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
         local_esp = compute_nuclear_potential_erf_values(
-            molecule, basis, np.copy(grid[start:end, :3]), D, np.copy(grid[start:end, 4]))
+            molecule, basis, np.copy(grid[start:end, :3]), D,
+            np.copy(grid[start:end, 4]))
 
-        if local_comm.Get_rank() == mpi_master():
-            local_esp = cross_comm.gather(local_esp, root=mpi_master())
-
+        gathered_esp = self.comm.gather(local_esp, root=mpi_master())
         if self.rank == mpi_master():
-            for i in range(self.nodes):
-                start = sum(counts[:i])
-                end = sum(counts[:i + 1])
-                esp[start:end] += local_esp[i]
-            return esp
+            esp = np.hstack(gathered_esp)
         else:
-            return None
+            esp = None
+
+        return esp
 
     def get_contribution_to_Fock(self, molecule, basis, grid, q):
 
-        grid_coords = grid[:, :3].copy()
-        zeta        = grid[:, 4].copy()
+        ave, res = divmod(grid.shape[0], self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-        if self.rank == mpi_master():
-            nerf_drv = NuclearPotentialErfDriver()
-            V_es = -1.0 * nerf_drv.compute(molecule, basis, q, grid_coords, zeta).full_matrix().to_numpy()
+        grid_coords = grid[start:end, :3].copy()
+        zeta        = grid[start:end, 4].copy()
 
-        else:
-            V_es = None
+        nerf_drv = NuclearPotentialErfDriver()
+
+        local_V_es = -1.0 * nerf_drv.compute(molecule, basis, q[start:end], grid_coords, zeta).to_numpy()
+
+        V_es = self.comm.reduce(local_V_es, root=mpi_master())
 
         return V_es
 
@@ -650,7 +643,7 @@ class CpcmDriver:
             The converged density matrix.
 
         :return:
-        The gradient array of each cartesian component -- of shape (nAtoms, 3).
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
         
         npoints = grid.shape[0]
@@ -672,17 +665,36 @@ class CpcmDriver:
         Collects the CPCM gradient contribution.
         """
 
+        cpcm_t0 = time.time()
+
         gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x)
+
+        self.ostream.print_info(
+            f'  Time spent in C-PCM grad_Aij: {time.time() - cpcm_t0:.2f} sec')
+        cpcm_t0 = time.time()
 
         gradA += self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
 
+        self.ostream.print_info(
+            f'  Time spent in C-PCM grad_Aii: {time.time() - cpcm_t0:.2f} sec')
+        cpcm_t0 = time.time()
+
         gradB = self.grad_B(molecule, grid, q)
+
+        self.ostream.print_info(
+            f'  Time spent in C-PCM grad_B:   {time.time() - cpcm_t0:.2f} sec')
+        cpcm_t0 = time.time()
 
         gradC = self.grad_C(molecule, basis, grid, q, D)
 
+        self.ostream.print_info(
+            f'  Time spent in C-PCM grad_C:   {time.time() - cpcm_t0:.2f} sec')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         return gradA + gradB + gradC
 
-    def cg_solve_parallel(self, local_Amat, precond, rhs, x0=None):
+    def cg_solve_parallel_direct(self, grid, sw_func, precond, rhs, x0=None):
         """
         Solves the C-PCM equations using conjugate gradient.
         """
@@ -698,7 +710,12 @@ class CpcmDriver:
             Matrix-vector product
             """
 
-            local_v = np.dot(local_Amat, v)
+            ave, res = divmod(grid.shape[0], self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+
+            local_v = cpcm_local_matrix_A_dot_vector(grid, sw_func, v, start, end)
 
             ret = self.comm.allgather(local_v)
             return np.hstack(ret)
@@ -711,7 +728,7 @@ class CpcmDriver:
 
             return precond * v
 
-        n = local_Amat.shape[1]
+        n = grid.shape[0]
 
         LinOp = linalg.LinearOperator((n, n), matvec=matvec)
         PrecondOp = linalg.LinearOperator((n, n), matvec=precond_matvec)
@@ -740,7 +757,6 @@ class CpcmDriver:
         assert_msg_critical(cg_conv == 0,
                             'C-PCM: conjugate gradient solver did not converge')
 
-        if cg_conv == 0:
-            return cg_solution
-        else:
-            return None
+        cg_solution = self.comm.bcast(cg_solution, root=mpi_master())
+
+        return cg_solution

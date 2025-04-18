@@ -35,25 +35,21 @@
 
 #include <vector>
 
-#include "DenseMatrix.hpp"
-
 namespace cpcm {  // cpcm namespace
 
-/**
- Form matrix A for C-PCM
+auto local_matrix_A_diagonals(const double* ptr_grid_data,
+                              const int     row_start,
+                              const int     row_end,
+                              const int     ncols,
+                              const double* ptr_sw_func) -> std::vector<double>;
 
- @param ptr_grid_data the pointer to the C-PCM grid data.
- @param row_start the starting row of matrix A to be calculated.
- @param row_end the end row of matrix A to be calculated.
- @param ncols the number of columns of matrix A.
- @param ptr_sw_func the pointer to the switching function.
- */
-auto form_matrix_A(const int     npoints,
-                   const double* ptr_grid_data,
-                   const int     row_start,
-                   const int     row_end,
-                   const int     ncols,
-                   const double* ptr_sw_func) -> CDenseMatrix;
+auto local_matrix_A_dot_vector(const int     npoints,
+                               const double* ptr_grid_data,
+                               const int     row_start,
+                               const int     row_end,
+                               const int     ncols,
+                               const double* ptr_sw_func,
+                               const double* ptr_vector) -> std::vector<double>;
 
 auto comp_grad_Aij(const double* ptr_grid_coords,
                    const double* ptr_zeta,
