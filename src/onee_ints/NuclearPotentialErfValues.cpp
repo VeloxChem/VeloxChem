@@ -44,7 +44,7 @@
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
 
-#define PAD_SIZE 8
+#define CHUNK_SIZE 4
 
 #define MATH_CONST_PI 3.14159265358979323846
 
@@ -390,7 +390,7 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
     // S-S block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -425,6 +425,28 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
 
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            {
+                auto j_cgto_sph = j_cgto;
+                double j_coef_sph = 1.0;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -474,31 +496,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                {
-                    auto j_cgto_sph = j_cgto;
-                    double j_coef_sph = 1.0;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // S-P block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -535,6 +540,29 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
         const auto PB_0 = (-a_i * inv_aij) * rij[b0];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -594,32 +622,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // S-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -658,6 +668,29 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
         const auto PB_0 = (-a_i * inv_aij) * rij[b0];
         const auto PB_1 = (-a_i * inv_aij) * rij[b1];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -736,32 +769,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // S-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -802,6 +817,29 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
         const auto PB_1 = (-a_i * inv_aij) * rij[b1];
         const auto PB_2 = (-a_i * inv_aij) * rij[b2];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -903,32 +941,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // P-P block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -967,6 +987,30 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
         const auto PB_0 = (-a_i * inv_aij) * rij[b0];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1045,33 +1089,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // P-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1112,6 +1137,30 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
         const auto PB_0 = (-a_i * inv_aij) * rij[b0];
         const auto PB_1 = (-a_i * inv_aij) * rij[b1];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1213,33 +1262,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // P-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1282,6 +1312,30 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
         const auto PB_1 = (-a_i * inv_aij) * rij[b1];
         const auto PB_2 = (-a_i * inv_aij) * rij[b2];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1430,33 +1484,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // D-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < dd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1499,6 +1534,30 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
         const auto PB_0 = (-a_i * inv_aij) * rij[b0];
         const auto PB_1 = (-a_i * inv_aij) * rij[b1];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1647,33 +1706,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // D-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < df_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1718,6 +1758,30 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
         const auto PB_1 = (-a_i * inv_aij) * rij[b1];
         const auto PB_2 = (-a_i * inv_aij) * rij[b2];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -1940,33 +2004,14 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // F-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < ff_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -2013,6 +2058,30 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
         const auto PB_1 = (-a_i * inv_aij) * rij[b1];
         const auto PB_2 = (-a_i * inv_aij) * rij[b2];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_f[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
 
@@ -2393,26 +2462,7 @@ computeNuclearPotentialErfValues(const CMolecule& molecule,
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_f[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
