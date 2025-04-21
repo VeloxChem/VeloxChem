@@ -243,6 +243,7 @@ class ScfDriver:
         self.cpcm_drv = None
         self.cpcm_epsilon = 78.39
         self.cpcm_grid_per_sphere = (194, 110)
+        self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
         self.cpcm_custom_vdw_radii = None
 
@@ -328,6 +329,8 @@ class ScfDriver:
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
                     ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
+                'cpcm_cg_thresh':
+                    ('float', 'threshold for solving C-PCM charges'),
                 'cpcm_epsilon':
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
@@ -1477,7 +1480,7 @@ class ScfDriver:
 
                 self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
                     self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
-                    rhs, self._cpcm_q)
+                    rhs, self._cpcm_q, self.cpcm_cg_thresh)
 
                 if self.rank == mpi_master():
                     e_sol = self.cpcm_drv.compute_solv_energy(

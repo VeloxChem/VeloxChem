@@ -692,7 +692,13 @@ class CpcmDriver:
 
         return gradA + gradB + gradC
 
-    def cg_solve_parallel_direct(self, grid, sw_func, precond, rhs, x0=None):
+    def cg_solve_parallel_direct(self,
+                                 grid,
+                                 sw_func,
+                                 precond,
+                                 rhs,
+                                 x0=None,
+                                 cg_thresh=1.0e-8):
         """
         Solves the C-PCM equations using conjugate gradient.
         """
@@ -740,7 +746,7 @@ class CpcmDriver:
                                              b=b,
                                              x0=x0,
                                              M=PrecondOp,
-                                             rtol=1.0e-6,
+                                             rtol=cg_thresh,
                                              atol=0)
         except TypeError:
             # workaround for scipy < 1.11
@@ -748,7 +754,7 @@ class CpcmDriver:
                                              b=b,
                                              x0=x0,
                                              M=PrecondOp,
-                                             tol=(1.0e-6 * np.linalg.norm(b)),
+                                             tol=(cg_thresh * np.linalg.norm(b)),
                                              atol=0)
 
 
