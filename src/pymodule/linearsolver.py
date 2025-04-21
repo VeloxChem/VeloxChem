@@ -1550,17 +1550,23 @@ class LinearSolver:
                 Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
                                                         self._cpcm_grid,
                                                         dens[idx] * 2.0)
-                if self.non_equilibrium_solv:
-                    scale_f = -(self.cpcm_optical_epsilon - 1) / (
-                                self.cpcm_optical_epsilon + self.cpcm_drv.x)
+                if comm_rank == mpi_master():
+                    if self.non_equilibrium_solv:
+                        scale_f = -(self.cpcm_optical_epsilon - 1) / (
+                                    self.cpcm_optical_epsilon + self.cpcm_drv.x)
+                    else:
+                        scale_f = -(self.cpcm_drv.epsilon - 1) / (
+                                    self.cpcm_drv.epsilon + self.cpcm_drv.x)
+                    rhs = scale_f * (Cvec)
+                    self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
                 else:
-                    scale_f = -(self.cpcm_drv.epsilon - 1) / (
-                                self.cpcm_drv.epsilon + self.cpcm_drv.x)
-                rhs = scale_f * (Cvec)
-                self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
+                    self._cpcm_q = None
+
+                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
-                        molecule, basis, self._cpcm_grid, self._cpcm_q)
-                
+                            molecule, basis, self._cpcm_grid, self._cpcm_q)
+
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol
 
