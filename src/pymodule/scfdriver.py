@@ -67,7 +67,8 @@ from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import create_hdf5, write_scf_results_to_hdf5
+from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
+                         write_cpcm_charges, read_cpcm_charges)
 
 
 class ScfDriver:
@@ -856,6 +857,12 @@ class ScfDriver:
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
+
+            if self._cpcm:
+                if self.restart and self.rank == mpi_master():
+                    self._cpcm_q = read_cpcm_charges(self.checkpoint_file)
+                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
         # two level C2-DIIS method
@@ -1282,6 +1289,8 @@ class ScfDriver:
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
+                if self._cpcm:
+                    write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
                 self.ostream.print_blank()
                 self.ostream.print_info('Checkpoint written to file: ' +
                                         self.checkpoint_file)
