@@ -328,7 +328,7 @@ class EvbDriver():
                 self.save_forcefield(self.reactant, str(reactant_ff_path))
                 self.save_forcefield(self.product, str(product_ff_path))
 
-                reactant_mol_path = cwd / self.input_folder / f"{combined_product_name}.xyz"
+                reactant_mol_path = cwd / self.input_folder / f"{combined_reactant_name}.xyz"
                 self.reactant.molecule.write_xyz_file(str(reactant_mol_path))
                 self.product.molecule.write_xyz_file(str(mapped_product_path))
 
