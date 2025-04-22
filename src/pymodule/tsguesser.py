@@ -34,9 +34,10 @@ from mpi4py import MPI
 import sys
 import numpy as np
 import os
+import math
 from pathlib import Path
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .molecule import Molecule
@@ -93,12 +94,23 @@ class TransitionStateGuesser():
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
         self.ostream.flush()
         mm_energies, mm_geometries, ff_exception = self.scan_ff(evb)
-        self.results = {}
-        for i, (E, P) in enumerate(zip(mm_energies, mm_geometries)):
-            self.results[self.lambda_vec[i]] = {
-                'mm_energy': E,
-                'mm_geometry': P,
-            }
+        xyz_geometries = []
+        for mm_geom in mm_geometries:
+            xyz_geom = self.mm_to_xyz_geom(mm_geom, evb.reactant.molecule)
+            xyz_geometries.append(xyz_geom)
+        self.results = {
+            'mm_energies':mm_energies,
+            'mm_geometries':mm_geometries,
+            'xyz_geometries':xyz_geometries,
+            'lambda_vec':self.lambda_vec,
+            'broken_bonds':evb.broken_bonds,
+            'formed_bonds':evb.formed_bonds,
+        }
+        # for i, (E, P) in enumerate(zip(mm_energies, mm_geometries)):
+        #     self.results[self.lambda_vec[i]] = {
+        #         'mm_energy': E,
+        #         'mm_geometry': P,
+        #     }
         self.results['broken_bonds'] = evb.broken_bonds
         self.results['formed_bonds'] = evb.formed_bonds
         if ff_exception:
@@ -110,42 +122,53 @@ class TransitionStateGuesser():
         self.molecule = evb.reactant.molecule
 
         max_mm_index = np.argmax(mm_energies)
-        max_mm_geom = mm_geometries[max_mm_index]
+        max_xyz_geom = xyz_geometries[max_mm_index]
         max_mm_energy = mm_energies[max_mm_index]
         max_mm_lambda = self.lambda_vec[max_mm_index]
+        self.ostream.print_info(
+            f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
+        )
+        self.ostream.print_blank()
         if not scf:
-            self.ostream.print_info(
-                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}. Returning"
-            )
-            self.molecule = self.set_molecule_positions(self.molecule,
-                                                        max_mm_geom)
-            return self.molecule, self.results
+            self.results.update({'final_geometry': max_xyz_geom})
+            self.results.update({'final_lambda': max_mm_lambda})
         else:
-            self.ostream.print_info(
-                f"Found highest MM E: {max_mm_energy:.3f} at Lammba: {max_mm_lambda}."
-            )
-            self.ostream.print_blank()
+            # assert False, 'Not implemented yet'
+            
             self.ostream.print_header(
-                f"Starting SCF scan at Lambda {max_mm_lambda}")
+                f"Starting SCF scan")
+            self.ostream.flush()
+            scf_energies = self.scan_scf()
+            max_scf_index = np.argmax(scf_energies)
+            max_scf_geom = self.results['xyz_geometries'][max_scf_index]
+            max_scf_energy = scf_energies[max_scf_index]
+            max_scf_lambda = self.lambda_vec[max_scf_index]
+            self.results.update({'final_geometry': max_scf_geom})
+            self.results.update({'final_lambda': max_scf_lambda})
+            self.ostream.print_info(
+                f"Found highest SCF E: {max_scf_energy:.3f} at Lammba: {max_scf_lambda}."
+            )
             self.ostream.flush()
 
-            max_scf_lambda = self.scan_scf(max_mm_index)
-            if max_scf_lambda is not None:
-                self.ostream.print_info(
-                    f"Found highest SCF E at Lambda: {max_scf_lambda}. Returning"
-                )
-                self.ostream.flush()
-                self.molecule = self.set_molecule_positions(
-                    self.molecule, self.results[max_scf_lambda]['mm_geometry'])
-                return self.molecule, self.results
-            else:
-                self.ostream.print_info(
-                    f"Could not find a maximum in the SCF energy. Returning mm results"
-                )
-                self.ostream.flush()
-                self.molecule = self.set_molecule_positions(
-                    self.molecule, max_mm_geom)
-                return self.molecule, self.results
+            # max_scf_lambda = self.scan_scf(max_mm_index)
+            # if max_scf_lambda is not None:
+            #     self.ostream.print_info(
+            #         f"Found highest SCF E at Lambda: {max_scf_lambda}. Returning"
+            #     )
+            #     self.ostream.flush()
+            #     self.molecule = self.set_molecule_positions(
+            #         self.molecule, self.results[max_scf_lambda]['mm_geometry'])
+            #     return self.molecule, self.results
+            # else:
+            #     self.ostream.print_info(
+            #         f"Could not find a maximum in the SCF energy. Returning mm results"
+            #     )
+            #     self.ostream.flush()
+            #     self.molecule = self.set_molecule_positions(
+            #         self.molecule, max_mm_geom)
+            #     return self.molecule, self.results
+        self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
+        return self.molecule, self.results
 
     def get_constraint_string(self, geom=None):
         #todo return a string that can be directly inserted in any geometry optimisation
@@ -222,64 +245,72 @@ class TransitionStateGuesser():
             exception = e
         return energies, positions, exception
 
-    def scan_scf(self, starting_index=None, starting_lambda=None):
-
-        if starting_index is not None:
-            l = self.lambda_vec[starting_index]
-        elif starting_lambda is not None:
-            assert starting_lambda in self.lambda_vec
-            l = starting_lambda
-            starting_index = np.where(self.lambda_vec == l)[0][0]
-        else:
-            assert_msg_critical(
-                False,
-                "Either starting_index or starting_lambda must be provided")
-
-        if l == 1:
-            l = self.lambda_vec[-1]
-            lp1 = 1
-        else:
-            lp1 = self.lambda_vec[starting_index + 1]
-        scf_E_1 = self._get_scf_energy(self.results[l]['mm_geometry'])
-        self.ostream.print_info(
-            f"Lambda: {l}, SCF Energy: {scf_E_1:.3f} Hartree")
-        self.ostream.flush()
-        scf_E_2 = self._get_scf_energy(self.results[lp1]['mm_geometry'])
-        self.ostream.print_info(
-            f"Lambda: {lp1}, SCF Energy: {scf_E_2:.3f} Hartree")
-        self.ostream.flush()
-        self.results[l]['scf_energy'] = scf_E_1
-        self.results[lp1]['scf_energy'] = scf_E_2
-
-        if scf_E_2 > scf_E_1:
-            start = starting_index + 2
-            direction = 1
-            end = len(self.lambda_vec)
-            scf_E = scf_E_2
-        else:
-            start = starting_index - 1
-            direction = -1
-            end = 0
-            scf_E = scf_E_1
-
-        for i in range(start, end, direction):
-            last_scf_E = scf_E
-            l = self.lambda_vec[i]
-            geom = self.results[l]['mm_geometry']
+    def scan_scf(self):
+        scf_energies = []
+        for i,l in enumerate(self.lambda_vec):
+            geom = self.results['mm_geometries'][i]
             scf_E = self._get_scf_energy(geom)
-            self.results[l]['scf_energy'] = scf_E
-
+            scf_energies.append(scf_E)
             self.ostream.print_info(
-                f"Lambda: {l}, SCF Energy: {scf_E:.3f} Hartree")
+                f"Lambda: {l}, SCF Energy: {scf_E:.3f} kJ/mol")
             self.ostream.flush()
-            self.molecule = self.set_molecule_positions(self.molecule, geom)
-            if last_scf_E > scf_E:
 
-                return self.lambda_vec[i - direction]
+        self.results['scf_energies'] = scf_energies
 
-        self.ostream.print_info(f"Could not find a maximum in the SCF energy.")
-        self.ostream.flush()
-        return None
+        return scf_energies
+    # def scan_scf(self, starting_index=None, starting_lambda=None):
+        # if starting_index is not None:
+        #     l = self.lambda_vec[starting_index]
+        # elif starting_lambda is not None:
+        #     assert starting_lambda in self.lambda_vec
+        #     l = starting_lambda
+        #     starting_index = np.where(self.lambda_vec == l)[0][0]
+        # else:
+        #     assert_msg_critical(
+        #         False,
+        #         "Either starting_index or starting_lambda must be provided")
+
+        # if l == 1:
+        #     l = self.lambda_vec[-1]
+        #     lp1 = 1
+        # else:
+        #     lp1 = self.lambda_vec[starting_index + 1]
+        # scf_E_1 = self._get_scf_energy(self.results[l]['mm_geometry'])
+        # self.ostream.print_info(
+        #     f"Lambda: {l}, SCF Energy: {scf_E_1:.3f} Hartree")
+        # self.ostream.flush()
+        # scf_E_2 = self._get_scf_energy(self.results[lp1]['mm_geometry'])
+        # self.ostream.print_info(
+        #     f"Lambda: {lp1}, SCF Energy: {scf_E_2:.3f} Hartree")
+        # self.ostream.flush()
+        # self.results[l]['scf_energy'] = scf_E_1
+        # self.results[lp1]['scf_energy'] = scf_E_2
+
+        # if scf_E_2 > scf_E_1:
+        #     start = starting_index + 2
+        #     direction = 1
+        #     end = len(self.lambda_vec)
+        #     scf_E = scf_E_2
+        # else:
+        #     start = starting_index - 1
+        #     direction = -1
+        #     end = 0
+        #     scf_E = scf_E_1
+
+        # for i in range(start, end, direction):
+        #     last_scf_E = scf_E
+        #     l = self.lambda_vec[i]
+        #     geom = self.results[l]['mm_geometry']
+        #     scf_E = self._get_scf_energy(geom)
+        #     self.results[l]['scf_energy'] = scf_E
+
+        #     self.ostream.print_info(
+        #         f"Lambda: {l}, SCF Energy: {scf_E:.3f} Hartree")
+        #     self.ostream.flush()
+        #     self.molecule = self.set_molecule_positions(self.molecule, geom)
+        #     if last_scf_E > scf_E:
+
+        #         return self.lambda_vec[i - direction]
 
     def _get_scf_energy(self, positions):
         self.molecule = self.set_molecule_positions(self.molecule, positions)
@@ -289,7 +320,147 @@ class TransitionStateGuesser():
         basis = MolecularBasis.read(self.molecule, self.scf_basis)
         scf_drv.xcfun = self.scf_xcfun
         scf_results = scf_drv.compute(self.molecule, basis)
-        return scf_results['scf_energy']
+        return scf_results['scf_energy'] * hartree_in_kjpermol()
+
+
+    def show_results(self,ts_results=None, atom_indices=False):
+        """
+            Plot the convergence of the optimization
+
+            :param ts_results:
+                The dictionary of transition finder results.
+            """
+
+        try:
+            import ipywidgets
+        except ImportError:
+            raise ImportError('ipywidgets is required for this functionality.')
+
+        if ts_results is None:
+            ts_results = self.results
+
+        mm_energies = ts_results['mm_energies']
+        geometries = ts_results['xyz_geometries']
+        lambda_vec = ts_results['lambda_vec']
+        scf_energies = ts_results.get('scf_energies', None)
+        final_lambda = ts_results['final_lambda']
+        ipywidgets.interact(
+            self._show_iteration,
+            mm_energies=ipywidgets.fixed(mm_energies),
+            scf_energies=ipywidgets.fixed(scf_energies),
+            geometries=ipywidgets.fixed(geometries),
+            lambda_vec=ipywidgets.fixed(lambda_vec),
+            step=ipywidgets.SelectionSlider(options=lambda_vec,
+                                            description='Lambda',
+                                            value=final_lambda),
+            atom_indices=ipywidgets.fixed(atom_indices),
+        )
+
+    def _show_iteration(self,
+                    mm_energies,
+                    geometries,
+                    lambda_vec,
+                    step,
+                    scf_energies=None,
+                    atom_indices=False):
+        """
+        Show the geometry at a specific iteration.
+        """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('matplotlib is required for this functionality.')
+
+        rel_mm_energies = mm_energies - np.min(mm_energies)
+
+        lam_index = np.where(lambda_vec == step)[0][0]
+        xyz_data_i = geometries[lam_index]
+        total_steps = len(rel_mm_energies) - 1
+        x = np.linspace(0, lambda_vec[-1], 100)
+        y = np.interp(x, lambda_vec, rel_mm_energies)
+        fig, ax1 = plt.subplots(figsize=(6.5, 4))
+        ax1.plot(
+            x,
+            y,
+            color='black',
+            alpha=0.9,
+            linewidth=2.5,
+            linestyle='-',
+            zorder=0,
+            label='MM energy',
+        )
+        ax1.scatter(
+            lambda_vec,
+            rel_mm_energies,
+            color='black',
+            alpha=0.7,
+            s=120 / math.log(total_steps, 10),
+            facecolors="none",
+            edgecolor="darkcyan",
+            zorder=1,
+        )
+        ax1.scatter(
+            lambda_vec[lam_index],
+            rel_mm_energies[lam_index],
+            marker='o',
+            color='darkcyan',
+            alpha=1.0,
+            s=120 / math.log(total_steps, 10),
+            zorder=2,
+        )
+        ax1.set_xlabel(r'$\lambda$')
+        ax1.set_ylabel('Relative MM energy [kJ/mol]')
+
+        if scf_energies is not None:
+            ax2 = ax1.twinx()
+            rel_scf_energies = scf_energies - np.min(scf_energies)
+            ax2.plot(
+                x,
+                np.interp(x, lambda_vec, rel_scf_energies),
+                color='darkred',
+                alpha=0.9,
+                linewidth=2.5,
+                linestyle='--',
+                zorder=0,
+                label='SCF energy',
+            )
+            ax2.scatter(
+                lambda_vec,
+                rel_scf_energies,
+                alpha=0.7,
+                s=120 / math.log(total_steps, 10),
+                facecolors="none",
+                edgecolor="darkorange",
+                zorder=1,
+            )
+            ax2.scatter(
+                lambda_vec[lam_index],
+                rel_scf_energies[lam_index],
+                marker='o',
+                color='darkorange',
+                alpha=1.0,
+                s=120 / math.log(total_steps, 10),
+                zorder=2,
+            )
+            ax2.set_ylabel('Relative SCF energy [kJ/mol]')
+
+        fig.legend(loc='upper right',
+                bbox_to_anchor=(1, 1),
+                bbox_transform=ax1.transAxes)
+        ax1.set_title("Transition state finder")
+        # Ensure x-axis displays as integers
+        ax1.set_xticks(lambda_vec[::2])
+        fig.tight_layout()
+        plt.show()
+
+        mol = Molecule.read_xyz_string(xyz_data_i)
+        mol.show(atom_indices=atom_indices, width=640, height=360)
+
+    @staticmethod
+    def mm_to_xyz_geom(geom,molecule):
+        new_mol = TransitionStateGuesser.set_molecule_positions(molecule, geom)
+        return new_mol.get_xyz_string()
 
     @staticmethod
     def set_molecule_positions(molecule, positions):
@@ -297,3 +468,5 @@ class TransitionStateGuesser():
         for i in range(molecule.number_of_atoms()):
             molecule.set_atom_coordinates(i, positions[i])
         return molecule
+
+
