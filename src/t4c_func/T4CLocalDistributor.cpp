@@ -1909,6 +1909,14 @@ local_distribute_gen_j(CMatrices&                       focks,
 
     const auto dcomps = tensor::number_of_spherical_components(std::array<int, 1>{d_angmom});
 
+   // skip repeating integrals in diagonal block
+    auto m_start = ket_range.first;
+
+    if (diagonal)
+    {
+        m_start = std::max(m_start, bra_igto);
+    }
+
     for (int i = 0; i < acomps; i++)
     {
         const auto p = i * adim + refp;
@@ -1926,6 +1934,10 @@ local_distribute_gen_j(CMatrices&                       focks,
 
             const auto q = j * bdim + refq;
 
+            auto pq_fact = 1.0;
+
+            if ( p == q) pq_fact = 0.5;
+
             const auto loc_q = j * blocdim + loc_refq;
 
             for (int k = 0; k < ccomps; k++)
@@ -1934,15 +1946,11 @@ local_distribute_gen_j(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    auto pq_result = 0.0;
+
+                    #pragma omp simd reduction(+:pq_result)
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -1955,25 +1963,6 @@ local_distribute_gen_j(CMatrices&                       focks,
 
                         const auto loc_refs = d_loc_indices[m + 1];
 
-                        // impose angular symmetry on ket side
-
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
-
-                        // impose angular symmetry for itentical bra and ket sides
-
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
-
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
-
                         // compute r and s indexes
 
                         const auto r = k * cdim + refr;
@@ -1984,11 +1973,13 @@ local_distribute_gen_j(CMatrices&                       focks,
 
                         const auto loc_s = l * dlocdim + loc_refs;
 
+                        auto rs_fact = static_cast<int>(!(refr == refs && l < k));
+
+                        rs_fact *= static_cast<int>(!((refp == refr && refq == refs) && (k < i || (k == i && l < j))));
+
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
-
-                        if (p == q) fval *= 0.5;
+                        auto fval = rs_fact * pq_fact * curr_buffer[m - ket_range.first];
 
                         if (r == s) fval *= 0.5;
 
@@ -2002,14 +1993,17 @@ local_distribute_gen_j(CMatrices&                       focks,
 
                         // Coulomb contributions
 
-                        submat_pq->at({loc_p, loc_q}) += f2rs;
-
-                        submat_qp->at({loc_q, loc_p}) += f2rs;
+                        pq_result += f2rs;
 
                         submat_rs->at({loc_r, loc_s}) += f2pq;
 
                         submat_sr->at({loc_s, loc_r}) += f2pq;
                     }
+
+                    submat_pq->at({loc_p, loc_q}) += pq_result;
+
+                    submat_qp->at({loc_q, loc_p}) += pq_result;
+
                 }
             }
         }
