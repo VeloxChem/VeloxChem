@@ -1478,6 +1478,12 @@ class ScfDriver:
                     rhs = None
                 rhs = self.comm.bcast(rhs, root=mpi_master())
 
+                # in case number of C-PCM grid points do not match between
+                # cpcm_q and rhs, such as between previous and current
+                # geometries during an optimization, reset cpcm_q
+                if self._cpcm_q is not None and self._cpcm_q.size != rhs.size:
+                    self._cpcm_q = None
+
                 self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
                     self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
                     rhs, self._cpcm_q, self.cpcm_cg_thresh)
