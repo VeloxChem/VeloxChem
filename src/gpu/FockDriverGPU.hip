@@ -39,6 +39,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include <numeric>
 
 #include "ScreeningData.hpp"
 #include "BoysFuncTable.hpp"
@@ -7771,8 +7772,47 @@ computeFockOnGPU(const              CMolecule& molecule,
 
         timer.start("    K block DDDD");
 
+        // Allocate memory for temp storage of indices
+        // Host side
+        std::vector<uint32_t> h_deviceBlockSize(pair_inds_count_for_K_dd, 0);
+        uint32_t* d_deviceBlockSize = nullptr;
+
+        hipSafe(hipMalloc(&d_deviceBlockSize, pair_inds_count_for_K_dd * sizeof(uint32_t)));
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDDBlockSizes, num_blocks, threads_per_block, 0, 0,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           d_pair_inds_i_for_K_dd,
+                           d_pair_inds_k_for_K_dd,
+                           d_pair_counts_K_dd);
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipSafe(hipMemcpy(h_deviceBlockSize.data(), d_deviceBlockSize, pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyDeviceToHost));
+
+        // We treat the structure as a flat array, so that the maximum size is simply
+        // nblocks * total_entry_count
+        // The actual bookkeeping needs to be done by us, to make sure we index into the correct data
+        // instead of writing randomly
+
+        const auto allBlocks = std::accumulate(h_deviceBlockSize.begin(), h_deviceBlockSize.end(), 0);
+
+        DeviceStore<9>* d_deviceBlockData = nullptr;
+        hipSafe(hipMalloc(&d_deviceBlockData, allBlocks * sizeof(DeviceStore<9>)));
+        std::vector<uint32_t> h_deviceBlockOffsets(pair_inds_count_for_K_dd, 0);
+        for (int i = 1; i < pair_inds_count_for_K_dd; ++i)
+        {
+            h_deviceBlockOffsets[i] = h_deviceBlockOffsets[i - 1] + h_deviceBlockSize[i];
+        }
+
+        uint32_t* d_deviceBlockOffsets = nullptr;
+        hipSafe(hipMalloc(&d_deviceBlockOffsets, pair_inds_count_for_K_dd * sizeof(uint32_t)));
+
+        hipSafe(hipMemcpy(d_deviceBlockOffsets, h_deviceBlockOffsets.data(), pair_inds_count_for_K_dd * sizeof(uint32_t), hipMemcpyHostToDevice));
+
         hipLaunchKernelGGL(gpu::computeExchangeFockDDDDPrepare, num_blocks, threads_per_block, 0, 0,
-                           d_mat_K,
+                           d_deviceBlockData,
+                           d_deviceBlockOffsets,
                            d_pair_inds_i_for_K_dd,
                            d_pair_inds_k_for_K_dd,
                            static_cast<uint32_t>(pair_inds_count_for_K_dd),
@@ -7780,8 +7820,6 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_d_prim_aoinds,
                            static_cast<uint32_t>(d_prim_count),
                            dd_max_D,
-                           d_mat_D_full_AO,
-                           static_cast<uint32_t>(cart_naos),
                            d_Q_K_dd,
                            d_D_inds_K_dd,
                            d_pair_displs_K_dd,
@@ -7791,6 +7829,171 @@ computeFockOnGPU(const              CMolecule& molecule,
                            d_boys_func_ft,
                            omega,
                            eri_threshold);
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD0, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD1, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD2, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD3, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD4, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD5, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD6, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD7, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD8, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD9, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD10, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD11, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD12, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD13, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
+
+        hipSafe(hipDeviceSynchronize());
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockDDDD14, num_blocks, threads_per_block, 0, 0,
+                           d_mat_K,
+                           d_deviceBlockData,
+                           d_mat_D_full_AO,
+                           d_deviceBlockOffsets,
+                           d_deviceBlockSize,
+                           static_cast<uint32_t>(pair_inds_count_for_K_dd),
+                           static_cast<uint32_t>(cart_naos));
 
         hipSafe(hipDeviceSynchronize());
 

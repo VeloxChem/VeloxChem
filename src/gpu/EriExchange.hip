@@ -28515,8 +28515,8 @@ computeExchangeFockDDDP6(double*         mat_K,
 static inline constexpr uint32_t d_cart_inds[6][2] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}, {1, 2}, {2, 2}};
 static inline constexpr double   delta[3][3] = {{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}};
 
-__device__ double __attribute__((noinline)) 
-computeExchangeFockDDDD0(const double* F8_t,
+__device__ double __attribute__((always_inline)) 
+computeExchangeFockDDDD0Internal(const double* F8_t,
                          const double* PQ,
                          const double Lambda,
                          const double S_ij_00,
@@ -28727,8 +28727,8 @@ computeExchangeFockDDDD0(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline)) 
-computeExchangeFockDDDD1(const double* F8_t,
+__device__ double __attribute__((always_inline)) 
+computeExchangeFockDDDD1Internal(const double* F8_t,
                          const double* PQ,
                          const double Lambda,
                          const double S_ij_00,
@@ -28985,8 +28985,8 @@ computeExchangeFockDDDD1(const double* F8_t,
 
 }
 
- __device__ double __attribute__((noinline))                                    
- computeExchangeFockDDDD2(const double* F8_t,         
+ __device__ double __attribute__((always_inline))                                    
+ computeExchangeFockDDDD2Internal(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
                           const double S_ij_00,       
@@ -29279,8 +29279,8 @@ computeExchangeFockDDDD1(const double* F8_t,
             );
 }
 
-__device__ double __attribute__((noinline))                                           
-computeExchangeFockDDDD3(const double* F8_t,                
+__device__ double __attribute__((always_inline))                                           
+computeExchangeFockDDDD3Internal(const double* F8_t,                
                          const double* PQ,                  
                          const double Lambda,               
                          const double S_ij_00,              
@@ -29633,8 +29633,8 @@ computeExchangeFockDDDD3(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))                                           
-computeExchangeFockDDDD4(const double* F8_t,                
+__device__ double __attribute__((always_inline))                                           
+computeExchangeFockDDDD4Internal(const double* F8_t,                
                          const double* PQ,                  
                          const double Lambda,               
                          const double S_ij_00,              
@@ -30123,8 +30123,8 @@ computeExchangeFockDDDD4(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))                                           
-computeExchangeFockDDDD5(const double* F8_t,                
+__device__ double __attribute__((always_inline))                                           
+computeExchangeFockDDDD5Internal(const double* F8_t,                
                          const double* PQ,                  
                          const double Lambda,               
                          const double S_ij_00,              
@@ -30284,8 +30284,8 @@ computeExchangeFockDDDD5(const double* F8_t,
                             );
 }
 
- __device__ double __attribute__((noinline))                                    
- computeExchangeFockDDDD6(const double* F8_t,         
+ __device__ double __attribute__((always_inline))                                    
+ computeExchangeFockDDDD6Internal(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
                           const double S_ij_00,       
@@ -30442,8 +30442,8 @@ computeExchangeFockDDDD5(const double* F8_t,
 
 }
 
- __device__ double __attribute__((noinline))                                    
- computeExchangeFockDDDD7(const double* F8_t,         
+ __device__ double __attribute__((always_inline))                                    
+ computeExchangeFockDDDD7Internal(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
                           const double S_ij_00,       
@@ -30555,8 +30555,8 @@ computeExchangeFockDDDD5(const double* F8_t,
                             );
 }
 
- __device__ double __attribute__((noinline))                                    
- computeExchangeFockDDDD8(const double* F8_t,         
+ __device__ double __attribute__((always_inline))                                    
+ computeExchangeFockDDDD8Internal(const double* F8_t,         
                           const double* PQ,           
                           const double Lambda,        
                           const double S_ij_00,       
@@ -31112,8 +31112,8 @@ computeExchangeFockDDDD5(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))                                    
-computeExchangeFockDDDD9(const double* F8_t,         
+__device__ double __attribute__((always_inline))                                    
+computeExchangeFockDDDD9Internal(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
                          const double S_ij_00,       
@@ -31180,8 +31180,8 @@ computeExchangeFockDDDD9(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))                                    
-computeExchangeFockDDDD10(const double* F8_t,         
+__device__ double __attribute__((always_inline))                                    
+computeExchangeFockDDDD10Internal(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
                          const double S_ij_00,       
@@ -31296,8 +31296,8 @@ computeExchangeFockDDDD10(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))                                    
-computeExchangeFockDDDD11(const double* F8_t,         
+__device__ double __attribute__((always_inline))                                    
+computeExchangeFockDDDD11Internal(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
                          const double S_ij_00,       
@@ -31436,8 +31436,8 @@ computeExchangeFockDDDD11(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))                                    
-computeExchangeFockDDDD12(const double* F8_t,         
+__device__ double __attribute__((always_inline))                                    
+computeExchangeFockDDDD12Internal(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
                          const double S_ij_00,       
@@ -31818,8 +31818,8 @@ computeExchangeFockDDDD12(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))                                    
-computeExchangeFockDDDD13(const double* F8_t,         
+__device__ double __attribute__((always_inline))                                    
+computeExchangeFockDDDD13Internal(const double* F8_t,         
                          const double* PQ,           
                          const double Lambda,        
                          const double S_ij_00,       
@@ -31968,33 +31968,33 @@ computeExchangeFockDDDD13(const double* F8_t,
                             );
 }
 
-__device__ double __attribute__((noinline))
-computeExchangeFockDDDD14(const double* F8_t,         
-                         const double* PQ,           
-                         const double Lambda,        
-                         const double S_ij_00,       
-                         const double S_kl_00,       
-                         const double S1,            
-                         const double S2,            
-                         const double inv_S1,        
-                         const double inv_S2,        
-                         const double inv_S4,        
-                         const double PA_0,          
-                         const double PA_1,          
-                         const double PB_0,          
-                         const double PB_1,          
-                         const double QC_0,          
-                         const double QC_1,          
-                         const double QD_0,          
-                         const double QD_1,          
-                         const uint32_t a0,          
-                         const uint32_t a1,          
-                         const uint32_t b0,          
-                         const uint32_t b1,          
-                         const uint32_t c0,          
-                         const uint32_t c1,          
-                         const uint32_t d0,          
-                         const uint32_t d1)          
+__device__ double __attribute__((always_inline))
+computeExchangeFockDDDD14Internal(const double* F8_t,         
+                                  const double* PQ,           
+                                  const double Lambda,        
+                                  const double S_ij_00,       
+                                  const double S_kl_00,       
+                                  const double S1,            
+                                  const double S2,            
+                                  const double inv_S1,        
+                                  const double inv_S2,        
+                                  const double inv_S4,        
+                                  const double PA_0,          
+                                  const double PA_1,          
+                                  const double PB_0,          
+                                  const double PB_1,          
+                                  const double QC_0,          
+                                  const double QC_1,          
+                                  const double QD_0,          
+                                  const double QD_1,          
+                                  const uint32_t a0,          
+                                  const uint32_t a1,          
+                                  const uint32_t b0,          
+                                  const uint32_t b1,          
+                                  const uint32_t c0,          
+                                  const uint32_t c1,          
+                                  const uint32_t d0,          
+                                  const uint32_t d1)          
 {
                     return Lambda * S_ij_00 * S_kl_00 * (
 
@@ -32299,7 +32299,813 @@ computeExchangeFockDDDD14(const double* F8_t,
 }
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
-computeExchangeFockDDDDPrepare(double*         mat_K,
+computeExchangeFockDDDD0(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD0Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD1(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD1Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD2(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD2Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD3(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD3Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD4(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD4Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD5(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD5Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD6(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD6Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD7(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD7Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD8(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD8Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD9(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD9Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD10(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD10Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD11(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD11Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD12(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD12Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD13(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD13Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDD14(
+                        double*         mat_K,
+                        const DeviceStore<9>*         data,
+                        const double*   mat_D_full_AO,
+                        const uint32_t* blockOffset,
+                        const uint32_t* blockSize,
+                        const uint32_t  pair_inds_count_for_K_dd,
+                        const uint32_t  naos)
+{
+
+    __shared__ double   ERIs[TILE_SIZE_K];
+    double K_ik = 0.0;
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd )
+    {
+        const auto* storedData = data + blockOffset[ik];
+
+        for (uint32_t pos = 0; pos < (blockSize[ik] + TILE_SIZE_K - 1) / TILE_SIZE_K; pos++)
+        {
+            const uint32_t index = pos * TILE_SIZE_K + threadIdx.x;
+            if (index < blockSize[ik] && storedData[index].valid_)
+            {
+                const auto& entry = storedData[index];
+                ERIs[threadIdx.x] = computeExchangeFockDDDD14Internal(entry.boysFuncData_.data(), entry.PQ_.data(), entry.Lambda_, entry.S_ij_00_,
+                                entry.S_kl_00_, entry.S1_, entry.S2_, entry.inv_S1_, entry.inv_S2_, entry.inv_S4_, entry.PA_0_,
+                                entry.PA_1_, entry.PB_0_, entry.PB_1_, entry.QC_0_, entry.QC_1_, entry.QD_0_, entry.QD_1_,
+                                entry.a0_, entry.a1_, entry.b0_, entry.b1_, entry.c0_, entry.c1_, entry.d0_, entry.d1_) *
+                                mat_D_full_AO[entry.j_cgto_ * naos + entry.l_cgto_];
+            }
+            else
+            {
+                ERIs[threadIdx.x] = 0.0;
+            }
+        }
+
+        __syncthreads();
+
+
+        if (threadIdx.x == 0)
+        {
+            for (uint32_t x = 0; x < TILE_SIZE_K; x++)
+            {
+            
+               K_ik += ERIs[x];
+            
+            }
+            mat_K[ik] += K_ik;
+        }
+    }
+}
+
+
+
+
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDDBlockSizes(uint32_t *blockSize,
+                                  const uint32_t  pair_inds_count_for_K_dd,
+                                  const uint32_t* pair_inds_i_for_K_dd,
+                                  const uint32_t* pair_inds_k_for_K_dd,
+                                  const uint32_t* pair_counts_K_dd)
+{
+    const uint32_t ik = blockIdx.x;
+    if (ik < pair_inds_count_for_K_dd)
+    {
+        const auto i = pair_inds_i_for_K_dd[ik];
+        const auto k = pair_inds_k_for_K_dd[ik];
+
+        const auto count_i = pair_counts_K_dd[i];
+        const auto count_k = pair_counts_K_dd[k];
+
+        blockSize[ik] = count_i * count_k;
+    }
+}
+
+__global__ void __launch_bounds__(TILE_SIZE_K)
+computeExchangeFockDDDDPrepare(
+                        DeviceStore<9>*         data,
+                        const uint32_t* blockOffset,
                         const uint32_t* pair_inds_i_for_K_dd,
                         const uint32_t* pair_inds_k_for_K_dd,
                         const uint32_t  pair_inds_count_for_K_dd,
@@ -32307,8 +33113,6 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
                         const uint32_t* d_prim_aoinds,
                         const uint32_t  d_prim_count,
                         const double    dd_max_D,
-                        const double*   mat_D_full_AO,
-                        const uint32_t  naos,
                         const double*   Q_K_dd,
                         const uint32_t* D_inds_K_dd,
                         const uint32_t* pair_displs_K_dd,
@@ -32322,15 +33126,11 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
     // each thread block scans over [i?|k?] and sum up to a primitive K matrix element
     // J. Chem. Theory Comput. 2009, 5, 4, 1004-1015
 
-    __shared__ double   ERIs[TILE_DIM_Y_K][TILE_DIM_X_K + 1];
     __shared__ uint32_t skip_thread_block;
 
     const uint32_t ik = blockIdx.x;
 
     double K_ik = 0.0, d2 = 1.0;
-
-
-
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
 
@@ -32338,6 +33138,8 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
 
     if (ik < pair_inds_count_for_K_dd)
     {
+        auto* storedData = data + blockOffset[ik];
+
         const auto i = pair_inds_i_for_K_dd[ik];
         const auto k = pair_inds_k_for_K_dd[ik];
 
@@ -32407,9 +33209,8 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
 
                     if (l < count_k)
                     {
-                        const auto Q_kl = Q_K_dd[displ_k + l];
-
-                        if (fabs(Q_ij * Q_kl * dd_max_D) > eri_threshold)
+                        const auto Q_ik = Q_K_dd[displ_k + l];
+                        if (fabs(Q_ij * Q_K_dd[displ_k + l]  * dd_max_D) > eri_threshold)
                         {
                             const auto l_prim = D_inds_K_dd[displ_k + l];
 
@@ -32433,7 +33234,7 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
                             const auto inv_S2 = 1.0 / S2;
                             const auto inv_S4 = 1.0 / (S1 + S2);
 
-                            const double PQ[3] = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
+                            const std::array<double, 3> PQ = {(a_k * r_k[0] + a_l * r_l[0]) * inv_S2 - (a_i * r_i[0] + a_j * r_j[0]) * inv_S1,
                                                   (a_k * r_k[1] + a_l * r_l[1]) * inv_S2 - (a_i * r_i[1] + a_j * r_j[1]) * inv_S1,
                                                   (a_k * r_k[2] + a_l * r_l[2]) * inv_S2 - (a_i * r_i[2] + a_j * r_j[2]) * inv_S1};
 
@@ -32445,9 +33246,9 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
 
                             const auto Lambda = sqrt(4.0 * rho * d2 * MATH_CONST_INV_PI);
 
-                            double F8_t[9];
+                            std::array<double, 9> F8_t;
 
-                            gpu::computeBoysFunction(F8_t, rho * d2 * r2_PQ, 8, boys_func_table, boys_func_ft);
+                            gpu::computeBoysFunction(F8_t.data(), rho * d2 * r2_PQ, 8, boys_func_table, boys_func_ft);
 
                             if (omega != 0.0)
                             {
@@ -32466,71 +33267,15 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
                             const auto QD_0 = (-a_k * inv_S2) * (r_l[d0] - r_k[d0]);
                             const auto QD_1 = (-a_k * inv_S2) * (r_l[d1] - r_k[d1]);
 
-                            auto eri_ijkl = computeExchangeFockDDDD0(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
+                            storedData[(m * count_k) + n] = DeviceStore<9>(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
                                                                      inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
+                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1, j_cgto, l_cgto);
 
-                            eri_ijkl += computeExchangeFockDDDD1(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
 
-                            eri_ijkl += computeExchangeFockDDDD2(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD3(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD4(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD5(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD6(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD7(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD8(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD9(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD10(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD11(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD12(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD13(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            eri_ijkl += computeExchangeFockDDDD14(F8_t, PQ, Lambda, S_ij_00, S_kl_00, S1, S2, inv_S1,
-                                                                     inv_S2, inv_S4, PA_0, PA_1, PB_0, PB_1, QC_0, QC_1,
-                                                                     QD_0, QD_1, a0, a1, b0, b1, c0, c1, d0, d1);
-
-                            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * mat_D_full_AO[j_cgto * naos + l_cgto];
                         }
                         else
                         {
-                            ERIs[threadIdx.y][threadIdx.x] = 0.0;
+                            storedData[(m * count_k) + n] = DeviceStore<9>();
 
                             // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
                             if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
@@ -32538,7 +33283,7 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
                     }
                     else
                     {
-                        ERIs[threadIdx.y][threadIdx.x] = 0.0;
+                        storedData[(m * count_k) + n] = DeviceStore<9>();
 
                         // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
                         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
@@ -32548,42 +33293,11 @@ computeExchangeFockDDDDPrepare(double*         mat_K,
 
                     // early exit for thread block
                     if (skip_thread_block == m + 1) break;
-
-                    if ((threadIdx.y == 0) && (threadIdx.x == 0))
-                    {
-                        for (uint32_t y = 0; y < TILE_DIM_Y_K; y++)
-                        {
-                            for (uint32_t x = 0; x < TILE_DIM_X_K; x++)
-                            {
-                                K_ik += ERIs[y][x];
-                            }
-                        }
-                    }
-
-                    __syncthreads();
                 }
             }
         }
-
-        if ((threadIdx.y == 0) && (threadIdx.x == 0))
-        {
-            mat_K[ik] += K_ik;
-        }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 __global__ void __launch_bounds__(TILE_SIZE_K)
 computeExchangeFockDPDP(double*         mat_K,
