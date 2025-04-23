@@ -48,7 +48,6 @@ from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
-from .scfrestdriver import ScfRestrictedDriver
 from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input
 from .errorhandler import assert_msg_critical, safe_arccos
@@ -359,27 +358,27 @@ class MMForceFieldGenerator:
                             'please run create_topology before scan_dihedral')
 
         # Identify the dihedral indices for the rotatable bond
-        central_atom_1 = rotatable_bond[0] - 1
-        central_atom_2 = rotatable_bond[1] - 1
-
         dihedral_indices = []
         dihedral_types = []
 
+        central_atom_1 = rotatable_bond[0] - 1
+        central_atom_2 = rotatable_bond[1] - 1
+
         for (i,j,k,l), dihedral in self.dihedrals.items():
-            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
+            if sorted([j, k]) == sorted([central_atom_1, central_atom_2]):
                 dihedral_indices.append([i,j,k,l])
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        dihedral_indices_one_based = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
         
         # Print a header
         header = 'VeloxChem Dihedral Scan'
         self.ostream.print_header(header)
-        self.ostream.print_header('=' * len(header))
+        self.ostream.print_header('=' * (len(header) + 2))
         self.ostream.print_blank()
         self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
-        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_one_based}')
         self.ostream.print_blank()
 
         # Run SCF
@@ -406,34 +405,41 @@ class MMForceFieldGenerator:
         opt_drv.constraints = [constraint]
 
         # Scan the dihedral
-        self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
+        self.ostream.print_info(f'Dihedral {reference_dih_name} will be used in QM scan.')
         self.ostream.print_info(f'Dihedral angle range: {scan_range[0]}-{scan_range[1]}')
         self.ostream.print_info(f'Number of points: {n_points}')
+        self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
         self.ostream.flush()
 
         opt_drv.ostream.mute()
-        opt_drv.compute(self.molecule, basis, scf_results)
+        scan_results = opt_drv.compute(self.molecule, basis, scf_results)
         opt_drv.ostream.unmute()
 
         self.ostream.print_info('Scan completed.')
+        self.ostream.print_blank()
         self.ostream.flush()
 
-        # Change the default file name to the dihedral indices
-        file_path = Path("scan-final.xyz")
-        file_path.rename(f"{reference_dih_name}.xyz")
+        scan_dih_angles = []
+        scan_energies = []
+        scan_geometries = []
+        target_dihedrals = []
 
-        # Read the QM scan
-        self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
+        scan_dih_angles.append([float(val) for val in np.linspace(*scan_range, n_points)])
+        scan_energies.append([float(val) for val in scan_results['scan_energies']])
+        scan_geometries.append([Molecule.read_xyz_string(xyzstr) for xyzstr in scan_results['scan_geometries']])
+        target_dihedrals.append(reference_dih)
+
+        return {
+            'scan_dih_angles': scan_dih_angles,
+            'scan_energies': scan_energies,
+            'scan_geometries': scan_geometries,
+            'target_dihedrals': target_dihedrals,
+        }
 
     def reparameterize_dihedrals(self,
                                  rotatable_bond,
+                                 scan_results=None,
                                  scan_file=None,
-                                 scf_drv=None,
-                                 basis=None,
-                                 scf_results=None,
-                                 scan_range=[0, 360],
-                                 n_points=19,
-                                 scan_verbose=False,
                                  visualize=False,
                                  fit_extrema=False,
                                  initial_validation=True,
@@ -447,18 +453,6 @@ class MMForceFieldGenerator:
             The list of indices of the rotatable bond. (1-indexed)
         :param scan_file:
             The file with the QM scan. If None is provided it a QM scan will be performed.
-        :param scf_drv:
-            The SCF driver. If None is provided it will use HF.
-        :param basis:
-            The AO basis set. If None is provided it will use 6-31G*.
-        :param scf_results:
-            The dictionary containing converged SCF results.
-        :param scan_range:
-            List with the range of dihedral angles. Default is [0, 360].
-        :param n_points:
-            The number of points to be calculated. Default is 19.
-        :param scan_verbose:
-            Whether the QM scan should print all the information.
         :param visualize:
             Whether the dihedral scans should be visualized.
         :param fit_extrema:
@@ -472,52 +466,49 @@ class MMForceFieldGenerator:
             error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
-        # If scan file is provided, read it
+        valid_input = ((scan_results is None and scan_file is not None) or
+                       (scan_results is not None and scan_file is None))
+        assert_msg_critical(valid_input,
+            'MMForceFieldGenerator.reparameterize_dihedrals: ' +
+            'Please provide either scan_results or scan_file')
+
+        # double check dihedral angle if scan file is provided
         if scan_file is not None:
-            with open(scan_file, 'r') as f:
-                lines = f.readlines()
-
-            for line in lines:
-                if line.startswith('Scan'):
-                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
-                    # Extract the dihedral indices
-                    scanned_dih = [int(i) for i in line.split('Dihedral')[1].split()[0].split('-')]
-                    central_atom_1 = scanned_dih[1] - 1
-                    central_atom_2 = scanned_dih[2] - 1
-
-                    # Check if the rotatable bond matches the scan file
-                    if sorted([central_atom_1, central_atom_2]) != sorted(
-                            [rotatable_bond[0] - 1, rotatable_bond[1] - 1]):
-                        raise ValueError('The rotatable bond does not match the scan file.')
-
-                    break
-
-        else:
-            central_atom_1 = rotatable_bond[0] - 1
-            central_atom_2 = rotatable_bond[1] - 1
+            with open(scan_file, 'r') as fh:
+                for line in fh:
+                    if line.startswith('Scan'):
+                        # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
+                        # Extract the dihedral indices
+                        scanned_dih = [int(i) for i in line.split('Dihedral')[1].split()[0].split('-')]
+                        assert_msg_critical(
+                            sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
+                            'MMForceFieldGenerator.reparameterize_dihedrals: ' +
+                            'The rotatable bond does not match the scan file')
+                        break
 
         # Identify the dihedral indices for the rotatable bond
         dihedral_indices = []
         dihedral_types = []
 
+        central_atom_1 = rotatable_bond[0] - 1
+        central_atom_2 = rotatable_bond[1] - 1
+
         for (i,j,k,l), dihedral in self.dihedrals.items():
-            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
+            if sorted([j, k]) == sorted([central_atom_1, central_atom_2]):
                 dihedral_indices.append([i,j,k,l])
                 dihedral_types.append(dihedral['comment'])
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        dihedral_indices_one_based = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
         
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
         self.ostream.print_header(header)
-        self.ostream.print_header('=' * len(header))
+        self.ostream.print_header('=' * (len(header) + 2))
         self.ostream.print_blank()
-
         self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
-
-        # Print the dihedral indices *in 1 index* and types
-        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_one_based}')
+        self.ostream.print_blank()
 
         # If the scan file is provided, read it
         if scan_file is not None:
@@ -530,54 +521,11 @@ class MMForceFieldGenerator:
                 raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
             self.read_qm_scan_xyz_files([scan_file])
         else:
-            # Perform a QM scan
-            self.ostream.print_info('No scan file provided. Performing QM scan...')
-        
-            if scf_drv is None:
-                scf_drv = ScfRestrictedDriver()
-                if not scan_verbose:
-                    scf_drv.ostream.mute()
-                self.ostream.print_info('SCF driver not provided. Using default: RHF')
-
-            if basis is None:
-                basis = MolecularBasis.read(self.molecule,'6-31G*')
-                self.ostream.print_info('Basis set not provided. Using dafault: 6-31G*')
-
-            # Perform the reference SCF calculation
-            if scf_results is None:
-                self.ostream.print_info('Performing SCF calculation...')
-                self.ostream.flush()
-                scf_results = scf_drv.compute(self.molecule, basis)
-            
-            # Take one of the dihedrals to perform the scan
-            reference_dih = dihedral_indices[0]
-            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
-
-            opt_drv = OptimizationDriver(scf_drv)
-            
-            if not scan_verbose:
-                opt_drv.ostream.mute()
-
-            constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
-            opt_drv.constraints = [constraint]
-
-            # Scan the dihedral
-            self.ostream.print_info(f'Dihedral: {reference_dih_name} taken for scan...')
-            self.ostream.print_info(f'Angle range: {scan_range[0]}-{scan_range[1]}')
-            self.ostream.print_info(f'Number of points: {n_points}')
-            self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
-            self.ostream.flush()
-
-            opt_drv.compute(self.molecule, basis, scf_results)
-
-            self.ostream.print_info('Scan completed.')
-
-            # Change the default file name to the dihedral indices
-            file_path = Path("scan-final.xyz")
-            file_path.rename(f"{reference_dih_name}.xyz")
-
-            # Read the QM scan
-            self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
+            # process scan results
+            self.scan_dih_angles = scan_results['scan_dih_angles']
+            self.scan_energies = scan_results['scan_energies']
+            self.scan_geometries = scan_results['scan_geometries']
+            self.target_dihedrals = scan_results['target_dihedrals']
 
         # Group dihedrals by their types
         dihedral_groups = defaultdict(list)
