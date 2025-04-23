@@ -661,6 +661,7 @@ class MMForceFieldGenerator:
 
         # Print initial barriers
         self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
+        self.ostream.print_blank()
 
         # Store the original barriers and perform the initial validation
         original_barriers = barriers.copy()
@@ -668,7 +669,6 @@ class MMForceFieldGenerator:
         if initial_validation:
             self.ostream.print_info('Validating the initial force field...')
             self.ostream.print_blank()
-            self.ostream.flush()
 
             mm_energies = dihedral_potential(
                 dihedral_angles_rad,
@@ -761,6 +761,7 @@ class MMForceFieldGenerator:
         # List of the fitted barriers
         fit_barrier_to_print = fitted_barriers.copy()
         self.ostream.print_info(f'New fitted barriers: {fit_barrier_to_print}')
+        self.ostream.print_blank()
 
         # If there are multiple dihedrals, group them in list of lists
         fitted_barriers_grouped = []
@@ -795,7 +796,6 @@ class MMForceFieldGenerator:
         # Validate the fitted parameters
         self.ostream.print_info('Validating the fitted force field...')
         self.ostream.print_blank()
-        self.ostream.flush()
 
         fitted_dihedral_results = {
             'dihedral_indices': list(initial_data['dihedral_indices']),
@@ -3019,7 +3019,7 @@ class MMForceFieldGenerator:
         dih = self.target_dihedrals[i]
 
         dih_str = f'{dih[0] + 1}-{dih[1] + 1}-{dih[2] + 1}-{dih[3] + 1}'
-        self.ostream.print_info(f'  Target dihedral angle: {dih_str}')
+        self.ostream.print_info(f'Target dihedral angle: {dih_str}')
         self.ostream.print_blank()
 
         geom = self.scan_geometries[i]
@@ -3029,19 +3029,6 @@ class MMForceFieldGenerator:
 
         qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
         qm_scan *= hartree_in_kjpermol()
-
-        if verbose:
-            self.ostream.print_blank()
-            self.ostream.print_info(
-                '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
-            self.ostream.print_info(
-                '  ---------------------------------------------------------------')
-            for angle, e_mm, e_qm in zip(angles, mm_scan, qm_scan):
-                self.ostream.print_info(
-                    f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
-                    f'{(e_mm - e_qm):10.3f}')
-            self.ostream.print_blank()
-            self.ostream.flush()
 
         self.fitting_summary = {
             'maximum_difference': np.max(np.abs(mm_scan - qm_scan)),
@@ -3073,11 +3060,6 @@ class MMForceFieldGenerator:
 
         # select scan angles and geometries from QM data
 
-        if verbose:
-            self.ostream.print_info('      Dihedral           MM energy')
-            self.ostream.print_info('  --------------------------------')
-            self.ostream.flush()
-
         energies = []
 
         for i, (geom, angle) in enumerate(zip(geometries, angles)):
@@ -3094,9 +3076,11 @@ class MMForceFieldGenerator:
             energies.append(pot_energy)
 
             if verbose:
-                self.ostream.print_info(
-                    f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
+                self.ostream.print_info(f'  {angle:8.1f} deg...')
                 self.ostream.flush()
+
+        if verbose:
+            self.ostream.print_blank()
 
         return energies
 
@@ -3132,6 +3116,19 @@ class MMForceFieldGenerator:
         :param validation_result:
             The dictionary containing the result of validation.
         """
+
+        self.ostream.print_info(
+            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+        self.ostream.print_info(
+            '  ---------------------------------------------------------------')
+        for angle, e_mm, e_qm in zip(
+                fitted_dihedral_results['dihedral_angles'],
+                fitted_dihedral_results['mm_scan_kJpermol'],
+                fitted_dihedral_results['qm_scan_kJpermol']):
+            self.ostream.print_info(
+                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                f'{(e_mm - e_qm):10.3f}')
+        self.ostream.print_blank()
 
         self.ostream.print_info('Summary of validation')
         self.ostream.print_info('---------------------')
