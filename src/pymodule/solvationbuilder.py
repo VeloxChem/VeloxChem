@@ -140,7 +140,7 @@ class SolvationBuilder:
         # Standard forcefield
         self.parent_forcefield = 'amber03'
 
-    def solvate(self, solute, solvent = 'spce', solvent_molecule=None, padding=1, target_density=None, neutralize=True, equilibrate=False):
+    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False):
         """
         Create a solvated system with the most typical solvent molecules.
 

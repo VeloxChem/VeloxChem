@@ -331,6 +331,100 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
+    def scan_dihedral(self,
+                      scf_driver,
+                      basis,
+                      rotatable_bond,
+                      scf_results=None,
+                      scan_range=[0, 360],
+                      n_points=7):
+        """
+        Changes the dihedral constants for a specific rotatable bond in order to
+        fit the QM scan.
+
+        :param scf_driver:
+            The SCF driver. If None is provided it will use HF.
+        :param basis:
+            The AO basis set. If None is provided it will use 6-31G*.
+        :param rotatable_bond:
+            The list of indices of the rotatable bond. (1-indexed)
+        :param scan_range:
+            List with the range of dihedral angles. Default is [0, 360].
+        :param n_points:
+            The number of points to be calculated. Default is 19.
+        """
+
+        assert_msg_critical(hasattr(self, 'dihedrals'),
+                            'MMForceFieldGenerator.scan_dihedral: ' +
+                            'please run create_topology before scan_dihedral')
+
+        # Identify the dihedral indices for the rotatable bond
+        central_atom_1 = rotatable_bond[0] - 1
+        central_atom_2 = rotatable_bond[1] - 1
+
+        dihedral_indices = []
+        dihedral_types = []
+
+        for (i,j,k,l), dihedral in self.dihedrals.items():
+            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
+                dihedral_indices.append([i,j,k,l])
+                dihedral_types.append(dihedral['comment'])
+
+        # Transform the dihedral indices to 1-indexed for printing
+        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        
+        # Print a header
+        header = 'VeloxChem Dihedral Scan'
+        self.ostream.print_header(header)
+        self.ostream.print_header('=' * len(header))
+        self.ostream.print_blank()
+        self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
+        self.ostream.print_blank()
+
+        # Run SCF
+        if scf_results is None:
+            self.ostream.print_info('Performing SCF calculation...')
+            self.ostream.flush()
+
+            scf_driver.filename = self.molecule_name
+            scf_driver.ostream.mute()
+            scf_results = scf_driver.compute(self.molecule, basis)
+            scf_driver.ostream.unmute()
+
+            self.ostream.print_info('SCF completed.')
+            self.ostream.print_blank()
+        
+        # Take one of the dihedrals to perform the scan
+        reference_dih = dihedral_indices[0]
+        reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
+
+        opt_drv = OptimizationDriver(scf_driver)
+        opt_drv.filename = self.molecule_name
+        
+        constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
+        opt_drv.constraints = [constraint]
+
+        # Scan the dihedral
+        self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
+        self.ostream.print_info(f'Dihedral angle range: {scan_range[0]}-{scan_range[1]}')
+        self.ostream.print_info(f'Number of points: {n_points}')
+        self.ostream.flush()
+
+        opt_drv.ostream.mute()
+        opt_drv.compute(self.molecule, basis, scf_results)
+        opt_drv.ostream.unmute()
+
+        self.ostream.print_info('Scan completed.')
+        self.ostream.flush()
+
+        # Change the default file name to the dihedral indices
+        file_path = Path("scan-final.xyz")
+        file_path.rename(f"{reference_dih_name}.xyz")
+
+        # Read the QM scan
+        self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
+
     def reparameterize_dihedrals(self,
                                  rotatable_bond,
                                  scan_file=None,
@@ -1073,8 +1167,11 @@ class MMForceFieldGenerator:
                 if resp_drv.equal_charges is None:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
+                resp_drv.ostream.mute()
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
                                                         'resp')
+                resp_drv.ostream.unmute()
+
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 
@@ -1094,8 +1191,11 @@ class MMForceFieldGenerator:
                 if resp_drv.equal_charges is None:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
+                resp_drv.ostream.mute()
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
                                                         scf_results, 'resp')
+                resp_drv.ostream.unmute()
+
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 
@@ -2028,7 +2128,7 @@ class MMForceFieldGenerator:
         self.ostream.print_info(msg)
         self.ostream.flush()
     
-    def add_dihedral(self, dihedral, barrier=1, phase=0, periodicity=1):
+    def add_dihedral(self, dihedral, barrier=0.0, phase=0, periodicity=1):
         """
         Adds a dihedral to the an existing dihedral in the topology
         converting it in a multiple dihedral.
