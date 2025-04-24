@@ -165,15 +165,12 @@ local_distribute_rest_jk(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -184,15 +181,14 @@ local_distribute_rest_jk(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -207,22 +203,13 @@ local_distribute_rest_jk(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -236,13 +223,13 @@ local_distribute_rest_jk(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // Coulomb contribution (F_pq)
 
@@ -443,15 +430,12 @@ local_distribute_rest_jkx(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -462,15 +446,14 @@ local_distribute_rest_jkx(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -485,22 +468,13 @@ local_distribute_rest_jkx(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -514,13 +488,13 @@ local_distribute_rest_jkx(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // Coulomb contribution (F_pq)
 
@@ -690,15 +664,12 @@ local_distribute_rest_j(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -709,15 +680,14 @@ local_distribute_rest_j(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -732,22 +702,13 @@ local_distribute_rest_j(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -761,13 +722,13 @@ local_distribute_rest_j(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // Coulomb contribution (F_pq)
 
@@ -907,15 +868,12 @@ local_distribute_rest_k(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -926,15 +884,14 @@ local_distribute_rest_k(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -949,22 +906,13 @@ local_distribute_rest_k(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -978,13 +926,13 @@ local_distribute_rest_k(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // Exchange contribution (F_pr)
 
@@ -1147,15 +1095,12 @@ local_distribute_rest_kx(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -1166,15 +1111,14 @@ local_distribute_rest_kx(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -1189,22 +1133,13 @@ local_distribute_rest_kx(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -1218,13 +1153,13 @@ local_distribute_rest_kx(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = factor * curr_buffer[m - ket_range.first];
+                        auto fval = factor * curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // Exchange contribution (F_pr)
 
@@ -1339,7 +1274,6 @@ local_distribute_gen_jk(CMatrices&                       focks,
     auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
 
     auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
-    ;
 
     auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
 
@@ -1425,15 +1359,12 @@ local_distribute_gen_jk(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -1444,15 +1375,14 @@ local_distribute_gen_jk(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -1467,22 +1397,13 @@ local_distribute_gen_jk(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -1496,13 +1417,13 @@ local_distribute_gen_jk(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // precomputed integrals
 
@@ -1608,7 +1529,6 @@ local_distribute_gen_jkx(CMatrices&                       focks,
     auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
 
     auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
-    ;
 
     auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
 
@@ -1694,15 +1614,12 @@ local_distribute_gen_jkx(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -1713,15 +1630,14 @@ local_distribute_gen_jkx(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -1736,22 +1652,13 @@ local_distribute_gen_jkx(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -1765,13 +1672,13 @@ local_distribute_gen_jkx(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // precomputed integrals
 
@@ -1915,15 +1822,12 @@ local_distribute_gen_j(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -1934,15 +1838,14 @@ local_distribute_gen_j(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -1957,22 +1860,13 @@ local_distribute_gen_j(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -1986,13 +1880,13 @@ local_distribute_gen_j(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // precomputed integrals
 
@@ -2063,7 +1957,6 @@ local_distribute_gen_k(CMatrices&                       focks,
     auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
 
     auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
-    ;
 
     auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
 
@@ -2141,15 +2034,12 @@ local_distribute_gen_k(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -2160,15 +2050,14 @@ local_distribute_gen_k(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -2183,22 +2072,13 @@ local_distribute_gen_k(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -2212,13 +2092,13 @@ local_distribute_gen_k(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = curr_buffer[m - ket_range.first];
+                        auto fval = curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // Exchange contributions
 
@@ -2292,7 +2172,6 @@ local_distribute_gen_kx(CMatrices&                       focks,
     auto submat_rp = focks.matrix("RP_" + suffix)->sub_matrix({0, 0});
 
     auto submat_ps = focks.matrix("PS_" + suffix)->sub_matrix({0, 0});
-    ;
 
     auto submat_sp = focks.matrix("SP_" + suffix)->sub_matrix({0, 0});
 
@@ -2370,15 +2249,12 @@ local_distribute_gen_kx(CMatrices&                       focks,
 
         const auto loc_p = i * alocdim + loc_refp;
 
-        for (int j = 0; j < bcomps; j++)
+        // impose angular symmetry on bra side
+
+        const auto j_start = static_cast<int>(refp == refq) * i;
+
+        for (int j = j_start; j < bcomps; j++)
         {
-            // impose angular symmetry on bra side
-
-            if (refp == refq)
-            {
-                if (j < i) continue;
-            }
-
             const auto q = j * bdim + refq;
 
             const auto loc_q = j * blocdim + loc_refq;
@@ -2389,15 +2265,14 @@ local_distribute_gen_kx(CMatrices&                       focks,
                 {
                     auto curr_buffer = buffer.data(offset + i * bcomps * ccomps * dcomps + j * ccomps * dcomps + k * dcomps + l);
 
-                    for (auto m = ket_range.first; m < ket_range.second; m++)
+                    // skip repeating integrals in diagonal block
+
+                    auto m_start = ket_range.first;
+
+                    if (diagonal) m_start = std::max(ket_range.first, bra_igto);
+
+                    for (auto m = m_start; m < ket_range.second; m++)
                     {
-                        // skip repeating integrals in diagonal block
-
-                        if (diagonal)
-                        {
-                            if (m < bra_igto) continue;
-                        }
-
                         // reference indexes on ket side
 
                         const auto refr = c_indices[m + 1];
@@ -2412,22 +2287,13 @@ local_distribute_gen_kx(CMatrices&                       focks,
 
                         // impose angular symmetry on ket side
 
-                        if (refr == refs)
-                        {
-                            if (l < k) continue;
-                        }
+                        double sym_fac = static_cast<double>(!((refr == refs) && (l < k)));
 
                         // impose angular symmetry for itentical bra and ket sides
 
-                        if ((refp == refr) && (refq == refs))
-                        {
-                            if (k < i) continue;
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (k < i)));
 
-                            if (i == k)
-                            {
-                                if (l < j) continue;
-                            }
-                        }
+                        sym_fac *= static_cast<double>(!((refp == refr) && (refq == refs) && (i == k) && (l < j)));
 
                         // compute r and s indexes
 
@@ -2441,13 +2307,13 @@ local_distribute_gen_kx(CMatrices&                       focks,
 
                         // prescale integral for accumulation to Fock matrix
 
-                        auto fval = factor * curr_buffer[m - ket_range.first];
+                        auto fval = factor * curr_buffer[m - ket_range.first] * sym_fac;
 
-                        if (p == q) fval *= 0.5;
+                        fval *= static_cast<double>(!(p == q)) * 0.5 + 0.5;
 
-                        if (r == s) fval *= 0.5;
+                        fval *= static_cast<double>(!(r == s)) * 0.5 + 0.5;
 
-                        if ((p == r) && (q == s)) fval *= 0.5;
+                        fval *= static_cast<double>(!((p == r) && (q == s))) * 0.5 + 0.5;
 
                         // Exchange contributions
 
