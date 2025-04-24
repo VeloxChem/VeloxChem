@@ -31,6 +31,9 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import sys
+
+from .errorhandler import assert_msg_critical
 
 try:
     from scipy.optimize import minimize
@@ -120,7 +123,7 @@ def objective_function_pre(params, G, static_atom_positions, sorted_nodes,
     Returns:
         float: Total distance metric to minimize.
     """
-    num_nodes = len(G.nodes())
+    # num_nodes = len(G.nodes())
     set_rotation_matrices = params.reshape(len(pname_set_dict), 3, 3)
     rotation_matrices = expand_setrots(pname_set_dict, set_rotation_matrices,
                                        sorted_nodes)
@@ -176,7 +179,7 @@ def objective_function_after(params, G, static_atom_positions, sorted_nodes,
     Returns:
         float: Total distance metric to minimize.
     """
-    num_nodes = len(G.nodes())
+    # num_nodes = len(G.nodes())
     set_rotation_matrices = params.reshape(len(pname_set_dict), 3, 3)
     rotation_matrices = expand_setrots(pname_set_dict, set_rotation_matrices,
                                        sorted_nodes)
