@@ -394,10 +394,6 @@ class HessianOrbitalResponse(CphfSolver):
         hessian_first_integral_derivatives = self.comm.reduce(
             hessian_first_integral_derivatives, root=mpi_master())
 
-        #todo atompair
-        # print('hessian_first_integral_derivatives')
-        # print(hessian_first_integral_derivatives)
-
         profiler.stop_timer('1stHess')
 
         dist_cphf_rhs = []
@@ -543,15 +539,8 @@ class HessianOrbitalResponse(CphfSolver):
                                                           distribute=False)
                         dist_cphf_rhs.insert(i * 3 + j, empty_dist_arr)
 
-        #todo atompair
-        # print('dist_cphf_rhs')
-        # print(dist_cphf_rhs)
-
         hessian_eri_overlap = self.comm.reduce(hessian_eri_overlap,
                                                root=mpi_master())
-        #todo atompair
-        # print('hessian_eri_overlap')
-        # print(hessian_eri_overlap)
 
         t2 = tm.time()
 

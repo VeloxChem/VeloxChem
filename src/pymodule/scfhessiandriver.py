@@ -395,13 +395,7 @@ class ScfHessianDriver(HessianDriver):
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
-        #todo atompair
-        # print('dist_cphf_ov:')
-        # print(np.array([arr.data for arr in dist_cphf_ov]))
-
-        # print('dist_cphf_rhs:')
-        # print(np.array([arr.data for arr in dist_cphf_rhs]))
-
+        
         hessian_first_integral_derivatives = cphf_solution_dict[
             'hessian_first_integral_derivatives']
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
@@ -444,27 +438,13 @@ class ScfHessianDriver(HessianDriver):
 
         hessian_cphf_coeff_rhs = self.comm.reduce(hessian_cphf_coeff_rhs,
                                                   root=mpi_master())
-        # #todo atompair
-        # print('hessian_cphf_coeff_rhs:')
-        # print(hessian_cphf_coeff_rhs.reshape(natm * 3, natm * 3))
-        # print('hessian first integral derivatives:')
-        # print(hessian_first_integral_derivatives.reshape(natm * 3, natm * 3))
-        # print('hessian eri overlap:')
-        # print(hessian_eri_overlap.reshape(natm * 3, natm * 3))
-
-        # print('first integral derivatives:\n', hessian_first_integral_derivatives)
-        # print('eri overlap:\n', hessian_eri_overlap)
-
+        
         if self.rank == mpi_master():
             hessian_first_order_derivatives = (
                 hessian_cphf_coeff_rhs + hessian_first_integral_derivatives +
                 hessian_eri_overlap)
         else:
             hessian_first_order_derivatives = None
-
-        # #todo atompair
-        # print('first order derivatives:')
-        # print(hessian_first_order_derivatives)
 
         self.ostream.print_info('First order derivative contributions' +
                                 ' to the Hessian computed in' +
@@ -542,10 +522,7 @@ class ScfHessianDriver(HessianDriver):
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
         # TODO: use alternative way to partition atoms
-        # todo only do atoms in atom pairs
-        if atom_pairs is not None:
-            atoms = atom_pair_atoms
-        else:
+        if atom_pairs is None
             atoms = list(range(natm))
         local_atoms = atoms[self.rank::self.nodes]
 
@@ -636,9 +613,6 @@ class ScfHessianDriver(HessianDriver):
             all_atom_pairs = atom_pairs
             for i in atom_pair_atoms:
                 all_atom_pairs.append((i, i))
-            # for pair in all_atom_pairs:
-            #     if pair[0] in atom_pair_atoms and pair[1] in atom_pair_atoms:
-            #         all_atom_pairs_subset.append(pair)
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
 
         for i, j in local_atom_pairs:
@@ -742,10 +716,6 @@ class ScfHessianDriver(HessianDriver):
         hessian_2nd_order_derivatives = self.comm.reduce(
             hessian_2nd_order_derivatives, root=mpi_master())
 
-        # #todo atompair
-        # print('2nd order derivatives:')
-        # print(hessian_2nd_order_derivatives)
-
         # DFT:
         if self._dft:
             grid_drv = GridDriver(self.comm)
@@ -767,7 +737,6 @@ class ScfHessianDriver(HessianDriver):
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
         # nuclei-point charges contribution
-        #todo atompairs, this needs to be verified
         if self.scf_driver.point_charges is not None:
 
             hessian_point_charges = np.zeros((natm, natm, 3, 3))
@@ -776,67 +745,72 @@ class ScfHessianDriver(HessianDriver):
             nuclear_charges = molecule.get_element_ids()
 
             for i in range(self.rank, natm, self.nodes):
-                if atom_pairs is None or i in atom_pair_atoms:
-                    q_i = nuclear_charges[i]
-                    xyz_i = qm_coords[i]
+                if atom_pairs is not None:
+                    if i not in atoms:
+                        continue
+                
+                q_i = nuclear_charges[i]
+                xyz_i = qm_coords[i]
 
-                    for j in range(len(mm_charges)):
-                        q_j = mm_charges[j]
-                        xyz_j = mm_coords[j]
+                for j in range(len(mm_charges)):
+                    q_j = mm_charges[j]
+                    xyz_j = mm_coords[j]
 
-                        vec_ij = xyz_j - xyz_i
-                        rij = np.linalg.norm(vec_ij)
+                    vec_ij = xyz_j - xyz_i
+                    rij = np.linalg.norm(vec_ij)
 
-                        hess_ii = q_i * q_j * (3.0 * np.outer(vec_ij, vec_ij) /
-                                               rij**5 - np.eye(3) / rij**3)
+                    hess_ii = q_i * q_j * (3.0 * np.outer(vec_ij, vec_ij) /
+                                            rij**5 - np.eye(3) / rij**3)
 
-                        hessian_point_charges[i, i, :, :] += hess_ii
+                    hessian_point_charges[i, i, :, :] += hess_ii
 
             if self.scf_driver.qm_vdw_params is not None:
 
                 for i in range(self.rank, natm, self.nodes):
-                    if atom_pairs is None or i in atom_pair_atoms:
+                    if atom_pairs is not None:
+                        if i not in atoms:
+                            continue
 
-                        xyz_i = qm_coords[i]
-                        sigma_i = self.scf_driver.qm_vdw_params[i, 0]
-                        epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
+                    xyz_i = qm_coords[i]
+                    sigma_i = self.scf_driver.qm_vdw_params[i, 0]
+                    epsilon_i = self.scf_driver.qm_vdw_params[i, 1]
 
-                        for j in range(len(mm_charges)):
-                            xyz_j = self.scf_driver.point_charges[:3, j]
-                            sigma_j = self.scf_driver.point_charges[4, j]
-                            epsilon_j = self.scf_driver.point_charges[5, j]
+                    for j in range(len(mm_charges)):
+                        xyz_j = self.scf_driver.point_charges[:3, j]
+                        sigma_j = self.scf_driver.point_charges[4, j]
+                        epsilon_j = self.scf_driver.point_charges[5, j]
 
-                            vec_ij = xyz_j - xyz_i
+                        vec_ij = xyz_j - xyz_i
 
-                            # convert vector to nm
-                            vec_ij *= bohr_in_angstrom() * 0.1
+                        # convert vector to nm
+                        vec_ij *= bohr_in_angstrom() * 0.1
 
-                            epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
-                            sigma_ij = 0.5 * (sigma_i + sigma_j)
+                        epsilon_ij = np.sqrt(epsilon_i * epsilon_j)
+                        sigma_ij = 0.5 * (sigma_i + sigma_j)
 
-                            if epsilon_ij == 0.0:
-                                continue
+                        if epsilon_ij == 0.0:
+                            continue
 
-                            rij = np.linalg.norm(vec_ij)
-                            inv_r2 = 1.0 / rij**2
-                            inv_r4 = inv_r2**2
+                        rij = np.linalg.norm(vec_ij)
+                        inv_r2 = 1.0 / rij**2
+                        inv_r4 = inv_r2**2
 
-                            sigma_r_6 = (sigma_ij / rij)**6
-                            sigma_r_12 = sigma_r_6**2
+                        sigma_r_6 = (sigma_ij / rij)**6
+                        sigma_r_12 = sigma_r_6**2
 
-                            coef_rr = (28.0 * sigma_r_12 -
-                                       8.0 * sigma_r_6) * inv_r4
-                            coef_I = (2.0 * sigma_r_12 - sigma_r_6) * inv_r2
+                        coef_rr = (28.0 * sigma_r_12 -
+                                    8.0 * sigma_r_6) * inv_r4
+                        coef_I = (2.0 * sigma_r_12 - sigma_r_6) * inv_r2
 
-                            hess_ii = 24.0 * epsilon_ij * (
-                                coef_rr * np.outer(vec_ij, vec_ij) -
-                                coef_I * np.eye(3))
+                        hess_ii = 24.0 * epsilon_ij * (
+                            coef_rr * np.outer(vec_ij, vec_ij) -
+                            coef_I * np.eye(3))
 
-                            # convert hessian to atomic unit
-                            hess_ii /= (hartree_in_kjpermol() *
-                                        (10.0 / bohr_in_angstrom())**2)
+                        # convert hessian to atomic unit
+                        hess_ii /= (hartree_in_kjpermol() *
+                                    (10.0 / bohr_in_angstrom())**2)
 
-                            hessian_point_charges[i, i, :, :] += hess_ii
+                        hessian_point_charges[i, i, :, :] += hess_ii
 
             hessian_point_charges = self.comm.reduce(hessian_point_charges,
                                                      root=mpi_master())
@@ -858,16 +832,6 @@ class ScfHessianDriver(HessianDriver):
                 hessian_first_order_derivatives +
                 hessian_2nd_order_derivatives.transpose(0, 2, 1, 3) +
                 hessian_nuclear_nuclear.transpose(0, 2, 1, 3))
-
-            #todo atompair
-            # print('first order derivatives:')
-            # print(hessian_first_order_derivatives.reshape(natm * 3, natm * 3))
-            # print('2nd order derivatives:')
-            # print(hessian_2nd_order_derivatives.transpose(0, 2, 1, 3).reshape(natm*3,natm*3))
-            # print('nuclear nuclear:')
-            # print(
-            #     hessian_nuclear_nuclear.transpose(0, 2, 1, 3).reshape(
-            #         natm * 3, natm * 3))
 
             if self.scf_driver.point_charges is not None:
                 self.hessian += hessian_point_charges.transpose(0, 2, 1, 3)
