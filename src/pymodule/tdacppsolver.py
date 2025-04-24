@@ -1257,6 +1257,7 @@ class ComplexResponseTDA(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+        ostream.flush()
 
     def _print_ecd_results(self, rsp_results, ostream=None):
         """
@@ -1313,6 +1314,7 @@ class ComplexResponseTDA(LinearSolver):
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
+        ostream.flush()
 
     def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """

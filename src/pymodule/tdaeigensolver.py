@@ -65,6 +65,9 @@ class TdaEigenSolver(LinearSolver):
     Implements TDA excited states computation schheme for Hartree-Fock/Kohn-Sham
     level of theory.
 
+    # vlxtag: RHF, Absorption, ECD, CIS
+    # vlxtag: RKS, Absorption, ECD, TDA
+
     :param comm:
         The MPI communicator.
     :param ostream:

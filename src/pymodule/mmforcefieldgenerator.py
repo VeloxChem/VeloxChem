@@ -64,6 +64,8 @@ class MMForceFieldGenerator:
     """
     Parameterizes general Amber force field and creates Gromacs topologies.
 
+    # vlxtag: RKS, MM_Force_Field_Generation
+
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -2649,8 +2651,8 @@ class MMForceFieldGenerator:
 
             attributes = {
                 # Name is the atom type_molname
-                "name": atom['name'],
-                "class": str(i + 1),
+                "name": atom['name'] + f'_{mol_name}',
+                "class": str(i + 1) + f'_{mol_name}',
                 "element": element,
                 "mass": str(atom['mass'])
             }
@@ -2663,7 +2665,7 @@ class MMForceFieldGenerator:
             ET.SubElement(Residue,
                           "Atom",
                           name=atom_data['name'],
-                          type=atom_data['name'],
+                          type=atom_data['name'] + f'_{mol_name}',
                           charge=str(atom_data['charge']))
         for bond_id, bond_data in self.bonds.items():
             ET.SubElement(Residue,
@@ -2675,8 +2677,8 @@ class MMForceFieldGenerator:
         Bonds = ET.SubElement(ForceField, "HarmonicBondForce")
         for bond_id, bond_data in self.bonds.items():
             attributes = {
-                "class1": str(bond_id[0] + 1),
-                "class2": str(bond_id[1] + 1),
+                "class1": str(bond_id[0] + 1) + f'_{mol_name}',
+                "class2": str(bond_id[1] + 1) + f'_{mol_name}',
                 "length": str(bond_data['equilibrium']),
                 "k": str(bond_data['force_constant'])
             }
@@ -2686,9 +2688,9 @@ class MMForceFieldGenerator:
         Angles = ET.SubElement(ForceField, "HarmonicAngleForce")
         for angle_id, angle_data in self.angles.items():
             attributes = {
-                "class1": str(angle_id[0] + 1),
-                "class2": str(angle_id[1] + 1),
-                "class3": str(angle_id[2] + 1),
+                "class1": str(angle_id[0] + 1) + f'_{mol_name}',
+                "class2": str(angle_id[1] + 1) + f'_{mol_name}',
+                "class3": str(angle_id[2] + 1) + f'_{mol_name}',
                 "angle": str(angle_data['equilibrium'] * np.pi / 180),
                 "k": str(angle_data['force_constant'])
             }
@@ -2701,10 +2703,10 @@ class MMForceFieldGenerator:
             # Not multiple dihedrals has periodicity1, phase1, k1
             if not dihedral_data['multiple']:
                 attributes = {
-                    "class1": str(dihedral_id[0] + 1),
-                    "class2": str(dihedral_id[1] + 1),
-                    "class3": str(dihedral_id[2] + 1),
-                    "class4": str(dihedral_id[3] + 1),
+                    "class1": str(dihedral_id[0] + 1) + f'_{mol_name}',
+                    "class2": str(dihedral_id[1] + 1) + f'_{mol_name}',
+                    "class3": str(dihedral_id[2] + 1) + f'_{mol_name}',
+                    "class4": str(dihedral_id[3] + 1) + f'_{mol_name}',
                     "periodicity1": str(dihedral_data['periodicity']),
                     "phase1": str(dihedral_data['phase'] * np.pi / 180),
                     "k1": str(dihedral_data['barrier'])
@@ -2717,10 +2719,10 @@ class MMForceFieldGenerator:
                 
                 # One set of classes
                 attributes = {
-                    "class1": str(dihedral_id[0] + 1),
-                    "class2": str(dihedral_id[1] + 1),
-                    "class3": str(dihedral_id[2] + 1),
-                    "class4": str(dihedral_id[3] + 1),
+                    "class1": str(dihedral_id[0] + 1) + f'_{mol_name}',
+                    "class2": str(dihedral_id[1] + 1) + f'_{mol_name}',
+                    "class3": str(dihedral_id[2] + 1) + f'_{mol_name}',
+                    "class4": str(dihedral_id[3] + 1) + f'_{mol_name}',
                 }
                 # Multiple sets of periodicity, phase, k
                 for i in range(len(dihedral_data['periodicity'])):
@@ -2739,10 +2741,10 @@ class MMForceFieldGenerator:
             # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
 
             attributes = {
-                "class1": str(improper_id[1] + 1),
-                "class2": str(improper_id[0] + 1),
-                "class3": str(improper_id[2] + 1),
-                "class4": str(improper_id[3] + 1),
+                "class1": str(improper_id[1] + 1) + f'_{mol_name}',
+                "class2": str(improper_id[0] + 1) + f'_{mol_name}',
+                "class3": str(improper_id[2] + 1) + f'_{mol_name}',
+                "class4": str(improper_id[3] + 1) + f'_{mol_name}',
                 "periodicity1": str(improper_data['periodicity']),
                 "phase1": str(improper_data['phase'] * np.pi / 180),
                 "k1": str(improper_data['barrier'])
@@ -2756,7 +2758,7 @@ class MMForceFieldGenerator:
                                        lj14scale=str(self.fudgeLJ))
         for atom_id, atom_data in self.atoms.items():
             attributes = {
-                "type": atom_data['name'],
+                "type": atom_data['name'] + f'_{mol_name}',
                 "charge": str(atom_data['charge']),
                 "sigma": str(atom_data['sigma']),
                 "epsilon": str(atom_data['epsilon'])

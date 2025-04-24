@@ -2,11 +2,6 @@
 # the unit test executable
 add_library(vlxobjs OBJECT)
 
-target_compile_definitions(vlxobjs
-  PUBLIC
-    $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
-  )
-
 if(WIN32)
   target_compile_definitions(vlxobjs
     PUBLIC

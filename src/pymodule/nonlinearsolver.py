@@ -34,14 +34,19 @@ from mpi4py import MPI
 import numpy as np
 import time as tm
 import math
+import sys
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import SubMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
+from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
+from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
@@ -51,6 +56,11 @@ from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
 
 
 class NonlinearSolver:
@@ -98,6 +108,11 @@ class NonlinearSolver:
         # ERI settings
         self.eri_thresh = 1.0e-15
         self.batch_size = None
+
+        # RI-J
+        self.ri_coulomb = False
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_drv = None
 
         # dft
         self._dft = False
@@ -166,6 +181,8 @@ class NonlinearSolver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             },
@@ -299,6 +316,12 @@ class NonlinearSolver:
         else:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
+
+        if self.ri_coulomb:
+            self._ri_drv = RIFockDriver(self.comm, self.ostream)
+            self._ri_drv.prepare_buffers(molecule, basis,
+                                         self.ri_auxiliary_basis,
+                                         verbose=False)
 
         return {
             'screening': screening,
@@ -828,11 +851,25 @@ class NonlinearSolver:
             fock_arrays = []
 
             for idx in range(len(dts_for_fock)):
-                den_mat = make_matrix(ao_basis, mat_t.general)
-                den_mat.set_values(dts_for_fock[idx])
+                if self.ri_coulomb:
+                    assert_msg_critical(
+                        fock_type == 'j',
+                        'NonlinearSolver: RI is only applicable to pure DFT functional'
+                    )
 
-                fock_mat = fock_drv.compute(screening, den_mat, fock_type,
-                                            fock_k_factor, 0.0, thresh_int)
+                if self.ri_coulomb and fock_type == 'j':
+                    # symmetrize density for RI-J
+                    den_mat_for_ri_j = make_matrix(ao_basis, mat_t.symmetric)
+                    den_mat_for_ri_j.set_values(
+                        0.5 * (dts_for_fock[idx] + dts_for_fock[idx].T))
+
+                    fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+                else:
+                    den_mat = make_matrix(ao_basis, mat_t.general)
+                    den_mat.set_values(dts_for_fock[idx])
+
+                    fock_mat = fock_drv.compute(screening, den_mat, fock_type,
+                                                fock_k_factor, 0.0, thresh_int)
 
                 fock_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -984,6 +1021,7 @@ class NonlinearSolver:
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_fock_time(self, time):
         """
@@ -1025,6 +1063,10 @@ class NonlinearSolver:
         cur_str = 'Damping Parameter               : {:.6e}'.format(
             self.damping)
         self.ostream.print_header(cur_str.ljust(width))
+
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

@@ -8,6 +8,7 @@ from veloxchem.evbdriver import EvbDriver
 from veloxchem.evbffbuilder import EvbForceFieldBuilder
 from veloxchem.evbsystembuilder import EvbSystemBuilder
 from veloxchem.evbdataprocessing import EvbDataProcessing
+from veloxchem.xtbdriver import XtbDriver
 
 try:
     import openmm as mm
@@ -15,10 +16,11 @@ except ImportError:
     pass
 
 
+@pytest.mark.skipif(('openmm' not in sys.modules) or (not XtbDriver.is_available()),
+                    reason='openmm or xtb-python not available')
+@pytest.mark.timeconsuming
 class TestEvb:
 
-    @pytest.mark.skipif('openmm' not in sys.modules, reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_forcefield_builder(self):
         # build reactant and product forcefields from unordered xyz inputs and compare outputs with reference
         ffbuilder = EvbForceFieldBuilder()
@@ -133,8 +135,6 @@ class TestEvb:
             else:
                 assert val1 == val2
 
-    @pytest.mark.skipif('openmm' not in sys.modules, reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_system_builder(self):
         data_path = Path(__file__).parent / 'data'
         # load forcefields
@@ -210,8 +210,6 @@ class TestEvb:
             return result
         return False
 
-    @pytest.mark.skipif('openmm' not in sys.modules, reason='openmm not available')
-    @pytest.mark.timeconsuming
     def test_data_processing(self):
         # Load simulation data
         input_results = {}
