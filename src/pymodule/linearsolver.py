@@ -163,7 +163,8 @@ class LinearSolver:
         self.cpcm_drv = None
         self.cpcm_epsilon = 78.39
         self.cpcm_optical_epsilon = 1.777849
-        self.cpcm_grid_per_sphere = 194
+        self.cpcm_grid_per_sphere = (194, 110)
+        self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
         self.cpcm_custom_vdw_radii = None
 
@@ -260,7 +261,9 @@ class LinearSolver:
                 'electric_field': ('seq_fixed', 'static electric field'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
-                    ('int', 'number of grid points per sphere (C-PCM)'),
+                    ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
+                'cpcm_cg_thresh':
+                    ('float', 'threshold for solving C-PCM charges'),
                 'cpcm_epsilon':
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_optical_epsilon':
@@ -527,11 +530,32 @@ class LinearSolver:
             self.ostream.print_reference(iswig_ref)
             self.ostream.print_blank()
             self.ostream.flush()
+
             self.cpcm_drv = CpcmDriver(self.comm, self.ostream)
+
+            self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
+            self.cpcm_drv.epsilon = self.cpcm_epsilon
+            self.cpcm_drv.x = self.cpcm_x
+            self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
+
+            cpcm_grid_t0 = tm.time()
+
             (self._cpcm_grid,
              self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
-            self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
+
+            cpcm_local_precond = self.cpcm_drv.form_local_precond(
                 self._cpcm_grid, self._cpcm_sw_func)
+
+            self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
+            self._cpcm_precond = np.hstack(self._cpcm_precond)
+
+            self._cpcm_q = None
+
+            self.ostream.print_info(
+                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
+                + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def _read_checkpoint(self, rsp_vector_labels):
         """
@@ -1481,6 +1505,9 @@ class LinearSolver:
 
 
         if self._cpcm:
+
+            t0 = tm.time()
+
             for idx in range(num_densities):
                 Cvec = self.cpcm_drv.form_vector_C(molecule, basis,
                                                         self._cpcm_grid,
@@ -1493,17 +1520,23 @@ class LinearSolver:
                         scale_f = -(self.cpcm_drv.epsilon - 1) / (
                                     self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (Cvec)
-                    self._cpcm_q = safe_solve(self._cpcm_Amat, rhs)
                 else:
-                    self._cpcm_q = None
+                    rhs = None
 
-                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+                rhs = self.comm.bcast(rhs, root=mpi_master())
+
+                self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
+                    rhs, self._cpcm_q, self.cpcm_cg_thresh)
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
                             molecule, basis, self._cpcm_grid, self._cpcm_q)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol
+
+            if profiler is not None:
+                profiler.add_timing_info('FockCPCM', tm.time() - t0)
 
 
         for idx in range(len(fock_arrays)):
@@ -1687,14 +1720,17 @@ class LinearSolver:
             cur_str = 'Solvation Model                 : '
             cur_str += 'C-PCM'
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'C-PCM Dielectric Constant       : '
-            cur_str += f'{self.cpcm_epsilon}'
+            cur_str = 'C-PCM Points per Hydrogen Sphere: '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere[1]}'
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'C-PCM Points per Atomic Sphere  : '
-            cur_str += f'{self.cpcm_grid_per_sphere}'
+            cur_str = 'C-PCM Points per non-H Sphere   : '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere[0]}'
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Non-Equilibrium solvation       : '
             cur_str += f'{self.non_equilibrium_solv}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Dielectric Constant       : '
+            cur_str += f'{self.cpcm_epsilon}'
             self.ostream.print_header(cur_str.ljust(str_width))
             if self.non_equilibrium_solv:
                 cur_str = 'C-PCM Optical Dielectric Constant: '
