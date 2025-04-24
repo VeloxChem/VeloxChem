@@ -40,7 +40,6 @@ import re
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from .mofoptimizer import (
-    optimize_rotations_pre,
     optimize_rotations_after,
     apply_rotations_to_atom_positions,
     apply_rotations_to_Xatoms_positions,
@@ -126,7 +125,7 @@ def read_mof_top_dict(data_path):
         mof_top_dict_path = str(Path(data_path, "MOF_topology_dict"))
         with open(mof_top_dict_path, "r") as f:
             lines = f.readlines()
-        titles = lines[0].split()
+        # titles = lines[0].split()
         mofs = lines[1:]
     mof_top_dict = {}
     for mof in mofs:
@@ -944,7 +943,7 @@ def find_center_nodes_pair(lG, center_nodes):
     # loop each pair to find center pair
     for p in pairs:
         a = p[0]
-        b = p[1]
+        # b = p[1]
         ds = []
         for n in centers:
             if n not in p:
@@ -1218,14 +1217,14 @@ def process_linker_molecule(
             coords,
             mass_center_angstrom,
         )
-        center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
-        subgraph_center_frag_edges = list(subgraph_center_frag.edges)
+        # center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
+        # subgraph_center_frag_edges = list(subgraph_center_frag.edges)
         # plot2dedge(lG,coords,subgraph_center_frag_edges,True)
         # plot2dedge(lG,coords,subgraph_center_frag_edges,False)
         pairXs = get_pairX_outer_frag(connected_pairXs, outer_frag_nodes)
         subgraph_single_frag = cleave_outer_frag_subgraph(lG, pairXs, outer_frag_nodes)
         rows, frag_Xs = lines_of_single_frag(subgraph_single_frag, Xs_indices)
-        single_frag_bonds = get_bonds_from_subgraph(subgraph_single_frag, Xs_indices)
+        # single_frag_bonds = get_bonds_from_subgraph(subgraph_single_frag, Xs_indices)
         if linker_topic == 3:
             print(
                 "linker_center_frag:", subgraph_center_frag.number_of_nodes(), center_Xs
@@ -1282,7 +1281,7 @@ def process_linker_molecule(
         pairXs = Xs_indices
         print("pairXs:", pairXs)
         subgraph_center_frag = cleave_outer_frag_subgraph(lG, pairXs, lG.nodes)
-        subgraph_center_frag_edges = list(subgraph_center_frag.edges)
+        # subgraph_center_frag_edges = list(subgraph_center_frag.edges)
         # plot2dedge(lG,coords,subgraph_center_frag_edges,True)
         # plot2dedge(subgraph_center_frag,coords,subgraph_center_frag_edges,False)
         lines, center_Xs = lines_of_center_frag(
@@ -1293,7 +1292,7 @@ def process_linker_molecule(
             coords,
             mass_center_angstrom,
         )
-        center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
+        # center_frag_bonds = get_bonds_from_subgraph(subgraph_center_frag, Xs_indices)
         # create_cif(lines,center_frag_bonds,'edges','diedge.cif')
         edge_pdb_name = str(Path(save_edges_dir, "diedge"))
         create_pdb(edge_pdb_name, lines)
@@ -3071,7 +3070,7 @@ def make_dummy_split_node_dict(dummy_node_name):
     dict_path = dummy_node_name.split(".")[0] + "_dict"
     with open(dict_path, "r") as f:
         lines = f.readlines()
-    node_res_counts = 0
+    # node_res_counts = 0
     for li in lines:
         li = li.strip("\n")
         key = li[:20].strip(" ")
@@ -3152,7 +3151,7 @@ def convert_node_array_to_gro_lines(array, line_num_start, res_num_start):
         ind_inres = i + 1
         name = line[1]
         value_atom_number_in_gro = int(ind_inres + line_num_start)  # atom_number
-        value_label = re.sub("\d", "", line[2]) + str(ind_inres)  # atom_label
+        value_label = re.sub(r"\d", "", line[2]) + str(ind_inres)  # atom_label
         value_resname = str(name)[0:3]  # +str(eG.nodes[n]['index'])  # residue_name
         value_resnumber = int(res_num_start + int(line[0]))  # residue number
         value_x = 0.1 * float(line[3])  # x
@@ -3560,7 +3559,7 @@ class NetOptimizer:
         node_xcoords = self.node_x_ccoords
         node_coords = self.node_ccoords
         linker_length = self.linker_length
-        opt_method = self.opt_method
+        # opt_method = self.opt_method
 
         constant_length = self.constant_length
 
