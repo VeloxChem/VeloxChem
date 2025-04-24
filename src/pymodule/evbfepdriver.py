@@ -89,6 +89,8 @@ class EvbFepDriver():
         self.report_forcegroups: bool = True
         self.debug: bool = False
         self.save_frames: int = 1000
+        self.variable_integrator: bool = True
+        self.error_tol: float = 0.001
 
     def run_FEP(
         self,
@@ -171,7 +173,7 @@ class EvbFepDriver():
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
 
-            equil_state = self._minimise_and_equiliberate(system, l,positions)
+            equil_state = self._minimise_and_equiliberate(system, l, positions)
 
             if self.constrain_H:
                 info = "Removing constraints involving H atoms"
@@ -183,27 +185,15 @@ class EvbFepDriver():
             positions = state.getPositions()
         self.ostream.flush()
 
-    def _minimise_and_equiliberate(self,system,l,positions):
-        equil_integrator = mm.LangevinMiddleIntegrator(
-            self.integrator_temperature,
-            self.integrator_friction_coeff,
-            self.equil_step_size * mmunit.picoseconds,
+    def _minimise_and_equiliberate(self, system, l, positions):
+        equil_integrator = self._get_integrator(
+            step_size=self.equil_step_size,
         )
-        equil_integrator.setIntegrationForceGroups(
-            EvbForceGroup.integration_force_groups())
-        if self.platform is not None:
-            equil_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                equil_integrator,
-                mm.Platform.getPlatformByName(self.platform),
-            )
-        else:
-            equil_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                equil_integrator,
-            )
+        equil_simulation = self._get_simulation(
+            system,
+            equil_integrator,
+        )
+
         equil_simulation.context.setPositions(positions)
 
         if l == 0:
@@ -251,38 +241,58 @@ class EvbFepDriver():
         sz = self.equil_step_size * mmunit.picoseconds
         equil_simulation.integrator.setStepSize(sz)
         self.ostream.print_info(f"Equilibration with step size {sz}")
-        if l ==0:
+        if l == 0:
             if self.NPT:
-                self.ostream.print_info(f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps")
+                self.ostream.print_info(
+                    f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
+                )
                 self.ostream.flush()
-                equil_simulation.integrator.setIntegrationForceGroups(EvbForceGroup.NVT_integration_force_groups())
-                equil_simulation.step(self.initial_equil_NVT_steps)
-                self.ostream.print_info(f"Running initial NPT equilibration for {self.initial_equil_NPT_steps} steps")
+                equil_simulation.integrator.setIntegrationForceGroups(
+                    EvbForceGroup.NVT_integration_force_groups())
+                self._safe_step(equil_simulation, self.initial_equil_NVT_steps)
+
+                self.ostream.print_info(
+                    f"Running initial NPT equilibration for {self.initial_equil_NPT_steps} steps"
+                )
                 self.ostream.flush()
-                equil_simulation.integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
-                equil_simulation.step(self.initial_equil_NPT_steps)
+                equil_simulation.integrator.setIntegrationForceGroups(
+                    EvbForceGroup.integration_force_groups())
+                self._safe_step(equil_simulation, self.initial_equil_NPT_steps)
+
             else:
-                self.ostream.print_info(f"Running initial equilibration for {self.initial_equil_NVT_steps+self.initial_equil_NPT_steps} steps")
+                self.ostream.print_info(
+                    f"Running initial equilibration for {self.initial_equil_NVT_steps+self.initial_equil_NPT_steps} steps"
+                )
                 self.ostream.flush()
-                equil_simulation.integrator.setIntegrationForceGroups(EvbForceGroup.integration_force_groups())
-                equil_simulation.step(self.initial_equil_NVT_steps+self.initial_equil_NPT_steps)
+                equil_simulation.integrator.setIntegrationForceGroups(
+                    EvbForceGroup.integration_force_groups())
+                self._safe_step(
+                    equil_simulation,
+                    self.initial_equil_NVT_steps + self.initial_equil_NPT_steps)
 
         if self.NPT:
             self.ostream.print_info(
-                f"Running NVT equilibration for {self.equil_NVT_steps} steps"
-            )
+                f"Running NVT equilibration for {self.equil_NVT_steps} steps")
             self.ostream.flush()
             equil_simulation.integrator.setIntegrationForceGroups(
                 EvbForceGroup.NVT_integration_force_groups())
-            equil_simulation.step(self.equil_NVT_steps)
+            self._safe_step(equil_simulation, self.equil_NVT_steps)
 
             self.ostream.print_info(
-                f"Running NPT equilibration for {self.equil_NPT_steps} steps"
+                f"Running NPT equilibration for {self.equil_NPT_steps} steps")
+            self.ostream.flush()
+            equil_simulation.integrator.setIntegrationForceGroups(
+                EvbForceGroup.integration_force_groups())
+            self._safe_step(equil_simulation, self.equil_NPT_steps)
+        else:
+            self.ostream.print_info(
+                f"Running equilibration for {self.equil_NVT_steps+self.equil_NPT_steps} steps"
             )
             self.ostream.flush()
             equil_simulation.integrator.setIntegrationForceGroups(
                 EvbForceGroup.integration_force_groups())
-            equil_simulation.step(self.equil_NPT_steps)
+            self._safe_step(equil_simulation,
+                            self.equil_NVT_steps + self.equil_NPT_steps)
 
         equil_state = equil_simulation.context.getState(
             getPositions=True,
@@ -304,28 +314,15 @@ class EvbFepDriver():
 
         return equil_state
 
-    def _sample(self,system,l,initial_state):
-        run_integrator = mm.LangevinMiddleIntegrator(
-            self.integrator_temperature,
-            self.integrator_friction_coeff,
-            self.equil_step_size * mmunit.picoseconds,
+    def _sample(self, system, l, initial_state):
+        run_integrator = self._get_integrator(
+            step_size=self.step_size,
         )
-        run_integrator.setIntegrationForceGroups(
-            EvbForceGroup.integration_force_groups())
 
-        if self.platform is not None:
-            run_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                run_integrator,
-                mm.Platform.getPlatformByName(self.platform),
-            )
-        else:
-            run_simulation = mmapp.Simulation(
-                self.topology,
-                system,
-                run_integrator,
-            )
+        run_simulation = self._get_simulation(
+            system,
+            run_integrator,
+        )
 
         run_simulation.reporters.append(self.traj_roporter)
         sz = self.step_size * mmunit.picoseconds
@@ -384,6 +381,46 @@ class EvbFepDriver():
         self.ostream.flush()
         states = self._safe_step(run_simulation, self.total_sample_steps)
         return states[-1]
+
+    def _get_simulation(self, system, integrator):
+        if self.platform is not None:
+            run_simulation = mmapp.Simulation(
+                self.topology,
+                system,
+                integrator,
+                mm.Platform.getPlatformByName(self.platform),
+            )
+        else:
+            run_simulation = mmapp.Simulation(
+                self.topology,
+                system,
+                integrator,
+            )
+            
+        return run_simulation
+
+    def _get_integrator(self, step_size=None, variable_integrator=None):
+        if variable_integrator is None:
+            variable_integrator = self.variable_integrator
+        
+        if not variable_integrator:
+            assert step_size is not None, "step_size must be set if variable_integrator is False"
+
+        if variable_integrator:
+            integrator = mm.VariableLangevinIntegrator(
+                self.integrator_temperature,
+                self.integrator_friction_coeff,
+                self.error_tol,
+            )
+        else:
+            integrator = mm.LangevinIntegrator(
+                self.integrator_temperature,
+                self.integrator_friction_coeff,
+                self.step_size * mmunit.picoseconds,
+            )
+        integrator.setIntegrationForceGroups(
+            EvbForceGroup.integration_force_groups())
+        return integrator
 
     def _constrain_H_bonds(self, system):
         harm_bond_forces = [
@@ -449,15 +486,15 @@ class EvbFepDriver():
                 states.pop(0)
 
             # if pot > 0 and not potwarning:
-                
+
             #     self.ostream.print_warning(
             #         f"Potential energy is positive: {pot:.5f} kJ/mol."
             #     )
             #     potwarning = True
-                # self._save_states(states, simulation, i)
-                # raise RuntimeError(
-                #     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
-                # )
+            # self._save_states(states, simulation, i)
+            # raise RuntimeError(
+            #     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
+            # )
 
         return states
 

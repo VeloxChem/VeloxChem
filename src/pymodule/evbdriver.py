@@ -170,8 +170,9 @@ class EvbDriver():
         optimize: bool = False,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] = [],
+        name = None,
     ):
-
+        self.name = name
         cwd = Path().cwd()
         input_path = cwd / self.input_folder
         if not input_path.exists():
@@ -249,20 +250,12 @@ class EvbDriver():
         breaking_bonds: list[tuple[int, int]] = [],
         save_output: bool = True,
     ):
-        #todo
-        # assigning charges and multiplicities to molecules
-        # validation input of (partial) charges
-        # combined molecules
         if isinstance(reactant, list):
             combined_reactant_name = '_'.join(reactant)
         else:
             combined_reactant_name = reactant
+        self.name = combined_reactant_name
         combined_rea_input = self._get_input_files(combined_reactant_name)
-        # self._process_file_input(
-        #     combined_reactant_name,
-        #     reactant_charge,
-        #     reactant_multiplicity,
-        # )[0]
 
         if isinstance(product, list):
             combined_product_name = '_'.join(product)
@@ -591,14 +584,14 @@ class EvbDriver():
         assert all(
             isinstance(conf, dict) for conf in configurations
         ), "Configurations must be a list of strings or a list of dictionaries"
-        configurations: list[dict] = configurations  # type: ignore
+        self.configurations: list[dict] = configurations  # type: ignore
         if constraints is None:
             constraints = []
         if isinstance(constraints, dict):
             constraints = [constraints]
 
         #Per configuration
-        for conf in configurations:
+        for conf in self.configurations:
             #create folders,
             if save_output:
                 data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
@@ -635,6 +628,7 @@ class EvbDriver():
                 self.save_systems_as_xml(systems, conf["run_folder"])
 
                 top_path = cwd / data_folder / "topology.pdb"
+
                 mmapp.PDBFile.writeFile(
                     topology,
                     initial_positions *
@@ -881,7 +875,7 @@ class EvbDriver():
             equil_NVT_steps = 0
             equil_NPT_steps = 100
             sample_steps = 200
-            write_step = 5
+            write_step = 1
             initial_equil_NVT_steps = 0
             initial_equil_NPT_steps = 100
             step_size = 0.001

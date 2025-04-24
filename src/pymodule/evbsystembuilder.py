@@ -261,34 +261,96 @@ class EvbSystemBuilder():
         no_reactant = configuration.get("no_reactant", False)
         E_field = configuration.get("E_field", [0, 0, 0])
         neutralize = configuration.get("neutralize", False)
+        pdb = configuration.get("pdb", None)
 
         self.constraints = constraints
 
-        system = mm.System()
-        topology = mmapp.Topology()
+        if pdb is None:
+            system = mm.System()
+            topology = mmapp.Topology()
+
+            nb_force = mm.NonbondedForce()
+            cmm_remover = mm.CMMotionRemover()
+            system.addForce(nb_force)
+            system.addForce(cmm_remover)
+        else:
+            pdb_file = mmapp.PDBFile(pdb)
+            topology = pdb_file.getTopology()
+            chains = [chain for chain in topology.chains()]
+
+            env_modeller = mmapp.Modeller(topology, pdb_file.positions)
+            env_modeller.delete([chains[1]])
+            env_topology = env_modeller.getTopology()
+            forcefield = mmapp.ForceField('amber14-all.xml',
+                                          'amber14/tip3pfb.xml')
+
+            system = forcefield.createSystem(
+                env_topology,
+                nonbondedMethod=mmapp.PME,
+                nonbondedCutoff=1 * mmunit.nanometer,
+                constraints=mmapp.HBonds,
+            )
+            rea_modeller = mmapp.Modeller(topology, pdb_file.positions)
+            rea_modeller.delete([chains[0]])
+            rea_topology = rea_modeller.getTopology()
+            rea_pdb_pos = rea_modeller.getPositions()
+            # pass
+            assert len(reactant.atoms) == rea_topology.getNumAtoms(
+            ), "Number of atoms in the reactant and the topology do not match"
+            topology = env_topology
+            nb_force = [
+                force for force in system.getForces()
+                if isinstance(force, mm.NonbondedForce)
+            ][0]
+            cmm_remover = [
+                force for force in system.getForces()
+                if isinstance(force, mm.CMMotionRemover)
+            ][0]
+
         reaction_chain = topology.addChain()
         reaction_residue = topology.addResidue(name="REA", chain=reaction_chain)
         reaction_atoms = []
-        nb_force = mm.NonbondedForce()
+
         nb_force.setName("General nonbonded force")
+        nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
+        nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
+        cmm_remover.setName("CMM remover")
+        cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
 
         if not no_reactant:
             # add atoms of the solute to the topology and the system
             elements = reactant.molecule.get_labels()
+
             for i, atom in enumerate(reactant.atoms.values()):
                 mm_element = mmapp.Element.getBySymbol(elements[i])
                 name = f"{elements[i]}{i}"
-                reaction_atom = topology.addAtom(name, mm_element,
-                                                 reaction_residue)
+                reaction_atom = topology.addAtom(
+                    name,
+                    mm_element,
+                    reaction_residue,
+                )
                 reaction_atoms.append(reaction_atom)
                 system.addParticle(mm_element.mass)
                 nb_force.addParticle(
                     0, 1, 0
                 )  #Placeholder values, actual values depend on lambda and will be set later
+            for bond in reactant.bonds.keys():
+                topology.addBond(
+                    reaction_atoms[bond[0]],
+                    reaction_atoms[bond[1]],
+                )
 
+        #todo come up with a more structured way of building systems
         if not no_reactant:
-            system_mol = Molecule(reactant.molecule)
-            positions = system_mol.get_coordinates_in_angstrom()
+            if pdb is None:
+                system_mol = Molecule(reactant.molecule)
+                positions = system_mol.get_coordinates_in_angstrom()
+            else:
+                #solvating a pdb is not yet a prio, so don't need system_mol
+                system_mol = Molecule()
+                positions = pdb_file.getPositions(asNumpy=True).value_in_unit(
+                    mmunit.angstrom)
+
             x_size = 0.1 * (max(positions[:, 0]) - min(positions[:, 0]))
             y_size = 0.1 * (max(positions[:, 1]) - min(positions[:, 1]))
             z_size = 0.1 * (max(positions[:, 2]) - min(positions[:, 2]))
@@ -298,6 +360,7 @@ class EvbSystemBuilder():
             self.ostream.print_info(
                 f"Size of the molecule: {x_size:.3f} x {y_size:.3f} x {z_size:.3f}, padding: {padding:.3f} nm."
             )
+
         else:
             box = [1, 1, 1]
             system_mol = Molecule()
@@ -311,18 +374,11 @@ class EvbSystemBuilder():
         # self.ostream.print_info(f"Building system in box with dimensions {box[0]:.3f} x {box[1]:.3f} x {box[2]:.3f} nm")
 
         if solvent:
+            assert pdb is None, "Solvent cannot be used with a PDB file yet"
             box = self._add_solvent(system, system_mol, solvent, topology,
                                     nb_force, neutralize, padding)
-
         else:
             self.positions = np.array(positions) * 0.1
-
-        cmm_remover = mm.CMMotionRemover()
-        cmm_remover.setName("CMM remover")
-        cmm_remover.setForceGroup(EvbForceGroup.CMM_REMOVER.value)
-        system.addForce(cmm_remover)
-
-        nb_force.setNonbondedMethod(mm.NonbondedForce.PME)
 
         cutoff = min(
             self.minimal_nb_cutoff,
@@ -332,8 +388,6 @@ class EvbSystemBuilder():
         nb_force.setUseSwitchingFunction(True)
         self.ostream.print_info(f"Setting nonbonded cutoff to {cutoff:.3f} nm")
         nb_force.setSwitchingDistance(0.9 * cutoff)
-        nb_force.setForceGroup(EvbForceGroup.NB_FORCE.value)
-        system.addForce(nb_force)
 
         if NPT:
             barostat = mm.MonteCarloFlexibleBarostat(
@@ -391,7 +445,8 @@ class EvbSystemBuilder():
                         raise ValueError(
                             "Sigma is 0 while epsilon is not, which will cause division by 0"
                         )
-                nb_force.setParticleParameters(i, charge, sigma, epsilon)
+                nb_force.setParticleParameters(reaction_atoms[i].index, charge,
+                                               sigma, epsilon)
 
             for i in range(system.getNumParticles()):
                 charge = nb_force.getParticleParameters(i)[0]
@@ -402,19 +457,14 @@ class EvbSystemBuilder():
                 self.ostream.print_warning(
                     f"Warning: total charge for lambda {lam} is {total_charge} and is not a whole number"
                 )
-
             self.systems[lam] = copy.deepcopy(system)
-            # if lam == 0.0:
-            #     self.systems["reactant"] = copy.deepcopy(system)
-            # if lam == 1.0:
-            #     self.systems["product"] = copy.deepcopy(system)
 
         self.reactant = reactant
         self.product = product
 
         self.reaction_atoms = reaction_atoms  #Used in _add_reaction_forces
         self.topology: mmapp.Topology = topology
-        self.system_mol = system_mol
+        # self.system_mol = system_mol
 
         if not no_reactant:
             for lam in Lambda:
@@ -1113,12 +1163,12 @@ class EvbSystemBuilder():
                 self._add_distance_restraint(max_distance, atom_ids,
                                              broken_length, 1 - scale)
 
-                self._add_bond(
-                    integration_force,
-                    atom_ids,
-                    bond['equilibrium'] * scale + broken_length * (1 - scale),
-                    bond['force_constant'],
-                )
+                # self._add_bond(
+                #     integration_force,
+                #     atom_ids,
+                #     bond['equilibrium'] * scale + broken_length * (1 - scale),
+                #     bond['force_constant'],
+                # )
         return harmonic_force, integration_force, morse_force, max_distance
 
     def _create_angle_forces(self, lam: float):
@@ -1159,9 +1209,9 @@ class EvbSystemBuilder():
 
                 self._add_angle(harmonic_force, atom_ids, angle['equilibrium'],
                                 angle['force_constant'] * scale)
-                self._add_angle(integration_force,
-                                atom_ids, broken_equil,
-                                angle['force_constant'] * (1 - scale))
+                # self._add_angle(integration_force,
+                #                 atom_ids, broken_equil,
+                #                 angle['force_constant'] * (1 - scale))
 
         return harmonic_force, integration_force
 

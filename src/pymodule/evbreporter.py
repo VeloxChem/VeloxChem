@@ -199,8 +199,8 @@ class EvbReporter():
         ).getPotentialEnergy().value_in_unit(mm.unit.kilojoules_per_mole)
 
         for e in E:
-            line += f", {e}"
-        line += f", {Em_pes}, {Em_int}\n"
+            line += f", {e:.10e}"
+        line += f", {Em_pes:.10e}, {Em_int:.10e}\n"
         self.E_out.write(line)
 
         if self.report_forces:
@@ -209,7 +209,7 @@ class EvbReporter():
             line = f"{self.Lambda}"
             kjpermolenm = mm.unit.kilojoules_per_mole / mm.unit.nanometer
             for i in range(forces.shape[0]):
-                line += f", {forces[i][0].value_in_unit(kjpermolenm)}, {forces[i][1].value_in_unit(kjpermolenm)}, {forces[i][2].value_in_unit(kjpermolenm)}, {norms[i]}"
+                line += f", {forces[i][0].value_in_unit(kjpermolenm):.5e}, {forces[i][1].value_in_unit(kjpermolenm):.5e}, {forces[i][2].value_in_unit(kjpermolenm):.5e}, {norms[i]:.5e}"
             line += '\n'
             self.F_out.write(line)
 
@@ -218,7 +218,7 @@ class EvbReporter():
             line = f"{self.Lambda}"
             nmperps = mm.unit.nanometer / mm.unit.picosecond
             for i in range(velocities.shape[0]):
-                line += f", {velocities[i][0].value_in_unit(nmperps)}, {velocities[i][1].value_in_unit(nmperps)}, {velocities[i][2].value_in_unit(nmperps)}"
+                line += f", {velocities[i][0].value_in_unit(nmperps):.5e}, {velocities[i][1].value_in_unit(nmperps):.5e}, {velocities[i][2].value_in_unit(nmperps):.5e}"
             line += '\n'
             self.v_out.write(line)
 
@@ -235,7 +235,7 @@ class EvbReporter():
                 if e> 1e9:
                     raise ValueError(
                         f"Force group {fg.name}({fg.value}) energy is too large: {e}")
-                line += f"{e}, "
+                line += f"{e:.9e}, "
             line = line[:-2] + '\n'
 
         self.FG_out.write(line)
