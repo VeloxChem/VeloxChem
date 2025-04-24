@@ -166,6 +166,7 @@ class HessianOrbitalResponse(CphfSolver):
                         local_atoms.append(i)
                     if j not in local_atoms:
                         local_atoms.append(j)
+                # natm = len(local_atoms)
             else:
                 local_atoms = []
 
@@ -266,7 +267,6 @@ class HessianOrbitalResponse(CphfSolver):
 
         profiler.start_timer('dXC')
 
-
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
@@ -310,7 +310,8 @@ class HessianOrbitalResponse(CphfSolver):
                         molecule, basis, gs_density, mol_grid,
                         self.xcfun.get_func_label(), local_atoms)
 
-                    for vecind, (iatom, root_rank) in enumerate(all_atom_idx_rank):
+                    for vecind, (iatom,
+                                 root_rank) in enumerate(all_atom_idx_rank):
                         # print(iatom)
                         for x in range(3):
                             vxc_deriv_ix = self.comm.reduce(
@@ -322,7 +323,6 @@ class HessianOrbitalResponse(CphfSolver):
                             key_ix = (iatom, x)
                             dist_fock_deriv_ao[
                                 key_ix].data += dist_vxc_deriv_ix.data
-                        
 
         profiler.stop_timer('dXC')
 
@@ -364,6 +364,11 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
+                    if atom_pairs is not None:
+                        if (iatom, jatom) not in atom_pairs and \
+                                (jatom, iatom) not in atom_pairs and iatom!=jatom:
+                            continue
+
                     for y in range(3):
                         key_jy = (jatom, y)
 
@@ -388,6 +393,10 @@ class HessianOrbitalResponse(CphfSolver):
 
         hessian_first_integral_derivatives = self.comm.reduce(
             hessian_first_integral_derivatives, root=mpi_master())
+
+        #todo atompair
+        # print('hessian_first_integral_derivatives')
+        # print(hessian_first_integral_derivatives)
 
         profiler.stop_timer('1stHess')
 
@@ -441,7 +450,10 @@ class HessianOrbitalResponse(CphfSolver):
                 for jatom, root_rank_j in all_atom_idx_rank:
                     if jatom < iatom:
                         continue
-
+                    if atom_pairs is not None:
+                        if (iatom, jatom) not in atom_pairs and \
+                                (jatom, iatom) not in atom_pairs and iatom!=jatom:
+                            continue
                     for y in range(3):
                         key_jy = (jatom, y)
 
@@ -522,7 +534,7 @@ class HessianOrbitalResponse(CphfSolver):
 
         # fill up the missing values in dist_cphf_rhs with zeros so later indexing does not fail
         if atom_pairs is not None:
-            for i in range(natm):
+            for i in range(molecule.number_of_atoms()):
                 if i not in local_atoms:
                     zer = np.zeros(len(dist_cphf_rhs[0].data))
                     for j in range(3):
@@ -531,8 +543,15 @@ class HessianOrbitalResponse(CphfSolver):
                                                           distribute=False)
                         dist_cphf_rhs.insert(i * 3 + j, empty_dist_arr)
 
+        #todo atompair
+        # print('dist_cphf_rhs')
+        # print(dist_cphf_rhs)
+
         hessian_eri_overlap = self.comm.reduce(hessian_eri_overlap,
                                                root=mpi_master())
+        #todo atompair
+        # print('hessian_eri_overlap')
+        # print(hessian_eri_overlap)
 
         t2 = tm.time()
 

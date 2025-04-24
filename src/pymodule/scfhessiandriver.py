@@ -395,6 +395,13 @@ class ScfHessianDriver(HessianDriver):
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
+        #todo atompair
+        # print('dist_cphf_ov:')
+        # print(np.array([arr.data for arr in dist_cphf_ov]))
+
+        # print('dist_cphf_rhs:')
+        # print(np.array([arr.data for arr in dist_cphf_rhs]))
+
         hessian_first_integral_derivatives = cphf_solution_dict[
             'hessian_first_integral_derivatives']
         hessian_eri_overlap = cphf_solution_dict['hessian_eri_overlap']
@@ -409,8 +416,10 @@ class ScfHessianDriver(HessianDriver):
         atom_pair_atoms = []
         if atom_pairs is not None:
             for i, j in atom_pairs:
-                atom_pair_atoms.append(i)
-                atom_pair_atoms.append(j)
+                if i not in atom_pair_atoms:
+                    atom_pair_atoms.append(i)
+                if j not in atom_pair_atoms:
+                    atom_pair_atoms.append(j)
 
             atoms = atom_pair_atoms
         else:
@@ -421,6 +430,10 @@ class ScfHessianDriver(HessianDriver):
                 dist_cphf_ov_ix_data = dist_cphf_ov[i * 3 + x].data
 
                 for j in atoms:
+                    if atom_pairs is not None:
+                        if i != j and (i, j) not in atom_pairs and (
+                                j, i) not in atom_pairs:
+                            continue
                     for y in range(3):
                         hess_ijxy = 4.0 * (np.dot(
                             dist_cphf_ov_ix_data,
@@ -431,15 +444,27 @@ class ScfHessianDriver(HessianDriver):
 
         hessian_cphf_coeff_rhs = self.comm.reduce(hessian_cphf_coeff_rhs,
                                                   root=mpi_master())
+        # #todo atompair
+        # print('hessian_cphf_coeff_rhs:')
+        # print(hessian_cphf_coeff_rhs.reshape(natm * 3, natm * 3))
+        # print('hessian first integral derivatives:')
+        # print(hessian_first_integral_derivatives.reshape(natm * 3, natm * 3))
+        # print('hessian eri overlap:')
+        # print(hessian_eri_overlap.reshape(natm * 3, natm * 3))
 
         # print('first integral derivatives:\n', hessian_first_integral_derivatives)
         # print('eri overlap:\n', hessian_eri_overlap)
+
         if self.rank == mpi_master():
             hessian_first_order_derivatives = (
                 hessian_cphf_coeff_rhs + hessian_first_integral_derivatives +
                 hessian_eri_overlap)
         else:
             hessian_first_order_derivatives = None
+
+        # #todo atompair
+        # print('first order derivatives:')
+        # print(hessian_first_order_derivatives)
 
         self.ostream.print_info('First order derivative contributions' +
                                 ' to the Hessian computed in' +
@@ -604,15 +629,17 @@ class ScfHessianDriver(HessianDriver):
         # do only upper triangular matrix
 
         # TODO: use alternative way to partition atom pairs
-        all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
         if atom_pairs is None:
+            all_atom_pairs = [(i, j) for i in range(natm) for j in range(i, natm)]
             local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
         else:
-            all_atom_pairs_subset = []
-            for pair in all_atom_pairs:
-                if pair[0] in atom_pair_atoms and pair[1] in atom_pair_atoms:
-                    all_atom_pairs_subset.append(pair)
-            local_atom_pairs = all_atom_pairs_subset[self.rank::self.nodes]
+            all_atom_pairs = atom_pairs
+            for i in atom_pair_atoms:
+                all_atom_pairs.append((i, i))
+            # for pair in all_atom_pairs:
+            #     if pair[0] in atom_pair_atoms and pair[1] in atom_pair_atoms:
+            #         all_atom_pairs_subset.append(pair)
+            local_atom_pairs = all_atom_pairs[self.rank::self.nodes]
 
         for i, j in local_atom_pairs:
 
@@ -714,6 +741,10 @@ class ScfHessianDriver(HessianDriver):
 
         hessian_2nd_order_derivatives = self.comm.reduce(
             hessian_2nd_order_derivatives, root=mpi_master())
+
+        # #todo atompair
+        # print('2nd order derivatives:')
+        # print(hessian_2nd_order_derivatives)
 
         # DFT:
         if self._dft:
@@ -818,15 +849,25 @@ class ScfHessianDriver(HessianDriver):
             if atom_pairs is not None:
                 for i in range(natm):
                     for j in range(natm):
-                        if i not in atom_pair_atoms or j not in atom_pair_atoms:
+                        if (i,j) not in all_atom_pairs and (j,i) not in all_atom_pairs:
                             hessian_nuclear_nuclear[i, j, :, :] = 0.0
-                            hessian_dft_xc[3 * i:3 * i + 3,
-                                           3 * j:3 * j + 3] = 0.0
+                            if self._dft:
+                                hessian_dft_xc[i*3:i*3+3, j*3:j*3+3] = 0.0
 
             self.hessian = (
                 hessian_first_order_derivatives +
                 hessian_2nd_order_derivatives.transpose(0, 2, 1, 3) +
                 hessian_nuclear_nuclear.transpose(0, 2, 1, 3))
+
+            #todo atompair
+            # print('first order derivatives:')
+            # print(hessian_first_order_derivatives.reshape(natm * 3, natm * 3))
+            # print('2nd order derivatives:')
+            # print(hessian_2nd_order_derivatives.transpose(0, 2, 1, 3).reshape(natm*3,natm*3))
+            # print('nuclear nuclear:')
+            # print(
+            #     hessian_nuclear_nuclear.transpose(0, 2, 1, 3).reshape(
+            #         natm * 3, natm * 3))
 
             if self.scf_driver.point_charges is not None:
                 self.hessian += hessian_point_charges.transpose(0, 2, 1, 3)
@@ -847,6 +888,7 @@ class ScfHessianDriver(HessianDriver):
 
             if self._dft:
                 self.hessian += hessian_dft_xc
+            
 
         self.ostream.print_info('Second order derivative contributions' +
                                 ' to the Hessian computed in' +
