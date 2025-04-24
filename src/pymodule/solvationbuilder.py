@@ -388,29 +388,29 @@ class SolvationBuilder:
         self.ostream.print_info(
             'The density of the solvent after packing is: ' +
             f'{self._check_density(solvent_molecule, self.added_solvent_counts[0], volume_nm3)} kg/m^3')
+        self.ostream.print_blank()
         self.ostream.flush()
 
         self.system_molecule = self._save_molecule()
 
         if equilibrate:
-            self.equilibration_flag = True
-            self.ostream.print_blank()
-            self.ostream.print_info("Equilibrating the system")
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.ostream.print_info(f"Duration: {self.steps/1000} ps")
-            self.ostream.flush()
-            self.ostream.print_info(f"Temperature: {self.temperature} K")
-            self.ostream.flush()
-            self.ostream.print_info(f"Pressure: {self.pressure} bar")
-            self.ostream.flush()
-            self.ostream.print_blank()
-            start = time.time()
-            self.perform_equilibration()
-            self.ostream.print_info("Equilibration completed, system saved")
-            self.ostream.flush()
-            end = time.time()
-            self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
+            # TODO: run perform_equilibration using openmm files
+            try:
+                start = time.time()
+                self.perform_equilibration()
+                end = time.time()
+                self.ostream.print_info("Equilibrating the system")
+                self.ostream.print_blank()
+                self.ostream.print_info(f"Duration: {self.steps/1000} ps")
+                self.ostream.print_info(f"Temperature: {self.temperature} K")
+                self.ostream.print_info(f"Pressure: {self.pressure} bar")
+                self.ostream.print_blank()
+                self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
+                self.equilibration_flag = True
+            except ValueError:
+                # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
+                self.ostream.print_info("Equilibration skipped due to missing files")
+                self.ostream.print_blank()
             self.ostream.flush()
 
 
