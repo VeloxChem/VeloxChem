@@ -82,13 +82,18 @@ class TransitionStateGuesser():
         self.mm_steps = 1000
         self.mm_step_size = 0.001 * mmunit.picoseconds
         self.save_mm_traj = False
+        self.scf_drv = None
 
-    def find_TS(self, evb, scf=True, constraints=None):
+    def find_TS(self, evb, scf=True, constraints=None, scf_drv=None):
         #todo ideally find a way to efficiently deal with the input to the EVB object
+        self.scf_drv = scf_drv
         evb.temperature = self.mm_temperature
         config = evb.default_system_configurations("ts_guesser")
 
-        evb.build_systems([config], self.lambda_vec, save_output=False, constraints=constraints)
+        evb.build_systems([config],
+                          self.lambda_vec,
+                          save_output=False,
+                          constraints=constraints)
         self.ostream.print_blank()
         self.ostream.print_header("Starting MM scan")
         self.ostream.print_info(f"Lambda vector: {self.lambda_vec}")
@@ -99,12 +104,12 @@ class TransitionStateGuesser():
             xyz_geom = self.mm_to_xyz_geom(mm_geom, evb.reactant.molecule)
             xyz_geometries.append(xyz_geom)
         self.results = {
-            'mm_energies':mm_energies,
-            'mm_geometries':mm_geometries,
-            'xyz_geometries':xyz_geometries,
-            'lambda_vec':self.lambda_vec,
-            'broken_bonds':evb.broken_bonds,
-            'formed_bonds':evb.formed_bonds,
+            'mm_energies': mm_energies,
+            'mm_geometries': mm_geometries,
+            'xyz_geometries': xyz_geometries,
+            'lambda_vec': self.lambda_vec,
+            'broken_bonds': evb.broken_bonds,
+            'formed_bonds': evb.formed_bonds,
         }
         # for i, (E, P) in enumerate(zip(mm_energies, mm_geometries)):
         #     self.results[self.lambda_vec[i]] = {
@@ -134,9 +139,8 @@ class TransitionStateGuesser():
             self.results.update({'final_lambda': max_mm_lambda})
         else:
             # assert False, 'Not implemented yet'
-            
-            self.ostream.print_header(
-                f"Starting SCF scan")
+
+            self.ostream.print_header(f"Starting SCF scan")
             self.ostream.flush()
             scf_energies = self.scan_scf()
             max_scf_index = np.argmax(scf_energies)
@@ -150,23 +154,6 @@ class TransitionStateGuesser():
             )
             self.ostream.flush()
 
-            # max_scf_lambda = self.scan_scf(max_mm_index)
-            # if max_scf_lambda is not None:
-            #     self.ostream.print_info(
-            #         f"Found highest SCF E at Lambda: {max_scf_lambda}. Returning"
-            #     )
-            #     self.ostream.flush()
-            #     self.molecule = self.set_molecule_positions(
-            #         self.molecule, self.results[max_scf_lambda]['mm_geometry'])
-            #     return self.molecule, self.results
-            # else:
-            #     self.ostream.print_info(
-            #         f"Could not find a maximum in the SCF energy. Returning mm results"
-            #     )
-            #     self.ostream.flush()
-            #     self.molecule = self.set_molecule_positions(
-            #         self.molecule, max_mm_geom)
-            #     return self.molecule, self.results
         self.molecule = Molecule.read_xyz_string(self.results['final_geometry'])
         return self.molecule, self.results
 
@@ -247,7 +234,7 @@ class TransitionStateGuesser():
 
     def scan_scf(self):
         scf_energies = []
-        for i,l in enumerate(self.lambda_vec):
+        for i, l in enumerate(self.lambda_vec):
             geom = self.results['mm_geometries'][i]
             scf_E = self._get_scf_energy(geom)
             scf_energies.append(scf_E)
@@ -258,72 +245,75 @@ class TransitionStateGuesser():
         self.results['scf_energies'] = scf_energies
 
         return scf_energies
+
     # def scan_scf(self, starting_index=None, starting_lambda=None):
-        # if starting_index is not None:
-        #     l = self.lambda_vec[starting_index]
-        # elif starting_lambda is not None:
-        #     assert starting_lambda in self.lambda_vec
-        #     l = starting_lambda
-        #     starting_index = np.where(self.lambda_vec == l)[0][0]
-        # else:
-        #     assert_msg_critical(
-        #         False,
-        #         "Either starting_index or starting_lambda must be provided")
+    # if starting_index is not None:
+    #     l = self.lambda_vec[starting_index]
+    # elif starting_lambda is not None:
+    #     assert starting_lambda in self.lambda_vec
+    #     l = starting_lambda
+    #     starting_index = np.where(self.lambda_vec == l)[0][0]
+    # else:
+    #     assert_msg_critical(
+    #         False,
+    #         "Either starting_index or starting_lambda must be provided")
 
-        # if l == 1:
-        #     l = self.lambda_vec[-1]
-        #     lp1 = 1
-        # else:
-        #     lp1 = self.lambda_vec[starting_index + 1]
-        # scf_E_1 = self._get_scf_energy(self.results[l]['mm_geometry'])
-        # self.ostream.print_info(
-        #     f"Lambda: {l}, SCF Energy: {scf_E_1:.3f} Hartree")
-        # self.ostream.flush()
-        # scf_E_2 = self._get_scf_energy(self.results[lp1]['mm_geometry'])
-        # self.ostream.print_info(
-        #     f"Lambda: {lp1}, SCF Energy: {scf_E_2:.3f} Hartree")
-        # self.ostream.flush()
-        # self.results[l]['scf_energy'] = scf_E_1
-        # self.results[lp1]['scf_energy'] = scf_E_2
+    # if l == 1:
+    #     l = self.lambda_vec[-1]
+    #     lp1 = 1
+    # else:
+    #     lp1 = self.lambda_vec[starting_index + 1]
+    # scf_E_1 = self._get_scf_energy(self.results[l]['mm_geometry'])
+    # self.ostream.print_info(
+    #     f"Lambda: {l}, SCF Energy: {scf_E_1:.3f} Hartree")
+    # self.ostream.flush()
+    # scf_E_2 = self._get_scf_energy(self.results[lp1]['mm_geometry'])
+    # self.ostream.print_info(
+    #     f"Lambda: {lp1}, SCF Energy: {scf_E_2:.3f} Hartree")
+    # self.ostream.flush()
+    # self.results[l]['scf_energy'] = scf_E_1
+    # self.results[lp1]['scf_energy'] = scf_E_2
 
-        # if scf_E_2 > scf_E_1:
-        #     start = starting_index + 2
-        #     direction = 1
-        #     end = len(self.lambda_vec)
-        #     scf_E = scf_E_2
-        # else:
-        #     start = starting_index - 1
-        #     direction = -1
-        #     end = 0
-        #     scf_E = scf_E_1
+    # if scf_E_2 > scf_E_1:
+    #     start = starting_index + 2
+    #     direction = 1
+    #     end = len(self.lambda_vec)
+    #     scf_E = scf_E_2
+    # else:
+    #     start = starting_index - 1
+    #     direction = -1
+    #     end = 0
+    #     scf_E = scf_E_1
 
-        # for i in range(start, end, direction):
-        #     last_scf_E = scf_E
-        #     l = self.lambda_vec[i]
-        #     geom = self.results[l]['mm_geometry']
-        #     scf_E = self._get_scf_energy(geom)
-        #     self.results[l]['scf_energy'] = scf_E
+    # for i in range(start, end, direction):
+    #     last_scf_E = scf_E
+    #     l = self.lambda_vec[i]
+    #     geom = self.results[l]['mm_geometry']
+    #     scf_E = self._get_scf_energy(geom)
+    #     self.results[l]['scf_energy'] = scf_E
 
-        #     self.ostream.print_info(
-        #         f"Lambda: {l}, SCF Energy: {scf_E:.3f} Hartree")
-        #     self.ostream.flush()
-        #     self.molecule = self.set_molecule_positions(self.molecule, geom)
-        #     if last_scf_E > scf_E:
+    #     self.ostream.print_info(
+    #         f"Lambda: {l}, SCF Energy: {scf_E:.3f} Hartree")
+    #     self.ostream.flush()
+    #     self.molecule = self.set_molecule_positions(self.molecule, geom)
+    #     if last_scf_E > scf_E:
 
-        #         return self.lambda_vec[i - direction]
+    #         return self.lambda_vec[i - direction]
 
     def _get_scf_energy(self, positions):
         self.molecule = self.set_molecule_positions(self.molecule, positions)
-        scf_drv = ScfRestrictedDriver()
+        if self.scf_drv is None:
+            scf_drv = ScfRestrictedDriver()
+            scf_drv.xcfun = self.scf_xcfun
+            self.scf_drv = scf_drv
+
         if self.mute_scf:
-            scf_drv.ostream.mute()
+            self.scf_drv.ostream.mute()
         basis = MolecularBasis.read(self.molecule, self.scf_basis)
-        scf_drv.xcfun = self.scf_xcfun
-        scf_results = scf_drv.compute(self.molecule, basis)
+        scf_results = self.scf_drv.compute(self.molecule, basis)
         return scf_results['scf_energy'] * hartree_in_kjpermol()
 
-
-    def show_results(self,ts_results=None, atom_indices=False):
+    def show_results(self, ts_results=None, atom_indices=False):
         """
             Plot the convergence of the optimization
 
@@ -357,12 +347,12 @@ class TransitionStateGuesser():
         )
 
     def _show_iteration(self,
-                    mm_energies,
-                    geometries,
-                    lambda_vec,
-                    step,
-                    scf_energies=None,
-                    atom_indices=False):
+                        mm_energies,
+                        geometries,
+                        lambda_vec,
+                        step,
+                        scf_energies=None,
+                        atom_indices=False):
         """
         Show the geometry at a specific iteration.
         """
@@ -446,8 +436,8 @@ class TransitionStateGuesser():
             ax2.set_ylabel('Relative SCF energy [kJ/mol]')
 
         fig.legend(loc='upper right',
-                bbox_to_anchor=(1, 1),
-                bbox_transform=ax1.transAxes)
+                   bbox_to_anchor=(1, 1),
+                   bbox_transform=ax1.transAxes)
         ax1.set_title("Transition state finder")
         # Ensure x-axis displays as integers
         ax1.set_xticks(lambda_vec[::2])
@@ -458,7 +448,7 @@ class TransitionStateGuesser():
         mol.show(atom_indices=atom_indices, width=640, height=360)
 
     @staticmethod
-    def mm_to_xyz_geom(geom,molecule):
+    def mm_to_xyz_geom(geom, molecule):
         new_mol = TransitionStateGuesser.set_molecule_positions(molecule, geom)
         return new_mol.get_xyz_string()
 
@@ -468,5 +458,3 @@ class TransitionStateGuesser():
         for i in range(molecule.number_of_atoms()):
             molecule.set_atom_coordinates(i, positions[i])
         return molecule
-
-
