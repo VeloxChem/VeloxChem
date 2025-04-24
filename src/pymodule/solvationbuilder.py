@@ -569,7 +569,8 @@ class SolvationBuilder:
                 for i in range(len(self.solvent_ffs)):
                     f.write(f'#include "solvent_{i+1}.itp"\n')
                 if self.counterion:
-                    f.write('#include "counterion.itp"\n')
+                    f.write(f'#include "{self.parent_forcefield}.ff/forcefield.itp"\n')
+                    f.write(f'#include "{self.parent_forcefield}.ff/ions.itp"\n')
                 f.write('\n[ system ]\n')
                 f.write('System\n\n')
                 f.write('[ molecules ]\n')
@@ -577,7 +578,8 @@ class SolvationBuilder:
                 for i, count in enumerate(self.added_solvent_counts):
                     f.write(f'SOL{i+1} {count}\n')
                 if self.counterion:
-                    f.write('ION 1\n')
+                    residue_name = self.ion_name.upper()
+                    f.write(f'{residue_name} {abs(self.added_counterions)}\n')
             if not equilibration:
                 self.ostream.print_info("system.top file written")
                 self.ostream.flush()
@@ -629,10 +631,10 @@ class SolvationBuilder:
 
         # Write the system PDB file
         if self.equilibration_flag:
-            # If the system was equilibrated, OpenMM has already written the PDB file
-            Path('equilibrated_system.pdb').rename(filename)
-        else:
-            self._write_system_pdb(filename=filename)
+            # If the system was equilibrated, remove pdb to align with new resnames etc. 
+            Path('equilibrated_system.pdb').unlink()
+
+        self._write_system_pdb(filename=filename)
         # Print information
         self.ostream.print_info(f"{filename} file written")
         self.ostream.flush()

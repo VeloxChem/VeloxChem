@@ -84,7 +84,8 @@ class SolvationFepDriver:
         - solute_ff: The solute force field.
         - platform: The platform for the openMM simulation.
         - save_trajectory_xtc: If True, save the trajectories in XTC format.
-        - save_energies_txt: If True, save the energies from each simulation in txt
+        - save_system_xml: If True, save the system in XML format.
+        - save_energies_txt: If True, save the energies from each simulation in txt format.
         - alpha: The alpha parameter for the Gaussian softcore potential.
         - beta: The beta parameter for the Gaussian softcore potential.
         - x: The x parameter for the Gaussian softcore potential.
@@ -147,6 +148,7 @@ class SolvationFepDriver:
         self.solute_ff = None
         self.platform = None
         self.save_trajectory_xtc = False
+        self.save_system_xml = False
         self.save_energies_txt = False
 
         # Alchemical parameters
@@ -156,7 +158,7 @@ class SolvationFepDriver:
         # Single parameter for lambdas for stage 1
         # Set to 6 to be on the safe side
         self.lambdas_stage1 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Asymetric lambdas for stage 2
+        # Asymetric lambdas for stage 2 ##TODO: see if it's possible to reduce #of lambdas here..
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
         # Fixed lambda vector for stage 3 with 6 lambdas
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
@@ -208,7 +210,7 @@ class SolvationFepDriver:
         # Note: GROMACS files will be used instead of OpenMM files.
         sol_builder.write_gromacs_files(ff_gen_solute, ff_gen_solvent)
         
-        if self.save_trajectory_xtc or self.save_energies_txt:
+        if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
         if not ff_gen_solute:
@@ -279,7 +281,7 @@ class SolvationFepDriver:
         # Special name for the solvent
         self.solvent_name = 'omm_files'
 
-        if self.save_trajectory_xtc or self.save_energies_txt:
+        if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
@@ -310,7 +312,7 @@ class SolvationFepDriver:
         self.solute_gro = solute_gro
         self.solute_top = solute_top
 
-        if self.save_trajectory_xtc or self.save_energies_txt:
+        if self.save_trajectory_xtc or self.save_system_xml or self.save_energies_txt:
             self.output_folder.mkdir(parents=True, exist_ok=True)
 
         delta_f, final_free_energy = self._run_stages()
@@ -374,7 +376,7 @@ class SolvationFepDriver:
         self.ostream.flush()
 
         self.delta_f = [delta_f_1, delta_f_2, delta_f_3, delta_f_4]
-        
+        #rename
         delta_f = {i+1: {'Delta_f': self.delta_f[i]['Delta_f'][-1,0],
                 'Uncertainty': self.delta_f[i]['dDelta_f'][-1,0]}
           for i in range(4)}
@@ -411,9 +413,9 @@ class SolvationFepDriver:
         self.ostream.flush()
         # Create systems, topology and initial positions
         if vacuum:
-            systems, topology, positions = self._create_vacuum_system(lambdas)
+            systems, topology, positions = self._create_vacuum_systems(lambdas)
         else:
-            systems, topology, positions = self._create_solvated_system(lambdas)
+            systems, topology, positions = self._create_solvated_systems(lambdas)
 
         snapshots = []
         for l, lam in enumerate(lambdas):
@@ -428,7 +430,6 @@ class SolvationFepDriver:
             total_sim_time += sim_time
 
             # Performance calculation in ns/hour
-
             snapshots.append(conformations)
 
 
@@ -443,8 +444,6 @@ class SolvationFepDriver:
         self.ostream.print_info(f"Recalculating energies for stage {stage}...")
         self.ostream.flush()
         recalculation_start = time.time()
-        # TODO: remove this, if not save it for very large systems
-        #trajectories = self._fetch_files(lambdas=lambdas, stage=stage)
 
         u_kln = self._recalculate_energies(snapshots, systems, topology)
 
@@ -465,7 +464,7 @@ class SolvationFepDriver:
 
         return delta_f, free_energy
     
-    def _create_solvated_system(self, lambdas):
+    def _create_solvated_systems(self, lambdas):
         """
         Create solvated system with alchemical scaling.
         """
@@ -540,13 +539,14 @@ class SolvationFepDriver:
                         gsc_force.addExclusion(p1, p2)
 
             # Add interaction group for GSC potential
-            gsc_force.addInteractionGroup(chemical_region, alchemical_region)
+            gsc_force.addInteractionGroup(alchemical_region, chemical_region)
+            gsc_force.addInteractionGroup(alchemical_region, alchemical_region) # To avoid self-collapse in flexible molecules
             solvated_system.addForce(gsc_force)
             solvated_systems.append(solvated_system)
 
         return solvated_systems, topology, positions
 
-    def _create_vacuum_system(self, lambdas):
+    def _create_vacuum_systems(self, lambdas):
         """
         Create vacuum system with alchemical scaling.
         """
@@ -621,13 +621,8 @@ class SolvationFepDriver:
         Run the simulation using OpenMM. Return simulated time in ns and real elapsed time in seconds.
         """
         integrator = mm.LangevinIntegrator(self.temperature, 1.0 / unit.picoseconds, self.timestep)
-
-        if self.platform:
-            platform = mm.Platform.getPlatformByName(self.platform)
-            simulation = app.Simulation(topology, system, integrator, platform)
-        else:
-            simulation = app.Simulation(topology, system, integrator)
-        
+        platform = mm.Platform.getPlatformByName(self.platform) if self.platform else None
+        simulation = app.Simulation(topology, system, integrator, platform=platform)
         simulation.context.setPositions(positions)
 
         # Minimize energy
@@ -648,6 +643,13 @@ class SolvationFepDriver:
             simulation.reporters.append(app.XTCReporter(str(trajectory_filename), interval))
             self.ostream.print_info(f"Trajectory will be saved in {str(trajectory_filename)}")
             self.ostream.flush()
+        # Save system xml
+        if self.save_system_xml:
+            system_filename = output_folder / f'system_{lambda_value}_stage{self.stage}.xml'
+            with open(system_filename, 'w') as f:
+                f.write(mm.XmlSerializer.serialize(system))
+            self.ostream.print_info(f"System will be saved in {str(system_filename)}")
+            self.ostream.flush()
         # State data reporter
         if self.save_energies_txt:
             energy_filename = output_folder / f'energy_{lambda_value}_stage{self.stage}.txt'
@@ -655,31 +657,17 @@ class SolvationFepDriver:
                                                             step=True, potentialEnergy=True, temperature=True))
             self.ostream.print_info(f"Energies will be saved in {str(energy_filename)}")
             self.ostream.flush()
-        #TODO: 
-        # OBS: Don't remove (if system is too large...)
-        # Write the system to a file
-        # if self.stage in [1, 2]:
-        #     hdf5_filename = output_folder / f'positions_{lambda_value}_stage{self.stage}.h5'
-        # elif self.stage in [3, 4]:
-        #     hdf5_filename = output_folder / f'positions_{lambda_value}_stage{self.stage}.h5'
-            
+
         # Start the production run
         time_start = time.time()
-        # Create the hdf5 file
-        #hf = h5py.File(hdf5_filename, 'w')
         
         # Snapshot counter for the hdf5 file labels
         conformations = []
-        #snapshot = 0
         for _ in range(self.number_of_snapshots):
             simulation.step(interval)
-            # snapshot += 1
             state = simulation.context.getState(getPositions=True)
             positions = state.getPositions().value_in_unit(unit.nanometers)
-            # label = f'positions_{snapshot}'
-            # hf.create_dataset(label, data=positions) 
             conformations.append(positions)
-        #hf.close()
 
         time_end = time.time()
 
@@ -691,69 +679,34 @@ class SolvationFepDriver:
         self.ostream.flush()
 
         return conformations, simulated_ns, elapsed_time
-
-    # TODO: Can be removed 
-    def _fetch_files(self, lambdas, stage):
-        """
-        Fetch trajectories and forcefields generated during the simulation.
-        """
-        trajectories = []
-
-        for lam in lambdas:
-            lam = round(lam, 2)
-            positions_path = self.output_folder / f'positions_{lam}_stage{stage}.h5'
-            trajectories.append(str(positions_path))
-
-        return trajectories
-
+    
     def _recalculate_energies(self, conformations, forcefields, topology):
         
         # TODO: Change from U_kln to U_kn (where n is snapshots*lambdas) since pymbar is phasing this out
-        u_kln = np.zeros((len(conformations), len(forcefields), self.number_of_snapshots))
+        num_snapshots = self.number_of_snapshots
+        u_kln = np.zeros((len(conformations), len(forcefields), num_snapshots))
 
-        # k loop for U_kln
-        for k, conformation in enumerate(conformations):
-            time_start_trajectory = time.time()
-            self.ostream.print_info(f"Recalculating energies for trajectory {k}...")
+        # l loop for U_kln
+        for l, forcefield in enumerate(forcefields):
+            self.ostream.print_info(f"Recalculating energies for Forcefield {l}...")
             self.ostream.flush()
-            # Load the positions from the hdf5 file for recalculation
-            # positions = []
-            # with h5py.File(trajectory, 'r') as hf:
-            #     positions = [hf[f'positions_{n+1}'][:] for n in range(self.number_of_snapshots)]
-
-            # l loop for U_kln
-            for l, forcefield in enumerate(forcefields):
-                time_start_forcefield = time.time()
-                self.ostream.print_info(f"Recalculating energies for forcefield {l}...") 
-                self.ostream.flush()
-                integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
-
-                if self.platform:
-                    platform = mm.Platform.getPlatformByName(self.platform)
-                    simulation = app.Simulation(topology, forcefield, integrator, platform)
-                else:
-                    simulation = app.Simulation(topology, forcefield, integrator)
-
+            time_start_forcefield = time.time()
+            
+            integrator = mm.VerletIntegrator(1.0 * unit.femtoseconds)
+            platform = mm.Platform.getPlatformByName(self.platform) if self.platform else None
+            simulation = app.Simulation(topology, forcefield, integrator, platform=platform)
+            
+            # k loop for U_kln
+            for k, conformation in enumerate(conformations):
                 # n loop for U_kln
-                for n in range(self.number_of_snapshots):
-                    #positions_with_units = conformation[n] * unit.nanometers
+                for n in range(num_snapshots):
                     simulation.context.setPositions(conformation[n])
                     state = simulation.context.getState(getEnergy=True)
                     u_kln[k, l, n] = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-
-                time_end_forcefield = time.time()
-                elapsed_time_forcefield = time_end_forcefield - time_start_forcefield
-                self.ostream.print_info(f"Forcefield {l} energy recalculation took {elapsed_time_forcefield:.2f} seconds.")
-                self.ostream.flush()
-
                 
-            time_end_trajectory = time.time()
-            elapsed_time_trajectory = time_end_trajectory - time_start_trajectory
-            self.ostream.print_info(f"Trajectory {l} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
+            elapsed_time_trajectory = time.time() - time_start_forcefield
+            self.ostream.print_info(f"Forcefield {l} energy recalculation took {elapsed_time_trajectory:.2f} seconds.")
             self.ostream.flush()
-
-            # Delete the pdb file to save space
-            #Path.unlink(trajectory)
 
         return u_kln
 
@@ -761,7 +714,7 @@ class SolvationFepDriver:
         n_states = u_kln.shape[0]
         N_k = np.zeros(n_states)
         subsample_indices = []
-
+        # TODO: change this, subsampling is not recommended. 
         for k in range(n_states):
             t0, g, Neff_max = timeseries.detect_equilibration(u_kln[k, k, :])
             u_equil = u_kln[k, k, t0:]
@@ -774,7 +727,6 @@ class SolvationFepDriver:
             for l in range(n_states):
                 u_kln_reduced[k, l, :int(N_k[k])] = u_kln[k, l, subsample_indices[k]]
 
-        # TODO: change this, subsampling is not recommended. 
         if any(n <= self.number_of_snapshots // 4 for n in N_k):
             self.ostream.print_warning("MBAR may not converge due to insufficient sampling. Consider increasing the number of steps per lambda.")
             self.ostream.flush()
