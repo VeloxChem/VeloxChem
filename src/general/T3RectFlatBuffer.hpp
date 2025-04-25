@@ -67,6 +67,33 @@ class CT3RectFlatBuffer
             });
         }
     }
+    
+    /// @brief The default constructor.
+    /// @param indices The vector of indices along x axis of tensor.
+    /// @param width_y The width of tensor along  z axes.
+    /// @param width_z The width of tensor along  z axes.
+    CT3RectFlatBuffer(const std::vector<size_t>&      indices,
+                      const size_t                    width_y,
+                      const size_t                    width_z)
+    {
+        _indices = indices;
+        
+        for (size_t i = 0; i < width_y; i++)
+        {
+            _mask_indices.insert({i, i});
+        }
+        
+        _width = width_z;
+        
+        _data.reserve(_indices.size());
+        
+        if (const auto nelems = _mask_indices.size() * _width; nelems > 0)
+        {
+            std::ranges::for_each(_indices, [&](const auto& index) {
+                _data.push_back(std::vector<T>(nelems, T{0.0}));
+            });
+        }
+    }
 
     /// @brief The default copy constructor.
     /// @param other The SIMD array to be copied.

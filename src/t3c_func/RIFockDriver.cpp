@@ -2,6 +2,8 @@
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 
+#include <iostream>
+
 CRIFockDriver::CRIFockDriver()
 
     : _j_metric(nullptr)
@@ -126,6 +128,55 @@ auto
 CRIFockDriver::compute_local_bq_vector(const CMatrix &density) const -> std::vector<double>
 {
     return _trafo_local_gamma_vector(_comp_gamma_vector(density));
+}
+
+auto
+CRIFockDriver::compute_bq_matrices(const CSubMatrix& molorbs) const -> CT3RectFlatBuffer<double>
+{
+    const auto nmos = molorbs.number_of_columns();
+    
+    const auto naos = molorbs.number_of_rows();
+    
+    CT3RectFlatBuffer<double> bmats(_eri_buffer.indices(), nmos, naos);
+  
+    const auto ndim = _eri_buffer.aux_width();
+    
+    auto buff_ptr = &_eri_buffer;
+    
+    auto bmats_ptr = &bmats;
+    
+    auto cmos_ptr = molorbs.data();
+    
+    for (size_t i = 0; i < ndim; i++)
+    {
+        auto tint_ptr = buff_ptr->data(i);
+        
+        auto bmat_ptr = bmats_ptr->data(i);
+        
+        for (size_t j = 0; j < nmos; j++)
+        {
+            for (size_t k = 0; k <  naos; k++)
+            {
+                double fsum = 0.0;
+                
+                for (size_t l = 0; l < naos; l++)
+                {
+                    if (l <= k)
+                    {
+                        fsum += cmos_ptr[l * nmos + j] * tint_ptr[mathfunc::uplo_rm_index(l, k, naos)];
+                    }
+                    else
+                    {
+                        fsum += cmos_ptr[l * nmos + j] * tint_ptr[mathfunc::uplo_rm_index(k, l, naos)];
+                    }
+                }
+                
+                bmat_ptr[j * naos + k] = fsum;
+            }
+        }
+    }
+    
+    return bmats;
 }
 
 auto

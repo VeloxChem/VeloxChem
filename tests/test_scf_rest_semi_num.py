@@ -60,8 +60,6 @@ class TestScfRestrictedSemiNumDriver:
         scf_drv.semi_num_exchange = True
         scf_results = scf_drv.compute(mol, bas, min_bas)
         
-        assert False
-
         if scf_drv.rank == mpi_master():
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol
 

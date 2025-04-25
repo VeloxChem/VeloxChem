@@ -8,6 +8,7 @@
 #include "T3FlatBuffer.hpp"
 #include "Molecule.hpp"
 #include "MolecularBasis.hpp"
+#include "T3RectFlatBuffer.hpp"
 
 /// Class CRIFockDriver provides methods for computing Coulomb Fock matrices
 /// using three center electron repulsion integrals.
@@ -104,6 +105,11 @@ class CRIFockDriver
     /// @param density The density matrix to construct Fock matrix.
     /// @return The transformed Gamma vector.
     auto compute_local_bq_vector(const CMatrix &density) const -> std::vector<double>;
+    
+    /// @brief Computes half-transformed B^Q_it matrices.
+    /// @param molorbs The matrix with occupied molecular orbitals.
+    /// @return The half-transformed B^Q_it matrices.
+    auto compute_bq_matrices(const CSubMatrix& molorbs) const -> CT3RectFlatBuffer<double>;
     
     private:
     /// @brief Pointer to metric matrix for J fitting.

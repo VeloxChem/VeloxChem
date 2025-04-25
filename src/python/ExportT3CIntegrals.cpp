@@ -57,7 +57,8 @@ export_t3cintegrals(py::module& m)
              "Computes Coulomb Fock matrix for given density.")
         .def("local_compute", &CRIFockDriver::local_compute, "Computes local Coulomb Fock matrix for given density.")
         .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.")
-        .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.");
+        .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.")
+        .def("compute_bq_matrices", &CRIFockDriver::compute_bq_matrices, "Computes half-transformed B^Q_it matrices for given occupied molecular orbitals."); 
     
     // CRIFockGradDriver class
     PyClass<CRIFockGradDriver>(m, "RIFockGradDriver")
