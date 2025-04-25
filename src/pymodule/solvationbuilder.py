@@ -151,7 +151,7 @@ class SolvationBuilder:
             The name of the solvent molecule. The default is 'water'.
             Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 
             'chloroform', 'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 
-            'acetonitrile', 'other' or 'itself'.
+            'acetonitrile', 'dmf', 'other' or 'itself'.
                 * 'other': The solvent molecule must be provided.
                 * 'itself': The solute molecule is used as the solvent as well.
         :param solvent_molecule:
