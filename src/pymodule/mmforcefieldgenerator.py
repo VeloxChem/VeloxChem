@@ -56,6 +56,8 @@ from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
+from .tmparameters import get_tm_parameters
+from .waterparameters import get_water_parameters
 from .environment import get_data_path
 
 
@@ -158,6 +160,12 @@ class MMForceFieldGenerator:
 
         # UFF parameters
         self.uff_parameters = get_uff_parameters()
+
+        # TM parameters
+        self.tm_parameters = get_tm_parameters()
+
+        # Water parameters
+        self.water_parameters = get_water_parameters()
 
         # Summary of fitting
         self.fitting_summary = None
@@ -1010,7 +1018,7 @@ class MMForceFieldGenerator:
 
         return data
 
-    def create_topology(self, molecule, basis=None, scf_results=None, resp=True, use_xml=True):
+    def create_topology(self, molecule, basis=None, scf_results=None, resp=True, water_model=None, use_xml=True):
         """
         Analyzes the topology of the molecule and create dictionaries
         for the atoms, bonds, angles, dihedrals, impropers and pairs.
@@ -1086,7 +1094,7 @@ class MMForceFieldGenerator:
         atomtypeidentifier.identify_equivalences()
         
         self.atom_info_dict = atomtypeidentifier.atom_info_dict
-
+        ## TODO: change this to skip when water is used
         if not resp:
             # skip RESP charges calculation
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
@@ -1243,10 +1251,12 @@ class MMForceFieldGenerator:
 
         use_gaff = False
         use_uff = False
+        use_tm = False
+        use_water_model = False
 
         for at in self.unique_atom_types:
             atom_type_found = False
-
+            
             # Auxilary variable for finding parameters in UFF
             element = ''
             for c in at:
@@ -1265,6 +1275,7 @@ class MMForceFieldGenerator:
                         atom_type_found = True
                         use_gaff = True
                         break
+            
             else:
                 for line in ff_data_lines:
                     if line.startswith(f'  {at}     '):
@@ -1277,10 +1288,31 @@ class MMForceFieldGenerator:
                         break
 
             if not atom_type_found:
-                if at == 'ow':
-                    sigma, epsilon, comment = 3.15061e-01, 6.36386e-01, 'OW'
-                elif at == 'hw':
-                    sigma, epsilon, comment = 0.0, 0.0, 'HW'
+                if at in ['ow','hw']:
+                    assert_msg_critical(water_model is not None, 'MMForceFieldGenerator: water model not specified.')
+                    assert_msg_critical(water_model in self.water_parameters, 
+                        f"Error: '{water_model}' is not available. Available models are: {list(self.water_parameters.keys())}")
+                    
+                    sigma = self.water_parameters[water_model][at]['sigma']
+                    epsilon = self.water_parameters[water_model][at]['epsilon']
+
+                    water_bonds = self.water_parameters[water_model]['bonds']
+                    water_angles = self.water_parameters[water_model]['angles']
+                    self.partial_charges = [self.water_parameters[water_model][a]['charge'] for a in self.atom_types]
+                    atom_type_found = True
+                    use_water_model = True
+                    self.eq_param = False
+                    comment = water_model
+
+                elif element in self.tm_parameters:
+                    tmmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
+                    tmmsg += ' Taking TM parameters sigma and epsilon from vlx library.' ##TODO: rephrase
+                    self.ostream.print_info(tmmsg)
+                    sigma = self.tm_parameters[element]['sigma']
+                    epsilon = self.tm_parameters[element]['epsilon']
+                    comment = 'TM'
+                    use_tm = True
+                
                 # Case for atoms in UFF but not in GAFF
                 elif element in self.uff_parameters:
                     uffmsg = f'MMForceFieldGenerator: atom type {at} is not in GAFF.'
@@ -1290,7 +1322,8 @@ class MMForceFieldGenerator:
                     epsilon = self.uff_parameters[element]['epsilon']
                     comment = 'UFF'
                     use_uff = True
-                else:
+
+                else: 
                     assert_msg_critical(
                         False,
                         f'MMForceFieldGenerator: atom type {at} not found in GAFF or UFF.'
@@ -1319,6 +1352,22 @@ class MMForceFieldGenerator:
             uff_ref = 'A. K. Rappé, C. J. Casewit, K. S.  Colwell, W. A. Goddard III,'
             uff_ref += ' W. M. Skiff, J. Am. Chem. Soc. 1992, 114, 10024-10035.'
             self.ostream.print_reference('Reference: ' + uff_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_tm:
+            self.ostream.print_info('Using TM parameters.')
+            tm_ref = 'F. Šebesta, V. Sláma, J. Melcr, Z. Futera, and J. V. Burda.'
+            tm_ref += 'J. Chem. Theory Comput. 2016 12 (8), 3681-3688.'
+            self.ostream.print_reference('Reference: ' + tm_ref)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if use_water_model:
+            self.ostream.print_info(f'Using modified water model parameters for {water_model}.')
+            wff_ref = 'T. Luchko, S. Gusarov, D. R. Roe, C. Simmerling, D. A. Case, J. Tuszynski,'
+            wff_ref += 'A. Kovalenko. J. Chem. Theory Comput. 2010 6 (3), 607-624.'
+            self.ostream.print_reference('Reference: ' + wff_ref)
             self.ostream.print_blank()
             self.ostream.flush()
 
@@ -1374,6 +1423,13 @@ class MMForceFieldGenerator:
                             comment = '-'.join(target_bond)
                             bond_found = True
                             break
+            
+            elif use_water_model: ##TODO: Double check the UNITS
+                r = water_bonds['equilibrium']
+                k_r = water_bonds['force_constant']
+                comment = 'ow-hw'
+                bond_found = True
+
             else:
                 for line in ff_data_lines:
                     for p in patterns:
@@ -1449,6 +1505,13 @@ class MMForceFieldGenerator:
                             comment = '-'.join(target_angle)
                             angle_found = True
                             break
+            
+            elif use_water_model:
+                k_theta = water_angles['force_constant']
+                theta = water_angles['equilibrium']
+                comment = water_angles['comment']
+                angle_found = True
+
             else:
                 for line in ff_data_lines:
                     for p in patterns:
@@ -2509,6 +2572,7 @@ class MMForceFieldGenerator:
 
             f_top.write('\n#include "' + Path(itp_fname).name + '"\n')
 
+            ##TODO: change this to fit with the self.water_parameters -- e.g., if water_model in self.water_parameters
             if water_model is not None:
                 # very rudimentary check for water model names
                 assert_msg_critical(
@@ -2519,7 +2583,7 @@ class MMForceFieldGenerator:
                     amber_ff is not None, 'MMForceFieldGenerator.write_top: ' +
                     'amber_ff is required for water_model')
                 water_include = str(
-                    PurePath(f'{amber_ff}.ff') / f'{water_model}.itp')
+                    PurePath(f'{amber_ff}.ff') / f'{water_model}.itp') ##TODO: add maybe changed water model or similar
                 f_top.write(f'\n#include "{water_include}"\n')
 
             # system
