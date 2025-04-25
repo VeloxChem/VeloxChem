@@ -358,7 +358,7 @@ class SolvationFepDriver:
         delta_f_1, free_en_s1 = self._run_lambda_simulations(stage=1)
         self.ostream.flush()
         
-        self.ostream.print_info("Starting removing GSC potential (Stage 2)...\n")
+        self.ostream.print_info("Removing GSC potential (Stage 2)...\n")
         delta_f_2, free_en_s2 = self._run_lambda_simulations(stage=2)
         self.ostream.flush()
 
@@ -366,7 +366,7 @@ class SolvationFepDriver:
         delta_f_3, free_en_s3 = self._run_lambda_simulations(stage=3, vacuum=True)
         self.ostream.flush()
 
-        self.ostream.print_info("Starting removing GSC potential in vacuum (Stage 4)...\n")
+        self.ostream.print_info("Removing GSC potential in vacuum (Stage 4)...\n")
         delta_f_4, free_en_s4 = self._run_lambda_simulations(stage=4, vacuum=True)
         self.ostream.flush()
 
