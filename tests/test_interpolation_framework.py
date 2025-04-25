@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import pytest
 
@@ -10,10 +11,9 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
 
 
-@pytest.mark.solvers
 class TestInterpolationSetup:
     
-    def confirm_b_b2_matrix(self):
+    def test_b_b2_matrix(self):
 
         def compute_numerical_b2_matrix(structure, z_matrix, delta=1e-4):
 
@@ -22,7 +22,6 @@ class TestInterpolationSetup:
             n_atoms = structure.shape[0]
 
             b2 = np.zeros((n_internal, n_cart, n_cart))
-            
 
             for atom in range(n_atoms):
                 for coord in range(3):
@@ -77,8 +76,6 @@ class TestInterpolationSetup:
                     
             return b
         
-
-        
         molecule_xyz = '''7
 
         C             -0.666468000000        -2.187340000000        -0.571285000000
@@ -100,18 +97,13 @@ class TestInterpolationSetup:
         
         b_matrix = interpolation_datapoint.b_matrix
         b2_matrix = interpolation_datapoint.b2_matrix
-        print(np.linalg.norm(num_b - b_matrix))
-        print(np.linalg.norm(num_b2 - b2_matrix))
 
         # Check if the B- and B2-Matrix are correctly determined by comparing to the numerical versions
 
         assert np.max(np.abs(num_b - b_matrix)) < 1.0e-5
         assert np.max(np.abs(num_b2 - b2_matrix)) < 1.0e-5
-        
-        
 
-    def compare_internal_transformation(self):
-        
+    def test_internal_transformation(self):
         
         molecule_xyz = '''7
 
@@ -155,13 +147,10 @@ class TestInterpolationSetup:
         assert np.max(np.abs(qm_gradient - cartesian_gradient)) < 1.0e-5
         assert np.max(np.abs(cartesian_hessian - cartesian_hessian)) < 1.0e-5
 
-        print('I have not asserted')
+    def test_interpolation_scheme(self):
 
-        print('norm of Gradient', np.linalg.norm(cartesian_gradient - qm_gradient))
-        print('norm of Hessian', np.linalg.norm(cartesian_hessian - qm_hessian))
-
-    
-    def confirm_interpolation_scheme(self, interpolationdatafile):
+        here = Path(__file__).parent
+        interpolationdatafile = str(here / 'data' / 'test_interpolation_database.h5')
 
         molecule_xyz_1 = '''7
 
@@ -228,7 +217,6 @@ class TestInterpolationSetup:
 
         gradients = [gradient_mol_1, gradient_mol_2]
 
-
         for i, mol_xyz in enumerate(molecule_xyz_strings):
             molecule = Molecule.from_xyz_string(mol_xyz)
             
@@ -253,10 +241,9 @@ class TestInterpolationSetup:
             # Check if the internal coordinates are being defined correctly
 
             assert sorted(map(tuple, org_z_matrix)) == sorted(map(tuple, z_matrix))
+
             interpolation_driver.impes_coordinate.z_matrix = z_matrix
             
-
-                    
             im_datapoints = []
             for ordered_label in sorted_labels:
                 im_datapoint = InterpolationDatapoint(z_matrix)
@@ -295,11 +282,3 @@ class TestInterpolationSetup:
 
             assert np.max(np.abs(im_simple_energy - correct_simple_interpolation_energy)) < 1.0e-5
             assert np.max(np.abs(im_simple_gradient - correct_simple_interpolation_gradient)) < 1.0e-5
-
-test = TestInterpolationSetup()
-test.compare_internal_transformation()
-test.confirm_interpolation_scheme('data/test_interpolation_database.h5')
-test.confirm_b_b2_matrix()
-
-print('Test has passed')
-
