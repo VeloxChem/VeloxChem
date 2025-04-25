@@ -251,22 +251,38 @@ class EvbFepDriver():
         sz = self.equil_step_size * mmunit.picoseconds
         equil_simulation.integrator.setStepSize(sz)
         self.ostream.print_info(f"Equilibration with step size {sz}")
+        if self.NPT:
+            NPT_equil_reporter = mmapp.StateDataReporter(
+                str(self.run_folder / f"equil_NPT_data_{l:.3f}.csv"),
+                1,
+                step=True,
+                potentialEnergy=True,
+                kineticEnergy=True,
+                temperature=True,
+                volume=True,
+                density=True,
+                append=False,
+            )
+            equil_simulation.reporters.append(NPT_equil_reporter)
+            barostat = [force for force in equil_simulation.system.getForces() if isinstance(force,mm.MonteCarloBarostat)][0]
         if l == 0:
             if self.NPT:
+                barostat.setFrequency(0)
                 self.ostream.print_info(
                     f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
                 )
                 self.ostream.flush()
-                equil_simulation.integrator.setIntegrationForceGroups(
-                    EvbForceGroup.NVT_integration_force_groups())
+                # equil_simulation.integrator.setIntegrationForceGroups(
+                #     EvbForceGroup.NVT_integration_force_groups())
 
                 self._safe_step(equil_simulation, self.initial_equil_NVT_steps)
                 self.ostream.print_info(
                     f"Running initial NPT equilibration for {self.initial_equil_NPT_steps} steps"
                 )
                 self.ostream.flush()
-                equil_simulation.integrator.setIntegrationForceGroups(
-                    EvbForceGroup.integration_force_groups())
+                barostat.setFrequency(25)
+                # equil_simulation.integrator.setIntegrationForceGroups(
+                #     EvbForceGroup.integration_force_groups())
                 self._safe_step(equil_simulation, self.initial_equil_NPT_steps)
             else:
                 self.ostream.print_info(
@@ -283,15 +299,17 @@ class EvbFepDriver():
             self.ostream.print_info(
                 f"Running NVT equilibration for {self.equil_NVT_steps} steps")
             self.ostream.flush()
-            equil_simulation.integrator.setIntegrationForceGroups(
-                EvbForceGroup.NVT_integration_force_groups())
+            barostat.setFrequency(0)
+            # equil_simulation.integrator.setIntegrationForceGroups(
+            #     EvbForceGroup.NVT_integration_force_groups())
             self._safe_step(equil_simulation, self.equil_NVT_steps)
 
             self.ostream.print_info(
                 f"Running NPT equilibration for {self.equil_NPT_steps} steps")
             self.ostream.flush()
-            equil_simulation.integrator.setIntegrationForceGroups(
-                EvbForceGroup.integration_force_groups())
+            barostat.setFrequency(25)
+            # equil_simulation.integrator.setIntegrationForceGroups(
+            #     EvbForceGroup.integration_force_groups())
             self._safe_step(equil_simulation, self.equil_NPT_steps)
 
         equil_state = equil_simulation.context.getState(
@@ -443,32 +461,17 @@ class EvbFepDriver():
                 getVelocities=True,
                 getForces=True,
                 getEnergy=True,
+                enforcePeriodicBox=True,
             )
             kin = state.getKineticEnergy()
             kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
             pot = state.getPotentialEnergy()
             pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
 
-            # self.ostream.print_info(
-            #     f"Step {i}, kinetic energy: {kin:.5f} kJ/mol, potential energy: {pot:.5f} kJ/mol"
-            # )
-            self.ostream.flush()
 
             states.append(state)
             if len(states) > self.save_frames:
                 states.pop(0)
-
-            # if pot > 0 and not potwarning:
-
-            #     self.ostream.print_warning(
-            #         f"Potential energy is positive: {pot:.5f} kJ/mol."
-            #     )
-            #     potwarning = True
-            # self._save_states(states, simulation, i)
-            # raise RuntimeError(
-            #     f"Potential energy is positive: {pot:.5f} kJ/mol. Simulation crashed"
-            # )
-
         return states
 
     def _save_states(self, states, simulation, step):
@@ -477,7 +480,7 @@ class EvbFepDriver():
         cwd = Path.cwd()
         path = cwd / self.run_folder
 
-        energies = np.zeros((len(states), len(EvbForceGroup) + 3))
+        energies = np.zeros((len(states), len(EvbForceGroup) + 4))
 
         for j, state in enumerate(states):
             step_num = step - len(states) + j
@@ -495,10 +498,13 @@ class EvbFepDriver():
             kin = kin.value_in_unit(mmunit.kilojoule_per_mole)
             pot = state.getPotentialEnergy()
             pot = pot.value_in_unit(mmunit.kilojoule_per_mole)
+            vol = state.getPeriodicBoxVolume()
+            vol = vol.value_in_unit(mmunit.nanometer**3)
 
             energies[j, 0] = step_num
             energies[j, 1] = kin
             energies[j, 2] = pot
+            energies[j, 3] = vol
 
             simulation.context.setState(state)
             energies[j, 0]
@@ -510,7 +516,7 @@ class EvbFepDriver():
                 energy = fg_state.getPotentialEnergy()
                 energy = energy.value_in_unit(mmunit.kilojoule_per_mole)
                 energies[j, k + 3] = energy
-        header = "step,kinetic,potential,"
+        header = "step,kinetic,potential,volume"
         header += ",".join([fg.name for fg in EvbForceGroup])
         np.savetxt(
             path / f"crash_energies.csv",

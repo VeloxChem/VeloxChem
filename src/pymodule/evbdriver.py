@@ -878,11 +878,11 @@ class EvbDriver():
                 "Debugging enabled, using low number of steps. Do not use for production"
             )
             self.ostream.flush()
-            equil_NVT_steps = 0
+            equil_NVT_steps = 100
             equil_NPT_steps = 100
             sample_steps = 200
             write_step = 5
-            initial_equil_NVT_steps = 0
+            initial_equil_NVT_steps = 100
             initial_equil_NPT_steps = 100
             step_size = 0.001
             equil_step_size = 0.001
