@@ -30,7 +30,7 @@
 //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 //  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "NuclearPotentialValues.hpp"
+#include "NuclearPotentialErfValues.hpp"
 
 #include <omp.h>
 
@@ -44,7 +44,7 @@
 #include "GtoInfo.hpp"
 #include "MathFunc.hpp"
 
-#define PAD_SIZE 8
+#define CHUNK_SIZE 4
 
 #define MATH_CONST_PI 3.14159265358979323846
 
@@ -53,13 +53,19 @@
 namespace onee {  // onee namespace
 
 auto
-computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& basis, const double* point_coords, const int npoints, const double* D, const int naos) -> std::vector<double>
+computeNuclearPotentialErfValues(const CMolecule& molecule,
+                                 const CMolecularBasis& basis,
+                                 const double* point_coords,
+                                 const int npoints,
+                                 const double* D,
+                                 const int naos,
+                                 const double* omega) -> std::vector<double>
 {
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
 
     errors::assertMsgCritical(
             naos == gtofunc::getNumberOfAtomicOrbitals(gto_blocks),
-            std::string("computeNuclearPotentialValues: Inconsistent number of AOs"));
+            std::string("computeNuclearPotentialErfValues: Inconsistent number of AOs"));
 
     auto nthreads = omp_get_max_threads();
 
@@ -123,7 +129,7 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
         }
         else
         {
-            std::string errangmom("computeNuclearPotentialValues: Only implemented up to f-orbitals");
+            std::string errangmom("computeNuclearPotentialErfValues: Only implemented up to f-orbitals");
 
             errors::assertMsgCritical(false, errangmom);
         }
@@ -384,7 +390,7 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
     // S-S block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -413,12 +419,40 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
 
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            {
+                auto j_cgto_sph = j_cgto;
+                double j_coef_sph = 1.0;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -426,19 +460,31 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F0_t[1];
 
-            onee::computeBoysFunction(F0_t, (a_i + a_j) * r2_PC, 0, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F0_t, rho * d2 * r2_PC, 0, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F0_t[0] *= sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F0_t[0] * (
 
@@ -450,31 +496,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                {
-                    auto j_cgto_sph = j_cgto;
-                    double j_coef_sph = 1.0;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // S-P block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -504,13 +533,42 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -518,19 +576,33 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F1_t[2];
 
-            onee::computeBoysFunction(F1_t, (a_i + a_j) * r2_PC, 1, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F1_t, rho * d2 * r2_PC, 1, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F1_t[0] *= sqrt_d2;
+
+                F1_t[1] *= d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F1_t[0] * (
 
@@ -550,32 +622,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // S-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -606,14 +660,43 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+        const auto PB_1 = (-a_i * inv_aij) * rij[b1];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -621,19 +704,35 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F2_t[3];
 
-            onee::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F2_t, rho * d2 * r2_PC, 2, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F2_t[0] *= sqrt_d2;
+
+                F2_t[1] *= d2 * sqrt_d2;
+
+                F2_t[2] *= d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F2_t[0] * (
 
@@ -670,32 +769,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // S-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < sf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -727,15 +808,44 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
-        const auto PB_2 = (-a_i / (a_i + a_j)) * rij[b2];
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+        const auto PB_1 = (-a_i * inv_aij) * rij[b1];
+        const auto PB_2 = (-a_i * inv_aij) * rij[b2];
 
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        {
+            auto i_cgto_sph = i_cgto;
+            double i_coef_sph = 1.0;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -743,19 +853,37 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F3_t[4];
 
-            onee::computeBoysFunction(F3_t, (a_i + a_j) * r2_PC, 3, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F3_t, rho * d2 * r2_PC, 3, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F3_t[0] *= sqrt_d2;
+
+                F3_t[1] *= d2 * sqrt_d2;
+
+                F3_t[2] *= d2 * d2 * sqrt_d2;
+
+                F3_t[3] *= d2 * d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F3_t[0] * (
 
@@ -813,32 +941,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            {
-                auto i_cgto_sph = i_cgto;
-                double i_coef_sph = 1.0;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // P-P block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pp_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -869,14 +979,44 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
 
-        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
+        const auto PA_0 = (a_j * inv_aij) * rij[a0];
 
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -884,19 +1024,35 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F2_t[3];
 
-            onee::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F2_t, rho * d2 * r2_PC, 2, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F2_t[0] *= sqrt_d2;
+
+                F2_t[1] *= d2 * sqrt_d2;
+
+                F2_t[2] *= d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F2_t[0] * (
 
@@ -933,33 +1089,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_p[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // P-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -991,15 +1128,45 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
 
-        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
+        const auto PA_0 = (a_j * inv_aij) * rij[a0];
 
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+        const auto PB_1 = (-a_i * inv_aij) * rij[b1];
+
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1007,19 +1174,37 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F3_t[4];
 
-            onee::computeBoysFunction(F3_t, (a_i + a_j) * r2_PC, 3, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F3_t, rho * d2 * r2_PC, 3, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F3_t[0] *= sqrt_d2;
+
+                F3_t[1] *= d2 * sqrt_d2;
+
+                F3_t[2] *= d2 * d2 * sqrt_d2;
+
+                F3_t[3] *= d2 * d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F3_t[0] * (
 
@@ -1077,33 +1262,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // P-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < pf_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1136,16 +1302,46 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
 
-        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
-        const auto PB_2 = (-a_i / (a_i + a_j)) * rij[b2];
+        const auto PA_0 = (a_j * inv_aij) * rij[a0];
 
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+        const auto PB_1 = (-a_i * inv_aij) * rij[b1];
+        const auto PB_2 = (-a_i * inv_aij) * rij[b2];
+
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1153,19 +1349,39 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F4_t[5];
 
-            onee::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F4_t, rho * d2 * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F4_t[0] *= sqrt_d2;
+
+                F4_t[1] *= d2 * sqrt_d2;
+
+                F4_t[2] *= d2 * d2 * sqrt_d2;
+
+                F4_t[3] *= d2 * d2 * d2 * sqrt_d2;
+
+                F4_t[4] *= d2 * d2 * d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F4_t[0] * (
 
@@ -1268,33 +1484,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_p[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // D-D block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < dd_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1327,16 +1524,46 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
 
-        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-        const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
+        const auto PA_0 = (a_j * inv_aij) * rij[a0];
+        const auto PA_1 = (a_j * inv_aij) * rij[a1];
 
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+        const auto PB_1 = (-a_i * inv_aij) * rij[b1];
+
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1344,19 +1571,39 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F4_t[5];
 
-            onee::computeBoysFunction(F4_t, (a_i + a_j) * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F4_t, rho * d2 * r2_PC, 4, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F4_t[0] *= sqrt_d2;
+
+                F4_t[1] *= d2 * sqrt_d2;
+
+                F4_t[2] *= d2 * d2 * sqrt_d2;
+
+                F4_t[3] *= d2 * d2 * d2 * sqrt_d2;
+
+                F4_t[4] *= d2 * d2 * d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F4_t[0] * (
 
@@ -1459,33 +1706,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_d[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // D-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < df_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1519,17 +1747,47 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
 
-        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-        const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
-        const auto PB_2 = (-a_i / (a_i + a_j)) * rij[b2];
+        const auto PA_0 = (a_j * inv_aij) * rij[a0];
+        const auto PA_1 = (a_j * inv_aij) * rij[a1];
 
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+        const auto PB_1 = (-a_i * inv_aij) * rij[b1];
+        const auto PB_2 = (-a_i * inv_aij) * rij[b2];
+
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = (Dij + Dji);
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1537,19 +1795,41 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F5_t[6];
 
-            onee::computeBoysFunction(F5_t, (a_i + a_j) * r2_PC, 5, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F5_t, rho * d2 * r2_PC, 5, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F5_t[0] *= sqrt_d2;
+
+                F5_t[1] *= d2 * sqrt_d2;
+
+                F5_t[2] *= d2 * d2 * sqrt_d2;
+
+                F5_t[3] *= d2 * d2 * d2 * sqrt_d2;
+
+                F5_t[4] *= d2 * d2 * d2 * d2 * sqrt_d2;
+
+                F5_t[5] *= d2 * d2 * d2 * d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F5_t[0] * (
 
@@ -1724,33 +2004,14 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_d[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = (Dij + Dji);
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 
 
     // F-F block
 
-    #pragma omp parallel for schedule(static, PAD_SIZE)
+    #pragma omp parallel for schedule(dynamic, CHUNK_SIZE)
     for (int ij = 0; ij < ff_prim_pair_count; ij++)
     {
         const auto thread_id = omp_get_thread_num();
@@ -1785,18 +2046,48 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
         const auto r2_ij = rij[0] * rij[0] + rij[1] * rij[1] + rij[2] * rij[2];
 
-        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto inv_aij = 1.0 / (a_i + a_j);
 
-        const auto PA_0 = (a_j / (a_i + a_j)) * rij[a0];
-        const auto PA_1 = (a_j / (a_i + a_j)) * rij[a1];
-        const auto PA_2 = (a_j / (a_i + a_j)) * rij[a2];
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI * inv_aij, 1.5) * std::exp(-a_i * a_j * inv_aij * r2_ij);
 
-        const auto PB_0 = (-a_i / (a_i + a_j)) * rij[b0];
-        const auto PB_1 = (-a_i / (a_i + a_j)) * rij[b1];
-        const auto PB_2 = (-a_i / (a_i + a_j)) * rij[b2];
+        const auto PA_0 = (a_j * inv_aij) * rij[a0];
+        const auto PA_1 = (a_j * inv_aij) * rij[a1];
+        const auto PA_2 = (a_j * inv_aij) * rij[a2];
 
+        const auto PB_0 = (-a_i * inv_aij) * rij[b0];
+        const auto PB_1 = (-a_i * inv_aij) * rij[b1];
+        const auto PB_2 = (-a_i * inv_aij) * rij[b2];
+
+        // product of density and cart-sph transformation coefficients
+
+        double dens_coef_prod = 0.0;
+
+        for (const auto& i_cgto_sph_ind_coef : cart_sph_f[i_cgto])
+        {
+            auto i_cgto_sph = i_cgto_sph_ind_coef.first;
+            auto i_coef_sph = i_cgto_sph_ind_coef.second;
+
+            for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
+            {
+                auto j_cgto_sph = j_cgto_sph_ind_coef.first;
+                auto j_coef_sph = j_cgto_sph_ind_coef.second;
+
+                auto coef_sph = i_coef_sph * j_coef_sph;
+
+                auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
+                auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
+
+                double D_sym = ((i == j) ? Dij : (Dij + Dji));
+
+                dens_coef_prod += coef_sph * D_sym;
+            }
+        }
 
         // J. Chem. Phys. 84, 3963-3974 (1986)
+
+        const auto rho = a_i + a_j;
+
+        const auto V_ij_00 = MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00;
 
         for (int c = 0; c < npoints; c++)
         {
@@ -1804,19 +2095,43 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
             const auto y_c = points_info[c + npoints * 1];
             const auto z_c = points_info[c + npoints * 2];
 
-            const double PC[3] = {(a_i * x_i + a_j * x_j) / (a_i + a_j) - x_c,
-                                  (a_i * y_i + a_j * y_j) / (a_i + a_j) - y_c,
-                                  (a_i * z_i + a_j * z_j) / (a_i + a_j) - z_c};
+            const double PC[3] = {(a_i * x_i + a_j * x_j) * inv_aij - x_c,
+                                  (a_i * y_i + a_j * y_j) * inv_aij - y_c,
+                                  (a_i * z_i + a_j * z_j) * inv_aij - z_c};
 
             const auto r2_PC = PC[0] * PC[0] + PC[1] * PC[1] + PC[2] * PC[2];
 
+            double d2 = 1.0;
+
+            if ((omega != nullptr) && (omega[c] != 0.0)) d2 = omega[c] * omega[c] / (rho + omega[c] * omega[c]);
+
             double F6_t[7];
 
-            onee::computeBoysFunction(F6_t, (a_i + a_j) * r2_PC, 6, boys_func_table.data(), boys_func_ft.data());
+            onee::computeBoysFunction(F6_t, rho * d2 * r2_PC, 6, boys_func_table.data(), boys_func_ft.data());
+
+            if ((omega != nullptr) && (omega[c] != 0.0))
+            {
+                const double sqrt_d2 = std::sqrt(d2);
+
+                F6_t[0] *= sqrt_d2;
+
+                F6_t[1] *= d2 * sqrt_d2;
+
+                F6_t[2] *= d2 * d2 * sqrt_d2;
+
+                F6_t[3] *= d2 * d2 * d2 * sqrt_d2;
+
+                F6_t[4] *= d2 * d2 * d2 * d2 * sqrt_d2;
+
+                F6_t[5] *= d2 * d2 * d2 * d2 * d2 * sqrt_d2;
+
+                F6_t[6] *= d2 * d2 * d2 * d2 * d2 * d2 * sqrt_d2;
+
+            }
 
             // Note: minus sign from electron charge
 
-            double npot_val = (-1.0) * MATH_CONST_TWO_OVER_SQRT_PI * sqrt(a_i + a_j) * S_ij_00 * (
+            double npot_val = (-1.0) * V_ij_00 * (
 
                     F6_t[0] * (
 
@@ -2147,26 +2462,7 @@ computeNuclearPotentialValues(const CMolecule& molecule, const CMolecularBasis& 
 
             );
 
-            for (const auto& i_cgto_sph_ind_coef : cart_sph_f[i_cgto])
-            {
-                auto i_cgto_sph = i_cgto_sph_ind_coef.first;
-                auto i_coef_sph = i_cgto_sph_ind_coef.second;
-
-                for (const auto& j_cgto_sph_ind_coef : cart_sph_f[j_cgto])
-                {
-                    auto j_cgto_sph = j_cgto_sph_ind_coef.first;
-                    auto j_coef_sph = j_cgto_sph_ind_coef.second;
-
-                    auto coef_sph = i_coef_sph * j_coef_sph;
-
-                    auto Dij = D[i_cgto_sph * naos + j_cgto_sph];
-                    auto Dji = D[j_cgto_sph * naos + i_cgto_sph];
-
-                    double D_sym = ((i == j) ? Dij : (Dij + Dji));
-
-                    npot_values_omp[thread_id][c] += npot_val * coef_sph * D_sym;
-                }
-            }
+            npot_values_omp[thread_id][c] += npot_val * dens_coef_prod;
         }
     }
 

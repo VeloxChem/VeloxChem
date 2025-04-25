@@ -1,14 +1,13 @@
-from mpi4py import MPI
 import numpy as np
 import pytest
 
 from veloxchem import Molecule, MolecularBasis
 from veloxchem import FockGeom1000Driver
-from veloxchem import RIFockDriver, TwoCenterElectronRepulsionDriver
-from veloxchem import T4CScreener, SubMatrix
+from veloxchem import T4CScreener
 from veloxchem import make_matrix, mat_t, mpi_master
 from veloxchem import ScfRestrictedDriver
-from veloxchem.rigradientdriver import RIFockGradDriver
+from veloxchem.rifockdriver import RIFockDriver
+from veloxchem.veloxchemlib import RIFockGradDriver
 
 
 @pytest.mark.solvers
@@ -71,26 +70,13 @@ class TestRIJFockGeomExGradDriver:
         ket_t4c = T4CScreener()
         ket_t4c.partition(bas, mol, 'eri')
 
-        # compute J metric
-        t2c_drv = TwoCenterElectronRepulsionDriver()
-        matj = t2c_drv.compute(mol, bas_aux)
-        rmatj = np.linalg.inv(matj.full_matrix().to_numpy())
-        invmatj = SubMatrix([0, 0, rmatj.shape[0], rmatj.shape[0]])
-        invmatj.set_values(rmatj)
-
         local_atoms = mol.partition_atoms(comm)
 
-        ri_fock_drv = RIFockDriver(invmatj)
-        ri_fock_drv.prepare_buffers(mol, bas, bas_aux, local_atoms)
+        ri_fock_drv = RIFockDriver(comm)
+        ri_fock_drv.prepare_buffers(mol, bas, bas_aux, verbose=False)
 
-        local_gs_bq = np.array(ri_fock_drv.compute_local_bq_vector(gs_den_mat))
-        gs_bq = np.zeros(local_gs_bq.shape)
-        comm.Allreduce(local_gs_bq, gs_bq, op=MPI.SUM)
-
-        local_rw_bq = np.array(
-            ri_fock_drv.compute_local_bq_vector(rw_den_sym_mat))
-        rw_bq = np.zeros(local_rw_bq.shape)
-        comm.Allreduce(local_rw_bq, rw_bq, op=MPI.SUM)
+        gs_bq = ri_fock_drv.compute_bq_vector(gs_den_mat)
+        rw_bq = ri_fock_drv.compute_bq_vector(rw_den_sym_mat)
 
         ri_grad_drv = RIFockGradDriver()
 

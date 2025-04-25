@@ -8,6 +8,7 @@ from veloxchem.evbdriver import EvbDriver
 from veloxchem.evbffbuilder import EvbForceFieldBuilder
 from veloxchem.evbsystembuilder import EvbSystemBuilder
 from veloxchem.evbdataprocessing import EvbDataProcessing
+from veloxchem.xtbdriver import XtbDriver
 
 try:
     import openmm as mm
@@ -15,6 +16,10 @@ except ImportError:
     pass
 
 
+@pytest.mark.skipif(('openmm' not in sys.modules)
+                    or (not XtbDriver.is_available()),
+                    reason='openmm or xtb-python not available')
+@pytest.mark.timeconsuming
 class TestEvb:
 
     @pytest.mark.skipif('openmm' not in sys.modules,

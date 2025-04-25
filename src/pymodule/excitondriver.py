@@ -64,6 +64,9 @@ class ExcitonModelDriver:
     """
     Implements the exciton model.
 
+    # vlxtag: RHF, Exciton_Model
+    # vlxtag: RKS, Exciton_Model
+
     :param comm:
         The MPI communicator.
     :param ostream:

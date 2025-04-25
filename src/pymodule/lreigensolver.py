@@ -69,6 +69,9 @@ class LinearResponseEigenSolver(LinearSolver):
     """
     Implements linear response eigensolver.
 
+    # vlxtag: RHF, Absorption, ECD, TDHF
+    # vlxtag: RKS, Absorption, ECD, TDDFT
+
     :param comm:
         The MPI communicator.
     :param ostream:
