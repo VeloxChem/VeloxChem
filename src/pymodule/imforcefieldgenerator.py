@@ -681,23 +681,6 @@ class IMForceFieldGenerator:
         """
 
         all_structures = None
-
-        if self.dynamics_method == 'MM':
-            
-            # define OpenMMDriver object and perform a dynamical sampling
-            openmmdyn = OpenMMDynamics()
-
-            openmmdyn.create_system_from_molecule(molecule, ff_gen=forcefield_generator, 
-                                                  solvent=self.dynamics_settings['solvent'], 
-                                                  qm_atoms='all')
-    
-            _, conformation_structures = openmmdyn.conformational_sampling(ensemble=self.ensemble,
-                                                                           snapshots=self.snapshots, 
-                                                                           nsteps=self.timestep, 
-                                                                           temperature=self.temperature, 
-                                                                           minimize=True)
-
-            all_structures = conformation_structures
             
 
         if self.dynamics_method == 'IM':
@@ -778,10 +761,6 @@ class IMForceFieldGenerator:
                             'imforcefield_file':self.imforcefieldfile,
                             'use_inverse_bond_length':True
                           }
-
-        if self.dynamics_method == 'MM':
-            rot_bonds = forcefield_generator.rotatable_bonds
-            forcefield_generator.reparametrize_dihedrals(rot_bonds[0], scan_range=[180, 360], n_points=7, visualize=True)
 
         database_quality = False
 
@@ -1039,7 +1018,7 @@ class IMForceFieldGenerator:
         interpolation_driver.imforcefield_file = imforcefielddatafile
         z_matrix = self.define_z_matrix(molecule)
         sorted_labels = []
-        print('Here is the way', imforcefielddatafile in os.listdir(os.getcwd()))
+
         if imforcefielddatafile in os.listdir(os.getcwd()):
             labels, z_matrix = interpolation_driver.read_labels()
             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
