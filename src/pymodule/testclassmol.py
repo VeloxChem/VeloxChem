@@ -179,8 +179,7 @@ class MPC1:
                 negative_energies_virtual_orbitals_squared = negative_energies_virtual_orbitals[j][idx]**2
                 ae_point_val += negative_energies_virtual_orbitals_squared * energy_unocc[j] # Sum over all unoccupied MOs
 
-            ae_point_val /= sum(occ_mo_val[j][idx]**2 for j in range(len(occ_mo_val)))
-
+            ae_point_val /=  (sum(occ_mo_val[j][idx]**2 for j in range(len(occ_mo_val)))/2) # The last "/2" comes from that the whole expression for electron attachment should be multiplied by 2 since we use restricted wavefunctions
             AE.append(ae_point_val)
         
         self.ea_values = EA
