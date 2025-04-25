@@ -815,7 +815,7 @@ def get_mapping_between_nometal_linker_xyz(
                             center_nums + frag_nums * 4)
 
         frag1_Xs = [i + center_nums for i in frag_Xs
-                    ]  # frag_Xs is Xs indices in a single outer_edge_frag
+                   ]  # frag_Xs is Xs indices in a single outer_edge_frag
         frag2_Xs = [j + frag_nums for j in frag1_Xs]
         frag3_Xs = [k + frag_nums for k in frag2_Xs]
 
@@ -829,8 +829,8 @@ def get_mapping_between_nometal_linker_xyz(
                     if np.linalg.norm(x_center - x_frag) < 3.5:
                         cn_bond.append((x_i, x_j))
             left_xs = list(
-                set(frag1_Xs + frag2_Xs + frag3_Xs) - set(i[1]
-                                                          for i in cn_bond))
+                set(frag1_Xs + frag2_Xs + frag3_Xs) -
+                set(i[1] for i in cn_bond))
             print(left_xs, "left_xs")
             if linker_topic == 3:
                 for m in range(len(labels) - 3 * 3, len(labels)):

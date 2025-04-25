@@ -88,7 +88,7 @@ class MofBuilder:
             self.node_metal = preparation.node_metal
             self.linker_pdb = preparation.selected_linker_edge_pdb
             self.linker_center_pdb = (preparation.selected_linker_center_pdb
-                                      )  # could be None if ditopic linker
+                                     )  # could be None if ditopic linker
             self.linker_topic = preparation.linker_topic
             self.linker_xyz = preparation.linker_xyz
             return True
@@ -96,6 +96,11 @@ class MofBuilder:
             print("Error: Could not find the required files")
             print("Please redo the preparation steps")
             return False
+
+    def set_bridge_node(self, brigde_node=False, range=0.5, max_neighbor=2):
+        self.brigde_node = brigde_node
+        self.brigde_node_search_range = range
+        self.brigde_node_max_neighbor = max_neighbor
 
     def set_supercell(self, supercell):
         self.supercell = supercell
@@ -209,8 +214,7 @@ class MofBuilder:
                 self.net.set_rotation_optimizer_method(
                     self.rotation_optimizer_method)
             if hasattr(self, "rotation_optimizer_eps"):
-                self.net.set_rotation_optimizer_eps(
-                    self.rotation_optimizer_eps)
+                self.net.set_rotation_optimizer_eps(self.rotation_optimizer_eps)
             if hasattr(self, "rotation_optimizer_iprint"):
                 self.net.set_rotation_optimizer_iprint(
                     self.rotation_optimizer_iprint)
@@ -310,8 +314,7 @@ class MofBuilder:
                     self.rotation_optimizer_method)
 
             if hasattr(self, "rotation_optimizer_eps"):
-                self.net.set_rotation_optimizer_eps(
-                    self.rotation_optimizer_eps)
+                self.net.set_rotation_optimizer_eps(self.rotation_optimizer_eps)
 
             if hasattr(self, "rotation_optimizer_iprint"):
                 self.net.set_rotation_optimizer_iprint(
@@ -380,6 +383,8 @@ class MofBuilder:
         self.nodes_eG = self.net.nodes_eG.copy()
         self.edges_eG = self.net.edges_eG.copy()
         self.terms_eG = self.net.terms_eG.copy()
+        self.saved_eG_unsaturated_node = self.net.unsaturated_node.copy()
+        self.saved_eG_matched_vnode_xind = self.net.matched_vnode_xind.copy()
 
     def get_gro_lines_list(self, graphG):
         merged_node_edge_term = self.net.get_node_edge_term_grolines(
@@ -394,8 +399,7 @@ class MofBuilder:
         if gro_name is not None:
             self.gro_name = gro_name
         else:
-            self.gro_name = ("mof_" + str(self.mof_family.split(".")[0]) +
-                             "_" +
+            self.gro_name = ("mof_" + str(self.mof_family.split(".")[0]) + "_" +
                              self.linker_xyz.strip(".xyz").split("/")[-1] +
                              ".gro")
             print("gro_name is not set, will be saved as: ", self.gro_name)
@@ -649,8 +653,7 @@ class MofBuilder:
                 line = line.strip("/n")
                 arr[idx][0] = int(line[0:5])
                 arr[idx][1] = re.sub(r" ", "", str(line[5:10]))  # remove space
-                arr[idx][2] = re.sub(r" ", "",
-                                     str(line[10:15]))  # remove space
+                arr[idx][2] = re.sub(r" ", "", str(line[10:15]))  # remove space
                 arr[idx][3] = int(line[15:20])
                 arr[idx][4] = float(line[20:28]) * 10
                 arr[idx][5] = float(line[28:36]) * 10

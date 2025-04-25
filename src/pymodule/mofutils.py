@@ -107,8 +107,8 @@ def fetch_pdbfile(dir_name, keywords, nokeywords):
     candidates = []
     for pdb in Path(dir_name).rglob("*.pdb"):
         name = pdb.name
-        if all(i in name for i in keywords) and all(j not in name
-                                                    for j in nokeywords):
+        if all(i in name for i in keywords) and all(
+                j not in name for j in nokeywords):
             candidates.append(pdb.name)
     if len(candidates) == 0:
         raise ValueError(f"Cannot find a file including '{keywords}' ")
@@ -172,7 +172,7 @@ def add_quotes(value):
 def remove_note_lines(lines):
     newlines = []
     for i in range(len(lines)):
-        m = re.search("_", lines[i])
+        m = re.search(r"_", lines[i])
         if m is None:
             newlines.append(lines[i])
     return newlines
@@ -245,8 +245,8 @@ def extract_value_from_str(s):
     z_slice = [s_list[i] for i in range(len(s_list)) if "z" in s_list[i]]
     # find the only digit in the slice no x,y,z
     const_slice = [
-        s_list[i] for i in range(len(s_list)) if "x" not in s_list[i]
-        and "y" not in s_list[i] and "z" not in s_list[i]
+        s_list[i] for i in range(len(s_list)) if "x" not in s_list[i] and
+        "y" not in s_list[i] and "z" not in s_list[i]
     ]
     # extract the coefficient and constant from slice
     # if * exist then use the value before *, if - exist then *-1
@@ -312,9 +312,9 @@ def read_cif(cif_file):
         lines = f.readlines()
         nonempty_lines = [line for line in lines if line.strip()]
     # nonempty_lines=lines
-    keyword1 = "loop_"
-    keyword2 = "x,\s*y,\s*z"
-    keyword3 = "-x"
+    keyword1 = r"loop_"
+    keyword2 = r"x,\s*y,\s*z"
+    keyword3 = r"-x"
     # find the symmetry sector begin with x,y,z, beteen can have space or tab and comma,but just x start, not '-x'
     # keyword2 = "x,\s*y,\s*z"
 
@@ -328,12 +328,12 @@ def read_cif(cif_file):
             find_keyword(keyword2, nonempty_lines[i]) and
             (not find_keyword(keyword3, nonempty_lines[i])))
 
-        a = re.search("_cell_length_a", nonempty_lines[i])
-        b = re.search("_cell_length_b", nonempty_lines[i])
-        c = re.search("_cell_length_c", nonempty_lines[i])
-        alpha = re.search("_cell_angle_alpha", nonempty_lines[i])
-        beta = re.search("_cell_angle_beta", nonempty_lines[i])
-        gamma = re.search("_cell_angle_gamma", nonempty_lines[i])
+        a = re.search(r"_cell_length_a", nonempty_lines[i])
+        b = re.search(r"_cell_length_b", nonempty_lines[i])
+        c = re.search(r"_cell_length_c", nonempty_lines[i])
+        alpha = re.search(r"_cell_angle_alpha", nonempty_lines[i])
+        beta = re.search(r"_cell_angle_beta", nonempty_lines[i])
+        gamma = re.search(r"_cell_angle_gamma", nonempty_lines[i])
 
         if m:
             loop_key.append(linenumber)
@@ -377,7 +377,7 @@ def read_cif(cif_file):
             symmetry_sector = cif_sectors[i]
 
         if len(cif_sectors[i]) > 1:
-            if re.search("_atom_site_label\s+",
+            if re.search(r"_atom_site_label\s+",
                          cif_sectors[i][1]):  # line0 is _loop
                 atom_site_sector = cif_sectors[i]
 
@@ -425,8 +425,8 @@ def apply_sym_operator(symmetry_operations, array_metal_xyz):
         new_xyz = new_extend_xyz[:, 0:3]
         cell_array_metal_xyz = np.vstack((cell_array_metal_xyz, new_xyz))
 
-    round_cell_array_metal_xyz = np.round(
-        limit_value_0_1(cell_array_metal_xyz), 4)
+    round_cell_array_metal_xyz = np.round(limit_value_0_1(cell_array_metal_xyz),
+                                          4)
     _, unique_indices = np.unique(round_cell_array_metal_xyz,
                                   axis=0,
                                   return_index=True)
@@ -459,7 +459,7 @@ def process_node_pdb(pdbfile, com_target_type):
 
 def extract_atoms_fcoords_from_lines(atom_site_sector):
     atom_site_lines = []
-    keyword = "_"
+    keyword = r"_"
     for line in atom_site_sector:  # search for keywords and get linenumber
         m = re.search(keyword, line)
         if m is None:
@@ -554,8 +554,8 @@ def nodepdb2G(pdbfile, metal):
     for i in range(len(node_data)):
         for j in range(i, len(node_data)):
             if con_matrix[i, j] == 1:
-                if (nn(node_data[i][0]) == nn(node_data[j][0])
-                        and nn(node_data[i][0])
+                if (nn(node_data[i][0]) == nn(node_data[j][0]) and
+                        nn(node_data[i][0])
                         == metal):  # skip same atom type bond metal-metal
                     continue
                 # skip metal-X bond
@@ -1178,8 +1178,8 @@ def process_linker_molecule(molecule,
             linker_C_l = []
             l_list = []
             for n in lG.nodes:
-                if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k]
-                        and lG.nodes[n]["label"] == "C"):
+                if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k] and
+                        lG.nodes[n]["label"] == "C"):
                     linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                     l_list.append(lG.nodes[n]["cnodes_l"][1])
             center_connected_C_ind = [
@@ -1223,8 +1223,8 @@ def process_linker_molecule(molecule,
                 linker_C_l = []
                 l_list = []
                 for n in lG.nodes:
-                    if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k]
-                            and lG.nodes[n]["label"] == "C"):
+                    if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k] and
+                            lG.nodes[n]["label"] == "C"):
                         linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                         l_list.append(lG.nodes[n]["cnodes_l"][1])
 
@@ -1245,8 +1245,8 @@ def process_linker_molecule(molecule,
             linker_C_l = []
             l_list = []
             for n in lG.nodes:
-                if (lG.nodes[n]["cnodes_l"][0] == center_nodes[0]
-                        and lG.nodes[n]["label"] == "C"):
+                if (lG.nodes[n]["cnodes_l"][0] == center_nodes[0] and
+                        lG.nodes[n]["label"] == "C"):
                     linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                     l_list.append(lG.nodes[n]["cnodes_l"][1])
 
@@ -1266,8 +1266,8 @@ def process_linker_molecule(molecule,
                 linker_C_l = []
                 l_list = []
                 for n in lG.nodes:
-                    if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k]
-                            and lG.nodes[n]["label"] == "C"):
+                    if (lG.nodes[n]["cnodes_l"][0] == center_nodes[k] and
+                            lG.nodes[n]["label"] == "C"):
                         linker_C_l.append((n, lG.nodes[n]["cnodes_l"]))
                         l_list.append(lG.nodes[n]["cnodes_l"][1])
                 outer_connected_C_ind = [
@@ -1330,8 +1330,8 @@ def process_linker_molecule(molecule,
         single_frag_bonds = get_bonds_from_subgraph(subgraph_single_frag,
                                                     Xs_indices)
         if linker_topic == 3:
-            print("linker_center_frag:",
-                  subgraph_center_frag.number_of_nodes(), center_Xs)
+            print("linker_center_frag:", subgraph_center_frag.number_of_nodes(),
+                  center_Xs)
             print("linker_outer_frag:", subgraph_single_frag.number_of_nodes(),
                   frag_Xs)
             linker_center_node_pdb_name = Path(save_nodes_dir, "tricenter")
@@ -1508,8 +1508,8 @@ def find_pair_v_e(vvnode333, eenode333, unit_cell, distance_range=[]):
             v2 = vvnode333[np.argmin(dist)]
             v2_idx = np.argmin(dist)
         else:  # if distance_range is given, then use the distance_range to find the pair of v
-            v1v2_candidates = np.where((dist > distance_range[0])
-                                       & (dist < distance_range[1]))[0]
+            v1v2_candidates = np.where((dist > distance_range[0]) &
+                                       (dist < distance_range[1]))[0]
             if len(v1v2_candidates) != 2:
                 print("mimimum distance", np.min(dist))
                 print("dist", [d for d in dist if d < distance_range[1]])
@@ -1534,7 +1534,7 @@ def find_pair_v_e(vvnode333, eenode333, unit_cell, distance_range=[]):
                     "V" + str(v2_idx),
                     fcoords=(v1, v2),
                     fc_center=e,
-                ), )
+                ),)
                 pair_ve.append((v1, v2, e))
     return pair_ve, len(pair_ve), G
 
@@ -1573,7 +1573,7 @@ def find_pair_v_e_c(vvnode333, ecnode333, eenode333,
                     "CV" + str(v2_idx),
                     fcoords=(v1, v2),
                     fc_center=e,
-                ), )
+                ),)
                 pair_ve.append(("V" + str(v1_idx), "CV" + str(v2_idx), e))
 
     return pair_ve, len(pair_ve), G
@@ -1708,8 +1708,8 @@ def termpdb(filename):
                 except ValueError:
                     value_res_num = 1
                 data.append([
-                    value_atom, value_charge, value_note, value_res_num,
-                    'TERM', value_res_num, value_x, value_y, value_z
+                    value_atom, value_charge, value_note, value_res_num, 'TERM',
+                    value_res_num, value_x, value_y, value_z
                 ])
     return np.vstack(data)
 
@@ -2204,6 +2204,7 @@ def addxoo2edge_multitopic(eG, sc_unit_cell):
     # all xoo_node for the V node is the same
     EDGE_nodes = [n for n in eG.nodes() if pname(n) == "EDGE"]
     for n in EDGE_nodes:
+        eG.nodes[n]["xoo_f_points"] = np.zeros((0, 5))
         Xs_edge_indices, Xs_edge_fpoints = fetch_X_atoms_ind_array(
             eG.nodes[n]["f_points"], 0, "X")
         Xs_edge_ccpoints = np.hstack((
@@ -2261,12 +2262,11 @@ def addxoo2edge_multitopic(eG, sc_unit_cell):
             xoo_ind_in_vnode = [[nearest_X_ind_in_vnode] +
                                 corresponding_o_indices]
             xoo_fpoints_in_vnode = [
-                eG.nodes[nearest_vnode]["f_points"][i]
-                for i in xoo_ind_in_vnode
+                eG.nodes[nearest_vnode]["f_points"][i] for i in xoo_ind_in_vnode
             ]
             xoo_fpoints_in_vnode = np.vstack(xoo_fpoints_in_vnode)
-            eG.nodes[n]["f_points"] = np.vstack(
-                (eG.nodes[n]["f_points"], xoo_fpoints_in_vnode))
+            eG.nodes[n]["xoo_f_points"] = np.vstack(
+                (eG.nodes[n]["xoo_f_points"], xoo_fpoints_in_vnode))
             # print('add xoo to edge node',n) #debug
     return eG, unsaturated_linker, matched_vnode_X, xoo_dict
 
@@ -2281,6 +2281,7 @@ def addxoo2edge_ditopic(eG, sc_unit_cell):
     # all xoo_node for the V node is the same
     EDGE_nodes = [n for n in eG.nodes() if pname(n) == "EDGE"]
     for n in EDGE_nodes:
+        eG.nodes[n]["xoo_f_points"] = np.zeros((0, 5))
         Xs_edge_indices, Xs_edge_fpoints = fetch_X_atoms_ind_array(
             eG.nodes[n]["f_points"], 0, "X")
         Xs_edge_ccpoints = np.hstack((
@@ -2336,12 +2337,11 @@ def addxoo2edge_ditopic(eG, sc_unit_cell):
             xoo_ind_in_vnode = [[nearest_X_ind_in_vnode] +
                                 corresponding_o_indices]
             xoo_fpoints_in_vnode = [
-                eG.nodes[nearest_vnode]["f_points"][i]
-                for i in xoo_ind_in_vnode
+                eG.nodes[nearest_vnode]["f_points"][i] for i in xoo_ind_in_vnode
             ]
             xoo_fpoints_in_vnode = np.vstack(xoo_fpoints_in_vnode)
-            eG.nodes[n]["f_points"] = np.vstack(
-                (eG.nodes[n]["f_points"], xoo_fpoints_in_vnode))
+            eG.nodes[n]["xoo_f_points"] = np.vstack(
+                (eG.nodes[n]["xoo_f_points"], xoo_fpoints_in_vnode))
             # print('add xoo to edge node',n) #debug
     return eG, unsaturated_linker, matched_vnode_X, xoo_dict
 
@@ -2587,17 +2587,15 @@ def update_supercell_edge_fpoints(sG, superG, supercell):
                     type=sG.edges[e]["type"],
                 )
 
-            elif (s_edge[0] in superG.nodes()) or (s_edge[1]
-                                                   in superG.nodes()):
+            elif (s_edge[0] in superG.nodes()) or (s_edge[1] in superG.nodes()):
                 if s_edge[0] in superG.nodes():
                     superG.add_node(
                         s_edge[1],
                         f_points=np.hstack(
                             (
                                 sG.nodes[e[1]]["f_points"][:, 0:2],
-                                sG.nodes[e[1]]["f_points"][:,
-                                                           2:5].astype(float) +
-                                i,
+                                sG.nodes[e[1]]["f_points"][:, 2:5].astype(float)
+                                + i,
                             )
                         ),  # NOTE:modified because of extra column of atom type
                         fcoords=sG.nodes[e[1]]["fcoords"] + i,
@@ -2611,9 +2609,8 @@ def update_supercell_edge_fpoints(sG, superG, supercell):
                         f_points=np.hstack(
                             (
                                 sG.nodes[e[0]]["f_points"][:, 0:2],
-                                sG.nodes[e[0]]["f_points"][:,
-                                                           2:5].astype(float) +
-                                i,
+                                sG.nodes[e[0]]["f_points"][:, 2:5].astype(float)
+                                + i,
                             )
                         ),  # NOTE:modified because of extra column of atom type
                         fcoords=sG.nodes[e[0]]["fcoords"] + i,
@@ -2684,8 +2681,8 @@ def update_supercell_bundle(superG, super_multiedge_bundlings):
                 ec_node,
                 f_points=np.hstack((
                     superG.nodes[prim_ecname]["f_points"]
-                    [:, 0:
-                     2],  # NOTE:modified because of extra column of atom type
+                    [:,
+                     0:2],  # NOTE:modified because of extra column of atom type
                     superG.nodes[prim_ecname]["f_points"][:, 2:5].astype(float)
                     + trans,
                 )),  # NOTE:modified because of extra column of atom type
@@ -2705,8 +2702,9 @@ def update_supercell_bundle(superG, super_multiedge_bundlings):
                         superG.nodes[prim_cnname]["f_points"]
                         [:, 0:
                          2],  # NOTE:modified because of extra column of atom type
-                        superG.nodes[prim_cnname]["f_points"][:, 2:5].astype(
-                            float) + trans,
+                        superG.nodes[prim_cnname]["f_points"][:,
+                                                              2:5].astype(float)
+                        + trans,
                     )),  # NOTE:modified because of extra column of atom type
                     fcoords=superG.nodes[prim_cnname]["fcoords"] + trans,
                     type="SV",
@@ -2717,8 +2715,8 @@ def update_supercell_bundle(superG, super_multiedge_bundlings):
                 cn,
                 f_points=np.hstack((
                     superG.edges[prim_ecname, prim_cnname]["f_points"]
-                    [:, 0:
-                     2],  # NOTE:modified because of extra column of atom type
+                    [:,
+                     0:2],  # NOTE:modified because of extra column of atom type
                     superG.edges[prim_ecname,
                                  prim_cnname]["f_points"][:, 2:5].astype(float)
                     + trans,
@@ -2735,12 +2733,9 @@ def check_multiedge_bundlings_insuperG(super_multiedge_bundlings, superG):
     super_multiedge_bundlings_edges = []
     for ec_node in super_multiedge_bundlings:
         # check is all CV node in superG are in the super_multiedge_bundlings_edges first element
-        cvnodes = [
-            n for n in superG.nodes() if superG.nodes[n]["note"] == "CV"
-        ]
+        cvnodes = [n for n in superG.nodes() if superG.nodes[n]["note"] == "CV"]
         # use set to check if all cvnodes are in the super_multiedge_bundlings_edges
-        if set(cvnodes) == set([i[0]
-                                for i in super_multiedge_bundlings_edges]):
+        if set(cvnodes) == set([i[0] for i in super_multiedge_bundlings_edges]):
             return superG
         else:
             print("not all CV nodes in super_multiedge_bundlings_edges")
@@ -2814,8 +2809,7 @@ def fetch_X_atoms_ind_array(array, column, X):
     # X: label to search for
 
     ind = [
-        k for k in range(len(array))
-        if re.sub(r"\d", "", array[k, column]) == X
+        k for k in range(len(array)) if re.sub(r"\d", "", array[k, column]) == X
     ]
     x_array = array[ind]
     return ind, x_array
@@ -2878,9 +2872,7 @@ def sort_nodes_by_type_connectivity(G):
             if G.nodes[n]["type"] == "DV" and G.nodes[n]["note"] == "V"
         ]
         CV_Vnodes = sorted(CV_Vnodes, key=lambda x: G.degree(x), reverse=True)
-        CV_DVnodes = sorted(CV_DVnodes,
-                            key=lambda x: G.degree(x),
-                            reverse=True)
+        CV_DVnodes = sorted(CV_DVnodes, key=lambda x: G.degree(x), reverse=True)
         V_Vnodes = sorted(V_Vnodes, key=lambda x: G.degree(x), reverse=True)
         V_DVnodes = sorted(V_DVnodes, key=lambda x: G.degree(x), reverse=True)
 
@@ -2920,8 +2912,7 @@ def make_unsaturated_vnode_xoo_dict(unsaturated_node, xoo_dict,
     for unsat_v in unsaturated_node:
         if unsat_v in matched_vnode_xind_dict.keys():
             unsaturated_vnode_xind_dict[unsat_v] = [
-                i for i in xoo_keys
-                if i not in matched_vnode_xind_dict[unsat_v]
+                i for i in xoo_keys if i not in matched_vnode_xind_dict[unsat_v]
             ]
             # print(unsaturated_vnode_xind_dict[unsat_v],'unsaturated_vnode_xind_dict[unsat_v]') #DEBUG
         else:
@@ -2936,7 +2927,7 @@ def make_unsaturated_vnode_xoo_dict(unsaturated_node, xoo_dict,
             x_cpoints = np.hstack(
                 (x_fpoints[0:2],
                  fractional_to_cartesian(x_fpoints[2:5], sc_unit_cell)
-                 ))  # NOTE: modified add the atom type and atom name
+                ))  # NOTE: modified add the atom type and atom name
             oo_ind_in_vnode = xoo_dict[xind]
             oo_fpoints_in_vnode = [
                 eG.nodes[vnode]["f_points"][i] for i in oo_ind_in_vnode
@@ -3049,9 +3040,9 @@ def extract_node_edge_term(tG, sc_unit_cell):
                         )))  # term name in eG is added to the last column
 
         elif pname(n) == "EDGE":
-            postions = tG.nodes[n]["f_points"]
+            postions = np.vstack(
+                (tG.nodes[n]["f_points"], tG.nodes[n]["xoo_f_points"]))
             name = tG.nodes[n]["name"]
-            print('edge name', name)
             edges_check_set.add(len(postions))
             edges_name_set.add(name)
             if len(edges_check_set) > len(edges_name_set):
@@ -3085,9 +3076,9 @@ def check_supercell_box_range(point, supercell, buffer_plus, buffer_minus):
     supercell_x = supercell[0] + buffer_plus
     supercell_y = supercell[1] + buffer_plus
     supercell_z = supercell[2] + buffer_plus
-    if (point[0] >= 0 + buffer_minus and point[0] <= supercell_x
-            and point[1] >= 0 + buffer_minus and point[1] <= supercell_y
-            and point[2] >= 0 + buffer_minus and point[2] <= supercell_z):
+    if (point[0] >= 0 + buffer_minus and point[0] <= supercell_x and
+            point[1] >= 0 + buffer_minus and point[1] <= supercell_y and
+            point[2] >= 0 + buffer_minus and point[2] <= supercell_z):
         return True
     else:
         # print(point, 'out of supercell box range:  [',supercell_x,supercell_y,supercell_z, '],   will be excluded') #debug
@@ -3160,8 +3151,8 @@ def make_dummy_split_node_dict(dummy_node_name):
 
 
 def chunk_array(chunk_list, array, chunk_num, chunksize):
-    chunk_list.extend(array[i * chunksize:(i + 1) * chunksize]
-                      for i in range(chunk_num))
+    chunk_list.extend(
+        array[i * chunksize:(i + 1) * chunksize] for i in range(chunk_num))
     return chunk_list
 
 
@@ -3188,8 +3179,7 @@ def rename_node_arr(node_split_dict, node_arr):
             metal = idx_arr[0:metal_range].copy()
             metal[:, 1] = "METAL"
             metals_list = chunk_array(metals_list, metal,
-                                      node_split_dict["METAL_count"],
-                                      dummy_len)
+                                      node_split_dict["METAL_count"], dummy_len)
         if hho_num > 0:
             hho = idx_arr[metal_range:hho_range].copy()
             hho[:, 1] = "HHO"
@@ -3198,8 +3188,7 @@ def rename_node_arr(node_split_dict, node_arr):
         if ho_num > 0:
             ho = idx_arr[hho_range:ho_range].copy()
             ho[:, 1] = "HO"
-            hos_list = chunk_array(hos_list, ho, node_split_dict["HO_count"],
-                                   2)
+            hos_list = chunk_array(hos_list, ho, node_split_dict["HO_count"], 2)
         if o_num > 0:
             o = idx_arr[ho_range:o_range].copy()
             o[:, 1] = "O"
@@ -3208,8 +3197,8 @@ def rename_node_arr(node_split_dict, node_arr):
     return metals_list, hhos_list, hos_list, os_list
 
 
-def merge_metal_list_to_node_array(merged_node_edge_term, metals_list,
-                                   line_num, res_count):
+def merge_metal_list_to_node_array(merged_node_edge_term, metals_list, line_num,
+                                   res_count):
     if any([len(metal) == 0 for metal in metals_list]):
         return merged_node_edge_term, line_num, res_count
     for i in range(len(metals_list)):
@@ -3231,7 +3220,7 @@ def convert_node_array_to_gro_lines(array, line_num_start, res_num_start):
         name = line[1]
         value_atom_number_in_gro = int(ind_inres +
                                        line_num_start)  # atom_number
-        value_label = re.sub("\d", "", line[2]) + str(ind_inres)  # atom_label
+        value_label = re.sub(r"\d", "", line[2]) + str(ind_inres)  # atom_label
         value_resname = str(name)[
             0:3]  # +str(eG.nodes[n]['index'])  # residue_name
         value_resnumber = int(res_num_start + int(line[0]))  # residue number
@@ -3583,8 +3572,7 @@ class NetOptimizer:
         """
         self.saved_optimized_rotations = optimized_rotations
         print(
-            "load the saved optimized_rotations from the previous optimization"
-        )
+            "load the saved optimized_rotations from the previous optimization")
 
     def to_save_optimized_rotations(self, filename):
         """
@@ -3699,10 +3687,9 @@ class NetOptimizer:
             pname_set_dict[pname(node)]["ind_ofsortednodes"].append(i)
             if len(pname_set_dict[pname(node)]
                    ["ind_ofsortednodes"]) == 1:  # first node
-                pname_set_dict[pname(
-                    node)]["rot_trans"] = get_rot_trans_matrix(
-                        node, G, sorted_nodes,
-                        Xatoms_positions_dict)  # initial guess
+                pname_set_dict[pname(node)]["rot_trans"] = get_rot_trans_matrix(
+                    node, G, sorted_nodes,
+                    Xatoms_positions_dict)  # initial guess
         self.pname_set_dict = pname_set_dict
 
         for p_name in pname_set_dict:
@@ -3733,8 +3720,8 @@ class NetOptimizer:
             ##    initial_rots
             ##).flatten()  # Initial guess for rotation matrices
 
-            initial_guess_set_rotations = (np.eye(3, 3).reshape(
-                1, 3, 3).repeat(len(pname_set), axis=0))
+            initial_guess_set_rotations = (np.eye(3, 3).reshape(1, 3, 3).repeat(
+                len(pname_set), axis=0))
 
             ####TODO: modified for mil53
             (
@@ -3794,8 +3781,7 @@ class NetOptimizer:
                 if self.use_saved_rotations_as_initial_guess:
                     print("use the saved optimized_rotations as initial guess")
                     print("-" * 80)
-                    print(" " * 20, "start to optimize the rotations",
-                          " " * 20)
+                    print(" " * 20, "start to optimize the rotations", " " * 20)
                     print("-" * 80)
 
                     saved_set_rotations = self.saved_optimized_rotations.reshape(
@@ -3895,12 +3881,10 @@ class NetOptimizer:
             G, edge_lengths, start_node, new_edge_length)
         # exclude the start_node in updated_ccoords and original_ccoords
         updated_ccoords = {
-            k: v
-            for k, v in updated_ccoords.items() if k != start_node
+            k: v for k, v in updated_ccoords.items() if k != start_node
         }
         original_ccoords = {
-            k: v
-            for k, v in original_ccoords.items() if k != start_node
+            k: v for k, v in original_ccoords.items() if k != start_node
         }
 
         # use optimized_params to update all of nodes ccoords in G, according to the fccoords
@@ -3908,8 +3892,9 @@ class NetOptimizer:
             print("-" * 80)
             print(" " * 20, "start to optimize the cell parameters", " " * 20)
             print("-" * 80)
-            optimized_params = optimize_cell_parameters(
-                self.cell_info, original_ccoords, updated_ccoords)
+            optimized_params = optimize_cell_parameters(self.cell_info,
+                                                        original_ccoords,
+                                                        updated_ccoords)
             print("-" * 80)
             print(" " * 20, "cell parameters optimization completed", " " * 20)
             print("-" * 80)
@@ -4118,8 +4103,7 @@ class NetOptimizer:
         self.prim_multiedge_bundlings = self.multiedge_bundlings
         self.super_multiedge_bundlings = make_super_multiedge_bundlings(
             self.prim_multiedge_bundlings, self.supercell)
-        superG = update_supercell_bundle(superG,
-                                         self.super_multiedge_bundlings)
+        superG = update_supercell_bundle(superG, self.super_multiedge_bundlings)
         superG = check_multiedge_bundlings_insuperG(
             self.super_multiedge_bundlings, superG)
         self.superG = superG
@@ -4224,10 +4208,10 @@ class NetOptimizer:
         only keep the main fragment of the target MOF cell, remove the other fragments, to avoid the disconnected fragments
         """
         eG = self.eG
-        self.eG = [eG.subgraph(c).copy()
-                   for c in nx.connected_components(eG)][0]
+        self.eG = [eG.subgraph(c).copy() for c in nx.connected_components(eG)
+                  ][0]
         print("main fragment of the MOF cell is kept"
-              )  # ,len(self.eG.nodes()),'nodes')
+             )  # ,len(self.eG.nodes()),'nodes')
         # print('fragment size list:',[len(c) for c in nx.connected_components(eG)]) #debug
         return self.eG
 
@@ -4247,7 +4231,7 @@ class NetOptimizer:
                     removed_nodes.append(n)
             elif pname(n) == "EDGE":
                 if (arr_dimension(eG.nodes[n]["fcoords"]) == 2
-                    ):  # ditopic linker have two points in the fcoords
+                   ):  # ditopic linker have two points in the fcoords
                     edge_coords = np.mean(eG.nodes[n]["fcoords"], axis=0)
                 elif (
                         arr_dimension(eG.nodes[n]["fcoords"]) == 1
@@ -4360,9 +4344,9 @@ class NetOptimizer:
             node_oo_center_cvec = np.mean(
                 exvnode_oo_ccoords[:, 2:5].astype(float),
                 axis=0)  # NOTE: modified add the atom type and atom name
-            node_xoo_cvecs = (
-                node_xoo_ccoords[:, 2:5].astype(float) - node_oo_center_cvec
-            )  # NOTE: modified add the atom type and atom name
+            node_xoo_cvecs = (node_xoo_ccoords[:, 2:5].astype(float) -
+                              node_oo_center_cvec
+                             )  # NOTE: modified add the atom type and atom name
             node_xoo_cvecs = node_xoo_cvecs.astype("float")
             # use record to record the rotation matrix for get rid of the repeat calculation
 
