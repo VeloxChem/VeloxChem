@@ -1,4 +1,4 @@
-name: vlxenv_impes_merge
+name: vlxenv
 channels:
   - conda-forge
 dependencies:
@@ -7,8 +7,7 @@ dependencies:
   - scikit-build
   - cxx-compiler
   - mpich
-  - blas=*=*mkl*
-  - mkl-include
+  - libblas=*=*mkl
   - eigen
   - mpi4py
   - numpy
@@ -25,7 +24,6 @@ dependencies:
   - scipy
   - rdkit
   - dftd4-python
-  - xtb
   - geometric
   - libxc
   - clang-format

@@ -22,6 +22,12 @@ Second release candidate
 
 Third release candidate
 
+1.0-rc4_ (2025-04-07)
+---------------------
+
+Fourth release candidate
+
 .. _1.0-rc: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc
 .. _1.0-rc2: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc2
 .. _1.0-rc3: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc3
+.. _1.0-rc4: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc4

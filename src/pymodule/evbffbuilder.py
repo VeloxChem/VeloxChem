@@ -1,3 +1,35 @@
+#
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
+#
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  Copyright 2018-2025 VeloxChem developers
+#
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 from mpi4py import MPI
 import numpy as np
 import networkx as nx
@@ -37,15 +69,13 @@ class EvbForceFieldBuilder():
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
 
-        self.optimise: bool = False
+        self.optimize: bool = False
         self.reparameterize: bool = True
 
         self.input_folder: str = "input_files"
 
         self.reactant: MMForceFieldGenerator = None
         self.products: list[MMForceFieldGenerator] = None
-        self.gaff_path = None
-        pass
 
     def build_forcefields(
         self,
@@ -64,7 +94,7 @@ class EvbForceFieldBuilder():
             reactant_charge,
             reactant_multiplicity,
             self.reparameterize,
-            self.optimise,
+            self.optimize,
         )
         self.reactant.ostream.flush()
 
@@ -79,7 +109,7 @@ class EvbForceFieldBuilder():
                     product_charge[i],
                     product_multiplicity[i],  # type:ignore
                     self.reparameterize,
-                    self.optimise
+                    self.optimize
                 ))
 
         rea_elems = self.reactant.molecule.get_element_ids()
@@ -90,9 +120,13 @@ class EvbForceFieldBuilder():
         ]
 
         # Never merge the reactant forcefield generators, for these we actually need positions
+        self.ostream.print_info("Creating combined product force field")
+        self.ostream.flush()
         self.product = self._create_combined_forcefield(products)
         
         if not ordered_input:
+            self.ostream.print_info("Matching reactant and product force fields")
+            self.ostream.flush()
             self.product = self._match_reactant_and_product(self.reactant, rea_elems,self.product, pro_elems, breaking_bonds)
         self.product.ostream.flush()
         self._summarise_reaction(self.reactant, self.product)
@@ -105,7 +139,7 @@ class EvbForceFieldBuilder():
         charge: int,
         multiplicity: int,
         reparameterize: bool,
-        optimise: bool,
+        optimize: bool,
     ) -> MMForceFieldGenerator:
 
         molecule = input["molecule"]
@@ -120,7 +154,7 @@ class EvbForceFieldBuilder():
             forcefield = input["forcefield"]
             forcefield.molecule = molecule
         else:
-            if input["optimise"] and optimise:
+            if input["optimize"] and optimize:
                 self.ostream.print_info("Optimising the geometry with xtb.")
                 scf_drv = XtbDriver()
                 opt_drv = OptimizationDriver(scf_drv)
@@ -129,8 +163,6 @@ class EvbForceFieldBuilder():
                 molecule = Molecule.from_xyz_string(opt_results["final_geometry"])
 
             forcefield = MMForceFieldGenerator()
-            if self.gaff_path is not None:
-                forcefield.force_field_data = self.gaff_path
 
             #Load or calculate the charges
             

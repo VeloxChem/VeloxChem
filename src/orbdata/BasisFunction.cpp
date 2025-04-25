@@ -1,3 +1,35 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "BasisFunction.hpp"
 
 #include <algorithm>
@@ -171,6 +203,12 @@ CBasisFunction::number_of_primitive_functions() const -> size_t
 auto
 CBasisFunction::_rescale() -> void
 {
+    // NOTE: Primitive Gaussians are normalized using standard solid harmonic
+    // formula (Supporting Info Eq. A13):
+    // N_eta = 1 / sqrt(integral |S^l_m(r)exp(-eta r^2)| dr)
+    //       = (2 eta / pi)^3/4 sqrt[(4 eta)^l / (2l - 1)!!]
+    // J. Chem. Theory Comput. 2020, https://doi.org/10.1021/acs.jctc.9b01296
+    
     constexpr auto fpi = 2.0 / mathconst::pi_value();
 
     std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= std::pow(_exponents[i] * fpi, 0.75); });
@@ -181,34 +219,34 @@ CBasisFunction::_rescale() -> void
     }
     else if (_angular_momentum == 2)
     {
-        const double fact = 2.0 / std::sqrt(3.0);
+        const double fact = 4.0 / std::sqrt(3.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()), [&](const auto i) { _norms[i] *= fact * _exponents[i]; });
     }
     else if (_angular_momentum == 3)
     {
-        const double fact = 4.0 / std::sqrt(15.0);
+        const double fact = 8.0 / std::sqrt(15.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * std::sqrt(_exponents[i]); });
     }
     else if (_angular_momentum == 4)
     {
-        const double fact = 2.0 / std::sqrt(105.0);
+        const double fact = 16.0 / std::sqrt(105.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i]; });
     }
     else if (_angular_momentum == 5)
     {
-        const double fact = 4.0 / std::sqrt(945.0);
+        const double fact = 32.0 / std::sqrt(945.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * std::sqrt(_exponents[i]); });
     }
     else if (_angular_momentum == 6)
     {
-        const double fact = 4.0 / std::sqrt(10395.0);
+        const double fact = 64.0 / std::sqrt(10395.0);
 
         std::ranges::for_each(std::views::iota(size_t{0}, _exponents.size()),
                               [&](const auto i) { _norms[i] *= fact * _exponents[i] * _exponents[i] * _exponents[i]; });
@@ -242,23 +280,23 @@ CBasisFunction::_overlap(const std::pair<size_t, size_t> &index) const -> double
     }
     else if (_angular_momentum == 2)
     {
-        return 3.0 * fab * fab * fovl;
+        return 0.75 * fab * fab * fovl;
     }
     else if (_angular_momentum == 3)
     {
-        return 7.5 * fab * fab * fab * fovl;
+        return 1.875 * fab * fab * fab * fovl;
     }
     else if (_angular_momentum == 4)
     {
-        return 420.0 * fab * fab * fab * fab * fovl;
+        return 6.5625 * fab * fab * fab * fab * fovl;
     }
     else if (_angular_momentum == 5)
     {
-        return 1890.0 * fab * fab * fab * fab * fab * fovl;
+        return 29.53125 * fab * fab * fab * fab * fab * fovl;
     }
     else if (_angular_momentum == 6)
     {
-        return 41580.0 * fab * fab * fab * fab * fab * fab * fovl;
+        return 162.421875 * fab * fab * fab * fab * fab * fab * fovl;
     }
     else
     {

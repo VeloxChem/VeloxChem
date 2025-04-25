@@ -7,7 +7,8 @@ dependencies:
   - scikit-build
   - cxx-compiler
   - mpich
-  - openblas=*=*openmp*
+  - libblas=*=*openblas
+  - libopenblas=*=openmp*
   - eigen
   - mpi4py
   - numpy
@@ -24,7 +25,6 @@ dependencies:
   - scipy
   - rdkit
   - dftd4-python
-  - xtb
   - geometric
   - libxc
   - clang-format

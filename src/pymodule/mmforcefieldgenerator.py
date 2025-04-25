@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path, PurePath
@@ -40,20 +48,22 @@ from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
 from .mmdriver import MMDriver
 from .mmgradientdriver import MMGradientDriver
-from .scfrestdriver import ScfRestrictedDriver
 from .optimizationdriver import OptimizationDriver
-from .inputparser import parse_input, get_random_string_parallel
+from .inputparser import parse_input
 from .errorhandler import assert_msg_critical, safe_arccos
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .uffparameters import get_uff_parameters
+from .environment import get_data_path
 
 
 class MMForceFieldGenerator:
     """
     Parameterizes general Amber force field and creates Gromacs topologies.
+
+    # vlxtag: RKS, MM_Force_Field_Generation
 
     :param comm:
         The MPI communicator.
@@ -105,7 +115,7 @@ class MMForceFieldGenerator:
         self.ostream = ostream
 
         # molecule
-        self.molecule_name = 'vlx_' + get_random_string_parallel(self.comm)
+        self.molecule_name = 'MOL'
         self.scan_xyz_files = None
         self.atom_types = None
         self.rotatable_bonds = []
@@ -320,7 +330,121 @@ class MMForceFieldGenerator:
                 pass
             self.workdir = None
 
-    def reparameterize_dihedrals(self, rotatable_bond, scan_file=None, scf_drv=None, basis=None, scf_results=None, scan_range=[0, 360], n_points=19, scan_verbose=False, visualize=False, fit_extrema=False, initial_validation=True):
+    def scan_dihedral(self,
+                      scf_driver,
+                      basis,
+                      rotatable_bond,
+                      scf_results=None,
+                      scan_range=[0, 360],
+                      n_points=7):
+        """
+        Changes the dihedral constants for a specific rotatable bond in order to
+        fit the QM scan.
+
+        :param scf_driver:
+            The SCF driver. If None is provided it will use HF.
+        :param basis:
+            The AO basis set. If None is provided it will use 6-31G*.
+        :param rotatable_bond:
+            The list of indices of the rotatable bond. (1-indexed)
+        :param scan_range:
+            List with the range of dihedral angles. Default is [0, 360].
+        :param n_points:
+            The number of points to be calculated. Default is 19.
+        """
+
+        assert_msg_critical(hasattr(self, 'dihedrals'),
+                            'MMForceFieldGenerator.scan_dihedral: ' +
+                            'please run create_topology before scan_dihedral')
+
+        # Identify the dihedral indices for the rotatable bond
+        dihedral_indices = []
+        dihedral_types = []
+
+        central_atom_1 = rotatable_bond[0] - 1
+        central_atom_2 = rotatable_bond[1] - 1
+
+        for (i,j,k,l), dihedral in self.dihedrals.items():
+            if sorted([j, k]) == sorted([central_atom_1, central_atom_2]):
+                dihedral_indices.append([i,j,k,l])
+                dihedral_types.append(dihedral['comment'])
+
+        # Transform the dihedral indices to 1-indexed for printing
+        dihedral_indices_one_based = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        
+        # Print a header
+        header = 'VeloxChem Dihedral Scan'
+        self.ostream.print_header(header)
+        self.ostream.print_header('=' * (len(header) + 2))
+        self.ostream.print_blank()
+        self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_one_based}')
+        self.ostream.print_blank()
+
+        # Run SCF
+        if scf_results is None:
+            self.ostream.print_info('Performing SCF calculation...')
+            self.ostream.flush()
+
+            scf_driver.filename = self.molecule_name
+            scf_driver.ostream.mute()
+            scf_results = scf_driver.compute(self.molecule, basis)
+            scf_driver.ostream.unmute()
+
+            self.ostream.print_info('SCF completed.')
+            self.ostream.print_blank()
+        
+        # Take one of the dihedrals to perform the scan
+        reference_dih = dihedral_indices[0]
+        reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
+
+        opt_drv = OptimizationDriver(scf_driver)
+        opt_drv.filename = self.molecule_name
+        
+        constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
+        opt_drv.constraints = [constraint]
+
+        # Scan the dihedral
+        self.ostream.print_info(f'Dihedral {reference_dih_name} will be used in QM scan.')
+        self.ostream.print_info(f'Dihedral angle range: {scan_range[0]}-{scan_range[1]}')
+        self.ostream.print_info(f'Number of points: {n_points}')
+        self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
+        self.ostream.flush()
+
+        opt_drv.ostream.mute()
+        scan_results = opt_drv.compute(self.molecule, basis, scf_results)
+        opt_drv.ostream.unmute()
+
+        self.ostream.print_info('Scan completed.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        scan_dih_angles = []
+        scan_energies = []
+        scan_geometries = []
+        target_dihedrals = []
+
+        scan_dih_angles.append([float(val) for val in np.linspace(*scan_range, n_points)])
+        scan_energies.append([float(val) for val in scan_results['scan_energies']])
+        scan_geometries.append([Molecule.read_xyz_string(xyzstr) for xyzstr in scan_results['scan_geometries']])
+        target_dihedrals.append(reference_dih)
+
+        return {
+            'scan_dih_angles': scan_dih_angles,
+            'scan_energies': scan_energies,
+            'scan_geometries': scan_geometries,
+            'target_dihedrals': target_dihedrals,
+        }
+
+    def reparameterize_dihedrals(self,
+                                 rotatable_bond,
+                                 scan_results=None,
+                                 scan_file=None,
+                                 visualize=False,
+                                 fit_extrema=False,
+                                 initial_validation=True,
+                                 show_diff=False,
+                                 verbose=True):
         """
         Changes the dihedral constants for a specific rotatable bond in order to
         fit the QM scan.
@@ -329,18 +453,6 @@ class MMForceFieldGenerator:
             The list of indices of the rotatable bond. (1-indexed)
         :param scan_file:
             The file with the QM scan. If None is provided it a QM scan will be performed.
-        :param scf_drv:
-            The SCF driver. If None is provided it will use HF.
-        :param basis:
-            The AO basis set. If None is provided it will use 6-31G*.
-        :param scf_results:
-            The dictionary containing converged SCF results.
-        :param scan_range:
-            List with the range of dihedral angles. Default is [0, 360].
-        :param n_points:
-            The number of points to be calculated. Default is 19.
-        :param scan_verbose:
-            Whether the QM scan should print all the information.
         :param visualize:
             Whether the dihedral scans should be visualized.
         :param fit_extrema:
@@ -354,59 +466,49 @@ class MMForceFieldGenerator:
             error_msg = 'Scipy is required for reparameterize_dihedrals.'
             assert_msg_critical(False, error_msg)
 
-        # If scan file is provided, read it
+        valid_input = ((scan_results is None and scan_file is not None) or
+                       (scan_results is not None and scan_file is None))
+        assert_msg_critical(valid_input,
+            'MMForceFieldGenerator.reparameterize_dihedrals: ' +
+            'Please provide either scan_results or scan_file')
+
+        # double check dihedral angle if scan file is provided
         if scan_file is not None:
-            with open(scan_file, 'r') as f:
-                lines = f.readlines()
-
-            for line in lines:
-                if line.startswith('Scan'):
-                    # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
-                    # Extract the dihedral indices
-                    scanned_dih = [int(i) for i in line.split('Dihedral')[1].split()[0].split('-')]
-                    central_atom_1 = scanned_dih[1] - 1
-                    central_atom_2 = scanned_dih[2] - 1
-
-                    # Check if the rotatable bond matches the scan file
-                    if sorted([central_atom_1, central_atom_2]) != sorted(
-                            [rotatable_bond[0] - 1, rotatable_bond[1] - 1]):
-                        raise ValueError('The rotatable bond does not match the scan file.')
-
-                    break
-
-        else:
-            central_atom_1 = rotatable_bond[0] - 1
-            central_atom_2 = rotatable_bond[1] - 1
+            with open(scan_file, 'r') as fh:
+                for line in fh:
+                    if line.startswith('Scan'):
+                        # Scan Cycle 1/19 ; Dihedral 3-4-6-7 = 0.00 ; Iteration 17 Energy -1089.05773546
+                        # Extract the dihedral indices
+                        scanned_dih = [int(i) for i in line.split('Dihedral')[1].split()[0].split('-')]
+                        assert_msg_critical(
+                            sorted(scanned_dih[1:3]) == sorted(rotatable_bond),
+                            'MMForceFieldGenerator.reparameterize_dihedrals: ' +
+                            'The rotatable bond does not match the scan file')
+                        break
 
         # Identify the dihedral indices for the rotatable bond
         dihedral_indices = []
         dihedral_types = []
-        multiple_dihedrals = []
+
+        central_atom_1 = rotatable_bond[0] - 1
+        central_atom_2 = rotatable_bond[1] - 1
 
         for (i,j,k,l), dihedral in self.dihedrals.items():
-            if (j == central_atom_1 and k == central_atom_2) or (j == central_atom_2 and k == central_atom_1):
+            if sorted([j, k]) == sorted([central_atom_1, central_atom_2]):
                 dihedral_indices.append([i,j,k,l])
                 dihedral_types.append(dihedral['comment'])
-                if dihedral['multiple'] == True:
-                    multiple_dihedrals.append(True)
-                else:
-                    multiple_dihedrals.append(False)
 
         # Transform the dihedral indices to 1-indexed for printing
-        dihedral_indices_print = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
+        dihedral_indices_one_based = [[i+1,j+1,k+1,l+1] for i,j,k,l in dihedral_indices]
         
         # Print a header
         header = 'VeloxChem Dihedral Reparameterization'
         self.ostream.print_header(header)
-        self.ostream.print_header('=' * len(header))
+        self.ostream.print_header('=' * (len(header) + 2))
         self.ostream.print_blank()
-        self.ostream.flush()
-        # Print some information
         self.ostream.print_info(f'Rotatable bond selected: {rotatable_bond[0]}-{rotatable_bond[1]}')
-
-        # Print the dihedral indices *in 1 index* and types
-        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_print}')
-        self.ostream.flush()
+        self.ostream.print_info(f'Dihedrals involved:{dihedral_indices_one_based}')
+        self.ostream.print_blank()
 
         # If the scan file is provided, read it
         if scan_file is not None:
@@ -419,63 +521,18 @@ class MMForceFieldGenerator:
                 raise ValueError('The scan file name does not match the dihedral indices. Format should be 1-2-3-4.xyz')
             self.read_qm_scan_xyz_files([scan_file])
         else:
-            # Perform a QM scan
-            self.ostream.print_info('No scan file provided. Performing QM scan...')
-            self.ostream.flush()
-        
-            if scf_drv is None:
-                scf_drv = ScfRestrictedDriver()
-                if not scan_verbose:
-                    scf_drv.ostream.mute()
-                self.ostream.print_info('SCF driver not provided. Using default: RHF')
-                self.ostream.flush()
-            
-            if basis is None:
-                basis = MolecularBasis.read(self.molecule,'6-31G*')
-                self.ostream.print_info('Basis set not provided. Using dafault: 6-31G*')
-                self.ostream.flush()
-
-            # Perform the reference SCF calculation
-            if scf_results is None:
-                self.ostream.print_info('Performing SCF calculation...')
-                self.ostream.flush()
-                scf_results = scf_drv.compute(self.molecule, basis)
-            
-            # Take one of the dihedrals to perform the scan
-            reference_dih = dihedral_indices[0]
-            reference_dih_name = f"{reference_dih[0] + 1}-{reference_dih[1] + 1}-{reference_dih[2] + 1}-{reference_dih[3] + 1}"
-
-            opt_drv = OptimizationDriver(scf_drv)
-            
-            if not scan_verbose:
-                opt_drv.ostream.mute()
-
-            constraint = f"scan dihedral {reference_dih[0]+1} {reference_dih[1]+1} {reference_dih[2]+1} {reference_dih[3]+1} {scan_range[0]} {scan_range[1]} {n_points}"
-            opt_drv.constraints = [constraint]
-
-            # Scan the dihedral
-            self.ostream.print_info(f'Dihedral: {reference_dih_name} taken for scan...')
-            self.ostream.print_info(f'Angle range: {scan_range[0]}-{scan_range[1]}')
-            self.ostream.print_info(f'Number of points: {n_points}')
-            self.ostream.print_info(f'Scanning dihedral {reference_dih_name}...')
-            self.ostream.flush()
-            opt_drv.compute(self.molecule, basis, scf_results)
-            self.ostream.print_info('Scan completed.')
-            self.ostream.flush()
-
-            # Change the default file name to the dihedral indices
-            file_path = Path("scan-final.xyz")
-            file_path.rename(f"{reference_dih_name}.xyz")
-
-            # Read the QM scan
-            self.read_qm_scan_xyz_files([f"{reference_dih_name}.xyz"])
+            # process scan results
+            self.scan_dih_angles = scan_results['scan_dih_angles']
+            self.scan_energies = scan_results['scan_energies']
+            self.scan_geometries = scan_results['scan_geometries']
+            self.target_dihedrals = scan_results['target_dihedrals']
 
         # Group dihedrals by their types
         dihedral_groups = defaultdict(list)
         for i, j, k, l in dihedral_indices:
             dihedral = self.dihedrals[(i, j, k, l)]
             # If the dihedral is multiple add all the types
-            if dihedral['multiple'] == True:
+            if dihedral['multiple']:
                 # Handle multiple dihedrals
                 for idx, dihedral_type in enumerate(dihedral['comment']):
                     dihedral_groups[dihedral_type].append((i, j, k, l))
@@ -489,7 +546,7 @@ class MMForceFieldGenerator:
         periodicities = []
         for i, j, k, l in dihedral_indices:
             dihedral = self.dihedrals[(i, j, k, l)]
-            if dihedral['multiple'] == True:
+            if dihedral['multiple']:
                 # Handle multiple dihedrals
                 for idx, dihedral_type in enumerate(dihedral['comment']):
                     barrier = dihedral['barrier'][idx]
@@ -519,7 +576,7 @@ class MMForceFieldGenerator:
 
         # Set the dihedral barriers to zero for the scan
         for i, j, k, l in dihedral_indices:
-            if self.dihedrals[(i, j, k, l)]['multiple'] == True:
+            if self.dihedrals[(i, j, k, l)]['multiple']:
                 for idx, dihedral_type in enumerate(self.dihedrals[(i, j, k, l)]['comment']):
                     self.dihedrals[(i, j, k, l)]['barrier'][idx] = 0.0
             else:
@@ -532,7 +589,7 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        initial_data = self.validate_force_field(0)
+        initial_data = self.validate_force_field(0, verbose=verbose)
 
         qm_energies = np.array(initial_data['qm_scan_kJpermol'])
         mm_baseline = np.array(initial_data['mm_scan_kJpermol'])
@@ -604,7 +661,7 @@ class MMForceFieldGenerator:
 
         # Print initial barriers
         self.ostream.print_info(f"Dihedral barriers {barriers} will be used as initial guess.")
-        self.ostream.flush()
+        self.ostream.print_blank()
 
         # Store the original barriers and perform the initial validation
         original_barriers = barriers.copy()
@@ -612,7 +669,6 @@ class MMForceFieldGenerator:
         if initial_validation:
             self.ostream.print_info('Validating the initial force field...')
             self.ostream.print_blank()
-            self.ostream.flush()
 
             mm_energies = dihedral_potential(
                 dihedral_angles_rad,
@@ -632,12 +688,11 @@ class MMForceFieldGenerator:
             self.print_validation_summary(fitted_dihedral_results)
 
             if visualize:
-                self.visualize(fitted_dihedral_results)
+                self.visualize(fitted_dihedral_results, show_diff=show_diff)
 
         self.ostream.print_info('Fitting the dihedral parameters...')
         if fit_extrema:
             self.ostream.print_info('Only minimum/maximum points are used for fitting.')
-        self.ostream.flush()
 
         # Use the original barriers as the initial guess
         # Note that we add an additional parameter for shifting QM and MM
@@ -657,7 +712,7 @@ class MMForceFieldGenerator:
 
         # Perform the optimization
         self.ostream.print_info('Optimizing dihedral via least squares fitting...')
-        self.ostream.flush()
+
         result = least_squares(
             fun=objective_function,
             x0=initial_guess,
@@ -706,43 +761,41 @@ class MMForceFieldGenerator:
         # List of the fitted barriers
         fit_barrier_to_print = fitted_barriers.copy()
         self.ostream.print_info(f'New fitted barriers: {fit_barrier_to_print}')
+        self.ostream.print_blank()
 
-        # If there are multiple dihedrals group them in list of lists
-        if any(multiple_dihedrals):
-            fitted_barriers_grouped = []
-            for i, j, k, l in dihedral_indices:
-                dihedral = self.dihedrals[(i, j, k, l)]
-                if dihedral['multiple'] == True:
-                    # Handle multiple dihedrals
-                    number_dihedrals = len(dihedral['comment'])
-                    fitted_barriers_grouped.append(fitted_barriers[:number_dihedrals])
-                    fitted_barriers = fitted_barriers[number_dihedrals:]
-                else:
-                    fitted_barriers_grouped.append([fitted_barriers[0]])
-                    fitted_barriers = fitted_barriers[1:]
+        # If there are multiple dihedrals, group them in list of lists
+        fitted_barriers_grouped = []
 
-            fitted_barriers = fitted_barriers_grouped
+        for i, j, k, l in dihedral_indices:
+            dihedral = self.dihedrals[(i, j, k, l)]
+            if dihedral['multiple']:
+                number_dihedrals = len(dihedral['comment'])
+                fitted_barriers_grouped.append(fitted_barriers[:number_dihedrals])
+                fitted_barriers = np.array(fitted_barriers[number_dihedrals:])
+            else:
+                fitted_barriers_grouped.append([fitted_barriers[0]])
+                fitted_barriers = np.array(fitted_barriers[1:])
 
+        fitted_barriers = fitted_barriers_grouped
 
         # Assign the fitted barriers to the dihedrals
         for idx, (i, j, k, l) in enumerate(dihedral_indices):
             dihedral = self.dihedrals[(i, j, k, l)]
-            if dihedral['multiple'] == True:
-                dihedral['barrier'] = fitted_barriers[idx]
-                # The comment is a list of strings, add ' (fitted)' to each string
-                dihedral['comment'] = [str(dihedral['comment'][idx] + ' (fitted)') for idx in range(len(dihedral['comment']))]
+            if dihedral['multiple']:
+                # make sure that the barrier is a list of float and not a list of numpy.float
+                dihedral['barrier'] = [float(x) for x in fitted_barriers[idx]]
+                for comment_idx in range(len(dihedral['comment'])):
+                    if not dihedral['comment'][comment_idx].endswith(' (fitted)'):
+                        dihedral['comment'][comment_idx] += ' (fitted)'
             else:
-                if any(multiple_dihedrals):
-                    dihedral['barrier'] = fitted_barriers[idx][0]
-                else:
-                    dihedral['barrier'] = fitted_barriers[idx]
-
-                dihedral['comment'] = str(dihedral['comment'] + ' (fitted)')
+                # make sure that the barrier is float and not numpy.float
+                dihedral['barrier'] = float(fitted_barriers[idx][0])
+                if not dihedral['comment'].endswith(' (fitted)'):
+                    dihedral['comment'] += ' (fitted)'
 
         # Validate the fitted parameters
         self.ostream.print_info('Validating the fitted force field...')
         self.ostream.print_blank()
-        self.ostream.flush()
 
         fitted_dihedral_results = {
             'dihedral_indices': list(initial_data['dihedral_indices']),
@@ -754,7 +807,7 @@ class MMForceFieldGenerator:
         self.print_validation_summary(fitted_dihedral_results)
 
         if visualize:
-            self.visualize(fitted_dihedral_results)
+            self.visualize(fitted_dihedral_results, show_diff=show_diff)
 
         self.ostream.print_info('Dihedral MM parameters have been reparameterized and updated in the topology.')
         self.ostream.flush()
@@ -785,7 +838,6 @@ class MMForceFieldGenerator:
             xyz_fname = str(inp_dir / xyz)
 
             self.ostream.print_info(f'  {xyz_fname}')
-            self.ostream.flush()
 
             geometries = []
             energies = []
@@ -901,7 +953,8 @@ class MMForceFieldGenerator:
             'fudgeLJ': None,
         }
 
-        gaff_path = Path(__file__).parent / 'tests' / 'data' / 'gaff-2.11.xml'
+        data_path = get_data_path()
+        gaff_path = Path(data_path) / 'gaff-2.11.xml'
         tree = ET.parse(str(gaff_path))
         root = tree.getroot()
 
@@ -1039,7 +1092,6 @@ class MMForceFieldGenerator:
             self.partial_charges = np.zeros(self.molecule.number_of_atoms())
             msg = 'RESP calculation disabled: All partial charges are set to zero.'
             self.ostream.print_info(msg)
-            self.ostream.flush()
 
         if self.partial_charges is None:
             if scf_results is None:
@@ -1063,8 +1115,11 @@ class MMForceFieldGenerator:
                 if resp_drv.equal_charges is None:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
+                resp_drv.ostream.mute()
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
                                                         'resp')
+                resp_drv.ostream.unmute()
+
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 
@@ -1076,16 +1131,19 @@ class MMForceFieldGenerator:
 
                 resp_drv = RespChargesDriver(self.comm, self.ostream)
                 resp_drv.filename = self.molecule_name
-                msg = 'Using provided SCF result for RESP charges'
+                msg = 'Using provided SCF result for RESP charges.'
                 self.ostream.print_info(msg)
-                self.ostream.flush()
+
                 if self.resp_dict is not None:
                     resp_drv.update_settings(self.resp_dict)
                 if resp_drv.equal_charges is None:
                     resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
+                resp_drv.ostream.mute()
                 self.partial_charges = resp_drv.compute(self.molecule, basis,
                                                         scf_results, 'resp')
+                resp_drv.ostream.unmute()
+
                 self.partial_charges = self.comm.bcast(self.partial_charges,
                                                        root=mpi_master())
 
@@ -1107,7 +1165,6 @@ class MMForceFieldGenerator:
             msg += ' from the largest charge.'
             self.ostream.print_info(msg)
             self.ostream.print_blank()
-            self.ostream.flush()
 
         # preparing atomtypes and atoms
 
@@ -1338,7 +1395,6 @@ class MMForceFieldGenerator:
                     msg = f'Updated bond length {i + 1}-{j + 1} '
                     msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
                     self.ostream.print_info(msg)
-                    self.ostream.flush()
                 r = r_eq
 
             self.bonds[(i, j)] = {
@@ -1414,7 +1470,6 @@ class MMForceFieldGenerator:
                     msg = f'Updated bond angle {i + 1}-{j + 1}-{k + 1} '
                     msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.3f} deg'
                     self.ostream.print_info(msg)
-                    self.ostream.flush()
                 theta = theta_eq
 
             self.angles[(i, j, k)] = {
@@ -1863,6 +1918,8 @@ class MMForceFieldGenerator:
                     'comment': comment
                 }
 
+        self.ostream.flush()
+
     @staticmethod
     def get_dihedral_type_string(target_dihedral):
         """
@@ -2019,7 +2076,7 @@ class MMForceFieldGenerator:
         self.ostream.print_info(msg)
         self.ostream.flush()
     
-    def add_dihedral(self, dihedral, barrier=1, phase=0, periodicity=1):
+    def add_dihedral(self, dihedral, barrier=0.0, phase=0, periodicity=1):
         """
         Adds a dihedral to the an existing dihedral in the topology
         converting it in a multiple dihedral.
@@ -2079,6 +2136,52 @@ class MMForceFieldGenerator:
         self.ostream.print_info(msg)
         self.ostream.flush()
 
+    def get_dihedral_params(self, atom_indices_for_dihedral):
+        """
+        Gets dihedral parameters.
+
+        :param atom_indices_for_dihedral:
+            One-based atom indices for the dihedral.
+
+        :return:
+            The dihedral parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_dihedral) == 4,
+            'MMForceFieldGenerator.get_dihedral_params: ' +
+            'Expecting a tuple of four atom indices')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+
+        return dict(self.dihedrals[key])
+
+    def set_dihedral_params(self, atom_indices_for_dihedral, dihedral_params):
+        """
+        Sets dihedral parameters.
+
+        :param atom_indices_for_dihedral:
+            One-based atom indices for the dihedral.
+        :param dihedral_params:
+            The dihedral parameters in a dictionary.
+        """
+
+        assert_msg_critical(
+            len(atom_indices_for_dihedral) == 4,
+            'MMForceFieldGenerator.set_dihedral_params: ' +
+            'Expecting a tuple of four atom indices')
+
+        assert_msg_critical(
+            isinstance(dihedral_params, dict),
+            'MMForceFieldGenerator.set_dihedral_params: ' +
+            'Expecting a dictionary of dihedral parameters')
+
+        # convert 1-based indices to 0-based indices
+        key = tuple([x - 1 for x in atom_indices_for_dihedral])
+
+        self.dihedrals[key] = dict(dihedral_params)
+
     def check_rotatable_bonds(self, rotatable_bonds_types):
         """
         Checks the rotatable bonds in the molecule and the atom types involved.
@@ -2092,6 +2195,10 @@ class MMForceFieldGenerator:
         non_rotatable_bonds = set()
         for atom1 in ['c2', 'n2', 'cc', 'ce', 'nc', 'ne']:
             for atom2 in ['c2', 'n2', 'cd', 'cf', 'nd', 'nf']:
+                non_rotatable_bonds.add((atom1, atom2))
+                non_rotatable_bonds.add((atom2, atom1))
+        for atom1 in ['c ']:
+            for atom2 in ['n ', 'ns']:
                 non_rotatable_bonds.add((atom1, atom2))
                 non_rotatable_bonds.add((atom2, atom1))
         non_rotatable_bonds = list(non_rotatable_bonds)
@@ -2556,7 +2663,7 @@ class MMForceFieldGenerator:
                 )
 
             for (i, j, k, l), dih in self.impropers.items():
-                line_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1, k + 1)
+                line_str = '{:6}{:7}{:7}{:7}'.format(i + 1, j + 1, k + 1, l + 1)
                 line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
                     4, dih['phase'], dih['barrier'], abs(dih['periodicity']),
                     dih['comment'])
@@ -2592,8 +2699,8 @@ class MMForceFieldGenerator:
 
             attributes = {
                 # Name is the atom type_molname
-                "name": atom['name'] + '_' + mol_name,
-                "class": str(i + 1),
+                "name": atom['name'] + f'_{mol_name}',
+                "class": str(i + 1) + f'_{mol_name}',
                 "element": element,
                 "mass": str(atom['mass'])
             }
@@ -2606,7 +2713,7 @@ class MMForceFieldGenerator:
             ET.SubElement(Residue,
                           "Atom",
                           name=atom_data['name'],
-                          type=atom_data['name'] + '_' + mol_name,
+                          type=atom_data['name'] + f'_{mol_name}',
                           charge=str(atom_data['charge']))
         for bond_id, bond_data in self.bonds.items():
             ET.SubElement(Residue,
@@ -2618,8 +2725,8 @@ class MMForceFieldGenerator:
         Bonds = ET.SubElement(ForceField, "HarmonicBondForce")
         for bond_id, bond_data in self.bonds.items():
             attributes = {
-                "class1": str(bond_id[0] + 1),
-                "class2": str(bond_id[1] + 1),
+                "class1": str(bond_id[0] + 1) + f'_{mol_name}',
+                "class2": str(bond_id[1] + 1) + f'_{mol_name}',
                 "length": str(bond_data['equilibrium']),
                 "k": str(bond_data['force_constant'])
             }
@@ -2629,24 +2736,25 @@ class MMForceFieldGenerator:
         Angles = ET.SubElement(ForceField, "HarmonicAngleForce")
         for angle_id, angle_data in self.angles.items():
             attributes = {
-                "class1": str(angle_id[0] + 1),
-                "class2": str(angle_id[1] + 1),
-                "class3": str(angle_id[2] + 1),
+                "class1": str(angle_id[0] + 1) + f'_{mol_name}',
+                "class2": str(angle_id[1] + 1) + f'_{mol_name}',
+                "class3": str(angle_id[2] + 1) + f'_{mol_name}',
                 "angle": str(angle_data['equilibrium'] * np.pi / 180),
                 "k": str(angle_data['force_constant'])
             }
             ET.SubElement(Angles, "Angle", **attributes)
 
         # Periodic Dihedrals section
+        # Proper dihedrals
         Dihedrals = ET.SubElement(ForceField, "PeriodicTorsionForce")
         for dihedral_id, dihedral_data in self.dihedrals.items():
             # Not multiple dihedrals has periodicity1, phase1, k1
             if not dihedral_data['multiple']:
                 attributes = {
-                    "class1": str(dihedral_id[0] + 1),
-                    "class2": str(dihedral_id[1] + 1),
-                    "class3": str(dihedral_id[2] + 1),
-                    "class4": str(dihedral_id[3] + 1),
+                    "class1": str(dihedral_id[0] + 1) + f'_{mol_name}',
+                    "class2": str(dihedral_id[1] + 1) + f'_{mol_name}',
+                    "class3": str(dihedral_id[2] + 1) + f'_{mol_name}',
+                    "class4": str(dihedral_id[3] + 1) + f'_{mol_name}',
                     "periodicity1": str(dihedral_data['periodicity']),
                     "phase1": str(dihedral_data['phase'] * np.pi / 180),
                     "k1": str(dihedral_data['barrier'])
@@ -2659,10 +2767,10 @@ class MMForceFieldGenerator:
                 
                 # One set of classes
                 attributes = {
-                    "class1": str(dihedral_id[0] + 1),
-                    "class2": str(dihedral_id[1] + 1),
-                    "class3": str(dihedral_id[2] + 1),
-                    "class4": str(dihedral_id[3] + 1),
+                    "class1": str(dihedral_id[0] + 1) + f'_{mol_name}',
+                    "class2": str(dihedral_id[1] + 1) + f'_{mol_name}',
+                    "class3": str(dihedral_id[2] + 1) + f'_{mol_name}',
+                    "class4": str(dihedral_id[3] + 1) + f'_{mol_name}',
                 }
                 # Multiple sets of periodicity, phase, k
                 for i in range(len(dihedral_data['periodicity'])):
@@ -2674,23 +2782,22 @@ class MMForceFieldGenerator:
 
                 ET.SubElement(Dihedrals, "Proper", **attributes)
 
-        # Improper Dihedrals section
-        Impropers = ET.SubElement(ForceField, "PeriodicTorsionForce")
+        # Improper dihedrals
         for improper_id, improper_data in self.impropers.items():
 
             # The order of the atoms is defined in the OpenMM documentation
             # http://docs.openmm.org/latest/userguide/application/06_creating_ffs.html
 
             attributes = {
-                "class1": str(improper_id[1] + 1),
-                "class2": str(improper_id[0] + 1),
-                "class3": str(improper_id[2] + 1),
-                "class4": str(improper_id[3] + 1),
+                "class1": str(improper_id[1] + 1) + f'_{mol_name}',
+                "class2": str(improper_id[0] + 1) + f'_{mol_name}',
+                "class3": str(improper_id[2] + 1) + f'_{mol_name}',
+                "class4": str(improper_id[3] + 1) + f'_{mol_name}',
                 "periodicity1": str(improper_data['periodicity']),
                 "phase1": str(improper_data['phase'] * np.pi / 180),
                 "k1": str(improper_data['barrier'])
             }
-            ET.SubElement(Impropers, "Improper", **attributes)
+            ET.SubElement(Dihedrals, "Improper", **attributes)
 
         # NonbondedForce section
         NonbondedForce = ET.SubElement(ForceField,
@@ -2699,7 +2806,7 @@ class MMForceFieldGenerator:
                                        lj14scale=str(self.fudgeLJ))
         for atom_id, atom_data in self.atoms.items():
             attributes = {
-                "type": atom_data['name'] + '_' + mol_name,
+                "type": atom_data['name'] + f'_{mol_name}',
                 "charge": str(atom_data['charge']),
                 "sigma": str(atom_data['sigma']),
                 "epsilon": str(atom_data['epsilon'])
@@ -2898,80 +3005,7 @@ class MMForceFieldGenerator:
                 dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(src.read_text())
 
-    def dihedral_correction(self, i, kT=None):
-        """
-        Corrects dihedral parameters.
-
-        :param i:
-            The index of the target dihedral.
-        :param kT:
-            kT for Boltzmann factor (used in weighted fitting).
-        """
-
-        try:
-            from scipy.optimize import curve_fit
-        except ImportError:
-            raise ImportError('Unable to import scipy. Please install scipy ' +
-                              'via pip or conda.')
-
-        # Ryckaert-Bellemans function
-
-        def rbpot(phi, c0, c1, c2, c3, c4, c5):
-            v = c0 + c1 * np.cos((180 - phi) * 2 * np.pi / 360)
-            v += c2 * np.cos((180 - phi) * 2 * np.pi / 360)**2
-            v += c3 * np.cos((180 - phi) * 2 * np.pi / 360)**3
-            v += c4 * np.cos((180 - phi) * 2 * np.pi / 360)**4
-            v += c5 * np.cos((180 - phi) * 2 * np.pi / 360)**5
-            return v
-
-        dih = self.target_dihedrals[i]
-        geom = self.scan_geometries[i]
-        qm_scan = self.scan_energies[i]
-        angles = self.scan_dih_angles[i]
-
-        dih_str = f'{dih[0] + 1}-{dih[1] + 1}-{dih[2] + 1}-{dih[3] + 1}'
-        self.ostream.print_info(f'Fitting dihedral angle {dih_str}...')
-        self.ostream.flush()
-
-        # MM scan with dihedral parameters set to zero
-
-        self.set_dihedral_parameters(dih, [0.0 for x in range(6)])
-
-        mm_zero_scan = self.perform_mm_scan(dih,
-                                            geom,
-                                            angles,
-                                            print_energies=False)
-
-        # fitting Ryckaert-Bellemans function
-
-        if self.rank == mpi_master():
-            rel_e_qm = np.array(qm_scan) - min(qm_scan)
-            rel_e_qm *= hartree_in_kjpermol()
-            rel_e_mm = np.array(mm_zero_scan) - min(mm_zero_scan)
-
-            difference = rel_e_qm - rel_e_mm
-            initial_coef = tuple([0.] * 6)
-
-            if kT is not None:
-                sigma = 1.0 / np.exp(-rel_e_qm / kT)
-                coef, cv = curve_fit(rbpot,
-                                     angles,
-                                     difference,
-                                     initial_coef,
-                                     sigma,
-                                     absolute_sigma=False)
-            else:
-                coef, cv = curve_fit(rbpot, angles, difference, initial_coef)
-
-            coef_list = coef.tolist()
-        else:
-            coef_list = None
-
-        coef_list = self.comm.bcast(coef_list, root=mpi_master())
-
-        self.set_dihedral_parameters(dih, coef_list)
-
-    def validate_force_field(self, i, print_summary=False):
+    def validate_force_field(self, i, verbose=True):
         """
         Validates force field by RMSD of dihedral potentials.
 
@@ -2985,45 +3019,21 @@ class MMForceFieldGenerator:
         dih = self.target_dihedrals[i]
 
         dih_str = f'{dih[0] + 1}-{dih[1] + 1}-{dih[2] + 1}-{dih[3] + 1}'
-        self.ostream.print_info(f'  Target dihedral angle: {dih_str}')
+        self.ostream.print_info(f'Target dihedral angle: {dih_str}')
         self.ostream.print_blank()
 
         geom = self.scan_geometries[i]
         angles = self.scan_dih_angles[i]
-        mm_scan = self.perform_mm_scan(dih, geom, angles)
+        mm_scan = self.perform_mm_scan(dih, geom, angles, verbose=verbose)
         mm_scan = np.array(mm_scan) - min(mm_scan)
 
         qm_scan = np.array(self.scan_energies[i]) - min(self.scan_energies[i])
         qm_scan *= hartree_in_kjpermol()
 
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
-        self.ostream.print_info(
-            '  ---------------------------------------------------------------')
-        for angle, e_mm, e_qm in zip(angles, mm_scan, qm_scan):
-            self.ostream.print_info(
-                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
-                f'{(e_mm - e_qm):10.3f}')
-        self.ostream.print_blank()
-        self.ostream.flush()
-
-        if print_summary:
-            # Summarize validation
-            self.ostream.print_info('Summary of validation')
-            self.ostream.print_info('---------------------')
-            # Maximum difference
-            max_diff = np.max(np.abs(mm_scan - qm_scan))
-            self.ostream.print_info(f'Maximum difference: {max_diff:.3f} kJ/mol')
-            # Standard deviation
-            std_diff = np.std(mm_scan - qm_scan)
-            self.ostream.print_info(f'Standard deviation: {std_diff:.3f} kJ/mol')
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.fitting_summary = {'maximum_difference': max_diff,
-                                    'standard_deviation': std_diff}
-        else:
-            self.fitting_summary = None
+        self.fitting_summary = {
+            'maximum_difference': np.max(np.abs(mm_scan - qm_scan)),
+            'standard_deviation': np.std(mm_scan - qm_scan),
+        }
 
         return {
             'dihedral_indices': list(dih),
@@ -3036,7 +3046,7 @@ class MMForceFieldGenerator:
                         dihedral,
                         geometries,
                         angles,
-                        print_energies=True):
+                        verbose=True):
         """
         Performs MM scan of a specific dihedral.
 
@@ -3049,11 +3059,6 @@ class MMForceFieldGenerator:
         """
 
         # select scan angles and geometries from QM data
-
-        if print_energies:
-            self.ostream.print_info('      Dihedral           MM energy')
-            self.ostream.print_info('  --------------------------------')
-            self.ostream.flush()
 
         energies = []
 
@@ -3070,10 +3075,12 @@ class MMForceFieldGenerator:
             pot_energy *= hartree_in_kjpermol()
             energies.append(pot_energy)
 
-            if print_energies:
-                self.ostream.print_info(
-                    f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
+            if verbose:
+                self.ostream.print_info(f'  {angle:8.1f} deg...')
                 self.ostream.flush()
+
+        if verbose:
+            self.ostream.print_blank()
 
         return energies
 
@@ -3102,38 +3109,6 @@ class MMForceFieldGenerator:
 
         return mm_drv.get_energy()
 
-    def set_dihedral_parameters(self, dihedral_key, coefficients):
-        """
-        Sets dihedral parameters of topology.
-
-        :param dihedral_key:
-            The dihedral (list of four atom ids).
-        :param coefficients:
-            The coefficients for Ryckaert-Bellemans funciton.
-        """
-
-        dih = self.dihedrals[tuple(dihedral_key)]
-
-        if dih['type'] == 'Fourier' and dih['multiple']:
-            comment = dih['comment'][0]
-        else:
-            comment = dih['comment']
-
-        self.dihedrals[tuple(dihedral_key)] = {
-            'type': 'RB',
-            'RB_coefficients': list(coefficients),
-            'comment': comment
-        }
-
-        dih_keys_to_remove = []
-        for i, j, k, l in self.dihedrals:
-            if [i, j, k, l] == dihedral_key:
-                continue
-            if [j, k] == dihedral_key[1:3] or [k, j] == dihedral_key[1:3]:
-                dih_keys_to_remove.append((i, j, k, l))
-        for dih_key in dih_keys_to_remove:
-            del self.dihedrals[dih_key]
-
     def print_validation_summary(self, fitted_dihedral_results):
         """
         Prints validation summary.
@@ -3141,6 +3116,19 @@ class MMForceFieldGenerator:
         :param validation_result:
             The dictionary containing the result of validation.
         """
+
+        self.ostream.print_info(
+            '      Dihedral      MM energy(rel)      QM energy(rel)       diff')
+        self.ostream.print_info(
+            '  ---------------------------------------------------------------')
+        for angle, e_mm, e_qm in zip(
+                fitted_dihedral_results['dihedral_angles'],
+                fitted_dihedral_results['mm_scan_kJpermol'],
+                fitted_dihedral_results['qm_scan_kJpermol']):
+            self.ostream.print_info(
+                f'  {angle:8.1f} deg {e_mm:12.3f} kJ/mol {e_qm:12.3f} kJ/mol ' +
+                f'{(e_mm - e_qm):10.3f}')
+        self.ostream.print_blank()
 
         self.ostream.print_info('Summary of validation')
         self.ostream.print_info('---------------------')
@@ -3159,7 +3147,7 @@ class MMForceFieldGenerator:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def visualize(self, validation_result):
+    def visualize(self, validation_result, show_diff=False):
         """
         Visualizes dihedral potential.
 
@@ -3189,6 +3177,10 @@ class MMForceFieldGenerator:
         # Plot spline
         plt.plot(dihedrals_dense, qm_scan_kJpermol_spl, color='black', linewidth=4,  label='QM (spline)', alpha=0.7)
         plt.plot(dihedrals_dense, mm_scan_kJpermol_spl, color='darkcyan', linewidth=4, label='MM (spline)' , alpha=0.7)
+
+        if show_diff:
+            plt.plot(dihedrals_dense, qm_scan_kJpermol_spl - mm_scan_kJpermol_spl, color='orange',
+                     linewidth=2, linestyle=':', label='diff (spline)', alpha=0.7)
 
         # Print the original points 
         plt.scatter(dihedral_angles, qm_scan_kJpermol, color='black', s=25, label='QM (points)')

@@ -43,7 +43,6 @@ monkey:cron_deploy:
         -Bbuild
         -GNinja
         -DCMAKE_CXX_COMPILER=mpicxx
-        -DVLX_LA_VENDOR=MKL
     - cmake --build build --parallel 6 -- -d stats
     - ctest --test-dir build --output-on-failure
     # prepare tar.bz2 archive

@@ -1,36 +1,68 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from pathlib import Path
 import numpy as np
 import math
 
 from .veloxchemlib import Molecule
-from .veloxchemlib import bohr_in_angstrom
+from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .outputstream import OutputStream
 from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical, safe_arccos
+
+
+@staticmethod
+def _Molecule_smiles_formal_charge(smiles_str):
+    """
+    Gets formal charge from SMILES string.
+
+    :param smiles_str:
+        The SMILES string.
+
+    :return:
+        The formal charge.
+    """
+
+    try:
+        from rdkit import Chem
+
+        mol_bare = Chem.MolFromSmiles(smiles_str)
+        mol_chg = Chem.GetFormalCharge(mol_bare)
+
+        return mol_chg
+
+    except ImportError:
+        raise ImportError('Unable to import rdkit.')
 
 
 @staticmethod
@@ -84,8 +116,12 @@ def _Molecule_read_smiles(smiles_str):
     """
 
     xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
+    mol = Molecule.read_xyz_string(xyz)
 
-    return Molecule.read_xyz_string(xyz)
+    mol_chg = Molecule.smiles_formal_charge(smiles_str)
+    mol.set_charge(mol_chg)
+
+    return mol
 
 
 def _element_guesser(atom_name, residue_name):
@@ -649,11 +685,19 @@ def _Molecule_set_dihedral(self, dihedral_indices_one_based, target_angle,
 
     current_angle = self.get_dihedral(dihedral_indices_one_based, angle_unit)
 
+    updated_target_angle = target_angle
+    half_period = 180.0 if angle_unit.lower() == 'degree' else math.pi
+    while updated_target_angle - current_angle > half_period:
+        updated_target_angle -= 2.0 * half_period
+    while updated_target_angle - current_angle < -half_period:
+        updated_target_angle += 2.0 * half_period
+
     # make several attempts to rotate the dihedral angle, with the constraint
     # that the connectivity matrix should not change
     for attempt in range(10, -1, -1):
 
-        rotation_angle = (target_angle - current_angle) * (0.1 * attempt)
+        rotation_angle = (updated_target_angle - current_angle) * (0.1 *
+                                                                   attempt)
 
         new_coords_in_au = self._rotate_around_vector(coords_in_au,
                                                       coords_in_au[j], vij,
@@ -827,7 +871,7 @@ def _Molecule_get_distance_matrix_in_angstrom(self):
     return distance_matrix
 
 
-def _Molecule_get_xyz_string(self, precision=12):
+def _Molecule_get_xyz_string(self, precision=12, comment=''):
     """
     Returns xyz string of molecule.
 
@@ -841,8 +885,13 @@ def _Molecule_get_xyz_string(self, precision=12):
     elem_ids = self.get_identifiers()
     atom_basis_labels = self.get_atom_basis_labels()
 
+    if comment and isinstance(comment, str):
+        trimmed_comment = comment.strip().splitlines()[0][:80]
+    else:
+        trimmed_comment = ''
+
     natoms = len(labels)
-    xyz = f'{natoms}\n\n'
+    xyz = f'{natoms}\n{trimmed_comment}\n'
 
     for a in range(natoms):
         xa, ya, za = coords_in_angstrom[a]
@@ -1137,10 +1186,54 @@ def _Molecule_number_of_beta_electrons(self):
     return (self.number_of_electrons() - self.get_multiplicity() + 1) // 2
 
 
+def _Molecule_partition_atoms(self, comm):
+    """
+    Partition atoms for a given MPI communicator.
+
+    :param comm:
+        The MPI communicator.
+
+    :return:
+        The list of atom indices for the current MPI rank.
+    """
+
+    rank = comm.Get_rank()
+    nnodes = comm.Get_size()
+
+    if rank == mpi_master():
+        elem_ids = self.get_identifiers()
+        coords = self.get_coordinates_in_bohr()
+        mol_com = self.center_of_mass_in_bohr()
+
+        r2_array = np.sum((coords - mol_com)**2, axis=1)
+        sorted_r2_list = sorted([
+            (r2, nchg, i)
+            for i, (r2, nchg) in enumerate(zip(r2_array, elem_ids))
+        ])
+
+        dict_atoms = {}
+        for r2, nchg, i in sorted_r2_list:
+            if nchg not in dict_atoms:
+                dict_atoms[nchg] = []
+            dict_atoms[nchg].append(i)
+
+        list_atoms = []
+        for nchg in sorted(dict_atoms.keys(), reverse=True):
+            list_atoms += dict_atoms[nchg]
+
+    else:
+        list_atoms = None
+
+    list_atoms = comm.bcast(list_atoms, root=mpi_master())
+
+    return list(list_atoms[rank::nnodes])
+
+
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 Molecule._find_connected_atoms = _Molecule_find_connected_atoms
 Molecule._rotate_around_vector = _Molecule_rotate_around_vector
 
+Molecule.smiles_formal_charge = _Molecule_smiles_formal_charge
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.read_gro_file = _Molecule_read_gro_file
 Molecule.read_pdb_file = _Molecule_read_pdb_file
@@ -1174,6 +1267,7 @@ Molecule.print_keywords = _Molecule_print_keywords
 Molecule.check_multiplicity = _Molecule_check_multiplicity
 Molecule.number_of_alpha_electrons = _Molecule_number_of_alpha_electrons
 Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
+Molecule.partition_atoms = _Molecule_partition_atoms
 
 # aliases for backward compatibility
 Molecule.read_xyz = _Molecule_read_xyz_file

@@ -6,9 +6,15 @@ on:
       - master
       - simd_master_test
       - multipsi_newcore
-      - evb-test
+      - embedding_test
       - c_pcm
-      - impes_merge
+      - dft-update
+      - hessian-update
+      - ri-test
+      - ri-grad-test
+      - tddft_vibanalysis_test
+      - tddft_grad_test
+      - feature-test
 
 jobs:
   vlx_ci:
@@ -60,17 +66,18 @@ jobs:
           git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
           CXX=g++ python -m pip install \
-            git+https://gitlab.com/FraME-projects/PyFraME.git@35188b620c84f74a73e2c28d737abee4386a503a
+            git+https://gitlab.com/FraME-projects/PyFraME.git@84a356bfe3b9af17345ec754383a38792291dbbb
+          python -m pip install dftd4 xtb
           python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="
-          export DFTD4_HOME=/usr/local
-          export XTBHOME=/usr/local
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
-          SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=OpenBLAS -DCMAKE_CXX_COMPILER=g++" \
+          SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++" \
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
           OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO \
-            --pyargs veloxchem -m "solvers" --durations=10
+            -m "solvers" --durations=10
           OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
-            --pyargs veloxchem -m "not timeconsuming" --durations=10
+            -m "not timeconsuming" --durations=10
+          git clone https://github.com/VeloxChem/vlx-extra-tests.git
+          OMP_NUM_THREADS=4 python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests

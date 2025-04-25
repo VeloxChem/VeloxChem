@@ -1,3 +1,35 @@
+#
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
+#
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  Copyright 2018-2025 VeloxChem developers
+#
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
@@ -64,7 +96,12 @@ class EvbDriver():
 
         self.t_label = int(time.time())
 
-    def build_and_run_default_water_EVB(self, reactant: str | Molecule, product: str | list[str] | Molecule | list[Molecule], barrier, free_energy, ordered_input=False):
+    def build_and_run_default_water_EVB(self,
+                                        reactant: str | Molecule,
+                                        product: str | list[str] | Molecule | list[Molecule],
+                                        barrier,
+                                        free_energy,
+                                        ordered_input=False):
         """Automatically perform an EVB calculation using a vacuum system as reference and a system solvated in water as target system.
 
         Args:
@@ -77,7 +114,7 @@ class EvbDriver():
         self.ostream.print_blank()
         self.ostream.print_header("Building forcefields")
         self.ostream.flush()
-        self.build_forcefields(reactant, product, ordered_input=ordered_input,optimise=True)
+        self.build_forcefields(reactant, product, ordered_input=ordered_input, optimize=True)
         self.ostream.print_blank()
         self.ostream.print_header("Building systems")
         self.ostream.flush()
@@ -93,7 +130,8 @@ class EvbDriver():
             self.ostream.flush()
             self.compute_energy_profiles(barrier, free_energy)
         else:
-            self.ostream.print_info("Debugging option enabled. Skipping energy profile calculation because recalculation is necessary.")
+            self.ostream.print_info(
+                "Debugging option enabled. Skipping energy profile calculation because recalculation is necessary.")
 
         self.ostream.flush()
 
@@ -107,9 +145,9 @@ class EvbDriver():
         reactant_multiplicity: int = 1,
         product_multiplicity: int | list[int] = 1,
         reparameterize: bool = True,
-        optimise: bool = False,
+        optimize: bool = False,
         ordered_input: bool = False,
-        breaking_bonds: tuple[int,int] | list[tuple[int, int]] = None,
+        breaking_bonds: tuple[int, int] | list[tuple[int, int]] = None,
     ):
         """Build forcefields for the reactant and products, and set self.reactant and self.product to the respective forcefields as well as saving them as json to the input files folder. 
         Will calculate RESP charges and use an xtb Hessian for any necessary reparameterisation. If these files are already present in the input_files folder, they will be loaded instead of recalculated.
@@ -124,7 +162,7 @@ class EvbDriver():
             reactant_multiplicity (int, optional): The multiplicity of the reactant. Defaults to 1.
             product_multiplicity (int | list[int], optional): The multiplicity of each provided product. List should have the same length as the amount of products provided. Defaults to 1.
             reparameterize (bool, optional): If unknown parameters in the forcefield should be reparameterized. Defaults to True.
-            optimise (bool, optional): If the provided structure should be optimised before the forcefield is generated. Defaults to False.
+            optimize (bool, optional): If the provided structure should be optimized before the forcefield is generated. Defaults to False.
             ordered_input (bool, optional): If set to true, assumes that the reactant and product have the same ordering of atoms, and thus will not attempt to generate a mapping. Defaults to False.
             breaking_bonds (list[tuple[int, int]], optional): A list of tuples of atom-indices of breaking bonds. 
                 The atom indices are 0-indexed with respect to the reactant structure, and not all breaking bonds have to be provided. Defaults to None.
@@ -132,9 +170,11 @@ class EvbDriver():
         Raises:
             ValueError: If the reactant and product are not given both as a molecule or both as a file.
         """
-        
+
         if isinstance(reactant, Molecule):
-            assert isinstance(product, Molecule) or all(isinstance(pro, Molecule) for pro in product), "All products must be Molecule objects if the reactant is a Molecule object"
+            assert isinstance(product, Molecule) or all(
+                isinstance(pro, Molecule)
+                for pro in product), "All products must be Molecule objects if the reactant is a Molecule object"
             if not isinstance(product, list):
                 product = [product]
 
@@ -153,11 +193,18 @@ class EvbDriver():
                 assert reactant_charge == product_charge, "Total charge of reactant and products must match"
                 product_multiplicity = [product.get_multiplicity()]
 
-            rea_input = {"molecule": reactant, "optimise": None, "forcefield": None, "hessian": None, "charges": None}
-            pro_input = [{"molecule": pro, "optimise": None, "forcefield": None, "hessian": None, "charges": None} for pro in product]
+            rea_input = {"molecule": reactant, "optimize": None, "forcefield": None, "hessian": None, "charges": None}
+            pro_input = [{
+                "molecule": pro,
+                "optimize": None,
+                "forcefield": None,
+                "hessian": None,
+                "charges": None
+            } for pro in product]
 
         elif isinstance(reactant, str):
-            assert isinstance(product, str) or all(isinstance(pro, str) for pro in product), "All products must be strings if the reactant is a string"
+            assert isinstance(product, str) or all(
+                isinstance(pro, str) for pro in product), "All products must be strings if the reactant is a string"
             if not isinstance(product, list):
                 product = [product]
 
@@ -178,7 +225,7 @@ class EvbDriver():
 
             if isinstance(product_multiplicity, int):
                 product_multiplicity = [product_multiplicity] * len(product)
-            
+
             assert len(product) == len(product_charge), "Number of products and charges must match"
             assert len(product) == len(product_multiplicity), "Number of products and multiplicities must match"
 
@@ -192,7 +239,8 @@ class EvbDriver():
                 assert len(product) == 1, "Provide a list of seperate partial charges for every separate product"
                 pro_input[0]["charges"] = product_partial_charges
             else:
-                assert len(product) == len(product_partial_charges), "Amount of products and lists of partial charges must match"
+                assert len(product) == len(
+                    product_partial_charges), "Amount of products and lists of partial charges must match"
                 for pro, charges in zip(pro_input, product_partial_charges):
                     pro["charges"] = charges
 
@@ -202,7 +250,9 @@ class EvbDriver():
 
         rea_atoms = rea_input['molecule'].number_of_atoms()
         pro_atoms = [pro['molecule'].number_of_atoms() for pro in pro_input]
-        assert rea_atoms == sum(pro_atoms), f"Number of atoms in reactant ({rea_atoms}) and products ({pro_atoms}, sum={sum(pro_atoms)}) must match"
+        assert rea_atoms == sum(
+            pro_atoms
+        ), f"Number of atoms in reactant ({rea_atoms}) and products ({pro_atoms}, sum={sum(pro_atoms)}) must match"
         self.name = reactant_name
 
         if rea_input["forcefield"] is not None and combined_product_path.exists():
@@ -213,7 +263,7 @@ class EvbDriver():
         else:
             ffbuilder = EvbForceFieldBuilder()
             ffbuilder.reparameterize = reparameterize
-            ffbuilder.optimise = optimise
+            ffbuilder.optimize = optimize
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
@@ -233,18 +283,18 @@ class EvbDriver():
         self.ostream.flush()
 
     def _get_input_files(self, filename: str):
-        # Build a molecule from a (possibly optimised) geometry
-        optimise = True
+        # Build a molecule from a (possibly optimized) geometry
+        optimize = True
         cwd = Path().cwd()
 
         opt_path = cwd / self.input_folder / f"{filename}_xtb_opt.xyz"
         if opt_path.exists():
-            self.ostream.print_info(f"Loading optimised geometry from {opt_path}")
+            self.ostream.print_info(f"Loading optimized geometry from {opt_path}")
             molecule = Molecule.read_xyz_file(str(opt_path))
-            optimise = False
+            optimize = False
         else:
             struct_path = cwd / self.input_folder / f"{filename}.xyz"
-            self.ostream.print_info(f"Loading (possibly unoptimised) geometry from {struct_path}")
+            self.ostream.print_info(f"Loading (possibly unoptimized) geometry from {struct_path}")
             molecule = Molecule.read_xyz_file(str(struct_path))
 
         charges = None
@@ -258,9 +308,7 @@ class EvbDriver():
                     except ValueError:
                         self.ostream.print_info(f"Could not read line {line} from {charge_path}. Continuing")
             print_charge = sum([round(charge, 3) for charge in charges])
-            self.ostream.print_info(
-                f"Loading charges from {charge_path} file, total charge: {print_charge}"
-            )
+            self.ostream.print_info(f"Loading charges from {charge_path} file, total charge: {print_charge}")
 
         forcefield = None
         json_path = cwd / self.input_folder / f"{filename}_ff_data.json"
@@ -271,20 +319,25 @@ class EvbDriver():
             if charges is not None:
                 forcefield.partial_charges = charges
         else:
-            self.ostream.print_info(f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json.")
+            self.ostream.print_info(
+                f"Could not find force field data file {self.input_folder}/{filename}_ff_data.json.")
 
         hessian = None
         hessian_path = cwd / self.input_folder / f"{filename}_hess.np"
         if hessian_path.exists():
-            self.ostream.print_info(
-                f"Found hessian file at {hessian_path}, using it to reparameterize.")
+            self.ostream.print_info(f"Found hessian file at {hessian_path}, using it to reparameterize.")
             hessian = np.loadtxt(hessian_path)
         else:
             self.ostream.print_info(
-                f"Could not find hessian file at {hessian_path}, calculating hessian with xtb and saving it"
-            )
+                f"Could not find hessian file at {hessian_path}, calculating hessian with xtb and saving it")
 
-        return {"molecule": molecule, "optimise": optimise, "forcefield": forcefield, "hessian": hessian, "charges": charges}
+        return {
+            "molecule": molecule,
+            "optimize": optimize,
+            "forcefield": forcefield,
+            "hessian": hessian,
+            "charges": charges
+        }
 
     #todo, should be moved to forcefieldgenerator class
     @staticmethod
@@ -332,7 +385,6 @@ class EvbDriver():
         with open(path, "w", encoding="utf-8") as file:
             json.dump(ff_data, file, indent=4)
 
-
     @staticmethod
     def _str_to_tuple_key(dictionary: dict) -> dict:
         """
@@ -352,11 +404,11 @@ class EvbDriver():
                 item = item.replace("(", "")
                 item = item.replace(")", "")
                 item = item.replace(" ", "")
-                tuple += (int(item),)
+                tuple += (int(item), )
             if len(tuple) == 1:
                 tuple = tuple[0]
             tup_keys.append(tuple)
-        return {key: value for key, value in zip(tup_keys,dictionary.values())}
+        return {key: value for key, value in zip(tup_keys, dictionary.values())}
 
     @staticmethod
     def _tuple_to_str_key(dictionary: dict) -> dict:
@@ -377,7 +429,7 @@ class EvbDriver():
         configurations: list[str] | list[dict],  # type: ignore
         Lambda: list[float] | np.ndarray = None,
         constraints: dict | list[dict] | None = None,
-        save_output = True,
+        save_output=True,
     ):
         """Build OpenMM systems for the given configurations with interpolated forcefields for each lambda value. Saves the systems as xml files, the topology as a pdb file and the options as a json file to the disk.
 
@@ -394,16 +446,16 @@ class EvbDriver():
         if Lambda is None:
             if not self.debug:
                 if self.fast_run:
-                    Lambda = np.linspace(0,0.1,6)
-                    Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,21))
-                    Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,6))
+                    Lambda = np.linspace(0, 0.1, 6)
+                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 21))
+                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 6))
                 else:
-                    Lambda = np.linspace(0,0.1,11)
-                    Lambda = np.append(Lambda[:-1],np.linspace(0.1,0.9,41))
-                    Lambda = np.append(Lambda[:-1],np.linspace(0.9,1,11))
-                Lambda = np.round(Lambda,3)
+                    Lambda = np.linspace(0, 0.1, 11)
+                    Lambda = np.append(Lambda[:-1], np.linspace(0.1, 0.9, 41))
+                    Lambda = np.append(Lambda[:-1], np.linspace(0.9, 1, 11))
+                Lambda = np.round(Lambda, 3)
             else:
-                Lambda = [0, 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+                Lambda = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
         assert (Lambda[0] == 0 and Lambda[-1] == 1), f"Lambda must start at 0 and end at 1. Lambda = {Lambda}"
         assert np.all(np.diff(Lambda) > 0), f"Lambda must be monotonically increasing. Lambda = {Lambda}"
         Lambda = [round(lam, 3) for lam in Lambda]
@@ -423,7 +475,7 @@ class EvbDriver():
         #Per configuration
         for conf in configurations:
             #create folders,
-            
+
             data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
             conf["data_folder"] = data_folder
             run_folder = str(Path(data_folder) / "run")
@@ -454,7 +506,7 @@ class EvbDriver():
             conf["systems"] = systems
             conf["topology"] = topology
             conf["initial_positions"] = initial_positions
-            
+
             if save_output:
                 self.ostream.print_info(f"Saving files to {data_folder_path}")
                 self.ostream.flush()
@@ -476,7 +528,6 @@ class EvbDriver():
                         },
                         file,
                     )
-
 
         self.system_confs = configurations
         self.ostream.flush()
@@ -552,7 +603,7 @@ class EvbDriver():
 
         return conf
 
-    def load_initialisation(self, data_folder: str, name: str, skip_systems = False, skip_pdb = False):
+    def load_initialisation(self, data_folder: str, name: str, skip_systems=False, skip_pdb=False):
         """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
@@ -570,7 +621,9 @@ class EvbDriver():
             temperature = options["temperature"]
             Lambda = options["Lambda"]
         if self.Lambda != Lambda and self.Lambda is not None:
-            self.ostream.print_warning(f"Lambda vector in {data_folder}/options.json does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file.")
+            self.ostream.print_warning(
+                f"Lambda vector in {data_folder}/options.json does not match the current Lambda vector. Overwriting current Lambda vector with the one from the file."
+            )
 
         self.Lambda = Lambda
 
@@ -590,11 +643,12 @@ class EvbDriver():
         if not skip_pdb:
             pdb = mmapp.PDBFile(str(Path(data_folder) / "topology.pdb"))
             conf["topology"] = pdb.getTopology()
-            conf["initial_positions"]  = pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers)
-        
+            conf["initial_positions"] = pdb.getPositions(asNumpy=True).value_in_unit(mmunit.nanometers)
 
         self.system_confs.append(conf)
-        self.ostream.print_info(f"Initialised configuration with {len(systems)} systems, topology, initial positions, temperatue {temperature} and Lambda vector {Lambda} from {data_folder}")
+        self.ostream.print_info(
+            f"Initialised configuration with {len(systems)} systems, topology, initial positions, temperatue {temperature} and Lambda vector {Lambda} from {data_folder}"
+        )
         self.ostream.print_info(f"Current configurations: {[conf['name'] for conf in self.system_confs]}")
         self.ostream.flush()
 
@@ -658,7 +712,7 @@ class EvbDriver():
         """Run the the FEP calculations for all configurations in self.system_confs.
 
         Args:
-            equil_steps (int, optional): The amount of timesteps to equiliberate at the beginning af each Lambda frame. Equilibration is done with frozen H-bonds. Defaults to 5000.
+            equil_steps (int, optional): The amount of timesteps to equilibrate at the beginning af each Lambda frame. Equilibration is done with frozen H-bonds. Defaults to 5000.
             sample_steps (int, optional): The amount of steps to sample. Defaults to 100000.
             write_step (int, optional): Per how many steps to take a sample and save its data as well as the trajectory point. Defaults to 1000.
             initial_equil_steps (int, optional): The amount of timesteps to add to the equilibration at the first Lambda frame. Defaults to 5000.
@@ -679,26 +733,29 @@ class EvbDriver():
 
         if self.fast_run:
             self.ostream.print_warning("Fast run enabled, using modest number of steps. Be careful with using results")
-            sample_steps=25000
+            sample_steps = 25000
 
         for conf in self.system_confs:
             self.ostream.print_blank()
             self.ostream.print_header(f"Running FEP for {conf['name']}")
             self.ostream.flush()
             FEP = EvbFepDriver()
-            FEP.run_FEP(
-                equilibration_steps=equil_steps,
-                total_sample_steps=sample_steps,
-                write_step=write_step,
-                lambda_0_equilibration_steps=initial_equil_steps,
-                step_size=step_size,
-                equil_step_size=equil_step_size,
-                initial_equil_step_size=initial_equil_step_size,
-                Lambda=self.Lambda,
-                configuration=conf
-            )
+            FEP.run_FEP(equilibration_steps=equil_steps,
+                        total_sample_steps=sample_steps,
+                        write_step=write_step,
+                        lambda_0_equilibration_steps=initial_equil_steps,
+                        step_size=step_size,
+                        equil_step_size=equil_step_size,
+                        initial_equil_step_size=initial_equil_step_size,
+                        Lambda=self.Lambda,
+                        configuration=conf)
 
-    def compute_energy_profiles(self, barrier, free_energy, lambda_sub_sample=1, lambda_sub_sample_ends=False, time_sub_sample=1):
+    def compute_energy_profiles(self,
+                                barrier,
+                                free_energy,
+                                lambda_sub_sample=1,
+                                lambda_sub_sample_ends=False,
+                                time_sub_sample=1):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
         Args:
@@ -727,17 +784,15 @@ class EvbDriver():
         if results is None:
             if file_name is None:
                 assert self.results is not None, "No results known, and none provided"
-            
+
             if self.results is None:
                 self.results = self._load_dict_from_h5(file_name)
             else:
                 results = self.results
-            
-            
+
         dp = EvbDataProcessing()
         dp.print_results(results, self.ostream)
         self.ostream.flush()
-        pass
 
     def plot_results(self, results: dict = None, file_name: str = None):
         """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
@@ -749,7 +804,7 @@ class EvbDriver():
         if results is None:
             if file_name is None:
                 assert self.results is not None, "No results known, and none provided"
-            
+
             if self.results is None:
                 self.results = self._load_dict_from_h5(file_name)
             else:
@@ -757,7 +812,6 @@ class EvbDriver():
         dp = EvbDataProcessing()
         dp.plot_results(results)
         self.ostream.flush()
-        pass
 
     def _load_output_from_folders(self, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample) -> dict:
         reference_folder = self.system_confs[0]["data_folder"]
@@ -769,30 +823,39 @@ class EvbDriver():
         folders = [reference_folder] + target_folders
         results = {}
         cwd = Path().cwd()
-        
+
         common_results = []
         specific_results = {}
         for name, folder in zip([reference_name] + target_names, folders):
             E_file = str(cwd / folder / "Energies.dat")
             data_file = str(cwd / folder / "Data_combined.dat")
             options_file = str(cwd / folder / "options.json")
-            specific, common = self._load_output_files(E_file, data_file, options_file, lambda_sub_sample, lambda_sub_sample_ends, time_sub_sample)
-            specific_results.update({name:specific})
+            specific, common = self._load_output_files(E_file, data_file, options_file, lambda_sub_sample,
+                                                       lambda_sub_sample_ends, time_sub_sample)
+            specific_results.update({name: specific})
             common_results.append(common)
-        
+
         results.update({"configuration_results": specific_results})
         for common in common_results[1:]:
             for key, val in common.items():
-                if isinstance (common[key], list) or isinstance(common[key], np.ndarray):
-                    assert np.all(common[key] == common_results[0][key]), f"Common results are not the same for all configurations. Key: {key}, value: {val}"
+                if isinstance(common[key], list) or isinstance(common[key], np.ndarray):
+                    assert np.all(common[key] == common_results[0][key]
+                                  ), f"Common results are not the same for all configurations. Key: {key}, value: {val}"
                 else:
-                    assert common[key] == common_results[0][key], f"Common results are not the same for all configurations. Key: {key}, value: {val}"
+                    assert common[key] == common_results[0][
+                        key], f"Common results are not the same for all configurations. Key: {key}, value: {val}"
 
         for key, val in common_results[0].items():
             results.update({key: val})
         return results
 
-    def _load_output_files(self, E_file, data_file, options_file, lambda_sub_sample=1, lambda_sub_sample_ends=False, time_sub_sample=1):
+    def _load_output_files(self,
+                           E_file,
+                           data_file,
+                           options_file,
+                           lambda_sub_sample=1,
+                           lambda_sub_sample_ends=False,
+                           time_sub_sample=1):
         with open(options_file, "r") as file:
             options = json.load(file)
         Lambda = options["Lambda"]
@@ -803,23 +866,24 @@ class EvbDriver():
             if lambda_sub_sample_ends:
                 Lambda = Lambda[::lambda_sub_sample]
             else:
-                arg01 = np.where(np.array(Lambda)<=0.1)[0][-1]+1
-                arg09 = np.where(np.array(Lambda)>=0.9)[0][0]-1
-                Lambda = Lambda[:arg01]+Lambda[arg01:arg09:lambda_sub_sample]+Lambda[arg09:]
-                # Lambda_middle = 
-            self.ostream.print_info(f"Subsampling Lambda vector with factor {lambda_sub_sample}. New Lambda vector: {Lambda}")
+                arg01 = np.where(np.array(Lambda) <= 0.1)[0][-1] + 1
+                arg09 = np.where(np.array(Lambda) >= 0.9)[0][0] - 1
+                Lambda = Lambda[:arg01] + Lambda[arg01:arg09:lambda_sub_sample] + Lambda[arg09:]
+                # Lambda_middle =
+            self.ostream.print_info(
+                f"Subsampling Lambda vector with factor {lambda_sub_sample}. New Lambda vector: {Lambda}")
 
         if Lambda[-1] != 1:
             self.ostream.print_info("Lambda vector does not end at 1. Appending 1 to the Lambda vector")
             Lambda = np.append(Lambda, 1)
-        
-        E_data = np.loadtxt(E_file,skiprows=1,delimiter=',').T
+
+        E_data = np.loadtxt(E_file, skiprows=1, delimiter=',').T
         l_sub_indices = np.where([lf in Lambda for lf in E_data[0]])[0]
-        
+
         sub_indices = l_sub_indices[::time_sub_sample]
 
-        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = E_data[:,sub_indices]
-        step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file,skiprows=1,delimiter=',').T[:,sub_indices]
+        Lambda_frame, E1_ref, E2_ref, E1_run, E2_run, E_m = E_data[:, sub_indices]
+        step, Ep, Ek, Temp, Vol, Dens = np.loadtxt(data_file, skiprows=1, delimiter=',').T[:, sub_indices]
 
         specific_result = {
             "E1_ref": E1_ref,
@@ -854,6 +918,7 @@ class EvbDriver():
             dict: Dictionary with the results
         """
         with h5py.File(file, "r") as f:
+
             def load_group(group):
                 data = {}
                 for k, v in group.items():
@@ -875,11 +940,12 @@ class EvbDriver():
             results (dict): Dictionary to be saved.
         """
         cwd = Path.cwd()
-        
+
         file_path = str(cwd / f"{file_name}.h5")
 
         with h5py.File(file_path, "w") as file:
             self.ostream.print_info(f"Saving results to {file_path}")
+
             def save_group(data, group):
                 for k, v in data.items():
                     if isinstance(v, dict):

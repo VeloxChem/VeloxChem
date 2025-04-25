@@ -9,7 +9,12 @@ from veloxchem.respchargesdriver import RespChargesDriver
 
 class TestRespCharges:
 
-    def run_resp(self, inpfile, ref_charges, inp_chg_dict, chg_type):
+    def run_resp(self,
+                 inpfile,
+                 ref_charges,
+                 inp_chg_dict,
+                 chg_type,
+                 custom_mk_radii=None):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
@@ -26,6 +31,9 @@ class TestRespCharges:
         chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
         chg_drv.update_settings(chg_dict, task.input_dict['method_settings'])
 
+        if custom_mk_radii is not None:
+            chg_drv.custom_mk_radii = custom_mk_radii
+
         q_fit = chg_drv.compute(task.molecule, task.ao_basis, scf_results,
                                 chg_type.lower())
 
@@ -35,13 +43,14 @@ class TestRespCharges:
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
             if pdb_file.is_file():
                 pdb_file.unlink()
-            scf_h5_file = Path(chg_drv.filename).with_suffix('.scf.h5')
+
+            final_h5_file = Path(chg_drv.filename).with_suffix('.h5')
+            if final_h5_file.is_file():
+                final_h5_file.unlink()
+
+            scf_h5_file = Path(chg_drv.filename + '_scf.h5')
             if scf_h5_file.is_file():
                 scf_h5_file.unlink()
-            scf_final_h5_file = Path(
-                chg_drv.filename).with_suffix('.scf.results.h5')
-            if scf_final_h5_file.is_file():
-                scf_final_h5_file.unlink()
 
     def test_resp_methanol(self):
 
@@ -56,6 +65,22 @@ class TestRespCharges:
         chg_dict = {'number_layers': 1}
 
         self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp')
+
+    def test_resp_methanol_custom_radii(self):
+
+        # vlxtag: RHF, RESP_charges
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'methanol.inp')
+
+        ref_resp_charges = np.array([
+            0.04858359, -0.00613574, 0.04858359, 0.04858359, -0.43473053,
+            0.29511548
+        ])
+
+        chg_dict = {'number_layers': 1}
+
+        self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp', ['C', 3.0])
 
     def test_esp_methanol(self):
 

@@ -1,27 +1,34 @@
 #
-#                           VELOXCHEM 1.0-RC3
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import Path
@@ -133,7 +140,7 @@ class SolvationBuilder:
         # Standard forcefield
         self.parent_forcefield = 'amber03'
 
-    def solvate(self, solute, solvent = 'spce', solvent_molecule=None, padding=1, target_density=None, neutralize=True, equilibrate=False):
+    def solvate(self, solute, solvent='spce', solvent_molecule=None, padding=1.0, target_density=None, neutralize=True, equilibrate=False):
         """
         Create a solvated system with the most typical solvent molecules.
 
@@ -166,7 +173,7 @@ class SolvationBuilder:
         
         header_msg = "VeloxChem System Builder"
         self.ostream.print_header(header_msg)
-        self.ostream.print_header("="*len(header_msg))
+        self.ostream.print_header("=" * (len(header_msg) + 2))
         self.ostream.print_blank()
         self.ostream.flush()
         
@@ -378,30 +385,32 @@ class SolvationBuilder:
         self.ostream.print_info(f"Time to solvate the system: {end - start:.2f} s")
         self.ostream.flush()
         # Print results
-        self.ostream.print_info(f'The density of the solvent after packing is:{self._check_density(solvent_molecule, self.added_solvent_counts[0], volume_nm3)} kg/m^3')
+        self.ostream.print_info(
+            'The density of the solvent after packing is: ' +
+            f'{self._check_density(solvent_molecule, self.added_solvent_counts[0], volume_nm3)} kg/m^3')
+        self.ostream.print_blank()
         self.ostream.flush()
 
         self.system_molecule = self._save_molecule()
 
         if equilibrate:
-            self.equilibration_flag = True
-            self.ostream.print_blank()
-            self.ostream.print_info("Equilibrating the system")
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.ostream.print_info(f"Duration: {self.steps/1000} ps")
-            self.ostream.flush()
-            self.ostream.print_info(f"Temperature: {self.temperature} K")
-            self.ostream.flush()
-            self.ostream.print_info(f"Pressure: {self.pressure} bar")
-            self.ostream.flush()
-            self.ostream.print_blank()
-            start = time.time()
-            self.perform_equilibration()
-            self.ostream.print_info("Equilibration completed, system saved as 'equilibrated_system.pdb'")
-            self.ostream.flush()
-            end = time.time()
-            self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
+            # TODO: run perform_equilibration using openmm files
+            try:
+                start = time.time()
+                self.perform_equilibration()
+                end = time.time()
+                self.ostream.print_info("Equilibrating the system")
+                self.ostream.print_blank()
+                self.ostream.print_info(f"Duration: {self.steps/1000} ps")
+                self.ostream.print_info(f"Temperature: {self.temperature} K")
+                self.ostream.print_info(f"Pressure: {self.pressure} bar")
+                self.ostream.print_blank()
+                self.ostream.print_info(f"Elapsed time to equilibrate the system: {end - start:.2f} s")
+                self.equilibration_flag = True
+            except ValueError:
+                # ValueError: Could not locate #include file: amber03.ff/forcefield.itp
+                self.ostream.print_info("Equilibration skipped due to missing files")
+                self.ostream.print_blank()
             self.ostream.flush()
 
 
@@ -1331,7 +1340,7 @@ class SolvationBuilder:
             # Special case for 'itself' solvent
             if self.solvent_name == 'itself':
                 residue_name = 'MOL' 
-                num_atoms_per_molecule = len(self.solute_ff.atoms)
+                # num_atoms_per_molecule = len(self.solute_ff.atoms)
                 for mols in range(self.added_solvent_counts[0]):
                     if residue_counter > 9999:
                         residue_counter -= 9999
@@ -1430,7 +1439,7 @@ class SolvationBuilder:
             if self.solvent_ffs:
                 # Solvent bonds for 'itself' solvent
                 if self.solvent_name == 'itself':
-                    num_atoms_per_molecule = len(self.solute_ff.atoms)
+                    # num_atoms_per_molecule = len(self.solute_ff.atoms)
                     for mols in range(self.added_solvent_counts[0]):
                         for (i_atom, j_atom) in self.solute_ff.bonds:
                             pdb_i = pdb_atom_numbers[('solvent', mols, i_atom)]
@@ -1560,14 +1569,45 @@ class SolvationBuilder:
         batch_size = max(batch_size, min_batch_size)
         return batch_size
 
+    def show_solvation_box(self, width=600, height=500, solvent_opacity=0.8):
 
+        n_solute_atoms = self.solute.number_of_atoms()
 
+        solute_atoms = []
+        for atom in self.system[:n_solute_atoms]:
+            solute_atoms.append([atom[1]] + [str(x) for x in atom[2]])
+        solute_atoms_xyz = f'{len(solute_atoms)}\n\n'
+        for a in solute_atoms:
+            solute_atoms_xyz += ' '.join(a) + '\n'
 
+        solvent_atoms = []
+        for atom in self.system[n_solute_atoms:]:
+            solvent_atoms.append([atom[1]] + [str(x) for x in atom[2]])
+        solvent_atoms_xyz = f'{len(solvent_atoms)}\n\n'
+        for a in solvent_atoms:
+            solvent_atoms_xyz += ' '.join(a) + '\n'
 
+        try:
+            import py3Dmol
+            viewer = py3Dmol.view(width=width, height=height)
+            viewer.setViewStyle({"style": "outline", "width": 0.02})
 
+            viewer.addModel(solute_atoms_xyz)
+            viewer.setStyle({'model': 0}, {"stick": {}, "sphere": {"scale": 0.25}})
 
+            viewer.addModel(solvent_atoms_xyz)
+            viewer.setStyle(
+                {
+                    'model': 1,
+                },
+                {
+                    "stick": {"radius": 0.1, "opacity": solvent_opacity},
+                    "sphere": {"scale": 0.08, "opacity": solvent_opacity},
+                },
+            )
 
+            viewer.zoomTo()
+            viewer.show()
 
-
-
-
+        except ImportError:
+            raise ImportError('Unable to import py3Dmol')

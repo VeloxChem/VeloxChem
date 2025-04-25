@@ -1,3 +1,35 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "FockDriver.hpp"
 
 #include <algorithm>
@@ -170,6 +202,86 @@ CFockDriver::compute(const CT4CScreener& screener,
     fock_mat.symmetrize();
 
     return fock_mat;
+}
+
+auto
+CFockDriver::compute_mixpre(const CT4CScreener &screener,
+                            const CMatrix      &density,
+                            const std::string  &label,
+                            const double        exchange_factor,
+                            const double        omega,
+                            const int           ithreshold) const -> CMatrix
+{
+    auto bsfac = _determine_block_size_factor(_get_nao(density));
+
+    // set up Fock matrix
+
+    auto fock_mat = CMatrix(density);
+
+    fock_mat.zero();
+
+    // prepare pointers for OMP parallel region
+
+    auto ptr_screener = &screener;
+
+    auto ptr_density = &density;
+
+    auto ptr_fock = &fock_mat;
+
+    // execute OMP tasks with static scheduling
+    
+    const auto min_thresh = (ithreshold - 7) > 0 ? ithreshold - 7 : 0;
+
+#pragma omp parallel shared(ptr_screener, ptr_density, ptr_fock, label, exchange_factor, omega, ithreshold)
+    {
+#pragma omp single nowait
+        {
+            auto gto_pair_blocks = ptr_screener->gto_pair_blocks();
+
+            // double precision block
+            
+            auto work_tasks = omp::make_work_group(gto_pair_blocks, min_thresh, bsfac);
+            
+            std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
+                const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
+                const auto ket_gpairs = gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
+                const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
+                const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
+                const bool diagonal   = (task[0] == task[1]) && (task[2] == task[3]) && (bra_range == ket_range);
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal)
+                {
+                    CT4CMatrixDistributor distributor(ptr_fock, ptr_density, label, exchange_factor, omega);
+                    distributor.set_indices(bra_gpairs, ket_gpairs);
+                    erifunc::compute<CT4CMatrixDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal);
+                    distributor.accumulate(bra_gpairs, ket_gpairs);
+                }
+            });
+            
+            // single precision block
+            
+            work_tasks = omp::make_work_group(gto_pair_blocks, min_thresh, ithreshold, bsfac);
+            
+            std::ranges::for_each(std::views::reverse(work_tasks), [&](const auto& task) {
+                const auto bra_gpairs = gto_pair_blocks[task[0]].gto_pair_block(static_cast<int>(task[2]));
+                const auto ket_gpairs = gto_pair_blocks[task[1]].gto_pair_block(static_cast<int>(task[3]));
+                const auto bra_range  = std::pair<size_t, size_t>{task[4], task[5]};
+                const auto ket_range  = std::pair<size_t, size_t>{task[6], task[7]};
+#pragma omp task firstprivate(bra_gpairs, ket_gpairs, bra_range, ket_range)
+                {
+                    CT4CMatrixDistributor distributor(ptr_fock, ptr_density, label, exchange_factor, omega);
+                    distributor.set_indices(bra_gpairs, ket_gpairs);
+                    //erifunc::compute_mixpre<CT4CMatrixDistributor>(distributor, bra_gpairs, ket_gpairs, bra_range, ket_range, diagonal);
+                    distributor.accumulate(bra_gpairs, ket_gpairs);
+                }
+            });
+        }
+    }
+
+    fock_mat.symmetrize();
+
+    return fock_mat;
+    
+    
 }
 
 auto

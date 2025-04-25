@@ -1,26 +1,34 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ExportOneElecInts.hpp"
 
@@ -30,12 +38,17 @@
 #include <pybind11/stl.h>
 
 #include "AngularMomentumIntegrals.hpp"
+#include "ElectricFieldFockGradient.hpp"
 #include "ElectricFieldIntegrals.hpp"
+#include "ElectricFieldPotentialGradient.hpp"
+#include "ElectricFieldPotentialGradientAtMMSites.hpp"
+#include "ElectricFieldPotentialHessian.hpp"
 #include "ElectricFieldValues.hpp"
 #include "ExportGeneral.hpp"
 #include "ErrorHandler.hpp"
 #include "LinearMomentumIntegrals.hpp"
-#include "NuclearPotentialValues.hpp"
+#include "NuclearPotentialErfGradient.hpp"
+#include "NuclearPotentialErfValues.hpp"
 #include "QuadrupoleIntegrals.hpp"
 #include "OldOneElecIntsDrivers.hpp"
 
@@ -189,7 +202,113 @@ export_oneeints(py::module& m)
              "molecule"_a,
              "basis"_a,
              "dipole_coords"_a,
-             "D"_a);
+             "density"_a);
+
+    m.def("compute_electric_field_potential_gradient",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& dipole_coords,
+               const py::array_t<double>& dipole_moments,
+               const py::array_t<double>& D) -> py::array_t<double> {
+                std::string errstyle("compute_electric_field_potential_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                std::string errsize("compute_electric_field_potential_gradient: Inconsistent dimension of dipole coordinates/moments");
+                errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);
+                std::string errshape("compute_electric_field_potential_gradient: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto ndipoles = static_cast<int>(dipole_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto ef_grad = onee::computeElectricFieldPotentialGradient(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles, D.data(), naos);
+                return vlx_general::pointer_to_numpy(ef_grad.values(), {ef_grad.getNumberOfRows(), ef_grad.getNumberOfColumns()});
+            },
+            "Computes electric field integrals contribution to molecular gradient.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "dipole_moments"_a,
+             "density"_a);
+
+    m.def("compute_electric_field_fock_gradient",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& dipole_coords,
+               const py::array_t<double>& dipole_moments,
+               const int                  qm_atom_index) -> py::array_t<double> {
+                std::string errstyle("compute_electric_field_fock_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                std::string errsize("compute_electric_field_fock_gradient: Inconsistent dimension of dipole coordinates/moments");
+                errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);
+                auto ndipoles = static_cast<int>(dipole_coords.shape(0));
+                auto ef_fock_grad = onee::computeElectricFieldFockGradient(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles, qm_atom_index);
+                auto naos = static_cast<int>(basis.dimensions_of_basis());
+                CDenseMatrix ret(3, naos * naos);
+                for (int n = 0; n < 3; n++) std::memcpy(ret.row(n), ef_fock_grad[n].values(), naos * naos * sizeof(double));
+                return vlx_general::pointer_to_numpy(ret.values(), {3, naos, naos});
+            },
+            "Computes electric field integrals contribution to fock gradient.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "dipole_moments"_a,
+             "qm_atom_index"_a);
+
+    m.def("compute_electric_field_potential_gradient_for_mm",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& dipole_coords,
+               const py::array_t<double>& D,
+               const int                  atom_idx) -> py::array_t<double> {
+                std::string errstyle("compute_electric_field_potential_gradient_for_mm: Expecting contiguous numpy arrays");
+                auto        c_style = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+                std::string errsize("compute_electric_field_potential_gradient_for_mm: Inconsistent dimension of dipole coordinates/moments");
+                errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
+                std::string errshape("compute_electric_field_potential_gradient_for_mm: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto ndipoles = static_cast<int>(dipole_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto ef_grad_for_mm = onee::computeElectricFieldPotentialGradientAtMMSites(molecule, basis, dipole_coords.data(), ndipoles, D.data(), naos, atom_idx);
+                return vlx_general::pointer_to_numpy(ef_grad_for_mm.values(), {3, ndipoles, 3});
+            },
+            "Computes electric field potential gradient for solving MM induced dipoles.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "density"_a,
+             "qm_atom_index"_a);
+
+    m.def("compute_electric_field_potential_hessian",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& dipole_coords,
+               const py::array_t<double>& dipole_moments,
+               const py::array_t<double>& D) -> py::array_t<double> {
+                std::string errstyle("compute_electric_field_potential_hessian: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(dipole_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(dipole_moments.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+                std::string errsize("compute_electric_field_potential_hessian: Inconsistent dimension of dipole coordinates/moments");
+                errors::assertMsgCritical(dipole_coords.shape(1) == 3, errsize);
+                errors::assertMsgCritical(dipole_moments.shape(1) == 3, errsize);
+                std::string errshape("compute_electric_field_potential_hessian: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto ndipoles = static_cast<int>(dipole_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto ef_hess = onee::computeElectricFieldPotentialHessian(molecule, basis, dipole_coords.data(), dipole_moments.data(), ndipoles, D.data(), naos);
+                return vlx_general::pointer_to_numpy(ef_hess.values(), {ef_hess.getNumberOfRows(), ef_hess.getNumberOfColumns()});
+            },
+            "Computes electric field integrals contribution to molecular Hessian.",
+             "molecule"_a,
+             "basis"_a,
+             "dipole_coords"_a,
+             "dipole_moments"_a,
+             "density"_a);
 
     m.def("compute_nuclear_potential_values",
             [](const CMolecule&           molecule,
@@ -197,20 +316,86 @@ export_oneeints(py::module& m)
                const py::array_t<double>& point_coords,
                const py::array_t<double>& D) -> py::array_t<double> {
                 std::string errstyle("compute_nuclear_potential_values: Expecting contiguous numpy arrays");
-                auto        c_style = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
-                errors::assertMsgCritical(c_style, errstyle);
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
                 std::string errshape("compute_electric_point_values: Expecting square matrix D");
                 errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
                 auto npoints = static_cast<int>(point_coords.shape(0));
                 auto naos = static_cast<int>(D.shape(0));
-                auto npot_vals = onee::computeNuclearPotentialValues(molecule, basis, point_coords.data(), npoints, D.data(), naos);
+                auto npot_vals = onee::computeNuclearPotentialErfValues(molecule, basis, point_coords.data(), npoints, D.data(), naos);
                 return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
             },
             "Computes nuclear potential values.",
              "molecule"_a,
              "basis"_a,
              "point_coords"_a,
-             "D"_a);
+             "density"_a);
+
+    m.def("compute_nuclear_potential_erf_values",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& point_coords,
+               const py::array_t<double>& D,
+               const py::array_t<double>& omega) -> py::array_t<double> {
+                std::string errstyle("compute_nuclear_potential_erf_values: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(omega.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+                std::string errsize("compute_electric_point_erf_values: Inconsistent sizes");
+                errors::assertMsgCritical(omega.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                std::string errshape("compute_electric_point_erf_values: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto npot_vals = onee::computeNuclearPotentialErfValues(molecule, basis, point_coords.data(), npoints, D.data(), naos, omega.data());
+                return vlx_general::pointer_to_numpy(npot_vals.data(), {static_cast<int>(npot_vals.size())});
+            },
+            "Computes nuclear potential values.",
+             "molecule"_a,
+             "basis"_a,
+             "point_coords"_a,
+             "density"_a,
+             "omega"_a);
+
+    m.def("compute_nuclear_potential_erf_gradient",
+            [](const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const py::array_t<double>& point_coords,
+               const py::array_t<double>& point_charges,
+               const py::array_t<double>& D,
+               const py::array_t<double>& omega,
+               const py::array_t<int>&    atom_indices) -> py::array_t<double> {
+                std::string errstyle("compute_nuclear_potential_erf_gradient: Expecting contiguous numpy arrays");
+                auto        c_style_1 = py::detail::check_flags(point_coords.ptr(), py::array::c_style);
+                auto        c_style_2 = py::detail::check_flags(point_charges.ptr(), py::array::c_style);
+                auto        c_style_3 = py::detail::check_flags(D.ptr(), py::array::c_style);
+                auto        c_style_4 = py::detail::check_flags(omega.ptr(), py::array::c_style);
+                auto        c_style_5 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+                errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4 && c_style_5), errstyle);
+                std::string errsize("compute_electric_point_erf_gradient: Inconsistent sizes");
+                errors::assertMsgCritical(omega.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_charges.shape(0) == point_coords.shape(0), errsize);
+                errors::assertMsgCritical(point_charges.shape(0) == atom_indices.shape(0), errsize);
+                errors::assertMsgCritical(point_coords.shape(1) == 3, errsize);
+                std::string errshape("compute_electric_point_erf_gradient: Expecting square matrix D");
+                errors::assertMsgCritical(D.shape(0) == D.shape(1), errshape);
+                auto npoints = static_cast<int>(point_coords.shape(0));
+                auto naos = static_cast<int>(D.shape(0));
+                auto grad = onee::computeNuclearPotentialErfGradient(
+                    molecule, basis, point_coords.data(), point_charges.data(), npoints, D.data(), naos, omega.data(), atom_indices.data());
+                return vlx_general::pointer_to_numpy(grad.values(), {grad.getNumberOfRows(), grad.getNumberOfColumns()});
+            },
+            "Computes nuclear potential gradient on charges.",
+             "molecule"_a,
+             "basis"_a,
+             "point_coords"_a,
+             "point_charges"_a,
+             "density"_a,
+             "omega"_a,
+             "atom_indices"_a);
 
     m.def("compute_quadrupole_integrals",
             [](const CMolecule&           molecule,

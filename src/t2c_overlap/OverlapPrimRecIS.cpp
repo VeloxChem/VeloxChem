@@ -1,15 +1,47 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "OverlapPrimRecIS.hpp"
 
-namespace ovlrec {  // ovlrec namespace
+namespace ovlrec { // ovlrec namespace
 
 auto
-comp_prim_overlap_is(CSimdArray<double>&       pbuffer,
-                     const size_t              idx_ovl_is,
-                     const size_t              idx_ovl_gs,
-                     const size_t              idx_ovl_hs,
+comp_prim_overlap_is(CSimdArray<double>& pbuffer, 
+                     const size_t idx_ovl_is,
+                     const size_t idx_ovl_gs,
+                     const size_t idx_ovl_hs,
                      const CSimdArray<double>& factors,
-                     const size_t              idx_rpa,
-                     const double              a_exp) -> void
+                     const size_t idx_rpa,
+                     const double a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -135,62 +167,7 @@ comp_prim_overlap_is(CSimdArray<double>&       pbuffer,
 
     auto ts_zzzzzz_0 = pbuffer.data(idx_ovl_is + 27);
 
-#pragma omp simd aligned(pa_x,            \
-                             pa_y,        \
-                             pa_z,        \
-                             ts_xxxx_0,   \
-                             ts_xxxxx_0,  \
-                             ts_xxxxxx_0, \
-                             ts_xxxxxy_0, \
-                             ts_xxxxxz_0, \
-                             ts_xxxxyy_0, \
-                             ts_xxxxyz_0, \
-                             ts_xxxxz_0,  \
-                             ts_xxxxzz_0, \
-                             ts_xxxyy_0,  \
-                             ts_xxxyyy_0, \
-                             ts_xxxyyz_0, \
-                             ts_xxxyzz_0, \
-                             ts_xxxzz_0,  \
-                             ts_xxxzzz_0, \
-                             ts_xxyy_0,   \
-                             ts_xxyyy_0,  \
-                             ts_xxyyyy_0, \
-                             ts_xxyyyz_0, \
-                             ts_xxyyzz_0, \
-                             ts_xxyzzz_0, \
-                             ts_xxzz_0,   \
-                             ts_xxzzz_0,  \
-                             ts_xxzzzz_0, \
-                             ts_xyyy_0,   \
-                             ts_xyyyy_0,  \
-                             ts_xyyyyy_0, \
-                             ts_xyyyyz_0, \
-                             ts_xyyyzz_0, \
-                             ts_xyyzz_0,  \
-                             ts_xyyzzz_0, \
-                             ts_xyzzzz_0, \
-                             ts_xzzz_0,   \
-                             ts_xzzzz_0,  \
-                             ts_xzzzzz_0, \
-                             ts_yyyy_0,   \
-                             ts_yyyyy_0,  \
-                             ts_yyyyyy_0, \
-                             ts_yyyyyz_0, \
-                             ts_yyyyz_0,  \
-                             ts_yyyyzz_0, \
-                             ts_yyyzz_0,  \
-                             ts_yyyzzz_0, \
-                             ts_yyzz_0,   \
-                             ts_yyzzz_0,  \
-                             ts_yyzzzz_0, \
-                             ts_yzzz_0,   \
-                             ts_yzzzz_0,  \
-                             ts_yzzzzz_0, \
-                             ts_zzzz_0,   \
-                             ts_zzzzz_0,  \
-                             ts_zzzzzz_0, \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, pa_z, ts_xxxx_0, ts_xxxxx_0, ts_xxxxxx_0, ts_xxxxxy_0, ts_xxxxxz_0, ts_xxxxyy_0, ts_xxxxyz_0, ts_xxxxz_0, ts_xxxxzz_0, ts_xxxyy_0, ts_xxxyyy_0, ts_xxxyyz_0, ts_xxxyzz_0, ts_xxxzz_0, ts_xxxzzz_0, ts_xxyy_0, ts_xxyyy_0, ts_xxyyyy_0, ts_xxyyyz_0, ts_xxyyzz_0, ts_xxyzzz_0, ts_xxzz_0, ts_xxzzz_0, ts_xxzzzz_0, ts_xyyy_0, ts_xyyyy_0, ts_xyyyyy_0, ts_xyyyyz_0, ts_xyyyzz_0, ts_xyyzz_0, ts_xyyzzz_0, ts_xyzzzz_0, ts_xzzz_0, ts_xzzzz_0, ts_xzzzzz_0, ts_yyyy_0, ts_yyyyy_0, ts_yyyyyy_0, ts_yyyyyz_0, ts_yyyyz_0, ts_yyyyzz_0, ts_yyyzz_0, ts_yyyzzz_0, ts_yyzz_0, ts_yyzzz_0, ts_yyzzzz_0, ts_yzzz_0, ts_yzzzz_0, ts_yzzzzz_0, ts_zzzz_0, ts_zzzzz_0, ts_zzzzzz_0, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -253,4 +230,5 @@ comp_prim_overlap_is(CSimdArray<double>&       pbuffer,
     }
 }
 
-}  // namespace ovlrec
+} // ovlrec namespace
+

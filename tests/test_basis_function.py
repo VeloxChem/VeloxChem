@@ -72,7 +72,7 @@ class TestBasisFunction:
         bf_a.normalize()
         bf_b = BasisFunction(
             [0.800000000000000, 1.50000000000000, 2.700000000000000],
-            [0.490395036432180, 0.429719528168190, -0.858586268491259], 2)
+            [0.980790072864359, 0.8594390563363751, -1.7171725369825064], 2)
         assert bf_a == bf_b
 
         # testing normalization for f functions
@@ -80,7 +80,7 @@ class TestBasisFunction:
         bf_a.normalize()
         bf_b = BasisFunction(
             [0.800000000000000, 1.50000000000000, 2.70000000000000],
-            [0.389718603429863, 0.467617545540924, -1.25350450414293], 3)
+            [0.779437206859724, 0.9352350910818505, -2.5070090082858605], 3)
         assert bf_a == bf_b
 
         # testing normalization for g functions
@@ -88,7 +88,7 @@ class TestBasisFunction:
         bf_a.normalize()
         bf_b = BasisFunction(
             [0.8000000000000000, 1.50000000000000, 2.700000000000000],
-            [0.0655648873703003, 0.107723787859937, -0.387420831892870], 4)
+            [0.5245190989624026, 0.8617903028794913, -3.099366655142966], 4)
         assert bf_a == bf_b
 
         # testing normalization for h functions
@@ -96,7 +96,7 @@ class TestBasisFunction:
         bf_a.normalize()
         bf_b = BasisFunction(
             [0.8000000000000000, 1.5000000000000000, 2.700000000000000],
-            [0.0389717954232193, 0.0876781437334342, -0.423057065413809], 5)
+            [0.3117743633857545, 0.7014251498674728, -3.3844565233104653], 5)
         assert bf_a == bf_b
 
         # testing normalization for i functions
@@ -104,7 +104,7 @@ class TestBasisFunction:
         bf_a.normalize()
         bf_b = BasisFunction(
             [0.8000000000000000, 1.5000000000000000, 2.700000000000000],
-            [0.0104896922997734, 0.0323150117007786, -0.209193495104709], 6)
+            [0.1678350767963739, 0.5170401872124587, -3.3470959216753484], 6)
         assert bf_a == bf_b
 
     def test_get_exponents(self):

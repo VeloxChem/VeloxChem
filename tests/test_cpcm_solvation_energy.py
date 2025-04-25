@@ -9,7 +9,8 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 @pytest.mark.solvers
 class TestCpcmSolvation:
 
-    def run_cpcm_solvation(self, xcfun_label, ref_solv_energy, tol):
+    def run_cpcm_solvation(self, xcfun_label, ref_solv_energy,
+                           cpcm_custom_vdw_radii, tol):
 
         xyz_string = """6
         xyz
@@ -27,8 +28,11 @@ class TestCpcmSolvation:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
+
         scf_drv.solvation_model = 'cpcm'
-        scf_drv.cpcm_grid_per_sphere = 110
+        scf_drv.cpcm_grid_per_sphere = (110, 110)
+        scf_drv.cpcm_custom_vdw_radii = cpcm_custom_vdw_radii
+
         scf_drv.ostream.mute()
         scf_drv.compute(mol, bas)
 
@@ -37,8 +41,13 @@ class TestCpcmSolvation:
 
     def test_hf(self):
 
-        self.run_cpcm_solvation('hf', -0.022994741795899817, 1.0e-8)
+        self.run_cpcm_solvation('hf', -0.022994741795899817, None, 1.0e-8)
 
     def test_b3lyp(self):
 
-        self.run_cpcm_solvation('b3lyp', -0.020249892377218158, 1.0e-6)
+        self.run_cpcm_solvation('b3lyp', -0.020249892377218158, None, 1.0e-6)
+
+    def test_b3lyp_custom_radii(self):
+
+        self.run_cpcm_solvation('b3lyp', -0.00214350811184457, ['O', 3.0],
+                                1.0e-6)

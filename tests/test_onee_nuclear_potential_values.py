@@ -4,6 +4,7 @@ from veloxchem.veloxchemlib import compute_nuclear_potential_values
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.oneeints import compute_nuclear_potential_integrals
+from veloxchem.oneeints import compute_nuclear_potential_gradient_bfs
 
 
 class TestOneElecIntsNuclearPotential:
@@ -283,3 +284,11 @@ class TestOneElecIntsNuclearPotential:
         ref_npot_vals = np.array(ref_npot_vals)
 
         assert np.max(np.abs(npot_vals - ref_npot_vals)) < 1.0e-7
+
+        charges = [-0.676, 0.337, 0.337, -0.676, 0.337, 0.337]
+        ref_npot_grad_bfs = np.array([[-0.0075664, 0.07381133, 0.1285646],
+                                      [-0.00852576, 0.00165804, 0.01336406],
+                                      [-0.00251203, 0.00125916, 0.00465168]])
+        npot_grad_bfs = compute_nuclear_potential_gradient_bfs(
+            mol, bas, charges, point_coords, D)
+        assert np.max(np.abs(npot_grad_bfs - ref_npot_grad_bfs)) < 1.0e-8

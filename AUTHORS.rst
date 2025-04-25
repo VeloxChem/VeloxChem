@@ -26,17 +26,21 @@ Contributors
 * Juan de Gracia
 * Bastiaan van Hoorn
 * Manuel Brand
+* Jonas Vester
 * Erik Vitols
 * Nanna H. List
+* Carl Svennerstedt
 * Xiaoyu Chen
 * Lukas Lampe
+* Chenxi Li
+* Julia Rune
 * Mathieu Linares
 * Noah Deveaux
 * Magnus Ringholm
 * Valentin LindFeld
 * Thomas Fransson
-* Jonas Vester
-* Julia Rune
+* Rasmine Knudsen
+* Magnus Johansen
 * Gabriel L. S. Rodrigues
 * Mikael T. Scott
 * Maximilian Scheurer
@@ -44,4 +48,4 @@ Contributors
 * Michael F. Herbst
 * Joe Jordan
 
-The list of contributors was obtained 2025-02-20 by ``git shortlog -sn``
+The list of contributors was obtained 2025-04-04 by ``git shortlog -sn``

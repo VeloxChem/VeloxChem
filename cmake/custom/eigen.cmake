@@ -11,6 +11,7 @@ if(DEFINED ENV{EIGEN_INCLUDE_DIR})
 
   if(_eigen_include_dirs)
     message(STATUS "Found Eigen in $ENV{EIGEN_INCLUDE_DIR}")
+    add_library(Math::LA INTERFACE IMPORTED)
     target_include_directories(Math::LA
       SYSTEM
       INTERFACE
@@ -35,6 +36,7 @@ else()
   if(_eigen_include_dirs)
     cmake_path(APPEND _eigen_include_dirs "eigen3")
     message(STATUS "Found Eigen in ${_eigen_include_dirs}")
+    add_library(Math::LA INTERFACE IMPORTED)
     target_include_directories(Math::LA
       SYSTEM
       INTERFACE

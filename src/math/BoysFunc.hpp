@@ -1,26 +1,34 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifndef BoysFunc_hpp
 #define BoysFunc_hpp
@@ -77,6 +85,12 @@ class CBoysFunc
     /// @param index_vals The primary row index of values in Boys function data.
     /// @param index_args The primary row index of arguments in Boys function data.
     auto compute(CSimdArray<double>& buffer, const size_t index_vals, const size_t index_args) const -> void;
+    
+    /// @brief Computes Boys function values up to specified order (inclusively) for given vector of arguments.
+    /// @param buffer The Boys function data buffer (values, arguments).
+    /// @param index_vals The primary row index of values in Boys function data.
+    /// @param index_args The primary row index of arguments in Boys function data.
+    auto compute(CSimdArray<float>& buffer, const size_t index_vals, const size_t index_args) const -> void;
 
     /// @brief Computes scaled Boys function values up to specified order (inclusively) for given vector of arguments.
     /// @param buffer The Boys function data buffer (values, arguments).
@@ -109,6 +123,27 @@ class CBoysFunc
                  const double              a_exp,
                  const double              b_exp,
                  const double              omega) const -> void;
+    
+    /// @brief Computes scaled Boys function values up to specified order (inclusively) for given vector of arguments.
+    /// @param buffer The Boys function data buffer (values, arguments).
+    /// @param index_vals The primary row index of values in Boys function data.
+    /// @param index_args The primary row index of arguments in Boys function data.
+    /// @param factors The primitive factors buffer.
+    /// @param a_exp The primitive basis function exponent on center A.
+    /// @param b_exp The primitive basis function exponent on center B.
+    /// @param omega THe range separation parameter.
+    /// @WARNING Boys function arguments are overwrited during computation.
+    auto compute(CSimdArray<float>&       buffer,
+                 const size_t             index_vals,
+                 const size_t             index_args,
+                 const CSimdArray<float>& factors,
+                 const float              a_exp,
+                 const float              b_exp,
+                 const float              omega) const -> void;
+
+    /// @brief Gets Boys function table.
+    /// @return The Boys function table.
+    auto get_table() const -> std::array<std::array<double, 7>, 121>;
 
    private:
     /// @brief The order of Boys function.
@@ -24889,6 +24924,90 @@ CBoysFunc<N>::compute(CSimdArray<double>& buffer, const size_t index_vals, const
 
 template <int N>
 auto
+CBoysFunc<N>::compute(CSimdArray<float>& buffer, const size_t index_vals, const size_t index_args) const -> void
+{
+    const double fpi = 0.5 * std::sqrt(mathconst::pi_value());
+
+    const std::array<double, 28> ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
+                                    1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0,
+                                    1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
+                                    1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
+
+    const auto nelems = static_cast<int>(buffer.number_of_active_elements());
+
+    auto args = buffer.data(index_args);
+
+    for (int i = 0; i < nelems; i++)
+    {
+        int pnt = (args[i] > 1.0e5) ? 1000000 : static_cast<int>(10.0 * args[i] + 0.5);
+
+        if (pnt < 121)
+        {
+            const double fa = args[i];
+
+            const double w = fa - 0.1 * pnt;
+
+            const double w2 = w * w;
+
+            const double w4 = w2 * w2;
+
+            buffer.data(index_vals + N)[i] = (float) (_table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
+
+                                             + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2);
+
+            const double f2a = fa + fa;
+
+            const double fx = std::exp(-fa);
+
+            for (int j = 0; j < N; j++)
+            {
+                buffer.data(index_vals + N - j - 1)[i] = (float) (ft[N - j - 1] * (f2a * buffer.data(index_vals + N - j)[i] + fx));
+            }
+        }
+        else
+        {
+            const double fia = 1.0 / args[i];
+
+            double pf = 0.5 * fia;
+
+            buffer.data(index_vals)[i] = (float) (fpi * std::sqrt(fia));
+
+            if (pnt < 921)
+            {
+                const double fia2 = fia * fia;
+
+                const double f = 0.4999489092 * fia - 0.2473631686 * fia2
+
+                                 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+
+                const double fx = std::exp(-args[i]);
+
+                buffer.data(index_vals)[i] -= (float) (f * fx);
+
+                const double rterm = pf * fx;
+
+                for (int j = 1; j <= N; j++)
+                {
+                    buffer.data(index_vals + j)[i] = (float) (pf * buffer.data(index_vals + j - 1)[i] - rterm);
+
+                    pf += fia;
+                }
+            }
+            else
+            {
+                for (int j = 1; j <= N; j++)
+                {
+                    buffer.data(index_vals + j)[i] = (float) (pf * buffer.data(index_vals + j - 1)[i]);
+
+                    pf += fia;
+                }
+            }
+        }
+    }
+}
+
+template <int N>
+auto
 CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
                       const size_t              index_vals,
                       const size_t              index_args,
@@ -25000,5 +25119,73 @@ CBoysFunc<N>::compute(CSimdArray<double>&       buffer,
     }
 }
 
+template <int N>
+auto
+CBoysFunc<N>::compute(CSimdArray<float>&       buffer,
+                      const size_t             index_vals,
+                      const size_t             index_args,
+                      const CSimdArray<float>& factors,
+                      const float              a_exp,
+                      const float              b_exp,
+                      const float              omega) const -> void
+{
+    // compute Boys function values
+
+    compute(buffer, index_vals, index_args);
+
+    // Set up exponents
+
+    auto c_exps = factors.data(0);
+
+    auto d_exps = factors.data(1);
+
+    // rescale computed Boys function values
+
+    auto bvals = buffer.data(index_vals);
+
+    auto facts = buffer.data(index_args);
+
+    auto nelems = buffer.number_of_active_elements();
+
+#pragma omp simd aligned(bvals, facts, c_exps, d_exps : 64)
+    for (size_t i = 0; i < nelems; i++)
+    {
+        double ab_exp = a_exp + b_exp;
+
+        double cd_exp = c_exps[i] + d_exps[i];
+        
+        double frho = ab_exp * cd_exp / (ab_exp + cd_exp);
+
+        facts[i] = omega / std::sqrt(omega * omega + frho);
+
+        bvals[i] *= facts[i];
+    }
+
+    for (int i = 1; i <= N; i++)
+    {
+        bvals = buffer.data(index_vals + i);
+
+#pragma omp simd aligned(bvals, facts, c_exps, d_exps : 64)
+        for (size_t j = 0; j < nelems; j++)
+        {
+            double ab_exp = a_exp + b_exp;
+
+            double cd_exp = c_exps[j] + d_exps[j];
+            
+            double frho = ab_exp * cd_exp / (ab_exp + cd_exp);
+
+            facts[j] *= omega * omega / (omega * omega + frho);
+
+            bvals[j] *= facts[j];
+        }
+    }
+}
+
+template <int N>
+auto
+CBoysFunc<N>::get_table() const -> std::array<std::array<double, 7>, 121>
+{
+    return _table;
+}
 
 #endif /* BoysFunc_hpp */

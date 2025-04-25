@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from pathlib import PurePath
@@ -441,6 +449,14 @@ def print_keywords(input_keywords, ostream):
     """
 
     width = 90
+
+    max_key_width = 0
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
+            max_key_width = max(len(key), max_key_width)
+
     for group in input_keywords:
         group_print = group.replace('_', ' ')
         ostream.print_header('=' * width)
@@ -449,9 +465,9 @@ def print_keywords(input_keywords, ostream):
         for key, val in input_keywords[group].items():
             if key.startswith('_'):
                 continue
-            text = f'  {key}'.ljust(30)
-            text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 45)
+            text = f'  {key}'.ljust(max_key_width + 2)
+            text += f'  {get_keyword_type(val[0])}'.ljust(12)
+            text += f'  {val[1]}'.ljust(width - max_key_width - 14)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -463,14 +479,22 @@ def print_attributes(input_keywords, ostream):
     """
 
     width = 90
+
+    max_key_width = 0
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            if key.startswith('_'):
+                continue
+            max_key_width = max(len(key), max_key_width)
+
     ostream.print_header('=' * width)
     for group in input_keywords:
         for key, val in input_keywords[group].items():
             if key.startswith('_'):
                 continue
-            text = f'  {key}'.ljust(30)
-            text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 45)
+            text = f'  {key}'.ljust(max_key_width + 2)
+            text += f'  {get_keyword_type(val[0])}'.ljust(12)
+            text += f'  {val[1]}'.ljust(width - max_key_width - 14)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -516,8 +540,7 @@ def get_random_string_serial():
 
     datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
     datetime_string = datetime_string.replace('-', '')
-    datetime_string = datetime_string.replace('T', '_')
-    datetime_string = datetime_string.replace(':', '')
+    datetime_string = datetime_string.split('T')[0]
 
     random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
 
