@@ -272,8 +272,6 @@ class EvbFepDriver():
                     f"Running initial NVT equilibration for {self.initial_equil_NVT_steps} steps"
                 )
                 self.ostream.flush()
-                # equil_simulation.integrator.setIntegrationForceGroups(
-                #     EvbForceGroup.NVT_integration_force_groups())
 
                 self._safe_step(equil_simulation, self.initial_equil_NVT_steps)
                 self.ostream.print_info(
@@ -281,8 +279,6 @@ class EvbFepDriver():
                 )
                 self.ostream.flush()
                 barostat.setFrequency(25)
-                # equil_simulation.integrator.setIntegrationForceGroups(
-                #     EvbForceGroup.integration_force_groups())
                 self._safe_step(equil_simulation, self.initial_equil_NPT_steps)
             else:
                 self.ostream.print_info(
@@ -300,17 +296,19 @@ class EvbFepDriver():
                 f"Running NVT equilibration for {self.equil_NVT_steps} steps")
             self.ostream.flush()
             barostat.setFrequency(0)
-            # equil_simulation.integrator.setIntegrationForceGroups(
-            #     EvbForceGroup.NVT_integration_force_groups())
             self._safe_step(equil_simulation, self.equil_NVT_steps)
 
             self.ostream.print_info(
                 f"Running NPT equilibration for {self.equil_NPT_steps} steps")
             self.ostream.flush()
             barostat.setFrequency(25)
-            # equil_simulation.integrator.setIntegrationForceGroups(
-            #     EvbForceGroup.integration_force_groups())
             self._safe_step(equil_simulation, self.equil_NPT_steps)
+        else:
+            self.ostream.print_info(
+                f"Running equilibration for {self.equil_NVT_steps+self.equil_NPT_steps} steps"
+            )
+            self.ostream.flush()
+            self._safe_step(equil_simulation, self.equil_NVT_steps+self.equil_NPT_steps)
 
         equil_state = equil_simulation.context.getState(
             getPositions=True,

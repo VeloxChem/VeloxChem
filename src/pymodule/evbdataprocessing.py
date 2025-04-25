@@ -97,8 +97,8 @@ class EvbDataProcessing:
         self.smooth_polynomial_order = 3
         self.coordinate_bins = np.array([])
         self.bin_size = 10
-        self.dens_threshold = 0.05
-        self.dens_max_window = 30
+        self.dens_threshold = 0.1
+        self.dens_max_window = 50
 
     def _beta(self, T) -> float:
         return 1 / (self.kb * T)
@@ -586,7 +586,7 @@ class EvbDataProcessing:
         return fig, ax
 
     @staticmethod
-    def plot_results(results, plot_analytical=True, plot_discrete=True):
+    def plot_results(results, plot_analytical=True, plot_discrete=False):
 
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -611,6 +611,7 @@ class EvbDataProcessing:
 
             #Shift both averages by the same amount so that their relative differences stay the same
             ax[0].plot(Lambda, result["dGfep"], label=name)
+            ax[0].set_xlim(0, 1)
             if plot_discrete:
                 if "discrete" in result.keys():
                     ax[1].plot(
@@ -629,6 +630,8 @@ class EvbDataProcessing:
                         label=f"{name} analytical",
                         color=colors[colorkeys[i]],
                     )
+
+            ax[1].set_xlim(coordinate_bins[0], coordinate_bins[-1])
 
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
             legend_labels.append(name)

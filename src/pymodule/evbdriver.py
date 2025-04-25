@@ -998,7 +998,10 @@ class EvbDriver():
         dp.print_results(results, self.ostream)
         self.ostream.flush()
 
-    def plot_results(self, results: dict = None, file_name: str = None):
+    def plot_results(self,
+                     results: dict = None,
+                     file_name: str = None,
+                     *kwargs):
         """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
 
         Args:
@@ -1014,7 +1017,7 @@ class EvbDriver():
             else:
                 results = self.results
         dp = EvbDataProcessing()
-        dp.plot_results(results)
+        dp.plot_results(results, *kwargs)
         self.ostream.flush()
 
     def _load_output_from_folders(self, lambda_sub_sample,
