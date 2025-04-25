@@ -170,8 +170,9 @@ class EvbDriver():
         optimize: bool = False,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] = [],
+        name=None,
     ):
-
+        self.name = name
         cwd = Path().cwd()
         input_path = cwd / self.input_folder
         if not input_path.exists():
@@ -249,20 +250,12 @@ class EvbDriver():
         breaking_bonds: list[tuple[int, int]] = [],
         save_output: bool = True,
     ):
-        #todo
-        # assigning charges and multiplicities to molecules
-        # validation input of (partial) charges
-        # combined molecules
         if isinstance(reactant, list):
             combined_reactant_name = '_'.join(reactant)
         else:
             combined_reactant_name = reactant
+        self.name = combined_reactant_name
         combined_rea_input = self._get_input_files(combined_reactant_name)
-        # self._process_file_input(
-        #     combined_reactant_name,
-        #     reactant_charge,
-        #     reactant_multiplicity,
-        # )[0]
 
         if isinstance(product, list):
             combined_product_name = '_'.join(product)
@@ -310,7 +303,6 @@ class EvbDriver():
 
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
-
 
             self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
                 rea_input,
@@ -368,8 +360,9 @@ class EvbDriver():
                     sum(partial_charge) - charge
                 ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total foral charge of the system {charge} for input {i+1}"
 
-        for inp,filename in zip(input,filenames):
-            assert inp['molecule'] is not None or inp['forcefield'] is not None, f"Could not load {filename} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
+        for inp, filename in zip(input, filenames):
+            assert inp['molecule'] is not None or inp[
+                'forcefield'] is not None, f"Could not load {filename} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
 
         return input
 
@@ -591,14 +584,14 @@ class EvbDriver():
         assert all(
             isinstance(conf, dict) for conf in configurations
         ), "Configurations must be a list of strings or a list of dictionaries"
-        configurations: list[dict] = configurations  # type: ignore
+        self.configurations: list[dict] = configurations  # type: ignore
         if constraints is None:
             constraints = []
         if isinstance(constraints, dict):
             constraints = [constraints]
 
         #Per configuration
-        for conf in configurations:
+        for conf in self.configurations:
             #create folders,
             if save_output:
                 data_folder = f"EVB_{self.name}_{conf['name']}_data_{self.t_label}"
@@ -635,6 +628,7 @@ class EvbDriver():
                 self.save_systems_as_xml(systems, conf["run_folder"])
 
                 top_path = cwd / data_folder / "topology.pdb"
+
                 mmapp.PDBFile.writeFile(
                     topology,
                     initial_positions *
@@ -680,7 +674,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1,
+                "padding": 1.5,
                 "ion_count": 0,
                 "neutralize": False
             }
@@ -713,7 +707,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1,
+                "padding": 1.5,
                 "ion_count": 0,
                 "E_field": [0, 0, 10],
             }
@@ -724,7 +718,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1,
+                "padding": 1.5,
                 "ion_count": 0,
                 "no_reactant": True,
             }
@@ -744,7 +738,7 @@ class EvbDriver():
                 "solvent": name,
                 "temperature": self.temperature,
                 "NPT": True,
-                "pressure": 1,
+                "pressure": 1.5,
                 "padding": 1,
                 "ion_count": 0,
             }
@@ -878,11 +872,11 @@ class EvbDriver():
                 "Debugging enabled, using low number of steps. Do not use for production"
             )
             self.ostream.flush()
-            equil_NVT_steps = 100
+            equil_NVT_steps = 0
             equil_NPT_steps = 100
             sample_steps = 200
-            write_step = 5
-            initial_equil_NVT_steps = 100
+            write_step = 1
+            initial_equil_NVT_steps = 0
             initial_equil_NPT_steps = 100
             step_size = 0.001
             equil_step_size = 0.001
