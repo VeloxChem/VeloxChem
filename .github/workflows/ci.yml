@@ -15,6 +15,7 @@ on:
       - tddft_vibanalysis_test
       - tddft_grad_test
       - feature-test
+      - merge-test
 
 jobs:
   vlx_ci:
