@@ -90,9 +90,18 @@ class NitrogenProtonation:
 
         for i, _ in enumerate(self.protonated_molecules):
             protonated_molecules = self.protonated_molecules
-            self.save_mol_as_xyz(protonated_molecules[i],
-                                  self.molecule_name.strip() + "_protonated_" + str(i) + '.xyz', self.output_folder)
+            
+            base_name = os.path.splitext(self.molecule_name.strip())[0]
+            filename = f"{base_name}_protonated_{i}.xyz"
+
+            self.save_mol_as_xyz(protonated_molecules[i], filename, self.output_folder)
+
+
+            #self.save_mol_as_xyz(protonated_molecules[i],
+            #                      self.molecule_name.strip() + "_protonated_" + str(i) + '.xyz', self.output_folder)
                
-            print(f"Protonated molecule {i} saved as {self.molecule_name.strip()}_protonated_{i}.xyz")
+            print(f"Protonated molecule {i} saved as:", filename)
 
         print("All nitrogen atoms have been individually protonated. Remember to adjust the charge if needed.")     
+        
+        return len(self.protonated_molecules)

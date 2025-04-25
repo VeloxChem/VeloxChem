@@ -24,23 +24,7 @@ class OxygenDeprotonation:
         self.deprotonated_molecules = None
         self.molecule_name = molecule_name
         self.output_folder = output_folder
-
-        
-
-    # def load_molecule(self):
-    #     """
-    #     Load the molecule from the xyz file.
-    #     """
-    #     file_path = os.path.join(self.folder_path, self.xyz_filename)
-    #     if os.path.exists(file_path):
-    #         self.molecule = vlx.Molecule.read_xyz_file(file_path)
-    #         # self.mol = Chem.MolFromXYZFile(file_path)
-    #         # self.molecule.show(atom_indices=True)
-    #         self.basis = vlx.MolecularBasis.read(self.molecule, "def2-SVP")
-    #     else:
-    #         raise FileNotFoundError(f"Error: The file {file_path} does not exist.")
-    
-        
+      
     def _find_hydroxyl_hydrogens(self):
         """
         Find the hydroxyl hydrogens in the molecule.
@@ -67,7 +51,11 @@ class OxygenDeprotonation:
 
         self.deprotonated_molecules = [] # List to save the deprotonated molecules
         oxygen_hydrogen_index = self._find_hydroxyl_hydrogens()
-
+        
+        if len(oxygen_hydrogen_index) == 0:
+            print("No hydroxyl hydrogens found — skipping deprotonation.")
+            return  # Don't add anything to deprotonated_molecules
+        
         for idx in sorted(oxygen_hydrogen_index, reverse=True):
             # Convert into an editable molecule
             new_molecule = Chem.RWMol(self.mol)
@@ -102,7 +90,7 @@ class OxygenDeprotonation:
         if not self.deprotonated_molecules:
             print("\n No hydroxyl hydrogens found in the molecule.\n")
             print("Deprotonation failed.\n")
-            
+
             return False # Return False if no deprotonated molecules were found
 
         for i, file_name in enumerate(self.deprotonated_molecules):
