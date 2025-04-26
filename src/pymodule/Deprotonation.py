@@ -63,22 +63,68 @@ class OxygenDeprotonation:
             new_molecule.RemoveAtom(atom_index_to_remove)
             self.deprotonated_molecules.append(new_molecule)
 
-    def save_deprotonated_molecules_as_xyz(self, filename):
+    # def save_deprotonated_molecules_as_xyz(self, filename):
+    #     """
+    #     Save the deprotonated molecules as an xyz file.
+    #     """
+    #     for deprotonated_molecule in self.deprotonated_molecules:
+
+    #         AllChem.EmbedMolecule(deprotonated_molecule, AllChem.ETKDG()) # Generate 3D coordinates
+    #         conf = deprotonated_molecule.GetConformer() # Get the conformer
+
+    #         # Write the file
+    #         with open(filename, "w") as f:
+    #             f.write(f"{deprotonated_molecule.GetNumAtoms()}\n")
+    #             f.write("\n")
+    #             for atom in deprotonated_molecule.GetAtoms():
+    #                 pos = conf.GetAtomPosition(atom.GetIdx())
+    #                 f.write(f"{atom.GetSymbol()} {pos.x} {pos.y} {pos.z}\n")
+
+    # def Deprotonate(self):
+    #     """
+    #     Deprotonate the oxygen atom and save the new molecules.
+    #     """
+    #     # self.load_molecule()
+    #     self.remove_hydroxyl_hydrogen()
+
+    #     if not self.deprotonated_molecules:
+    #         print("\n No hydroxyl hydrogens found in the molecule.\n")
+    #         print("Deprotonation failed.\n")
+
+    #         return False # Return False if no deprotonated molecules were found
+
+    #     for i, file_name in enumerate(self.deprotonated_molecules):
+    #         # filapath = os.path.join(self.folder_path, f"/Users/simonisaksson/Examensarbete/veloxchem/Atom mapping/deprotonated_molecules/ deprotonated_{molecule}.xyz")
+    #         self.save_deprotonated_molecules_as_xyz(f"{self.output_folder}/{str(self.molecule_name.strip())}_{i}.xyz")
+    #         # saved_files.append(file_name)
+    #         print(f"Deprotonated molecule {i} saved as {self.molecule_name.strip()}.xyz")
+
+    #     print('All Molecules with OH-groups have been deprotonated, molecules without this group is not saved as an xyz file.')
+    #     print('Remember to set the charge to -1 for the molecule when loaded with VeloxChem')
+    #     # return saved_files
+
+    #     return True # Return True if the deprotonation was successful (needed for other class)
+    
+    
+    #--------------------------------------------
+    def save_deprotonated_molecules_as_xyz(self, filename, deprotonated_molecule, directory=""):
         """
         Save the deprotonated molecules as an xyz file.
         """
-        for deprotonated_molecule in self.deprotonated_molecules:
 
-            AllChem.EmbedMolecule(deprotonated_molecule, AllChem.ETKDG()) # Generate 3D coordinates
-            conf = deprotonated_molecule.GetConformer() # Get the conformer
+        AllChem.EmbedMolecule(deprotonated_molecule, AllChem.ETKDG()) # Generate 3D coordinates
+        conf = deprotonated_molecule.GetConformer() # Get the conformer
 
-            # Write the file
-            with open(filename, "w") as f:
-                f.write(f"{deprotonated_molecule.GetNumAtoms()}\n")
-                f.write("\n")
-                for atom in deprotonated_molecule.GetAtoms():
-                    pos = conf.GetAtomPosition(atom.GetIdx())
-                    f.write(f"{atom.GetSymbol()} {pos.x} {pos.y} {pos.z}\n")
+        # Create the full path
+        full_path = os.path.join(directory, filename)
+
+        # Write the file
+        with open(full_path, "w") as f:
+            f.write(f"{deprotonated_molecule.GetNumAtoms()}\n")
+            f.write("\n")
+            for atom in deprotonated_molecule.GetAtoms():
+                pos = conf.GetAtomPosition(atom.GetIdx())
+                f.write(f"{atom.GetSymbol()} {pos.x} {pos.y} {pos.z}\n")
 
     def Deprotonate(self):
         """
@@ -92,17 +138,17 @@ class OxygenDeprotonation:
             print("Deprotonation failed.\n")
 
             return False # Return False if no deprotonated molecules were found
+        
 
         for i, file_name in enumerate(self.deprotonated_molecules):
-            # filapath = os.path.join(self.folder_path, f"/Users/simonisaksson/Examensarbete/veloxchem/Atom mapping/deprotonated_molecules/ deprotonated_{molecule}.xyz")
-            self.save_deprotonated_molecules_as_xyz(f"{self.output_folder}/{str(self.molecule_name.strip())}_{i}.xyz")
-            # saved_files.append(file_name)
-            print(f"Deprotonated molecule {i} saved as {self.molecule_name.strip()}.xyz")
+            base_name= os.path.splitext(self.molecule_name.strip())[0]
+            file_name = f"{base_name}_deprotonated_{i}.xyz"
+
+            self.save_deprotonated_molecules_as_xyz(filename=file_name, deprotonated_molecule=self.deprotonated_molecules[i], directory=self.output_folder)
+
+            print(f"Deprotonated molecule {i} saved as {file_name}")
 
         print('All Molecules with OH-groups have been deprotonated, molecules without this group is not saved as an xyz file.')
-        print('Remember to set the charge to -1 for the molecule when loaded with VeloxChem')
         # return saved_files
 
-        return True # Return True if the deprotonation was successful (needed for other class)
-        
-        
+        return True # Return True if the deprotonation was successful (needed for other class)        
