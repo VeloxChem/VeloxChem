@@ -1,12 +1,11 @@
-import os
 import numpy as np
 import re
 import shutil
 import pandas as pd
 import linecache
 from .mofutils import create_lG
-import glob
 import networkx as nx
+from pathlib import Path
 
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
@@ -104,7 +103,7 @@ def ff_gen_xyz(
     scf_maxiter=30,
 ):
     m1 = Molecule.read_xyz_file(f)
-    gromacs_file = os.path.basename(f).removesuffix(".xyz")
+    gromacs_file = Path(f).stem
     res_name = residue_name
     if show:
         m1.show(atom_indices=True)
@@ -120,9 +119,8 @@ def ff_gen_xyz(
     ff_gen = MMForceFieldGenerator()
     ff_gen.ostream.mute()
     ff_gen.create_topology(m1, basis, scf_results)
-    ff_gen.write_gromacs_files(
-        os.path.abspath("") + "/Residues/" + gromacs_file, res_name)
-    return os.path.abspath("") + "/Residues/" + gromacs_file + ".itp"
+    ff_gen.write_gromacs_files(str(Path("Residues", gromacs_file)), res_name)
+    return str(Path("Residues", f"{gromacs_file}.itp"))
 
 
 # 1.ff_gen to generate ff for user_linker
@@ -154,8 +152,7 @@ def get_residues_forcefield(
     print("fetching residues...")
     restypes = [name for name in np.unique(arr[:, 1])]
 
-    path = os.path.abspath("") + "/Residues/"
-    os.makedirs(path, exist_ok=True)
+    Path("Residues").mkdir(parents=True, exist_ok=True)
 
     res_info = {}
 
@@ -180,7 +177,7 @@ def get_residues_forcefield(
             res_info[res] = res_sum
             res_previous_sum += res_sum
             # print(res_previous_sum,res_sum,res)
-            xyz_file = os.path.join("Residues", str(res) + ".xyz")
+            xyz_file = Path("Residues", f"{res}.xyz")
             temp_xyz_nm(xyz_file, sample_arr)
             if res == "O":
                 # xtb_residue(xyz_file,-2)
@@ -210,7 +207,7 @@ def get_residues_forcefield(
             res_info[res] = res_sum
             res_previous_sum += res_sum
             # print(res_previous_sum,res_sum,res)
-            xyz_file = os.path.join("Residues", str(res) + ".xyz")
+            xyz_file = Path("Residues", f"{res}.xyz")
             temp_xyz(xyz_file, sample_arr)
             if res in ["EDG", "EDGE"]:
                 # xtb_residue(xyz_file,-3)
@@ -262,8 +259,7 @@ def get_residues_forcefield(
 
 
 def parseff(INPUT):
-    newpath = os.path.abspath('') + '/Residues/parsedfile/'  # input file
-    os.makedirs(newpath, exist_ok=True)
+    newpath = Path("Residues", "parsedfile").mkdir(parents=True, exist_ok=True)
     inputfile = str(INPUT)
     #outputfile = 'new'+inputfile.strip(".ff")
     #print(inputfile,outputfile+'.ff')
@@ -316,8 +312,7 @@ def readxyz(input):
     with open(input, "r") as f:
         lines = f.readlines()
         #number_resname = lines[0].split()[0]
-        resname = os.path.basename(input).removesuffix(
-            '.xyz')  #re.sub(r"^\d+", "", number_resname)
+        resname = Path(input).stem
         atoms = []
         for i in range(2, len(lines)):
             if len(lines[i].split()) == 0:
@@ -353,8 +348,7 @@ def getatoms(input, father, son, son_atoms, son_resname):
     with open(input, "r") as f:
         lines = f.readlines()
 
-    with open(os.path.abspath('') + '/Residues/parsedfile/' + "atoms1",
-              "w") as f:
+    with open(str(Path("Residues/parsedfile/atoms1")), "w") as f:
         newff = []
         for i in range(2, len(lines)):
             values = lines[i].split()
@@ -399,7 +393,7 @@ def getatoms(input, father, son, son_atoms, son_resname):
         f.writelines(newff)
 
     df = pd.read_csv(
-        os.path.abspath('') + '/Residues/parsedfile/' + "atoms1",
+        str(Path("Residues/parsedfile/atoms1")),
         sep='\s+',
         names=[
             "nr",
@@ -425,13 +419,12 @@ def getatoms(input, father, son, son_atoms, son_resname):
         sondf.loc[i,
                   "massB"] = sondf.loc[i - 1, "massB"] + sondf.loc[i, "charge"]
 
-    sondf.to_csv(os.path.abspath('') + '/Residues/parsedfile/' + "atoms2",
+    sondf.to_csv(str(Path("Residues/parsedfile/atoms2")),
                  sep="\t",
                  header=None,
                  index=False)
 
-    with open(os.path.abspath('') + '/Residues/parsedfile/' + "atoms2",
-              "r") as f:
+    with open(str(Path("Residues/parsedfile/atoms2")), "r") as f:
         sonlines = f.readlines()
 
         #with open("atoms.txt", "w") as f:
@@ -475,8 +468,8 @@ def getatoms(input, father, son, son_atoms, son_resname):
                 newff.append(formatted_line + "\n")
 
         #f.writelines(newff)
-    os.remove(os.path.abspath('') + '/Residues/parsedfile/' + "atoms1")
-    os.remove(os.path.abspath('') + '/Residues/parsedfile/' + "atoms2")
+    Path("Residues/parsedfile/atoms1").unlink(missing_ok=True)
+    Path("Residues/parsedfile/atoms2").unlink(missing_ok=True)
     return newff
 
 
@@ -661,9 +654,8 @@ def map_forcefield_by_xyz(path, map_path, ff_xyz, new_xyz='EDGE.xyz'):
     dihedral_im = path + "dihedrals_im.txt"
 
     fatherxyz = ff_xyz
-    sonxyz = os.path.abspath('') + '/Residues/' + new_xyz
-    new_itp = os.path.abspath('') + '/Residues/' + new_xyz.removesuffix(
-        '.xyz') + '.itp'
+    sonxyz = str(Path("Residues", f"{new_xyz}"))
+    new_itp = str(Path("Residues", f"{Path(new_xyz).stem}.itp"))
 
     with open(mapfile, "r") as f:
         father = []
@@ -683,23 +675,23 @@ def map_forcefield_by_xyz(path, map_path, ff_xyz, new_xyz='EDGE.xyz'):
     atomtypes = getatomtype(atomtype)
     moleculetypes = getmoleculetype(moleculetype, new_resname)
     atoms = getatoms(atom, father, son, son_atoms, new_resname)
-    if os.path.exists(bond):
+    if Path(bond).exists():
         bonds = getbonds(bond, father, son)
     else:
         bonds = False
-    if os.path.exists(pair):
+    if Path(pair).exists():
         pairs = getpairs(pair, father, son)
     else:
         pairs = False
-    if os.path.exists(angle):
+    if Path(angle).exists():
         angles = getangles(angle, father, son)
     else:
         angles = False
-    if os.path.exists(dihedral):
+    if Path(dihedral).exists():
         dihedrals = getdihedrals(dihedral, father, son)
     else:
         dihedrals = False
-    if os.path.exists(dihedral_im):
+    if Path(dihedral_im).exists():
         dihedrals_im = getdihedrals_im(dihedral_im, father, son)
     else:
         dihedrals_im = False
@@ -977,8 +969,8 @@ def write_mapping_file(path,
                        metals,
                        mol_metals,
                        map_name="linker_ff_mapping"):
-    map_path = os.path.join(path, map_name)
-    if os.path.exists(path):
+    map_path = str(Path(path, map_name))
+    if Path(path).exists():
         with open(map_path, "w") as f:
             for i in list(mapping):
                 f.write(str(mapping[i] + 1))
@@ -1018,14 +1010,12 @@ def fetch_res_in_node_num(res, node_split_dict, DUMMY_NODE):
 
 def copy_file(old_path, new_path):
     # Check if the source file exists
-    if not os.path.exists(old_path):
+    if not Path(old_path).exists():
         raise FileNotFoundError(f"The source file does not exist: {old_path}")
 
     # Ensure the destination directory exists
-    new_dir = os.path.dirname(new_path)
-    if not os.path.exists(new_dir):
-        os.makedirs(new_dir)  # Create the directory if it doesn't exist
-
+    new_dir = Path(new_path).parent
+    new_dir.mkdir(parents=True, exist_ok=True)
     # Copy the file
     shutil.copy2(old_path, new_path)  # copy2 preserves metadata
     print(f"File copied from {old_path} to {new_path}")
@@ -1037,7 +1027,7 @@ def copy_file(old_path, new_path):
 def get_gro(model_name, new_arr):
     #tempgro('2testdummy.gro',new_arr)
     #copy_file('2testdummy.gro','MD_run/TEST.gro')
-    os.makedirs('MD_run/', exist_ok=True)
+    Path('MD_run').mkdir(parents=True, exist_ok=True)
     groname = 'MD_run/' + model_name + '.gro'
     tempgro(groname, new_arr)
     new_gro_path = atoms2c(groname, 3, 3, 3, 10, 10, 10)
@@ -1046,33 +1036,35 @@ def get_gro(model_name, new_arr):
 
 
 def get_itps(data_path, restypes, metal, node_termination, sol_list):
+    # itps nodes_database, edges, sol, gas
+    itp_path = Path('MD_run/itps')
+    nodesitp_path = str(Path(data_path, 'nodes_itps'))
+    itp_path.mkdir(parents=True, exist_ok=True)
 
-    #itps nodes_database,edges,sol,gas
-    itp_path = 'MD_run/itps'
-    nodesitp_path = os.path.join(data_path, 'nodes_itps')
-    os.makedirs(itp_path, exist_ok=True)
     # copy nodes itps
-    for i in glob.glob(os.path.join(data_path, 'nodes_itps/*itp')):
-        itp_name = os.path.basename(i)
-        if itp_name.removesuffix('.itp') in restypes:
-            copy_file(i, os.path.join(itp_path, itp_name))
-        if itp_name.removesuffix('.itp') == metal:
-            copy_file(i, os.path.join(itp_path, itp_name))
-    # copy EDGE(/TERM) itps
-    for j in glob.glob(os.path.join('Residues', '*itp')):
-        itp_name = os.path.basename(j)
-        if itp_name.removesuffix('.itp') in restypes:
-            copy_file(j, os.path.join(itp_path, itp_name))
-    # copy TERM itp
-    for k in glob.glob(os.path.join(data_path, 'terminations_itps/*itp')):
-        itp_name = os.path.basename(i)
-        if itp_name.removesuffix('.itp') == node_termination:
-            copy_file(i, os.path.join(itp_path, 'TERM.itp'))
+    for i in Path(data_path, 'nodes_itps').rglob("*.itp"):
+        itp_name = i.stem
+        if itp_name in restypes or itp_name == metal:
+            copy_file(i, itp_path / i.name)
 
-    #copy solvent,ions,gas itps
+    # copy EDGE(/TERM) itps
+    for j in Path('Residues').rglob('*.itp'):
+        itp_name = j.stem
+        if itp_name in restypes:
+            copy_file(j, itp_path / j.name)
+
+    # copy TERM itp
+    for k in Path(data_path, 'terminations_itps').rglob('*.itp'):
+        itp_name = k.stem
+        if itp_name == node_termination:
+            copy_file(k, itp_path / 'TERM.itp')
+
+    # copy solvent, ions, gas itps
     for sol in sol_list:
-        copy_file(os.path.join(data_path, 'solvent_database/' + sol + '.itp'),
-                  os.path.join(itp_path, sol + '.itp'))
+        copy_file(
+            Path(data_path) / 'solvent_database' / f'{sol}.itp',
+            itp_path / f'{sol}.itp')
+
     return itp_path
 
 
@@ -1144,8 +1136,8 @@ def itp_extract(itp_file):
 
 def extract_atomstypes(itp_path):
     all_secs = []
-    for f in glob.glob(os.path.join(itp_path, "*itp")):
-        if os.path.basename(f) not in ["posre.itp"]:
+    for f in Path(itp_path).rglob("*itp"):
+        if str(Path(f).parent) not in ["posre.itp"]:
             print(f)
             sec_atomtypes = itp_extract(f)
             all_secs += sec_atomtypes
@@ -1178,9 +1170,9 @@ def genrate_top_file(itp_path, data_path, res_info, model_name=None):
         top_res_lines.append("\n")
 
     top_itp_lines = []
-    for i in glob.glob(os.path.join(itp_path, "*itp")):
-        if os.path.basename(i) not in ["posre.itp"]:
-            line = '#include "itps/' + os.path.basename(i) + '"' + "\n"
+    for i in Path(itp_path).rglob("*itp"):
+        if str(Path(i).parent) not in ["posre.itp"]:
+            line = '#include "itps/' + Path(i).parent + '"' + "\n"
             top_itp_lines.append(line)
     sec1 = unique_atomtypes
     sec2 = top_itp_lines
@@ -1295,8 +1287,8 @@ def top_gen(itp_file, middlelines, outtopname, input_res_num):
 
 ##################below are from mdps.py######################
 def copy_mdps(data_path):
-    mdp_path = 'MD_run/mdp'
-    os.makedirs(mdp_path, exist_ok=True)
-    for i in glob.glob(os.path.join(data_path + '/mdp/', '*')):
-        copy_file(i, 'MD_run/mdp/' + os.path.basename(i))
+    mdp_path = Path('MD_run/mdp')
+    mdp_path.mkdir(parents=True, exist_ok=True)
+    for i in Path(data_path, "mdp").rglob("*.mdp"):
+        copy_file(i, 'MD_run/mdp/' + str(Path(i).name))
     return mdp_path
