@@ -417,7 +417,7 @@ class MofBuilder:
             with open(defective_gro_path, "w") as f:
                 f.writelines(defective_gro_lines)
 
-    def show(self, width=800, height=600, res_indices=False, res_names=False):
+    def show(self, width=800, height=600, residue_indices=False, residue_names=False):
         if hasattr(self, "defective_mofG"):
             grolines = self.get_gro_lines_list(self.defective_mofG)
         else:
@@ -426,8 +426,8 @@ class MofBuilder:
             gro_lines_list=grolines,
             w=width,
             h=height,
-            res_id=res_indices,
-            res_name=res_names,
+            res_id=residue_indices,
+            res_name=residue_names,
         )
 
     # functions for defects are under construction
