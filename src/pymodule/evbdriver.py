@@ -1048,16 +1048,16 @@ class EvbDriver():
             common_results.append(common)
 
         results.update({"configuration_results": specific_results})
-        # for common in common_results[1:]:
-        #     for key, val in common.items():
-        #         if isinstance(common[key], list) or isinstance(
-        #                 common[key], np.ndarray):
-        #             assert np.all(
-        #                 common[key] == common_results[0][key]
-        #             ), f"Common results are not the same for all configurations. Key: {key}, value: {val}"
-        #         else:
-        #             assert common[key] == common_results[0][
-        #                 key], f"Common results are not the same for all configurations. Key: {key}, value: {val}"
+        for common in common_results[1:]:
+            for key, val in common.items():
+                if isinstance(common[key], list) or isinstance(
+                        common[key], np.ndarray):
+                    assert np.all(
+                        common[key] == common_results[0][key]
+                    ), f"Common results are not the same for all configurations. Key: {key}, value: {val}"
+                else:
+                    assert common[key] == common_results[0][
+                        key], f"Common results are not the same for all configurations. Key: {key}, value: {val}"
 
         for key, val in common_results[0].items():
             results.update({key: val})
@@ -1139,7 +1139,6 @@ class EvbDriver():
             np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame
         ]
         common_result = {
-            "step": step,
             "Lambda": Lambda,
             "Lambda_frame": Lambda_frame,
             "Lambda_indices": lambda_indices,
