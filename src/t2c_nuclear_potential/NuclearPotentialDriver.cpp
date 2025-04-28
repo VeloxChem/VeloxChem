@@ -11,6 +11,8 @@
 #include "OpenMPFunc.hpp"
 #include "DenseMatrixDistributor.hpp"
 #include "T2CDistributor.hpp"
+#include "TensorComponents.hpp"
+#include "NuclearPotentialGridFunc.hpp"
 
 auto
 CNuclearPotentialDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule) const -> CMatrix
@@ -111,4 +113,136 @@ CNuclearPotentialDriver::compute(CDenseMatrix&                   gmatrix,
             }
         }
     }
+}
+
+auto
+CNuclearPotentialDriver::compute(const std::vector<CGtoBlock>&   gto_blocks,
+                                 const CDenseMatrix&             fmatrix,
+                                 const std::map<size_t, size_t>& ao_mask,
+                                 const std::vector<double>&      gcoords_x,
+                                 const std::vector<double>&      gcoords_y,
+                                 const std::vector<double>&      gcoords_z,
+                                 const std::vector<double>&      gweights) const -> CDenseMatrix
+{
+    const auto npoints = static_cast<int>(gweights.size());
+    
+    const auto naos = static_cast<int>(ao_mask.size());
+    
+    CDenseMatrix mat_g(npoints, naos);
+    
+    mat_g.zero();
+    
+    if (const auto nblocks = gto_blocks.size(); nblocks > 0)
+    {
+        for (size_t i = 0; i < nblocks; i++)
+        {
+            const auto nbra_gtos = gto_blocks[i].number_of_basis_functions();
+            
+            const auto bra_mom = gto_blocks[i].angular_momentum();
+            
+            const auto bra_indices = gto_blocks[i].orbital_indices();
+            
+            // const auto nbra_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{bra_mom, });
+            
+            const auto nbra_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{bra_mom, });
+            
+            for (size_t j = i; j < nblocks; j++)
+            {
+                const auto nket_gtos = gto_blocks[j].number_of_basis_functions();
+                
+                const auto ket_mom = gto_blocks[j].angular_momentum();
+                
+                const auto ket_indices = gto_blocks[j].orbital_indices();
+                
+                // const auto nket_cart_comps = tensor::number_of_cartesian_components(std::array<int, 1>{ket_mom, });
+                
+                const auto nket_spher_comps = tensor::number_of_spherical_components(std::array<int, 1>{ket_mom, });
+                
+                // allocate local buffers
+                
+                const std::array<size_t, 4> cdims{0, 0, _get_buffer_rows(bra_mom, ket_mom), static_cast<size_t>(npoints)};
+                
+                auto cbuffer = CSubMatrix(cdims);
+                
+                const std::array<size_t, 4> sdims{0, 0, static_cast<size_t>(nbra_spher_comps * nket_spher_comps), static_cast<size_t>(npoints)};
+                
+                auto sbuffer = CSubMatrix(sdims);
+                
+                // loop over GTO pairs
+                
+                for (int k = 0; k < nbra_gtos; k++)
+                {
+                    const int lstart = (i == j) ? k : 0;
+                    
+                    for (int l = lstart; l < nket_gtos; l++)
+                    {
+                        sbuffer.zero();
+                        
+                        cbuffer.zero();
+                        
+                        npotfunc::compute(sbuffer, cbuffer, gcoords_x, gcoords_y, gcoords_z, gweights, gto_blocks[i], gto_blocks[j], k, l);
+                        
+//                        std::cout << " *** Block *** (" << k << "," << l << ")" << std::endl;
+//                        
+//                        for (size_t m = 0; m < npoints; m++)
+//                        {
+//                            std::cout << " m = " << m << " val = " << cbuffer.at({6, m}) << std::endl; 
+//                        }
+                        
+                        // FIX ME: Add distributor here....
+                        
+                        if ((bra_mom + ket_mom) == 0)
+                        {
+                            t2cfunc::distribute(mat_g, cbuffer, 6, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, (i == j) && (k == l));
+                        }
+                        else
+                        {
+                            t2cfunc::distribute(mat_g, sbuffer, 0, fmatrix, gweights, ao_mask, bra_indices, ket_indices, bra_mom, ket_mom, k, l, (i == j) && (k == l));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return mat_g;
+}
+
+auto
+CNuclearPotentialDriver::_get_buffer_rows(const int bra_angmom,
+                                          const int ket_angmom) const -> size_t
+{
+    if ((bra_angmom == 0) && (ket_angmom == 0)) return 7;
+    
+    if ((bra_angmom == 0) && (ket_angmom == 1)) return 14;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 0)) return 14;
+    
+    if ((bra_angmom == 0) && (ket_angmom == 2)) return 28;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 0)) return 28;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 1)) return 34;
+    
+    if ((bra_angmom == 0) && (ket_angmom == 3)) return 53;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 0)) return 53;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 2)) return 69;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 1)) return 81;
+    
+    if ((bra_angmom == 1) && (ket_angmom == 3)) return 124;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 1)) return 170;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 2)) return 170;
+    
+    if ((bra_angmom == 2) && (ket_angmom == 3)) return 301;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 2)) return 373;
+    
+    if ((bra_angmom == 3) && (ket_angmom == 3)) return 669;
+    
+    return 0;
 }

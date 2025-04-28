@@ -6,6 +6,8 @@
 #include "CustomViews.hpp"
 #include "TensorComponents.hpp"
 
+#include <iostream>
+
 namespace t2cfunc {  // t2cfunc namespace
 
 auto
@@ -767,5 +769,181 @@ distribute(CSubMatrix*                      matrix,
         t2cfunc::distribute(matrix, buffer.data(offset + i * ket_comps + j), bra_indices, ket_indices, i, j, bra_igto, ket_range, ang_order);
     });
 }
+
+auto
+comp_distances_pc(      CSubMatrix&          buffer,
+                  const size_t               index_pc,
+                  const std::vector<double>& gcoords_x,
+                  const std::vector<double>& gcoords_y,
+                  const std::vector<double>& gcoords_z,
+                  const double               p_x,
+                  const double               p_y,
+                  const double               p_z) -> void
+{
+    // set up number of grid points
+    
+    const auto npoints = buffer.number_of_columns();
+    
+    // set up R(PC) = P - C distances
+    
+    auto pc_x = &(buffer.data()[npoints * index_pc]);
+    
+    auto pc_y = &(buffer.data()[npoints * (index_pc + 1)]);
+    
+    auto pc_z = &(buffer.data()[npoints * (index_pc + 2)]);
+    
+    // set up grid point coordinates
+    
+    auto g_x = gcoords_x.data();
+    
+    auto g_y = gcoords_y.data();
+    
+    auto g_z = gcoords_z.data();
+    
+    // compute R(PC) distances on grid points
+    
+    #pragma omp simd
+    for (size_t i = 0; i < npoints; i++)
+    {
+        pc_x[i] = p_x - g_x[i];
+        
+        pc_y[i] = p_y - g_y[i];
+        
+        pc_z[i] = p_z - g_z[i];
+    }
+}
+
+auto
+comp_boys_args(     CSubMatrix& buffer,
+               const size_t     index_args,
+               const size_t     index_pc,
+               const double     factor) -> void
+{
+    // set up number of grid points
+    
+    const auto npoints = buffer.number_of_columns();
+    
+    // set up R(PC) = P - C distances
+    
+    auto pc_x = &(buffer.data()[npoints * index_pc]);
+    
+    auto pc_y = &(buffer.data()[npoints * (index_pc + 1)]);
+    
+    auto pc_z = &(buffer.data()[npoints * (index_pc + 2)]);
+    
+    // set up Boys function arguments
+    
+    auto bargs = &(buffer.data()[npoints * index_args]);
+    
+    #pragma omp simd
+    for (size_t i = 0; i < npoints; i++)
+    {
+        bargs[i] = factor * (pc_x[i] * pc_x[i] + pc_y[i] * pc_y[i] + pc_z[i] * pc_z[i]);
+    }
+}
+
+auto
+reduce(CSubMatrix& buffer, const size_t index_contr, const size_t index_prim, const size_t ndims) -> void
+{
+    // set up number of grid points
+    
+    const auto npoints = buffer.number_of_columns();
+    
+    for (size_t i = 0; i < ndims; i++)
+    {
+        // set up buffers
+        
+        auto cvals = &(buffer.data()[npoints * (index_contr + i)]);
+        
+        auto pvals = &(buffer.data()[npoints * (index_prim + i)]);
+        
+        #pragma omp simd
+        for (size_t j = 0; j < npoints; j++)
+        {
+            cvals[j] += pvals[j];
+        }
+    }
+}
+
+auto
+distribute(      CDenseMatrix&             gmatrix,
+           const CSubMatrix&               buffer,
+           const size_t                    offset,
+           const CDenseMatrix&             fmatrix,
+           const std::vector<double>&      weights, 
+           const std::map<size_t, size_t>& ao_mask,
+           const std::vector<size_t>&      bra_indices,
+           const std::vector<size_t>&      ket_indices,
+           const int                       bra_angmom,
+           const int                       ket_angmom,
+           const size_t                    bra_igto,
+           const size_t                    ket_igto,
+           const bool                      bra_eq_ket) -> void
+{
+    // reference indexes on bra and ket sides
+
+    const size_t refp = bra_indices[bra_igto + 1];
+    
+    const size_t refq = ket_indices[ket_igto + 1];
+    
+    // dimensions of bra and ket orbital indexes
+
+    const auto adim = bra_indices[0];
+
+    const auto bdim = ket_indices[0];
+    
+    // set up angular components
+
+    const auto acomps = tensor::number_of_spherical_components(std::array<int, 1>{bra_angmom});
+    
+    const auto bcomps = tensor::number_of_spherical_components(std::array<int, 1>{ket_angmom});
+    
+    // set up pointer to G matrix
+    
+    auto gmat = gmatrix.values();
+    
+    // set up pointer to F matrix
+    
+    auto fmat = fmatrix.values();
+    
+    // set up numnber of AOs
+    
+    auto naos = gmatrix.getNumberOfColumns();
+    
+    // set up number of grid points
+    
+    auto npoints = fmatrix.getNumberOfColumns();
+    
+    for (int i = 0; i < acomps; i++)
+    {
+        const auto p = ao_mask.at(i * adim + refp);
+        
+        for (int j = 0; j < bcomps; j++)
+        {
+            const size_t idx_ij = offset + static_cast<size_t>(i * bcomps + j);
+            
+            const auto q = ao_mask.at(j * bdim + refq);
+                
+            if (bra_eq_ket)
+            {
+                for (size_t m = 0; m < npoints; m++)
+                {
+                    gmat[m * naos + p] += weights[m] * buffer.at({idx_ij, m}) * fmat[q * npoints + m];
+                }
+            }
+            else
+            {
+                for (size_t m = 0; m < npoints; m++)
+                {
+                    gmat[m * naos + p] += weights[m] * buffer.at({idx_ij, m}) * fmat[q * npoints + m];
+                    
+                    gmat[m * naos + q] += weights[m] * buffer.at({idx_ij, m}) * fmat[p * npoints + m];
+                }
+            }
+        }
+    }
+}
+
+
 
 }  // namespace t2cfunc

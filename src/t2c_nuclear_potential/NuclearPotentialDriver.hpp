@@ -86,6 +86,31 @@ class CNuclearPotentialDriver
                  const double                    gpoint_y,
                  const double                    gpoint_z,
                  const double                    gpoint_w) const -> void;
+    
+    /// @brief Computes G matrix.
+    /// @param gto_blocks The vector of basis function blocks.
+    /// @param fmatrix The F matrix ( AOs x grid points).
+    /// @param ao_mask The mask of local indices.
+    /// @param gcoords_x The Cartesian X coordinates of grid points.
+    /// @param gcoords_y The Cartesian Y coordinates of grid points.
+    /// @param gcoords_z The Cartesian Z coordinates of grid points.
+    /// @param gweights The weight of grid points.
+    auto compute(const std::vector<CGtoBlock>&   gto_blocks,
+                 const CDenseMatrix&             fmatrix,
+                 const std::map<size_t, size_t>& ao_mask,
+                 const std::vector<double>&      gcoords_x,
+                 const std::vector<double>&      gcoords_y,
+                 const std::vector<double>&      gcoords_z,
+                 const std::vector<double>&      gweights) const -> CDenseMatrix;
+    
+private:
+        
+    /// @brief Determines number of rows in Cartesian buffer for on grid recursions.
+    /// @param bra_angmom The angular momentum of integrals buffer on bra side.
+    /// @param ket_angmom The angular momentum of integrals buffer on ket side.
+    /// @return The number of rows in Cartesian buffer.
+    auto _get_buffer_rows(const int bra_angmom,
+                          const int ket_angmom) const -> size_t;
 };
 
 #endif /* NuclearPotentialDriver_hpp */

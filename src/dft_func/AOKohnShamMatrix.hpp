@@ -134,6 +134,11 @@ class CAOKohnShamMatrix
      Resets all elements of AO Kohn-Sham matrix to zero.
      */
     auto zero() -> void;
+    
+    /**
+     Symmetrize and scale AO Kohn-Sham matrix.
+     */
+    auto inPlaceSymmetrizeAndScale(const double factor) -> void;
 
     /**
      Sets number of electron obtained by integrating Kohn-Sham matrix.

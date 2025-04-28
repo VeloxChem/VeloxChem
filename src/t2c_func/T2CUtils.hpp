@@ -3,11 +3,14 @@
 
 #include <cstddef>
 #include <utility>
+#include <vector>
+#include <map>
 
 #include "Matrix.hpp"
 #include "Point.hpp"
 #include "SimdArray.hpp"
 #include "SubMatrix.hpp"
+#include "DenseMatrix.hpp"
 
 namespace t2cfunc {  // t2cfunc namespace
 
@@ -296,6 +299,70 @@ auto distribute(CSubMatrix*                      matrix,
                 const size_t                     bra_igto,
                 const std::pair<size_t, size_t>& ket_range,
                 const bool                       ang_order) -> void;
+
+
+/// @brief Computes R(PC) = P - C distances on grid.
+/// @param buffer The buffer with factors.
+/// @param index_pc The primary row index of R(PC) distances in buffer.
+/// @param gcoords_x The Cartesian X coordinates of grid points.
+/// @param gcoords_y The Cartesian Y coordinates of grid points.
+/// @param gcoords_z The Cartesian Z coordinates of grid points.
+/// @param p_x The Cartesian X coordinate of P point.
+/// @param p_y The Cartesian Y coordinate of P point.
+/// @param p_z The Cartesian Z coordinate of P point.
+auto comp_distances_pc(      CSubMatrix&          buffer,
+                       const size_t               index_pc,
+                       const std::vector<double>& gcoords_x,
+                       const std::vector<double>& gcoords_y,
+                       const std::vector<double>& gcoords_z,
+                       const double               p_x,
+                       const double               p_y,
+                       const double               p_z) -> void;
+
+/// @brief Computes Boys function arguments  on grid.
+/// @param buffer The buffer with factors.
+/// @param index_args The primary row index of Boys function arguments in buffer.
+/// @param index_pc The primary row index of R(PC) distances in buffer.
+/// @param factor The Boys function argumnet scaling factor.
+auto comp_boys_args(     CSubMatrix& buffer,
+                    const size_t     index_args,
+                    const size_t     index_pc,
+                    const double     factor) -> void;
+
+/// @brief Reduces primitive array to contracted array.
+/// @param buffer The buffer with factors.
+/// @param index_contr The primary row index  of contracted integrals in buffer.
+/// @param index_prim The primary row index  of primitive integrals in buffer.
+/// @param ndims The dimensions of contracted rows.
+auto reduce(CSubMatrix& buffer, const size_t index_contr, const size_t index_prim, const size_t ndims) -> void;
+
+/// Distributes buffer of integrals into given matrix on grid.
+/// @param gmatrix The matrix for storage of contracted integrals on grid.
+/// @param buffer The integrals buffer on grid.
+/// @param offset The offset in integrals buffer.
+/// @param fmatrix The matrix used for contracttion of integrals on grid.
+/// @param weights The vector of weights. 
+/// @param ao_mask The mask of local indices.
+/// @param bra_indices The compressed contracted basis functions indexes on bra side.
+/// @param ket_indices The compressed contracted basis functions indexes on ket side.
+/// @param bra_angmom The angular momentum of integrals buffer on bra side.
+/// @param ket_angmom The angular momentum of integrals buffer on ket side.
+/// @param bra_igto The index of basis function on bra side.
+/// @param ket_igto The index of basis function on ket side.
+/// @param bra_eq_ket The flag for bra and ket basis function blocks being equal.
+auto distribute(      CDenseMatrix&             gmatrix,
+                const CSubMatrix&               buffer,
+                const size_t                    offset,
+                const CDenseMatrix&             fmatrix,
+                const std::vector<double>&      weights,
+                const std::map<size_t, size_t>& ao_mask,
+                const std::vector<size_t>&      bra_indices,
+                const std::vector<size_t>&      ket_indices,
+                const int                       bra_angmom,
+                const int                       ket_angmom,
+                const size_t                    bra_igto,
+                const size_t                    ket_igto,
+                const bool                      bra_eq_ket) -> void;
 
 }  // namespace t2cfunc
 

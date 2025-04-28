@@ -283,7 +283,7 @@ CGtoBlock::reduce(const std::vector<int>& mask) const -> CGtoBlock
         
         for (int i = 0; i < ncgtos; i++)
         {
-            if (std::ranges::find(mask, _orb_indices[i + 1]) != mask.end())
+            if (mask[i] == 1)
             {
                 red_coordinates.push_back(_coordinates[i]);
                 
@@ -295,26 +295,28 @@ CGtoBlock::reduce(const std::vector<int>& mask) const -> CGtoBlock
         
         if (const auto red_ncgtos = red_atm_indices.size(); red_ncgtos > 0)
         {
-            std::vector<double> red_exponents;
+            std::vector<double> red_exponents(red_ncgtos * _npgtos);
             
-            std::vector<double> red_norms;
+            std::vector<double> red_norms(red_ncgtos * _npgtos);
             
             size_t red_idx = 0;
             
             for (int i = 0; i < ncgtos; i++)
             {
-                if (std::ranges::find(mask, _orb_indices[i + 1]) != mask.end())
+                if (mask[i] == 1)
                 {
-                    
+                    for (int j = 0; j < _npgtos; j++)
+                    {
+                        red_exponents[j * red_ncgtos + red_idx] = _exponents[j * ncgtos + i];
+                        
+                        red_norms[j * red_ncgtos + red_idx] = _norms[j * ncgtos + i];
+                    }
                     
                     red_idx++;
                 }
             }
-            
-            //_exponents[j * ncgtos + i] = fexps[j];
-            //_norms[j * ncgtos + i]     = fnorms[j];
-            
-            return CGtoBlock();
+        
+            return CGtoBlock(red_coordinates, red_exponents, red_norms, red_orb_indices, red_atm_indices, _angular_momentum, _npgtos);
         }
         else
         {

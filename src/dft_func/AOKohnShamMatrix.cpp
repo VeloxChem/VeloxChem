@@ -164,6 +164,15 @@ CAOKohnShamMatrix::zero() -> void
 }
 
 auto
+CAOKohnShamMatrix::inPlaceSymmetrizeAndScale(const double factor) -> void
+{
+    for (size_t i = 0; i < _xcMatrices.size(); i++)
+    {
+        _xcMatrices[i].inPlaceSymmetrizeAndScale(factor);
+    }
+}
+
+auto
 CAOKohnShamMatrix::setNumberOfElectrons(const double xcElectrons) -> void
 {
     _xcElectrons = xcElectrons;

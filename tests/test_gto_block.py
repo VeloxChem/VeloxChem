@@ -1,4 +1,5 @@
 import numpy as np
+import math as mt
 
 from veloxchem.veloxchemlib import BasisFunction
 from veloxchem.molecularbasis import MolecularBasis
@@ -27,6 +28,66 @@ class TestGtoBlock:
         b_block = GtoBlock(bas_svp, mol_h2o, [1, 2], 0, 3)
         assert a_block == b_block
 
+    def test_reduce(self):
+
+        tol = 1.0e-12
+
+        mol_h2o, bas_svp = self.get_data()
+        gblock = GtoBlock(bas_svp, mol_h2o, 0, 1)
+        rblock = gblock.reduce([1,0,1,0])
+        
+        a_coords = rblock.coordinates()
+        b_coords = [
+            Point([0.000, 0.000, -1.000]),
+            Point([0.000, 1.400, -2.100]),
+        ]
+        assert a_coords == b_coords
+        
+        a_indexes = rblock.orbital_indices()
+        b_indexes = [7, 1, 4]
+        assert a_indexes == b_indexes
+        
+        a_indexes = rblock.atomic_indices()
+        b_indexes = [0, 1]
+        assert a_indexes == b_indexes
+        
+        assert rblock.angular_momentum() == 0
+        assert rblock.number_of_basis_functions() == 2
+        assert rblock.number_of_primitives() == 1
+        
+        ref_exps = gblock.exponents()
+        red_exps = rblock.exponents()
+        assert len(red_exps) == 2
+        assert mt.isclose(ref_exps[0], red_exps[0],
+                          rel_tol=tol, abs_tol=tol)
+        assert mt.isclose(ref_exps[2], red_exps[1],
+                          rel_tol=tol, abs_tol=tol)
+                          
+        ref_norms = gblock.normalization_factors()
+        red_norms = rblock.normalization_factors()
+        assert len(red_norms) == 2
+        assert mt.isclose(ref_norms[0], red_norms[0],
+                          rel_tol=tol, abs_tol=tol)
+        assert mt.isclose(ref_norms[2], red_norms[1],
+                          rel_tol=tol, abs_tol=tol)
+                          
+    def test_reduce_contracted(self):
+        
+        mol_h2o, bas_svp = self.get_data()
+        gblock = GtoBlock(bas_svp, mol_h2o, 0, 3)
+        
+        rblock = gblock.reduce([0,1])
+        b_block = GtoBlock(bas_svp, mol_h2o, [2,], 0, 3)
+        assert rblock == b_block
+        
+        rblock = gblock.reduce([1,0])
+        b_block = GtoBlock(bas_svp, mol_h2o, [1,], 0, 3)
+        assert rblock == b_block
+        
+        rblock = gblock.reduce([1,1])
+        b_block = GtoBlock(bas_svp, mol_h2o, 0, 3)
+        assert rblock == b_block
+        
     def test_coordinates(self):
 
         tol = 1.0e-12
