@@ -34,12 +34,7 @@ from contextlib import redirect_stderr
 from io import StringIO
 import numpy as np
 import h5py
-import sys
-from .profiler import Profiler
-import multiprocessing as mp
-from mpi4py import MPI
 
-from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes)
 

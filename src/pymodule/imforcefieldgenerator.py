@@ -33,15 +33,10 @@
 import numpy as np
 import math
 import os
-from pathlib import Path
-from sys import stdout
-from time import time
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
 import random
-
 from contextlib import redirect_stderr
 from io import StringIO
+
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -59,16 +54,13 @@ from .imdatabasepointcollecter import IMDatabasePointCollecter
 #from .impesforcefieldgenerator_parallel import ImpesForceFieldGeneratorParallel
 from .mmforcefieldgenerator import MMForceFieldGenerator
 from .optimizationdriver import OptimizationDriver
-from .atomtypeidentifier import AtomTypeIdentifier
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
+
 
 class IMForceFieldGenerator:
     """

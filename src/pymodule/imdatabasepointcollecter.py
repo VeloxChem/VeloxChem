@@ -38,17 +38,12 @@ import sys
 from time import time
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import random
-import re
 
 from contextlib import redirect_stderr
 from io import StringIO
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
 
-import openmm as mm
-import openmm.app as app
-import openmm.unit as unit
 from .molecule import Molecule
 from .veloxchemlib import mpi_master
 from. veloxchemlib import hartree_in_kcalpermol, bohr_in_angstrom
@@ -67,6 +62,12 @@ from .xtbhessiandriver import XtbHessianDriver
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
 
+try:
+    import openmm as mm
+    import openmm.app as app
+    import openmm.unit as unit
+except ImportError:
+    pass
 
 
 class IMDatabasePointCollecter:
@@ -119,6 +120,10 @@ class IMDatabasePointCollecter:
         """
         Initializes the class with default simulation parameters.
         """
+
+        assert_msg_critical("openmm" in sys.modules,
+                            "openmm is required by IMDatabasePointCollecter.")
+
         np.set_printoptions(threshold=sys.maxsize)
         # MPI and output stream
         if comm is None:
@@ -710,10 +715,10 @@ class IMDatabasePointCollecter:
         if self.system is None:
             raise RuntimeError('System has not been created!')
         
-        temperature = self.temperature
+        # temperature = self.temperature
         self.temperature = self.temperature * unit.kelvin
         
-        friction = self.friction
+        # friction = self.friction
         self.friction = self.friction / unit.picosecond
         
         timestep = self.timestep
@@ -1192,7 +1197,7 @@ class IMDatabasePointCollecter:
             ET.SubElement(NonbondedForce, "Atom", **attributes)
 
         # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")  
@@ -1398,7 +1403,7 @@ class IMDatabasePointCollecter:
                 ET.SubElement(ImproperForce, "Torsion", **attributes)
 
         # Generate the tree and write to file
-        tree = ET.ElementTree(ForceField)
+        # tree = ET.ElementTree(ForceField)
         rough_string = ET.tostring(ForceField, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         indented_string = reparsed.toprettyxml(indent="    ")  
@@ -2130,21 +2135,6 @@ class IMDatabasePointCollecter:
         return qm_hessian
 
 
-
-    def get_qm_potential_energy(self):
-        """
-        Returns the potential energy of the QM region.
-
-        Args:
-            context: The OpenMM context object.
-        Returns:
-            The potential energy of the QM region.
-        """
-
-        potential_energy = self.current_energy
-
-        return potential_energy
-    
     def output_file_writer(self, outputfile):
 
         # Open the file in write mode ('w')
