@@ -40,6 +40,7 @@ import re
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
 from .mofoptimizer import (
+    optimize_rotations_pre,
     optimize_rotations_after,
     apply_rotations_to_atom_positions,
     apply_rotations_to_Xatoms_positions,
