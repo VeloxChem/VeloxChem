@@ -126,59 +126,65 @@ class MoleculeProcessor2:
             prefix = deprot_file[:12] if len(deprot_file) >= 12 else deprot_file[:8]
             deprot_path = os.path.join(self.deprotonated_dir, deprot_file)
 
+            # Check if the deprot file matches a neutral file
+            found_match = False
             for folder_path in self.folder_paths:
                 neutral_file = next((f for f in os.listdir(folder_path) if f.startswith(prefix)), None)
-                if neutral_file is None:
-                    continue
+                if neutral_file is not None:
+                    found_match = True
+                    break
+        
+            if not found_match:
+                continue  # Skip to the next deprot_file
 
-                neutral_path = os.path.join(folder_path, neutral_file)
-                neutral_mol = Chem.MolFromXYZFile(neutral_path)
-                deprot_mol = Chem.MolFromXYZFile(deprot_path)
+            neutral_path = os.path.join(folder_path, neutral_file)
+            neutral_mol = Chem.MolFromXYZFile(neutral_path)
+            deprot_mol = Chem.MolFromXYZFile(deprot_path)
 
-                if neutral_mol is None or deprot_mol is None:
-                    logging.warning(f"Could not load molecules: {neutral_file} or {deprot_file}")
-                    continue
+            if neutral_mol is None or deprot_mol is None:
+                logging.warning(f"Could not load molecules: {neutral_file} or {deprot_file}")
+                continue
 
-                try:
-                    mapping = vlx.MCS(neutral_mol, deprot_mol, deprotonated = True).get_atom_mapping()
-                    if mapping is None:
-                        raise ValueError("Atom mapping failed.")
-                except Exception as e:
-                    logging.error(f"Mapping failed for {deprot_file}: {e}")
-                    self.failed_mapping.append(deprot_file)
-                    continue
+            try:
+                mapping = vlx.MCS(neutral_mol, deprot_mol, deprotonated = True).get_atom_mapping()
+                if mapping is None:
+                    raise ValueError("Atom mapping failed.")
+            except Exception as e:
+                logging.error(f"Mapping failed for {deprot_file}: {e}")
+                self.failed_mapping.append(deprot_file)
+                continue
 
-                try:
-                    mol = vlx.Molecule.read_xyz_file(deprot_path)
-                    calc = vlx.MPC1(mol, deprotonated=True)
-                    data_matrix = calc.run_all_calculations()
-                    xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
-                    df = pd.DataFrame(data_matrix, columns=[
-                        'Atom idx', 'Atom numbers', 'deprot_min_EA', 'deprot_max_EA', 'deprot_mean_EA', 'deprot_median_EA',
-                        'deprot_min_IE', 'deprot_max_IE', 'deprot_mean_IE', 'deprot_median_IE', 'deprot_min_AE', 'deprot_max_AE',
-                        'deprot_mean_AE', 'deprot_median_AE', 'deprot_localized_charge', 'deprot_resp_charge',
-                        'deprot_max_esp_values', 'deprot_min_esp_values', 'deprot_local_polarizability X',
-                        'deprot_local_polarizability Y', 'deprot_local_polarizability Z', 'deprot_Total energy'
-                    ])
+            try:
+                mol = vlx.Molecule.read_xyz_file(deprot_path)
+                calc = vlx.MPC1(mol, deprotonated=True)
+                data_matrix = calc.run_all_calculations()
+                xyz = np.array(calc.get_xyz_string(), dtype=h5py.string_dtype(encoding='utf-8'))
+                df = pd.DataFrame(data_matrix, columns=[
+                    'Atom idx', 'Atom numbers', 'deprot_min_EA', 'deprot_max_EA', 'deprot_mean_EA', 'deprot_median_EA',
+                    'deprot_min_IE', 'deprot_max_IE', 'deprot_mean_IE', 'deprot_median_IE', 'deprot_min_AE', 'deprot_max_AE',
+                    'deprot_mean_AE', 'deprot_median_AE', 'deprot_localized_charge', 'deprot_resp_charge',
+                    'deprot_max_esp_values', 'deprot_min_esp_values', 'deprot_local_polarizability X',
+                    'deprot_local_polarizability Y', 'deprot_local_polarizability Z', 'deprot_Total energy'
+                ])
 
-                    df = df.iloc[:, 2:]
-                    idx_map = {d: p for p, d in mapping}
-                    reordered = df.iloc[list(idx_map.keys())]
-                    reordered.index = [idx_map[i] for i in idx_map]
-                    reordered = reordered.sort_index()
+                df = df.iloc[:, 2:]
+                idx_map = {d: p for p, d in mapping}
+                reordered = df.iloc[list(idx_map.keys())]
+                reordered.index = [idx_map[i] for i in idx_map]
+                reordered = reordered.sort_index()
 
-                    neutral_h5_file = next((f for f in os.listdir(self.output_folder) if f.startswith(prefix) and f.endswith('.h5')), None)
-                    if neutral_h5_file:
-                        deprot_h5_filename = deprot_file.replace(".xyz", ".h5")
-                        h5_path = os.path.join(self.h5_deprotonated_dir, deprot_h5_filename)
-                        shutil.copy2(os.path.join(self.output_folder, neutral_h5_file), h5_path)
-                        with h5py.File(h5_path, 'a') as f:
-                            for key, value in reordered.items():
-                                f.create_dataset(key, data=value)
-                            f.create_dataset("xyz coordinates deprot", data=xyz)
-                        logging.info(f"Added deprotonated data to {h5_path}")
-                except Exception as e:
-                    logging.error(f"Failed to process deprotonated {deprot_file}: {e}")
+                neutral_h5_file = next((f for f in os.listdir(self.output_folder) if f.startswith(prefix) and f.endswith('.h5')), None)
+                if neutral_h5_file:
+                    deprot_h5_filename = deprot_file.replace(".xyz", ".h5")
+                    h5_path = os.path.join(self.h5_deprotonated_dir, deprot_h5_filename)
+                    shutil.copy2(os.path.join(self.output_folder, neutral_h5_file), h5_path)
+                    with h5py.File(h5_path, 'a') as f:
+                        for key, value in reordered.items():
+                            f.create_dataset(key, data=value)
+                        f.create_dataset("xyz coordinates deprot", data=xyz)
+                    logging.info(f"Added deprotonated data to {h5_path}")
+            except Exception as e:
+                logging.error(f"Failed to process deprotonated {deprot_file}: {e}")
 
     def protonate_and_process(self):
         if not self.protonate:
@@ -224,7 +230,18 @@ class MoleculeProcessor2:
             prefix = prot_file[:12] if len(prot_file) >= 12 else prot_file[:8]
             prot_path = os.path.join(self.protonated_dir, prot_file)
 
+            # Check if the prot xyz-file comes from the defined folder
+            found_match = False
+            for folder_path in self.folder_paths:
+                neutral_file = next((f for f in os.listdir(folder_path) if f.startswith(prefix)), None)
+                if neutral_file is not None:
+                    found_match = True
+                    break
 
+            if not found_match:
+                continue  # <-- Skip this prot_file and move to the next one
+            
+            
             try:
                 mol = vlx.Molecule.read_xyz_file(prot_path)
                 calc = vlx.MPC1(mol, protonated=True)
