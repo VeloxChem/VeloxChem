@@ -397,7 +397,8 @@ class MofBuilder:
 
     def write_gromacs_files(self, gro_name=None):
         if gro_name is not None:
-            self.gro_name = gro_name
+            self.gro_name = Path(gro_name).stem + ".gro"
+            print("gro_name is set, will be saved as: ", self.gro_name)
         else:
             self.gro_name = ("mof_" + str(self.mof_family.split(".")[0]) + "_" +
                              self.linker_xyz.strip(".xyz").split("/")[-1] +
