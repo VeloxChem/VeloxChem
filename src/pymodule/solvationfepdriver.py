@@ -184,7 +184,7 @@ class SolvationFepDriver:
         :param solvent:
             The solvent to use for solvation. Default is spce water.
             Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
-            'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'other' or 'itself'.
+            'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf','other' or 'itself'.
         :param solvent_molecule:
             The VeloxChem molecule object for the solvent. Mandatory for 'other'.
         :param ff_gen_solvent:
@@ -222,7 +222,7 @@ class SolvationFepDriver:
 
         return delta_f, final_free_energy
         
-    def compute_solvation_from_omm_files(self, solute_pdb, solute_xml, other_xml_files, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None):
+    def compute_solvation_from_omm_files(self, solute_pdb, solute_xml, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None):
         """
         Run the solvation free energy calculation using OpenMM.
         :param solute_pdb:
@@ -236,7 +236,7 @@ class SolvationFepDriver:
         :param solvent:
             The solvent to use for solvation. Default is spce water.
             Available options: 'spce', 'tip3p', 'ethanol', 'methanol', 'acetone', 'chloroform', 
-            'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'other' or 'itself'.
+            'hexane', 'toluene', 'dcm', 'benzene', 'dmso', 'thf', 'acetonitrile', 'dmf', 'other' or 'itself'.
         :param solvent_molecule:
             The VeloxChem molecule object for the solvent. Mandatory for 'other'.
         :param ff_gen_solvent:
@@ -254,6 +254,7 @@ class SolvationFepDriver:
             molecule = Molecule.read_pdb_file(solute_pdb)
 
             ffgen_solute = MMForceFieldGenerator()
+            ffgen_solute.ostream.mute()
             ffgen_solute.create_topology(molecule, resp=False)
 
             sol_builder = SolvationBuilder()
@@ -270,14 +271,18 @@ class SolvationFepDriver:
             
             sol_builder.write_openmm_files(solute_ff=ffgen_solute,solvent_ffs=ff_gen_solvent)
             self.system_pdb = 'system.pdb'
-            
+            self.other_xml_files = ['solvent_1.xml']
+            if other_xml_files:
+                self.other_xml_files.extend(other_xml_files)
             
         else: 
-            self.system_pdb = system_pdb    
+            self.system_pdb = system_pdb
+            assert_msg_critical(other_xml_files is not None,
+                "SolvationFepDriver: other_xml_files must be provided if system_pdb is provided")
+            self.other_xml_files = other_xml_files    
 
         self.solute_pdb = solute_pdb
         self.solute_xml = solute_xml
-        self.other_xml_files = other_xml_files
         # Special name for the solvent
         self.solvent_name = 'omm_files'
 
