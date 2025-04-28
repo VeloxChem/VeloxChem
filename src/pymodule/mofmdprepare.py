@@ -1,16 +1,22 @@
-import numpy as np
-import re
-import shutil
-import pandas as pd
-import linecache
-from .mofutils import create_lG
-import networkx as nx
 from pathlib import Path
+import numpy as np
+import networkx as nx
+import linecache
+import re
+import sys
 
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfunrestdriver import ScfUnrestrictedDriver
 from .mmforcefieldgenerator import MMForceFieldGenerator
+from .errorhandler import assert_msg_critical
+from .mofutils import copy_file
+from .mofutils import create_lG
+
+try:
+    import pandas as pd
+except ImportError:
+    pass
 
 
 def tempgro(output, all_array):
@@ -24,8 +30,8 @@ def tempgro(output, all_array):
             line = all_array[i]
 
             value_atom_number = int(i + 1)  # atom_number
-            value_label = re.sub('\d', '', line[0]) + re.sub(
-                '\D', '', line[2])  # atom_label
+            value_label = re.sub(r'\d', '', line[0]) + re.sub(
+                r'\D', '', line[2])  # atom_label
             value_resname = str(line[4])[0:3]  # residue_name
             value_resnumber = int(line[5])  # residue number
             value_x = 0.1 * float(line[6])  # x
@@ -233,7 +239,6 @@ def get_residues_forcefield(
                                       map_path,
                                       linker_file,
                                       new_xyz="EDG.xyz")
-                shutil.rmtree(parsed_path)
                 print(res, "  mapped")
             elif res in ["HEDGE"]:
                 # xtb_residue(xyz_file,-1*linker_topic+1)
@@ -345,6 +350,10 @@ def getmoleculetype(input, new_resname):
 
 
 def getatoms(input, father, son, son_atoms, son_resname):
+
+    assert_msg_critical('pandas' in sys.modules,
+                        'pandas is required for mofmdprepare.')
+
     with open(input, "r") as f:
         lines = f.readlines()
 
@@ -394,7 +403,7 @@ def getatoms(input, father, son, son_atoms, son_resname):
 
     df = pd.read_csv(
         str(Path("Residues/parsedfile/atoms1")),
-        sep='\s+',
+        sep=r'\s+',
         names=[
             "nr",
             "type",
@@ -1008,19 +1017,6 @@ def fetch_res_in_node_num(res, node_split_dict, DUMMY_NODE):
         return 3
 
 
-def copy_file(old_path, new_path):
-    # Check if the source file exists
-    if not Path(old_path).exists():
-        raise FileNotFoundError(f"The source file does not exist: {old_path}")
-
-    # Ensure the destination directory exists
-    new_dir = Path(new_path).parent
-    new_dir.mkdir(parents=True, exist_ok=True)
-    # Copy the file
-    shutil.copy2(old_path, new_path)  # copy2 preserves metadata
-    print(f"File copied from {old_path} to {new_path}")
-
-
 ##############below are from gro_itps.py##############
 
 
@@ -1038,7 +1034,7 @@ def get_gro(model_name, new_arr):
 def get_itps(data_path, restypes, metal, node_termination, sol_list):
     # itps nodes_database, edges, sol, gas
     itp_path = Path('MD_run/itps')
-    nodesitp_path = str(Path(data_path, 'nodes_itps'))
+    # nodesitp_path = str(Path(data_path, 'nodes_itps'))
     itp_path.mkdir(parents=True, exist_ok=True)
 
     # copy nodes itps
@@ -1174,10 +1170,10 @@ def genrate_top_file(itp_path, data_path, res_info, model_name=None):
         if str(Path(i).parent) not in ["posre.itp"]:
             line = '#include "itps/' + Path(i).parent + '"' + "\n"
             top_itp_lines.append(line)
-    sec1 = unique_atomtypes
-    sec2 = top_itp_lines
-    sec3 = ["MOF" + "\n" + "\n"]
-    sec4 = top_res_lines + ["\n"] + ["\n"]
+    # sec1 = unique_atomtypes
+    # sec2 = top_itp_lines
+    # sec3 = ["MOF" + "\n" + "\n"]
+    # sec4 = top_res_lines + ["\n"] + ["\n"]
 
     newtop = (middlelines[0] + ["\n"] + ["\n"] + middlelines[1] +
               unique_atomtypes + ["\n"] + ["\n"] + top_itp_lines + ["\n"] +
@@ -1204,9 +1200,9 @@ def parsetop(inputfile):
 
     lines = [line for line in original_lines if line.strip()]
     number = []
-    includelines_number = []
+    # includelines_number = []
     lineNumber = 1
-    lineNumber_include = 1
+    # lineNumber_include = 1
     keyword1 = "]"  # input('Keyword:')
     for eachline in lines:  # search for keywords and get linenumber
         m = re.search(keyword1, eachline)

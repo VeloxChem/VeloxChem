@@ -1011,32 +1011,6 @@ def distinguish_G_centers(lG):
     return center_class, center_nodes
 
 
-def find_center_nodes_pair(lG, center_nodes):
-    if len(center_nodes) > 6:
-        centers = nx.center(lG)
-
-    pairs = []
-    for i in range(len(centers)):
-        for j in range(i, len(centers)):
-            l = nx.shortest_path_length(lG, centers[i], centers[j])
-            if l == 1:
-                pairs.append([centers[i], centers[j]])
-
-    # loop each pair to find center pair
-    for p in pairs:
-        a = p[0]
-        # b = p[1]
-        ds = []
-        for n in centers:
-            if n not in p:
-                d = nx.shortest_path_length(lG, a, n)
-                ds.append(d)
-        if len(set(ds)) < len(ds):
-            center_pair = p
-
-    return center_pair
-
-
 def classify_nodes(lG, center_nodes):
     # Step 1: Identify the center node(s) of the graph
     # center_nodes = nx.center(lG)
@@ -1075,7 +1049,7 @@ def find_center_nodes_pair(lG, center_nodes):
     # loop each pair to find center pair
     for p in pairs:
         a = p[0]
-        b = p[1]
+        # b = p[1]
         ds = []
         for n in centers:
             if n not in p:
@@ -1922,6 +1896,10 @@ def update_node_ccoords(G, edge_lengths, start_node, new_edge_length):
 
 
 def find_pair_x_edge_fc(x_matrix, edge_matrix, sc_unit_cell):
+
+    assert_msg_critical("scipy" in sys.modules,
+                        "scipy is required for find_pair_x_edge_fc.")
+
     dist_matrix = np.zeros((len(x_matrix), len(edge_matrix)))
     x_matrix = fractional_to_cartesian(x_matrix, sc_unit_cell)
     edge_matrix = fractional_to_cartesian(edge_matrix, sc_unit_cell)

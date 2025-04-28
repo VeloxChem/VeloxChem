@@ -40,9 +40,6 @@ try:
 except ImportError:
     pass
 
-from .errorhandler import assert_msg_critical
-import sys
-
 
 ###
 def unit_cell_to_cartesian_matrix(aL, bL, cL, alpha, beta, gamma):
