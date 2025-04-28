@@ -2031,7 +2031,7 @@ class ScfDriver:
             The Fock matrix, AO Kohn-Sham (Vxc) matrix, etc.
         """
 
-        fock_mat, vxc_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
+        fock_mat, vxc_mat, vkx_mat, e_emb, V_emb, e_pr, V_pr = self._comp_2e_fock_single_comm(
             den_mat, molecule, basis, screener, e_grad, profiler)
 
         return fock_mat, vxc_mat, vkx_mat, e_emb, V_emb, e_pr, V_pr

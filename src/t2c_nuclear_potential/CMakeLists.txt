@@ -51,6 +51,22 @@ target_sources(vlxobjs
     NuclearPotentialPrimRecSI.cpp
     NuclearPotentialPrimRecSP.cpp
     NuclearPotentialPrimRecSS.cpp
+    NuclearPotentialGridPrimRecDD.cpp
+    NuclearPotentialGridPrimRecDF.cpp
+    NuclearPotentialGridPrimRecDP.cpp
+    NuclearPotentialGridPrimRecDS.cpp
+    NuclearPotentialGridPrimRecFD.cpp
+    NuclearPotentialGridPrimRecFF.cpp
+    NuclearPotentialGridPrimRecFP.cpp
+    NuclearPotentialGridPrimRecFS.cpp
+    NuclearPotentialGridPrimRecPD.cpp
+    NuclearPotentialGridPrimRecPF.cpp
+    NuclearPotentialGridPrimRecPP.cpp
+    NuclearPotentialGridPrimRecPS.cpp
+    NuclearPotentialGridPrimRecSD.cpp
+    NuclearPotentialGridPrimRecSF.cpp
+    NuclearPotentialGridPrimRecSP.cpp
+    NuclearPotentialGridPrimRecSS.cpp
   )
 
 target_include_directories(vlxobjs

@@ -1,6 +1,10 @@
 #ifndef NuclearPotentialGridPrimRecSS_hpp
 #define NuclearPotentialGridPrimRecSS_hpp
 
+#include <cstddef>
+#include <array>
+#include <utility>
+#include <cmath>
 #include "SubMatrix.hpp"
 
 namespace npotrec {  // npotrec namespace
