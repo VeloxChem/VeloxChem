@@ -2043,14 +2043,6 @@ class AtomTypeIdentifier:
 
         return (int(at_match.group()) if at_match else 0)
 
-    @staticmethod
-    def measure_length(v1, v2):
-        """
-        Calculates the distance between v1 and v2
-        """
-
-        return np.linalg.norm(np.array(v1) - np.array(v2))
-
     def identify_equivalences(self, depth=10):
         """
         Identifies equivalent atoms in the molecule.
