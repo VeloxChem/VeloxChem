@@ -55,6 +55,9 @@ export_t3cintegrals(py::module& m)
         .def("compute",  py::overload_cast<const CMatrix&, const std::vector<double>&, const std::string&>
              (&CRIFockDriver::compute, py::const_),
              "Computes Coulomb Fock matrix for given density.")
+        .def("compute",  py::overload_cast<const CMolecule&, const CMolecularBasis&, const CSubMatrix&, const std::string&>
+             (&CRIFockDriver::compute, py::const_),
+             "Computes Coulomb Fock matrix for given density.")
         .def("local_compute", &CRIFockDriver::local_compute, "Computes local Coulomb Fock matrix for given density.")
         .def("compute_bq_vector", &CRIFockDriver::compute_bq_vector, "Computes transformed Gamma vector for given density.")
         .def("compute_local_bq_vector", &CRIFockDriver::compute_local_bq_vector, "Computes transformed local Gamma vector for given density.")

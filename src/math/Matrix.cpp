@@ -204,7 +204,14 @@ CMatrix::assign_flat_values(const std::vector<double>& values) -> void
         }
         else
         {
-            // FIX ME:
+            std::ranges::for_each(_sub_matrices, [&](auto &mvalue) {
+                const auto dims = mvalue.second->get_dimensions();
+                std::ranges::for_each(views::rectangular(dims[2], dims[3]), [&](const auto &index) {
+                        const auto i = dims[0] + index.first;
+                        const auto j = dims[1] + index.second;
+                        mvalue.second->at(index) = values[i * nrows + j];
+                    });
+                });
         }
     }
 }
