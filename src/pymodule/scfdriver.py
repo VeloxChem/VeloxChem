@@ -232,6 +232,9 @@ class ScfDriver:
         self._filename = 'veloxchem_scf_' + get_random_string_parallel(
             self.comm)
 
+        # may be used in rare cases when user wants to skip the writing of h5
+        self._skip_writing_h5 = False
+
         # input keywords
         self._input_keywords = {
             'scf': {
@@ -998,6 +1001,9 @@ class ScfDriver:
         :param basis_set:
             Name of the basis set.
         """
+
+        if self._skip_writing_h5:
+            return
 
         if self.checkpoint_file is None and self._filename is None:
             return
@@ -2433,6 +2439,9 @@ class ScfDriver:
         :param ao_basis:
             The AO basis set.
         """
+
+        if self._skip_writing_h5:
+            return
 
         if self.checkpoint_file is None:
             return
