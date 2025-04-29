@@ -1142,6 +1142,8 @@ class OpenMMDynamics:
             self.driver_flag = 'ROSCF Driver'
         elif isinstance(self.qm_driver, InterpolationDriver):
             self.driver_flag = 'IM Driver'
+            _ = self.qm_driver.read_qm_data_points()
+
         
         else:
             raise ValueError('Invalid QM driver. Please use a valid VeloxChem driver.')

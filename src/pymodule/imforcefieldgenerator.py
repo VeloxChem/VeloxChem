@@ -233,11 +233,11 @@ class IMForceFieldGenerator:
         self.unique_molecules = []
 
         # In here I want to store Number_of_dp, exponent_p, exponent_q
-        self.results = {'n_datapoints': None, 'RMSD': None, '|D|':None} 
+        self.im_results = {'n_datapoints': None, 'RMSD': None, '|D|':None} 
 
 
         # confirm database quality
-        self.dynamics_method = 'MM'
+        self.dynamics_method = 'IM'
         self.minimize = True
         self.nstruc_to_confirm_database_quality = 50
 
@@ -318,7 +318,6 @@ class IMForceFieldGenerator:
         if self.qm_driver is ScfRestrictedDriver:
             assert_msg_critical(self .qm_driver, 'ImForceFieldGenerator: QM-Driver/ QM-Gradient-Driver / QM-Hessian-Driver were initialized as ScF Method!.')
         
-        print('MOlecule labels', molecule.get_labels())
         self.interpolation_settings = { 'interpolation_type':self.interpolation_type, 
                             'exponent_p':self.exponent_p,
                             'exponent_q':self.exponent_q, 
@@ -340,16 +339,13 @@ class IMForceFieldGenerator:
         
 
         self.set_up_the_system(molecule, self.dihedrals, self.sampling_structures)
-        print('basis', basis.get_main_basis_label())
         for counter, entry in enumerate(self.molecules_along_rp.items()):
             key_old, molecules = entry
             for i, mol in enumerate(molecules):
                 
                 key = key_old
+                print('Key', key)   
                 if self.dihedrals is not None:
-                    # if abs(int(round(mol.get_dihedral_in_degrees(key_old)))) == 180:
-                    #     key = (key_old, abs(int(round(mol.get_dihedral_in_degrees(key_old)))))
-                    # else:
                     key = (key_old, int(round(molecules[i].get_dihedral_in_degrees(key_old))))
                     if i > 0:
                         impes_driver = InterpolationDriver(self.z_matrix)
@@ -366,7 +362,7 @@ class IMForceFieldGenerator:
                         
                         self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.molecules_along_rp, qm_data_points, self.interpolation_settings['dihedrals'])
 
-                print('Density of datapoints', self.density_of_datapoints)
+                print('Density of datapoints', self.density_of_datapoints, key, key_old )
 
                 in_db = False
                 if self.minimize:
@@ -376,8 +372,9 @@ class IMForceFieldGenerator:
                     current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
                     _, scf_results = self.compute_energy(self.qm_driver, mol, current_basis)
                     opt_drv.ostream.mute()
-                    constraint = f"freeze dihedral {reference_dih[0]} {reference_dih[1]} {reference_dih[2]} {reference_dih[3]}"
-                    opt_drv.constraints = [constraint]
+                    if self.dihedrals is not None:
+                        constraint = f"freeze dihedral {reference_dih[0]} {reference_dih[1]} {reference_dih[2]} {reference_dih[3]}"
+                        opt_drv.constraints = [constraint]
                     opt_results = opt_drv.compute(mol, current_basis, scf_results)
                     optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                     mol = optimized_molecule
@@ -403,7 +400,10 @@ class IMForceFieldGenerator:
                     self.interpolation_settings['imforcefield_file'] = self.imforcefieldfile
                     self.z_matrix = self.define_z_matrix(molecule)
                     print('Molecule added to the database',  self.density_of_datapoints)
-                    self.density_of_datapoints[(key_old, int(round(molecules[i].get_dihedral_in_degrees(key_old))))] += 1
+                    if self.dihedrals is not None:
+                        self.density_of_datapoints[(key_old, int(round(molecules[i].get_dihedral_in_degrees(key_old))))] += 1
+                    else:
+                        self.density_of_datapoints[key_old] += 1
 
 
 
@@ -415,6 +415,8 @@ class IMForceFieldGenerator:
                 im_database_driver = IMDatabasePointCollecter()
                 im_database_driver.distance_thrsh = self.distance_thrsh
                 im_database_driver.platform = 'CUDA'
+                if not self.minimize:
+                    im_database_driver.optimize = False
 
                 im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
                 desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
@@ -449,8 +451,11 @@ class IMForceFieldGenerator:
     
                 counter += 1
         
-        self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.molecules_along_rp, qm_data_points, self.interpolation_settings['dihedrals'])
+        self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.molecules_along_rp, None, self.interpolation_settings['dihedrals'])
         print('The construction of the database was sucessfull', self.density_of_datapoints)
+        self.im_results['n_datapoints'] = self.density_of_datapoints
+
+        return self.im_results 
 
     
     def database_density_check_with_molecule(self, molecule, qm_datapoints, specific_dihedrals=None, nsampling=None):
@@ -559,28 +564,36 @@ class IMForceFieldGenerator:
             vec2 = structure_to_vector(dihedrals2)
             return np.linalg.norm(vec1 - vec2)
         
-        
+        if qm_datapoints is None:
+            impes_driver = InterpolationDriver(self.z_matrix)
+            impes_driver.imforcefield_file = self.imforcefieldfile
+            self.qmlabels, self.z_matrix = impes_driver.read_labels()
+            qm_datapoints = []
+            for label in self.qmlabels:
+                qm_data_point = InterpolationDatapoint(self.z_matrix)
+                qm_data_point.read_hdf5(self.imforcefieldfile, label)
+                qm_datapoints.append(qm_data_point)
         reseted_point_densities_dict = {key: 0 for key in point_densities_dict}
         impes_driver = InterpolationDriver(self.z_matrix)
         impes_driver.update_settings(self.interpolation_settings)
-        for specific_dihedral in dihedrals:
-            for point in qm_datapoints:
-                min_distance = np.inf
-                key = None
-                for i, mol in enumerate(sampled_molecules_dict[tuple(specific_dihedral)]):
-                    datapoint_molecule = Molecule(self.molecule.get_labels(), point.cartesian_coordinates, 'bohr')
-                    dihedrals_of_mol = [mol.get_dihedral_in_degrees(specific_dihedral)]
-                    dihedrals_of_dp = [datapoint_molecule.get_dihedral_in_degrees(specific_dihedral)]
-                    distance_vectorized = dihedral_distance_vectorized(dihedrals_of_mol, dihedrals_of_dp)
-                    if abs(distance_vectorized) < min_distance:
-                        min_distance = abs(distance_vectorized)
-                        key = (tuple(specific_dihedral), int(round(mol.get_dihedral_in_degrees(specific_dihedral))))
+        if dihedrals is not None:
+            for specific_dihedral in dihedrals:
+                for point in qm_datapoints:
+                    min_distance = np.inf
+                    key = None
+                    for i, mol in enumerate(sampled_molecules_dict[tuple(specific_dihedral)]):
+                        datapoint_molecule = Molecule(self.molecule.get_labels(), point.cartesian_coordinates, 'bohr')
+                        dihedrals_of_mol = [mol.get_dihedral_in_degrees(specific_dihedral)]
+                        dihedrals_of_dp = [datapoint_molecule.get_dihedral_in_degrees(specific_dihedral)]
+                        distance_vectorized = dihedral_distance_vectorized(dihedrals_of_mol, dihedrals_of_dp)
+                        if abs(distance_vectorized) < min_distance:
+                            min_distance = abs(distance_vectorized)
+                            key = (tuple(specific_dihedral), int(round(mol.get_dihedral_in_degrees(specific_dihedral))))
+
+                    reseted_point_densities_dict[key] += 1
+        else:
+            reseted_point_densities_dict[None, 180] = len(qm_datapoints)
                 
-                reseted_point_densities_dict[key] += 1
-
-                
-
-
         return reseted_point_densities_dict
 
 
@@ -681,7 +694,6 @@ class IMForceFieldGenerator:
         """
 
         all_structures = None
-            
 
         if self.dynamics_method == 'IM':
             interpolation_driver = InterpolationDriver()
@@ -762,8 +774,8 @@ class IMForceFieldGenerator:
                             'use_inverse_bond_length':True
                           }
 
-        database_quality = False
 
+        database_quality = False
 
         while database_quality is False:
             
@@ -780,7 +792,7 @@ class IMForceFieldGenerator:
             # if given_molecular_strucutres is not None:
             #     random_structure_choices = given_molecular_strucutres
 
-            while rmsd < 0.3 and counter <= 20:
+            while rmsd < 0.1 and counter <= 20:
                 if self.dihedrals is not None:
                     desired_angles = np.linspace(0, 360, 36)
                     angles_mols = {int(angle):[] for angle in desired_angles}
@@ -834,11 +846,14 @@ class IMForceFieldGenerator:
                 
                 rmsd = min(individual_distances)
                 counter += 1
-                if rmsd >= 0.3:
-                    print(f'The overall RMSD is {rmsd} -> The current structures are well seperated from the database conformations! loop is discontinued')
+                
+                if rmsd >= 0.1:
+                    print(f'The overall RMSD is {rmsd} -> set of structures is used to establish databse convergence.')
                 else:
-                    print(f'The overall RMSD is {rmsd} -> The current structures are not all well seperated from the database conformations! loop is continued')        
-            
+                    print(f'The overall RMSD is {rmsd} -> set of structures is not diverse enough to establish databse convergence.')
+                if counter == 20:
+                    print(f'The given set of simulation structures does not cover large conformational space.')
+
             if self.dihedrals is not None:
                 for random_mol in random_structure_choices:
                     print('angle', random_mol.get_dihedral_in_degrees(self.dihedrals[0]))
@@ -856,10 +871,11 @@ class IMForceFieldGenerator:
                 current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
                 impes_driver.compute(mol, labels=sorted_labels)
                 reference_energy, scf_results = self.compute_energy(self.qm_driver, mol, current_basis)
-                print('Is converged', self.qm_driver.is_converged, self.qm_driver.history)
+
                 while scf_results is None:
-                    reference_energy, scf_results = self.compute_energy(self.qm_driver, mol, current_basis)
-                    print('Is converged', self.qm_driver.is_converged, self.qm_driver.history)
+                    new_mol = Molecule.from_xyz_string(mol.get_xyz_string())
+                    current_basis = MolecularBasis.read(new_mol, basis.get_main_basis_label())
+                    reference_energy, scf_results = self.compute_energy(self.qm_driver, new_mol, current_basis)
                 qm_energies.append(reference_energy)
                 im_energies.append(impes_driver.impes_coordinate.energy)
                 
@@ -868,8 +884,6 @@ class IMForceFieldGenerator:
                 print(f'\n\n ########## Step {i} ######### \n')
                 print(f'delta_E:   {abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()} kcal/mol \n')
                 if abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol() > self.energy_threshold and improve == True:
-                    print(mol.get_xyz_string())
-                    print('basis, scf_results', current_basis, scf_results)
                     labels = []
                     labels.append("point_{0}".format((len(sorted_labels) + 1)))
                     self.add_point(mol, im_database_file, current_basis)
@@ -1018,7 +1032,7 @@ class IMForceFieldGenerator:
         interpolation_driver.imforcefield_file = imforcefielddatafile
         z_matrix = self.define_z_matrix(molecule)
         sorted_labels = []
-
+        print('Here is the way', imforcefielddatafile in os.listdir(os.getcwd()))
         if imforcefielddatafile in os.listdir(os.getcwd()):
             labels, z_matrix = interpolation_driver.read_labels()
             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
