@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
@@ -29,6 +37,7 @@ import numpy as np
 import time as tm
 import tempfile
 import math
+import h5py
 
 from .veloxchemlib import mpi_master, hartree_in_kjpermol
 from .molecule import Molecule
@@ -38,6 +47,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .scfgradientdriver import ScfGradientDriver
 from .scfhessiandriver import ScfHessianDriver
+from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .openmmdriver import OpenMMDriver
@@ -202,6 +212,7 @@ class OptimizationDriver:
         elif (isinstance(drv, ScfGradientDriver) or
               isinstance(drv, XtbGradientDriver) or
               isinstance(drv, OpenMMGradientDriver) or
+              isinstance(drv, TddftGradientDriver) or
               isinstance(drv, MMGradientDriver)):
             grad_drv = drv
 
@@ -454,6 +465,10 @@ class OptimizationDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
+                # Write opt results to final hdf5 file
+                final_h5_fname = filename + ".h5"
+                self._write_final_hdf5(final_h5_fname, final_mol, opt_results)
+
             opt_results = self.comm.bcast(opt_results, root=mpi_master())
 
         try:
@@ -637,6 +652,7 @@ class OptimizationDriver:
             self.ostream.print_header(line)
 
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_scan_result(self, progress):
         """
@@ -888,3 +904,64 @@ class OptimizationDriver:
 
         mol = Molecule.read_xyz_string(xyz_data_i)
         mol.show(atom_indices=atom_indices, width=640, height=360)
+
+    def _write_final_hdf5(self, fname, molecule, opt_results):
+        """
+        Creats a HDF5 file and saves the optimization results.
+
+        :param fname:
+            Name of the HDF5 file.
+        :param molecule:
+            The molecule.
+        :param opt_results:
+            The dictionary of optimzation results.
+        """
+
+        if (fname and isinstance(fname, str) and Path(fname).is_file()):
+
+            hf = h5py.File(fname, 'a')
+
+            opt_group = 'opt/'
+
+            # Check if it is a scan job or not
+            if 'scan_energies' in opt_results.keys():
+                hf.create_dataset(opt_group + 'scan_energies',
+                                  data=opt_results['scan_energies'])
+
+                nuclear_repulsion_energies = []
+                scan_coordinates_au = []
+                for xyzstr in opt_results['scan_geometries']:
+                    mol = Molecule.read_xyz_string(xyzstr)
+                    nuclear_repulsion_energies.append(
+                        mol.nuclear_repulsion_energy())
+                    scan_coordinates_au.append(mol.get_coordinates_in_bohr())
+
+                hf.create_dataset(opt_group + 'scan_coordinates_au',
+                                  data=np.array(scan_coordinates_au))
+
+            else:
+                hf.create_dataset(opt_group + 'opt_energies',
+                                  data=opt_results['opt_energies'])
+
+                nuclear_repulsion_energies = []
+                opt_coordinates_au = []
+                for xyzstr in opt_results['opt_geometries']:
+                    mol = Molecule.read_xyz_string(xyzstr)
+                    nuclear_repulsion_energies.append(
+                        mol.nuclear_repulsion_energy())
+                    opt_coordinates_au.append(mol.get_coordinates_in_bohr())
+
+                hf.create_dataset(opt_group + 'opt_coordinates_au',
+                                  data=np.array(opt_coordinates_au))
+
+            # TODO: reconsider saving this
+            hf.create_dataset(opt_group + 'nuclear_repulsion_energies',
+                              data=np.array(nuclear_repulsion_energies))
+
+            valstr = 'Optimization results written to file: '
+            valstr += fname
+            self.ostream.print_info(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+            hf.close()

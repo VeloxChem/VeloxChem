@@ -12,7 +12,7 @@ from veloxchem.vibrationalanalysis import VibrationalAnalysis
 class TestXtbVibrationalAnalysisDriver:
 
     @pytest.mark.skipif(not XtbDriver.is_available(),
-                        reason='xtb not available')
+                        reason='xtb-python not available')
     def test_xtb_vibrational_analysis_driver(self):
 
         here = Path(__file__).parent

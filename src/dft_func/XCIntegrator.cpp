@@ -1,49 +1,50 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "XCIntegrator.hpp"
 
 #include <omp.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <iomanip>
-#include <sstream>
+#include <vector>
 
-#include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
-#include "DensityGridGenerator.hpp"
-#include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
-#include "MultiTimer.hpp"
 #include "Prescreener.hpp"
-#include "StringFormat.hpp"
 #include "XCIntegratorForGGA.hpp"
 #include "XCIntegratorForLDA.hpp"
 #include "XCIntegratorForMGGA.hpp"
@@ -82,7 +83,14 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
 
     if (xcfuntype == xcfun::lda)
     {
-        return xcintlda::integrateVxcFockForLDA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintlda::integrateVxcFockForLdaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintlda::integrateVxcFockForLdaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
     }
 
     if (xcfuntype == xcfun::gga)
@@ -99,7 +107,14 @@ CXCIntegrator::integrateVxcFock(const CMolecule&                  molecule,
 
     if (xcfuntype == xcfun::mgga)
     {
-        return xcintmgga::integrateVxcFockForMGGA(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, flag);
+        if (flag == std::string("CLOSEDSHELL"))
+        {
+            return xcintmgga::integrateVxcFockForMetaGgaClosedShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
+        else
+        {
+            return xcintmgga::integrateVxcFockForMetaGgaOpenShell(molecule, basis, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
+        }
     }
 
     std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
@@ -138,7 +153,7 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateFxcFockForLDA(
+            xcintlda::integrateFxcFockForLdaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
@@ -148,7 +163,7 @@ CXCIntegrator::integrateFxcFock(const std::vector<double*>&       aoFockPointers
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateFxcFockForMGGA(
+            xcintmgga::integrateFxcFockForMetaGgaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc);
         }
         else
@@ -199,15 +214,15 @@ CXCIntegrator::integrateKxcFock(const std::vector<double*>& aoFockPointers,
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateKxcFockForLDA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintlda::integrateKxcFockForLdaClosedShell(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            xcintgga::integrateKxcFockForGGA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintgga::integrateKxcFockForGgaClosedShell(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateKxcFockForMGGA(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
+            xcintmgga::integrateKxcFockForMetaGgaClosedShell(aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, quadMode);
         }
         else
         {
@@ -259,17 +274,17 @@ CXCIntegrator::integrateKxcLxcFock(const std::vector<double*>& aoFockPointers,
     {
         if (xcfuntype == xcfun::lda)
         {
-            xcintlda::integrateKxcLxcFockForLDA(
+            xcintlda::integrateKxcLxcFockForLdaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            xcintgga::integrateKxcLxcFockForGGA(
+            xcintgga::integrateKxcLxcFockForGgaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::mgga)
         {
-            xcintmgga::integrateKxcLxcFockForMGGA(
+            xcintmgga::integrateKxcLxcFockForMetaGgaClosedShell(
                 aoFockPointers, molecule, basis, rwDensityPointers, rw2DensityPointers, rw3DensityPointers, gsDensityPointers, molecularGrid, _screeningThresholdForGTOValues, fvxc, cubeMode);
         }
         else

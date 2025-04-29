@@ -8,66 +8,78 @@ from veloxchem.mp2driver import Mp2Driver
 from veloxchem.mpitask import MpiTask
 
 
-@pytest.mark.solvers
 class TestMp2Driver:
 
-    def test_h2se_mp2(self):
+    def run_mp2(self, task, scf_type, e_ref, mp2_type, tol):
 
-        # scf
+        if scf_type.lower() == 'restricted':
+            scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        else:
+            scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
+
+        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        if mp2_type.lower() == 'conventional':
+            mp2_drv.conventional = True
+        else:
+            mp2_drv.conventional = False
+        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
+
+        if task.mpi_rank == mpi_master():
+            assert abs(e_ref - mp2_result['mp2_energy']) < tol
+
+    @pytest.mark.solvers
+    def test_mp2_conventional(self):
+
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
 
         task = MpiTask([inpfile, None])
 
-        scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
-
-        # mp2
         e_ref = -0.28529088
 
-        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        self.run_mp2(task, 'restricted', e_ref, 'conventional', 1.0e-8)
 
-        mp2_drv.conventional = True
-        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
-        if task.mpi_rank == mpi_master():
-            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-8
+    @pytest.mark.solvers
+    def test_mp2_fockdriven(self):
 
-        mp2_drv.conventional = False
-        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
-        if task.mpi_rank == mpi_master():
-            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-8
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'h2se.inp')
 
-        task.finish()
+        task = MpiTask([inpfile, None])
 
-    def test_h2se_ump2(self):
+        e_ref = -0.28529088
 
-        # scf
+        self.run_mp2(task, 'restricted', e_ref, 'fockdriven', 1.0e-8)
+
+    @pytest.mark.solvers
+    def test_ump2_conventional(self):
+
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'h2se.inp')
 
         task = MpiTask([inpfile, None])
         task.molecule.set_multiplicity(3)
 
-        scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
-                                      task.min_basis)
-
-        # mp2
         e_ref = -0.26775296
 
-        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        self.run_mp2(task, 'unrestricted', e_ref, 'conventional', 1.0e-7)
 
-        mp2_drv.conventional = True
-        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
-        if task.mpi_rank == mpi_master():
-            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-7
+    @pytest.mark.timeconsuming
+    def test_ump2_fockdriven(self):
 
-        mp2_drv.conventional = False
-        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
-        if task.mpi_rank == mpi_master():
-            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-7
+        here = Path(__file__).parent
+        inpfile = str(here / 'data' / 'h2se.inp')
 
+        task = MpiTask([inpfile, None])
+        task.molecule.set_multiplicity(3)
+
+        e_ref = -0.26775296
+
+        self.run_mp2(task, 'unrestricted', e_ref, 'fockdriven', 1.0e-7)
+
+    @pytest.mark.solvers
     def test_mp2_update_settings(self):
 
         mp2_dict = {

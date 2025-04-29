@@ -1,3 +1,35 @@
+#
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
+#
+#  SPDX-License-Identifier: BSD-3-Clause
+#
+#  Copyright 2018-2025 VeloxChem developers
+#
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 from mpi4py import MPI
 from networkx.algorithms.isomorphism import GraphMatcher
 from networkx.algorithms.isomorphism import categorical_node_match
@@ -32,12 +64,12 @@ class ReactionMatcher:
 
     def match_reaction_graphs(self, A: nx.Graph, B: nx.Graph):
         # figure out how many bonds need to change -> difficult to impossible with multiple graphs right?
-        largest_in_A = len(list(nx.connected_components(A))[0])
-        largest_in_B = len(list(nx.connected_components(B))[0])
-        swapped = False
-        if largest_in_A > largest_in_B:
-            A, B = B, A
-            swapped = True
+        # largest_in_A = max(len(c) for c in nx.connected_components(A))
+        # largest_in_B = max(len(c) for c in nx.connected_components(B))
+        # swapped = False
+        # if largest_in_A > largest_in_B:
+        #     A, B = B, A
+        #     swapped = True
         
         mapping, forming_bonds, breaking_bonds = ReactionMatcher._match_subgraph(A, B)
         start_time = time.time()
@@ -86,8 +118,8 @@ class ReactionMatcher:
                     self.ostream.print_info(f"Found {len(Am2_mappings)} mappings with removing 2 bonds")
         if mapping == {}:
             self.ostream.print_info("No mapping found with removing two bonds, removing 3 bonds is not implemented. Try suggesting some broken bonds.")
-        if swapped:
-            mapping = {v: k for k, v in mapping.items()}
+        # if swapped:
+        #     mapping = {v: k for k, v in mapping.items()}
 
         spent_time = time.time() - start_time
         self.ostream.print_info(f"Spent {spent_time:.3f} seconds finding mapping")

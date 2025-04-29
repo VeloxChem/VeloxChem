@@ -1,8 +1,6 @@
 # find mpi4py
 include(${PROJECT_SOURCE_DIR}/cmake/custom/FindPythonModule.cmake)
 
-find_python_module(mpi4py REQUIRED)
-
 # create Python module with pybind11
 # * use pybind11 header files with -isystem
 # * explicitly disable LTO, even for release builds
@@ -15,8 +13,8 @@ pybind11_add_module(veloxchemlib
     ExportOneElecInts.cpp
     ExportOrbdata.cpp
     ExportVisualization.cpp
-    ExportXtb.cpp
     ExportT2CIntegrals.cpp
+    ExportT3CIntegrals.cpp
     ExportT4CIntegrals.cpp
     ExportVeloxChemLib.cpp
   )

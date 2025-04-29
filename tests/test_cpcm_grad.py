@@ -10,14 +10,18 @@ from veloxchem.scfgradientdriver import ScfGradientDriver
 @pytest.mark.solvers
 class TestGradCpcm:
 
-    def run_grad(self, molecule, xcfun_label, basis_label, ref_grad, tol):
+    def run_grad(self, molecule, xcfun_label, basis_label, ref_grad,
+                 cpcm_custom_vdw_radii, tol):
 
         basis = MolecularBasis.read(molecule, basis_label)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
+
         scf_drv.solvation_model = 'cpcm'
-        scf_drv.cpcm_grid_per_sphere = 110
+        scf_drv.cpcm_grid_per_sphere = (110, 110)
+        scf_drv.cpcm_custom_vdw_radii = cpcm_custom_vdw_radii
+
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
 
@@ -42,18 +46,25 @@ class TestGradCpcm:
                              [1.263075, 0.80436803, -2.00404575],
                              [1.36189124, 0.6039564, 2.00973266]])
 
-        self.run_grad(mol, 'hf', 'def2-svp', ref_grad, 1.0e-5)
+        self.run_grad(mol, 'hf', 'def2-svp', ref_grad, None, 1.0e-5)
 
         ref_grad = np.array([[-2.59710917, 1.09805904, 0.1187649],
                              [-0.04439474, -2.5096928, -0.12424109],
                              [1.27129737, 0.80635098, -2.01236183],
                              [1.37051574, 0.60512271, 2.01779083]])
 
-        self.run_grad(mol, 'slater', 'def2-svp', ref_grad, 1.0e-3)
+        self.run_grad(mol, 'slater', 'def2-svp', ref_grad, None, 1.0e-3)
 
         ref_grad = np.array([[-2.56212, 1.0832703, 0.11717353],
                              [-0.04534075, -2.47949799, -0.12270971],
                              [1.25484747, 0.7974705, -1.98858115],
                              [1.35289684, 0.59861351, 1.99408099]])
 
-        self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, 1.0e-3)
+        self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, None, 1.0e-3)
+
+        ref_grad = np.array([[-2.55730976, 1.0813965, 0.11713555],
+                             [-0.04737833, -2.47972691, -0.12267538],
+                             [1.25332429, 0.79870663, -1.98929246],
+                             [1.3513638, 0.59962406, 1.99483228]])
+
+        self.run_grad(mol, 'b3lyp', 'def2-svp', ref_grad, ['N', 1.8], 1.0e-3)

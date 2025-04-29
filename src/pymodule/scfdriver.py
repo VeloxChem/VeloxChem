@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from pathlib import Path
 from datetime import datetime
@@ -43,6 +51,7 @@ from .veloxchemlib import denmat, mat_t
 from .veloxchemlib import make_matrix
 from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
+from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .profiler import Profiler
 from .griddriver import GridDriver
@@ -54,17 +63,25 @@ from .cpcmdriver import CpcmDriver
 from .dispersionmodel import DispersionModel
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
-from .dftutils import get_default_grid_level, print_libxc_reference
+from .dftutils import get_default_grid_level, print_xc_reference
 from .sanitychecks import (molecule_sanity_check, dft_sanity_check,
                            pe_sanity_check, solvation_model_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import create_hdf5, write_scf_results_to_hdf5
+from .checkpoint import (create_hdf5, write_scf_results_to_hdf5,
+                         write_cpcm_charges, read_cpcm_charges)
 
 
 class ScfDriver:
     """
     Implements SCF method with C2-DIIS and two-level C2-DIIS convergence
     accelerators.
+
+    # vlxtag: RHF, Energy
+    # vlxtag: RKS, Energy
+    # vlxtag: UHF, Energy
+    # vlxtag: UKS, Energy
+    # vlxtag: ROHF, Energy
+    # vlxtag: ROKS, Energy
 
     :param comm:
         The MPI communicator.
@@ -202,6 +219,11 @@ class ScfDriver:
         # for open-shell system: unpaired electrons for initial guess
         self.guess_unpaired_electrons = ''
 
+        # RI-J
+        self.ri_coulomb = False
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_drv = None
+
         # dft
         self.xcfun = None
         self.grid_level = None
@@ -212,7 +234,7 @@ class ScfDriver:
         self.potfile = None
         self.pe_options = {}
         self._pe = False
-        self.embedding_options = None
+        self.embedding = None
         self._embedding_drv = None
 
         # solvation model
@@ -220,8 +242,10 @@ class ScfDriver:
         self._cpcm = False
         self.cpcm_drv = None
         self.cpcm_epsilon = 78.39
-        self.cpcm_grid_per_sphere = 194
+        self.cpcm_grid_per_sphere = (194, 110)
+        self.cpcm_cg_thresh = 1.0e-8
         self.cpcm_x = 0
+        self.cpcm_custom_vdw_radii = None
 
         # point charges (in case we want a simple MM environment without PE)
         self.point_charges = None
@@ -259,6 +283,9 @@ class ScfDriver:
         self._block_size_factor = 8
         self._xcfun_ldstaging = 1024
 
+        # may be used in rare cases when user wants to skip the writing of h5
+        self._skip_writing_h5 = False
+
         # input keywords
         self._input_keywords = {
             'scf': {
@@ -293,16 +320,22 @@ class ScfDriver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'solvation_model': ('str', 'solvation model'),
                 'cpcm_grid_per_sphere':
-                    ('int', 'number of grid points per sphere (C-PCM)'),
+                    ('seq_fixed_int', 'number of C-PCM grid points per sphere'),
+                'cpcm_cg_thresh':
+                    ('float', 'threshold for solving C-PCM charges'),
                 'cpcm_epsilon':
                     ('float', 'dielectric constant of solvent (C-PCM)'),
                 'cpcm_x': ('float', 'parameter for scaling function (C-PCM)'),
+                'cpcm_custom_vdw_radii':
+                    ('seq_fixed_str', 'custom vdw radii for C-PCM'),
                 'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
@@ -457,7 +490,7 @@ class ScfDriver:
         if 'filename' in scf_dict:
             self.filename = scf_dict['filename']
             if 'checkpoint_file' not in scf_dict:
-                self.checkpoint_file = f'{self.filename}.scf.h5'
+                self.checkpoint_file = f'{self.filename}_scf.h5'
 
         method_keywords = {
             key: val[0]
@@ -514,6 +547,15 @@ class ScfDriver:
                 min_basis = None
             min_basis = self.comm.bcast(min_basis, root=mpi_master())
 
+        if self.filename is not None and self.checkpoint_file is None:
+            self.checkpoint_file = f'{self.filename}_scf.h5'
+
+        # check RI-J
+        # for now, force DIIS for RI-J
+        # TODO: double check
+        if self.ri_coulomb:
+            self.acc_type = 'DIIS'
+
         # check molecule
         molecule_sanity_check(molecule)
 
@@ -521,7 +563,7 @@ class ScfDriver:
         dft_sanity_check(self, 'compute')
 
         # check pe setup
-        pe_sanity_check(self)
+        pe_sanity_check(self, molecule=molecule)
 
         # check solvation model setup
         solvation_model_sanity_check(self)
@@ -530,6 +572,7 @@ class ScfDriver:
             self.cpcm_drv.grid_per_sphere = self.cpcm_grid_per_sphere
             self.cpcm_drv.epsilon = self.cpcm_epsilon
             self.cpcm_drv.x = self.cpcm_x
+            self.cpcm_drv.custom_vdw_radii = self.cpcm_custom_vdw_radii
         else:
             self.cpcm_drv = None
 
@@ -562,7 +605,7 @@ class ScfDriver:
 
         # generate integration grid
         if self._dft:
-            print_libxc_reference(self.xcfun, self.ostream)
+            print_xc_reference(self.xcfun, self.ostream)
 
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
@@ -613,38 +656,51 @@ class ScfDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
+            cpcm_grid_t0 = tm.time()
+
             (self._cpcm_grid,
              self._cpcm_sw_func) = self.cpcm_drv.generate_cpcm_grid(molecule)
-            self._cpcm_Amat = self.cpcm_drv.form_matrix_A(
+
+            cpcm_local_precond = self.cpcm_drv.form_local_precond(
                 self._cpcm_grid, self._cpcm_sw_func)
-            self._cpcm_Bmat = self.cpcm_drv.form_matrix_B(
+
+            self._cpcm_precond = self.comm.allgather(cpcm_local_precond)
+            self._cpcm_precond = np.hstack(self._cpcm_precond)
+
+            self._cpcm_Bzvec = self.cpcm_drv.form_vector_Bz(
                 self._cpcm_grid, molecule)
-            self._cpcm_Bzvec = np.dot(self._cpcm_Bmat,
-                                      molecule.get_element_ids())
+
+            self._cpcm_q = None
+
+            self.ostream.print_info(
+                f'C-PCM grid with {self._cpcm_grid.shape[0]} points generated '
+                + f'in {tm.time() - cpcm_grid_t0:.2f} sec.')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         # set up polarizable embedding
         if self._pe:
 
             # TODO: print PyFraME info
 
-            pot_info = 'Reading polarizable embedding potential: {}'.format(
+            pot_info = 'Reading polarizable embedding: {}'.format(
                 self.pe_options['potfile'])
             self.ostream.print_info(pot_info)
             self.ostream.print_blank()
 
             assert_msg_critical(
-                self.embedding_options['settings']['embedding_method'] == 'PE',
+                self.embedding['settings']['embedding_method'] == 'PE',
                 'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
             )
 
-            settings = self.embedding_options['settings']
+            settings = self.embedding['settings']
 
             from .embedding import PolarizableEmbeddingSCF
 
             self._embedding_drv = PolarizableEmbeddingSCF(
                 molecule=molecule,
                 ao_basis=ao_basis,
-                options=self.embedding_options,
+                options=self.embedding,
                 comm=self.comm)
 
             emb_info = 'Embedding settings:'
@@ -655,16 +711,22 @@ class ScfDriver:
                     self.ostream.print_info(f'- {key:<15s} : {settings[key]}')
 
             if 'vdw' in settings:
-                self.ostream.print_info('{- "vdw":<15s}')
+                self.ostream.print_info(f'- {"vdw":<15s}')
                 for key in ['method', 'combination_rule']:
                     self.ostream.print_info(
                         f'  - {key:<15s} : {settings["vdw"][key]}')
 
             if 'induced_dipoles' in settings:
-                self.ostream.print_info('{- "induced_dipoles":<15s}')
-                for key in ['solver', 'threshold', 'max_iterations']:
-                    self.ostream.print_info(
-                        f'  - {key:<15s} : {settings["induced_dipoles"][key]}')
+                self.ostream.print_info(f'- {"induced_dipoles":<15s}')
+                default_values = {
+                    'solver': 'jacobi',
+                    'threshold': 1e-8,
+                    'max_iterations': 100,
+                    'mic': False,
+                }
+                for key, default in default_values.items():
+                    value = settings['induced_dipoles'].get(key, default)
+                    self.ostream.print_info(f'  - {key:<15s} : {value}')
 
             self.ostream.print_blank()
 
@@ -798,6 +860,12 @@ class ScfDriver:
             else:
                 den_mat = None
             den_mat = self.comm.bcast(den_mat, root=mpi_master())
+
+            if self._cpcm:
+                if self.restart and self.rank == mpi_master():
+                    self._cpcm_q = read_cpcm_charges(self.checkpoint_file)
+                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
+
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
         # two level C2-DIIS method
@@ -1202,7 +1270,7 @@ class ScfDriver:
             else:
                 name_string = get_random_string_parallel(self.comm)
                 base_fname = 'vlx_' + name_string
-            self.checkpoint_file = f'{base_fname}.scf.h5'
+            self.checkpoint_file = f'{base_fname}_scf.h5'
         self.write_checkpoint(molecule.get_element_ids(), basis.get_label())
 
         self.comm.barrier()
@@ -1217,14 +1285,18 @@ class ScfDriver:
             Name of the basis set.
         """
 
+        if self._skip_writing_h5:
+            return
+
         if self.rank == mpi_master():
             if self.checkpoint_file and isinstance(self.checkpoint_file, str):
                 self.molecular_orbitals.write_hdf5(self.checkpoint_file,
                                                    nuclear_charges, basis_set)
+                if self._cpcm:
+                    write_cpcm_charges(self.checkpoint_file, self._cpcm_q)
                 self.ostream.print_blank()
-                checkpoint_text = 'Checkpoint written to file: '
-                checkpoint_text += self.checkpoint_file
-                self.ostream.print_info(checkpoint_text)
+                self.ostream.print_info('Checkpoint written to file: ' +
+                                        self.checkpoint_file)
 
     def _comp_diis(self, molecule, ao_basis, min_basis, den_mat, profiler):
         """
@@ -1341,17 +1413,21 @@ class ScfDriver:
 
         self._density = tuple([x.copy() for x in den_mat])
 
-        self._print_debug_info('before screener')
         if self.rank == mpi_master():
             screener = T4CScreener()
             screener.partition(ao_basis, molecule, 'eri')
         else:
             screener = None
-        self._print_debug_info('after  screener')
         screener = self.comm.bcast(screener, root=mpi_master())
-        self._print_debug_info('after  bcast screener')
 
         profiler.check_memory_usage('Initial guess')
+
+        if self.ri_coulomb:
+            self._ri_drv = RIFockDriver(self.comm, self.ostream)
+            self._ri_drv.prepare_buffers(molecule,
+                                         ao_basis,
+                                         self.ri_auxiliary_basis,
+                                         verbose=True)
 
         e_grad = None
 
@@ -1381,6 +1457,9 @@ class ScfDriver:
 
             self._comp_full_fock(fock_mat, vxc_mat, V_emb, kin_mat, npot_mat)
 
+            profiler.stop_timer('ErrVec')
+            profiler.start_timer('CPCM')
+
             if self._cpcm:
                 if self.scf_type == 'restricted':
                     Cvec = self.cpcm_drv.form_vector_C(molecule, ao_basis,
@@ -1395,16 +1474,27 @@ class ScfDriver:
                     scale_f = -(self.cpcm_drv.epsilon - 1) / (
                         self.cpcm_drv.epsilon + self.cpcm_drv.x)
                     rhs = scale_f * (self._cpcm_Bzvec + Cvec)
-                    self._cpcm_q = np.linalg.solve(self._cpcm_Amat, rhs)
+                else:
+                    rhs = None
+                rhs = self.comm.bcast(rhs, root=mpi_master())
 
+                # in case number of C-PCM grid points do not match between
+                # cpcm_q and rhs, such as between previous and current
+                # geometries during an optimization, reset cpcm_q
+                if self._cpcm_q is not None and self._cpcm_q.size != rhs.size:
+                    self._cpcm_q = None
+
+                self._cpcm_q = self.cpcm_drv.cg_solve_parallel_direct(
+                    self._cpcm_grid, self._cpcm_sw_func, self._cpcm_precond,
+                    rhs, self._cpcm_q, self.cpcm_cg_thresh)
+
+                if self.rank == mpi_master():
                     e_sol = self.cpcm_drv.compute_solv_energy(
                         self._cpcm_Bzvec, Cvec, self._cpcm_q)
                     e_el += e_sol
                     self.cpcm_epol = e_sol
                 else:
-                    self._cpcm_q = None
                     self.cpcm_epol = None
-                self._cpcm_q = self.comm.bcast(self._cpcm_q, root=mpi_master())
 
                 Fock_sol = self.cpcm_drv.get_contribution_to_Fock(
                     molecule, ao_basis, self._cpcm_grid, self._cpcm_q)
@@ -1413,6 +1503,9 @@ class ScfDriver:
                     fock_mat[0] += Fock_sol
                     if self.scf_type != 'restricted':
                         fock_mat[1] += Fock_sol
+
+            profiler.stop_timer('CPCM')
+            profiler.start_timer('ErrVec')
 
             if (self.rank == mpi_master() and i > 0 and
                     self.level_shifting > 0.0):
@@ -1601,6 +1694,7 @@ class ScfDriver:
                     'scf_type': self.scf_type,
                     'scf_energy': self.scf_energy,
                     'restart': self.restart,
+                    'filename': self.filename,
                     # scf tensors
                     'S': S,
                     'C_alpha': C_alpha,
@@ -1617,6 +1711,12 @@ class ScfDriver:
 
                 # for backward compatibility only
                 self._scf_tensors['F'] = (F_alpha, F_beta)
+
+                if self.ri_coulomb:
+                    # RI info
+                    self._scf_tensors['ri_coulomb'] = self.ri_coulomb
+                    self._scf_tensors[
+                        'ri_auxiliary_basis'] = self.ri_auxiliary_basis
 
                 if self._dft:
                     # dft info
@@ -1669,14 +1769,19 @@ class ScfDriver:
             True if a graceful exit is needed, False otherwise.
         """
 
+        need_exit = False
+
         if self.program_end_time is not None:
             remaining_hours = (self.program_end_time -
                                datetime.now()).total_seconds() / 3600
             # exit gracefully when the remaining time is not sufficient to
             # complete the next iteration (plus 25% to be on the safe side).
             if remaining_hours < iter_in_hours * 1.25:
-                return True
-        return False
+                need_exit = True
+
+        need_exit = self.comm.bcast(need_exit, root=mpi_master())
+
+        return need_exit
 
     def _graceful_exit(self, molecule, basis):
         """
@@ -1823,20 +1928,6 @@ class ScfDriver:
 
         return npot_mat
 
-    def _print_debug_info(self, label):
-        """
-        Prints debug information.
-
-        :param label:
-            The label of debug information.
-        """
-
-        if self._debug:
-            profiler = Profiler()
-            self.ostream.print_info(f'==DEBUG==   available memory {label}: ' +
-                                    profiler.get_available_memory())
-            self.ostream.flush()
-
     def _comp_2e_fock(self,
                       den_mat,
                       molecule,
@@ -1961,16 +2052,19 @@ class ScfDriver:
 
         fock_mat = None
 
-        self._print_debug_info('before Fock build')
-
         if self.scf_type == 'restricted':
             # restricted SCF
-            self._print_debug_info('before rest Fock build')
-            fock_mat = fock_drv.compute(screener, den_mat_for_fock, fock_type,
-                                        exchange_scaling_factor, 0.0,
-                                        thresh_int)
-            self._print_debug_info('after  rest Fock build')
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'SCF driver: RI is only applicable to pure DFT functional')
 
+            if self.ri_coulomb and fock_type == 'j':
+                fock_mat = self._ri_drv.compute(den_mat_for_fock, 'j')
+            else:
+                fock_mat = fock_drv.compute(screener, den_mat_for_fock,
+                                            fock_type, exchange_scaling_factor,
+                                            0.0, thresh_int)
             fock_mat_np = fock_mat.to_numpy()
             fock_mat = Matrix()
 
@@ -1980,10 +2074,8 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before rest erf Fock build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_fock, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  rest erf Fock build')
 
                 fock_mat_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2000,14 +2092,20 @@ class ScfDriver:
 
         else:
             # unrestricted SCF or restricted open-shell SCF
+
+            if self.ri_coulomb:
+                assert_msg_critical(
+                    fock_type == 'j',
+                    'SCF driver: RI is only applicable to pure DFT functional')
+
             if fock_type == 'j':
                 # for pure functional
                 # den_mat_for_Jab is D_total
-                self._print_debug_info('before unrest Fock J build')
-                fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j', 0.0,
-                                            0.0, thresh_int)
-                self._print_debug_info('after  unrest Fock J build')
-
+                if self.ri_coulomb:
+                    fock_mat = self._ri_drv.compute(den_mat_for_Jab, 'j')
+                else:
+                    fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
+                                                0.0, 0.0, thresh_int)
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
@@ -2015,29 +2113,23 @@ class ScfDriver:
                 fock_mat_b_np = J_ab_np.copy()
 
             else:
-                self._print_debug_info('before unrest Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_a_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock Kb build')
 
                 K_b_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest Fock J build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Jab, 'j',
                                             exchange_scaling_factor, 0.0,
                                             thresh_int)
-                self._print_debug_info('after  unrest Fock J build')
 
                 J_ab_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2047,18 +2139,14 @@ class ScfDriver:
 
             if need_omega:
                 # for range-separated functional
-                self._print_debug_info('before unrest erf Fock Ka build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Ka, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Ka build')
 
                 fock_mat_a_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
 
-                self._print_debug_info('before unrest erf Fock Kb build')
                 fock_mat = fock_drv.compute(screener, den_mat_for_Kb, 'kx_rs',
                                             erf_k_coef, omega, thresh_int)
-                self._print_debug_info('after  unrest erf Fock Kb build')
 
                 fock_mat_b_np -= fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -2075,8 +2163,6 @@ class ScfDriver:
                 fock_mat = [fock_mat_a_np, fock_mat_b_np]
             else:
                 fock_mat = None
-
-        self._print_debug_info('after  Fock build')
 
         if self.timing:
             profiler.add_timing_info('FockERI', tm.time() - eri_t0)
@@ -2569,6 +2655,10 @@ class ScfDriver:
             self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
@@ -2578,6 +2668,10 @@ class ScfDriver:
             cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
+        if self.dispersion:
+            cur_str = 'Dispersion Correction           : D4'
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         if self._cpcm:
             cur_str = 'Solvation Model                 : '
             cur_str += 'C-PCM with ISWIG Discretization'
@@ -2585,8 +2679,11 @@ class ScfDriver:
             cur_str = 'C-PCM Dielectric Constant       : '
             cur_str += f'{self.cpcm_drv.epsilon}'
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'C-PCM Points per Atomic Sphere  : '
-            cur_str += f'{self.cpcm_drv.grid_per_sphere}'
+            cur_str = 'C-PCM Points per Hydrogen Sphere: '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere[1]}'
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'C-PCM Points per non-H Sphere   : '
+            cur_str += f'{self.cpcm_drv.grid_per_sphere[0]}'
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.electric_field is not None:
@@ -2888,11 +2985,14 @@ class ScfDriver:
             The AO basis set.
         """
 
-        if self.checkpoint_file is None:
+        if self._skip_writing_h5:
             return
 
-        final_h5_fname = str(
-            Path(self.checkpoint_file).with_suffix('.results.h5'))
+        if self.filename is None:
+            return
+
+        # Final hdf5 file to save scf results
+        final_h5_fname = f'{self.filename}.h5'
 
         if self._dft:
             xc_label = self.xcfun.get_func_label()
@@ -2910,6 +3010,5 @@ class ScfDriver:
                                   self.history)
 
         self.ostream.print_blank()
-        checkpoint_text = 'SCF results written to file: '
-        checkpoint_text += final_h5_fname
-        self.ostream.print_info(checkpoint_text)
+        self.ostream.print_info('SCF results written to file: ' +
+                                final_h5_fname)

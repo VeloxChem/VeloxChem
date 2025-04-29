@@ -2,7 +2,7 @@
     "atoms": {
         "0": {
             "type": "c2",
-            "name": "C1",
+            "name": "C11",
             "mass": 12.0,
             "charge": -0.337857,
             "sigma": 0.3315212309943831,
@@ -11,7 +11,7 @@
         },
         "1": {
             "type": "c2",
-            "name": "C2",
+            "name": "C21",
             "mass": 12.0,
             "charge": -0.3485849999999999,
             "sigma": 0.3315212309943831,
@@ -20,7 +20,7 @@
         },
         "2": {
             "type": "ha",
-            "name": "H1",
+            "name": "H11",
             "mass": 1.007825,
             "charge": 0.170322,
             "sigma": 0.262547852235958,
@@ -29,7 +29,7 @@
         },
         "3": {
             "type": "ha",
-            "name": "H2",
+            "name": "H21",
             "mass": 1.007825,
             "charge": 0.170175,
             "sigma": 0.262547852235958,
@@ -38,7 +38,7 @@
         },
         "4": {
             "type": "ha",
-            "name": "H3",
+            "name": "H31",
             "mass": 1.007825,
             "charge": 0.173394,
             "sigma": 0.262547852235958,
@@ -47,7 +47,7 @@
         },
         "5": {
             "type": "ha",
-            "name": "H4",
+            "name": "H41",
             "mass": 1.007825,
             "charge": 0.172551,
             "sigma": 0.262547852235958,
@@ -56,7 +56,7 @@
         },
         "6": {
             "type": "oh",
-            "name": "O",
+            "name": "O2",
             "mass": 15.994915,
             "charge": -0.813698,
             "sigma": 0.3242871334030835,
@@ -66,7 +66,7 @@
         },
         "7": {
             "type": "ho",
-            "name": "H2",
+            "name": "H22",
             "mass": 1.007825,
             "charge": 0.406024,
             "sigma": 0.053792464601313685,
@@ -76,7 +76,7 @@
         },
         "8": {
             "type": "ho",
-            "name": "H1",
+            "name": "H12",
             "mass": 1.007825,
             "charge": 0.407674,
             "sigma": 0.053792464601313685,
@@ -89,43 +89,43 @@
         "(0, 1)": {
             "type": "harmonic",
             "force_constant": 403170.23999999993,
-            "equilibrium": 0.13337567181836424,
+            "equilibrium": 0.13340000000000002,
             "comment": "c2-c2"
         },
         "(0, 2)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(0, 3)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(1, 4)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(1, 5)": {
             "type": "harmonic",
             "force_constant": 328192.9599999999,
-            "equilibrium": 0.10850414528408164,
+            "equilibrium": 0.10880000000000001,
             "comment": "c2-ha"
         },
         "(6, 8)": {
             "type": "harmonic",
             "force_constant": 462750.3999999999,
-            "equilibrium": 0.09699989466483408,
+            "equilibrium": 0.09572000000000001,
             "comment": "ow-hw"
         },
         "(6, 7)": {
             "type": "harmonic",
             "force_constant": 462750.3999999999,
-            "equilibrium": 0.09699989466483408,
+            "equilibrium": 0.09572000000000001,
             "comment": "ow-hw"
         }
     },
@@ -133,43 +133,43 @@
         "(0, 1, 4)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(0, 1, 5)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(1, 0, 2)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(1, 0, 3)": {
             "type": "harmonic",
             "force_constant": 421.7472,
-            "equilibrium": 120.49799730796282,
+            "equilibrium": 120.43,
             "comment": "c2-c2-ha"
         },
         "(2, 0, 3)": {
             "type": "harmonic",
             "force_constant": 315.47360000000003,
-            "equilibrium": 119.00400538260389,
+            "equilibrium": 116.9,
             "comment": "ha-c2-ha"
         },
         "(4, 1, 5)": {
             "type": "harmonic",
             "force_constant": 315.47360000000003,
-            "equilibrium": 119.00400538260389,
+            "equilibrium": 116.9,
             "comment": "ha-c2-ha"
         },
         "(7, 6, 8)": {
             "type": "harmonic",
             "force_constant": 836.8000000000001,
-            "equilibrium": 109.47105579356159,
+            "equilibrium": 104.52,
             "comment": "hw-ow-hw"
         }
     },

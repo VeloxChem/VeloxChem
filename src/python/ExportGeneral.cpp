@@ -1,26 +1,34 @@
 //
-//                              VELOXCHEM
-//         ----------------------------------------------------
-//                     An Electronic Structure Code
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
 //
-//  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+//  SPDX-License-Identifier: BSD-3-Clause
 //
-//  SPDX-License-Identifier: LGPL-3.0-or-later
+//  Copyright 2018-2025 VeloxChem developers
 //
-//  This file is part of VeloxChem.
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
 //
-//  VeloxChem is free software: you can redistribute it and/or modify it under
-//  the terms of the GNU Lesser General Public License as published by the Free
-//  Software Foundation, either version 3 of the License, or (at your option)
-//  any later version.
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
 //
-//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-//  License for more details.
-//
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ExportGeneral.hpp"
 
@@ -32,12 +40,17 @@
 #include "AtomicRadii.hpp"
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
+#include "CpcmUtils.hpp"
+#include "ErrorHandler.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "SphericalMomentum.hpp"
 #include "StringFormat.hpp"
 #include "TensorComponents.hpp"
 #include "TensorLabels.hpp"
+#include "T3FlatBuffer.hpp"
+#include "T3RectFlatBuffer.hpp"
+#include "MathFunc.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -194,7 +207,12 @@ export_general(py::module &m) -> void
           py::overload_cast<const std::vector<CGtoBlock> &, const std::vector<CGtoBlock> &>(&omp::make_work_tasks),
           "Gets work tasks for given two vectors of basis function blocks.");
     m.def("make_diag_work_tasks", &omp::make_diag_work_group, "Gets work tasks for diagonal integrals.");
-    m.def("make_work_group", &omp::make_work_group, "Gets work group for ERIs.");
+    m.def("make_work_group",
+          py::overload_cast<const std::vector<CBlockedGtoPairBlock>&, const int, const int>(&omp::make_work_group),
+          "Gets work group for ERIs.");
+    m.def("make_work_group",
+          py::overload_cast<const std::vector<CBlockedGtoPairBlock>&, const int, const int, const int>(&omp::make_work_group),
+          "Gets work group for ERIs.");
     m.def("make_bra_ket_work_group", &omp::make_bra_ket_work_group, "Gets work group for ERIs.");
     m.def("partition_atoms", &omp::partition_atoms, "Get atomic indices of partitioned atoms list.");
 
@@ -204,6 +222,145 @@ export_general(py::module &m) -> void
     m.def("spherical_momentum_d_factors", spher_mom::transformation_factors<2>, "Gets transformation factors for D type spherical momentum.");
     m.def("spherical_momentum_f_factors", spher_mom::transformation_factors<3>, "Gets transformation factors for F type spherical momentum.");
     m.def("spherical_momentum_g_factors", spher_mom::transformation_factors<4>, "Gets transformation factors for G type spherical momentum.");
+
+    // exposing functions from CpcmUtils.hpp
+    m.def("cpcm_local_matrix_A_diagonals",
+          [](const py::array_t<double>& grid_data,
+             const py::array_t<double>& sw_func,
+             const int                  grid_index_start,
+             const int                  grid_index_end) -> py::array_t<double> {
+              std::string errstyle("cpcm_form_matrix_A: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_data.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(sw_func.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+              std::string errsize("cpcm_form_matrix_A: Inconsistent sizes");
+              errors::assertMsgCritical(grid_data.shape(0) == sw_func.shape(0), errsize);
+              const auto npoints = static_cast<int>(grid_data.shape(0));
+              const auto ncols = static_cast<int>(grid_data.shape(1));
+              std::string errindex("cpcm_form_matrix_A: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto Adiag = cpcm::local_matrix_A_diagonals(grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data());
+              return vlx_general::pointer_to_numpy(Adiag.data(), {static_cast<int>(Adiag.size())});
+          },
+          "Form local diagonals of C-PCM matrix A.",
+          "grid_data"_a,
+          "sw_func"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a);
+
+    m.def("cpcm_local_matrix_A_dot_vector",
+          [](const py::array_t<double>& grid_data,
+             const py::array_t<double>& sw_func,
+             const py::array_t<double>& vector,
+             const int                  grid_index_start,
+             const int                  grid_index_end) -> py::array_t<double> {
+              std::string errstyle("cpcm_local_matrix_A_dot_vector: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_data.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(sw_func.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(vector.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+              std::string errsize("cpcm_local_matrix_A_dot_vector: Inconsistent sizes");
+              errors::assertMsgCritical(grid_data.shape(0) == sw_func.shape(0), errsize);
+              errors::assertMsgCritical(grid_data.shape(0) == vector.shape(0), errsize);
+              const auto npoints = static_cast<int>(grid_data.shape(0));
+              const auto ncols = static_cast<int>(grid_data.shape(1));
+              std::string errindex("cpcm_local_matrix_A_dot_vector: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto prod = cpcm::local_matrix_A_dot_vector(npoints, grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data(), vector.data());
+              return vlx_general::pointer_to_numpy(prod.data(), {static_cast<int>(prod.size())});
+          },
+          "Form local product of C-PCM matrix A and a vector.",
+          "grid_data"_a,
+          "sw_func"_a,
+          "vector"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a);
+
+    m.def("cpcm_comp_grad_Aij",
+          [](const py::array_t<double>& grid_coords,
+             const py::array_t<double>& zeta,
+             const py::array_t<int>&    atom_indices,
+             const py::array_t<double>& q,
+             const int                  grid_index_start,
+             const int                  grid_index_end,
+             const int                  natoms) -> py::array_t<double> {
+              std::string errstyle("cpcm_comp_grad_Aij: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_coords.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(zeta.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+              auto        c_style_4 = py::detail::check_flags(q.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+              std::string errsize("cpcm_comp_grad_Aij: Inconsistent sizes");
+              errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
+              const auto npoints = static_cast<int>(grid_coords.shape(0));
+              std::string errindex("cpcm_comp_grad_Aij: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto grad_Amat = cpcm::comp_grad_Aij(grid_coords.data(), zeta.data(), atom_indices.data(), q.data(),
+                                                   grid_index_start, grid_index_end, npoints, natoms);
+              return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
+          },
+          "Compute C-PCM gradient for Aij.",
+          "grid_coords"_a,
+          "zeta"_a,
+          "atom_indices"_a,
+          "q"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a,
+          "natoms"_a);
+
+    m.def("cpcm_comp_grad_Aii",
+          [](const py::array_t<double>& grid_coords,
+             const py::array_t<double>& zeta,
+             const py::array_t<double>& sw_f,
+             const py::array_t<int>&    atom_indices,
+             const py::array_t<double>& q,
+             const int                  grid_index_start,
+             const int                  grid_index_end,
+             const py::array_t<double>& atom_coords,
+             const py::array_t<double>& atom_radii) -> py::array_t<double> {
+              std::string errstyle("cpcm_comp_grad_Aii: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_coords.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(zeta.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(sw_f.ptr(), py::array::c_style);
+              auto        c_style_4 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+              auto        c_style_5 = py::detail::check_flags(q.ptr(), py::array::c_style);
+              auto        c_style_6 = py::detail::check_flags(atom_coords.ptr(), py::array::c_style);
+              auto        c_style_7 = py::detail::check_flags(atom_radii.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+              errors::assertMsgCritical((c_style_5 && c_style_6 && c_style_7), errstyle);
+              std::string errsize("cpcm_comp_grad_Aii: Inconsistent sizes");
+              errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == sw_f.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
+              errors::assertMsgCritical(atom_coords.shape(0) == atom_radii.shape(0), errsize);
+              errors::assertMsgCritical(atom_coords.shape(1) == 3, errsize);
+              const auto npoints = static_cast<int>(grid_coords.shape(0));
+              const auto natoms = static_cast<int>(atom_coords.shape(0));
+              std::string errindex("cpcm_comp_grad_Aii: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto grad_Amat = cpcm::comp_grad_Aii(grid_coords.data(), zeta.data(), sw_f.data(), atom_indices.data(), q.data(),
+                                                   atom_coords.data(), atom_radii.data(), grid_index_start, grid_index_end, npoints, natoms);
+              return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
+          },
+          "Compute C-PCM gradient for Aii.",
+          "grid_coords"_a,
+          "zeta"_a,
+          "sw_f"_a,
+          "atom_indices"_a,
+          "q"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a,
+          "atom_coords"_a,
+          "atom_radii"_a);
 
     // TPoint class
     PyClass<TPoint<double>>(m, "Point")
@@ -222,6 +379,66 @@ export_general(py::module &m) -> void
         .def("__ne__", [](const TPoint<double> &self, const TPoint<double> &other) { return self != other; })
         .def("__copy__", [](const TPoint<double> &self) { return TPoint<double>(self); })
         .def("__deepcopy__", [](const TPoint<double> &self, py::dict) { return TPoint<double>(self); });
+    
+    // CT3FlatBuffer class
+    PyClass<CT3FlatBuffer<double>>(m, "T3FlatBuffer")
+        .def(py::init<>())
+        .def(py::init<const std::vector<size_t>&, const size_t>())
+        .def(py::init<const CT3FlatBuffer<double> &>())
+        .def("indices", &CT3FlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
+        .def("mask_indices", &CT3FlatBuffer<double>::mask_indices, "Gets mask of indices along x axis of tensor.")
+        .def(
+            "values",
+             [](const CT3FlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
+                 const auto ndim = self.width();
+                 const auto nelems = static_cast<py::ssize_t>(ndim * (ndim + 1) / 2);
+                 const auto tdim  = static_cast<py::ssize_t>(sizeof(double));
+                 return py::array_t<double>(
+                                            std::vector<py::ssize_t>({nelems,}), std::vector<py::ssize_t>({tdim, }), self.data(index));
+            },
+            "Gets slice of tensor values along y,z axes.")
+        .def("value",
+             [](const CT3FlatBuffer<double> &self, const size_t index, const size_t i, const size_t j) -> double {
+                if (i <= j)
+                {
+                    return self.data(index)[mathfunc::uplo_rm_index(i, j, self.width())];
+                }
+                else
+                {
+                    return self.data(index)[mathfunc::uplo_rm_index(j, i, self.width())];
+                }
+             },
+             "Gets tensor element value.")
+        .def("__copy__", [](CT3FlatBuffer<double> &self) { return CT3FlatBuffer<double>(self); })
+        .def("__deepcopy__", [](const CT3FlatBuffer<double> &self, py::dict) { return CT3FlatBuffer<double>(self); });
+    
+    // CT3RectFlatBuffer class
+    PyClass<CT3RectFlatBuffer<double>>(m, "T3RectFlatBuffer")
+        .def(py::init<>())
+        .def(py::init<const std::vector<size_t>&, const std::map<size_t, size_t>&, const size_t>())
+        .def(py::init<const CT3RectFlatBuffer<double> &>())
+        .def("indices", &CT3RectFlatBuffer<double>::indices, "Gets indices vector along x axis of tensor.")
+        .def("mask_indices", &CT3RectFlatBuffer<double>::mask_indices, "Gets masked indices along y axis of tensor.")
+        .def("width", &CT3RectFlatBuffer<double>::width, "Gets width along z axis of tensor.")
+        .def(
+            "values",
+             [](const CT3RectFlatBuffer<double> &self, const size_t index) -> py::array_t<double> {
+                 const auto nrows = self.mask_indices().size();
+                 const auto ncols = self.width();
+                 const auto nelems = static_cast<py::ssize_t>(nrows * ncols);
+                 const auto tdim  = static_cast<py::ssize_t>(sizeof(double));
+                 return py::array_t<double>(
+                                            std::vector<py::ssize_t>({nelems,}), std::vector<py::ssize_t>({tdim, }), self.data(index));
+            },
+            "Gets slice of tensor values along y,z axes.")
+        .def("value",
+             [](const CT3RectFlatBuffer<double> &self, const size_t index, const size_t i, const size_t j) -> double {
+                const auto mask = self.mask_indices();
+                return self.data(index)[mask.at(i) * self.width() + j];
+             },
+             "Gets tensor element value.")
+        .def("__copy__", [](CT3RectFlatBuffer<double> &self) { return CT3RectFlatBuffer<double>(self); })
+        .def("__deepcopy__", [](const CT3RectFlatBuffer<double> &self, py::dict) { return CT3RectFlatBuffer<double>(self); });
 }
 
 }  // namespace vlx_general

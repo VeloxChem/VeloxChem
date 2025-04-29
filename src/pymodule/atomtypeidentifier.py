@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 from collections import defaultdict
@@ -179,14 +187,14 @@ class AtomTypeIdentifier:
                 if self.connectivity_matrix[i][j] == 1:
                     self.graph.add_edge(i, j)
 
-        all_cycles = list(nx.simple_cycles(self.graph, length_bound=6))
+        all_cycles = list(nx.simple_cycles(self.graph, length_bound=10))
 
         # Sort by cycle length
         all_cycles = sorted(all_cycles, key=len)
 
-        # Filter only the cycles of size 3 to 6
+        # Filter only the cycles of size 3 to 10
         filtered_cycles = [
-            cycle for cycle in all_cycles if 3 <= len(cycle) <= 6
+            cycle for cycle in all_cycles if 3 <= len(cycle) <= 10
         ]
 
         # Remove super-cycles (cycles that contain smaller cycles)
@@ -262,6 +270,8 @@ class AtomTypeIdentifier:
                     else:
                         all_nitrogens_likely_sp2 = False
                         break
+
+            # TODO: add aromaticity detection for rings with 7-10 atoms
 
             if len(cycle) == 6 and only_carbon_nitrogen_in_cycle:
 
@@ -2033,19 +2043,11 @@ class AtomTypeIdentifier:
 
         return (int(at_match.group()) if at_match else 0)
 
-    @staticmethod
-    def measure_length(v1, v2):
-        """
-        Calculates the distance between v1 and v2
-        """
-
-        return np.linalg.norm(np.array(v1) - np.array(v2))
-
-    def identify_equivalences(self, depth=20):
+    def identify_equivalences(self, depth=10):
         """
         Identifies equivalent atoms in the molecule.
         The depth parameter specifies how many bonds are considered for the equivalence.
-        The default value is 4.
+        The default value is 10.
 
         :param depth:
             Depth of the equivalence search

@@ -1,29 +1,85 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #ifndef OverlapFunc_hpp
 #define OverlapFunc_hpp
 
 #include <array>
 
 #include "GtoBlock.hpp"
+#include "OverlapRecII.hpp"
+#include "OverlapRecIH.hpp"
+#include "OverlapRecID.hpp"
+#include "OverlapRecIF.hpp"
+#include "OverlapRecIG.hpp"
+#include "OverlapRecIP.hpp"
+#include "OverlapRecIS.hpp"
+#include "OverlapRecHI.hpp"
+#include "OverlapRecHH.hpp"
+#include "OverlapRecHD.hpp"
+#include "OverlapRecHF.hpp"
+#include "OverlapRecHG.hpp"
+#include "OverlapRecHP.hpp"
+#include "OverlapRecHS.hpp"
+#include "OverlapRecDI.hpp"
+#include "OverlapRecDH.hpp"
 #include "OverlapRecDD.hpp"
 #include "OverlapRecDF.hpp"
 #include "OverlapRecDG.hpp"
 #include "OverlapRecDP.hpp"
 #include "OverlapRecDS.hpp"
+#include "OverlapRecFI.hpp"
+#include "OverlapRecFH.hpp"
 #include "OverlapRecFD.hpp"
 #include "OverlapRecFF.hpp"
 #include "OverlapRecFG.hpp"
 #include "OverlapRecFP.hpp"
 #include "OverlapRecFS.hpp"
+#include "OverlapRecGI.hpp"
+#include "OverlapRecGH.hpp"
 #include "OverlapRecGD.hpp"
 #include "OverlapRecGF.hpp"
 #include "OverlapRecGG.hpp"
 #include "OverlapRecGP.hpp"
 #include "OverlapRecGS.hpp"
+#include "OverlapRecPI.hpp"
+#include "OverlapRecPH.hpp"
 #include "OverlapRecPD.hpp"
 #include "OverlapRecPF.hpp"
 #include "OverlapRecPG.hpp"
 #include "OverlapRecPP.hpp"
 #include "OverlapRecPS.hpp"
+#include "OverlapRecSI.hpp"
+#include "OverlapRecSH.hpp"
 #include "OverlapRecSD.hpp"
 #include "OverlapRecSF.hpp"
 #include "OverlapRecSG.hpp"
@@ -157,6 +213,20 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 0) && (ket_angmom == 5))
+    {
+        ovlrec::comp_overlap_sh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 0))
+    {
+        ovlrec::comp_overlap_hs(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 1) && (ket_angmom == 4))
     {
         ovlrec::comp_overlap_pg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
@@ -185,6 +255,34 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 0) && (ket_angmom == 6))
+    {
+        ovlrec::comp_overlap_si(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 0))
+    {
+        ovlrec::comp_overlap_is(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 1) && (ket_angmom == 5))
+    {
+        ovlrec::comp_overlap_ph(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 1))
+    {
+        ovlrec::comp_overlap_hp(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 2) && (ket_angmom == 4))
     {
         ovlrec::comp_overlap_dg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
@@ -206,6 +304,34 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 1) && (ket_angmom == 6))
+    {
+        ovlrec::comp_overlap_pi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 1))
+    {
+        ovlrec::comp_overlap_ip(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 2) && (ket_angmom == 5))
+    {
+        ovlrec::comp_overlap_dh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 2))
+    {
+        ovlrec::comp_overlap_hd(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 3) && (ket_angmom == 4))
     {
         ovlrec::comp_overlap_fg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
@@ -220,9 +346,107 @@ compute(T&                               distributor,
         return;
     }
 
+    if ((bra_angmom == 2) && (ket_angmom == 6))
+    {
+        ovlrec::comp_overlap_di(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 2))
+    {
+        ovlrec::comp_overlap_id(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 5))
+    {
+        ovlrec::comp_overlap_fh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 3))
+    {
+        ovlrec::comp_overlap_hf(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
     if ((bra_angmom == 4) && (ket_angmom == 4))
     {
         ovlrec::comp_overlap_gg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 3) && (ket_angmom == 6))
+    {
+        ovlrec::comp_overlap_fi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 3))
+    {
+        ovlrec::comp_overlap_if(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 4) && (ket_angmom == 5))
+    {
+        ovlrec::comp_overlap_gh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 5) && (ket_angmom == 4))
+    {
+        ovlrec::comp_overlap_hg(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 4) && (ket_angmom == 6))
+    {
+        ovlrec::comp_overlap_gi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 4))
+    {
+        ovlrec::comp_overlap_ig(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 5) && (ket_angmom == 5))
+    {
+        ovlrec::comp_overlap_hh(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 5) && (ket_angmom == 6))
+    {
+        ovlrec::comp_overlap_hi(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+
+    if ((bra_angmom == 6) && (ket_angmom == 5))
+    {
+        ovlrec::comp_overlap_ih(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
+
+        return;
+    }
+    
+    if ((bra_angmom == 6) && (ket_angmom == 6))
+    {
+        ovlrec::comp_overlap_ii(distributor, bra_gto_block, ket_gto_block, bra_indices, ket_indices, bra_eq_ket);
 
         return;
     }

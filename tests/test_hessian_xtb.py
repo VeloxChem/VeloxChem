@@ -12,7 +12,7 @@ from veloxchem.xtbhessiandriver import XtbHessianDriver
 class TestXtbHessianDriver:
 
     @pytest.mark.skipif(not XtbDriver.is_available(),
-                        reason='xtb not available')
+                        reason='xtb-python not available')
     def test_xtb_hessian_driver(self):
 
         here = Path(__file__).parent

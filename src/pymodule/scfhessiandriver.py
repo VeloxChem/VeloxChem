@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
 import time as tm
@@ -56,7 +64,7 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check)
+                           dft_sanity_check, pe_sanity_check)
 
 
 class ScfHessianDriver(HessianDriver):
@@ -295,7 +303,7 @@ class ScfHessianDriver(HessianDriver):
 
         assert_msg_critical(
             self.scf_driver.scf_type == 'restricted',
-            'ScfHessianDriver: Analytical gradient only implemented ' +
+            'ScfHessianDriver: Analytical Hessian only implemented ' +
             'for restricted case')
 
         assert_msg_critical(
@@ -306,6 +314,12 @@ class ScfHessianDriver(HessianDriver):
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_tensors)
         dft_sanity_check(self, 'compute')
+
+        # use determine_xc_hessian_grid_level here to ensure early exit for
+        # unsupported cases
+        if self._dft:
+            self.determine_xc_hessian_grid_level(
+                molecule, get_default_grid_level(self.scf_driver.xcfun))
 
         self.ostream.print_info('Computing analytical Hessian...')
         self.ostream.print_blank()
@@ -341,12 +355,32 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
+        # TODO: double check analytical Hessian with PE
+        assert_msg_critical(
+            not self.scf_driver._pe,
+            'ScfHessianDriver: Analytical Hessian with ' +
+            'polarizable embedding (PE) not yet available')
+
+        if self.scf_driver._pe:
+
+            # TODO: double check
+            cphf_solver.embedding = self.scf_driver.embedding
+            pe_sanity_check(cphf_solver, molecule=molecule)
+
+            from .embedding import PolarizableEmbeddingHess
+            cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
+                molecule=molecule,
+                ao_basis=ao_basis,
+                options=self.scf_driver.embedding,
+                comm=self.comm,
+                density=density * 2)
+
         # TODO: double check propagation of cphf settings
-        profiler_keywords = {
+        cphf_keywords = {
             'timing', 'profiling', 'memory_profiling', 'memory_tracing',
-            'use_subcomms'
+            'use_subcomms', 'filename'
         }
-        for key in profiler_keywords:
+        for key in cphf_keywords:
             setattr(cphf_solver, key, getattr(self, key))
 
         cphf_solver.compute(molecule, ao_basis, scf_tensors)
@@ -659,11 +693,11 @@ class ScfHessianDriver(HessianDriver):
             grid_level = (get_default_grid_level(self.scf_driver.xcfun)
                           if self.scf_driver.grid_level is None else
                           self.scf_driver.grid_level)
-            # make sure to use high grid level for DFT Hessian
-            if molecule.get_charge() == 0:
-                grid_level = max(6, grid_level)
-            else:
-                grid_level = max(7, grid_level)
+
+            # determine grid level for XC Hessian
+            grid_level = self.determine_xc_hessian_grid_level(
+                molecule, grid_level)
+
             grid_drv.set_level(grid_level)
             mol_grid = grid_drv.generate(molecule)
 
@@ -759,6 +793,18 @@ class ScfHessianDriver(HessianDriver):
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 
+            # add pe contr to hessian
+            if self.scf_driver._pe:
+                from .embedding import PolarizableEmbeddingHess
+                embedding_drv = PolarizableEmbeddingHess(
+                    molecule=molecule,
+                    ao_basis=ao_basis,
+                    options=self.scf_driver.embedding,
+                    density=density * 2,
+                    comm=self.comm)
+                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
+                    density_matrix=density * 2)
+
             if self._dft:
                 self.hessian += hessian_dft_xc
 
@@ -771,6 +817,55 @@ class ScfHessianDriver(HessianDriver):
         # Calculate the gradient of the dipole moment for IR intensities
         if self.do_dipole_gradient:
             self.compute_dipole_gradient(molecule, ao_basis, dist_cphf_ov)
+
+    def determine_xc_hessian_grid_level(self, molecule, grid_level):
+        """
+        Determines XC Hessian grid level.
+
+        :param molecule:
+            The molecule.
+        :param grid_level:
+            The input grid_level.
+
+        :return:
+            The recommended grid_level for XC Hessian.
+        """
+
+        # make sure to use high grid level for DFT Hessian
+        # see J. Chem. Phys. 119, 12763-12768 (2003)
+
+        # determine grid level for XC Hessian based on default_grid_level
+        # and max_elem_id
+
+        default_grid_level = get_default_grid_level(self.scf_driver.xcfun)
+        elem_ids = molecule.get_identifiers()
+        max_elem_id = max(elem_ids)
+
+        errmsg = 'Hessian calculation with '
+        errmsg += self.scf_driver.xcfun.get_func_label().upper()
+        errmsg += f' functional and max element id {max_elem_id} '
+        errmsg += 'is not supported.'
+
+        if default_grid_level <= 4:
+            if max_elem_id <= 18:
+                grid_level = max(6, grid_level)
+            elif max_elem_id <= 36:
+                grid_level = max(7, grid_level)
+            else:
+                assert_msg_critical(False, errmsg)
+
+        elif default_grid_level in [5, 6]:
+            if max_elem_id <= 10:
+                grid_level = max(6, grid_level)
+            elif max_elem_id <= 18:
+                grid_level = max(7, grid_level)
+            else:
+                assert_msg_critical(False, errmsg)
+
+        else:
+            assert_msg_critical(False, errmsg)
+
+        return grid_level
 
     def compute_dipole_gradient(self, molecule, ao_basis, dist_cphf_ov):
         """

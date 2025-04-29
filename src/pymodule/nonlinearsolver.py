@@ -1,39 +1,52 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 import numpy as np
 import time as tm
 import math
+import sys
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import TwoCenterElectronRepulsionDriver
+from .veloxchemlib import SubMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
+from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
+from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
@@ -43,6 +56,11 @@ from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+
+try:
+    from scipy.linalg import lu_factor, lu_solve
+except ImportError:
+    pass
 
 
 class NonlinearSolver:
@@ -90,6 +108,11 @@ class NonlinearSolver:
         # ERI settings
         self.eri_thresh = 1.0e-15
         self.batch_size = None
+
+        # RI-J
+        self.ri_coulomb = False
+        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        self._ri_drv = None
 
         # dft
         self._dft = False
@@ -158,6 +181,8 @@ class NonlinearSolver:
                 '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri_coulomb': ('bool', 'use RI-J approximation'),
+                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             },
@@ -249,7 +274,7 @@ class NonlinearSolver:
         if 'filename' in rsp_dict:
             self.filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}.rsp.h5'
+                self.checkpoint_file = f'{self.filename}_rsp.h5'
 
         method_keywords = {
             key: val[0]
@@ -291,6 +316,12 @@ class NonlinearSolver:
         else:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
+
+        if self.ri_coulomb:
+            self._ri_drv = RIFockDriver(self.comm, self.ostream)
+            self._ri_drv.prepare_buffers(molecule, basis,
+                                         self.ri_auxiliary_basis,
+                                         verbose=False)
 
         return {
             'screening': screening,
@@ -465,15 +496,15 @@ class NonlinearSolver:
 
         mode_is_valid = mode.lower() in [
             'crf', 'tpa', 'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf',
-            'shg', 'shg_red', 'tpa_quad'
+            'shg', 'shg_red', 'tpa_quad', '3pa', '3pa_ii'
         ]
         assert_msg_critical(mode_is_valid,
                             'NonlinearSolver: Invalid mode ' + mode.lower())
 
-        mode_is_cubic = mode.lower() in ['crf', 'tpa']
+        mode_is_cubic = mode.lower() in ['crf', 'tpa', '3pa']
         mode_is_quadratic = mode.lower() in [
             'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg',
-            'shg_red', 'tpa_quad'
+            'shg_red', 'tpa_quad', '3pa_ii'
         ]
 
         # determine number of batches
@@ -513,10 +544,21 @@ class NonlinearSolver:
                     # 6 third-order densities per frequency
                     size_1, size_2, size_3 = 12, 24, 6
 
+                elif mode.lower() == '3pa':
+                    # 4 first-order densities per frequency
+                    # 9 second-order densities per frequency
+                    # 6 third-order densities per frequency
+                    size_1, size_2, size_3 = 4, 9, 6
+
                 elif mode.lower() == 'crf_ii':
                     # 12 first-order densities per frequency
                     # 6 second-order densities per frequency
                     size_1, size_2 = 12, 2
+
+                elif mode.lower() == '3pa_ii':
+                    # 13 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 13, 6
 
                 elif mode.lower() == 'tpa_ii':
                     # 36 first-order densities per frequency
@@ -524,12 +566,12 @@ class NonlinearSolver:
                     size_1, size_2 = 36, 6
 
                 elif mode.lower() == 'redtpa_i':
-                    # 36 first-order densities per frequency
+                    # 6 first-order densities per frequency
                     # 6 second-order densities per frequency
                     size_1, size_2 = 6, 6
 
                 elif mode.lower() == 'redtpa_ii':
-                    # 36 first-order densities per frequency
+                    # 18 first-order densities per frequency
                     # 6 second-order densities per frequency
                     size_1, size_2 = 18, 6
 
@@ -809,11 +851,25 @@ class NonlinearSolver:
             fock_arrays = []
 
             for idx in range(len(dts_for_fock)):
-                den_mat = make_matrix(ao_basis, mat_t.general)
-                den_mat.set_values(dts_for_fock[idx])
+                if self.ri_coulomb:
+                    assert_msg_critical(
+                        fock_type == 'j',
+                        'NonlinearSolver: RI is only applicable to pure DFT functional'
+                    )
 
-                fock_mat = fock_drv.compute(screening, den_mat, fock_type,
-                                            fock_k_factor, 0.0, thresh_int)
+                if self.ri_coulomb and fock_type == 'j':
+                    # symmetrize density for RI-J
+                    den_mat_for_ri_j = make_matrix(ao_basis, mat_t.symmetric)
+                    den_mat_for_ri_j.set_values(
+                        0.5 * (dts_for_fock[idx] + dts_for_fock[idx].T))
+
+                    fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+                else:
+                    den_mat = make_matrix(ao_basis, mat_t.general)
+                    den_mat.set_values(dts_for_fock[idx])
+
+                    fock_mat = fock_drv.compute(screening, den_mat, fock_type,
+                                                fock_k_factor, 0.0, thresh_int)
 
                 fock_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -965,6 +1021,7 @@ class NonlinearSolver:
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_fock_time(self, time):
         """
@@ -1006,6 +1063,10 @@ class NonlinearSolver:
         cur_str = 'Damping Parameter               : {:.6e}'.format(
             self.damping)
         self.ostream.print_header(cur_str.ljust(width))
+
+        if self.ri_coulomb:
+            cur_str = 'Resolution of the Identity      : RI-J'
+            self.ostream.print_header(cur_str.ljust(width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

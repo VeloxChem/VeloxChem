@@ -1,16 +1,48 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "OverlapPrimRecIF.hpp"
 
-namespace ovlrec {  // ovlrec namespace
+namespace ovlrec { // ovlrec namespace
 
 auto
-comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
-                     const size_t              idx_ovl_if,
-                     const size_t              idx_ovl_gf,
-                     const size_t              idx_ovl_hd,
-                     const size_t              idx_ovl_hf,
+comp_prim_overlap_if(CSimdArray<double>& pbuffer, 
+                     const size_t idx_ovl_if,
+                     const size_t idx_ovl_gf,
+                     const size_t idx_ovl_hd,
+                     const size_t idx_ovl_hf,
                      const CSimdArray<double>& factors,
-                     const size_t              idx_rpa,
-                     const double              a_exp) -> void
+                     const size_t idx_rpa,
+                     const double a_exp) -> void
 {
     const auto nelems = pbuffer.number_of_active_elements();
 
@@ -746,44 +778,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxxxx_zzz = pbuffer.data(idx_ovl_if + 9);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_xxxx_xxx,   \
-                             ts_xxxx_xxy,   \
-                             ts_xxxx_xxz,   \
-                             ts_xxxx_xyy,   \
-                             ts_xxxx_xyz,   \
-                             ts_xxxx_xzz,   \
-                             ts_xxxx_yyy,   \
-                             ts_xxxx_yyz,   \
-                             ts_xxxx_yzz,   \
-                             ts_xxxx_zzz,   \
-                             ts_xxxxx_xx,   \
-                             ts_xxxxx_xxx,  \
-                             ts_xxxxx_xxy,  \
-                             ts_xxxxx_xxz,  \
-                             ts_xxxxx_xy,   \
-                             ts_xxxxx_xyy,  \
-                             ts_xxxxx_xyz,  \
-                             ts_xxxxx_xz,   \
-                             ts_xxxxx_xzz,  \
-                             ts_xxxxx_yy,   \
-                             ts_xxxxx_yyy,  \
-                             ts_xxxxx_yyz,  \
-                             ts_xxxxx_yz,   \
-                             ts_xxxxx_yzz,  \
-                             ts_xxxxx_zz,   \
-                             ts_xxxxx_zzz,  \
-                             ts_xxxxxx_xxx, \
-                             ts_xxxxxx_xxy, \
-                             ts_xxxxxx_xxz, \
-                             ts_xxxxxx_xyy, \
-                             ts_xxxxxx_xyz, \
-                             ts_xxxxxx_xzz, \
-                             ts_xxxxxx_yyy, \
-                             ts_xxxxxx_yyz, \
-                             ts_xxxxxx_yzz, \
-                             ts_xxxxxx_zzz, \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_xxxx_xxx, ts_xxxx_xxy, ts_xxxx_xxz, ts_xxxx_xyy, ts_xxxx_xyz, ts_xxxx_xzz, ts_xxxx_yyy, ts_xxxx_yyz, ts_xxxx_yzz, ts_xxxx_zzz, ts_xxxxx_xx, ts_xxxxx_xxx, ts_xxxxx_xxy, ts_xxxxx_xxz, ts_xxxxx_xy, ts_xxxxx_xyy, ts_xxxxx_xyz, ts_xxxxx_xz, ts_xxxxx_xzz, ts_xxxxx_yy, ts_xxxxx_yyy, ts_xxxxx_yyz, ts_xxxxx_yz, ts_xxxxx_yzz, ts_xxxxx_zz, ts_xxxxx_zzz, ts_xxxxxx_xxx, ts_xxxxxx_xxy, ts_xxxxxx_xxz, ts_xxxxxx_xyy, ts_xxxxxx_xyz, ts_xxxxxx_xzz, ts_xxxxxx_yyy, ts_xxxxxx_yyz, ts_xxxxxx_yzz, ts_xxxxxx_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -831,35 +826,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxxxy_zzz = pbuffer.data(idx_ovl_if + 19);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xxxxx_xx,   \
-                             ts_xxxxx_xxx,  \
-                             ts_xxxxx_xxy,  \
-                             ts_xxxxx_xxz,  \
-                             ts_xxxxx_xy,   \
-                             ts_xxxxx_xyy,  \
-                             ts_xxxxx_xyz,  \
-                             ts_xxxxx_xz,   \
-                             ts_xxxxx_xzz,  \
-                             ts_xxxxx_zzz,  \
-                             ts_xxxxxy_xxx, \
-                             ts_xxxxxy_xxy, \
-                             ts_xxxxxy_xxz, \
-                             ts_xxxxxy_xyy, \
-                             ts_xxxxxy_xyz, \
-                             ts_xxxxxy_xzz, \
-                             ts_xxxxxy_yyy, \
-                             ts_xxxxxy_yyz, \
-                             ts_xxxxxy_yzz, \
-                             ts_xxxxxy_zzz, \
-                             ts_xxxxy_yyy,  \
-                             ts_xxxxy_yyz,  \
-                             ts_xxxxy_yzz,  \
-                             ts_xxxy_yyy,   \
-                             ts_xxxy_yyz,   \
-                             ts_xxxy_yzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xxxxx_xx, ts_xxxxx_xxx, ts_xxxxx_xxy, ts_xxxxx_xxz, ts_xxxxx_xy, ts_xxxxx_xyy, ts_xxxxx_xyz, ts_xxxxx_xz, ts_xxxxx_xzz, ts_xxxxx_zzz, ts_xxxxxy_xxx, ts_xxxxxy_xxy, ts_xxxxxy_xxz, ts_xxxxxy_xyy, ts_xxxxxy_xyz, ts_xxxxxy_xzz, ts_xxxxxy_yyy, ts_xxxxxy_yyz, ts_xxxxxy_yzz, ts_xxxxxy_zzz, ts_xxxxy_yyy, ts_xxxxy_yyz, ts_xxxxy_yzz, ts_xxxy_yyy, ts_xxxy_yyz, ts_xxxy_yzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -907,35 +874,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxxxz_zzz = pbuffer.data(idx_ovl_if + 29);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_z,          \
-                             ts_xxxxx_xx,   \
-                             ts_xxxxx_xxx,  \
-                             ts_xxxxx_xxy,  \
-                             ts_xxxxx_xxz,  \
-                             ts_xxxxx_xy,   \
-                             ts_xxxxx_xyy,  \
-                             ts_xxxxx_xyz,  \
-                             ts_xxxxx_xz,   \
-                             ts_xxxxx_xzz,  \
-                             ts_xxxxx_yyy,  \
-                             ts_xxxxxz_xxx, \
-                             ts_xxxxxz_xxy, \
-                             ts_xxxxxz_xxz, \
-                             ts_xxxxxz_xyy, \
-                             ts_xxxxxz_xyz, \
-                             ts_xxxxxz_xzz, \
-                             ts_xxxxxz_yyy, \
-                             ts_xxxxxz_yyz, \
-                             ts_xxxxxz_yzz, \
-                             ts_xxxxxz_zzz, \
-                             ts_xxxxz_yyz,  \
-                             ts_xxxxz_yzz,  \
-                             ts_xxxxz_zzz,  \
-                             ts_xxxz_yyz,   \
-                             ts_xxxz_yzz,   \
-                             ts_xxxz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_z, ts_xxxxx_xx, ts_xxxxx_xxx, ts_xxxxx_xxy, ts_xxxxx_xxz, ts_xxxxx_xy, ts_xxxxx_xyy, ts_xxxxx_xyz, ts_xxxxx_xz, ts_xxxxx_xzz, ts_xxxxx_yyy, ts_xxxxxz_xxx, ts_xxxxxz_xxy, ts_xxxxxz_xxz, ts_xxxxxz_xyy, ts_xxxxxz_xyz, ts_xxxxxz_xzz, ts_xxxxxz_yyy, ts_xxxxxz_yyz, ts_xxxxxz_yzz, ts_xxxxxz_zzz, ts_xxxxz_yyz, ts_xxxxz_yzz, ts_xxxxz_zzz, ts_xxxz_yyz, ts_xxxz_yzz, ts_xxxz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -983,42 +922,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxxyy_zzz = pbuffer.data(idx_ovl_if + 39);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xxxx_xxx,   \
-                             ts_xxxx_xxz,   \
-                             ts_xxxx_xzz,   \
-                             ts_xxxxy_xxx,  \
-                             ts_xxxxy_xxz,  \
-                             ts_xxxxy_xzz,  \
-                             ts_xxxxyy_xxx, \
-                             ts_xxxxyy_xxy, \
-                             ts_xxxxyy_xxz, \
-                             ts_xxxxyy_xyy, \
-                             ts_xxxxyy_xyz, \
-                             ts_xxxxyy_xzz, \
-                             ts_xxxxyy_yyy, \
-                             ts_xxxxyy_yyz, \
-                             ts_xxxxyy_yzz, \
-                             ts_xxxxyy_zzz, \
-                             ts_xxxyy_xxy,  \
-                             ts_xxxyy_xy,   \
-                             ts_xxxyy_xyy,  \
-                             ts_xxxyy_xyz,  \
-                             ts_xxxyy_yy,   \
-                             ts_xxxyy_yyy,  \
-                             ts_xxxyy_yyz,  \
-                             ts_xxxyy_yz,   \
-                             ts_xxxyy_yzz,  \
-                             ts_xxxyy_zzz,  \
-                             ts_xxyy_xxy,   \
-                             ts_xxyy_xyy,   \
-                             ts_xxyy_xyz,   \
-                             ts_xxyy_yyy,   \
-                             ts_xxyy_yyz,   \
-                             ts_xxyy_yzz,   \
-                             ts_xxyy_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xxxx_xxx, ts_xxxx_xxz, ts_xxxx_xzz, ts_xxxxy_xxx, ts_xxxxy_xxz, ts_xxxxy_xzz, ts_xxxxyy_xxx, ts_xxxxyy_xxy, ts_xxxxyy_xxz, ts_xxxxyy_xyy, ts_xxxxyy_xyz, ts_xxxxyy_xzz, ts_xxxxyy_yyy, ts_xxxxyy_yyz, ts_xxxxyy_yzz, ts_xxxxyy_zzz, ts_xxxyy_xxy, ts_xxxyy_xy, ts_xxxyy_xyy, ts_xxxyy_xyz, ts_xxxyy_yy, ts_xxxyy_yyy, ts_xxxyy_yyz, ts_xxxyy_yz, ts_xxxyy_yzz, ts_xxxyy_zzz, ts_xxyy_xxy, ts_xxyy_xyy, ts_xxyy_xyz, ts_xxyy_yyy, ts_xxyy_yyz, ts_xxyy_yzz, ts_xxyy_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1066,33 +970,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxxyz_zzz = pbuffer.data(idx_ovl_if + 49);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             pa_z,          \
-                             ts_xxxxy_xxy,  \
-                             ts_xxxxy_xyy,  \
-                             ts_xxxxy_yyy,  \
-                             ts_xxxxyz_xxx, \
-                             ts_xxxxyz_xxy, \
-                             ts_xxxxyz_xxz, \
-                             ts_xxxxyz_xyy, \
-                             ts_xxxxyz_xyz, \
-                             ts_xxxxyz_xzz, \
-                             ts_xxxxyz_yyy, \
-                             ts_xxxxyz_yyz, \
-                             ts_xxxxyz_yzz, \
-                             ts_xxxxyz_zzz, \
-                             ts_xxxxz_xxx,  \
-                             ts_xxxxz_xxz,  \
-                             ts_xxxxz_xyz,  \
-                             ts_xxxxz_xz,   \
-                             ts_xxxxz_xzz,  \
-                             ts_xxxxz_zzz,  \
-                             ts_xxxyz_yyz,  \
-                             ts_xxxyz_yzz,  \
-                             ts_xxyz_yyz,   \
-                             ts_xxyz_yzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, pa_z, ts_xxxxy_xxy, ts_xxxxy_xyy, ts_xxxxy_yyy, ts_xxxxyz_xxx, ts_xxxxyz_xxy, ts_xxxxyz_xxz, ts_xxxxyz_xyy, ts_xxxxyz_xyz, ts_xxxxyz_xzz, ts_xxxxyz_yyy, ts_xxxxyz_yyz, ts_xxxxyz_yzz, ts_xxxxyz_zzz, ts_xxxxz_xxx, ts_xxxxz_xxz, ts_xxxxz_xyz, ts_xxxxz_xz, ts_xxxxz_xzz, ts_xxxxz_zzz, ts_xxxyz_yyz, ts_xxxyz_yzz, ts_xxyz_yyz, ts_xxyz_yzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1140,42 +1018,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxxzz_zzz = pbuffer.data(idx_ovl_if + 59);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_z,          \
-                             ts_xxxx_xxx,   \
-                             ts_xxxx_xxy,   \
-                             ts_xxxx_xyy,   \
-                             ts_xxxxz_xxx,  \
-                             ts_xxxxz_xxy,  \
-                             ts_xxxxz_xyy,  \
-                             ts_xxxxzz_xxx, \
-                             ts_xxxxzz_xxy, \
-                             ts_xxxxzz_xxz, \
-                             ts_xxxxzz_xyy, \
-                             ts_xxxxzz_xyz, \
-                             ts_xxxxzz_xzz, \
-                             ts_xxxxzz_yyy, \
-                             ts_xxxxzz_yyz, \
-                             ts_xxxxzz_yzz, \
-                             ts_xxxxzz_zzz, \
-                             ts_xxxzz_xxz,  \
-                             ts_xxxzz_xyz,  \
-                             ts_xxxzz_xz,   \
-                             ts_xxxzz_xzz,  \
-                             ts_xxxzz_yyy,  \
-                             ts_xxxzz_yyz,  \
-                             ts_xxxzz_yz,   \
-                             ts_xxxzz_yzz,  \
-                             ts_xxxzz_zz,   \
-                             ts_xxxzz_zzz,  \
-                             ts_xxzz_xxz,   \
-                             ts_xxzz_xyz,   \
-                             ts_xxzz_xzz,   \
-                             ts_xxzz_yyy,   \
-                             ts_xxzz_yyz,   \
-                             ts_xxzz_yzz,   \
-                             ts_xxzz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_z, ts_xxxx_xxx, ts_xxxx_xxy, ts_xxxx_xyy, ts_xxxxz_xxx, ts_xxxxz_xxy, ts_xxxxz_xyy, ts_xxxxzz_xxx, ts_xxxxzz_xxy, ts_xxxxzz_xxz, ts_xxxxzz_xyy, ts_xxxxzz_xyz, ts_xxxxzz_xzz, ts_xxxxzz_yyy, ts_xxxxzz_yyz, ts_xxxxzz_yzz, ts_xxxxzz_zzz, ts_xxxzz_xxz, ts_xxxzz_xyz, ts_xxxzz_xz, ts_xxxzz_xzz, ts_xxxzz_yyy, ts_xxxzz_yyz, ts_xxxzz_yz, ts_xxxzz_yzz, ts_xxxzz_zz, ts_xxxzz_zzz, ts_xxzz_xxz, ts_xxzz_xyz, ts_xxzz_xzz, ts_xxzz_yyy, ts_xxzz_yyz, ts_xxzz_yzz, ts_xxzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1223,42 +1066,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxyyy_zzz = pbuffer.data(idx_ovl_if + 69);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xxxy_xxx,   \
-                             ts_xxxy_xxz,   \
-                             ts_xxxy_xzz,   \
-                             ts_xxxyy_xxx,  \
-                             ts_xxxyy_xxz,  \
-                             ts_xxxyy_xzz,  \
-                             ts_xxxyyy_xxx, \
-                             ts_xxxyyy_xxy, \
-                             ts_xxxyyy_xxz, \
-                             ts_xxxyyy_xyy, \
-                             ts_xxxyyy_xyz, \
-                             ts_xxxyyy_xzz, \
-                             ts_xxxyyy_yyy, \
-                             ts_xxxyyy_yyz, \
-                             ts_xxxyyy_yzz, \
-                             ts_xxxyyy_zzz, \
-                             ts_xxyyy_xxy,  \
-                             ts_xxyyy_xy,   \
-                             ts_xxyyy_xyy,  \
-                             ts_xxyyy_xyz,  \
-                             ts_xxyyy_yy,   \
-                             ts_xxyyy_yyy,  \
-                             ts_xxyyy_yyz,  \
-                             ts_xxyyy_yz,   \
-                             ts_xxyyy_yzz,  \
-                             ts_xxyyy_zzz,  \
-                             ts_xyyy_xxy,   \
-                             ts_xyyy_xyy,   \
-                             ts_xyyy_xyz,   \
-                             ts_xyyy_yyy,   \
-                             ts_xyyy_yyz,   \
-                             ts_xyyy_yzz,   \
-                             ts_xyyy_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xxxy_xxx, ts_xxxy_xxz, ts_xxxy_xzz, ts_xxxyy_xxx, ts_xxxyy_xxz, ts_xxxyy_xzz, ts_xxxyyy_xxx, ts_xxxyyy_xxy, ts_xxxyyy_xxz, ts_xxxyyy_xyy, ts_xxxyyy_xyz, ts_xxxyyy_xzz, ts_xxxyyy_yyy, ts_xxxyyy_yyz, ts_xxxyyy_yzz, ts_xxxyyy_zzz, ts_xxyyy_xxy, ts_xxyyy_xy, ts_xxyyy_xyy, ts_xxyyy_xyz, ts_xxyyy_yy, ts_xxyyy_yyy, ts_xxyyy_yyz, ts_xxyyy_yz, ts_xxyyy_yzz, ts_xxyyy_zzz, ts_xyyy_xxy, ts_xyyy_xyy, ts_xyyy_xyz, ts_xyyy_yyy, ts_xyyy_yyz, ts_xyyy_yzz, ts_xyyy_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1306,36 +1114,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxyyz_zzz = pbuffer.data(idx_ovl_if + 79);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             pa_z,          \
-                             ts_xxxyy_xxx,  \
-                             ts_xxxyy_xxy,  \
-                             ts_xxxyy_xy,   \
-                             ts_xxxyy_xyy,  \
-                             ts_xxxyy_xyz,  \
-                             ts_xxxyy_yyy,  \
-                             ts_xxxyyz_xxx, \
-                             ts_xxxyyz_xxy, \
-                             ts_xxxyyz_xxz, \
-                             ts_xxxyyz_xyy, \
-                             ts_xxxyyz_xyz, \
-                             ts_xxxyyz_xzz, \
-                             ts_xxxyyz_yyy, \
-                             ts_xxxyyz_yyz, \
-                             ts_xxxyyz_yzz, \
-                             ts_xxxyyz_zzz, \
-                             ts_xxxyz_xxz,  \
-                             ts_xxxyz_xzz,  \
-                             ts_xxxz_xxz,   \
-                             ts_xxxz_xzz,   \
-                             ts_xxyyz_yyz,  \
-                             ts_xxyyz_yzz,  \
-                             ts_xxyyz_zzz,  \
-                             ts_xyyz_yyz,   \
-                             ts_xyyz_yzz,   \
-                             ts_xyyz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, pa_z, ts_xxxyy_xxx, ts_xxxyy_xxy, ts_xxxyy_xy, ts_xxxyy_xyy, ts_xxxyy_xyz, ts_xxxyy_yyy, ts_xxxyyz_xxx, ts_xxxyyz_xxy, ts_xxxyyz_xxz, ts_xxxyyz_xyy, ts_xxxyyz_xyz, ts_xxxyyz_xzz, ts_xxxyyz_yyy, ts_xxxyyz_yyz, ts_xxxyyz_yzz, ts_xxxyyz_zzz, ts_xxxyz_xxz, ts_xxxyz_xzz, ts_xxxz_xxz, ts_xxxz_xzz, ts_xxyyz_yyz, ts_xxyyz_yzz, ts_xxyyz_zzz, ts_xyyz_yyz, ts_xyyz_yzz, ts_xyyz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1383,35 +1162,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxyzz_zzz = pbuffer.data(idx_ovl_if + 89);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xxxyzz_xxx, \
-                             ts_xxxyzz_xxy, \
-                             ts_xxxyzz_xxz, \
-                             ts_xxxyzz_xyy, \
-                             ts_xxxyzz_xyz, \
-                             ts_xxxyzz_xzz, \
-                             ts_xxxyzz_yyy, \
-                             ts_xxxyzz_yyz, \
-                             ts_xxxyzz_yzz, \
-                             ts_xxxyzz_zzz, \
-                             ts_xxxzz_xx,   \
-                             ts_xxxzz_xxx,  \
-                             ts_xxxzz_xxy,  \
-                             ts_xxxzz_xxz,  \
-                             ts_xxxzz_xy,   \
-                             ts_xxxzz_xyy,  \
-                             ts_xxxzz_xyz,  \
-                             ts_xxxzz_xz,   \
-                             ts_xxxzz_xzz,  \
-                             ts_xxxzz_zzz,  \
-                             ts_xxyzz_yyy,  \
-                             ts_xxyzz_yyz,  \
-                             ts_xxyzz_yzz,  \
-                             ts_xyzz_yyy,   \
-                             ts_xyzz_yyz,   \
-                             ts_xyzz_yzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xxxyzz_xxx, ts_xxxyzz_xxy, ts_xxxyzz_xxz, ts_xxxyzz_xyy, ts_xxxyzz_xyz, ts_xxxyzz_xzz, ts_xxxyzz_yyy, ts_xxxyzz_yyz, ts_xxxyzz_yzz, ts_xxxyzz_zzz, ts_xxxzz_xx, ts_xxxzz_xxx, ts_xxxzz_xxy, ts_xxxzz_xxz, ts_xxxzz_xy, ts_xxxzz_xyy, ts_xxxzz_xyz, ts_xxxzz_xz, ts_xxxzz_xzz, ts_xxxzz_zzz, ts_xxyzz_yyy, ts_xxyzz_yyz, ts_xxyzz_yzz, ts_xyzz_yyy, ts_xyzz_yyz, ts_xyzz_yzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1459,42 +1210,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxxzzz_zzz = pbuffer.data(idx_ovl_if + 99);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_z,          \
-                             ts_xxxz_xxx,   \
-                             ts_xxxz_xxy,   \
-                             ts_xxxz_xyy,   \
-                             ts_xxxzz_xxx,  \
-                             ts_xxxzz_xxy,  \
-                             ts_xxxzz_xyy,  \
-                             ts_xxxzzz_xxx, \
-                             ts_xxxzzz_xxy, \
-                             ts_xxxzzz_xxz, \
-                             ts_xxxzzz_xyy, \
-                             ts_xxxzzz_xyz, \
-                             ts_xxxzzz_xzz, \
-                             ts_xxxzzz_yyy, \
-                             ts_xxxzzz_yyz, \
-                             ts_xxxzzz_yzz, \
-                             ts_xxxzzz_zzz, \
-                             ts_xxzzz_xxz,  \
-                             ts_xxzzz_xyz,  \
-                             ts_xxzzz_xz,   \
-                             ts_xxzzz_xzz,  \
-                             ts_xxzzz_yyy,  \
-                             ts_xxzzz_yyz,  \
-                             ts_xxzzz_yz,   \
-                             ts_xxzzz_yzz,  \
-                             ts_xxzzz_zz,   \
-                             ts_xxzzz_zzz,  \
-                             ts_xzzz_xxz,   \
-                             ts_xzzz_xyz,   \
-                             ts_xzzz_xzz,   \
-                             ts_xzzz_yyy,   \
-                             ts_xzzz_yyz,   \
-                             ts_xzzz_yzz,   \
-                             ts_xzzz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_z, ts_xxxz_xxx, ts_xxxz_xxy, ts_xxxz_xyy, ts_xxxzz_xxx, ts_xxxzz_xxy, ts_xxxzz_xyy, ts_xxxzzz_xxx, ts_xxxzzz_xxy, ts_xxxzzz_xxz, ts_xxxzzz_xyy, ts_xxxzzz_xyz, ts_xxxzzz_xzz, ts_xxxzzz_yyy, ts_xxxzzz_yyz, ts_xxxzzz_yzz, ts_xxxzzz_zzz, ts_xxzzz_xxz, ts_xxzzz_xyz, ts_xxzzz_xz, ts_xxzzz_xzz, ts_xxzzz_yyy, ts_xxzzz_yyz, ts_xxzzz_yz, ts_xxzzz_yzz, ts_xxzzz_zz, ts_xxzzz_zzz, ts_xzzz_xxz, ts_xzzz_xyz, ts_xzzz_xzz, ts_xzzz_yyy, ts_xzzz_yyz, ts_xzzz_yzz, ts_xzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1542,42 +1258,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxyyyy_zzz = pbuffer.data(idx_ovl_if + 109);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xxyy_xxx,   \
-                             ts_xxyy_xxz,   \
-                             ts_xxyy_xzz,   \
-                             ts_xxyyy_xxx,  \
-                             ts_xxyyy_xxz,  \
-                             ts_xxyyy_xzz,  \
-                             ts_xxyyyy_xxx, \
-                             ts_xxyyyy_xxy, \
-                             ts_xxyyyy_xxz, \
-                             ts_xxyyyy_xyy, \
-                             ts_xxyyyy_xyz, \
-                             ts_xxyyyy_xzz, \
-                             ts_xxyyyy_yyy, \
-                             ts_xxyyyy_yyz, \
-                             ts_xxyyyy_yzz, \
-                             ts_xxyyyy_zzz, \
-                             ts_xyyyy_xxy,  \
-                             ts_xyyyy_xy,   \
-                             ts_xyyyy_xyy,  \
-                             ts_xyyyy_xyz,  \
-                             ts_xyyyy_yy,   \
-                             ts_xyyyy_yyy,  \
-                             ts_xyyyy_yyz,  \
-                             ts_xyyyy_yz,   \
-                             ts_xyyyy_yzz,  \
-                             ts_xyyyy_zzz,  \
-                             ts_yyyy_xxy,   \
-                             ts_yyyy_xyy,   \
-                             ts_yyyy_xyz,   \
-                             ts_yyyy_yyy,   \
-                             ts_yyyy_yyz,   \
-                             ts_yyyy_yzz,   \
-                             ts_yyyy_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xxyy_xxx, ts_xxyy_xxz, ts_xxyy_xzz, ts_xxyyy_xxx, ts_xxyyy_xxz, ts_xxyyy_xzz, ts_xxyyyy_xxx, ts_xxyyyy_xxy, ts_xxyyyy_xxz, ts_xxyyyy_xyy, ts_xxyyyy_xyz, ts_xxyyyy_xzz, ts_xxyyyy_yyy, ts_xxyyyy_yyz, ts_xxyyyy_yzz, ts_xxyyyy_zzz, ts_xyyyy_xxy, ts_xyyyy_xy, ts_xyyyy_xyy, ts_xyyyy_xyz, ts_xyyyy_yy, ts_xyyyy_yyy, ts_xyyyy_yyz, ts_xyyyy_yz, ts_xyyyy_yzz, ts_xyyyy_zzz, ts_yyyy_xxy, ts_yyyy_xyy, ts_yyyy_xyz, ts_yyyy_yyy, ts_yyyy_yyz, ts_yyyy_yzz, ts_yyyy_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1625,36 +1306,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxyyyz_zzz = pbuffer.data(idx_ovl_if + 119);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             pa_z,          \
-                             ts_xxyyy_xxx,  \
-                             ts_xxyyy_xxy,  \
-                             ts_xxyyy_xy,   \
-                             ts_xxyyy_xyy,  \
-                             ts_xxyyy_xyz,  \
-                             ts_xxyyy_yyy,  \
-                             ts_xxyyyz_xxx, \
-                             ts_xxyyyz_xxy, \
-                             ts_xxyyyz_xxz, \
-                             ts_xxyyyz_xyy, \
-                             ts_xxyyyz_xyz, \
-                             ts_xxyyyz_xzz, \
-                             ts_xxyyyz_yyy, \
-                             ts_xxyyyz_yyz, \
-                             ts_xxyyyz_yzz, \
-                             ts_xxyyyz_zzz, \
-                             ts_xxyyz_xxz,  \
-                             ts_xxyyz_xzz,  \
-                             ts_xxyz_xxz,   \
-                             ts_xxyz_xzz,   \
-                             ts_xyyyz_yyz,  \
-                             ts_xyyyz_yzz,  \
-                             ts_xyyyz_zzz,  \
-                             ts_yyyz_yyz,   \
-                             ts_yyyz_yzz,   \
-                             ts_yyyz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, pa_z, ts_xxyyy_xxx, ts_xxyyy_xxy, ts_xxyyy_xy, ts_xxyyy_xyy, ts_xxyyy_xyz, ts_xxyyy_yyy, ts_xxyyyz_xxx, ts_xxyyyz_xxy, ts_xxyyyz_xxz, ts_xxyyyz_xyy, ts_xxyyyz_xyz, ts_xxyyyz_xzz, ts_xxyyyz_yyy, ts_xxyyyz_yyz, ts_xxyyyz_yzz, ts_xxyyyz_zzz, ts_xxyyz_xxz, ts_xxyyz_xzz, ts_xxyz_xxz, ts_xxyz_xzz, ts_xyyyz_yyz, ts_xyyyz_yzz, ts_xyyyz_zzz, ts_yyyz_yyz, ts_yyyz_yzz, ts_yyyz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1702,41 +1354,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxyyzz_zzz = pbuffer.data(idx_ovl_if + 129);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             pa_z,          \
-                             ts_xxyy_xxy,   \
-                             ts_xxyy_xyy,   \
-                             ts_xxyyz_xxy,  \
-                             ts_xxyyz_xyy,  \
-                             ts_xxyyzz_xxx, \
-                             ts_xxyyzz_xxy, \
-                             ts_xxyyzz_xxz, \
-                             ts_xxyyzz_xyy, \
-                             ts_xxyyzz_xyz, \
-                             ts_xxyyzz_xzz, \
-                             ts_xxyyzz_yyy, \
-                             ts_xxyyzz_yyz, \
-                             ts_xxyyzz_yzz, \
-                             ts_xxyyzz_zzz, \
-                             ts_xxyzz_xxx,  \
-                             ts_xxyzz_xxz,  \
-                             ts_xxyzz_xzz,  \
-                             ts_xxzz_xxx,   \
-                             ts_xxzz_xxz,   \
-                             ts_xxzz_xzz,   \
-                             ts_xyyzz_xyz,  \
-                             ts_xyyzz_yyy,  \
-                             ts_xyyzz_yyz,  \
-                             ts_xyyzz_yz,   \
-                             ts_xyyzz_yzz,  \
-                             ts_xyyzz_zzz,  \
-                             ts_yyzz_xyz,   \
-                             ts_yyzz_yyy,   \
-                             ts_yyzz_yyz,   \
-                             ts_yyzz_yzz,   \
-                             ts_yyzz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, pa_z, ts_xxyy_xxy, ts_xxyy_xyy, ts_xxyyz_xxy, ts_xxyyz_xyy, ts_xxyyzz_xxx, ts_xxyyzz_xxy, ts_xxyyzz_xxz, ts_xxyyzz_xyy, ts_xxyyzz_xyz, ts_xxyyzz_xzz, ts_xxyyzz_yyy, ts_xxyyzz_yyz, ts_xxyyzz_yzz, ts_xxyyzz_zzz, ts_xxyzz_xxx, ts_xxyzz_xxz, ts_xxyzz_xzz, ts_xxzz_xxx, ts_xxzz_xxz, ts_xxzz_xzz, ts_xyyzz_xyz, ts_xyyzz_yyy, ts_xyyzz_yyz, ts_xyyzz_yz, ts_xyyzz_yzz, ts_xyyzz_zzz, ts_yyzz_xyz, ts_yyzz_yyy, ts_yyzz_yyz, ts_yyzz_yzz, ts_yyzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1784,35 +1402,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxyzzz_zzz = pbuffer.data(idx_ovl_if + 139);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xxyzzz_xxx, \
-                             ts_xxyzzz_xxy, \
-                             ts_xxyzzz_xxz, \
-                             ts_xxyzzz_xyy, \
-                             ts_xxyzzz_xyz, \
-                             ts_xxyzzz_xzz, \
-                             ts_xxyzzz_yyy, \
-                             ts_xxyzzz_yyz, \
-                             ts_xxyzzz_yzz, \
-                             ts_xxyzzz_zzz, \
-                             ts_xxzzz_xx,   \
-                             ts_xxzzz_xxx,  \
-                             ts_xxzzz_xxy,  \
-                             ts_xxzzz_xxz,  \
-                             ts_xxzzz_xy,   \
-                             ts_xxzzz_xyy,  \
-                             ts_xxzzz_xyz,  \
-                             ts_xxzzz_xz,   \
-                             ts_xxzzz_xzz,  \
-                             ts_xxzzz_zzz,  \
-                             ts_xyzzz_yyy,  \
-                             ts_xyzzz_yyz,  \
-                             ts_xyzzz_yzz,  \
-                             ts_yzzz_yyy,   \
-                             ts_yzzz_yyz,   \
-                             ts_yzzz_yzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xxyzzz_xxx, ts_xxyzzz_xxy, ts_xxyzzz_xxz, ts_xxyzzz_xyy, ts_xxyzzz_xyz, ts_xxyzzz_xzz, ts_xxyzzz_yyy, ts_xxyzzz_yyz, ts_xxyzzz_yzz, ts_xxyzzz_zzz, ts_xxzzz_xx, ts_xxzzz_xxx, ts_xxzzz_xxy, ts_xxzzz_xxz, ts_xxzzz_xy, ts_xxzzz_xyy, ts_xxzzz_xyz, ts_xxzzz_xz, ts_xxzzz_xzz, ts_xxzzz_zzz, ts_xyzzz_yyy, ts_xyzzz_yyz, ts_xyzzz_yzz, ts_yzzz_yyy, ts_yzzz_yyz, ts_yzzz_yzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1860,42 +1450,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xxzzzz_zzz = pbuffer.data(idx_ovl_if + 149);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_z,          \
-                             ts_xxzz_xxx,   \
-                             ts_xxzz_xxy,   \
-                             ts_xxzz_xyy,   \
-                             ts_xxzzz_xxx,  \
-                             ts_xxzzz_xxy,  \
-                             ts_xxzzz_xyy,  \
-                             ts_xxzzzz_xxx, \
-                             ts_xxzzzz_xxy, \
-                             ts_xxzzzz_xxz, \
-                             ts_xxzzzz_xyy, \
-                             ts_xxzzzz_xyz, \
-                             ts_xxzzzz_xzz, \
-                             ts_xxzzzz_yyy, \
-                             ts_xxzzzz_yyz, \
-                             ts_xxzzzz_yzz, \
-                             ts_xxzzzz_zzz, \
-                             ts_xzzzz_xxz,  \
-                             ts_xzzzz_xyz,  \
-                             ts_xzzzz_xz,   \
-                             ts_xzzzz_xzz,  \
-                             ts_xzzzz_yyy,  \
-                             ts_xzzzz_yyz,  \
-                             ts_xzzzz_yz,   \
-                             ts_xzzzz_yzz,  \
-                             ts_xzzzz_zz,   \
-                             ts_xzzzz_zzz,  \
-                             ts_zzzz_xxz,   \
-                             ts_zzzz_xyz,   \
-                             ts_zzzz_xzz,   \
-                             ts_zzzz_yyy,   \
-                             ts_zzzz_yyz,   \
-                             ts_zzzz_yzz,   \
-                             ts_zzzz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_z, ts_xxzz_xxx, ts_xxzz_xxy, ts_xxzz_xyy, ts_xxzzz_xxx, ts_xxzzz_xxy, ts_xxzzz_xyy, ts_xxzzzz_xxx, ts_xxzzzz_xxy, ts_xxzzzz_xxz, ts_xxzzzz_xyy, ts_xxzzzz_xyz, ts_xxzzzz_xzz, ts_xxzzzz_yyy, ts_xxzzzz_yyz, ts_xxzzzz_yzz, ts_xxzzzz_zzz, ts_xzzzz_xxz, ts_xzzzz_xyz, ts_xzzzz_xz, ts_xzzzz_xzz, ts_xzzzz_yyy, ts_xzzzz_yyz, ts_xzzzz_yz, ts_xzzzz_yzz, ts_xzzzz_zz, ts_xzzzz_zzz, ts_zzzz_xxz, ts_zzzz_xyz, ts_zzzz_xzz, ts_zzzz_yyy, ts_zzzz_yyz, ts_zzzz_yzz, ts_zzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -1943,34 +1498,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xyyyyy_zzz = pbuffer.data(idx_ovl_if + 159);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_xyyyyy_xxx, \
-                             ts_xyyyyy_xxy, \
-                             ts_xyyyyy_xxz, \
-                             ts_xyyyyy_xyy, \
-                             ts_xyyyyy_xyz, \
-                             ts_xyyyyy_xzz, \
-                             ts_xyyyyy_yyy, \
-                             ts_xyyyyy_yyz, \
-                             ts_xyyyyy_yzz, \
-                             ts_xyyyyy_zzz, \
-                             ts_yyyyy_xx,   \
-                             ts_yyyyy_xxx,  \
-                             ts_yyyyy_xxy,  \
-                             ts_yyyyy_xxz,  \
-                             ts_yyyyy_xy,   \
-                             ts_yyyyy_xyy,  \
-                             ts_yyyyy_xyz,  \
-                             ts_yyyyy_xz,   \
-                             ts_yyyyy_xzz,  \
-                             ts_yyyyy_yy,   \
-                             ts_yyyyy_yyy,  \
-                             ts_yyyyy_yyz,  \
-                             ts_yyyyy_yz,   \
-                             ts_yyyyy_yzz,  \
-                             ts_yyyyy_zz,   \
-                             ts_yyyyy_zzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_xyyyyy_xxx, ts_xyyyyy_xxy, ts_xyyyyy_xxz, ts_xyyyyy_xyy, ts_xyyyyy_xyz, ts_xyyyyy_xzz, ts_xyyyyy_yyy, ts_xyyyyy_yyz, ts_xyyyyy_yzz, ts_xyyyyy_zzz, ts_yyyyy_xx, ts_yyyyy_xxx, ts_yyyyy_xxy, ts_yyyyy_xxz, ts_yyyyy_xy, ts_yyyyy_xyy, ts_yyyyy_xyz, ts_yyyyy_xz, ts_yyyyy_xzz, ts_yyyyy_yy, ts_yyyyy_yyy, ts_yyyyy_yyz, ts_yyyyy_yz, ts_yyyyy_yzz, ts_yyyyy_zz, ts_yyyyy_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2018,32 +1546,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xyyyyz_zzz = pbuffer.data(idx_ovl_if + 169);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_z,          \
-                             ts_xyyyy_xxx,  \
-                             ts_xyyyy_xxy,  \
-                             ts_xyyyy_xyy,  \
-                             ts_xyyyyz_xxx, \
-                             ts_xyyyyz_xxy, \
-                             ts_xyyyyz_xxz, \
-                             ts_xyyyyz_xyy, \
-                             ts_xyyyyz_xyz, \
-                             ts_xyyyyz_xzz, \
-                             ts_xyyyyz_yyy, \
-                             ts_xyyyyz_yyz, \
-                             ts_xyyyyz_yzz, \
-                             ts_xyyyyz_zzz, \
-                             ts_yyyyz_xxz,  \
-                             ts_yyyyz_xyz,  \
-                             ts_yyyyz_xz,   \
-                             ts_yyyyz_xzz,  \
-                             ts_yyyyz_yyy,  \
-                             ts_yyyyz_yyz,  \
-                             ts_yyyyz_yz,   \
-                             ts_yyyyz_yzz,  \
-                             ts_yyyyz_zz,   \
-                             ts_yyyyz_zzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_z, ts_xyyyy_xxx, ts_xyyyy_xxy, ts_xyyyy_xyy, ts_xyyyyz_xxx, ts_xyyyyz_xxy, ts_xyyyyz_xxz, ts_xyyyyz_xyy, ts_xyyyyz_xyz, ts_xyyyyz_xzz, ts_xyyyyz_yyy, ts_xyyyyz_yyz, ts_xyyyyz_yzz, ts_xyyyyz_zzz, ts_yyyyz_xxz, ts_yyyyz_xyz, ts_yyyyz_xz, ts_yyyyz_xzz, ts_yyyyz_yyy, ts_yyyyz_yyz, ts_yyyyz_yz, ts_yyyyz_yzz, ts_yyyyz_zz, ts_yyyyz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2091,34 +1594,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xyyyzz_zzz = pbuffer.data(idx_ovl_if + 179);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_xyyyzz_xxx, \
-                             ts_xyyyzz_xxy, \
-                             ts_xyyyzz_xxz, \
-                             ts_xyyyzz_xyy, \
-                             ts_xyyyzz_xyz, \
-                             ts_xyyyzz_xzz, \
-                             ts_xyyyzz_yyy, \
-                             ts_xyyyzz_yyz, \
-                             ts_xyyyzz_yzz, \
-                             ts_xyyyzz_zzz, \
-                             ts_yyyzz_xx,   \
-                             ts_yyyzz_xxx,  \
-                             ts_yyyzz_xxy,  \
-                             ts_yyyzz_xxz,  \
-                             ts_yyyzz_xy,   \
-                             ts_yyyzz_xyy,  \
-                             ts_yyyzz_xyz,  \
-                             ts_yyyzz_xz,   \
-                             ts_yyyzz_xzz,  \
-                             ts_yyyzz_yy,   \
-                             ts_yyyzz_yyy,  \
-                             ts_yyyzz_yyz,  \
-                             ts_yyyzz_yz,   \
-                             ts_yyyzz_yzz,  \
-                             ts_yyyzz_zz,   \
-                             ts_yyyzz_zzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_xyyyzz_xxx, ts_xyyyzz_xxy, ts_xyyyzz_xxz, ts_xyyyzz_xyy, ts_xyyyzz_xyz, ts_xyyyzz_xzz, ts_xyyyzz_yyy, ts_xyyyzz_yyz, ts_xyyyzz_yzz, ts_xyyyzz_zzz, ts_yyyzz_xx, ts_yyyzz_xxx, ts_yyyzz_xxy, ts_yyyzz_xxz, ts_yyyzz_xy, ts_yyyzz_xyy, ts_yyyzz_xyz, ts_yyyzz_xz, ts_yyyzz_xzz, ts_yyyzz_yy, ts_yyyzz_yyy, ts_yyyzz_yyz, ts_yyyzz_yz, ts_yyyzz_yzz, ts_yyyzz_zz, ts_yyyzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2166,34 +1642,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xyyzzz_zzz = pbuffer.data(idx_ovl_if + 189);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_xyyzzz_xxx, \
-                             ts_xyyzzz_xxy, \
-                             ts_xyyzzz_xxz, \
-                             ts_xyyzzz_xyy, \
-                             ts_xyyzzz_xyz, \
-                             ts_xyyzzz_xzz, \
-                             ts_xyyzzz_yyy, \
-                             ts_xyyzzz_yyz, \
-                             ts_xyyzzz_yzz, \
-                             ts_xyyzzz_zzz, \
-                             ts_yyzzz_xx,   \
-                             ts_yyzzz_xxx,  \
-                             ts_yyzzz_xxy,  \
-                             ts_yyzzz_xxz,  \
-                             ts_yyzzz_xy,   \
-                             ts_yyzzz_xyy,  \
-                             ts_yyzzz_xyz,  \
-                             ts_yyzzz_xz,   \
-                             ts_yyzzz_xzz,  \
-                             ts_yyzzz_yy,   \
-                             ts_yyzzz_yyy,  \
-                             ts_yyzzz_yyz,  \
-                             ts_yyzzz_yz,   \
-                             ts_yyzzz_yzz,  \
-                             ts_yyzzz_zz,   \
-                             ts_yyzzz_zzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_xyyzzz_xxx, ts_xyyzzz_xxy, ts_xyyzzz_xxz, ts_xyyzzz_xyy, ts_xyyzzz_xyz, ts_xyyzzz_xzz, ts_xyyzzz_yyy, ts_xyyzzz_yyz, ts_xyyzzz_yzz, ts_xyyzzz_zzz, ts_yyzzz_xx, ts_yyzzz_xxx, ts_yyzzz_xxy, ts_yyzzz_xxz, ts_yyzzz_xy, ts_yyzzz_xyy, ts_yyzzz_xyz, ts_yyzzz_xz, ts_yyzzz_xzz, ts_yyzzz_yy, ts_yyzzz_yyy, ts_yyzzz_yyz, ts_yyzzz_yz, ts_yyzzz_yzz, ts_yyzzz_zz, ts_yyzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2241,32 +1690,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xyzzzz_zzz = pbuffer.data(idx_ovl_if + 199);
 
-#pragma omp simd aligned(pa_x,              \
-                             pa_y,          \
-                             ts_xyzzzz_xxx, \
-                             ts_xyzzzz_xxy, \
-                             ts_xyzzzz_xxz, \
-                             ts_xyzzzz_xyy, \
-                             ts_xyzzzz_xyz, \
-                             ts_xyzzzz_xzz, \
-                             ts_xyzzzz_yyy, \
-                             ts_xyzzzz_yyz, \
-                             ts_xyzzzz_yzz, \
-                             ts_xyzzzz_zzz, \
-                             ts_xzzzz_xxx,  \
-                             ts_xzzzz_xxz,  \
-                             ts_xzzzz_xzz,  \
-                             ts_yzzzz_xxy,  \
-                             ts_yzzzz_xy,   \
-                             ts_yzzzz_xyy,  \
-                             ts_yzzzz_xyz,  \
-                             ts_yzzzz_yy,   \
-                             ts_yzzzz_yyy,  \
-                             ts_yzzzz_yyz,  \
-                             ts_yzzzz_yz,   \
-                             ts_yzzzz_yzz,  \
-                             ts_yzzzz_zzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, pa_y, ts_xyzzzz_xxx, ts_xyzzzz_xxy, ts_xyzzzz_xxz, ts_xyzzzz_xyy, ts_xyzzzz_xyz, ts_xyzzzz_xzz, ts_xyzzzz_yyy, ts_xyzzzz_yyz, ts_xyzzzz_yzz, ts_xyzzzz_zzz, ts_xzzzz_xxx, ts_xzzzz_xxz, ts_xzzzz_xzz, ts_yzzzz_xxy, ts_yzzzz_xy, ts_yzzzz_xyy, ts_yzzzz_xyz, ts_yzzzz_yy, ts_yzzzz_yyy, ts_yzzzz_yyz, ts_yzzzz_yz, ts_yzzzz_yzz, ts_yzzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2314,34 +1738,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_xzzzzz_zzz = pbuffer.data(idx_ovl_if + 209);
 
-#pragma omp simd aligned(pa_x,              \
-                             ts_xzzzzz_xxx, \
-                             ts_xzzzzz_xxy, \
-                             ts_xzzzzz_xxz, \
-                             ts_xzzzzz_xyy, \
-                             ts_xzzzzz_xyz, \
-                             ts_xzzzzz_xzz, \
-                             ts_xzzzzz_yyy, \
-                             ts_xzzzzz_yyz, \
-                             ts_xzzzzz_yzz, \
-                             ts_xzzzzz_zzz, \
-                             ts_zzzzz_xx,   \
-                             ts_zzzzz_xxx,  \
-                             ts_zzzzz_xxy,  \
-                             ts_zzzzz_xxz,  \
-                             ts_zzzzz_xy,   \
-                             ts_zzzzz_xyy,  \
-                             ts_zzzzz_xyz,  \
-                             ts_zzzzz_xz,   \
-                             ts_zzzzz_xzz,  \
-                             ts_zzzzz_yy,   \
-                             ts_zzzzz_yyy,  \
-                             ts_zzzzz_yyz,  \
-                             ts_zzzzz_yz,   \
-                             ts_zzzzz_yzz,  \
-                             ts_zzzzz_zz,   \
-                             ts_zzzzz_zzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_x, ts_xzzzzz_xxx, ts_xzzzzz_xxy, ts_xzzzzz_xxz, ts_xzzzzz_xyy, ts_xzzzzz_xyz, ts_xzzzzz_xzz, ts_xzzzzz_yyy, ts_xzzzzz_yyz, ts_xzzzzz_yzz, ts_xzzzzz_zzz, ts_zzzzz_xx, ts_zzzzz_xxx, ts_zzzzz_xxy, ts_zzzzz_xxz, ts_zzzzz_xy, ts_zzzzz_xyy, ts_zzzzz_xyz, ts_zzzzz_xz, ts_zzzzz_xzz, ts_zzzzz_yy, ts_zzzzz_yyy, ts_zzzzz_yyz, ts_zzzzz_yz, ts_zzzzz_yzz, ts_zzzzz_zz, ts_zzzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2389,44 +1786,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_yyyyyy_zzz = pbuffer.data(idx_ovl_if + 219);
 
-#pragma omp simd aligned(pa_y,              \
-                             ts_yyyy_xxx,   \
-                             ts_yyyy_xxy,   \
-                             ts_yyyy_xxz,   \
-                             ts_yyyy_xyy,   \
-                             ts_yyyy_xyz,   \
-                             ts_yyyy_xzz,   \
-                             ts_yyyy_yyy,   \
-                             ts_yyyy_yyz,   \
-                             ts_yyyy_yzz,   \
-                             ts_yyyy_zzz,   \
-                             ts_yyyyy_xx,   \
-                             ts_yyyyy_xxx,  \
-                             ts_yyyyy_xxy,  \
-                             ts_yyyyy_xxz,  \
-                             ts_yyyyy_xy,   \
-                             ts_yyyyy_xyy,  \
-                             ts_yyyyy_xyz,  \
-                             ts_yyyyy_xz,   \
-                             ts_yyyyy_xzz,  \
-                             ts_yyyyy_yy,   \
-                             ts_yyyyy_yyy,  \
-                             ts_yyyyy_yyz,  \
-                             ts_yyyyy_yz,   \
-                             ts_yyyyy_yzz,  \
-                             ts_yyyyy_zz,   \
-                             ts_yyyyy_zzz,  \
-                             ts_yyyyyy_xxx, \
-                             ts_yyyyyy_xxy, \
-                             ts_yyyyyy_xxz, \
-                             ts_yyyyyy_xyy, \
-                             ts_yyyyyy_xyz, \
-                             ts_yyyyyy_xzz, \
-                             ts_yyyyyy_yyy, \
-                             ts_yyyyyy_yyz, \
-                             ts_yyyyyy_yzz, \
-                             ts_yyyyyy_zzz, \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, ts_yyyy_xxx, ts_yyyy_xxy, ts_yyyy_xxz, ts_yyyy_xyy, ts_yyyy_xyz, ts_yyyy_xzz, ts_yyyy_yyy, ts_yyyy_yyz, ts_yyyy_yzz, ts_yyyy_zzz, ts_yyyyy_xx, ts_yyyyy_xxx, ts_yyyyy_xxy, ts_yyyyy_xxz, ts_yyyyy_xy, ts_yyyyy_xyy, ts_yyyyy_xyz, ts_yyyyy_xz, ts_yyyyy_xzz, ts_yyyyy_yy, ts_yyyyy_yyy, ts_yyyyy_yyz, ts_yyyyy_yz, ts_yyyyy_yzz, ts_yyyyy_zz, ts_yyyyy_zzz, ts_yyyyyy_xxx, ts_yyyyyy_xxy, ts_yyyyyy_xxz, ts_yyyyyy_xyy, ts_yyyyyy_xyz, ts_yyyyyy_xzz, ts_yyyyyy_yyy, ts_yyyyyy_yyz, ts_yyyyyy_yzz, ts_yyyyyy_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2474,35 +1834,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_yyyyyz_zzz = pbuffer.data(idx_ovl_if + 229);
 
-#pragma omp simd aligned(pa_y,              \
-                             pa_z,          \
-                             ts_yyyyy_xxx,  \
-                             ts_yyyyy_xxy,  \
-                             ts_yyyyy_xy,   \
-                             ts_yyyyy_xyy,  \
-                             ts_yyyyy_xyz,  \
-                             ts_yyyyy_yy,   \
-                             ts_yyyyy_yyy,  \
-                             ts_yyyyy_yyz,  \
-                             ts_yyyyy_yz,   \
-                             ts_yyyyy_yzz,  \
-                             ts_yyyyyz_xxx, \
-                             ts_yyyyyz_xxy, \
-                             ts_yyyyyz_xxz, \
-                             ts_yyyyyz_xyy, \
-                             ts_yyyyyz_xyz, \
-                             ts_yyyyyz_xzz, \
-                             ts_yyyyyz_yyy, \
-                             ts_yyyyyz_yyz, \
-                             ts_yyyyyz_yzz, \
-                             ts_yyyyyz_zzz, \
-                             ts_yyyyz_xxz,  \
-                             ts_yyyyz_xzz,  \
-                             ts_yyyyz_zzz,  \
-                             ts_yyyz_xxz,   \
-                             ts_yyyz_xzz,   \
-                             ts_yyyz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, pa_z, ts_yyyyy_xxx, ts_yyyyy_xxy, ts_yyyyy_xy, ts_yyyyy_xyy, ts_yyyyy_xyz, ts_yyyyy_yy, ts_yyyyy_yyy, ts_yyyyy_yyz, ts_yyyyy_yz, ts_yyyyy_yzz, ts_yyyyyz_xxx, ts_yyyyyz_xxy, ts_yyyyyz_xxz, ts_yyyyyz_xyy, ts_yyyyyz_xyz, ts_yyyyyz_xzz, ts_yyyyyz_yyy, ts_yyyyyz_yyz, ts_yyyyyz_yzz, ts_yyyyyz_zzz, ts_yyyyz_xxz, ts_yyyyz_xzz, ts_yyyyz_zzz, ts_yyyz_xxz, ts_yyyz_xzz, ts_yyyz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2550,42 +1882,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_yyyyzz_zzz = pbuffer.data(idx_ovl_if + 239);
 
-#pragma omp simd aligned(pa_y,              \
-                             pa_z,          \
-                             ts_yyyy_xxy,   \
-                             ts_yyyy_xyy,   \
-                             ts_yyyy_yyy,   \
-                             ts_yyyyz_xxy,  \
-                             ts_yyyyz_xyy,  \
-                             ts_yyyyz_yyy,  \
-                             ts_yyyyzz_xxx, \
-                             ts_yyyyzz_xxy, \
-                             ts_yyyyzz_xxz, \
-                             ts_yyyyzz_xyy, \
-                             ts_yyyyzz_xyz, \
-                             ts_yyyyzz_xzz, \
-                             ts_yyyyzz_yyy, \
-                             ts_yyyyzz_yyz, \
-                             ts_yyyyzz_yzz, \
-                             ts_yyyyzz_zzz, \
-                             ts_yyyzz_xxx,  \
-                             ts_yyyzz_xxz,  \
-                             ts_yyyzz_xyz,  \
-                             ts_yyyzz_xz,   \
-                             ts_yyyzz_xzz,  \
-                             ts_yyyzz_yyz,  \
-                             ts_yyyzz_yz,   \
-                             ts_yyyzz_yzz,  \
-                             ts_yyyzz_zz,   \
-                             ts_yyyzz_zzz,  \
-                             ts_yyzz_xxx,   \
-                             ts_yyzz_xxz,   \
-                             ts_yyzz_xyz,   \
-                             ts_yyzz_xzz,   \
-                             ts_yyzz_yyz,   \
-                             ts_yyzz_yzz,   \
-                             ts_yyzz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, pa_z, ts_yyyy_xxy, ts_yyyy_xyy, ts_yyyy_yyy, ts_yyyyz_xxy, ts_yyyyz_xyy, ts_yyyyz_yyy, ts_yyyyzz_xxx, ts_yyyyzz_xxy, ts_yyyyzz_xxz, ts_yyyyzz_xyy, ts_yyyyzz_xyz, ts_yyyyzz_xzz, ts_yyyyzz_yyy, ts_yyyyzz_yyz, ts_yyyyzz_yzz, ts_yyyyzz_zzz, ts_yyyzz_xxx, ts_yyyzz_xxz, ts_yyyzz_xyz, ts_yyyzz_xz, ts_yyyzz_xzz, ts_yyyzz_yyz, ts_yyyzz_yz, ts_yyyzz_yzz, ts_yyyzz_zz, ts_yyyzz_zzz, ts_yyzz_xxx, ts_yyzz_xxz, ts_yyzz_xyz, ts_yyzz_xzz, ts_yyzz_yyz, ts_yyzz_yzz, ts_yyzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2633,42 +1930,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_yyyzzz_zzz = pbuffer.data(idx_ovl_if + 249);
 
-#pragma omp simd aligned(pa_y,              \
-                             pa_z,          \
-                             ts_yyyz_xxy,   \
-                             ts_yyyz_xyy,   \
-                             ts_yyyz_yyy,   \
-                             ts_yyyzz_xxy,  \
-                             ts_yyyzz_xyy,  \
-                             ts_yyyzz_yyy,  \
-                             ts_yyyzzz_xxx, \
-                             ts_yyyzzz_xxy, \
-                             ts_yyyzzz_xxz, \
-                             ts_yyyzzz_xyy, \
-                             ts_yyyzzz_xyz, \
-                             ts_yyyzzz_xzz, \
-                             ts_yyyzzz_yyy, \
-                             ts_yyyzzz_yyz, \
-                             ts_yyyzzz_yzz, \
-                             ts_yyyzzz_zzz, \
-                             ts_yyzzz_xxx,  \
-                             ts_yyzzz_xxz,  \
-                             ts_yyzzz_xyz,  \
-                             ts_yyzzz_xz,   \
-                             ts_yyzzz_xzz,  \
-                             ts_yyzzz_yyz,  \
-                             ts_yyzzz_yz,   \
-                             ts_yyzzz_yzz,  \
-                             ts_yyzzz_zz,   \
-                             ts_yyzzz_zzz,  \
-                             ts_yzzz_xxx,   \
-                             ts_yzzz_xxz,   \
-                             ts_yzzz_xyz,   \
-                             ts_yzzz_xzz,   \
-                             ts_yzzz_yyz,   \
-                             ts_yzzz_yzz,   \
-                             ts_yzzz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, pa_z, ts_yyyz_xxy, ts_yyyz_xyy, ts_yyyz_yyy, ts_yyyzz_xxy, ts_yyyzz_xyy, ts_yyyzz_yyy, ts_yyyzzz_xxx, ts_yyyzzz_xxy, ts_yyyzzz_xxz, ts_yyyzzz_xyy, ts_yyyzzz_xyz, ts_yyyzzz_xzz, ts_yyyzzz_yyy, ts_yyyzzz_yyz, ts_yyyzzz_yzz, ts_yyyzzz_zzz, ts_yyzzz_xxx, ts_yyzzz_xxz, ts_yyzzz_xyz, ts_yyzzz_xz, ts_yyzzz_xzz, ts_yyzzz_yyz, ts_yyzzz_yz, ts_yyzzz_yzz, ts_yyzzz_zz, ts_yyzzz_zzz, ts_yzzz_xxx, ts_yzzz_xxz, ts_yzzz_xyz, ts_yzzz_xzz, ts_yzzz_yyz, ts_yzzz_yzz, ts_yzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2716,42 +1978,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_yyzzzz_zzz = pbuffer.data(idx_ovl_if + 259);
 
-#pragma omp simd aligned(pa_y,              \
-                             pa_z,          \
-                             ts_yyzz_xxy,   \
-                             ts_yyzz_xyy,   \
-                             ts_yyzz_yyy,   \
-                             ts_yyzzz_xxy,  \
-                             ts_yyzzz_xyy,  \
-                             ts_yyzzz_yyy,  \
-                             ts_yyzzzz_xxx, \
-                             ts_yyzzzz_xxy, \
-                             ts_yyzzzz_xxz, \
-                             ts_yyzzzz_xyy, \
-                             ts_yyzzzz_xyz, \
-                             ts_yyzzzz_xzz, \
-                             ts_yyzzzz_yyy, \
-                             ts_yyzzzz_yyz, \
-                             ts_yyzzzz_yzz, \
-                             ts_yyzzzz_zzz, \
-                             ts_yzzzz_xxx,  \
-                             ts_yzzzz_xxz,  \
-                             ts_yzzzz_xyz,  \
-                             ts_yzzzz_xz,   \
-                             ts_yzzzz_xzz,  \
-                             ts_yzzzz_yyz,  \
-                             ts_yzzzz_yz,   \
-                             ts_yzzzz_yzz,  \
-                             ts_yzzzz_zz,   \
-                             ts_yzzzz_zzz,  \
-                             ts_zzzz_xxx,   \
-                             ts_zzzz_xxz,   \
-                             ts_zzzz_xyz,   \
-                             ts_zzzz_xzz,   \
-                             ts_zzzz_yyz,   \
-                             ts_zzzz_yzz,   \
-                             ts_zzzz_zzz,   \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, pa_z, ts_yyzz_xxy, ts_yyzz_xyy, ts_yyzz_yyy, ts_yyzzz_xxy, ts_yyzzz_xyy, ts_yyzzz_yyy, ts_yyzzzz_xxx, ts_yyzzzz_xxy, ts_yyzzzz_xxz, ts_yyzzzz_xyy, ts_yyzzzz_xyz, ts_yyzzzz_xzz, ts_yyzzzz_yyy, ts_yyzzzz_yyz, ts_yyzzzz_yzz, ts_yyzzzz_zzz, ts_yzzzz_xxx, ts_yzzzz_xxz, ts_yzzzz_xyz, ts_yzzzz_xz, ts_yzzzz_xzz, ts_yzzzz_yyz, ts_yzzzz_yz, ts_yzzzz_yzz, ts_yzzzz_zz, ts_yzzzz_zzz, ts_zzzz_xxx, ts_zzzz_xxz, ts_zzzz_xyz, ts_zzzz_xzz, ts_zzzz_yyz, ts_zzzz_yzz, ts_zzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2799,34 +2026,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_yzzzzz_zzz = pbuffer.data(idx_ovl_if + 269);
 
-#pragma omp simd aligned(pa_y,              \
-                             ts_yzzzzz_xxx, \
-                             ts_yzzzzz_xxy, \
-                             ts_yzzzzz_xxz, \
-                             ts_yzzzzz_xyy, \
-                             ts_yzzzzz_xyz, \
-                             ts_yzzzzz_xzz, \
-                             ts_yzzzzz_yyy, \
-                             ts_yzzzzz_yyz, \
-                             ts_yzzzzz_yzz, \
-                             ts_yzzzzz_zzz, \
-                             ts_zzzzz_xx,   \
-                             ts_zzzzz_xxx,  \
-                             ts_zzzzz_xxy,  \
-                             ts_zzzzz_xxz,  \
-                             ts_zzzzz_xy,   \
-                             ts_zzzzz_xyy,  \
-                             ts_zzzzz_xyz,  \
-                             ts_zzzzz_xz,   \
-                             ts_zzzzz_xzz,  \
-                             ts_zzzzz_yy,   \
-                             ts_zzzzz_yyy,  \
-                             ts_zzzzz_yyz,  \
-                             ts_zzzzz_yz,   \
-                             ts_zzzzz_yzz,  \
-                             ts_zzzzz_zz,   \
-                             ts_zzzzz_zzz,  \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_y, ts_yzzzzz_xxx, ts_yzzzzz_xxy, ts_yzzzzz_xxz, ts_yzzzzz_xyy, ts_yzzzzz_xyz, ts_yzzzzz_xzz, ts_yzzzzz_yyy, ts_yzzzzz_yyz, ts_yzzzzz_yzz, ts_yzzzzz_zzz, ts_zzzzz_xx, ts_zzzzz_xxx, ts_zzzzz_xxy, ts_zzzzz_xxz, ts_zzzzz_xy, ts_zzzzz_xyy, ts_zzzzz_xyz, ts_zzzzz_xz, ts_zzzzz_xzz, ts_zzzzz_yy, ts_zzzzz_yyy, ts_zzzzz_yyz, ts_zzzzz_yz, ts_zzzzz_yzz, ts_zzzzz_zz, ts_zzzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2874,44 +2074,7 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
     auto ts_zzzzzz_zzz = pbuffer.data(idx_ovl_if + 279);
 
-#pragma omp simd aligned(pa_z,              \
-                             ts_zzzz_xxx,   \
-                             ts_zzzz_xxy,   \
-                             ts_zzzz_xxz,   \
-                             ts_zzzz_xyy,   \
-                             ts_zzzz_xyz,   \
-                             ts_zzzz_xzz,   \
-                             ts_zzzz_yyy,   \
-                             ts_zzzz_yyz,   \
-                             ts_zzzz_yzz,   \
-                             ts_zzzz_zzz,   \
-                             ts_zzzzz_xx,   \
-                             ts_zzzzz_xxx,  \
-                             ts_zzzzz_xxy,  \
-                             ts_zzzzz_xxz,  \
-                             ts_zzzzz_xy,   \
-                             ts_zzzzz_xyy,  \
-                             ts_zzzzz_xyz,  \
-                             ts_zzzzz_xz,   \
-                             ts_zzzzz_xzz,  \
-                             ts_zzzzz_yy,   \
-                             ts_zzzzz_yyy,  \
-                             ts_zzzzz_yyz,  \
-                             ts_zzzzz_yz,   \
-                             ts_zzzzz_yzz,  \
-                             ts_zzzzz_zz,   \
-                             ts_zzzzz_zzz,  \
-                             ts_zzzzzz_xxx, \
-                             ts_zzzzzz_xxy, \
-                             ts_zzzzzz_xxz, \
-                             ts_zzzzzz_xyy, \
-                             ts_zzzzzz_xyz, \
-                             ts_zzzzzz_xzz, \
-                             ts_zzzzzz_yyy, \
-                             ts_zzzzzz_yyz, \
-                             ts_zzzzzz_yzz, \
-                             ts_zzzzzz_zzz, \
-                             b_exps : 64)
+    #pragma omp simd aligned(pa_z, ts_zzzz_xxx, ts_zzzz_xxy, ts_zzzz_xxz, ts_zzzz_xyy, ts_zzzz_xyz, ts_zzzz_xzz, ts_zzzz_yyy, ts_zzzz_yyz, ts_zzzz_yzz, ts_zzzz_zzz, ts_zzzzz_xx, ts_zzzzz_xxx, ts_zzzzz_xxy, ts_zzzzz_xxz, ts_zzzzz_xy, ts_zzzzz_xyy, ts_zzzzz_xyz, ts_zzzzz_xz, ts_zzzzz_xzz, ts_zzzzz_yy, ts_zzzzz_yyy, ts_zzzzz_yyz, ts_zzzzz_yz, ts_zzzzz_yzz, ts_zzzzz_zz, ts_zzzzz_zzz, ts_zzzzzz_xxx, ts_zzzzzz_xxy, ts_zzzzzz_xxz, ts_zzzzzz_xyy, ts_zzzzzz_xyz, ts_zzzzzz_xzz, ts_zzzzzz_yyy, ts_zzzzzz_yyz, ts_zzzzzz_yzz, ts_zzzzzz_zzz, b_exps : 64)
     for (size_t i = 0; i < nelems; i++)
     {
         const double fe_0 = 0.5 / (a_exp + b_exps[i]);
@@ -2936,6 +2099,8 @@ comp_prim_overlap_if(CSimdArray<double>&       pbuffer,
 
         ts_zzzzzz_zzz[i] = 5.0 * ts_zzzz_zzz[i] * fe_0 + 3.0 * ts_zzzzz_zz[i] * fe_0 + ts_zzzzz_zzz[i] * pa_z[i];
     }
+
 }
 
-}  // namespace ovlrec
+} // ovlrec namespace
+

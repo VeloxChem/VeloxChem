@@ -2,11 +2,6 @@
 # the unit test executable
 add_library(vlxobjs OBJECT)
 
-target_compile_definitions(vlxobjs
-  PUBLIC
-    $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
-  )
-
 if(WIN32)
   target_compile_definitions(vlxobjs
     PUBLIC
@@ -58,6 +53,8 @@ add_subdirectory(pymodule)
 add_subdirectory(python)
 add_subdirectory(t2c_electric_dipole_momentum)
 add_subdirectory(t2c_electric_dipole_momentum_geom_X00)
+add_subdirectory(t2c_electron_repulsion)
+add_subdirectory(t2c_electron_repulsion_geom_X00)
 add_subdirectory(t2c_func)
 add_subdirectory(t2c_geometrical_derivatives)
 add_subdirectory(t2c_kinetic_energy)
@@ -71,6 +68,11 @@ add_subdirectory(t2c_nuclear_potential_geom_XY0)
 add_subdirectory(t2c_overlap)
 add_subdirectory(t2c_overlap_geom_X00)
 add_subdirectory(t2c_overlap_geom_X0Y)
+add_subdirectory(t3c_electron_repulsion)
+add_subdirectory(t3c_electron_repulsion_geom_0X0)
+add_subdirectory(t3c_electron_repulsion_geom_X00)
+add_subdirectory(t3c_func)
+add_subdirectory(t3c_overlap)
 add_subdirectory(t4c_electron_repulsion)
 add_subdirectory(t4c_electron_repulsion_geom_X000)
 add_subdirectory(t4c_electron_repulsion_geom_XY00)
@@ -78,4 +80,3 @@ add_subdirectory(t4c_electron_repulsion_geom_X0Y0)
 add_subdirectory(t4c_func)
 add_subdirectory(t4c_geometrical_derivatives)
 add_subdirectory(visualization)
-add_subdirectory(xtb)

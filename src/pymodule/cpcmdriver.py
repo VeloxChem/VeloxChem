@@ -1,39 +1,49 @@
 #
-#                           VELOXCHEM 1.0-RC3
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
-#  Contact: https://veloxchem.org/contact
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
 import numpy as np
 import math
+import time
 import sys
 
+from .veloxchemlib import cpcm_local_matrix_A_diagonals
+from .veloxchemlib import cpcm_local_matrix_A_dot_vector
+from .veloxchemlib import cpcm_comp_grad_Aii, cpcm_comp_grad_Aij
 from .veloxchemlib import bohr_in_angstrom, mpi_master
 from .veloxchemlib import gen_lebedev_grid
+from .veloxchemlib import compute_nuclear_potential_erf_values
+from .veloxchemlib import compute_nuclear_potential_erf_gradient
 from .veloxchemlib import NuclearPotentialErfDriver
-from .veloxchemlib import NuclearPotentialErfGeom010Driver
-from .veloxchemlib import NuclearPotentialErfGeom100Driver
-from .subcommunicators import SubCommunicators
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
@@ -84,13 +94,16 @@ class CpcmDriver:
         # model settings
         # standard value for dielectric const. is for that of water
         self.epsilon         = 78.39 
-        self.grid_per_sphere = 194
+        self.grid_per_sphere = (194, 110)
         self.x               = 0
+
+        self.custom_vdw_radii = None
         
         # input keywords
         self.input_keywords = {
             'cpcm': {
-                'grid_per_sphere': ('int', 'number of Lebedev grid points'),
+                'grid_per_sphere':
+                    ('seq_fixed_int', 'number of Lebedev grid points'),
                 'epsilon': ('float', 'dielectric constant of solvent'),
                 'x': ('float', 'parameter for scaling function'),
             },
@@ -145,6 +158,52 @@ class CpcmDriver:
             The C-PCM energy.
         """
         return 0.5 * np.vdot(q, Bzvec + Cvec)
+    
+    def get_cpcm_vdw_radii(self, molecule):
+        """
+        Get C-PCM VDW radii.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The VDW radii of the atoms.
+        """
+ 
+        atom_radii = molecule.vdw_radii_to_numpy()
+        if self.custom_vdw_radii is not None:
+            assert_msg_critical(
+                len(self.custom_vdw_radii) % 2 == 0,
+                'C-PCM: expecting even number of entries for user-defined C-PCM radii')
+ 
+            keys = self.custom_vdw_radii[0::2]
+            vals = self.custom_vdw_radii[1::2]
+ 
+            for key, val in zip(keys, vals):
+                val_au = float(val) / bohr_in_angstrom()
+                try:
+                    idx = int(key) - 1
+                    assert_msg_critical(
+                        0 <= idx and idx < molecule.number_of_atoms(),
+                        'C-PCM: invalid atom index for user-defined C-PCM radii')
+                    atom_radii[idx] = val_au
+                    self.ostream.print_info(
+                        f'Applying user-defined C-PCM radius {val} for atom {key}')
+
+                except ValueError:
+                    elem_found = False
+                    for idx, label in enumerate(molecule.get_labels()):
+                        if label.upper() == key.upper():
+                            atom_radii[idx] = val_au
+                            elem_found = True
+ 
+                    if elem_found:
+                        self.ostream.print_info(
+                            f'Applying user-defined C-PCM radius {val} for atom {key}')
+
+            self.ostream.print_blank()
+
+        return atom_radii
 
     def generate_cpcm_grid(self, molecule):
         """
@@ -161,35 +220,65 @@ class CpcmDriver:
         valid_grid_numbers = [50, 110, 194, 302, 434, 590, 770, 974, 2030]
 
         assert_msg_critical(
-            self.grid_per_sphere in valid_grid_numbers,
-            'CpcmDriver.generate_grid: Invalid grid_per_sphere')
+            (len(self.grid_per_sphere) == 2) and
+                (self.grid_per_sphere[0] in valid_grid_numbers) and
+                (self.grid_per_sphere[1] in valid_grid_numbers),
+            'CpcmDriver.generate_cpcm_grid: Invalid grid_per_sphere')
 
-        unit_grid = gen_lebedev_grid(self.grid_per_sphere)
+        unit_grid = gen_lebedev_grid(self.grid_per_sphere[0])
         unit_grid_coords = unit_grid[:, :3]
         unit_grid_weights = unit_grid[:, 3:]
+
+        unit_hydrogen_grid = gen_lebedev_grid(self.grid_per_sphere[1])
+        unit_hydrogen_grid_coords = unit_hydrogen_grid[:, :3]
+        unit_hydrogen_grid_weights = unit_hydrogen_grid[:, 3:]
 
         # standard normalization of lebedev weights -- unit sphere surface; 1 -> 4pi
         # Ref.: B. A. Gregersen and D. M. York, J. Chem. Phys. 122, 194110 (2005)
         unit_grid_weights *= 4 * np.pi
+        unit_hydrogen_grid_weights *= 4 * np.pi
 
-        zeta = self.get_zeta_dict()[self.grid_per_sphere]
+        zeta = self.get_zeta_dict()[self.grid_per_sphere[0]]
+        hydrogen_zeta = self.get_zeta_dict()[self.grid_per_sphere[1]]
 
         # increase radii by 20%
-        atom_radii = molecule.vdw_radii_to_numpy() * 1.2
+        atom_radii = self.get_cpcm_vdw_radii(molecule) * 1.2
         atom_coords = molecule.get_coordinates_in_bohr()
+        identifiers = molecule.get_identifiers()
 
         cpcm_grid_raw = np.zeros((0, 6))
 
-        for i in range(molecule.number_of_atoms()):
-            # scale and shift unit grid
-            atom_grid_coords = unit_grid_coords * atom_radii[i] + atom_coords[i]
-            grid_zeta = zeta / (atom_radii[i] * np.sqrt(unit_grid_weights))
-            atom_idx = np.full_like(grid_zeta, i)
-            atom_grid = np.hstack(
-                (atom_grid_coords, unit_grid_weights, grid_zeta, atom_idx))
+        natoms = molecule.number_of_atoms()
+        ave, rem = divmod(natoms, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        atom_start = sum(counts[:self.rank])
+        atom_end = sum(counts[:self.rank + 1])
+
+        for i in range(atom_start, atom_end):
+            if identifiers[i] == 1:
+                # scale and shift unit grid of hydrogen atom
+                atom_grid_coords = unit_hydrogen_grid_coords * atom_radii[i] + atom_coords[i]
+                grid_zeta = hydrogen_zeta / (atom_radii[i] * np.sqrt(unit_hydrogen_grid_weights))
+                atom_idx = np.full_like(grid_zeta, i)
+                atom_grid = np.hstack(
+                    (atom_grid_coords, unit_hydrogen_grid_weights, grid_zeta, atom_idx))
+            else:
+                # scale and shift unit grid of non-hydrogen atom
+                atom_grid_coords = unit_grid_coords * atom_radii[i] + atom_coords[i]
+                grid_zeta = zeta / (atom_radii[i] * np.sqrt(unit_grid_weights))
+                atom_idx = np.full_like(grid_zeta, i)
+                atom_grid = np.hstack(
+                    (atom_grid_coords, unit_grid_weights, grid_zeta, atom_idx))
             cpcm_grid_raw = np.vstack((cpcm_grid_raw, atom_grid))
 
+        gathered_cpcm_grid_raw = self.comm.allgather(cpcm_grid_raw)
+        cpcm_grid_raw = np.vstack(gathered_cpcm_grid_raw)
+
         sw_func_raw = self.get_switching_function(atom_coords, atom_radii, cpcm_grid_raw)
+
+        gathered_sw_func_raw = self.comm.allgather(sw_func_raw)
+        sw_func_raw = np.hstack(gathered_sw_func_raw)
+
         sw_mask = (sw_func_raw > 1.0e-8)
 
         cpcm_grid = cpcm_grid_raw[sw_mask, :]
@@ -217,20 +306,24 @@ class CpcmDriver:
             'CpcmDriver.get_switching_function: Inconsistent atom_coords ' +
             'and atom_radii')
 
-        assert_msg_critical(
-            grid.shape[0] == self.grid_per_sphere * atom_coords.shape[0],
-            'CpcmDriver.get_switching_function: Should only be used on ' +
-            'raw CPCM grid')
+        npoints = grid.shape[0]
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-        sw_func = np.zeros(grid.shape[0])
+        sw_func = np.zeros(end - start)
 
-        for g in range(grid.shape[0]):
+        for g in range(start, end):
             gx, gy, gz = grid[g, :3]
             zeta_g = grid[g, 4]
 
-            sw_func[g] = 1.0
-            atom_idx = g // self.grid_per_sphere
+            sw_func[g - start] = 1.0
 
+            # TODO: save grid atom_idx in another array
+            atom_idx = int(grid[g, 5])
+
+            # TODO: consider moving to C++
             for i in range(atom_coords.shape[0]):
                 if i == atom_idx:
                     continue
@@ -241,7 +334,7 @@ class CpcmDriver:
                 f_ag = 1.0 - 0.5 * (math.erf(zeta_g * (a_radius - r_ag)) +
                                     math.erf(zeta_g * (a_radius + r_ag)))
 
-                sw_func[g] *= f_ag
+                sw_func[g - start] *= f_ag
 
         return sw_func
     
@@ -263,7 +356,7 @@ class CpcmDriver:
             2030: 4.90744499142,
         }
 
-    def form_matrix_A(self, grid, sw_func):
+    def form_local_precond(self, grid, sw_func):
         """
         Forms the cavity-cavity interaction matrix.
 
@@ -272,38 +365,25 @@ class CpcmDriver:
             the Gaussian exponents, and indices for which atom they belong to.
         :param sw_func:
             The switching function.
-        
+
         :return:
             The (cavity) electrostatic potential at each grid point due to
             the grid (unweighted by the charges).
         """
 
-        Amat = np.zeros((grid.shape[0], grid.shape[0]))
+        ave, rem = divmod(grid.shape[0], self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-        sqrt_2_invpi = np.sqrt(2.0 / np.pi)
+        local_Adiag = cpcm_local_matrix_A_diagonals(grid, sw_func, start, end)
+        local_precond = 1.0 / local_Adiag
 
-        for i in range(grid.shape[0]):
-            xi, yi, zi, wi, zeta_i, atom_idx = grid[i]
-            Amat[i, i] = zeta_i * sqrt_2_invpi / sw_func[i]
-            zeta_i2 = zeta_i**2
+        return local_precond
 
-            for j in range(i + 1, grid.shape[0]):
-                xj, yj, zj, wj, zeta_j, atom_idx = grid[j]
-
-                zeta_j2 = zeta_j**2
-                zeta_ij = zeta_i * zeta_j / np.sqrt(zeta_i2 + zeta_j2)
-
-                r_ij = np.sqrt((xi - xj)**2 + (yi - yj)**2 + (zi - zj)**2)
-
-                Aij = math.erf(zeta_ij * r_ij) / r_ij
-                Amat[i, j] = Aij
-                Amat[j, i] = Aij
-
-        return Amat
-
-    def form_matrix_B(self, grid, molecule):
+    def form_vector_Bz(self, grid, molecule):
         """
-        Forms the nuclear-cavity interaction matrix.
+        Forms the nuclear-cavity interaction vector.
 
         :param molecule:
             The molecule.
@@ -315,18 +395,22 @@ class CpcmDriver:
             The (nuclear) electrostatic potential at each grid point due to
             each nucleus (not weighted by nuclear charge).
         """
-        Bmat = np.zeros((grid.shape[0], molecule.number_of_atoms()))
-        natoms = molecule.number_of_atoms()
+
+        Bzvec = np.zeros(grid.shape[0])
+
         atom_coords = molecule.get_coordinates_in_bohr()
+        elem_ids = molecule.get_element_ids()
 
-        for i in range(grid.shape[0]):
-            xi, yi, zi, wi, zeta_i, atom_idx = grid[i]
-            for a in range(natoms):
-                xa, ya, za = atom_coords[a]
-                r_ia = np.sqrt((xi - xa)**2 + (yi - ya)**2 + (zi - za)**2)
-                Bmat[i, a] = math.erf(zeta_i * r_ia) / r_ia
+        grid_coords = np.copy(grid[:, :3])
+        grid_zeta = np.copy(grid[:, 4])
 
-        return Bmat
+        for a in range(molecule.number_of_atoms()):
+
+            r_ia = np.sqrt(np.sum((grid_coords - atom_coords[a])**2, axis=1))
+
+            Bzvec += elem_ids[a] * self.erf_array(grid_zeta * r_ia) / r_ia
+
+        return Bzvec
 
     def form_vector_C(self, molecule, basis, grid, D):
         """
@@ -345,51 +429,39 @@ class CpcmDriver:
         :return:
             The total (electronic) electrostatic potential at each grid point.
         """
-        esp = np.zeros(grid.shape[0])
-        # electrostatic potential integrals
-        node_grps = [p for p in range(self.nodes)]
-        subcomm = SubCommunicators(self.comm, node_grps)
-        local_comm = subcomm.local_comm
-        cross_comm = subcomm.cross_comm
 
         ave, res = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        local_esp = np.zeros(end - start)
-        nerf_drv = NuclearPotentialErfDriver()
-        
-        for i in range(start, end):
-            epi_matrix = 1.0 * nerf_drv.compute(molecule, basis, [1.0], [grid[i,:3]], grid[i,4]).full_matrix().to_numpy()
+        local_esp = compute_nuclear_potential_erf_values(
+            molecule, basis, np.copy(grid[start:end, :3]), D,
+            np.copy(grid[start:end, 4]))
 
-            if local_comm.Get_rank() == mpi_master():
-                local_esp[i - start] -= np.sum(epi_matrix * D)
-
-        if local_comm.Get_rank() == mpi_master():
-            local_esp = cross_comm.gather(local_esp, root=mpi_master())
-
+        gathered_esp = self.comm.gather(local_esp, root=mpi_master())
         if self.rank == mpi_master():
-            for i in range(self.nodes):
-                start = sum(counts[:i])
-                end = sum(counts[:i + 1])
-                esp[start:end] += local_esp[i]
-            return esp
+            esp = np.hstack(gathered_esp)
         else:
-            return None
+            esp = None
+
+        return esp
 
     def get_contribution_to_Fock(self, molecule, basis, grid, q):
 
-        grid_coords = grid[:, :3].copy()
-        zeta        = grid[:, 4].copy()
+        ave, res = divmod(grid.shape[0], self.nodes)
+        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-        if self.rank == mpi_master():
-            nerf_drv = NuclearPotentialErfDriver()
-            V_es = -1.0 * nerf_drv.compute(molecule, basis, q, grid_coords, zeta).full_matrix().to_numpy()
+        grid_coords = grid[start:end, :3].copy()
+        zeta        = grid[start:end, 4].copy()
 
-        else:
-            V_es = None
+        nerf_drv = NuclearPotentialErfDriver()
+
+        local_V_es = -1.0 * nerf_drv.compute(molecule, basis, q[start:end], grid_coords, zeta).to_numpy()
+
+        V_es = self.comm.reduce(local_V_es, root=mpi_master())
 
         return V_es
 
@@ -455,51 +527,23 @@ class CpcmDriver:
         :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
-        # Defnine constants
-        two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
-        natoms         = molecule.number_of_atoms()
-        scale_f        = -(eps - 1) / (eps + x)
-        grid_coords    = grid[:, :3]
-        zeta           = grid[:, 4]
-        zeta_2         = zeta**2
-        atom_indices   = grid[:, 5]
-        n_dim          = 3 # x,y,z
-        
-        # M = Nr. of grid pts.
-        M = grid_coords.shape[0]
-        grad = np.zeros((M, M, natoms, 3))
 
-        delta_r = grid_coords[:, np.newaxis, :] - grid_coords[np.newaxis, :, :]
-        r_ij_2  = np.sum(delta_r**2, axis=-1)
-        # Diagonal terms are not used anyway so fill these elements
-        # to avoid divison by zero errors
-        np.fill_diagonal(r_ij_2, 1.0)
-        r_ij   = np.sqrt(r_ij_2)
-        dr_rij = delta_r / r_ij[:, :, np.newaxis]
+        natoms = molecule.number_of_atoms()
+        scale_f = -(eps - 1.0) / (eps + x)
 
-        # Construct the explicit terms appearing in the gradient
-        zeta_ij  = (zeta[:, np.newaxis] * zeta[np.newaxis, :]) / np.sqrt(zeta_2[:, np.newaxis] + zeta_2[np.newaxis, :])
-        erf_term = self.erf_array(zeta_ij * r_ij)
-        exp_term = np.exp(-zeta_ij**2 * r_ij_2)
+        grid_coords = np.copy(grid[:, :3])
+        zeta = np.copy(grid[:, 4])
+        atom_indices = np.copy(grid[:, 5].astype(int))
 
-        dA_dr = -1.0 * (erf_term - two_sqrt_invpi * zeta_ij * r_ij * exp_term) / r_ij_2
-        
-        # Definitions to keep track of which atom each piint belongs to
-        I_vals      = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
-        atom_idx_m  = atom_indices[np.newaxis, :, np.newaxis]
-        atom_idx_n  = atom_indices[np.newaxis, np.newaxis, :]
-        delta_ij    = ((I_vals == atom_idx_m).astype(int)
-                     - (I_vals == atom_idx_n).astype(int))
+        npoints = grid_coords.shape[0]
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-        # Construct the (n-1) gradient terms by broadcasting
-        grad[:, :, :-1, :] = dA_dr[:, :, np.newaxis, np.newaxis] * delta_ij.transpose(1, 2, 0)[:, :, :, np.newaxis] * dr_rij[:, :, np.newaxis, :]
-        # Translational invariance
-        grad[:, :, -1, :] = -np.sum(grad[:, :, :-1, :], axis=2)
-
-        # Perform contractions
-        partial_contract = np.matmul(q, grad.reshape(M, M * natoms * n_dim)).reshape(M, natoms * n_dim)
-        grad_Aij = np.matmul(partial_contract.T, q).reshape(natoms, n_dim)
+        grad_Aij = cpcm_comp_grad_Aij(grid_coords, zeta, atom_indices, q, start, end, natoms)
         grad_Aij *= (-0.5 / scale_f)
+
         return grad_Aij
 
     def grad_Aii(self, molecule, grid, sw_f, q, eps, x):
@@ -524,72 +568,30 @@ class CpcmDriver:
         :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
-        # Basic constants
-        sqrt_2_inv_pi = np.sqrt(2.0 / np.pi)
+
         scale_f       = -(eps - 1) / (eps + x)
-        natoms        = molecule.number_of_atoms()
+
+        grid_coords = np.copy(grid[:, :3])
+        zeta_i      = np.copy(grid[:, 4])
+        atom_idx    = np.copy(grid[:, 5])
+
         atom_coords   = molecule.get_coordinates_in_bohr()
-        atom_radii    = molecule.vdw_radii_to_numpy() * 1.2
-        
-        # Grid info
-        M           = grid.shape[0]
-        grid_coords = grid[:, :3]
-        zeta_i      = grid[:, 4]
-        atom_idx    = grid[:, 5]
-        n_dim       = 3 # x,y,z
-        F_i         = sw_f
+        atom_radii    = self.get_cpcm_vdw_radii(molecule) * 1.2
 
-        # Initialise grad. object
-        grad = np.zeros((M, M, natoms, 3))
+        npoints = grid_coords.shape[0]
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-        # Basic geometrical vectors
-        r_iJ      = grid_coords[:, np.newaxis, :] - atom_coords[np.newaxis, :, :]
-        r_iJ_norm = np.linalg.norm(r_iJ, axis=2)
-        dr_iJ     = r_iJ / r_iJ_norm[:, :, np.newaxis]
-        RJ        = atom_radii[np.newaxis, :]
+        # a, b: atoms
+        # i: grid points
+        # c: Cartesian components
+        # np.einsum('aib,ib,ibc,i->ac', delta, ratio_fiJ, dr_iJ, factor_i * q**2)
+        grad_Aii = cpcm_comp_grad_Aii(grid_coords, zeta_i, sw_f, atom_idx, q,
+                                      start, end, atom_coords, atom_radii)
+        grad_Aii *= (-0.5 / scale_f)
 
-        # Definitions to keep track of which atom each grid point belongs to
-        a_vals = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
-        _i_idx = atom_idx[np.newaxis, :, np.newaxis]
-        J_vals = np.arange(natoms)[np.newaxis, np.newaxis, :]
-        delta  = ((a_vals == _i_idx).astype(int)
-                - (a_vals == J_vals).astype(int))
-
-        # Compute fiJ
-        term_m = zeta_i[:, np.newaxis] * (RJ - r_iJ_norm)
-        term_p = zeta_i[:, np.newaxis] * (RJ + r_iJ_norm)
-        fiJ = 1.0 - 0.5*(self.erf_array(term_m) + self.erf_array(term_p))
-
-        # Derivative of fiJ: dfiJ_driJ
-        z2 = zeta_i[:, np.newaxis]**2
-        dfiJ_driJ = (zeta_i[:, np.newaxis] / np.sqrt(np.pi)) * (
-            -np.exp(-z2 * (RJ - r_iJ_norm)**2) + np.exp(-z2 * (RJ + r_iJ_norm)**2))
-        ratio_fiJ = dfiJ_driJ / fiJ
-
-        # Primitive switching func. derivative contribution
-        f_i = delta[:, :, :, np.newaxis] * ratio_fiJ[np.newaxis, :, :, np.newaxis] * dr_iJ[np.newaxis, :, :, :]
-        summed_fi = np.sum(f_i, axis=2)
-
-        # Switching func. contribution
-        grad_Fi = -F_i[np.newaxis, :, np.newaxis] * summed_fi
-
-        factor_i = -zeta_i[np.newaxis, :] * sqrt_2_inv_pi / (F_i[np.newaxis, :]**2)
-
-        final_contribution = grad_Fi * factor_i[:, :, np.newaxis]
-
-        idx = np.arange(M)
-        for a in range(natoms - 1):
-            contrib_a = final_contribution[a, :, :]
-            # SEt the diagonal
-            grad[idx, idx, a, :] = contrib_a
-
-        # Translational invariance
-        grad[:, :, -1, :] = -np.sum(grad[:, :, :-1, :], axis=2)
-
-        # Perform contractions
-        partial_contract = np.matmul(q, grad.reshape(M, M * natoms * n_dim)).reshape(M, natoms * n_dim)
-        grad_Aii         = np.matmul(partial_contract.T, q).reshape(natoms, n_dim)
-        grad_Aii        *= (-0.5 / scale_f)
         return grad_Aii
 
     def grad_B(self, molecule, grid, q):
@@ -607,49 +609,39 @@ class CpcmDriver:
         :return:
             The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
+
         atom_coords = molecule.get_coordinates_in_bohr()
         natoms      = molecule.number_of_atoms()
-        grid_coords = grid[:, :3]
-        zeta_i      = grid[:, 4]
-        atom_idx    = grid[:, 5]
-        n_dim       = 3 # x,y,z
 
-        # Define constants
-        # M = Nr. of grid points
-        M              = grid_coords.shape[0]
+        grid_coords = np.copy(grid[:, :3])
+        zeta_i      = np.copy(grid[:, 4])
+        atom_idx    = np.copy(grid[:, 5]).astype(int)
+
         two_sqrt_invpi = 2.0 / np.sqrt(np.pi)
-        dB_mat         = np.zeros((M, natoms, natoms, n_dim))
 
-        # distances and direction vects.
-        r_iA   = grid_coords[:, np.newaxis, :] - atom_coords[np.newaxis, :, :]
-        r_iA_2 = np.sum(r_iA**2, axis=2)
-        d_iA   = np.sqrt(r_iA_2)
-        dr_iA  = r_iA / d_iA[:, :, np.newaxis]
+        elem_ids = molecule.get_element_ids()
+        gradB_vec = np.zeros((natoms, 3))
 
-        zeta_r   = zeta_i[:, np.newaxis] * d_iA
-        erf_term    = self.erf_array(zeta_r)
-        exp_term = np.exp(-1.0 * (zeta_i[:, np.newaxis]**2) * r_iA_2)
-        dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
+        # np.einsum('ia,bia,iac,i,a->bc', dB_dr, factor, dr_iA, q, Z)
 
-        # Set up for broadcasting
-        I_vals       = np.arange(natoms - 1)[:, np.newaxis, np.newaxis]
-        A_vals       = np.arange(natoms)[np.newaxis, np.newaxis, :]
-        atom_idx_exp = atom_idx[np.newaxis, :, np.newaxis]
-        factor    = ((I_vals == atom_idx_exp).astype(int)
-                    - (I_vals == A_vals).astype(int))
-        
-        # Calculate for the n-1 first atoms
-        dB_mat_n_minus_1 = dB_dr[np.newaxis, :, :, np.newaxis] * factor[:, :, :, np.newaxis] * dr_iA[np.newaxis, :, :, :]
-        # Reordeer to (M, nAtoms, nAtoms-1, 3)
-        dB_mat_n_minus_1 = np.transpose(dB_mat_n_minus_1, (1, 2, 0, 3))
-        
-        # Translational invariance
-        dB_mat[:, :, :-1, :] = dB_mat_n_minus_1
-        dB_mat[:, :, -1, :]  = -np.sum(dB_mat[:, :, :-1, :], axis=2)
-        
-        # Contract
-        partial_contract = np.matmul(q, dB_mat.reshape(M, natoms * natoms * n_dim)).reshape(natoms, natoms * n_dim)
-        gradB_vec = np.matmul(partial_contract.T, molecule.get_element_ids()).reshape(natoms, n_dim)
+        for a in list(range(natoms))[self.rank::self.nodes]:
+
+            r_iA   = grid_coords - atom_coords[a]
+            r_iA_2 = np.sum(r_iA**2, axis=1)
+            d_iA   = np.sqrt(r_iA_2)
+
+            dr_iA  = r_iA / d_iA.reshape(-1, 1)
+
+            zeta_r   = zeta_i * d_iA
+            erf_term = self.erf_array(zeta_r)
+            exp_term = np.exp(-1.0 * (zeta_i**2) * r_iA_2)
+            dB_dr    = -1.0 * (erf_term - two_sqrt_invpi * zeta_r * exp_term) / r_iA_2
+
+            for b in range(natoms):
+
+                factor = (atom_idx == b).astype(int) - int(a == b)
+
+                gradB_vec[b] += np.dot(dB_dr * factor * q, dr_iA) * elem_ids[a]
 
         return gradB_vec
     
@@ -668,61 +660,107 @@ class CpcmDriver:
             The converged density matrix.
 
         :return:
-        The gradient array of each cartesian component -- of shape (nAtoms, 3).
+            The gradient array of each cartesian component -- of shape (nAtoms, 3).
         """
-        geom100_drv = NuclearPotentialErfGeom100Driver()
-        geom010_drv = NuclearPotentialErfGeom010Driver()
         
-        # DEfine constants
-        natoms = molecule.number_of_atoms()
-        grad_C_nuc = np.zeros((natoms, 3))
-        grad_C_cav = np.zeros((natoms, 3))
-        grid_coords  = grid[:, :3]
-        zeta         = grid[:, 4]
-        atom_indices = grid[:, 5].astype(int)
-        labels = ['X', 'Y', 'Z']
+        npoints = grid.shape[0]
 
-        # Compute both the nuclear and cavity contributions
-        for a in range(natoms - 1):
-            # Indices where the grid belongs to atom a
-            indices_a = (atom_indices == a)
-            q_subset  = q[indices_a]
-            grid_a    = grid_coords[indices_a]
-            zeta_a    = zeta[indices_a]
-            
-            geom100_mats, geom010_mats, geom001_mats = [], [], []
+        ave, rem = divmod(npoints, self.nodes)
+        counts = [ave + 1 if p < rem else ave for p in range(self.nodes)]
+        start = sum(counts[:self.rank])
+        end = sum(counts[:self.rank + 1])
 
-            for i, charge in enumerate(q_subset):
-                grad_010 = geom010_drv.compute(molecule, basis, [charge], [grid_a[i]], [zeta_a[i]])
-                geom010_mats.append(np.array([-1.0 * grad_010.matrix(label).full_matrix().to_numpy() for label in labels]))
+        grid_coords  = np.copy(grid[start:end, :3])
+        zeta         = np.copy(grid[start:end, 4])
+        atom_indices = np.copy(grid[start:end, 5].astype(int))
 
-            grad_100 = geom100_drv.compute(molecule, basis, a, grid_coords, q, zeta)
-            
-            for label in labels:
-                mat_100 = -1.0 * grad_100.matrix(label).full_matrix().to_numpy()
-                geom100_mats.append(mat_100)
-                geom001_mats.append(mat_100.T)
-
-            geom100_mats = np.array(geom100_mats)
-            geom010_mats = np.array(geom010_mats)
-            geom001_mats = np.array(geom001_mats)
-            geom100_mats += geom001_mats
-            
-            partial_nuc = np.tensordot(geom010_mats, DM, axes=([2, 3], [0, 1]))
-            grad_C_nuc[a] = np.sum(partial_nuc, axis=0)
-
-            grad_C_cav[a] = np.tensordot(DM, geom100_mats, axes=([0, 1], [1, 2]))
-
-        # Translational invariance
-        grad_C_cav[-1] = -np.sum(grad_C_cav[:-1], axis=0)
-        grad_C_nuc[-1] = -np.sum(grad_C_nuc[:-1], axis=0)
-        return grad_C_nuc + grad_C_cav
+        return compute_nuclear_potential_erf_gradient(
+            molecule, basis, grid_coords, q[start:end], DM, zeta, atom_indices)
 
     def cpcm_grad_contribution(self, molecule, basis, grid, sw_f, q, D):
         """
         Collects the CPCM gradient contribution.
         """
-        gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x) + self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
+
+        gradA = self.grad_Aij(molecule, grid, q, self.epsilon, self.x)
+
+        gradA += self.grad_Aii(molecule, grid, sw_f, q, self.epsilon, self.x)
+
         gradB = self.grad_B(molecule, grid, q)
+
         gradC = self.grad_C(molecule, basis, grid, q, D)
+
         return gradA + gradB + gradC
+
+    def cg_solve_parallel_direct(self,
+                                 grid,
+                                 sw_func,
+                                 precond,
+                                 rhs,
+                                 x0=None,
+                                 cg_thresh=1.0e-8):
+        """
+        Solves the C-PCM equations using conjugate gradient.
+        """
+
+        try:
+            from scipy.sparse import linalg
+        except ImportError:
+            raise ImportError('Unable to import scipy. Please install scipy ' +
+                              'via pip or conda.')
+
+        def matvec(v):
+            """
+            Matrix-vector product
+            """
+
+            ave, res = divmod(grid.shape[0], self.nodes)
+            counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
+            start = sum(counts[:self.rank])
+            end = sum(counts[:self.rank + 1])
+
+            local_v = cpcm_local_matrix_A_dot_vector(grid, sw_func, v, start, end)
+
+            ret = self.comm.allgather(local_v)
+            return np.hstack(ret)
+
+        def precond_matvec(v):
+            """
+            Matrix-vector product for preconditioner using the
+            inverse of the diagonal
+            """
+
+            return precond * v
+
+        n = grid.shape[0]
+
+        LinOp = linalg.LinearOperator((n, n), matvec=matvec)
+        PrecondOp = linalg.LinearOperator((n, n), matvec=precond_matvec)
+
+        b = rhs
+        if x0 is None:
+            x0 = np.zeros(rhs.shape)
+
+        try:
+            cg_solution, cg_conv = linalg.cg(A=LinOp,
+                                             b=b,
+                                             x0=x0,
+                                             M=PrecondOp,
+                                             rtol=cg_thresh,
+                                             atol=0)
+        except TypeError:
+            # workaround for scipy < 1.11
+            cg_solution, cg_conv = linalg.cg(A=LinOp,
+                                             b=b,
+                                             x0=x0,
+                                             M=PrecondOp,
+                                             tol=(cg_thresh * np.linalg.norm(b)),
+                                             atol=0)
+
+
+        assert_msg_critical(cg_conv == 0,
+                            'C-PCM: conjugate gradient solver did not converge')
+
+        cg_solution = self.comm.bcast(cg_solution, root=mpi_master())
+
+        return cg_solution

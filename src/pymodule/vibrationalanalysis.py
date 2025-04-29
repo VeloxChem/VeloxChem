@@ -1,26 +1,34 @@
 #
-#                              VELOXCHEM
-#         ----------------------------------------------------
-#                     An Electronic Structure Code
+#                                   VELOXCHEM
+#              ----------------------------------------------------
+#                          An Electronic Structure Code
 #
-#  Copyright © 2018-2024 by VeloxChem developers. All rights reserved.
+#  SPDX-License-Identifier: BSD-3-Clause
 #
-#  SPDX-License-Identifier: LGPL-3.0-or-later
+#  Copyright 2018-2025 VeloxChem developers
 #
-#  This file is part of VeloxChem.
+#  Redistribution and use in source and binary forms, with or without modification,
+#  are permitted provided that the following conditions are met:
 #
-#  VeloxChem is free software: you can redistribute it and/or modify it under
-#  the terms of the GNU Lesser General Public License as published by the Free
-#  Software Foundation, either version 3 of the License, or (at your option)
-#  any later version.
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#  3. Neither the name of the copyright holder nor the names of its contributors
+#     may be used to endorse or promote products derived from this software without
+#     specific prior written permission.
 #
-#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
-#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
-#  License for more details.
-#
-#  You should have received a copy of the GNU Lesser General Public License
-#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+#  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+#  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+#  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+#  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from contextlib import redirect_stderr
 from io import StringIO
@@ -62,9 +70,9 @@ class VibrationalAnalysis:
         - reduced_masses: The reduced masses of the normal modes in amu.
         - force_constants: The force constants in mdyn/Angstrom.
         - vib_frequencies: The vibrational frequencies in cm**-1.
-        - normal_modes: The non-normalized vibrational normal modes in
+        - raw_normal_modes: The non-normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
-        - normed_normal_modes: The normalized vibrational normal modes in
+        - normal_modes: The normalized vibrational normal modes in
                         (non-mass-weighted) Cartesian coordinates.
         - dipole_gradient: The gradient of the dipole moment.
         - ir_intensities: The IR intensities in km/mol.
@@ -111,8 +119,8 @@ class VibrationalAnalysis:
 
         # filenames
         self.filename = None
-        self.checkpoint_file = None
-        self.result_file = None
+        self.results_h5_file = None
+        self.vib_results_txt_file = None
 
         # option dictionaries from input
         # TODO: cleanup
@@ -141,8 +149,8 @@ class VibrationalAnalysis:
         self.force_constants = None
         self.vib_frequencies = None
 
-        self.normal_modes = None  # not normalized, not mass-weighted
-        self.normed_normal_modes = None  # normalized, not mass-weighted
+        self.raw_normal_modes = None  # not normalized, not mass-weighted
+        self.normal_modes = None  # normalized, not mass-weighted
         self.dipole_gradient = None
         self.ir_intensities = None
         self.polarizability_gradient = None
@@ -247,10 +255,8 @@ class VibrationalAnalysis:
 
         if 'filename' in vib_dict:
             self.filename = vib_dict['filename']
-            self.checkpoint_file = f'{self.filename}-vib-results.h5'
-            self.result_file = f'{self.filename}-vib-results.out'
-        else:
-            self.result_file = 'vib-results.out'
+            self.results_h5_file = f'{self.filename}.h5'
+            self.vib_results_txt_file = f'{self.filename}-vib-results.out'
 
         # settings for property modules
         if hessian_dict is None:
@@ -309,6 +315,7 @@ class VibrationalAnalysis:
             vib_results['free_energy_summary'] = self.free_energy_summary
             vib_results['vib_frequencies'] = self.vib_frequencies
             # FIXME: normalized or not? What should the user get?
+            # NOTE: JHA changes -- now they get for normalized ones
             vib_results['normal_modes'] = self.normal_modes
 
             # calculate force constants
@@ -320,18 +327,17 @@ class VibrationalAnalysis:
             # calculate the gradient of the dipole moment for IR intensities
             if self.do_ir:
                 self.ir_intensities = self.calculate_ir_intensity(
-                    self.normal_modes)
+                    self.raw_normal_modes)
                 vib_results['ir_intensities'] = self.ir_intensities
 
             # calculate the analytical polarizability gradient for Raman activities
             if (self.do_raman or self.do_resonance_raman) and self.is_scf:
                 (self.raman_activities, self.int_pol, self.int_depol,
                  self.depol_ratio) = self.calculate_raman_activity(
-                     self.normal_modes)
+                     self.raw_normal_modes)
                 vib_results['raman_activities'] = self.raman_activities
                 if self.depol_ratio is not None:
                     vib_results['depolarization_ratios'] = self.depol_ratio
-
             elif (self.do_raman or self.do_resonance_raman) and self.is_xtb:
                 self.ostream.print_info('Raman not available for XTB.')
                 self.do_raman = False
@@ -382,7 +388,7 @@ class VibrationalAnalysis:
         fname = 'vlx_' + get_random_string_serial() + '.vdata'
         vdata_file = Path(temp_path, fname)
 
-        self.vib_frequencies, self.normal_modes, self.gibbs_free_energy = (
+        self.vib_frequencies, self.raw_normal_modes, self.gibbs_free_energy = (
             geometric.normal_modes.frequency_analysis(
                 coords,
                 self.hessian,
@@ -392,6 +398,10 @@ class VibrationalAnalysis:
                 pressure=self.pressure,
                 outfnm=vdata_file.as_posix(),
                 normalized=False))
+
+        # normalize the normal modes
+        self.normal_modes = self.raw_normal_modes / np.linalg.norm(
+            self.raw_normal_modes, axis=1)[:, np.newaxis]
 
         assert_msg_critical(
             vdata_file.is_file(),
@@ -462,7 +472,7 @@ class VibrationalAnalysis:
                 self.polarizability_gradient[freq])
             size_x = current_polarizability_gradient.shape[0]
             size_y = current_polarizability_gradient.shape[1]
-            size_k = self.normal_modes.shape[0]
+            size_k = self.raw_normal_modes.shape[0]
 
             # einsum 'xyi,ik->xyk'
             raman_transmom = np.matmul(
@@ -531,7 +541,7 @@ class VibrationalAnalysis:
 
         # diagonalizes Hessian and calculates the reduced masses
         # einsum 'ki->i'
-        reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
+        reduced_masses = 1.0 / np.sum(self.raw_normal_modes.T**2, axis=0)
 
         force_constants = (4.0 * np.pi**2 *
                            (c * (self.vib_frequencies / cm_to_m))**2 *
@@ -555,10 +565,10 @@ class VibrationalAnalysis:
         bohr_in_km = bohr_in_angstrom() * 1e-13
 
         # conversion factor of IR intensity to km/mol
-        if (prop == 'ir'):
+        if prop == 'ir':
             conv_factor = (electron_mass_in_amu() * avogadro_constant() *
                            alpha**2 * bohr_in_km * np.pi / 3.0)
-        elif (prop == 'raman'):
+        elif prop == 'raman':
             conv_factor = 0.078424
 
         return conv_factor
@@ -607,6 +617,7 @@ class VibrationalAnalysis:
 
         if self.hessian_driver.hessian is None:
             self.ostream.print_warning('Hessian is not available.')
+            self.ostream.flush()
         else:
             self.hessian_driver.print_hessian(molecule)
 
@@ -660,10 +671,11 @@ class VibrationalAnalysis:
             lr_results = lr_drv.compute(molecule, ao_basis, scf_tensors)
 
         # compute polarizability gradient
-        polgrad_drv.compute(molecule, ao_basis, scf_tensors, lr_results)
+        polgrad = polgrad_drv.compute(molecule, ao_basis, scf_tensors,
+                                      lr_results)
 
         # save the gradient
-        self.polarizability_gradient = polgrad_drv.polgradient
+        self.polarizability_gradient = polgrad
 
     def print_vibrational_analysis(self, molecule, filename=None, rsp_drv=None):
         """
@@ -700,13 +712,15 @@ class VibrationalAnalysis:
 
         self.print_vibrational_analysis_ostream(molecule, normal_mode_idx_lst,
                                                 filename, rsp_drv)
-        self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
+        if number_of_modes > n_dom_modes:
+            self.print_vibrational_analysis_file(molecule, filename, rsp_drv)
 
-        fulltxt_msg = 'Full vibrational analysis results written to: '
-        fulltxt_msg += f'{self.result_file}'
-        self.ostream.print_info(fulltxt_msg)
-        self.ostream.print_blank()
-        self.ostream.flush()
+        if self.vib_results_txt_file is not None:
+            fulltxt_msg = 'Full vibrational analysis results written to: '
+            fulltxt_msg += f'{self.vib_results_txt_file}'
+            self.ostream.print_info(fulltxt_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def print_vibrational_analysis_ostream(self,
                                            molecule,
@@ -727,13 +741,7 @@ class VibrationalAnalysis:
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-
-        # normalize the normal modes
-        self.normal_modes /= np.linalg.norm(self.normal_modes,
-                                            axis=1)[:, np.newaxis]
-        self.normed_normal_modes = self.normal_modes / np.linalg.norm(
-            self.normal_modes, axis=1)[:, np.newaxis]
-
+       
         width = 52
         for k in idx_lst:
 
@@ -798,11 +806,11 @@ class VibrationalAnalysis:
                 valstr = '{:<8d}'.format(atom_index + 1)
                 valstr += '{:<8s}'.format(elem[atom_index])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 0])
+                    self.normal_modes[k][atom_index * 3 + 0])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 1])
+                    self.normal_modes[k][atom_index * 3 + 1])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 2])
+                    self.normal_modes[k][atom_index * 3 + 2])
                 self.ostream.print_header(valstr.ljust(width))
 
             self.ostream.print_blank()
@@ -872,17 +880,12 @@ class VibrationalAnalysis:
         elem = molecule.get_labels()
         number_of_modes = len(self.vib_frequencies)
 
-        # normalize the normal modes
-        self.normal_modes /= np.linalg.norm(self.normal_modes,
-                                            axis=1)[:, np.newaxis]
-        self.normed_normal_modes = self.normal_modes / np.linalg.norm(
-            self.normal_modes, axis=1)[:, np.newaxis]
+        # check output file
+        if self.vib_results_txt_file is None:
+            return
 
-        # set name of output file
-        if self.result_file is None:
-            self.result_file = 'vib-results.out'
         # open output file
-        fout = open(self.result_file, 'w')
+        fout = open(self.vib_results_txt_file, 'w')
 
         title = 'Vibrational Analysis'
         fout.write(title.center(52))
@@ -965,11 +968,11 @@ class VibrationalAnalysis:
                 valstr = '{:<8d}'.format(atom_index + 1)
                 valstr += '{:<8s}'.format(elem[atom_index])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 0])
+                    self.normal_modes[k][atom_index * 3 + 0])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 1])
+                    self.normal_modes[k][atom_index * 3 + 1])
                 valstr += '{:12.4f}'.format(
-                    self.normed_normal_modes[k][atom_index * 3 + 2])
+                    self.normal_modes[k][atom_index * 3 + 2])
                 fout.write(valstr.ljust(width))
                 fout.write('\n')
 
@@ -1011,12 +1014,8 @@ class VibrationalAnalysis:
             The molecule.
         """
 
-        if self.checkpoint_file is None:
-            return
-
-        final_h5_fname = self.checkpoint_file
-
-        self.write_vib_results_to_hdf5(molecule, final_h5_fname)
+        if self.results_h5_file is not None:
+            self.write_vib_results_to_hdf5(molecule, self.results_h5_file)
 
     def write_vib_results_to_hdf5(self, molecule, fname):
         """
@@ -1028,55 +1027,48 @@ class VibrationalAnalysis:
             Name of the HDF5 file.
         """
 
-        valid_checkpoint = (fname and isinstance(fname, str))
+        if not (fname and isinstance(fname, str) and Path(fname).is_file()):
+            return
 
-        if not valid_checkpoint:
-            return False
+        hf = h5py.File(fname, 'a')
 
-        # check if h5 file exists and deletes if True
-        file_path = Path(fname)
-        if file_path.is_file():
-            file_path.unlink()
-
-        hf = h5py.File(fname, 'w')
+        vib_group = 'vib/'
 
         nuc_rep = molecule.nuclear_repulsion_energy()
-        hf.create_dataset('nuclear_repulsion', data=nuc_rep)
+        hf.create_dataset(vib_group + 'nuclear_repulsion', data=nuc_rep)
 
         natm = molecule.number_of_atoms()
 
         normal_mode_grp = hf.create_group('normal_modes')
-        for n, Q in enumerate(self.normed_normal_modes, 1):
+        for n, Q in enumerate(self.normal_modes, 1):
             normal_mode_grp.create_dataset(str(n),
                                            data=np.array([Q]).reshape(natm, 3))
 
-        hf.create_dataset('hessian', data=self.hessian)
-        hf.create_dataset('vib_frequencies',
+        hf.create_dataset(vib_group + 'hessian', data=self.hessian)
+        hf.create_dataset(vib_group + 'vib_frequencies',
                           data=np.array([self.vib_frequencies]))
-        hf.create_dataset('force_constants',
+        hf.create_dataset(vib_group + 'force_constants',
                           data=np.array([self.force_constants]))
-        hf.create_dataset('reduced_masses',
+        hf.create_dataset(vib_group + 'reduced_masses',
                           data=np.array([self.reduced_masses]))
         if self.do_ir:
-            hf.create_dataset('ir_intensities',
+            hf.create_dataset(vib_group + 'ir_intensities',
                               data=np.array([self.ir_intensities]))
         if self.do_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('raman_activity')
+            raman_grp = hf.create_group(vib_group + 'raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         if self.do_resonance_raman:
             freqs = self.frequencies
-            raman_grp = hf.create_group('resonance_raman_activity')
+            raman_grp = hf.create_group(vib_group + 'resonance_raman_activity')
             for i in range(len(freqs)):
                 raman_grp.create_dataset(str(freqs[i]),
                                          data=np.array(
                                              [self.raman_activities[freqs[i]]]))
         hf.close()
-
-        return True
 
     def print_header(self):
         """
@@ -1465,7 +1457,7 @@ class VibrationalAnalysis:
             raise ImportError("py3Dmol is required for this functionality")
 
         assert_msg_critical(
-            mode <= len(vib_results['normal_modes']),
+            1 <= mode and mode <= len(vib_results['normal_modes']),
             "Your asking to animate the " + str(mode) +
             "th mode but the molecule only has " +
             str(len(vib_results['normal_modes'])) + " normal modes.")
