@@ -14,6 +14,7 @@ on:
       - ri-grad-test
       - tddft_vibanalysis_test
       - tddft_grad_test
+      - feature-test
 
 jobs:
   vlx_ci:

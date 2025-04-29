@@ -47,6 +47,8 @@ class PEForceFieldGenerator:
     """
     Implements the PE force field generator.
 
+    # vlxtag: RHF, PEForceFieldGenerator
+
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -90,6 +92,11 @@ class PEForceFieldGenerator:
         """
 
         natoms = molecule.number_of_atoms()
+
+        # sanity check for basis set: must use ANO basis
+        assert_msg_critical(
+            basis.get_label().upper().startswith('ANO-'),
+            'PEForceFieldGenerator (LoProp): Expecting ANO basis set')
 
         if self.rank == mpi_master():
 

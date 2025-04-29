@@ -51,6 +51,10 @@ class RespChargesDriver:
     """
     Implements ESP and RESP charges.
 
+    # vlxtag: RHF, RESP_charges
+    # vlxtag: RHF, ESP_charges
+    # vlxtag: RHF, ESP_on_points
+
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -852,12 +856,18 @@ class RespChargesDriver:
 
             for i in range(n_atoms):
                 if constr[i] != -1:
-                    for p in range(esp[m].size):
-                        r_pi = np.linalg.norm(grids[m][p] - coords[i])
-                        b_m[i] += esp[m][p] / r_pi
-                        for j in range(n_atoms):
-                            a_m[i, j] += 1.0 / (
-                                r_pi * np.linalg.norm(grids[m][p] - coords[j]))
+
+                    inv_r_pi = 1.0 / np.sqrt(np.sum(
+                        (grids[m] - coords[i])**2, axis=1))
+
+                    b_m[i] += np.sum(esp[m] * inv_r_pi)
+
+                    for j in range(n_atoms):
+
+                        r_pj = np.sqrt(np.sum(
+                            (grids[m] - coords[j])**2, axis=1))
+
+                        a_m[i, j] += np.sum(inv_r_pi / r_pj)
 
             a += weights[m] * a_m
             b += weights[m] * b_m
@@ -1026,7 +1036,8 @@ class RespChargesDriver:
                             elem_found = True
                     if elem_found:
                         self.ostream.print_info(
-                            f'Applying user-defined MK radius {val} for atom {key}')
+                            f'Applying user-defined MK radius {val} for atom {key}'
+                        )
 
             self.ostream.print_blank()
 
@@ -1191,35 +1202,32 @@ class RespChargesDriver:
             D = None
         D = self.comm.bcast(D, root=mpi_master())
 
-        esp = np.zeros(grid.shape[0])
-
-        # classical electrostatic potential
-
-        coords = molecule.get_coordinates_in_bohr()
-        elem_ids = molecule.get_element_ids()
-
-        if self.rank == mpi_master():
-            for i in range(esp.size):
-                for j in range(molecule.number_of_atoms()):
-                    esp[i] += elem_ids[j] / np.linalg.norm(coords[j] - grid[i])
-
-        # electrostatic potential integrals
-
         ave, res = divmod(grid.shape[0], self.nodes)
         counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
 
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        elec_esp = compute_nuclear_potential_values(molecule, basis,
-                                                    grid[start:end, :], D)
+        esp = np.zeros(end - start)
 
-        elec_esp_arrays = self.comm.gather(elec_esp, root=mpi_master())
+        # nuclear contribution
+
+        coords = molecule.get_coordinates_in_bohr()
+        elem_ids = molecule.get_element_ids()
+
+        for a in range(molecule.number_of_atoms()):
+            esp += elem_ids[a] / np.sqrt(
+                np.sum((grid[start:end, :] - coords[a])**2, axis=1))
+
+        # electrostatic contribution
+
+        esp += compute_nuclear_potential_values(molecule, basis,
+                                                grid[start:end, :], D)
+
+        gathered_esp = self.comm.gather(esp, root=mpi_master())
 
         if self.rank == mpi_master():
-            elec_esp_arrays = [arr for arr in elec_esp_arrays if arr.size > 0]
-            esp += np.hstack(elec_esp_arrays)
-            return esp
+            return np.hstack(gathered_esp)
         else:
             return None
 

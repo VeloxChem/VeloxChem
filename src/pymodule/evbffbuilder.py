@@ -182,6 +182,9 @@ class EvbForceFieldBuilder():
             self.ostream.print_info(f"Adding bond {bond} with r {s} for equilibration {note}, s1={s1}, s2={s2}")
 
         self.ostream.flush()
+
+        #merging of systems through openmm files is shaky, as it depends on the atom naming working. See atom renaming in combine_forcefield
+        #todo find a better way to do this
         forcefield.write_openmm_files(name,name)
 
         for bond in changing_bonds:
@@ -410,7 +413,7 @@ class EvbForceFieldBuilder():
         forcefield.dihedrals = {}
         forcefield.impropers = {}
         atom_count = 0
-
+        
         for i, ff in enumerate(forcefields):
             # Shift all atom keys by the current atom count so that every atom has a unique ID
             shift = atom_count
@@ -422,7 +425,7 @@ class EvbForceFieldBuilder():
                 ff, mapping)
             atom_count += len(ff.atoms)
             for atom in ff.atoms.values():
-                atom['name'] = f"{atom['name']}{i}"
+                atom['name'] = f"{atom['name']}{i+1}"
             forcefield.atoms.update(ff.atoms)
             forcefield.bonds.update(ff.bonds)
             forcefield.angles.update(ff.angles)

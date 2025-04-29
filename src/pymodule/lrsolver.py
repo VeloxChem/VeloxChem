@@ -50,6 +50,9 @@ class LinearResponseSolver(LinearSolver):
     """
     Implements linear response solver.
 
+    # vlxtag: RHF, Polarizability, LR
+    # vlxtag: RKS, Polarizability, LR
+
     :param comm:
         The MPI communicator.
     :param ostream:
