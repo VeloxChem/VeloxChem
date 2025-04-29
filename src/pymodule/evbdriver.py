@@ -738,8 +738,8 @@ class EvbDriver():
                 "solvent": name,
                 "temperature": self.temperature,
                 "NPT": True,
-                "pressure": 1.5,
-                "padding": 1,
+                "pressure": 1,
+                "padding": 1.5,
                 "ion_count": 0,
             }
         else:
