@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from sys import stderr
+import numpy as np
 
 
 def assert_msg_critical(condition, msg=''):
@@ -52,3 +53,16 @@ def assert_msg_critical(condition, msg=''):
                 MPI.COMM_WORLD.Get_rank(), msg))
             stderr.flush()
             MPI.COMM_WORLD.Abort()
+
+
+def safe_solve(mat, b):
+    """
+    Safely solve Ax=b.
+    """
+
+    try:
+        sol = np.linalg.solve(mat, b)
+    except np.linalg.LinAlgError:
+        sol = np.dot(np.linalg.pinv(mat), b)
+
+    return sol

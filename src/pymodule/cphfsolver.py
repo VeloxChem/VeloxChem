@@ -45,7 +45,7 @@ from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_sanity_check)
-from .errorhandler import assert_msg_critical
+from .errorhandler import assert_msg_critical, safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 
@@ -240,8 +240,7 @@ class CphfSolver(LinearSolver):
 
                 if self.rank == mpi_master():
                     # solve the equations exactly in the subspace
-                    #u_red = safe_solve(orbhess_red, cphf_rhs_red)
-                    u_red = np.linalg.solve(orbhess_red, cphf_rhs_red)
+                    u_red = safe_solve(orbhess_red, cphf_rhs_red)
                 else:
                     u_red = None
                 u_red = self.comm.bcast(u_red, root=mpi_master())
