@@ -56,8 +56,8 @@ except ImportError:
 
 
 # The EVB procedure uses two different potentials, one for the integration of the EOMs to explore phase space, and another one for the calculation of the PES
-# The integration potential is optimised to explore all relevant areas of phase space in an efficient manner. This includes constraints and distance restraints.
-# The PES potential is optimised to calculate the potential energy surface accurate. Constraints and restraints are ommitted for this.
+# The integration potential is optimized to explore all relevant areas of phase space in an efficient manner. This includes constraints and distance restraints.
+# The PES potential is optimized to calculate the potential energy surface accurate. Constraints and restraints are ommitted for this.
 # Soft core long range potentials provide faster convergence for averages and are thus included in the PES potential. They cause unstable integration though.
 class EvbForceGroup(Enum):
     DEFAULT = auto(
