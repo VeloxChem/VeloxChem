@@ -170,7 +170,7 @@ class EvbDriver():
         optimize: bool = False,
         ordered_input: bool = False,
         breaking_bonds: list[tuple[int, int]] = [],
-        name = None,
+        name=None,
     ):
         self.name = name
         cwd = Path().cwd()
@@ -304,7 +304,6 @@ class EvbDriver():
             if isinstance(breaking_bonds, tuple):
                 breaking_bonds = [breaking_bonds]
 
-
             self.reactant, self.product, self.formed_bonds, self.broken_bonds = ffbuilder.build_forcefields(
                 rea_input,
                 pro_input,
@@ -361,8 +360,9 @@ class EvbDriver():
                     sum(partial_charge) - charge
                 ) < 0.001, f"Sum of partial charges of reactant {sum(partial_charge)} must match the total foral charge of the system {charge} for input {i+1}"
 
-        for inp,filename in zip(input,filenames):
-            assert inp['molecule'] is not None or inp['forcefield'] is not None, f"Could not load {filename} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
+        for inp, filename in zip(input, filenames):
+            assert inp['molecule'] is not None or inp[
+                'forcefield'] is not None, f"Could not load {filename} file. Check if a corresponding xyz or json file exists and if the input folder is set correct"
 
         return input
 
@@ -674,7 +674,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1,
+                "padding": 1.5,
                 "ion_count": 0,
                 "neutralize": False
             }
@@ -707,7 +707,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1,
+                "padding": 1.5,
                 "ion_count": 0,
                 "E_field": [0, 0, 10],
             }
@@ -718,7 +718,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1,
+                "padding": 1.5,
                 "ion_count": 0,
                 "no_reactant": True,
             }
@@ -739,7 +739,7 @@ class EvbDriver():
                 "temperature": self.temperature,
                 "NPT": True,
                 "pressure": 1,
-                "padding": 1,
+                "padding": 1.5,
                 "ion_count": 0,
             }
         else:
@@ -750,16 +750,16 @@ class EvbDriver():
     def load_initialisation(self,
                             data_folder: str,
                             name: str,
-                            skip_systems=False,
-                            skip_pdb=False):
+                            load_systems=False,
+                            load_pdb=False):
         """Load a configuration from a data folder for which the systems have already been generated, such that an FEP can be performed. 
         The topology, initial positions, temperature and Lambda vector will be loaded from the data folder.
 
         Args:
             data_folder (str): The folder to load the data from
             name (str): The name of the configuration. Can be arbitrary, but should be unique.
-            skip_systems (bool, optional): If set to true, the systems will not be loaded from the xml files. Used for debugging. Defaults to False.
-            skip_topology (bool, optional): If set to true, the topology will not be loaded from the pdb file. Used for debugging. Defaults to False.
+            load_systems (bool, optional): If set to true, the systems will be loaded from the xml files. Used for debugging. Defaults to False.
+            lead_pdb (bool, optional): If set to true, the topology will be loaded from the pdb file. Used for debugging. Defaults to False.
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -783,13 +783,13 @@ class EvbDriver():
             "temperature": temperature,
             "Lambda": Lambda
         }
-        if not skip_systems:
+        if load_systems:
             systems = self.load_systems_from_xml(str(Path(data_folder) / "run"))
             conf["systems"] = systems
         else:
             systems = []
 
-        if not skip_pdb:
+        if load_pdb:
             pdb = mmapp.PDBFile(str(Path(data_folder) / "topology.pdb"))
             conf["topology"] = pdb.getTopology()
             conf["initial_positions"] = pdb.getPositions(
@@ -944,11 +944,11 @@ class EvbDriver():
         lambda_sub_sample=1,
         lambda_sub_sample_ends=False,
         time_sub_sample=1,
+        dE_range=None,
         alpha=None,
         H12=None,
         alpha_guess=None,
         H12_guess=None,
-        coordinate_bins=None,
     ):
         """Compute the EVB energy profiles using the FEP results, print the results and save them to an h5 file
 
@@ -969,12 +969,13 @@ class EvbDriver():
         if H12 is not None: dp.H12 = H12
         if alpha_guess is not None: dp.alpha_guess = alpha_guess
         if H12_guess is not None: dp.H12_guess = H12_guess
-        if coordinate_bins is not None: dp.coordinate_bins = coordinate_bins
+        if dE_range is not None:
+            dp.coordinate_bins = np.linspace(dE_range[0], dE_range[1], 200)
 
-        results = dp.compute(results, barrier, free_energy)
-        self._save_dict_as_h5(results, f"results_{self.name}_{self.t_label}")
-        self.results = results
         self.dataprocessing = dp
+        results = dp.compute(results, barrier, free_energy)
+        self._save_dict_as_h5(results, f"results_{self.name}")
+        self.results = results
         self.print_results()
         self.ostream.flush()
 
@@ -995,10 +996,13 @@ class EvbDriver():
                 results = self.results
 
         dp = EvbDataProcessing()
-        dp.print_results(results, self.ostream)
+        dp.print_results(self.results, self.ostream)
         self.ostream.flush()
 
-    def plot_results(self, results: dict = None, file_name: str = None):
+    def plot_results(self,
+                     results: dict = None,
+                     file_name: str = None,
+                     **kwargs):
         """Plot EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
 
         Args:
@@ -1014,7 +1018,7 @@ class EvbDriver():
             else:
                 results = self.results
         dp = EvbDataProcessing()
-        dp.plot_results(results)
+        dp.plot_results(self.results, **kwargs)
         self.ostream.flush()
 
     def _load_output_from_folders(self, lambda_sub_sample,
@@ -1136,7 +1140,6 @@ class EvbDriver():
             np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame
         ]
         common_result = {
-            "step": step,
             "Lambda": Lambda,
             "Lambda_frame": Lambda_frame,
             "Lambda_indices": lambda_indices,
@@ -1169,7 +1172,7 @@ class EvbDriver():
             data = load_group(f)
         return data
 
-    def _save_dict_as_h5(self, data: dict, file_name: str):
+    def _save_dict_as_h5(self, data: dict, file_name: str, overwrite=True):
         """Save the provided dictionary to an h5 file
 
         Args:

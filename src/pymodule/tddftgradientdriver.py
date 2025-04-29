@@ -464,7 +464,7 @@ class TddftGradientDriver(GradientDriver):
         need_omega = (self._dft and self.xcfun.is_range_separated())
         if need_omega:
             assert_msg_critical(
-                False, 'ScfGradientDriver: Not implemented for' +
+                False, 'TddftGradientDriver: Not implemented for' +
                 ' range-separated functional')
 
         fock_grad_drv = FockGeom1000Driver()
@@ -491,7 +491,7 @@ class TddftGradientDriver(GradientDriver):
 
             assert_msg_critical(
                 basis.get_label().lower().startswith('def2-'),
-                'ScfGradientDriver: Invalid basis set for RI-J')
+                'TddftGradientDriver: Invalid basis set for RI-J')
 
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
@@ -500,13 +500,11 @@ class TddftGradientDriver(GradientDriver):
                 basis_ri_j = None
             basis_ri_j = self.comm.bcast(basis_ri_j, root=mpi_master())
 
-            self._scf_drv._ri_drv.prepare_buffers(molecule, basis, basis_ri_j, local_atoms)
+            self._scf_drv._ri_drv.prepare_buffers(molecule, basis, basis_ri_j, verbose=False)
 
             ri_grad_drv = RIFockGradDriver()
 
-            local_ri_gvec_gs = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(den_mat_for_fock_gs))
-            ri_gvec_gs = np.zeros(local_ri_gvec_gs.shape)
-            self.comm.Allreduce(local_ri_gvec_gs, ri_gvec_gs, op=MPI.SUM)
+            ri_gvec_gs = self._scf_drv._ri_drv.compute_bq_vector(den_mat_for_fock_gs)
 
             for idx in range(dof):
 
@@ -515,17 +513,9 @@ class TddftGradientDriver(GradientDriver):
                 sym_den_mat_for_fock_xmy.set_values(self.get_sym_mat(x_minus_y_ao[idx]))
                 sym_den_mat_for_fock_xmy_p_xmyT.set_values(self.get_sym_mat(x_minus_y_ao[idx] + x_minus_y_ao[idx].T))
 
-                local_ri_gvec_rel = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_rel))
-                ri_gvec_rel = np.zeros(local_ri_gvec_rel.shape)
-                self.comm.Allreduce(local_ri_gvec_rel, ri_gvec_rel, op=MPI.SUM)
-
-                local_ri_gvec_xmy = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy))
-                ri_gvec_xmy = np.zeros(local_ri_gvec_xmy.shape)
-                self.comm.Allreduce(local_ri_gvec_xmy, ri_gvec_xmy, op=MPI.SUM)
-
-                local_ri_gvec_xmy_2 = np.array(self._scf_drv._ri_drv.compute_local_bq_vector(sym_den_mat_for_fock_xmy_p_xmyT))
-                ri_gvec_xmy_2 = np.zeros(local_ri_gvec_xmy_2.shape)
-                self.comm.Allreduce(local_ri_gvec_xmy_2, ri_gvec_xmy_2, op=MPI.SUM)
+                ri_gvec_rel = self._scf_drv._ri_drv.compute_bq_vector(sym_den_mat_for_fock_rel)
+                ri_gvec_xmy = self._scf_drv._ri_drv.compute_bq_vector(sym_den_mat_for_fock_xmy)
+                ri_gvec_xmy_2 = self._scf_drv._ri_drv.compute_bq_vector(sym_den_mat_for_fock_xmy_p_xmyT)
 
                 for iatom in local_atoms:
 

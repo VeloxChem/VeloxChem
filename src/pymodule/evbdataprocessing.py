@@ -97,8 +97,8 @@ class EvbDataProcessing:
         self.smooth_polynomial_order = 3
         self.coordinate_bins = np.array([])
         self.bin_size = 10
-        self.dens_threshold = 0.05
-        self.dens_max_window = 30
+        self.dens_threshold = 0.1
+        self.dens_max_window = 50
 
     def _beta(self, T) -> float:
         return 1 / (self.kb * T)
@@ -139,6 +139,7 @@ class EvbDataProcessing:
                             'scipy is required for EvbDataProcessing.')
 
         reference_key = list(self.results.keys())[0]
+        self.ostream.print_info(f"Configuration with key {reference_key} is used as reference for fitting")
 
         E1_ref = self.results[reference_key]["E1_pes"]
         E2_ref = self.results[reference_key]["E2_pes"]
@@ -483,16 +484,16 @@ class EvbDataProcessing:
     @staticmethod
     def print_results(results, ostream):
 
-        ostream.print_info(
-            f"{'Discrete':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}"
-        )
-        for name, result in results["configuration_results"].items():
-            if "discrete" in result.keys():
-                ostream.print_info(
-                    f"{name:<30} {result['discrete']['barrier']:20.2f} {result['discrete']['free_energy']:20.2f}"
-                )
+        # ostream.print_info(
+        #     f"{'Discrete':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}"
+        # )
+        # for name, result in results["configuration_results"].items():
+        #     if "discrete" in result.keys():
+        #         ostream.print_info(
+        #             f"{name:<30} {result['discrete']['barrier']:20.2f} {result['discrete']['free_energy']:20.2f}"
+        #         )
 
-        ostream.print_info("\n")
+        # ostream.print_info("\n")
         ostream.print_info(
             f"{'Analytical':<30} {'Barrier (kJ/mol)':>20} {'Free Energy (kJ/mol)':>20}"
         )
@@ -501,6 +502,8 @@ class EvbDataProcessing:
                 ostream.print_info(
                     f"{name:<30} {result['analytical']['barrier']:20.2f} {result['analytical']['free_energy']:20.2f}"
                 )
+
+        ostream.flush()
 
     @staticmethod
     def plot_dE_density(results):
@@ -586,7 +589,7 @@ class EvbDataProcessing:
         return fig, ax
 
     @staticmethod
-    def plot_results(results, plot_analytical=True, plot_discrete=True):
+    def plot_results(results, plot_analytical=True, plot_discrete=False, order = None):
 
         import matplotlib.pyplot as plt
         import matplotlib.colors as mcolors
@@ -595,7 +598,7 @@ class EvbDataProcessing:
         coordinate_bins = results["coordinate_bins"]
         Lambda = results["Lambda"]
 
-        fig, ax = plt.subplots(1, 2, figsize=(10, 4))
+        fig, ax = plt.subplots(1, 2, figsize=(15, 3.5))
         bin_indicators = (coordinate_bins[:-1] + coordinate_bins[1:]) / 2
         colors = mcolors.TABLEAU_COLORS
 
@@ -606,11 +609,25 @@ class EvbDataProcessing:
             discrete_linestyle = "--"
         else:
             discrete_linestyle = "-"
+
+        to_plot = []
+        names = []
+        if order is not None:
+            names = order
+            for name in order:
+                assert name in results['configuration_results'].keys(
+                ), f"{name} not in configuration results"
+                to_plot.append(results['configuration_results'][name])
+        else:
+            for name, conf in results['configuration_results'].items():
+                names.append(name)
+                to_plot.append(conf)
         for i, (name,
-                result) in enumerate(results["configuration_results"].items()):
+                result) in enumerate(zip(names,to_plot)):
 
             #Shift both averages by the same amount so that their relative differences stay the same
             ax[0].plot(Lambda, result["dGfep"], label=name)
+            ax[0].set_xlim(0, 1)
             if plot_discrete:
                 if "discrete" in result.keys():
                     ax[1].plot(
@@ -630,6 +647,7 @@ class EvbDataProcessing:
                         color=colors[colorkeys[i]],
                     )
 
+            ax[1].set_xlim(coordinate_bins[0], coordinate_bins[-1])
             legend_lines.append(Line2D([0], [0], color=colors[colorkeys[i]]))
             legend_labels.append(name)
 
@@ -647,15 +665,25 @@ class EvbDataProcessing:
         # ax[0].legend()
         ax[0].set_xlabel(r"$\lambda$")
         ax[0].set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
+        ax[0].set_title("FEP profiles", fontsize=12)
 
         ax[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
         ax[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
+        ax[1].set_title("EVB profiles", fontsize=12)
+        # fig.tight_layout()  # Adjust layout
         fig.legend(
             legend_lines,
             legend_labels,
-            loc=(0.22, 0.91),
-            ncol=len(legend_labels),
+            loc='center left',
+            bbox_to_anchor=(0.9, 0.5),
+            ncol=1,
         )
+        # fig.legend(
+        #     legend_lines,
+        #     legend_labels,
+        #     loc=(0.22, 0.91),
+        #     ncol=1,
+        # )
         return fig, ax
 
     @staticmethod

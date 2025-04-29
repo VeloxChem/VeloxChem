@@ -390,7 +390,7 @@ class EvbSystemBuilder():
         nb_force.setSwitchingDistance(0.9 * cutoff)
 
         if NPT:
-            barostat = mm.MonteCarloFlexibleBarostat(
+            barostat = mm.MonteCarloBarostat(
                 pressure * mmunit.bar,  # type: ignore
                 self.temperature * mmunit.kelvin,  # type: ignore
             )
