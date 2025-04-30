@@ -350,7 +350,6 @@ class IMForceFieldGenerator:
 
         self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)
         
-
         for counter, entry in enumerate(self.molecules_along_rp.items()):
             key, molecules = entry
            
@@ -401,10 +400,10 @@ class IMForceFieldGenerator:
             counter += 1
         
         self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)
+        keys = list(self.density_of_datapoints.keys())
         total = sum(
         value
-        for inner_dict in self.density_of_datapoints.values()
-        for value in inner_dict.values()
+        for value in self.density_of_datapoints[keys[0]].values()
         )
         self.im_results['n_datapoints'] = total
         self.im_results['conf_dp'] = self.density_of_datapoints
@@ -865,10 +864,10 @@ class IMForceFieldGenerator:
         density_of_datapoints, _, _ = self.determine_reaction_path_molecules(molecule, specific_dihedrals=self.dihedrals_dict)
         density_of_datapoints = self.determine_datapoint_density(density_of_datapoints, self.imforcefieldfile)
 
+        keys = list(density_of_datapoints.keys())
         total = sum(
         value
-        for inner_dict in density_of_datapoints.values()
-        for value in inner_dict.values()
+        for value in density_of_datapoints[keys[0]].values()
         )
         self.im_results['n_datapoints'] = total
         self.im_results['conf_dp'] = density_of_datapoints
