@@ -824,7 +824,7 @@ class IMForceFieldGenerator:
                 diff_E = abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()
                 print(f'\n\n ########## random structure {i} ######### \n')
                 print(f'delta E = {diff_E * 4.1840:+.8f} kJ/mol')
-                if diff_E < self.energy_threshold and improve == True:
+                if diff_E > self.energy_threshold and improve == True:
                     
                     if self.minimize:
 
