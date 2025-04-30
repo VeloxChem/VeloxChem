@@ -199,7 +199,6 @@ class IMDatabasePointCollecter:
         self.sorted_im_labels = []
         self.qm_energies = None
         self.qm_data_points = None
-        self.point_adding_molecule = {}
         self.energy_threshold = None
         self.collect_qm_points = None
         self.previous_energy_list = []
@@ -216,7 +215,6 @@ class IMDatabasePointCollecter:
         self.current_energy = 0
         self.point_checker = 1
         self.allowed_molecule_deviation = None
-        self.last_point_added = None
         self.im_labels = []
         self.add_a_point = False
         self.check_a_point = False
@@ -228,11 +226,12 @@ class IMDatabasePointCollecter:
         # output_file variables that will be written into self.general_variable_output
         self.gradients = None
         self.velocities = None
+        self.start_velocities = None
         self.coordinates = None
         self.coordinates_xyz = None
         self.molecules = []
         self.all_gradients = []
-        self.optimize = False
+        self.optimize = True
         
         
         self.summary_output = 'summary_output.txt'
@@ -741,6 +740,7 @@ class IMDatabasePointCollecter:
             if self.ensemble in ['NVT', 'NPT']:
                 self.simulation.context.setVelocitiesToTemperature(self.temperature)
         
+        self.start_velocities = self.simulation.context.getState(getVelocities=True).getVelocities()
         # Set up reporting
         self.simulation.reporters.clear()
         self.simulation.reporters.append(app.PDBReporter(self.out_file, save_freq))
@@ -774,7 +774,6 @@ class IMDatabasePointCollecter:
                self.qm_energies.append(qm_data_point.energy)
                self.qm_data_points.append(qm_data_point)
 
-        self.last_point_added = 0
         self.cycle_iteration = self.unadded_cycles
         
         print('current datapoints around the given starting structure', self.desired_datpoint_density, self.density_around_data_point[0], self.density_around_data_point[1], '\n allowed derivation from the given structure', self.allowed_molecule_deviation, '\n ---------------------------------------')
@@ -1776,7 +1775,11 @@ class IMDatabasePointCollecter:
                 context.setPositions(self.coordinates[0])
                 self.coordinates = [self.coordinates[0]]
                 # context.setVelocities(self.velocities[0])
-                context.setVelocitiesToTemperature(self.temperature)
+                if self.ensemble in ['NVT', 'NPT']:
+
+                    context.setVelocitiesToTemperature(self.temperature)
+                else:
+                    context.setVelocities(self.start_velocities)
                 self.velocities = [context.getState(getVelocities=True).getVelocities()]
                 
                 new_positions = context.getState(getPositions=True).getPositions()
@@ -1788,8 +1791,7 @@ class IMDatabasePointCollecter:
                 gradient_2 = self.update_gradient(qm_positions)
                 force = -np.array(gradient_2) * conversion_factor
             
-            if (self.point_checker + self.last_point_added) % self.duration == 0 and self.point_checker != 0:
-                self.last_point_added = 0
+            if (self.point_checker) % self.duration == 0 and self.point_checker != 0:
                 self.unadded_cycles -= 1
 
             if self.point_checker < 500 and self.cycle_iteration != self.unadded_cycles:
@@ -1805,7 +1807,11 @@ class IMDatabasePointCollecter:
         else:
             context.setPositions(self.coordinates[0])
             self.coordinates = [self.coordinates[0]]
-            context.setVelocitiesToTemperature(self.temperature)
+            if self.ensemble in ['NVT', 'NPT']:
+
+                context.setVelocitiesToTemperature(self.temperature)
+            else:
+                context.setVelocities(self.start_velocities)
             self.velocities = [context.getState(getVelocities=True).getVelocities()]
             new_positions = context.getState(getPositions=True).getPositions()
             qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
@@ -1896,24 +1902,23 @@ class IMDatabasePointCollecter:
 
             if self.optimize:
                 opt_qm_driver = ScfRestrictedDriver()
+                opt_qm_driver.ostream.mute()
                 opt_qm_driver.xcfun = 'b3lyp'
                 reference_dih = self.density_around_data_point[1]
                 opt_drv = OptimizationDriver(opt_qm_driver)
                 current_basis = MolecularBasis.read(molecule, 'def2-svp')
-                _, scf_results = self.compute_energy(opt_qm_driver, molecule, current_basis)
+                scf_tensors = opt_qm_driver.compute(molecule, current_basis)
                 opt_drv.ostream.mute()
                 if reference_dih is not None:
                     constraint = f"freeze dihedral {reference_dih[0] + 1} {reference_dih[1] + 1} {reference_dih[2] + 1} {reference_dih[3] + 1}"
                     opt_drv.constraints = [constraint]
-                opt_results = opt_drv.compute(molecule, current_basis, scf_results)
+                opt_results = opt_drv.compute(molecule, current_basis, scf_tensors)
                 optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                 molecule = optimized_molecule
 
-
             self.add_point(molecule, label, qm_energy, self.qm_datafile, current_basis, scf_results=scf_tensors)
-            self.last_point_added = self.point_checker - 1
             self.point_checker = 0
-            self.point_adding_molecule[self.step] = (molecule, qm_energy, label)
+
 
 
     def add_point(self, molecule, label, energy, filename, basis=None, scf_results=None):
@@ -1938,11 +1943,11 @@ class IMDatabasePointCollecter:
         if self.hess_driver is None:
             raise ValueError("No Hessian driver defined.")
 
-        energy = energy
+        energy = None
         gradient = None
         hessian = None
 
-       
+        energy, scf_results = self.compute_energy(molecule, basis)
         gradient = self.compute_gradient(molecule, basis, scf_results)
         hessian = self.compute_hessian(molecule, basis)
     
