@@ -305,6 +305,7 @@ class DensityViewer:
 
         # Loop over atoms
         for i_atom in range(natms):
+            self.progress.value = i_atom
             ao_indices_i = self._atom_to_ao[i_atom]
             atom_id_i = identifiers[i_atom]
             atom_orbs_i = np.array(self._ao_dict[atom_id_i])
@@ -509,6 +510,16 @@ class DensityViewer:
         for bonds in plt_bonds:
             self._this_plot += bonds
 
+        # Add widget
+        natm = molecule.number_of_atoms()
+
+        if not self.use_visualization_driver:
+            # add progress widget
+            self.progress = widgets.IntProgress(value=0, min=0, max=natm-1,
+                                      description='Loading:', bar_style='info',
+                                      style={'bar_color': '#44aa44'})
+            display(self.progress)
+
         density = self.compute_density(self._density_list[self._i_den])
         self._plt_iso_one, self._plt_iso_two = self.draw_density(density)
         self._this_plot += self._plt_iso_one
@@ -519,7 +530,7 @@ class DensityViewer:
         for i, label in enumerate(self._density_labels):
             den_list.append((label, i))
 
-        # Add widget
+
         self.density_selector = widgets.Dropdown(options=den_list,
                                                  value=self._i_den,
                                                  description='Density:')
