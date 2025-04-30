@@ -333,19 +333,19 @@ class IMForceFieldGenerator:
                         opt_qm_driver.xcfun = 'b3lyp'
                         reference_dih = key
                         opt_drv = OptimizationDriver(opt_qm_driver)
-                        current_basis = MolecularBasis.read(mol, 'def2-svp')
-                        _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
+                        opt_basis = MolecularBasis.read(mol, 'def2-svp')
+                        _, scf_results = self.compute_energy(opt_qm_driver, mol, opt_basis)
                         opt_drv.ostream.mute()
                         if key is not None:
                             constraint = f"freeze dihedral {reference_dih[0] + 1} {reference_dih[1] + 1} {reference_dih[2] + 1} {reference_dih[3] + 1}"
                             opt_drv.constraints = [constraint]
-                        opt_results = opt_drv.compute(mol, current_basis, scf_results)
+                        opt_results = opt_drv.compute(mol, opt_basis, scf_results)
                         optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                         mol = optimized_molecule
                         print(optimized_molecule.get_xyz_string())
                     
                     current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
-                    self.add_point(mol, current_basis, self.interpolation_settings)
+                    self.add_point(mol, current_basis, self.imforcefieldfile)
                     self.z_matrix = self.define_z_matrix(molecule)
 
         self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)
@@ -824,7 +824,7 @@ class IMForceFieldGenerator:
                 diff_E = abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()
                 print(f'\n\n ########## random structure {i} ######### \n')
                 print(f'delta E = {diff_E * 4.1840:+.8f} kJ/mol')
-                if diff_E > self.energy_threshold and improve == True:
+                if diff_E < self.energy_threshold and improve == True:
                     
                     if self.minimize:
 
@@ -832,8 +832,8 @@ class IMForceFieldGenerator:
                         opt_qm_driver.xcfun = 'b3lyp'
      
                         opt_drv = OptimizationDriver(opt_qm_driver)
-                        current_basis = MolecularBasis.read(mol, 'def2-svp')
-                        _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
+                        opt_basis = MolecularBasis.read(mol, 'def2-svp')
+                        _, scf_results = self.compute_energy(opt_qm_driver, mol, opt_basis)
                         opt_drv.ostream.mute()
                         if self.dihedrals_dict is not None:
                             constraints = []
@@ -849,7 +849,8 @@ class IMForceFieldGenerator:
                     
                     labels = []
                     labels.append("point_{0}".format((len(sorted_labels) + 1)))
-                    self.add_point(mol, imforcefieldfile, current_basis)
+                    current_basis = MolecularBasis.read(mol, basis.get_main_basis_label())
+                    self.add_point(mol, current_basis, imforcefieldfile)
                     database_expanded = True
                     print('The interpolation quality was to low! Structre as been added to the database')
 
@@ -978,7 +979,7 @@ class IMForceFieldGenerator:
         return z_matrix
     
 
-    def add_point(self, molecule, basis, interpolation_settings):
+    def add_point(self, molecule, basis, imforcefieldfile=None):
         """ Adds a new point to the database.
 
             :param molecule:
@@ -1000,11 +1001,13 @@ class IMForceFieldGenerator:
            
         # define impesdriver to determine if stucture should be added:
         interpolation_driver = InterpolationDriver()
-        interpolation_driver.update_settings(interpolation_settings)
+        if imforcefieldfile is not None:
+            self.interpolation_settings['imforcefieldfile'] = imforcefieldfile
+        interpolation_driver.update_settings(self.interpolation_settings)
         # interpolation_driver.imforcefieldfile = imforcefielddatafile
         z_matrix = self.define_z_matrix(molecule)
         sorted_labels = []
-        if interpolation_settings['imforcefieldfile'] in os.listdir(os.getcwd()):
+        if imforcefieldfile in os.listdir(os.getcwd()):
             labels, z_matrix = interpolation_driver.read_labels()
             sorted_labels = sorted(labels, key=lambda x: int(x.split('_')[1]))
 
@@ -1021,8 +1024,8 @@ class IMForceFieldGenerator:
         impes_coordinate.hessian = hessian[0]
         impes_coordinate.transform_gradient_and_hessian()
 
-        impes_coordinate.write_hdf5(interpolation_settings['imforcefieldfile'], f'point_{len(sorted_labels) + 1}')
-        interpolation_driver.imforcefieldfile = interpolation_settings['imforcefieldfile']
+        impes_coordinate.write_hdf5(self.interpolation_settings['imforcefieldfile'], f'point_{len(sorted_labels) + 1}')
+        interpolation_driver.imforcefieldfile = self.interpolation_settings['imforcefieldfile']
         labels, z_matrix = interpolation_driver.read_labels()
         
         print(f"Database expansion with {', '.join(labels)}")
