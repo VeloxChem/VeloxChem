@@ -219,7 +219,7 @@ class IMForceFieldGenerator:
         self.trajectory_file = 'trajectory.pdb'
         self.desired_point_density = 50
         self.converged_cycle = 5
-        self.energy_threshold = 1.5
+        self.energy_threshold = 2.0
         self.distance_thrsh = 0.1
         self.start_collect = 0
         self.solvent = 'gas'
@@ -450,12 +450,11 @@ class IMForceFieldGenerator:
         if specific_dihedrals is not None:
             for entries in specific_dihedrals:
                 specific_dihedral = entries[0]
-                periodicity = entries[1]
-                n_sampling = entries[2]
-                rotation_values = np.linspace(0, 360 / periodicity, n_sampling, endpoint=False)
+                n_sampling = entries[1]
+                rotation_values = np.linspace(0, 360, n_sampling, endpoint=False)
 
                 sampled_molecules[specific_dihedral] = []
-                normalized_angle = (360/periodicity) / (2 * n_sampling) #+ (180/periodicity)) % (360/periodicity)) - 180/periodicity
+                normalized_angle = (360) / (2 * n_sampling) #+ (180/periodicity)) % (360/periodicity)) - 180/periodicity
 
                 allowed_deviation[specific_dihedral] = {rotation_values[i]: (
                                                         (rotation_values[i] - normalized_angle)%360.0,
