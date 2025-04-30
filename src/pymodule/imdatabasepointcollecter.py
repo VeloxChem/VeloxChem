@@ -1718,7 +1718,6 @@ class IMDatabasePointCollecter:
             
             lower, upper = self.allowed_molecule_deviation
             
-            print(current_dihedral, lower, upper)
             # Case 1: If boundaries do not wrap (e.g., [-60, 60])
             if lower < upper:
                 allowed = lower <= current_dihedral <= upper
