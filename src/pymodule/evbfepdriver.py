@@ -138,7 +138,7 @@ class EvbFepDriver():
         self.total_snapshots = total_sample_steps / write_step * len(
             self.Lambda)
         self.ostream.print_info(f"Lambda: {self.Lambda}")
-        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equiliberation steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
+        info = f"Total lambda points: {len(self.Lambda)}, NVT equilibration steps: {equil_NVT_steps}, NPT equilibration steps: {equil_NPT_steps}, total sample steps: {total_sample_steps}, write step: {write_step}, step size: {step_size}\n"
         info += f"Snapshots per lambda: {total_sample_steps / write_step}, snapshots to be recorded: {self.total_snapshots}\n"
         info += f"System time per snapshot: {step_size * write_step} ps, system time per frame: {step_size * total_sample_steps} ps, total system time: {step_size * total_sample_steps * len(self.Lambda)} ps"
         self.ostream.print_info(info)
@@ -171,7 +171,7 @@ class EvbFepDriver():
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
 
-            equil_state = self._minimise_and_equiliberate(system, l, positions)
+            equil_state = self._minimize_and_equilibrate(system, l, positions)
 
             if self.constrain_H:
                 info = "Removing constraints involving H atoms"
@@ -183,7 +183,7 @@ class EvbFepDriver():
             positions = state.getPositions()
         self.ostream.flush()
 
-    def _minimise_and_equiliberate(self, system, l, positions):
+    def _minimize_and_equilibrate(self, system, l, positions):
         equil_integrator = mm.LangevinMiddleIntegrator(
             self.integrator_temperature,
             self.integrator_friction_coeff,

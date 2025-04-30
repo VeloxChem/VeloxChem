@@ -479,7 +479,7 @@ class OpenMMDynamics:
         if qm_atoms:
             self.set_qm_mm_system(phase, 
                                   ff_gen)
-            self.qm_stabilizer(ff_gen)
+            # self.qm_stabilizer(ff_gen)
         
         # Write the system to a xml file (for debugging purposes)
         with open(f'{filename}_system.xml', 'w') as f:
@@ -706,7 +706,7 @@ class OpenMMDynamics:
         self.set_qm_mm_system('periodic' if periodic else 'gas', ff_gen_qm)
 
         # Adding the stabilizer force to the QM region
-        self.qm_stabilizer(ff_gen_qm)
+        # self.qm_stabilizer(ff_gen_qm)
 
         # Save system to XML and PDB for inspection and reuse
         with open(f'{filename}_system.xml', 'w') as f:
