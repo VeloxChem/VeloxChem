@@ -228,16 +228,11 @@ class IMDatabasePointCollecter:
         self.velocities = None
         self.start_velocities = None
         self.coordinates = None
-        self.coordinates_xyz = None
         self.molecules = []
         self.all_gradients = []
         self.optimize = True
         
-        
-        self.summary_output = 'summary_output.txt'
-        with open(self.summary_output, 'w') as file:
-            file.write("########## Summaray Ouput of Structures and Energies ##########\n\n")
-        self.coordinates_xyz = None
+    
 
         self.velocities = []
 
@@ -713,7 +708,6 @@ class IMDatabasePointCollecter:
         self.kinetic_energies = []
         self.temperatures = []
         self.total_energies = []
-        self.coordinates_xyz = []
 
         save_freq = self.nsteps // self.snapshots if self.snapshots else self.nsteps
 
@@ -781,7 +775,6 @@ class IMDatabasePointCollecter:
         self.molecules = []
         openmm_coordinate = self.simulation.context.getState(getPositions=True).getPositions()
         self.coordinates = [openmm_coordinate]
-        self.coordinates_xyz = []
         self.gradients = []
         self.velocities = []
 
@@ -848,16 +841,11 @@ class IMDatabasePointCollecter:
                 print('-' * 60)
                 print('Current Density', self.density_around_data_point[0], '-->', self.desired_datpoint_density, self.unadded_cycles)   
 
-            self.output_file_writer(self.summary_output)
             self.step += 1
-            if self.step == 5650:
-                print('both')
-                # exit()
+
             self.simulation.step(1)
-            if step % 100 == 0 and step != 0:
-                self.simulation.saveCheckpoint('checkpoint')
-                #self.output_file_writer(self.summary_output)
-                #print('cooridnates', simulation.context.getState(getPositions=True).getPositions())
+            # if step % 100 == 0 and step != 0:
+            #     self.simulation.saveCheckpoint('checkpoint')
 
             if step == self.nsteps and self.density_around_data_point[0] != self.desired_datpoint_density:
                 step = 0
@@ -1631,7 +1619,6 @@ class IMDatabasePointCollecter:
             The gradient and potential energy of the QM region.
         """
 
-        # self.coordinates_xyz.append(new_positions * 10)
         positions_ang = new_positions * 10 
 
         new_molecule = None
@@ -1727,16 +1714,18 @@ class IMDatabasePointCollecter:
         self.add_a_point = False
         
         if self.density_around_data_point[1] is not None:
-            current_dihedral = new_molecule.get_dihedral_in_degrees([self.density_around_data_point[1][0] + 1, self.density_around_data_point[1][1] + 1, self.density_around_data_point[1][2] + 1, self.density_around_data_point[1][3] + 1])
+            current_dihedral = (new_molecule.get_dihedral_in_degrees([self.density_around_data_point[1][0] + 1, self.density_around_data_point[1][1] + 1, self.density_around_data_point[1][2] + 1, self.density_around_data_point[1][3] + 1])) % 360
+            
             lower, upper = self.allowed_molecule_deviation
-
+            
+            print(current_dihedral, lower, upper)
             # Case 1: If boundaries do not wrap (e.g., [-60, 60])
             if lower < upper:
                 allowed = lower <= current_dihedral <= upper
             else:
-                # Case 2: If boundaries wrap around (e.g., [120, -120])
                 allowed = current_dihedral >= lower or current_dihedral <= upper
 
+        
         if allowed:
 
             openmm_coordinate = context.getState(getPositions=True).getPositions()
@@ -1797,7 +1786,6 @@ class IMDatabasePointCollecter:
             if self.point_checker < 500 and self.cycle_iteration != self.unadded_cycles:
                 self.unadded_cycles += 1
             
-            self.coordinates_xyz.append(qm_positions * 10)
             ############################################################
             self.molecules.append(new_molecule)
             for i, atom_idx in enumerate(self.qm_atoms):
@@ -1823,7 +1811,6 @@ class IMDatabasePointCollecter:
             force = -np.array(gradient_2) * conversion_factor
             
             self.molecules.append(new_molecule)
-            self.coordinates_xyz.append(qm_positions * 10)
             for i, atom_idx in enumerate(self.qm_atoms):
                 self.system.getForce(self.qm_force_index).setParticleParameters(i, atom_idx, force[i])
             self.system.getForce(self.qm_force_index).updateParametersInContext(context)
@@ -1839,8 +1826,6 @@ class IMDatabasePointCollecter:
             The potential energy of the QM region.
         """
 
-        #positions = context.getState(getPositions=True).getPositions()
-        #qm_positions = np.array([positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
         potential_energy = self.current_energy
 
         return potential_energy
@@ -2069,41 +2054,6 @@ class IMDatabasePointCollecter:
             raise ValueError(error_txt)
 
         return qm_hessian
-
-
-    def output_file_writer(self, outputfile):
-
-        # Open the file in write mode ('w')
-        with open(outputfile, 'a') as file:
-            # Write the section header
-            
-            file.write(f"\n######################################\n")
-            file.write(f"############## Step {self.step} ################\n")
-            file.write(f"######################################\n")
-            file.write("\n########## Coordinates (Angstrom) ##########\n\n")
-            
-            for i, coord in enumerate(self.coordinates_xyz[self.step]):
-
-                file.write(f'{self.molecule.get_labels()[i]}   {coord[0]:.4f}    {coord[1]:.4f}     {coord[2]:.4f}\n')
-
-            file.write("\n########## Gradient (hatree/bohr) ##########\n\n")
-            
-            for i, grad in enumerate(self.all_gradients[self.step]):
-
-                file.write(f' {grad[0]:.4f}    {grad[1]:.4f}     {grad[2]:.4f}\n')
-            
-            file.write("########## Kinetic Energy (kJ mol^-1) ##########\n\n")
-            file.write(f"kin E = {self.kinetic_energies[self.step]:.8f}\n\n")
-            file.write("########## Potential Energy (kJ mol^-1) ##########\n\n")
-            file.write(f"pot E = {self.total_potentials[self.step]:.8f}\n\n")
-            file.write("########## Total Energy (kJ mol^-1) ##########\n\n")
-            file.write(f"tot E = {self.total_energies[self.step]:.8f}\n\n")
-            file.write("########## Temperature K ##########\n\n")
-            file.write(f"T = {self.temperatures[self.step]:.8f}\n\n")
-            file.write("########## ENERGY GAP (kJ mol^-1) ##########\n\n")
-            
-            # Write the column headers
-            file.write("STATE | ENERGY GAP\n\n")
 
 
     def calculate_translation_coordinates_analysis(self, given_coordinates):

@@ -353,6 +353,7 @@ class IMForceFieldGenerator:
 
         self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)
         
+
         for counter, entry in enumerate(self.molecules_along_rp.items()):
             key, molecules = entry
            
@@ -454,9 +455,13 @@ class IMForceFieldGenerator:
                 rotation_values = np.linspace(0, 360 / periodicity, n_sampling, endpoint=False)
 
                 sampled_molecules[specific_dihedral] = []
-                normalized_angle = (((360/periodicity) / n_sampling + (180/periodicity)) % (360/periodicity)) - 180/periodicity
+                normalized_angle = (360/periodicity) / (2 * n_sampling) #+ (180/periodicity)) % (360/periodicity)) - 180/periodicity
 
-                allowed_deviation[specific_dihedral] = {rotation_values[i]: (((rotation_values[i] - normalized_angle + 180) % 360) - 180, ((rotation_values[i] + normalized_angle + 180) % 360) - 180) for i in range(len(rotation_values))}
+                allowed_deviation[specific_dihedral] = {rotation_values[i]: (
+                                                        (rotation_values[i] - normalized_angle)%360.0,
+                                                        (rotation_values[i] + normalized_angle)%360.0
+                                                        )
+                                                        for i in range(len(rotation_values))}
                 point_densities[specific_dihedral] = {rotation_values[i]: 0 for i in range(len(rotation_values))}
                 for theta in rotation_values:
                     molecule.set_dihedral_in_degrees([specific_dihedral[0] + 1, specific_dihedral[1] + 1, specific_dihedral[2] + 1, specific_dihedral[3] + 1], theta)
@@ -468,7 +473,7 @@ class IMForceFieldGenerator:
             sampled_molecules[None] = [molecule]
             point_densities[None] = {360: 0}
             
-            allowed_deviation[None] = {360: (-180, 180)}
+            allowed_deviation[None] = {360: (0.0, 360.0)}
 
         return point_densities, sampled_molecules, allowed_deviation
     
@@ -833,14 +838,10 @@ class IMForceFieldGenerator:
             if not database_expanded:
                 database_quality = True
 
-        
-        # self.plot_final_energies(qm_energies, im_energies)
         self.structures_to_xyz_file(all_structures, 'full_xyz_traj.xyz')
         self.structures_to_xyz_file(random_structure_choices, 'random_xyz_structures.xyz', im_energies, qm_energies)
         density_of_datapoints, _, _ = self.determine_reaction_path_molecules(molecule, specific_dihedrals=self.dihedrals_dict)
         density_of_datapoints = self.determine_datapoint_density(density_of_datapoints, self.imforcefieldfile)
-
-        print(density_of_datapoints)
 
         total = sum(
         value
@@ -918,7 +919,7 @@ class IMForceFieldGenerator:
 
             if len(xyz_lines) >= 2 and im_energies is not None:
 
-                xyz_lines[1] += f'Energies  QM: {qm_energies[i]}  IM: {im_energies[i]}  delta_E: {abs(qm_energies[i] - im_energies[i])}'
+                xyz_lines[1] += f'Energies  QM: {qm_energies[i]}  IM: {im_energies[i]}  delta_E: {abs(qm_energies[i] - im_energies[i])} (h)'
 
 
             updated_xyz_string = "\n".join(xyz_lines)
@@ -993,10 +994,6 @@ class IMForceFieldGenerator:
 
         gradient = self.compute_gradient(self.qm_grad_driver, molecule, basis, scf_results)
         hessian = self.compute_hessian(self.qm_hess_driver, molecule, basis)
-
-        natoms = molecule.number_of_atoms()
-        elem = molecule.get_labels()
-        coords = molecule.get_coordinates_in_bohr().reshape(natoms * 3)
 
         impes_coordinate = InterpolationDatapoint(z_matrix)
         impes_coordinate.update_settings(self.interpolation_settings)
