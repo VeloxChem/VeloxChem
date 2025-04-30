@@ -978,6 +978,7 @@ class EvbDriver():
         self.results = results
         self.print_results()
         self.ostream.flush()
+        return self.results
 
     def print_results(self, results: dict = None, file_name: str = None):
         """Print EVB results. Uses the provided dictionary first, then tries to load it from the disk, and last it uses the results attribute of this object.
