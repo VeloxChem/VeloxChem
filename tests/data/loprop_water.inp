@@ -3,7 +3,7 @@ task: pe force field
 @end
 
 @method settings
-basis: 6-31g
+basis: ANO-S-VDZP
 @end
 
 @molecule

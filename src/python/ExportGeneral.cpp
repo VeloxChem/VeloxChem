@@ -40,6 +40,8 @@
 #include "AtomicRadii.hpp"
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
+#include "CpcmUtils.hpp"
+#include "ErrorHandler.hpp"
 #include "OpenMPFunc.hpp"
 #include "Point.hpp"
 #include "SphericalMomentum.hpp"
@@ -220,6 +222,145 @@ export_general(py::module &m) -> void
     m.def("spherical_momentum_d_factors", spher_mom::transformation_factors<2>, "Gets transformation factors for D type spherical momentum.");
     m.def("spherical_momentum_f_factors", spher_mom::transformation_factors<3>, "Gets transformation factors for F type spherical momentum.");
     m.def("spherical_momentum_g_factors", spher_mom::transformation_factors<4>, "Gets transformation factors for G type spherical momentum.");
+
+    // exposing functions from CpcmUtils.hpp
+    m.def("cpcm_local_matrix_A_diagonals",
+          [](const py::array_t<double>& grid_data,
+             const py::array_t<double>& sw_func,
+             const int                  grid_index_start,
+             const int                  grid_index_end) -> py::array_t<double> {
+              std::string errstyle("cpcm_form_matrix_A: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_data.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(sw_func.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2), errstyle);
+              std::string errsize("cpcm_form_matrix_A: Inconsistent sizes");
+              errors::assertMsgCritical(grid_data.shape(0) == sw_func.shape(0), errsize);
+              const auto npoints = static_cast<int>(grid_data.shape(0));
+              const auto ncols = static_cast<int>(grid_data.shape(1));
+              std::string errindex("cpcm_form_matrix_A: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto Adiag = cpcm::local_matrix_A_diagonals(grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data());
+              return vlx_general::pointer_to_numpy(Adiag.data(), {static_cast<int>(Adiag.size())});
+          },
+          "Form local diagonals of C-PCM matrix A.",
+          "grid_data"_a,
+          "sw_func"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a);
+
+    m.def("cpcm_local_matrix_A_dot_vector",
+          [](const py::array_t<double>& grid_data,
+             const py::array_t<double>& sw_func,
+             const py::array_t<double>& vector,
+             const int                  grid_index_start,
+             const int                  grid_index_end) -> py::array_t<double> {
+              std::string errstyle("cpcm_local_matrix_A_dot_vector: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_data.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(sw_func.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(vector.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3), errstyle);
+              std::string errsize("cpcm_local_matrix_A_dot_vector: Inconsistent sizes");
+              errors::assertMsgCritical(grid_data.shape(0) == sw_func.shape(0), errsize);
+              errors::assertMsgCritical(grid_data.shape(0) == vector.shape(0), errsize);
+              const auto npoints = static_cast<int>(grid_data.shape(0));
+              const auto ncols = static_cast<int>(grid_data.shape(1));
+              std::string errindex("cpcm_local_matrix_A_dot_vector: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto prod = cpcm::local_matrix_A_dot_vector(npoints, grid_data.data(), grid_index_start, grid_index_end, ncols, sw_func.data(), vector.data());
+              return vlx_general::pointer_to_numpy(prod.data(), {static_cast<int>(prod.size())});
+          },
+          "Form local product of C-PCM matrix A and a vector.",
+          "grid_data"_a,
+          "sw_func"_a,
+          "vector"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a);
+
+    m.def("cpcm_comp_grad_Aij",
+          [](const py::array_t<double>& grid_coords,
+             const py::array_t<double>& zeta,
+             const py::array_t<int>&    atom_indices,
+             const py::array_t<double>& q,
+             const int                  grid_index_start,
+             const int                  grid_index_end,
+             const int                  natoms) -> py::array_t<double> {
+              std::string errstyle("cpcm_comp_grad_Aij: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_coords.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(zeta.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+              auto        c_style_4 = py::detail::check_flags(q.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+              std::string errsize("cpcm_comp_grad_Aij: Inconsistent sizes");
+              errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
+              const auto npoints = static_cast<int>(grid_coords.shape(0));
+              std::string errindex("cpcm_comp_grad_Aij: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto grad_Amat = cpcm::comp_grad_Aij(grid_coords.data(), zeta.data(), atom_indices.data(), q.data(),
+                                                   grid_index_start, grid_index_end, npoints, natoms);
+              return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
+          },
+          "Compute C-PCM gradient for Aij.",
+          "grid_coords"_a,
+          "zeta"_a,
+          "atom_indices"_a,
+          "q"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a,
+          "natoms"_a);
+
+    m.def("cpcm_comp_grad_Aii",
+          [](const py::array_t<double>& grid_coords,
+             const py::array_t<double>& zeta,
+             const py::array_t<double>& sw_f,
+             const py::array_t<int>&    atom_indices,
+             const py::array_t<double>& q,
+             const int                  grid_index_start,
+             const int                  grid_index_end,
+             const py::array_t<double>& atom_coords,
+             const py::array_t<double>& atom_radii) -> py::array_t<double> {
+              std::string errstyle("cpcm_comp_grad_Aii: Expecting contiguous numpy arrays");
+              auto        c_style_1 = py::detail::check_flags(grid_coords.ptr(), py::array::c_style);
+              auto        c_style_2 = py::detail::check_flags(zeta.ptr(), py::array::c_style);
+              auto        c_style_3 = py::detail::check_flags(sw_f.ptr(), py::array::c_style);
+              auto        c_style_4 = py::detail::check_flags(atom_indices.ptr(), py::array::c_style);
+              auto        c_style_5 = py::detail::check_flags(q.ptr(), py::array::c_style);
+              auto        c_style_6 = py::detail::check_flags(atom_coords.ptr(), py::array::c_style);
+              auto        c_style_7 = py::detail::check_flags(atom_radii.ptr(), py::array::c_style);
+              errors::assertMsgCritical((c_style_1 && c_style_2 && c_style_3 && c_style_4), errstyle);
+              errors::assertMsgCritical((c_style_5 && c_style_6 && c_style_7), errstyle);
+              std::string errsize("cpcm_comp_grad_Aii: Inconsistent sizes");
+              errors::assertMsgCritical(grid_coords.shape(0) == zeta.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == sw_f.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == atom_indices.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(0) == q.shape(0), errsize);
+              errors::assertMsgCritical(grid_coords.shape(1) == 3, errsize);
+              errors::assertMsgCritical(atom_coords.shape(0) == atom_radii.shape(0), errsize);
+              errors::assertMsgCritical(atom_coords.shape(1) == 3, errsize);
+              const auto npoints = static_cast<int>(grid_coords.shape(0));
+              const auto natoms = static_cast<int>(atom_coords.shape(0));
+              std::string errindex("cpcm_comp_grad_Aii: Invalid indices");
+              errors::assertMsgCritical((0 <= grid_index_start) && (grid_index_start < npoints), errindex);
+              errors::assertMsgCritical((0 < grid_index_end) && (grid_index_end <= npoints), errindex);
+              auto grad_Amat = cpcm::comp_grad_Aii(grid_coords.data(), zeta.data(), sw_f.data(), atom_indices.data(), q.data(),
+                                                   atom_coords.data(), atom_radii.data(), grid_index_start, grid_index_end, npoints, natoms);
+              return vlx_general::pointer_to_numpy(grad_Amat.data(), {natoms, 3});
+          },
+          "Compute C-PCM gradient for Aii.",
+          "grid_coords"_a,
+          "zeta"_a,
+          "sw_f"_a,
+          "atom_indices"_a,
+          "q"_a,
+          "grid_index_start"_a,
+          "grid_index_end"_a,
+          "atom_coords"_a,
+          "atom_radii"_a);
 
     // TPoint class
     PyClass<TPoint<double>>(m, "Point")

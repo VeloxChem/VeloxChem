@@ -116,9 +116,11 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
     auto ptr_xcFunctional = &xcFunctional;
 
+    auto ptr_molgrad_threads = &molgrad_threads;
+
 #pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, densityMatrixPointer, \
-                            ptr_twoBodyDensityMatrix, ptr_activeMOs, ptr_xcFunctional, \
+                            ptr_gto_blocks, densityMatrixPointer, ptr_twoBodyDensityMatrix, \
+                            ptr_activeMOs, ptr_xcFunctional, ptr_molgrad_threads, \
                             n_boxes, n_gto_blocks, naos)
     {
 
@@ -423,7 +425,7 @@ integrateVxcPDFTGradientForLDA(const CMolecule&                molecule,
 
             omptimers[thread_id].start("Accumulate gradient");
 
-            auto gatm = molgrad_threads.row(thread_id);
+            auto gatm = ptr_molgrad_threads->row(thread_id);
             
             for (int iatom = 0; iatom < natoms; iatom++)
             {   
@@ -548,9 +550,11 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
     auto ptr_xcFunctional = &xcFunctional;
 
+    auto ptr_molgrad_threads = &molgrad_threads;
+
 #pragma omp parallel shared(ptr_counts, ptr_displacements, xcoords, ycoords, zcoords, \
-                            ptr_gto_blocks, densityMatrixPointer, \
-                            ptr_twoBodyDensityMatrix, ptr_activeMOs, ptr_xcFunctional, \
+                            ptr_gto_blocks, densityMatrixPointer, ptr_twoBodyDensityMatrix, \
+                            ptr_activeMOs, ptr_xcFunctional, ptr_molgrad_threads, \
                             n_boxes, n_gto_blocks, naos)
     {
 
@@ -984,7 +988,7 @@ integrateVxcPDFTGradientForGGA(const CMolecule&                molecule,
 
             omptimers[thread_id].start("Accumulate gradient");
 
-            auto gatm = molgrad_threads.row(thread_id);
+            auto gatm = ptr_molgrad_threads->row(thread_id);
 
             for (int iatom = 0; iatom < natoms; iatom++)
             {

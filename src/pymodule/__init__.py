@@ -67,7 +67,6 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
-from .veloxchemlib import RIFockDriver
 from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
@@ -118,6 +117,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
+from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
