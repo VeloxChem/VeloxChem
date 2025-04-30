@@ -69,7 +69,13 @@ class ExcitedStateAnalysisDriver:
         # output stream
         self.ostream = ostream
 
-    def compute(self, molecule, basis, scf_results, rsp_results, state_index=1):
+    def compute(self,
+                molecule,
+                basis,
+                scf_results,
+                rsp_results,
+                state_index=1,
+                num_core_orbitals=None):
         """
         Computes dictionary containing excited state descriptors for
         excited state nstate.
@@ -85,6 +91,8 @@ class ExcitedStateAnalysisDriver:
         :param state_index:
             The excited state for which the descriptors are
             computed (indexing starts at 1).
+        :param num_core_orbitals:
+            The number of core orbitals for X-ray absorption.
 
         :return:
             A dictionary containing the transition, hole and particle density matrices
@@ -108,7 +116,8 @@ class ExcitedStateAnalysisDriver:
 
         start_time = tm.time()
         dens_dict = self.compute_density_matrices(molecule, scf_results,
-                                                  rsp_results, state_index)
+                                                  rsp_results, state_index,
+                                                  num_core_orbitals)
         tdens_ao = dens_dict['transition_density_matrix_AO']
         ret_dict.update(dens_dict)
         self.ostream.print_info("Density matrices computed in " +
@@ -242,8 +251,12 @@ class ExcitedStateAnalysisDriver:
 
         return molecule, basis
 
-    def compute_density_matrices(self, molecule, scf_results, rsp_results,
-                                 state_index):
+    def compute_density_matrices(self,
+                                 molecule,
+                                 scf_results,
+                                 rsp_results,
+                                 state_index,
+                                 num_core_orbitals=None):
         """
         Computes the transition density matrix (TDM) for state
         nstate in MO and AO basis.
@@ -256,6 +269,8 @@ class ExcitedStateAnalysisDriver:
             The dictionary containing the rsp results.
         :param state_index:
             The excited state for which the TDM is computed.
+        :param num_core_orbitals:
+            The number of core orbitals (in case of X-ray absorption)
 
         :return:
             A tuple containing the transition, particle, and hole
@@ -276,7 +291,13 @@ class ExcitedStateAnalysisDriver:
         excstate = "S" + str(state_index)
         eigvec = rsp_results[excstate]
 
-        nexc = nocc * nvirt
+        if num_core_orbitals is None:
+            nexc = nocc * nvirt
+        else:
+            nocc = num_core_orbitals
+            nexc = nocc * nvirt
+            mo_occ = mo[:, :nocc].copy()
+
         z_mat = eigvec[:nexc]
         if eigvec.shape[0] == nexc:
             tdens_mo = np.reshape(z_mat, (nocc, nvirt))
