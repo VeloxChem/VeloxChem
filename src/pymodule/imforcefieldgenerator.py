@@ -234,6 +234,7 @@ class IMForceFieldGenerator:
         # confirm database quality
         self.dynamics_method = 'IM'
         self.minimize = True
+        self.constraint_minimize = False
         self.nstruc_to_confirm_database_quality = 50
 
         self.interpolation_settings = { 'interpolation_type':self.interpolation_type, 
@@ -263,7 +264,7 @@ class IMForceFieldGenerator:
 
         :param molecule: original molecule
 
-        :param dihedrals_dict: is a list of dihedrals, periodicity, n_sampling that should be scanned during the dynamics
+        :param dihedrals_dict: is a list of dihedrals, n_sampling that should be scanned during the dynamics
 
         """
 
@@ -271,8 +272,7 @@ class IMForceFieldGenerator:
         self.qm_data_points = None
         self.molecule = molecule
         # self.z_matrix = sorted(self.z_matrix, key=len)
-
-
+        
         self.z_matrix = self.define_z_matrix(molecule)
         # Read the database to determine the  
 
@@ -331,12 +331,12 @@ class IMForceFieldGenerator:
 
                         opt_qm_driver = ScfRestrictedDriver()
                         opt_qm_driver.xcfun = 'b3lyp'
-                        reference_dih = key
                         opt_drv = OptimizationDriver(opt_qm_driver)
                         opt_basis = MolecularBasis.read(mol, 'def2-svp')
                         _, scf_results = self.compute_energy(opt_qm_driver, mol, opt_basis)
                         opt_drv.ostream.mute()
-                        if key is not None:
+                        if key is not None and self.constraint_minimize:
+                            reference_dih = key
                             constraint = f"freeze dihedral {reference_dih[0] + 1} {reference_dih[1] + 1} {reference_dih[2] + 1} {reference_dih[3] + 1}"
                             opt_drv.constraints = [constraint]
                         opt_results = opt_drv.compute(mol, opt_basis, scf_results)
@@ -352,7 +352,7 @@ class IMForceFieldGenerator:
         
         for counter, entry in enumerate(self.molecules_along_rp.items()):
             key, molecules = entry
-           
+
             for i, mol in enumerate(molecules):
                 current_dihedral_angle = list(self.allowed_deviation[key].keys())[i]
                 self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)
@@ -365,8 +365,8 @@ class IMForceFieldGenerator:
                 im_database_driver = IMDatabasePointCollecter()
                 im_database_driver.distance_thrsh = self.distance_thrsh
                 im_database_driver.platform = self.platform
-                if not self.minimize:
-                    im_database_driver.optimize = False
+                if self.constraint_minimize:
+                    im_database_driver.optimize = True
                 im_database_driver.system_from_molecule(mol, self.z_matrix, forcefield_generator, solvent=self.solvent, qm_atoms='all')  
                 desiered_point_density = int(self.dynamics_settings['desired_datapoint_density'])
                 desired_density = False
@@ -828,7 +828,7 @@ class IMForceFieldGenerator:
                 print(f'delta E = {diff_E * 4.1840:+.8f} kJ/mol')
                 if diff_E > self.energy_threshold and improve == True:
                     
-                    if self.minimize:
+                    if self.constraint_minimize:
 
                         opt_qm_driver = ScfRestrictedDriver()
                         opt_qm_driver.xcfun = 'b3lyp'

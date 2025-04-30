@@ -224,17 +224,10 @@ class IMDatabasePointCollecter:
         self.molecule = None
 
         # output_file variables that will be written into self.general_variable_output
-        self.gradients = None
-        self.velocities = None
         self.start_velocities = None
         self.coordinates = None
         self.molecules = []
-        self.all_gradients = []
         self.optimize = True
-        
-    
-
-        self.velocities = []
 
         # Default value for the C-H linker distance
         self.linking_atom_distance = 1.0705 
@@ -775,8 +768,6 @@ class IMDatabasePointCollecter:
         self.molecules = []
         openmm_coordinate = self.simulation.context.getState(getPositions=True).getPositions()
         self.coordinates = [openmm_coordinate]
-        self.gradients = []
-        self.velocities = []
 
 
         self.current_state = 0
@@ -1397,9 +1388,7 @@ class IMDatabasePointCollecter:
         
         # The MM subregion is counted as regular MM atoms
         qm_group = set(self.qm_atoms)
-        print('QM Group:', qm_group)
         mm_group = set(range(total_atoms)) - qm_group
-        print('MM Group:', mm_group)
         if not mm_group:
             print('No external MM atoms found in the system')
 
@@ -1517,7 +1506,7 @@ class IMDatabasePointCollecter:
                 self.qm_force_index = i
                 break
 
-    def calculate_translation_coordinates(self, coordinates, rotation_point=None):
+    def calculate_translation_coordinates(self, coordinates):
         """Center the molecule by translating its geometric center to (0, 0, 0)."""
         center = np.mean(coordinates, axis=0)
         translated_coordinates = coordinates - center
@@ -1533,8 +1522,8 @@ class IMDatabasePointCollecter:
                 InterpolationDatapoint object
         """
         # First, translate the cartesian coordinates to zero
-        target_coordinates, center_target = self.calculate_translation_coordinates(coordinate_1)
-        reference_coordinates, center_reference = (
+        target_coordinates, _ = self.calculate_translation_coordinates(coordinate_1)
+        reference_coordinates, _ = (
             self.calculate_translation_coordinates(coordinate_2))
         # Then, determine the rotation matrix which
         # aligns data_point (target_coordinates)
@@ -1706,7 +1695,7 @@ class IMDatabasePointCollecter:
         new_molecule = Molecule(qm_atom_labels, positions_ang, units="angstrom")
         self.unique_molecules.append(new_molecule)
         force = -np.array(gradient) * conversion_factor
-        self.all_gradients.append(gradient)
+        
         ############################################################
         #################### Correlation Check #####################
         ############################################################
@@ -1729,8 +1718,7 @@ class IMDatabasePointCollecter:
 
             openmm_coordinate = context.getState(getPositions=True).getPositions()
             self.coordinates.append(openmm_coordinate)
-            self.velocities.append(context.getState(getVelocities=True).getVelocities())
-            self.gradients.append(gradient)
+
             if self.skipping_value == 0:
                 scanned = False
                 for checked_molecule in self.allowed_molecules:
@@ -1762,13 +1750,12 @@ class IMDatabasePointCollecter:
 
                 context.setPositions(self.coordinates[0])
                 self.coordinates = [self.coordinates[0]]
-                # context.setVelocities(self.velocities[0])
+
                 if self.ensemble in ['NVT', 'NPT']:
 
                     context.setVelocitiesToTemperature(self.temperature)
                 else:
                     context.setVelocities(self.start_velocities)
-                self.velocities = [context.getState(getVelocities=True).getVelocities()]
                 
                 new_positions = context.getState(getPositions=True).getPositions()
                 qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
@@ -1799,7 +1786,6 @@ class IMDatabasePointCollecter:
                 context.setVelocitiesToTemperature(self.temperature)
             else:
                 context.setVelocities(self.start_velocities)
-            self.velocities = [context.getState(getVelocities=True).getVelocities()]
             new_positions = context.getState(getPositions=True).getPositions()
             qm_positions = np.array([new_positions[i].value_in_unit(unit.nanometer) for i in self.qm_atoms])
             positions_ang = (qm_positions) * 10
@@ -1828,10 +1814,8 @@ class IMDatabasePointCollecter:
         potential_energy = self.current_energy
 
         return potential_energy
-    
-    
-    
-        ####################################################################
+        
+    ####################################################################
     ################ Functions to expand the database ##################
     ####################################################################
 
@@ -1900,12 +1884,12 @@ class IMDatabasePointCollecter:
                 optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
                 molecule = optimized_molecule
 
-            self.add_point(molecule, label, qm_energy, self.qm_datafile, current_basis, scf_results=scf_tensors)
+            self.add_point(molecule, label, self.qm_datafile, current_basis)
             self.point_checker = 0
 
 
 
-    def add_point(self, molecule, label, energy, filename, basis=None, scf_results=None):
+    def add_point(self, molecule, label, filename, basis):
         """ Adds a new point to the database.
 
             :param molecule:
