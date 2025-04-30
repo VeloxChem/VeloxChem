@@ -392,8 +392,11 @@ class IMForceFieldGenerator:
                     self.kinetic_energies.extend(im_database_driver.kinetic_energies)
                     self.unique_molecules.extend(im_database_driver.unique_molecules)
 
-            self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)        
-            _ = self.confirm_database_quality(mol, self.imforcefieldfile, basis=basis, given_molecular_strucutres=self.unique_molecules)
+            if len(self.unique_molecules) == 0:
+                print(len(self.unique_molecules) == 0, 'No structures to confirm the quality of the database! Check if the datapoint density is already achieved!')
+            else:
+                self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)        
+                _ = self.confirm_database_quality(mol, self.imforcefieldfile, basis=basis, given_molecular_strucutres=self.unique_molecules)
 
             counter += 1
         
@@ -824,7 +827,7 @@ class IMForceFieldGenerator:
                 diff_E = abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()
                 print(f'\n\n ########## random structure {i} ######### \n')
                 print(f'delta E = {diff_E * 4.1840:+.8f} kJ/mol')
-                if diff_E < self.energy_threshold and improve == True:
+                if diff_E > self.energy_threshold and improve == True:
                     
                     if self.minimize:
 
