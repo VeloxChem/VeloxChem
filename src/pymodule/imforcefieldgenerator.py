@@ -82,15 +82,12 @@ class IMForceFieldGenerator:
         - molecules_along_rp: Represents molecular structures along a predefined reaction path or internal coordinate 
                               pathway.
 
-        - dihedrals: A list of dihedral angles to be rotated or scanned during simulations. Used to determine a pre-
+        - dihedrals_dict: A list of dihedral angles and number of scan steps the angle is rotated or scanned for the database. Used to determine a pre-
                         defined path that should be sampled within the interpolation database construction.
-
-        - sampling_structures: Specifies how many structures to generate around rotatable dihedral angles for database 
-                               population.
 
         - molecule: The initial molecular structure. (This mus be provided by the user)
 
-        - datafile: Represents the database file (interpolation forcefield) used to store molecular structures and data points. 
+        - imforcefieldfile: Represents the database file (interpolation forcefield) used to store molecular structures and data points. 
                     Typically initialized as `im_database.h5`.
 
         - z_matrix: The original Z-matrix (internal coordinate definition) for the molecule, specifying bonds, angles, 
@@ -99,9 +96,6 @@ class IMForceFieldGenerator:
         - allowed_deviation: A threshold for how much a generated or sampled 
                             structure is allowed to deviate from an expected configuration. Ensures structural integrity 
                             during sampling or dynamics.
-
-        - angle_threshold: Defines the range within which dihedral angles can vary during sampling and dynamics.
-                           Making sure the smapling for 1 structure stays within a certain constained space.
 
         - interpolation_settings: A dictionary containing settings for the interpolation.
 
@@ -166,6 +160,9 @@ class IMForceFieldGenerator:
         - dynamics_method: Determines the method to generate molecular structures for the database quality conformation.
         
         - nstruc_to_confirm_database_quality: Number of randomly selected strucutures for the database quality check.
+        
+        - minimize: performing optimizations of all datapoint structures which are added to the database.
+
     """
     
     def __init__(self, qm_driver=None):
@@ -214,7 +211,7 @@ class IMForceFieldGenerator:
         self.ensemble = 'NVE'
         self.timestep = 0.5
         self.friction = 1.0
-        self.nsteps = 1000
+        self.nsteps = 10000
         self.snapshots = self.nsteps
         self.trajectory_file = 'trajectory.pdb'
         self.desired_point_density = 50
@@ -252,7 +249,7 @@ class IMForceFieldGenerator:
                                     'hess_driver': self.qm_hess_driver,
                                     'basis_set_label':None,
                                     'duration':self.duration, 'temperature':self.temperature, 'solvent':self.solvent,
-                                    'pressure':self.force_constant, 'force_constant': self.force_constant, 'ensemble':self.ensemble,
+                                    'pressure':self.pressure, 'force_constant': self.force_constant, 'ensemble':self.ensemble,
                                     'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
                                     'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
                                     'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
@@ -314,7 +311,7 @@ class IMForceFieldGenerator:
                                     'hess_driver': self.qm_hess_driver,
                                     'basis_set_label': basis.get_main_basis_label(),
                                     'duration':self.duration, 'temperature':self.temperature, 'solvent':self.solvent,
-                                    'pressure':self.force_constant, 'force_constant': self.force_constant, 'ensemble':self.ensemble,
+                                    'pressure':self.pressure, 'force_constant': self.force_constant, 'ensemble':self.ensemble,
                                     'timestep': self.timestep, 'nsteps': self.nsteps, 'friction':self.friction,
                                     'snapshots':self.snapshots, 'trajectory_file':self.trajectory_file,
                                     'desired_datapoint_density':self.desired_point_density, 'converged_cycle': self.converged_cycle, 'energy_threshold':self.energy_threshold,
@@ -454,7 +451,7 @@ class IMForceFieldGenerator:
                 rotation_values = np.linspace(0, 360, n_sampling, endpoint=False)
 
                 sampled_molecules[specific_dihedral] = []
-                normalized_angle = (360) / (2 * n_sampling) #+ (180/periodicity)) % (360/periodicity)) - 180/periodicity
+                normalized_angle = (360) / (2 * n_sampling)
 
                 allowed_deviation[specific_dihedral] = {rotation_values[i]: (
                                                         (rotation_values[i] - normalized_angle)%360.0,
@@ -827,7 +824,29 @@ class IMForceFieldGenerator:
                 diff_E = abs(qm_energies[-1] - im_energies[-1]) * hartree_in_kcalpermol()
                 print(f'\n\n ########## random structure {i} ######### \n')
                 print(f'delta E = {diff_E * 4.1840:+.8f} kJ/mol')
-                if diff_E > self.energy_threshold and improve == True:
+                if diff_E < self.energy_threshold and improve == True:
+                    
+                    if self.minimize:
+
+                        opt_qm_driver = ScfRestrictedDriver()
+                        opt_qm_driver.xcfun = 'b3lyp'
+     
+                        opt_drv = OptimizationDriver(opt_qm_driver)
+                        current_basis = MolecularBasis.read(mol, 'def2-svp')
+                        _, scf_results = self.compute_energy(opt_qm_driver, mol, current_basis)
+                        opt_drv.ostream.mute()
+                        if self.dihedrals_dict is not None:
+                            constraints = []
+                            for entry in self.dihedrals_dict:
+                                reference_dih = entry[0]
+                                constraint = f"freeze dihedral {reference_dih[0] + 1} {reference_dih[1] + 1} {reference_dih[2] + 1} {reference_dih[3] + 1}"
+                                constraints.append(constraint)
+
+                            opt_drv.constraints = constraints
+                        opt_results = opt_drv.compute(mol, current_basis, scf_results)
+                        optimized_molecule = Molecule.from_xyz_string(opt_results['final_geometry'])
+                        mol = optimized_molecule
+                    
                     labels = []
                     labels.append("point_{0}".format((len(sorted_labels) + 1)))
                     self.add_point(mol, imforcefieldfile, current_basis)
