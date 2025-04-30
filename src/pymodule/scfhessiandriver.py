@@ -522,7 +522,7 @@ class ScfHessianDriver(HessianDriver):
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
 
         # TODO: use alternative way to partition atoms
-        if atom_pairs is None
+        if atom_pairs is None:
             atoms = list(range(natm))
         local_atoms = atoms[self.rank::self.nodes]
 

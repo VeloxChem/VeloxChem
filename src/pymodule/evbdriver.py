@@ -243,7 +243,6 @@ class EvbDriver():
         reactant_charge: int | list[int] = 0,
         product_charge: int | list[int] = 0,
         reactant_multiplicity: int | list[int] = 1,
-        reactant_multiplicity: int | list[int] = 1,
         product_multiplicity: int | list[int] = 1,
         reparameterize: bool = True,
         optimize: bool = False,
