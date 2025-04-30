@@ -87,6 +87,17 @@ class CRIFockDriver
                  const std::vector<double>& gvector,
                  const std::string &label) const -> CMatrix;
     
+    /// @brief Computes Fock matrix for given density.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis.
+    /// @param molorbs The matrix with occupied molecular orbitals.
+    /// @param label The label of Fock matrix type.
+    /// @return The Fock matrix.
+    auto compute(const CMolecule&        molecule,
+                 const CMolecularBasis&  basis,
+                 const CSubMatrix&       molorbs,
+                 const std::string&      label) const -> CMatrix;
+    
     /// @brief Computes local Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @param gvector The Gamma vector.

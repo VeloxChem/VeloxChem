@@ -1,6 +1,7 @@
 #include "RIFockDriver.hpp"
 
 #include "ThreeCenterElectronRepulsionDriver.hpp"
+#include "MatrixFunc.hpp"
 
 #include <iostream>
 
@@ -116,6 +117,59 @@ CRIFockDriver::local_compute(const CMatrix&             density,
     }
     
     return fmat;
+}
+
+auto
+CRIFockDriver::compute(const CMolecule&        molecule,
+                       const CMolecularBasis&  basis,
+                       const CSubMatrix&       molorbs,
+                       const std::string&      label) const -> CMatrix
+{
+    // set up exchange matrix
+
+    auto exc_mat = matfunc::make_matrix(basis, mat_t::symmetric);
+    
+    // set up dimensions
+    
+    const auto nmos = molorbs.number_of_columns();
+    
+    const auto naos = molorbs.number_of_rows();
+    
+    const auto ndim = _eri_buffer.aux_width();
+    
+    const auto nelems = naos * (naos + 1) / 2;
+    
+    // compute B^Q_it matrices
+    
+    auto bmats = compute_bq_matrices(molorbs);
+    
+    // contract B^Q_it matrices to exchange matrix
+    
+    std::vector<double> exc_values(nelems, 0.0);
+    
+    for (size_t i = 0; i < ndim; i++)
+    {
+        auto bmat = bmats.data(i);
+        
+        for (size_t j = 0; j < naos; j++)
+        {
+            for (size_t k = j; k < naos; k++)
+            {
+                double fsum = 0;
+                
+                for (size_t l = 0; l < nmos; l++)
+                {
+                    fsum += bmat[l * naos + j] * bmat[l * naos + k];
+                }
+                
+                exc_values[mathfunc::uplo_rm_index(j, k, naos)] = fsum;
+            }
+        }
+    }
+    
+    exc_mat.assign_flat_values(exc_values);
+    
+    return exc_mat;
 }
 
 auto

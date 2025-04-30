@@ -59,7 +59,7 @@ class TestRIKDriver:
             H     2.852229840507    2.147373554317    0.886283579224
         """
         molecule = Molecule.read_xyz_string(xyz_string)
-        basis = MolecularBasis.read(molecule, 'def2-qzvp', ostream=None)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         aux_basis = MolecularBasis.read(molecule, 'def2-universal-jkfit')
 
         # carry out reference scf
