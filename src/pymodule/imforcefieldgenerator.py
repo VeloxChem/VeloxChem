@@ -358,7 +358,7 @@ class IMForceFieldGenerator:
                 self.density_of_datapoints = self.determine_datapoint_density(self.density_of_datapoints, self.imforcefieldfile)
             
                 forcefield_generator = MMForceFieldGenerator()
-                self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}.pdb'
+                self.dynamics_settings['trajectory_file'] = f'trajectory_{counter}_{i}.pdb'
                 
                 forcefield_generator.create_topology(mol)
                     
